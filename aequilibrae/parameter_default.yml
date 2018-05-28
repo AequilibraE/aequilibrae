@@ -1,0 +1,19 @@
+assignment:
+  Equilibrium:
+    rgap: 1.0e-03
+distribution:
+  gravity:
+    max error: 0.0001
+    max iterations: 100
+    max trip length: -1  # negative number means no limit
+  ipf:
+    balancing tolerance: 0.001
+    convergence level: 0.0001
+    max iterations: 5000
+system:
+  cpus: 4
+  default_directory: /media/pedro/LargeDrive/GOOGLE_DRIVES/UCI/DATA/Pedro/AequilibraE testing data/Assignment
+  temp directory: /temp
+  driving side: left
+  logging: true
+  report zeros: 1

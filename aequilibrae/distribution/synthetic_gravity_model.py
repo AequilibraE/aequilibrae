@@ -1,0 +1,88 @@
+"""
+-----------------------------------------------------------------------------------------------------------
+ Package:    AequilibraE
+
+ Name:      Synthetic gravity model class
+ Purpose:    Implementing a class object to represent synthetic gravity models
+
+ Original Author:  Pedro Camargo (c@margo.co)
+ Contributors:
+ Last edited by: Pedro Camargo
+
+ Website:    www.AequilibraE.com
+ Repository:  https://github.com/AequilibraE/AequilibraE
+
+ Created:    2017-08-11
+ Updated:
+ Copyright:   (c) AequilibraE authors
+ Licence:     See LICENSE.TXT
+ -----------------------------------------------------------------------------------------------------------
+ """
+import yaml
+
+valid_functions = ['EXPO', 'GAMMA', 'POWER']
+members = ['function', 'alpha', 'beta']
+model_type = 'SyntheticGravityModel'
+
+
+class SyntheticGravityModel:
+    def __init__(self):
+        self.function = None
+        self.alpha = None
+        self.beta = None
+
+    def __setattr__(self, key, value):
+        if value is None and key in ['function', 'alpha', 'beta']:
+            self.__dict__[key] = value
+        else:
+            if key == 'function':
+                self.alpha = None
+                self.beta = None
+                if value not in self.valid_functions:
+                    raise ValueError('Function needs to be one of these: ' + ', '.join(self.valid_functions))
+            else:
+                if isinstance(value, float) or isinstance(value, int):
+                    if key == 'alpha':
+                        if self.__dict__.get("function") == 'EXPO':
+                            raise ValueError('Exponential function does not have an alpha parameter')
+
+                    if key == 'beta':
+                        if self.function == 'POWER':
+                            raise ValueError('Inverse power function does not have a beta parameter')
+                else:
+                    raise ValueError('Parameter needs to be numeric')
+
+            self.__dict__[key] = value
+
+    def __getattr__(self, key):
+        if key == 'valid_functions':
+            return valid_functions
+        elif key == 'members':
+            return members
+        elif key == 'model_type':
+            return model_type
+        else:
+            return self.__dict__[key]
+
+    def load(self, file_name):
+        try:
+            model = yaml.safe_load(open(file_name, 'r'))[self.model_type]
+            for key, value in model.iteritems():
+                if key in self.members:
+                    self.__dict__[key] = value
+                else:
+                    raise ValueError('Model has unknown parameters: ' + str(key))
+        except:
+            raise ValueError('File provided is not a valid Synthetic Gravity Model')
+
+    def save(self, file_name):
+        filename = str(file_name)
+        if file_name[-4:].upper() != '.MOD':
+            file_name += '.mod'
+
+        model = {model_type:
+                     {'function': self.function,
+                      'alpha': self.alpha,
+                      'beta': self.beta}}
+
+        yaml.dump(model, open(file_name, 'w'), default_flow_style=False)

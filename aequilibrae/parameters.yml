@@ -1,0 +1,19 @@
+assignment:
+  Equilibrium:
+    rgap: 1.0e-03
+distribution:
+  gravity:
+    max error: 0.0001
+    max iterations: 100
+    max trip length: -1
+  ipf:
+    balancing tolerance: 0.001
+    convergence level: 0.0001
+    max iterations: 5000
+system:
+  cpus: 8
+  default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
+  driving side: right
+  logging: true
+  report zeros: 1
+  temp directory: /temp
