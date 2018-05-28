@@ -1,14 +1,16 @@
 
-# Created by https://www.gitignore.io/api/jetbrains
-
-### JetBrains ###
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and Webstorm
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
 # User-specific stuff:
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/dictionaries
+
+.idea/aequilibrae.iml
+.idea/pyquilibrae.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+
 
 # Sensitive or high-churn files:
 .idea/**/dataSources/
@@ -26,8 +28,6 @@
 # CMake
 cmake-build-debug/
 
-# Mongo Explorer plugin:
-.idea/**/mongoSettings.xml
 
 ## File-based project format:
 *.iws
@@ -43,11 +43,6 @@ cmake-build-debug/
 # JIRA plugin
 atlassian-ide-plugin.xml
 
-# Cursive Clojure plugin
-.idea/replstate.xml
-
-# Ruby plugin and RubyMine
-/.rakeTasks
 
 # Crashlytics plugin (for Android Studio and IntelliJ)
 com_crashlytics_export_strings.xml
@@ -55,16 +50,11 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
-### JetBrains Patch ###
-# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
-
-# *.iml
-# modules.xml
-# .idea/misc.xml
-# *.ipr
-
 # Sonarlint plugin
 .idea/sonarlint
 
-
-# End of https://www.gitignore.io/api/jetbrains
+# Build of plugin
+aequilibrae/paths/AoN.pyd
+aequilibrae/paths/basic_path_finding.html
+aequilibrae/paths/parameters.html
+aequilibrae/paths/build/*
