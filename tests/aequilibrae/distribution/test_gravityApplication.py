@@ -7,10 +7,9 @@ import os
 
 zones = 10
 
-
 # row vector
 args = {'entries': zones,
-        'field_names': ['rows'],
+        'field_names': [u'rows'],
         'data_types': [np.float64],
         'memory_mode': True}
 
@@ -26,9 +25,8 @@ column_vector.create_empty(**args)
 column_vector.index[:] = np.arange(column_vector.entries) + 100
 column_vector.columns[:] = column_vector.index[:] + np.random.rand(zones)[:]
 
-
 # balance vectors
-column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum()/column_vector.columns.sum())
+column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
 
 # Impedance matrix_procedures
 name_test = os.path.join(tempfile.gettempdir(), 'aequilibrae_matrix_test.aem')
@@ -41,7 +39,7 @@ matrix = AequilibraeMatrix()
 matrix.create_empty(**args)
 
 # randoms = np.random.randint(5, size=(2, 4))
-matrix.impedance[:, :] = np.random.rand(zones, zones)[:,:]
+matrix.impedance[:, :] = np.random.rand(zones, zones)[:, :]
 matrix.index[:] = np.arange(matrix.zones) + 100
 matrix.computational_view(['impedance'])
 
@@ -58,6 +56,7 @@ model_power = SyntheticGravityModel()
 model_power.function = 'POWER'
 model_power.alpha = -0.2
 
+
 class TestGravityApplication(TestCase):
     def test_apply(self):
         args = {'impedance': matrix,
@@ -66,7 +65,7 @@ class TestGravityApplication(TestCase):
                 'columns': column_vector,
                 'column_field': 'columns'}
 
-        models = [('EXPO', model_expo),('POWER', model_power), ('GAMMA', model_gamma)]
+        models = [('EXPO', model_expo), ('POWER', model_power), ('GAMMA', model_gamma)]
 
         for model_name, model_obj in models:
             args['model'] = model_obj
@@ -75,6 +74,3 @@ class TestGravityApplication(TestCase):
 
             if distributed_matrix.gap > distributed_matrix.parameters['convergence level']:
                 self.fail('Gravity application did not converge for model ' + model_name)
-
-
-

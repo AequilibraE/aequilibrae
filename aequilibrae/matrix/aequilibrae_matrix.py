@@ -140,7 +140,7 @@ class AequilibraeMatrix(object):
             else:
                 raise Exception('Matrix names need to be provided as a list')
 
-        self.names = [x.encode('utf-8') for x in matrix_names]
+        self.names = [x for x in matrix_names]
         self.cores = len(self.names)
         if None not in [self.file_path, self.zones]:
             self.__write__()

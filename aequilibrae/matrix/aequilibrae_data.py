@@ -95,7 +95,7 @@ class AequilibraEData(object):
             self.num_fields = len(self.fields)
 
             dtype = [('index', self.aeq_index_type)]
-            dtype.extend([(self.fields[i].encode('utf-8'), self.data_types[i]) for i in range(self.num_fields)])
+            dtype.extend([(self.fields[i], self.data_types[i]) for i in range(self.num_fields)])
 
             # the file
             if self.memory_mode:
