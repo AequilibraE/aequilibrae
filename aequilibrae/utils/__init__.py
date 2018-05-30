@@ -1,1 +1,1 @@
-from worker_thread import WorkerThread
+from .worker_thread import WorkerThread

@@ -13,8 +13,7 @@ from ...utils import WorkerThread
 from ...parameters import Parameters
 
 try:
-    from PyQt4.QtCore import SIGNAL
-
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
     pyqt = True
 except:
     pyqt = False
@@ -51,7 +50,7 @@ class create_gtfsdb(WorkerThread):
             zip_container = zipfile.ZipFile(self.source_path)
             ret = zip_container.testzip()
             if ret is not None:
-                print "First bad file in zip: %s" % ret
+                raise ValueError("First bad file in zip: %s" % ret)
             else:
                 self.source = "zip"
         elif os.path.isdir(self.source_path):

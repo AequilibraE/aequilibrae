@@ -6,23 +6,20 @@ Core AequilibraE
 Imports aequilibrae modules
 
 """
-
-name = "aequilibrae"
-
 import sys
-
 sys.dont_write_bytecode = True
 
+from . import utils
 from . import paths
 from . import distribution
 from . import matrix
-from . import utils
 from . import transit
-import reserved_fields
-from parameters import Parameters
+from . import reserved_fields
+from .parameters import Parameters
 from .reference_files import spatialite_database
+name = "aequilibrae"
 
-from parameters import Parameters
+from .parameters import Parameters
 import logging
 import tempfile
 import os

@@ -31,8 +31,8 @@ import numpy as np
 import yaml
 import os
 import tempfile
-from ipf import Ipf
-from synthetic_gravity_model import SyntheticGravityModel
+from .ipf import Ipf
+from .synthetic_gravity_model import SyntheticGravityModel
 from ..matrix import AequilibraeMatrix, AequilibraEData
 from time import clock
 from ..parameters import Parameters

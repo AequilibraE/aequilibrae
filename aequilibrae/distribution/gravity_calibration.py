@@ -27,7 +27,7 @@
 
 import sys, os
 from time import clock, strftime, gmtime
-from gravity_application import GravityApplication, SyntheticGravityModel
+from .gravity_application import GravityApplication, SyntheticGravityModel
 from ..matrix import AequilibraeMatrix, AequilibraEData
 import numpy as np
 import sys

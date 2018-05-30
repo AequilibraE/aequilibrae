@@ -101,7 +101,7 @@ class AequilibraeMatrix(object):
         # Matrix compression still not supported
         if compressed:
             compressed = False
-            print 'Matrix compression not yet supported'
+            raise Warning('Matrix compression not yet supported')
 
         if compressed:
             self.compressed = COMPRESSED

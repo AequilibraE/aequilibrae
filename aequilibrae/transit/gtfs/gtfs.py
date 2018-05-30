@@ -2,11 +2,11 @@ import numpy as np
 import os
 from collections import OrderedDict
 import codecs
-from agency import Agency
-from calendar_dates import CalendarDates
-from stop import Stop
-from route import Route
-from gtfs_sqlite_db import create_gtfsdb
+from .agency import Agency
+from .calendar_dates import CalendarDates
+from .stop import Stop
+from .route import Route
+from .gtfs_sqlite_db import create_gtfsdb
 import copy
 
 class GTFS:

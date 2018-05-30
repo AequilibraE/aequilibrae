@@ -55,15 +55,15 @@ class TestIpf(TestCase):
 
         result = fratar.output
         if (np.nansum(result.matrix_view) - np.nansum(row_vector.data['rows'])) > 0.001:
-            print fratar.gap
+            print (fratar.gap)
             for f in fratar.report:
-                print f
+                print (f)
             self.fail('Ipf did not converge')
 
         if fratar.gap > fratar.parameters['convergence level']:
-            print fratar.gap
+            print (fratar.gap)
             for f in fratar.report:
-                print f
+                print (f)
             self.fail('Ipf did not converge')
 
 

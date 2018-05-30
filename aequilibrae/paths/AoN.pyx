@@ -27,7 +27,7 @@ cimport numpy as np
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 from libc.stdlib cimport abort, malloc, free
-from __version__ import binary_version as VERSION_COMPILED
+from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1

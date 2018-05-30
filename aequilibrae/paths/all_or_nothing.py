@@ -23,15 +23,15 @@ import sys
 sys.dont_write_bytecode = True
 
 import numpy as np
-import thread
+from threading import Thread as thread
 from multiprocessing.dummy import Pool as ThreadPool
 try:
-    from PyQt4.QtCore import SIGNAL
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
     pyqt = True
 except:
     pyqt = False
 
-from multi_threaded_aon import MultiThreadedAoN
+from .multi_threaded_aon import MultiThreadedAoN
 try:
     from AoN import one_to_all, path_computation
 except:

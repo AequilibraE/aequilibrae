@@ -27,10 +27,10 @@
 
 import numpy as np
 import os, csv
-import cPickle
+import pickle
 from datetime import datetime
 import uuid
-from __version__ import binary_version as VERSION
+from .__version__ import binary_version as VERSION
 
 
 
@@ -600,10 +600,10 @@ class Graph:
         mygraph['graph_id'] = self.__id__
         mygraph['graph_version'] = self.__version__
 
-        cPickle.dump(mygraph, open(filename, 'wb'))
+        pickle.dump(mygraph, open(filename, 'wb'))
 
     def load_from_disk(self, filename):
-        mygraph = cPickle.load(open(filename, 'rb'))
+        mygraph = pickle.load(open(filename, 'rb'))
         self.description = mygraph['description']
         self.num_links = mygraph['num_links']
         self.num_nodes = mygraph['num_nodes']
@@ -739,6 +739,6 @@ def logger(message):
         o = open(debug_file, 'a')
     if type(message) in [list, tuple, dict]:
         message = str(message)
-    print >>o, message
+    o.write(message)
     o.flush()
     o.close()
