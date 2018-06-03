@@ -151,7 +151,7 @@ class AequilibraEData(object):
         if file_type == '.csv':
             fmt = "%d"
             for dt in self.data_types:
-                if np.issubdtype(dt, np.float):
+                if np.issubdtype(dt, np.floating):
                     fmt += ',%f'
                 elif np.issubdtype(dt, np.integer):
                     fmt += ',%d'

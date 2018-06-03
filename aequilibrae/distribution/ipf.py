@@ -19,6 +19,7 @@
  -----------------------------------------------------------------------------------------------------------
 """
 import sys
+
 sys.dont_write_bytecode = True
 
 import numpy as np
@@ -27,6 +28,7 @@ import yaml
 from time import clock
 from ..matrix import AequilibraeMatrix, AequilibraEData
 import uuid, tempfile
+
 
 class Ipf:
     def __init__(self, **kwargs):
@@ -50,7 +52,7 @@ class Ipf:
 
         self.output = None
         self.error = None
-        self.__required_parameters=['convergence level', 'max iterations', 'balancing tolerance']
+        self.__required_parameters = ['convergence level', 'max iterations', 'balancing tolerance']
         self.error_free = True
         self.report = ['  #####    IPF computation    #####  ', '']
         self.gap = None
@@ -70,13 +72,13 @@ class Ipf:
             raise TypeError('Seed matrix needs to be an instance of AequilibraEMatrix')
 
         # Check data type
-        if not np.issubdtype(self.matrix.dtype, np.float):
+        if not np.issubdtype(self.matrix.dtype, np.floating):
             raise ValueError('Seed matrix need to be a float type')
 
-        if not np.issubdtype(self.rows.data[self.row_field].dtype, np.float):
+        if not np.issubdtype(self.rows.data[self.row_field].dtype, np.floating):
             raise ValueError('production/rows vector must be a float type')
 
-        if not np.issubdtype(self.columns.data[self.column_field].dtype, np.float):
+        if not np.issubdtype(self.columns.data[self.column_field].dtype, np.floating):
             raise ValueError('Attraction/columns vector must be a float type')
 
         # Check data dimensions
@@ -102,14 +104,14 @@ class Ipf:
             else:
                 # guarantees that they are precisely balanced
                 self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (
-                    sum_rows / sum_cols)
+                        sum_rows / sum_cols)
 
         if self.error is not None:
             self.error_free = False
 
     def check_parameters(self):
         for i in self.__required_parameters:
-            if i not in  self.parameters:
+            if i not in self.parameters:
                 self.error = 'Parameters error. It needs to be a dictionary with the following keys: '
                 for t in self.__required_parameters:
                     self.error = self.error + t + ', '
@@ -124,7 +126,7 @@ class Ipf:
 
             self.output = self.matrix.copy(self.output_name)
             if self.nan_as_zero:
-                self.output.matrix_view[:,:] = np.nan_to_num(self.output.matrix_view)[:,:]
+                self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
             rows = self.rows.data[self.row_field]
             columns = self.columns.data[self.column_field]
@@ -147,27 +149,28 @@ class Ipf:
             while self.gap > conv_criteria and iter < max_iter:
                 iter += 1
                 # computes factors for zones
-                marg_rows = self.tot_rows(self.output.matrix_view[:,:])
+                marg_rows = self.tot_rows(self.output.matrix_view[:, :])
                 row_factor = self.factor(marg_rows, rows)
                 # applies factor
-                self.output.matrix_view[:,:] = np.transpose(np.transpose(self.output.matrix_view[:,:]) *
-                                                                    np.transpose(row_factor))[:, :]
+                self.output.matrix_view[:, :] = np.transpose(np.transpose(self.output.matrix_view[:, :]) *
+                                                             np.transpose(row_factor))[:, :]
 
                 # computes factors for columns
-                marg_cols = self.tot_columns(self.output.matrix_view[:,:])
+                marg_cols = self.tot_columns(self.output.matrix_view[:, :])
                 column_factor = self.factor(marg_cols, columns)
 
                 # applies factor
-                self.output.matrix_view[:,:] = self.output.matrix_view[:,:] * column_factor
+                self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
 
                 # increments iterarions and computes errors
                 self.gap = max(abs(1 - np.min(row_factor)), abs(np.max(row_factor) - 1), abs(1 - np.min(column_factor)),
-                            abs(np.max(column_factor) - 1))
+                               abs(np.max(column_factor) - 1))
 
                 self.report.append(str(iter) + '   ,   ' + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append('')
-            self.report.append('Running time: ' + str("{:4,.3f}".format(clock()-t)) + 's')
+            self.report.append('Running time: ' + str("{:4,.3f}".format(clock() - t)) + 's')
+
     def tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)
 

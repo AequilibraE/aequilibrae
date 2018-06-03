@@ -34,11 +34,13 @@ import sys
 import yaml
 from ..parameters import Parameters
 
+
 class GravityCalibration:
     """"
         where function is: 'EXPO' or 'POWER'. 'GAMMA' and 'FRICTION FACTORS' to be implemented at a later time
         parameters are: 'max trip length'
         """
+
     def __init__(self, **kwargs):
 
         self.__required_parameters = ['max trip length', 'max iterations', 'max error']
@@ -73,7 +75,7 @@ class GravityCalibration:
         self.report.append('Functional form: ' + deterrence_function)
         self.model = SyntheticGravityModel()
         if deterrence_function not in self.model.valid_functions:
-            raise ValueError ('Function needs to be one of these: ' + ', '.join(self.model.valid_functions))
+            raise ValueError('Function needs to be one of these: ' + ', '.join(self.model.valid_functions))
         else:
             self.model.function = deterrence_function
 
@@ -92,7 +94,6 @@ class GravityCalibration:
         self.max_iter = self.parameters['max iterations']
         self.max_error = self.parameters['max error']
 
-
         # Check the inputs
         self.check_inputs()
         if self.model.function in ["EXPO", "POWER"]:
@@ -102,10 +103,10 @@ class GravityCalibration:
             if max_cost > 0:
                 a = (self.impedance.matrix[self.impedance_core][:, :] < max_cost).astype(int)
 
-            #weighted average cost
+            # weighted average cost
             self.report.append('Iteration: 1')
-            cstar = np.nansum(self.impedance.matrix[self.impedance_core][:,:] * self.result_matrix.gravity[:, :]  * a) / \
-                    np.nansum(self.result_matrix.gravity[:, :]  * a)
+            cstar = np.nansum(self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :] * a) / \
+                    np.nansum(self.result_matrix.gravity[:, :] * a)
 
             b0 = 1 / cstar
 
@@ -125,7 +126,7 @@ class GravityCalibration:
             cm = self.apply_gravity()
             for i in self.gravity.report:
                 self.report.append('       ' + i)
-            self.report.append('Error: ' +  "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
+            self.report.append('Error: ' + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
             self.report.append('')
             cm1 = c0
 
@@ -151,14 +152,15 @@ class GravityCalibration:
             self.itera += 1
 
         if self.itera == self.max_iter:
-            self.report.append("DID NOT CONVERGE. Stopped in  " + str(self.itera) + "  with a global error of " + str(self.gap))
+            self.report.append(
+                "DID NOT CONVERGE. Stopped in  " + str(self.itera) + "  with a global error of " + str(self.gap))
         else:
             self.report.append("Converged in " + str(self.itera) + "  iterations to a global error of " + str(self.gap))
         s = clock() - t
         m, s1 = divmod(s, 60)
         s -= m * 60
         h, m = divmod(m, 60)
-        t =  "%d:%02d:%2.4f" % (h, m, s)
+        t = "%d:%02d:%2.4f" % (h, m, s)
 
         self.report.append('Running time: ' + t)
 
@@ -208,7 +210,6 @@ class GravityCalibration:
         self.columns.index[:] = self.matrix.index[:]
         self.columns.columns[:] = self.matrix.columns()[:]
 
-
         self.impedance_core = self.impedance.view_names[0]
 
     def apply_gravity(self):
@@ -225,7 +226,7 @@ class GravityCalibration:
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 
-        return np.nansum(self.impedance.matrix[self.impedance_core][:,:] * self.result_matrix.gravity[:, :]) \
+        return np.nansum(self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :]) \
                / np.nansum(self.result_matrix.gravity[:, :])
 
     def get_parameters(self):

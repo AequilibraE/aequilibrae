@@ -1,20 +1,20 @@
-import os, sys
-from unittest import TestCase
+import os
+import sys
+import unittest
 from aequilibrae.paths import Graph
 from aequilibrae.paths.results import SkimResults
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import skimming_single_origin
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 import numpy as np
-from parameters_test import centroids
+from .parameters_test import centroids
 
 # Adds the folder with the data to the path and collects the paths to the files
-lib_path = os.path.abspath(os.path.join('..', '../tests'))
-sys.path.append(lib_path)
-from data import path_test, test_graph
+# lib_path = os.path.abspath(os.path.join('..', '../tests'))
+# sys.path.append(lib_path)
+from ...data import path_test, test_graph
 
 
-class TestSkimming_single_origin(TestCase):
+class TestSkimming_single_origin(unittest.TestCase):
     def test_skimming_single_origin(self):
 
         origin = 1

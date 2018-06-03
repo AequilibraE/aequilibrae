@@ -1,6 +1,8 @@
 import sqlite3
 from collections import OrderedDict
-import os, shutil
+import os
+import shutil
+import io
 import numpy as np
 import codecs
 import copy
@@ -14,6 +16,7 @@ from ...parameters import Parameters
 
 try:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
+
     pyqt = True
 except:
     pyqt = False
@@ -22,6 +25,8 @@ except:
 # TODO : Add control for mandatory and optional files
 # TODO: Add constraints for non-negative and limited options (0,1,2, etc) for fields through foreign keys
 class create_gtfsdb(WorkerThread):
+    converting_gtfs = SIGNAL(object)
+
     def __init__(self, file_path, save_db, memory_db=False, spatialite_enabled=False, overwrite=False):
         WorkerThread.__init__(self, None)
         self.conn = None
@@ -39,8 +44,7 @@ class create_gtfsdb(WorkerThread):
         log_level = Parameters().parameters['system']['logging']
         if isinstance(log_level, str):
             log_level = log_level.upper()
-        if log_level in logging._levelNames.keys():
-            self.logger.setLevel(log_level)
+        self.logger.setLevel(log_level)
 
         self.logger.info('Starting GTFS import')
         self.logger.info("      " + self.source_path)
@@ -210,34 +214,35 @@ class create_gtfsdb(WorkerThread):
         # In case we have not create the database yet
         if self.conn is None:
             if pyqt:
-                self.emit(SIGNAL("converting_gtfs"), ['text', 'Creating container database'])
+                self.converting_gtfs.emit(['text', 'Creating container database'])
             self.create_database()
 
         # Import all tables to SQLITE
         tables = [x.split('.')[0] for x in self.column_order.keys()]
         if self.spatialite_enabled:
-            self.emit(SIGNAL("converting_gtfs"), ['total files', 16])
+            self.converting_gtfs.emit(['total files', 16])
         else:
-            self.emit(SIGNAL("converting_gtfs"), ['total files', 14])
+            self.converting_gtfs.emit(['total files', 14])
 
         for i, tbl in enumerate(tables):
             if pyqt:
-                self.emit(SIGNAL("converting_gtfs"), ['text', 'Loading data from file: ' + tbl])
+                self.converting_gtfs.emit(['text', 'Loading data from file: ' + tbl])
             self.logger.info('      loading table ' + tbl)
             self.__load_tables(tbl)
             if pyqt:
-                self.emit(SIGNAL("converting_gtfs"), ['files counter', i + 1])
+                self.converting_gtfs.emit(['files counter', i + 1])
 
         # Creates the geometry
         if self.spatialite_enabled:
             self.__create_geometry()
         self.conn.commit()
         self.conn.close()
-        self.emit(SIGNAL("converting_gtfs"), ['finished_threaded_procedure', 0])
+        self.converting_gtfs.emit(['finished_threaded_procedure', 0])
 
     def create_database(self):
         if pyqt:
-            self.emit(SIGNAL("converting_gtfs"), ['text', 'Creating empty database'])
+            self.converting_gtfs.emit(['text', 'Creating empty database'])
+            # self.converting_gtfs.emit(SIGNAL("converting_gtfs"), ['text', 'Creating empty database'])
 
         if self.spatialite_enabled:
             shutil.copy(spatialite_database, self.save_db)
@@ -453,9 +458,10 @@ class create_gtfsdb(WorkerThread):
             else:
                 data_file = open(data_file, 'r')
         else:
-            zip_container = zipfile.ZipFile(self.source_path)
+            zip_container = zipfile.ZipFile(self.source_path, 'r')
             if file_to_open in zip_container.namelist():
                 data_file = zip_container.open(file_to_open, 'r')
+                data_file = io.TextIOWrapper(data_file)
             else:
                 self.available_files[file_to_open] = False
                 self.logger.warning('          Table ' + table_name + ' not available')
@@ -486,7 +492,7 @@ class create_gtfsdb(WorkerThread):
     def __create_geometry(self):
         # enable extension loading
         self.conn.enable_load_extension(True)
-        self.cursor.execute("SELECT load_extension('mod_spatialite')")
+        self.cursor.execute("SELECT load_extension('mod_spatialite.so')")
         self.conn.commit()
         # We need to create three things here:
         # 1. A geometry column in the stops table
@@ -495,8 +501,8 @@ class create_gtfsdb(WorkerThread):
 
         # 1
         if pyqt:
-            self.emit(SIGNAL("converting_gtfs"), ['text', "Creating stops' geometry"])
-            self.emit(SIGNAL("converting_gtfs"), ['files counter', 14])
+            self.converting_gtfs.emit(['text', "Creating stops' geometry"])
+            self.converting_gtfs.emit(['files counter', 14])
 
         self.cursor.execute("SELECT AddGeometryColumn( 'stops', 'geometry', 4326, 'POINT', 'XY' );")
         self.cursor.execute("update stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);")
@@ -504,8 +510,8 @@ class create_gtfsdb(WorkerThread):
 
         # 2
         if pyqt:
-            self.emit(SIGNAL("converting_gtfs"), ['text', "Creating routes' geometry"])
-            self.emit(SIGNAL("converting_gtfs"), ['files counter', 15])
+            self.converting_gtfs.emit(['text', "Creating routes' geometry"])
+            self.converting_gtfs.emit(['files counter', 15])
         # We create the table to hold the shapes for each route
         self.cursor.execute('DROP TABLE IF EXISTS shape_routes')
         # TODO: Add foreign key to calendar_dates.txt
@@ -521,14 +527,14 @@ class create_gtfsdb(WorkerThread):
 
         # We check if we have shapes in the shape layer
         shape_ids = self.cursor.execute("SELECT DISTINCT shape_id from shapes;").fetchall()
-        shape_ids = [str(x[0]) for x in shape_ids]
+        shape_ids = [str(x[0], 'utf-8') for x in shape_ids]
         if len(shape_ids) > 0:
             if pyqt:
-                self.emit(SIGNAL("converting_gtfs"), ['max chunk counter', len(shape_ids)])
+                self.converting_gtfs.emit(['max chunk counter', len(shape_ids)])
 
             for i, shp in enumerate(shape_ids):
                 if pyqt:
-                    self.emit(SIGNAL("converting_gtfs"), ['chunk counter', i])
+                    self.converting_gtfs.emit(['chunk counter', i])
 
                 qry = self.cursor.execute("SELECT route_id, trip_id from trips where shape_id='" + shp + "'").fetchall()
                 if len(qry) > 0:
@@ -551,11 +557,11 @@ class create_gtfsdb(WorkerThread):
             trip_ids = self.cursor.execute("SELECT DISTINCT trip_id from trips;").fetchall()
             trip_ids = [str(x[0]) for x in trip_ids]
             if pyqt:
-                self.emit(SIGNAL("converting_gtfs"), ['max chunk counter', len(trip_ids)])
+                self.converting_gtfs.emit(['max chunk counter', len(trip_ids)])
 
             for i, trip_id in enumerate(trip_ids):
                 if pyqt:
-                    self.emit(SIGNAL("converting_gtfs"), ['chunk counter', i])
+                    self.converting_gtfs.emit(['chunk counter', i])
 
                 route_id = \
                     self.cursor.execute("SELECT route_id from trips where trip_id='" + str(trip_id) + "'").fetchone()[0]
@@ -574,7 +580,7 @@ class create_gtfsdb(WorkerThread):
 
         # creates the stops table with route ID info
         if pyqt:
-            self.emit(SIGNAL("converting_gtfs"), ['text', 'Associating routes and stops. Sit tight'])
+            self.converting_gtfs.emit(['text', 'Associating routes and stops. Sit tight'])
 
         self.cursor.execute('''CREATE TABLE 'shape_stops'
                                 AS
@@ -609,6 +615,8 @@ class create_gtfsdb(WorkerThread):
         ft = csv.reader(data_file)
         a = []
         for x in ft:
+            # if isinstance(x, bytes):
+            #     x = str(x, 'utf-8')
             a.append([y.replace(',', '-') for y in x])
 
         txt = open(tmp_file, 'w')
@@ -617,11 +625,14 @@ class create_gtfsdb(WorkerThread):
         txt.flush()
         txt.close()
 
-        data = np.genfromtxt(tmp_file, delimiter=',', names=True, dtype=None, )
-        content = [str(unicode(x.strip(codecs.BOM_UTF8), 'utf-8')) for x in data.dtype.names]
-        data.dtype.names = content
+        with codecs.open(tmp_file, 'r', 'utf-8') as feed_file:
+            data = feed_file.read().split('\n')
+            data[0] = data[0].encode('ascii', 'ignore')
+
+        data = np.genfromtxt(data, delimiter=',', names=True, dtype=None, )
+
         if column_order:
-            col_names = [x for x in column_order.keys() if x in content]
+            col_names = [x for x in column_order.keys() if x in data.dtype.names]
             data = data[col_names]
 
             # Define sizes for the string variables

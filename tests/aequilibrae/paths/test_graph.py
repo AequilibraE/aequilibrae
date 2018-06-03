@@ -5,12 +5,12 @@ import numpy as np
 from aequilibrae.paths import Graph
 from os.path import join
 import sys
-from parameters_test import centroids
+from .parameters_test import centroids
 
 # Adds the folder with the data to the path and collects the paths to the files
-lib_path = os.path.abspath(os.path.join('..', '../tests'))
-sys.path.append(lib_path)
-from data import path_test, test_graph, test_network
+# lib_path = os.path.abspath(os.path.join('..', '../tests'))
+# sys.path.append(lib_path)
+from ...data import path_test, test_graph, test_network
 
 
 class TestGraph(TestCase):

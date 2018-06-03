@@ -67,7 +67,7 @@ class SyntheticGravityModel:
     def load(self, file_name):
         try:
             model = yaml.safe_load(open(file_name, 'r'))[self.model_type]
-            for key, value in model.iteritems():
+            for key, value in model.items():
                 if key in self.members:
                     self.__dict__[key] = value
                 else:
@@ -85,4 +85,7 @@ class SyntheticGravityModel:
                       'alpha': self.alpha,
                       'beta': self.beta}}
 
-        yaml.dump(model, open(file_name, 'w'), default_flow_style=False)
+        mod = open(file_name, 'w')
+        yaml.dump(model, mod, default_flow_style=False)
+        mod.flush()
+        mod.close()

@@ -28,7 +28,9 @@ except:
 
 class WorkerThread(QThread):
     def __init__(self, parentThread):
+        super().__init__()
         QThread.__init__(self, parentThread)
+        self.sig = SIGNAL()
 
     def run(self):
         self.running = True

@@ -2,9 +2,9 @@ from unittest import TestCase
 from aequilibrae.transit.gtfs import create_gtfsdb
 import os, sys
 
-lib_path = os.path.abspath(os.path.join('..', '..'))
-sys.path.append(lib_path)
-from data import gtfs_folder, gtfs_zip, gtfs_db_output
+# lib_path = os.path.abspath(os.path.join('..', '..'))
+# sys.path.append(lib_path)
+from ...data import gtfs_folder, gtfs_zip, gtfs_db_output
 
 
 class TestCreate_gtfsdb(TestCase):
