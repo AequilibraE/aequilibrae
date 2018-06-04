@@ -57,12 +57,12 @@ class GTFS:
         self.available_files['agency.txt'] = True
         data = self.open(agency_file)
         # TODO: Transfer to the database style
-        self.agency.email = data['agency_id']
-        self.agency.name = data['agency_name']
-        self.agency.url = data['agency_url']
-        self.agency.timezone = data['agency_timezone']
-        self.agency.lang = data['agency_lang']
-        self.agency.phone = data['agency_phone']
+        self.agency.email = str(data['agency_id'], "utf-8")
+        self.agency.name = str(data['agency_name'], "utf-8")
+        self.agency.url = str(data['agency_url'], "utf-8")
+        self.agency.timezone = str(data['agency_timezone'], "utf-8")
+        self.agency.lang = str(data['agency_lang'], "utf-8")
+        self.agency.phone = str(data['agency_phone'], "utf-8")
         del (data)
 
     def load_stops(self):

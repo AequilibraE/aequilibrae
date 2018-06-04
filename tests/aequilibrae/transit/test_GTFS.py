@@ -14,7 +14,7 @@ class TestGTFS(TestCase):
     def test_load_calendar_dates(self):
         self.get_data()
         self.gtfs.load_calendar_dates()
-        self.assertEqual(self.gtfs.schedule_exceptions, set(['FULLW']), 'calendar_dates.txt was read wrong')
+        self.assertEqual(self.gtfs.schedule_exceptions, set([b'FULLW']), 'calendar_dates.txt was read wrong')
 
     def test_load_agency(self):
         try:
@@ -31,12 +31,12 @@ class TestGTFS(TestCase):
         except:
             self.fail('stops loader returned an error')
         self.assertEqual(len(self.gtfs.stops), 88, 'Not all values read')
-        self.assertEqual(self.gtfs.stops[88].name, 'Post Office', 'GTFS stops not read properly')
+        self.assertEqual(self.gtfs.stops[88].name, b'Post Office', 'GTFS stops not read properly')
 
     def test_load_routes(self):
         self.get_data()
         self.gtfs.load_routes()
-        self.assertEqual(self.gtfs.routes[1415].long_name, 'Braitling and Ciccone', 'Route long name not read properly')
+        self.assertEqual(self.gtfs.routes[1415].long_name, b'Braitling and Ciccone', 'Route long name not read properly')
         self.assertEqual(str(self.gtfs.routes[1825].short_name), '500', 'Route long name not read properly')
 
     def test_load_trips(self):
