@@ -41,6 +41,7 @@ from ..utils import WorkerThread
 
 
 class allOrNothing(WorkerThread):
+    assignment = SIGNAL(object)
     def __init__(self, matrix, graph, results):
         WorkerThread.__init__(self, None)
 
@@ -72,7 +73,7 @@ class allOrNothing(WorkerThread):
 
     def execute(self):
         if pyqt:
-            self.emit(SIGNAL("assignment"), ['zones finalized', 0])
+            self.assignment.emit(['zones finalized', 0])
 
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape((self.graph.num_zones, self.graph.num_zones,
@@ -93,8 +94,8 @@ class allOrNothing(WorkerThread):
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
 
         if pyqt:
-            self.emit(SIGNAL("assignment"), ['text AoN', "Saving Outputs"])
-            self.emit(SIGNAL("assignment"), ['finished_threaded_procedure', None])
+            self.assignment.emit(['text AoN', "Saving Outputs"])
+            self.assignment.emit(['finished_threaded_procedure', None])
 
     def func_assig_thread(self, O, all_threads):
         if thread.get_ident() in all_threads:
@@ -108,6 +109,6 @@ class allOrNothing(WorkerThread):
         if x != O:
             self.report.append(x)
         if pyqt:
-            self.emit(SIGNAL("assignment"), ['zones finalized', self.cumulative])
+            self.assignment.emit(['zones finalized', self.cumulative])
             txt = str(self.cumulative) + ' / ' + str(self.matrix.zones)
-            self.emit(SIGNAL("assignment"), ['text AoN', txt])
+            self.assignment.emit(['text AoN', txt])
