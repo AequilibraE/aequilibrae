@@ -19,7 +19,7 @@ import Cython.Compiler.Options
 
 Cython.Compiler.Options.annotate = True
 
-src_dir = 'aequilibrae/paths'
+src_dir = 'aequilibrae/paths/'
 ext_module = Extension(src_dir + 'AoN',
                        [src_dir + "AoN.pyx"],
                        include_dirs=[np.get_include()])
