@@ -9,6 +9,7 @@ os: linux
 install:
   - pip install -r requirements.txt
   - pip install cython
+  - python setup.py develop
 
 script:
   - pytest # or pytest for Python versions 3.6 and higher
