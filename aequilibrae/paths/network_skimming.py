@@ -20,18 +20,22 @@
  """
 
 import sys
+
 sys.dont_write_bytecode = True
 
 import numpy as np
-import thread
+from threading import Thread as thread
 from multiprocessing.dummy import Pool as ThreadPool
+
 try:
-    from PyQt4.QtCore import SIGNAL
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
+
     pyqt = True
 except:
     pyqt = False
 
-from multi_threaded_skimming import MultiThreadedNetworkSkimming
+from .multi_threaded_skimming import MultiThreadedNetworkSkimming
+
 try:
     from AoN import skimming_single_origin
 except:
@@ -41,6 +45,8 @@ from ..utils import WorkerThread
 
 
 class NetworkSkimming(WorkerThread):
+    skimming = SIGNAL(object)
+
     def __init__(self, graph, results, origins=None):
         WorkerThread.__init__(self, None)
 
@@ -60,13 +66,12 @@ class NetworkSkimming(WorkerThread):
         elif results.__graph_id__ != graph.__id__:
             raise ValueError('The results object was prepared for a different graph')
 
-
     def doWork(self):
         self.execute()
 
     def execute(self):
         if pyqt:
-            self.emit(SIGNAL("skimming"), ['zones finalized', 0])
+            self.skimming.emit(['zones finalized', 0])
 
         self.aux_res.prepare(self.graph, self.results)
 
@@ -83,8 +88,8 @@ class NetworkSkimming(WorkerThread):
         pool.join()
 
         if pyqt:
-            self.emit(SIGNAL("skimming"), ['text skimming', "Saving Outputs"])
-            self.emit(SIGNAL("skimming"), ['finished_threaded_procedure', None])
+            self.skimming.emit(['text skimming', "Saving Outputs"])
+            self.skimming.emit(['finished_threaded_procedure', None])
 
     def func_assig_thread(self, O, all_threads):
         if thread.get_ident() in all_threads:
@@ -98,6 +103,6 @@ class NetworkSkimming(WorkerThread):
         if x != O:
             self.report.append(x)
         if pyqt:
-            self.emit(SIGNAL("skimming"), ['zones finalized', self.cumulative])
+            self.skimming.emit(['zones finalized', self.cumulative])
             txt = str(self.cumulative) + ' / ' + str(self.matrix.zones)
-            self.emit(SIGNAL("skimming"), ['text skimming', txt])
+            self.skimming.emit(['text skimming', txt])

@@ -24,15 +24,12 @@
 # - Change logic of the information about centroids to include a list of centroids, not only the max number
 
 
-
 import numpy as np
-import os, csv
-import cPickle
+import os
+import pickle
 from datetime import datetime
 import uuid
-from __version__ import binary_version as VERSION
-
-
+from .__version__ import binary_version as VERSION
 
 
 class Graph:
@@ -72,16 +69,16 @@ class Graph:
         self.graph = False  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
-        self.all_nodes = False   # Holds an array with all nodes in the original network
-        self.nodes_to_indices = False   # Holds the reverse of the all_nodes
-        self.fs = False      # This method will hold the forward star for the graph
+        self.all_nodes = False  # Holds an array with all nodes in the original network
+        self.nodes_to_indices = False  # Holds the reverse of the all_nodes
+        self.fs = False  # This method will hold the forward star for the graph
         self.b_node = False  # b node for each directed link
 
-        self.cost = None    # This array holds the values being used in the shortest path routine
-        self.skims = False   # 2-D Array with the fields to be computed as skims
-        self.skim_fields = False # List of skim fields to be used in computation
-        self.cost_field = False # Name of the cost field
-        self.ids = False     # 1-D Array with link IDs (sequence from 0 to N-1)
+        self.cost = None  # This array holds the values being used in the shortest path routine
+        self.skims = False  # 2-D Array with the fields to be computed as skims
+        self.skim_fields = False  # List of skim fields to be used in computation
+        self.cost_field = False  # Name of the cost field
+        self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
 
         self.block_centroid_flows = False
         self.penalty_through_centroids = np.inf
@@ -95,7 +92,7 @@ class Graph:
 
         # Randomly generate a unique Graph ID randomly
         self.__id__ = uuid.uuid4().hex
-        self.__source__ = None    # Name of the file that originated the graph
+        self.__source__ = None  # Name of the file that originated the graph
 
         # In case the graph is generated in QGIS, it is useful to have the name of the layer and fields that originated
         # it
@@ -111,7 +108,7 @@ class Graph:
             raise ValueError('It must be either a int or a float')
 
     # Create a graph from a shapefile. To be upgraded to ANY geographic file in the future
-    def create_from_geography(self, geo_file, id_field, dir_field, cost_field, centroids, skim_fields = [],
+    def create_from_geography(self, geo_file, id_field, dir_field, cost_field, centroids, skim_fields=[],
                               anode="A_NODE", bnode="B_NODE"):
         """
         :param geo_file:
@@ -137,7 +134,7 @@ class Graph:
                     return i - 1
 
             f = [str(x[0]) for x in fields]
-            raise ValueError (field_name + ' does not exist. Fields available are: ' + ', '.join(f))
+            raise ValueError(field_name + ' does not exist. Fields available are: ' + ', '.join(f))
             return -1
 
         # collect the fields in the network
@@ -229,7 +226,7 @@ class Graph:
         if error is not None:
             raise ValueError(error)
 
-# TODO: Loading graphs and networks from disk need to be refactored in light of the new behaviour of arbitrary zone ID
+    # TODO: Loading graphs and networks from disk need to be refactored in light of the new behaviour of arbitrary zone ID
     # # Procedure to load csv network from disk
     # def load_network_from_csv(self, netw):
     #     self.network_ok = False
@@ -383,7 +380,7 @@ class Graph:
     #     self.ids = self.graph['id']
     #     self.b_node = np.array(self.graph['b_node'], np.int64)
 
-# TODO: Check why is there an error with the cost field is not float
+    # TODO: Check why is there an error with the cost field is not float
     def prepare_graph(self, centroids):
         """
         :param centroids: Numpy array of centroid IDs. Mandatory type Int64, unique and positive
@@ -435,10 +432,11 @@ class Graph:
                 a4 = a3 + zers.shape[0]
 
                 # Create the graph-specific node numbers
-                self.all_nodes = np.unique(np.hstack((self.network['a_node'],self.network['b_node']))).astype(self.__integer_type)
+                self.all_nodes = np.unique(np.hstack((self.network['a_node'], self.network['b_node']))).astype(
+                    self.__integer_type)
                 # We put the centroids as the first N elements of this array
                 for i in self.centroids:
-                    self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes==i))
+                    self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes == i))
 
                 self.all_nodes = np.hstack((centroids, self.all_nodes)).astype(self.__integer_type)
                 self.num_nodes = self.all_nodes.shape[0]
@@ -486,15 +484,15 @@ class Graph:
                 a = self.graph['a_node'][0]
                 p = 0
                 k = 0
-                for i in xrange(1, self.num_links):
+                for i in range(1, self.num_links):
                     if a != self.graph['a_node'][i]:
-                        for j in xrange(p, self.graph['a_node'][i]):
+                        for j in range(p, self.graph['a_node'][i]):
                             self.fs[j + 1] = k
                         p = a
                         a = self.graph['a_node'][i]
                         k = i
 
-                for j in xrange(p, self.num_nodes):
+                for j in range(p, self.num_nodes):
                     self.fs[j + 1] = k
 
                 self.fs[self.num_nodes] = self.graph.shape[0]
@@ -515,7 +513,8 @@ class Graph:
                 self.set_blocked_centroid_flows(block_centroid_flows)
 
             else:
-                raise ValueError('block_centroid_flows needs to be a boolean')
+                raise ValueError('block_c'
+                                 'entroid_flows needs to be a boolean')
 
         if cost_field is not None:
             if cost_field in self.graph.dtype.names:
@@ -524,7 +523,7 @@ class Graph:
                     self.cost = self.graph[cost_field]
                 else:
                     self.cost = self.graph[cost_field].astype(self.__float_type)
-                    Warning ('Cost field with wrong type. Converting to float64')
+                    Warning('Cost field with wrong type. Converting to float64')
 
             else:
                 raise ValueError('cost_field not available in the graph:' + str(self.graph.dtype.names))
@@ -571,8 +570,7 @@ class Graph:
             self.block_centroid_flows = blocking
             self.b_node = np.array(self.graph['b_node'], self.__integer_type)
         else:
-            raise ValueError ('You can only block flows through centroids after setting the centroids')
-
+            raise ValueError('You can only block flows through centroids after setting the centroids')
 
     # Procedure to pickle graph and save to disk
     def save_to_disk(self, filename):
@@ -600,10 +598,10 @@ class Graph:
         mygraph['graph_id'] = self.__id__
         mygraph['graph_version'] = self.__version__
 
-        cPickle.dump(mygraph, open(filename, 'wb'))
+        pickle.dump(mygraph, open(filename, 'wb'))
 
     def load_from_disk(self, filename):
-        mygraph = cPickle.load(open(filename, 'rb'))
+        mygraph = pickle.load(open(filename, 'rb'))
         self.description = mygraph['description']
         self.num_links = mygraph['num_links']
         self.num_nodes = mygraph['num_nodes']
@@ -699,7 +697,7 @@ class Graph:
         if np.min(self.graph['id']) != 0:
             self.status = '"id" field needs to start in 0 and go to number of links - 1'
 
-        if np.max(self.graph['id']) > self.graph['id'].shape[0]-1:
+        if np.max(self.graph['id']) > self.graph['id'].shape[0] - 1:
             self.status = '"id" field needs to start in 0 and go to number of links - 1'
 
     def __determine_types__(self, new_type, current_type):
@@ -731,6 +729,8 @@ class Graph:
 
 
 import tempfile
+
+
 def logger(message):
     debug_file = tempfile.gettempdir() + '/aequilibrae.log'
     if not os.path.exists(debug_file):
@@ -739,6 +739,6 @@ def logger(message):
         o = open(debug_file, 'a')
     if type(message) in [list, tuple, dict]:
         message = str(message)
-    print >>o, message
+    o.write(message)
     o.flush()
     o.close()

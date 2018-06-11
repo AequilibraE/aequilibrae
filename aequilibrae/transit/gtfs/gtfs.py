@@ -1,13 +1,12 @@
 import numpy as np
 import os
-from collections import OrderedDict
 import codecs
-from agency import Agency
-from calendar_dates import CalendarDates
-from stop import Stop
-from route import Route
-from gtfs_sqlite_db import create_gtfsdb
+from .agency import Agency
+from .calendar_dates import CalendarDates
+from .stop import Stop
+from .route import Route
 import copy
+
 
 class GTFS:
     """
@@ -57,14 +56,14 @@ class GTFS:
         agency_file = os.path.join(self.source_folder, 'agency.txt')
         self.available_files['agency.txt'] = True
         data = self.open(agency_file)
-        #TODO: Transfer to the database style
-        self.agency.email = data['agency_id']
-        self.agency.name = data['agency_name']
-        self.agency.url = data['agency_url']
-        self.agency.timezone = data['agency_timezone']
-        self.agency.lang = data['agency_lang']
-        self.agency.phone = data['agency_phone']
-        del(data)
+        # TODO: Transfer to the database style
+        self.agency.email = str(data['agency_id'], "utf-8")
+        self.agency.name = str(data['agency_name'], "utf-8")
+        self.agency.url = str(data['agency_url'], "utf-8")
+        self.agency.timezone = str(data['agency_timezone'], "utf-8")
+        self.agency.lang = str(data['agency_lang'], "utf-8")
+        self.agency.phone = str(data['agency_phone'], "utf-8")
+        del (data)
 
     def load_stops(self):
         stops_file = os.path.join(self.source_folder, 'stops.txt')
@@ -93,7 +92,7 @@ class GTFS:
             if 'wheelchair_boarding' in available_fields: stop.wheelchair_boarding = data['wheelchair_boarding'][i]
 
             self.stops[stop.id] = stop
-        del(data)
+        del (data)
 
     def load_routes(self):
         routes_file = os.path.join(self.source_folder, 'routes.txt')
@@ -169,8 +168,8 @@ class GTFS:
         all_shapes = list(np.unique(data['shape_id']))
 
         for shp in all_shapes:
-            trace = data[data['shape_id']==shp]
-            trace = np.sort(trace,order=['shape_pt_sequence'])
+            trace = data[data['shape_id'] == shp]
+            trace = np.sort(trace, order=['shape_pt_sequence'])
             coords = np.core.defchararray.add(trace['shape_pt_lon'].astype(str), ' ')
             coords = np.core.defchararray.add(coords, trace['shape_pt_lat'].astype(str))
             coords = ', '.join(list(coords))
@@ -178,13 +177,12 @@ class GTFS:
 
     def get_routes_shapes(self):
         for rt in self.routes.keys():
-            trips = self.trips[self.trips['route_id']==rt]['shape_id']
+            trips = self.trips[self.trips['route_id'] == rt]['shape_id']
             if self.available_files['shapes.txt']:
                 self.routes[rt].shapes = {t: self.shapes[t] for t in trips}
             else:
                 for t in trips:
-                    stop_times = self.stop_times[self.stop_times['trip_id']==t]
-
+                    stop_times = self.stop_times[self.stop_times['trip_id'] == t]
 
     def get_routes_stops(self):
         pass
@@ -192,11 +190,13 @@ class GTFS:
     @staticmethod
     def open(file_name, column_order=False):
         # Read the stops and cleans the names of the columns
-        data = np.genfromtxt(file_name, delimiter=',', names=True, dtype=None,)
-        content = [str(unicode(x.strip(codecs.BOM_UTF8), 'utf-8')) for x in data.dtype.names]
-        data.dtype.names = content
+        with codecs.open(file_name, 'r', 'utf-8') as feed_file:
+            data = feed_file.read().split('\n')
+            data[0] = data[0].encode('ascii', 'ignore')
+
+        data = np.genfromtxt(data, delimiter=',', names=True, dtype=None, encoding='bytes')
         if column_order:
-            col_names = [x for x in column_order.keys() if x in content]
+            col_names = [x for x in column_order.keys() if x in data.dtype.names]
             data = data[col_names]
 
             # Define sizes for the string variables
@@ -210,12 +210,10 @@ class GTFS:
 
             new_data_dt = [(f, column_order[f]) for f in col_names]
 
-            if int(data.shape.__len__())> 0:
+            if int(data.shape.__len__()) > 0:
                 new_data = np.array(data, new_data_dt)
             else:
                 new_data = data
-
-
         else:
             new_data = data
         return new_data

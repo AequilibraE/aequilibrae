@@ -27,7 +27,7 @@ from shutil import copyfile
 import warnings
 
 # CONSTANTS
-VERSION = 1            # VERSION OF THE MATRIX FORMAT
+VERSION = 1  # VERSION OF THE MATRIX FORMAT
 INT = 0
 FLOAT = 1
 COMPLEX = 2
@@ -87,8 +87,7 @@ class AequilibraeMatrix(object):
         self.names = None
         self.name = None
         self.description = None
-        self.__version__ = VERSION       # Writes file version
-
+        self.__version__ = VERSION  # Writes file version
 
     def create_empty(self, file_name=None, zones=None, matrix_names=None, data_type=np.float64,
                      index_names=None, compressed=False):
@@ -101,7 +100,7 @@ class AequilibraeMatrix(object):
         # Matrix compression still not supported
         if compressed:
             compressed = False
-            print 'Matrix compression not yet supported'
+            raise Warning('Matrix compression not yet supported')
 
         if compressed:
             self.compressed = COMPRESSED
@@ -140,7 +139,7 @@ class AequilibraeMatrix(object):
             else:
                 raise Exception('Matrix names need to be provided as a list')
 
-        self.names = [x.encode('utf-8') for x in matrix_names]
+        self.names = [x for x in matrix_names]
         self.cores = len(self.names)
         if None not in [self.file_path, self.zones]:
             self.__write__()
@@ -197,22 +196,24 @@ class AequilibraeMatrix(object):
 
         # matrix name
         self.name = np.memmap(self.file_path, dtype='S' + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode='r+',
-                                    shape=1)[0]
+                              shape=1)[0]
 
         # matrix description
         offset = 18 + MATRIX_NAME_MAX_LENGTH
         self.description = np.memmap(self.file_path, dtype='S' + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset,
-                                          mode='r+', shape=1)[0]
+                                     mode='r+', shape=1)[0]
 
         # core names
         offset += MATRIX_DESCRIPTION_MAX_LENGTH
         self.names = list(np.memmap(self.file_path, dtype='S' + str(CORE_NAME_MAX_LENGTH), offset=offset, mode='r+',
                                     shape=self.cores))
+        self.names = [x.decode('utf-8') for x in self.names]
 
         # Index names
         offset += CORE_NAME_MAX_LENGTH * self.cores
         self.index_names = list(np.memmap(self.file_path, dtype='S' + str(INDEX_NAME_MAX_LENGTH), offset=offset,
                                           mode='r+', shape=self.num_indices))
+        self.index_names = [x.decode('utf-8') for x in self.index_names]
 
         # Index
         offset += self.num_indices * INDEX_NAME_MAX_LENGTH
@@ -263,16 +264,17 @@ class AequilibraeMatrix(object):
 
         # matrix name
         np.memmap(self.file_path, dtype='S' + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode='r+',
-                       shape=1)[0] = self.name
+                  shape=1)[0] = self.name
 
         # matrix description
         offset = 18 + MATRIX_NAME_MAX_LENGTH
         np.memmap(self.file_path, dtype='S' + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset, mode='r+',
-                       shape=1)[0] = self.description
+                  shape=1)[0] = self.description
 
         # core names
         offset += MATRIX_DESCRIPTION_MAX_LENGTH
-        fp = np.memmap(self.file_path, dtype='S' + str(CORE_NAME_MAX_LENGTH), offset=offset, mode='r+', shape=self.cores)
+        fp = np.memmap(self.file_path, dtype='S' + str(CORE_NAME_MAX_LENGTH), offset=offset, mode='r+',
+                       shape=self.cores)
         for i, v in enumerate(self.names):
             fp[i] = v
         fp.flush()
@@ -317,7 +319,7 @@ class AequilibraeMatrix(object):
         if isinstance(index_to_set, int):
             if index_to_set >= self.num_indices:
                 raise ValueError('Index {} not available. Choose on interval [0, '
-                                 '{}]'.format(index_to_set, self.num_indices-1))
+                                 '{}]'.format(index_to_set, self.num_indices - 1))
         elif isinstance(index_to_set, str):
             if index_to_set in self.index:
                 index_to_set = self.index_names.index(index_to_set)
@@ -338,19 +340,19 @@ class AequilibraeMatrix(object):
 
     # Transforms matrix from dense to CSR
     def compress(self):
-        print (self.file_path + '. Method not implemented yet. All matrices are dense')
+        print(self.file_path + '. Method not implemented yet. All matrices are dense')
 
     # Transforms matrix from CSR to dense
     def decompress(self):
-        print (self.file_path + '. Method not implemented yet. All matrices are dense')
+        print(self.file_path + '. Method not implemented yet. All matrices are dense')
 
     # Adds index to matrix
     def add_index(self):
-        print (self.file_path + '. Method not implemented yet. All indices need to exist during the matrix creation')
+        print(self.file_path + '. Method not implemented yet. All indices need to exist during the matrix creation')
 
     # Adds index to matrix
     def remove_index(self, index_number):
-        print (self.file_path + '. Method not implemented. Indices are fixed on matrix creation: ' + str(index_number))
+        print(self.file_path + '. Method not implemented. Indices are fixed on matrix creation: ' + str(index_number))
 
     def close(self, flush=True):
         if flush:
@@ -358,7 +360,7 @@ class AequilibraeMatrix(object):
             self.index.flush()
         del self.matrices
         del self.index
-            
+
     def export(self, output_name, cores=None):
         fname, file_extension = os.path.splitext(output_name.upper())
 
@@ -379,7 +381,7 @@ class AequilibraeMatrix(object):
             titles = ['row', 'column']
             for core in self.view_names:
                 titles.append(core)
-            print >> output, ','.join(titles)
+            output.write(','.join(titles))
 
             for i in range(self.zones):
                 for j in range(self.zones):
@@ -388,11 +390,10 @@ class AequilibraeMatrix(object):
                         record.extend(self.matrix_view[i, j, :])
                     else:
                         record.append(self.matrix_view[i, j])
-                    print >> output, ','.join(str(x) for x in record)
+                    output.write(','.join(str(x) for x in record))
             output.flush()
             output.close()
             self.computational_view(names)
-
 
     def load(self, file_path):
         self.file_path = file_path
@@ -411,9 +412,9 @@ class AequilibraeMatrix(object):
 
                 if len(core_list) > 1:
                     for i, x in enumerate(core_list[1:]):
-                        k = self.names.index(x)   # index of the first element
-                        k0 = self.names.index(core_list[i])   # index of the first element
-                        if k-k0 != 1:
+                        k = self.names.index(x)  # index of the first element
+                        k0 = self.names.index(core_list[i])  # index of the first element
+                        if k - k0 != 1:
                             raise ValueError('Matrix cores {} and {} are not adjacent'.format(core_list[i - 1], x))
             else:
                 raise TypeError('Please provide a list of matrices')
@@ -485,9 +486,9 @@ class AequilibraeMatrix(object):
         return self.vector(axis=1)
 
     def nan_to_num(self):
-        if np.issubdtype(self.dtype, np.float) and self.matrix_view is not None:
+        if np.issubdtype(self.dtype, np.floating) and self.matrix_view is not None:
             for m in self.view_names:
-                self.matrix[m][:,:] = np.nan_to_num(self.matrix[m])[:,:]
+                self.matrix[m][:, :] = np.nan_to_num(self.matrix[m])[:, :]
 
     def vector(self, axis):
         if self.view_names is None:
@@ -501,7 +502,7 @@ class AequilibraeMatrix(object):
         return {self.index[i]: i for i in range(self.zones)}
 
     def define_data_class(self):
-        if np.issubdtype(self.dtype, np.float):
+        if np.issubdtype(self.dtype, np.floating):
             data_class = FLOAT
         elif np.issubdtype(self.dtype, np.integer):
             data_class = INT

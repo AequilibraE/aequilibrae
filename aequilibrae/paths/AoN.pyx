@@ -1,5 +1,4 @@
-"""
- -----------------------------------------------------------------------------------------------------------
+""" -----------------------------------------------------------------------------------------------------------
  Package:    AequilibraE
  Name:       Core path computation algorithms
  Purpose:    Implement shortest path and network loading routines
@@ -12,22 +11,14 @@
  Updated:    24/04/2018
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-
-"""
-TODO:
-LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
-- Checks of weather the centroid we are computing path from is a centroid and/or exists in the graph
-- Re-write function **network_loading** on the part of loading flows to centroids
-"""
+ -----------------------------------------------------------------------------------------------------------"""
 
 cimport numpy as np
 
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 from libc.stdlib cimport abort, malloc, free
-from __version__ import binary_version as VERSION_COMPILED
+from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1

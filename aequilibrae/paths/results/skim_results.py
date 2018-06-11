@@ -56,4 +56,4 @@ class SkimResults:
             self.milepost = None
 
         else:
-            print 'Exception: Path results object was not yet prepared/initialized'
+            raise ValueError('Exception: Path results object was not yet prepared/initialized')

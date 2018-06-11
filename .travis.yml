@@ -1,13 +1,26 @@
 language: python
-language: python
 python:
-  - "2.7"
+  - "3.6"
+  #- "3.6-dev"
+  #- "3.7-dev"
 os: linux
-virtualenv:
-  system_site_packages: true
+#virtualenv:
+#  system_site_packages: true
+before_install:
+  - sudo apt-get install -y libspatialite-dev
+
 install:
-  - pip install .
   - pip install -r requirements.txt
+  - pip install numpy --upgrade
+  - pip install cython
+  - pip install pytest pytest-cov coveralls pycodestyle
 
 script:
-  - py.test # or pytest for Python versions 3.6 and higher
+
+  - cd aequilibrae/paths
+  - python setup_Assignment.py build_ext --inplace
+  - cd ..
+  - cd ..
+  - pytest # or pytest for Python versions 3.6 and higher
+after_success:
+- coveralls

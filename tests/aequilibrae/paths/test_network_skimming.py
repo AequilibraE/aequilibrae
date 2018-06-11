@@ -7,19 +7,18 @@ from aequilibrae.paths import NetworkSkimming, skimming_single_origin
 import numpy as np
 
 # Adds the folder with the data to the path and collects the paths to the files
-lib_path = os.path.abspath(os.path.join('..', '..'))
-sys.path.append(lib_path)
-from data import path_test, test_graph
+from ...data import path_test, test_graph
 
-from parameters_test import centroids
+from .parameters_test import centroids
+
 
 class MultiThreadedNetworkSkimming:
     def __init__(self):
         self.predecessors = None  # The predecessors for each node in the graph
         self.temporary_skims = None  # holds the skims for all nodes in the network (during path finding)
-        self.reached_first = None    # Keeps the order in which the nodes were reached for the cascading network loading
+        self.reached_first = None  # Keeps the order in which the nodes were reached for the cascading network loading
         self.connectors = None  # The previous link for each node in the tree
-        self.temp_b_nodes = None  #  holds the b_nodes in case of flows through centroid connectors are blocked
+        self.temp_b_nodes = None  # holds the b_nodes in case of flows through centroid connectors are blocked
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph, results):
@@ -49,7 +48,6 @@ class TestNetwork_skimming(TestCase):
         aux_res = MultiThreadedNetworkSkimming()
         aux_res.prepare(g, res)
         a = skimming_single_origin(26, g, res, aux_res, 0)
-
 
         skm = NetworkSkimming(g, res)
         skm.execute()

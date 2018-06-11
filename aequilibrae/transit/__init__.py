@@ -1,1 +1,1 @@
-import gtfs
+from . import gtfs
