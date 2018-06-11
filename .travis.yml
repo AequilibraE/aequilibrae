@@ -11,9 +11,10 @@ install:
   - pip install numpy --upgrade
   - pip install cython
   - pip install pytest pytest-cov coveralls pycodestyle
-#  - python setup.py develop
+  - apt-get install libspatialite-dev
 
 script:
+
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
   - cd ..
