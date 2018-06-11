@@ -16,6 +16,6 @@ script:
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  - pytest aequilibrae# or pytest for Python versions 3.6 and higher
+  - pytest # or pytest for Python versions 3.6 and higher
 after_success:
 - coveralls
