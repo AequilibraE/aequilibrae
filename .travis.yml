@@ -8,13 +8,7 @@ os: linux
 #  system_site_packages: true
 before_install:
   - sudo apt-get install -y libspatialite-dev
-addons:
-    apt:
-        packages:
-            - libsqlite3-dev
-            - libsqlite3-0
-            - libspatialite-dev
-            - libspatialite3
+
 install:
   - pip install -r requirements.txt
   - pip install numpy --upgrade
