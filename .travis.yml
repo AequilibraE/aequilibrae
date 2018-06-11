@@ -14,8 +14,6 @@ install:
 script:
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
-
-script:
   - pytest # or pytest for Python versions 3.6 and higher
 after_success:
 - coveralls
