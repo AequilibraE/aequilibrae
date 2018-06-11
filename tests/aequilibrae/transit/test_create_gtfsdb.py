@@ -16,8 +16,8 @@ class TestCreate_gtfsdb(TestCase):
 
     def test_import_gtfs(self):
         # self.gtfs = create_gtfsdb(gtfs_folder, save_db=gtfs_db_output, overwrite=True, spatialite_enabled=True)
-        self.gtfs = create_gtfsdb(gtfs_folder, save_db=gtfs_db_output, overwrite=True, spatialite_enabled=True)
+        self.gtfs = create_gtfsdb(gtfs_folder, save_db=gtfs_db_output, overwrite=True, spatialite_enabled=False)
         self.gtfs.import_gtfs()
 
-        self.gtfs = create_gtfsdb(gtfs_zip, save_db=gtfs_db_output, overwrite=True, spatialite_enabled=True)
+        self.gtfs = create_gtfsdb(gtfs_zip, save_db=gtfs_db_output, overwrite=True, spatialite_enabled=False)
         self.gtfs.import_gtfs()
