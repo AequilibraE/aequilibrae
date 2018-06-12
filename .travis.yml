@@ -22,7 +22,8 @@ script:
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  - pytest --cov aequilibrae --cov-report # or pytest for Python versions 3.6 and higher
+  # or pytest for Python versions 3.6 and higher
+  - pytest --cov aequilibrae --cov-report term-missing
 after_success:
 - coveralls
 - codecov
