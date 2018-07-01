@@ -35,6 +35,7 @@ import os
 import tempfile
 from time import clock
 import glob
+import logging
 
 sys.dont_write_bytecode = True
 
@@ -66,6 +67,7 @@ class GravityApplication:
         self.nan_as_zero = kwargs.get('nan_as_zero', False)
         self.output = None
         self.gap = np.inf
+        self.logger = logging.getLogger('aequilibrae')
 
     def apply(self):
         self.check_data()
@@ -120,8 +122,8 @@ class GravityApplication:
         for i in glob.glob(tempfile.gettempdir() + '*.aem'):
             try:
                 os.unlink(i)
-            finally:
-                pass
+            except:
+                self.logger.warning("Could not remove " + i)
 
     def get_parameters(self):
         par = Parameters().parameters

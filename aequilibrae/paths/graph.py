@@ -29,6 +29,7 @@ import os
 import pickle
 from datetime import datetime
 import uuid
+import logging
 from .__version__ import binary_version as VERSION
 
 
@@ -52,6 +53,7 @@ class Graph:
             skims:    Name of the skim fields.
                                TYPE: String list  (OPTIONAL)
         '''
+        self.logger = logging.getLogger('aequilibrae')
         self.__integer_type = np.int64
         self.__float_type = np.float64
 
@@ -708,7 +710,7 @@ class Graph:
             try:
                 new_type = float(new_type)
             except:
-                pass
+                self.logger.warning("Could not convert " + str(new_type))
         nt = type(new_type)
         def_type = None
         if nt == int or nt == int:
