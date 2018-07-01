@@ -39,7 +39,6 @@ class create_gtfsdb(WorkerThread):
         self.memory_db = memory_db
         self.overwrite = overwrite
         self.report = []
-        # self.logger = logger
         self.logger = logging.getLogger('aequilibrae')
         log_level = Parameters().parameters['system']['logging']
         if isinstance(log_level, str):
