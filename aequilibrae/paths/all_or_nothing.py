@@ -23,7 +23,7 @@ import sys
 sys.dont_write_bytecode = True
 
 import numpy as np
-from threading import Thread as thread
+import threading
 from multiprocessing.dummy import Pool as ThreadPool
 try:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
@@ -98,10 +98,10 @@ class allOrNothing(WorkerThread):
             self.assignment.emit(['finished_threaded_procedure', None])
 
     def func_assig_thread(self, O, all_threads):
-        if thread.get_ident() in all_threads:
-            th = all_threads[thread.get_ident()]
+        if threading.get_ident() in all_threads:
+            th = all_threads[threading.get_ident()]
         else:
-            all_threads[thread.get_ident()] = all_threads['count']
+            all_threads[threading.get_ident()] = all_threads['count']
             th = all_threads['count']
             all_threads['count'] += 1
         x = one_to_all(O, self.matrix, self.graph, self.results, self.aux_res, th)

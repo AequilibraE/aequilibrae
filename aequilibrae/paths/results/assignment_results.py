@@ -7,6 +7,7 @@ import os
 from numpy.lib.format import open_memmap
 from ...matrix import AequilibraeMatrix, AequilibraEData
 from ..graph import Graph
+
 """
 TO-DO:
 1. Create a file type for memory-mapped path files
@@ -14,19 +15,20 @@ TO-DO:
 2. Make the writing to SQL faster by disabling all checks before the actual writing
 """
 
+
 class AssignmentResults:
     def __init__(self):
         """
         @type graph: Set of numpy arrays to store Computation results
         self.critical={required:{"links":[lnk_id1, lnk_id2, ..., lnk_idn], "path file": False}, results:{}}
         """
-        self.link_loads = None       # The actual results for assignment
-        self.skims = None            # The array of skims
-        self.no_path = None          # The list os paths
-        self.num_skims = None        # number of skims that will be computed. Depends on the setting of the graph provided
+        self.link_loads = None  # The actual results for assignment
+        self.skims = None  # The array of skims
+        self.no_path = None  # The list os paths
+        self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
         self.cores = mp.cpu_count()
-        self.classes = {'number':1,
-                        'names':['flow']}
+        self.classes = {'number': 1,
+                        'names': ['flow']}
 
         self.critical_links = {'save': False,
                                'queries': {},  # Queries are a dictionary
@@ -48,7 +50,6 @@ class AssignmentResults:
 
         self.lids = None
         self.direcs = None
-
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph, matrix):
@@ -135,9 +136,11 @@ class AssignmentResults:
                         if len(queries['labels']) == len(queries['elements']) == len(queries['type']):
                             a.create_empty(file_name=crit_res_result, zones=self.zones, matrix_names=queries['labels'])
                         else:
-                            raise ValueError("Queries are inconsistent. 'Labels', 'elements' and 'type' need to have same dimensions")
+                            raise ValueError(
+                                "Queries are inconsistent. 'Labels', 'elements' and 'type' need to have same dimensions")
                     else:
-                        raise ValueError("Queries are inconsistent. It needs to contain the following elements: 'Labels', 'elements' and 'type'")
+                        raise ValueError(
+                            "Queries are inconsistent. It needs to contain the following elements: 'Labels', 'elements' and 'type'")
         else:
             a.create_empty(file_name=a.random_name(), zones=self.zones, matrix_names=['empty', 'nothing'])
 
@@ -153,7 +156,7 @@ class AssignmentResults:
         # Fields: Origin, Node, Predecessor
         # Number of records: Origins * Nodes
         a = AequilibraEData()
-        d1 = max(1,self.zones)
+        d1 = max(1, self.zones)
         d2 = 1
         memory_mode = True
 
@@ -167,7 +170,8 @@ class AssignmentResults:
                     d2 = self.nodes
                     memory_mode = False
 
-        a.create_empty(file_path=path_result, entries=d1*d2, field_names=['origin', 'node', 'predecessor', 'connector'],
+        a.create_empty(file_path=path_result, entries=d1 * d2,
+                       field_names=['origin', 'node', 'predecessor', 'connector'],
                        data_types=[np.uint32, np.uint32, np.uint32, np.uint32], memory_mode=memory_mode)
 
         self.path_file = {'save': save,
@@ -188,7 +192,7 @@ class AssignmentResults:
         Nothing'''
 
         if file_name is None:
-            memory=True
+            memory = True
             file_type = 'MEMORY'
         else:
             memory = False
@@ -208,7 +212,6 @@ class AssignmentResults:
                 memory_mode = True
                 aed_file_name = None
 
-
             entries = int(np.unique(self.lids).shape[0])
             res = AequilibraEData()
             res.create_empty(file_path=aed_file_name, memory_mode=memory_mode, entries=entries,
@@ -216,7 +219,7 @@ class AssignmentResults:
 
             res.index[:] = np.unique(self.lids)[:]
 
-            indexing = np.zeros(int(self.lids.max())+1, np.uint64)
+            indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
             indexing[res.index[:]] = np.arange(entries)
 
             # Indices of links BA and AB
@@ -247,4 +250,3 @@ class AssignmentResults:
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == 'path_file':
             pass
-
