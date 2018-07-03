@@ -2,3 +2,4 @@ numpy
 pyaml
 PyQt5
 pyshp
+cython
