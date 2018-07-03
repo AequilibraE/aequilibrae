@@ -1,4 +1,4 @@
 numpy
 pyaml
-pyqt5
+PyQt5
 pyshp
