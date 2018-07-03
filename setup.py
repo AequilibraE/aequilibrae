@@ -1,36 +1,24 @@
-from __future__ import division, print_function, absolute_import
-import setuptools
 import sys
+import numpy as np
+from setuptools import setup
+from setuptools import Extension
+from Cython.Distutils import build_ext
+import Cython.Compiler.Options
 
 sys.dont_write_bytecode = True
-
-import numpy as np
-
-try:
-    from setuptools import setup
-    from setuptools import Extension
-except ImportError:
-    from distutils.core import setup
-    from distutils.extension import Extension
-
-from Cython.Distutils import build_ext
-
-import Cython.Compiler.Options
 
 Cython.Compiler.Options.annotate = True
 
 src_dir = 'aequilibrae/paths/'
 ext_module = Extension(src_dir + 'AoN',
                        [src_dir + "AoN.pyx"],
+                       libraries=[],
                        include_dirs=[np.get_include()])
 
-setup(cmdclass={'build_ext': build_ext},
-      ext_modules=[ext_module])
-
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
 if __name__ == "__main__":
+    with open("README.md", "r") as fh:
+        long_description = fh.read()
+
     setup(install_requires=['numpy', 'cython'],
           packages=['aequilibrae'],
           zip_safe=False,
@@ -41,7 +29,7 @@ if __name__ == "__main__":
           description="A package for transportation modeling",
           author="Pedro Camargo",
           author_email="pedro@xl-optim.com",
-          url="https://github.com/AequilibraE/pyquilibrae",
+          url="https://github.com/AequilibraE/aequilibrae",
           license='See license.txt',
           cmdclass={"build_ext": build_ext},
           ext_modules=[ext_module]
