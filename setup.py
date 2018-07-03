@@ -4,7 +4,6 @@ from setuptools import setup
 from setuptools import Extension
 from Cython.Distutils import build_ext
 import Cython.Compiler.Options
-
 sys.dont_write_bytecode = True
 
 Cython.Compiler.Options.annotate = True
