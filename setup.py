@@ -1,18 +1,13 @@
 import sys
+import os
 import numpy as np
 from setuptools import setup
 from setuptools import Extension
-from Cython.Distutils import build_ext
-import Cython.Compiler.Options
+from distutils.core import setup as cython_setup
+
 sys.dont_write_bytecode = True
 
-Cython.Compiler.Options.annotate = True
-
-src_dir = 'aequilibrae/paths/'
-ext_module = Extension(src_dir + 'AoN',
-                       [src_dir + "AoN.pyx"],
-                       libraries=[],
-                       include_dirs=[np.get_include()])
+os.system('python aequilibrae/paths/setup_Assignment.py build_ext --inplace')
 
 if __name__ == "__main__":
     with open("README.md", "r") as fh:
@@ -29,7 +24,5 @@ if __name__ == "__main__":
           author="Pedro Camargo",
           author_email="pedro@xl-optim.com",
           url="https://github.com/AequilibraE/aequilibrae",
-          license='See license.txt',
-          cmdclass={"build_ext": build_ext},
-          ext_modules=[ext_module]
+          license='See license.txt'
           )
