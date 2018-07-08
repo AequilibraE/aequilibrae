@@ -19,11 +19,8 @@
  -----------------------------------------------------------------------------------------------------------
  """
 
-try:
-    from PyQt4.QtCore import QThread, SIGNAL
-except:
-    from PyQt5.QtCore import QThread
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+from PyQt5.QtCore import QThread
+from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 
 class WorkerThread(QThread):
