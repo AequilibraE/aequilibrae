@@ -34,8 +34,8 @@ except:
 from .multi_threaded_aon import MultiThreadedAoN
 from .AoN import one_to_all, path_computation
 
-from ..utils import WorkerThread
-
+# from ..utils import WorkerThread
+from .. import WorkerThread
 
 class allOrNothing(WorkerThread):
     assignment = SIGNAL(object)

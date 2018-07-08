@@ -11,7 +11,8 @@ import csv
 import logging
 from tempfile import gettempdir
 from ...reference_files import spatialite_database
-from ...utils import WorkerThread
+from ... import WorkerThread
+# from ...utils import WorkerThread
 from ...parameters import Parameters
 
 try:

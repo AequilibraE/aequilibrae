@@ -38,8 +38,8 @@ from .multi_threaded_skimming import MultiThreadedNetworkSkimming
 
 from .AoN import skimming_single_origin
 
-from ..utils import WorkerThread
-
+# from ..utils import WorkerThread
+from .. import WorkerThread
 
 class NetworkSkimming(WorkerThread):
     skimming = SIGNAL(object)
