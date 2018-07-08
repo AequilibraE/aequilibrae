@@ -1,4 +1,7 @@
-
+# Documentation
+_build
+_static
+_templates
 
 # User-specific stuff:
 .idea/**/workspace.xml
