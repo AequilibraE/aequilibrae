@@ -22,6 +22,14 @@ aequilibrae.parameters module
     :undoc-members:
     :show-inheritance:
 
+aequilibrae.reserved\_fields module
+-----------------------------------
+
+.. automodule:: aequilibrae.reserved_fields
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 Module contents
 ---------------
