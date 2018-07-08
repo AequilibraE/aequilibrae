@@ -28,7 +28,7 @@ class TestAequilibraeMatrix(TestCase):
         matrix.mat[:, :] = matrix.mat[:, :] * (1000 / np.sum(matrix.mat[:, :]))
         matrix.setName('Test matrix - ' + str(random.randint(1, 10)))
         matrix.setDescription('Generated at ' + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
-        matrix.close(True)
+        matrix.close()
         del (matrix)
 
     def test_load(self):
@@ -50,7 +50,7 @@ class TestAequilibraeMatrix(TestCase):
             self.fail('Assigning to matrix view did not work')
         self.new_matrix.setName('Test matrix - ' + str(random.randint(1, 10)))
         self.new_matrix.setDescription('Generated at ' + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
-        self.new_matrix.close(True)
+        self.new_matrix.close()
 
     def test_copy(self):
         self.test_load()
@@ -61,13 +61,13 @@ class TestAequilibraeMatrix(TestCase):
 
         if not np.array_equal(matrix_copy.mat, self.new_matrix.mat):
             self.fail('Matrix copy was not perfect')
-        matrix_copy.close(True)
-        self.new_matrix.close(True)
+        matrix_copy.close()
+        self.new_matrix.close()
 
     def test_export(self):
         self.test_load()
         self.new_matrix.export(csv_export_name)
-        self.new_matrix.close(True)
+        self.new_matrix.close()
 
     def test_nan_to_num(self):
         self.test_load()

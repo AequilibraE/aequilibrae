@@ -25,6 +25,7 @@ import tempfile
 import os
 from shutil import copyfile
 import warnings
+from typing import List
 
 # CONSTANTS
 VERSION = 1  # VERSION OF THE MATRIX FORMAT
@@ -42,32 +43,43 @@ COMPRESSED = 1
 # TODO: Add check that the index 1 (or zero) has only unique values?
 
 
-"""
-Matrix structure
+# Matrix structure
+#
+# What:  Version | Compress flag | # cells: compressed matrix | # of zones | # of cores | # of indices (Y) | Data type |
+# Size:   uint8  |    uint8      |        uint64              |  uint32    |   uint8    |     uint8        |  uint8    |
+# Shape:     1   |       1       |           1                |     1      |            |       1          |     1     |
+# Offset:    0   |       1       |           2                |     10     |     14     |      15          |    16     |
+#
+#
+# What:    Data size |  matrix name | matrix description | Core names |   index names    |
+# Size:     uint8    |     S20      |          S144      |    S50     |      S20         |
+# Shape:      1      |      1       |            1       |  [cores]   |    [indices]     |
+# Offset:     17     |     18       |          38        |     182    |  182 + 50*cores  |
+#
+# What:         indices          |             Matrices                 |
+# Size:         uint64           |      f(Data type, Data size)         |
+# Shape:     [zones, indices]    |       [zones, zones, cores]          |
+# Offset:  18 + 50*cores + Y*20  |   18 + 50*cores + Y*20 + Y*zones*8   |
 
-What:   Version | Compress flag | # cells: compressed matrix | # of zones | # of cores | # of indices (Y) | Data type |
-Size:    uint8  |    uint8      |        uint64              |  uint32    |   uint8    |     uint8        |  uint8    |
-Shape:      1   |       1       |           1                |     1      |            |       1          |     1     |
-Offset:     0   |       1       |           2                |     10     |     14     |      15          |    16     |
 
-
-What:    Data size |  matrix name | matrix description | Core names |   index names    |
-Size:     uint8    |     S20      |          S144      |    S50     |      S20         |
-Shape:      1      |      1       |            1       |  [cores]   |    [indices]     |
-Offset:     17     |     18       |          38        |     182    |  182 + 50*cores  |
-
-What:         indices          |             Matrin-1                 |
-Size:         uint64           |      f(Data type, Data size)         |
-Shape:     [zones, indices]    |       [zones, zones, cores]          |
-Offset:  18 + 50*cores + Y*20  |   18 + 50*cores + Y*20 + Y*zones*8   | 
-
-"""
 matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
 
 
 class AequilibraeMatrix(object):
-    def __init__(self):
+    """
+    AequilibraeMatrix is a highly efficient matrix format that underlines all AequilibraE computation
 
+    It is capable of storing up to 256 different matrices (cores) per file, can have multiple indices to support matrix
+    aggregation and metadata of up to 144 caracters
+
+    It is based on NumPy's memory-mapped arrays, so it is highly efficient, and the format as a memory-blog on disk
+    makes it possible for other software to read the matrices as well.
+    """
+
+    def __init__(self):
+        """
+        Creates a memory instance for a matrix, that can be used to load an existing matrix or to create an empty one
+        """
         self.file_path = None
         self.dtype = None
         self.num_indices = None
@@ -78,7 +90,6 @@ class AequilibraeMatrix(object):
         self.matrix_hash = {}
         self.index = None
         self.indices = None
-        self.num_indices = None
         self.matrix = None
         self.matrices = None
         self.cores = None
@@ -87,10 +98,52 @@ class AequilibraeMatrix(object):
         self.names = None
         self.name = None
         self.description = None
+        self.current_index = None
         self.__version__ = VERSION  # Writes file version
 
-    def create_empty(self, file_name=None, zones=None, matrix_names=None, data_type=np.float64,
-                     index_names=None, compressed=False):
+    def create_empty(self, file_name: str = None, zones: int = None, matrix_names: List[str] = None,
+                     data_type: np.dtype = np.float64, index_names: List[str] = None, compressed: bool = False):
+        """
+        Creates an empty matrix in the AequilibraE format
+
+        Parameters
+        ----------
+        file_name: string
+            Local path to the matrix file
+
+        zones: integer
+            Number of zones in the model (Integer). Maximum number of zones in a matrix is 4,294,967,296
+
+        matrix_names: list
+            A regular Python list of names of the matrix. Limit is 50 characters each. Maximum number of cores per
+            matrix is 256
+
+        data_type: np.dtype, optional
+            Data type of the matrix as NUMPY data types (NP.int32, np.int64, np.float32, np.float64).
+            Dafaultis np.float64
+
+        index_names: list, optional
+            A regular Python list of names for indices. Limit is 20 characters each).
+            Maximum number of indices per matrix is 256
+
+        compressed: bool, optional
+            Whether it is a flat matrix or a compressed one(Boolean - Not yet implemented)
+
+        ------------------------------------------------------------
+        Example
+
+        >>> zones_in_the_model = 3317
+        >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
+        >>> mat.num_indices
+        1
+        >>> mat.zones
+        3317
+        >>> np.sum(mat[trips])
+        0.0
+        """
 
         self.file_path = file_name
         self.zones = zones
@@ -219,7 +272,7 @@ class AequilibraeMatrix(object):
         offset += self.num_indices * INDEX_NAME_MAX_LENGTH
         self.indices = np.memmap(self.file_path, dtype='uint64', offset=offset, mode='r+',
                                  shape=(self.zones, self.num_indices))
-        self.set_index(0)
+        self.set_index(self.index_names[0])
 
         # DATA
         offset += self.zones * 8 * self.num_indices
@@ -295,7 +348,7 @@ class AequilibraeMatrix(object):
                                  shape=(self.zones, self.num_indices))
         self.indices.fill(0)
         self.indices.flush()
-        self.set_index(0)
+        self.set_index(self.index_names[0])
 
         offset += self.zones * 8 * self.num_indices
         if self.compressed:
@@ -315,19 +368,40 @@ class AequilibraeMatrix(object):
         for i, v in enumerate(self.names):
             self.matrix[v] = self.matrices[:, :, i]
 
-    def set_index(self, index_to_set):
-        if isinstance(index_to_set, int):
-            if index_to_set >= self.num_indices:
-                raise ValueError('Index {} not available. Choose on interval [0, '
-                                 '{}]'.format(index_to_set, self.num_indices - 1))
-        elif isinstance(index_to_set, str):
-            if index_to_set in self.index:
-                index_to_set = self.index_names.index(index_to_set)
-            else:
-                raise ValueError('Index {} needs to be a string or its integer index.'.format(str(index_to_set)))
+    def set_index(self, index_to_set: str):
+        """
+                Sets the standard index to be the one the user wants to have be the one being used in all operations
+                during run time. The first index is ALWAYS the default one every time the matrix is instantiated
+
+                Parameters
+                ----------
+                index_to_set: string
+                    Name of the index to be used. The default index name is 'main_index'
+
+                ------------------------------------------------------------
+                Example
+
+                >>> zones_in_the_model = 3317
+                >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+                >>> index_list = ['tazs',  'census']
+
+                >>> mat = AequilibraeMatrix()
+                >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names=names_list, index_names =index_list )
+                >>> mat.num_indices
+                2
+                >>> mat.current_index
+                'tazs'
+                >>> mat.set_index('census')
+                >>> mat.current_index
+                'census'
+                """
+
+        if index_to_set in self.index_names:
+            ind_index = self.index_names.index(index_to_set)
+            self.index = self.indices[:, ind_index]
+            self.current_index = index_to_set
         else:
-            raise ValueError('Index {} not available. Choose one of {}'.format(index_to_set, str(self.index_names)))
-        self.index = self.indices[:, index_to_set]
+            raise ValueError('Index {} needs to be a string or its integer index.'.format(str(index_to_set)))
 
     def __getattr__(self, mat_name):
         if mat_name in object.__dict__:
@@ -339,29 +413,64 @@ class AequilibraeMatrix(object):
         raise AttributeError("No such method or matrix core! --> " + str(mat_name))
 
     # Transforms matrix from dense to CSR
-    def compress(self):
-        print(self.file_path + '. Method not implemented yet. All matrices are dense')
+    # def compress(self):
+    #     print(self.file_path + '. Method not implemented yet. All matrices are dense')
 
     # Transforms matrix from CSR to dense
-    def decompress(self):
-        print(self.file_path + '. Method not implemented yet. All matrices are dense')
+    # def decompress(self):
+    #     print(self.file_path + '. Method not implemented yet. All matrices are dense')
 
     # Adds index to matrix
-    def add_index(self):
-        print(self.file_path + '. Method not implemented yet. All indices need to exist during the matrix creation')
+    # def add_index(self):
+    #     print(self.file_path + '. Method not implemented yet. All indices need to exist during the matrix creation')
 
     # Adds index to matrix
-    def remove_index(self, index_number):
-        print(self.file_path + '. Method not implemented. Indices are fixed on matrix creation: ' + str(index_number))
+    # def remove_index(self, index_number):
+    #     print(self.file_path + '. Method not implemented. Indices are fixed on matrix creation: ' + str(index_number))
 
-    def close(self, flush=True):
-        if flush:
-            self.matrices.flush()
-            self.index.flush()
+    def close(self):
+        """
+        Removes matrix from memory and flushes all data to disk
+        """
+
+        self.matrices.flush()
+        self.index.flush()
         del self.matrices
         del self.index
 
-    def export(self, output_name, cores=None):
+    def export(self, output_name: str, cores: List[str] = None):
+        """
+        Exports the matrix to other formats. Formats currently supported: CSV
+
+        When exporting to AEM, the user can chose to export only a set of cores, but all indices are exported
+
+        When exporting to CSV, the active index wil;l be used, and all cores will be exported as separate columns in
+        the output file
+
+        Parameters
+        ----------
+        output_name: Name of the output file
+
+        cores: Names of the cores to be exported.
+
+         ------------------------------------------------------------
+        Example
+
+        >>> zones_in_the_model = 3317
+        >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
+        >>> mat.cores
+        ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+        >>> mat.export('my_new_path', ['Car trips', 'bike trips'])
+
+        >>> mat2 = AequilibraeMatrix()
+        >>> mat2.load('my_new_path')
+        >>> mat2.cores
+        ['Car trips', 'bike trips']
+        """
         fname, file_extension = os.path.splitext(output_name.upper())
 
         if file_extension not in ['.AEM', '.CSV']:
@@ -395,11 +504,54 @@ class AequilibraeMatrix(object):
             output.close()
             self.computational_view(names)
 
-    def load(self, file_path):
+    def load(self, file_path: str):
+        """
+                Loads matrix from disk. All cores and indices are load. First index is default
+
+                Parameters
+                ----------
+                file_path: Path to AEM file on disk
+                ------------------------------------------------------------
+                Example
+
+                >>> zones_in_the_model = 3317
+                >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+                >>> mat = AequilibraeMatrix()
+                >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
+                >>> mat.close()
+
+                >>> mat2 = AequilibraeMatrix()
+                >>> mat2.load('my/path/to/file')
+                >>> mat2.zones
+                3317
+                """
+
         self.file_path = file_path
         self.__load__()
 
-    def computational_view(self, core_list=None):
+    def computational_view(self, core_list: List[str] = None):
+        """
+        Creates a memory view for a list of matrices that is compatible with Cython memory buffers
+
+        It allows for AequilibraE matrices to be used in all parallelized algorithms within AequilibraE
+
+        Parameters
+        ----------
+        core_list: List with the names of all matrices that need to be in the buffer
+        ------------------------------------------------------------
+        Example
+
+        >>> zones_in_the_model = 3317
+        >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
+        >>> mat.computational_view(['bike trips', 'walk trips'])
+        >>> mat.view_names
+        ['bike trips', 'walk trips']
+        """
+
         self.matrix_view = None
         self.view_names = None
         if core_list is None:
@@ -426,7 +578,37 @@ class AequilibraeMatrix(object):
         elif len(core_list) > 1:
             self.matrix_view = self.matrices[:, :, self.names.index(core_list[0]):self.names.index(core_list[-1]) + 1]
 
-    def copy(self, output_name=None, cores=None, names=None, compress=None):
+    def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None):
+        """
+        Copies a list of cores (or all cores) from one matrix file to another one
+
+        Parameters
+        ----------
+        output_name: Name of the new matrix file
+
+        cores: List (str)
+            List of the matrix cores to be copied
+
+        names: List(str), optional
+            List with the new names for the cores (same list length as cores)
+
+        compress: bool
+            Whether you want to compress the matrix or not. NOT YET IMPLEMENTED
+        ------------------------------------------------------------
+        Example
+
+        >>> zones_in_the_model = 3317
+        >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
+        >>> mat.copy('my/new/path/to/file', cores=['bike trips', 'walk trips'], names=['bicycle', 'walking'])
+
+        >>> mat2 = AequilibraeMatrix()
+        >>> mat2.load('my/new/path/to/file')
+        >>> mat.cores
+        ['bicycle', 'walking']
+        """
         if output_name is None:
             output_name = self.random_name()
 
@@ -480,22 +662,62 @@ class AequilibraeMatrix(object):
         return output
 
     def rows(self):
-        return self.vector(axis=0)
+        # type: () -> np.array()
+        """
+            Returns row vector for the matrix in the computational view
+
+            Computational view needs to be set to a single matrix core
+
+            ------------------------------------------------------------
+            Example
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('my/path/to/file')
+            >>> mat.computational_view(mat.cores[0])
+            >>> mat.rows()
+            array([0.,...,0.])
+            """
+        return self.__vector(axis=0)
 
     def columns(self):
-        return self.vector(axis=1)
+        # type: () -> np.array()
+        """
+        Returns column vector for the matrix in the computational view
+
+        Computational view needs to be set to a single matrix core
+
+        ------------------------------------------------------------
+        Example
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.load('my/path/to/file')
+        >>> mat.computational_view(mat.cores[0])
+        >>> mat.columns()
+        array([0.,...,0.])
+        """
+        return self.__vector(axis=1)
 
     def nan_to_num(self):
+        """
+        Converts all NaN values in all cores in the computational view to zeros
+
+        ------------------------------------------------------------
+        Example
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.load('my/path/to/file')
+        >>> mat.computational_view(mat.cores[0])
+        >>> mat.nan_to_num()
+        """
         if np.issubdtype(self.dtype, np.floating) and self.matrix_view is not None:
             for m in self.view_names:
                 self.matrix[m][:, :] = np.nan_to_num(self.matrix[m])[:, :]
 
-    def vector(self, axis):
+    def __vector(self, axis: int):
         if self.view_names is None:
             raise ReferenceError('Matrix is not set for computation')
         if len(self.view_names) > 1:
             raise ValueError('Vector for a multi-core matrix is ambiguous')
-
         return self.matrix_view.astype(np.float).sum(axis=axis)[:]
 
     def __builds_hash__(self):
@@ -511,7 +733,26 @@ class AequilibraeMatrix(object):
                              'or floats with 16, 32 or 64 bits')
         return data_class
 
-    def setName(self, matrix_name):
+    def setName(self, matrix_name: str):
+        """
+        Sets the name for the matrix itself
+
+        Parameters
+        ----------
+        matrix_name: str
+            matrix name. Maximum length is 50 characters
+
+        ------------------------------------------------------------
+        Example
+
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.load('my/path/to/file')
+        >>> mat.setName('This is my example')
+        >>> mat.name
+        'This is my example'
+        """
+
         if matrix_name is not None:
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
                 matrix_name = str(matrix_name)[0:MATRIX_NAME_MAX_LENGTH]
@@ -519,7 +760,25 @@ class AequilibraeMatrix(object):
             np.memmap(self.file_path, dtype='S' + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode='r+',
                       shape=1)[0] = matrix_name
 
-    def setDescription(self, matrix_description):
+    def setDescription(self, matrix_description:str):
+        """
+        Sets description for the matrix
+
+        Parameters
+        ----------
+        matrix_name: str
+            Text with matrix description . Maximum length is 144 characters
+
+        ------------------------------------------------------------
+        Example
+
+
+        >>> mat = AequilibraeMatrix()
+        >>> mat.load('my/path/to/file')
+        >>> mat.setDescription('This is some text about this matrix of mine')
+        >>> mat.description
+        'This is some text about this matrix of mine'
+        """
         if matrix_description is not None:
             if len(str(matrix_description)) > MATRIX_DESCRIPTION_MAX_LENGTH:
                 matrix_description = str(matrix_description)[0:MATRIX_DESCRIPTION_MAX_LENGTH]
@@ -528,5 +787,15 @@ class AequilibraeMatrix(object):
                       mode='r+', shape=1)[0] = matrix_description
 
     @staticmethod
-    def random_name():
+    def random_name() -> str:
+        """
+        Returns a random name for a matrix with root in the temp directory of the user
+
+        ------------------------------------------------------------
+        Example
+
+
+        >>> name = AequilibraeMatrix().random_name()
+        '/tmp/Aequilibrae_matrix_54625f36-bf41-4c85-80fb-7fc2e3f3d76e.aem'
+        """
         return os.path.join(tempfile.gettempdir(), 'Aequilibrae_matrix_' + str(uuid.uuid4()) + '.aem')
