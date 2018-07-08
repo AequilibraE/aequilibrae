@@ -4,10 +4,16 @@ import numpy as np
 from setuptools import setup
 from setuptools import Extension
 from distutils.core import setup as cython_setup
+from subprocess import call
 
 sys.dont_write_bytecode = True
 
 os.system('python aequilibrae/paths/setup_Assignment.py build_ext --inplace')
+
+try:
+    call(["generate_docs.bat"])
+except:
+    pass
 
 if __name__ == "__main__":
     with open("README.md", "r") as fh:
