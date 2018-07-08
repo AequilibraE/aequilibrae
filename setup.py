@@ -7,7 +7,10 @@ from distutils.core import setup as cython_setup
 
 sys.dont_write_bytecode = True
 
-os.system('python aequilibrae/paths/setup_Assignment.py build_ext --inplace')
+here = os.path.dirname(os.path.realpath(__file__))
+whole_path = os.path.join(here, 'aequilibrae/paths','setup_Assignment.py')
+
+os.system('python ' + whole_path + 'build_ext --inplace')
 
 
 if __name__ == "__main__":
