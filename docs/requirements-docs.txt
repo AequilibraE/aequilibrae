@@ -1,6 +1,6 @@
 numpy
 pyaml
-PyQt5
+PyQt5==5.11
 pyshp
 cython
 enum34==1.1.6
