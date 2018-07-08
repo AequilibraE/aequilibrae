@@ -7,7 +7,6 @@ from distutils.core import setup as cython_setup
 
 sys.dont_write_bytecode = True
 
-os.system("generate_docs.bat")
 os.system('python aequilibrae/paths/setup_Assignment.py build_ext --inplace')
 
 
@@ -26,5 +25,11 @@ if __name__ == "__main__":
           author="Pedro Camargo",
           author_email="pedro@xl-optim.com",
           url="https://github.com/AequilibraE/aequilibrae",
-          license='See license.txt'
+          license='See license.txt',
+          classifiers=[
+              'Programming Language :: Python',
+              'Programming Language :: Python :: 3.5',
+              'Programming Language :: Python :: 3.6',
+              'Programming Language :: Python :: 3.7',
+          ],
           )
