@@ -9,4 +9,4 @@ sphinx-apidoc.exe -o docs/source/generated aequilibrae || goto :error
 
 pushd docs
 
-call make htmlhelp
+call make html

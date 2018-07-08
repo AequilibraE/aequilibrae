@@ -1,23 +1,21 @@
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       AequilibraE Matrix
- Purpose:    Implements a new class to represent multi-layer matrices
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2017-10-02
- Updated:
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
+# -----------------------------------------------------------------------------------------------------------
+# Package:    AequilibraE
+#
+# Name:       AequilibraE Matrix
+# Purpose:    Implements a new class to represent multi-layer matrices
+#
+# Original Author:  Pedro Camargo (c@margo.co)
+# Contributors:
+# Last edited by: Pedro Camargo
+#
+# Website:    www.AequilibraE.com
+# Repository:  https://github.com/AequilibraE/AequilibraE
+#
+# Created:    2018-07-08
+# Updated:
+# Copyright:   (c) AequilibraE authors
+# Licence:     See LICENSE.TXT
+# -----------------------------------------------------------------------------------------------------------
 
 import numpy as np
 import uuid
@@ -760,7 +758,7 @@ class AequilibraeMatrix(object):
             np.memmap(self.file_path, dtype='S' + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode='r+',
                       shape=1)[0] = matrix_name
 
-    def setDescription(self, matrix_description:str):
+    def setDescription(self, matrix_description: str):
         """
         Sets description for the matrix
 
