@@ -9,6 +9,7 @@ Imports aequilibrae modules
 import sys
 sys.dont_write_bytecode = True
 
+from .utils import WorkerThread
 from . import utils
 from . import paths
 from . import distribution
