@@ -10,7 +10,7 @@ sys.dont_write_bytecode = True
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, 'aequilibrae/paths','setup_Assignment.py')
 
-os.system('python ' + whole_path + 'build_ext --inplace')
+os.system('python ' + whole_path + ' build_ext --inplace')
 
 
 if __name__ == "__main__":
