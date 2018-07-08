@@ -7,7 +7,7 @@ from distutils.core import setup as cython_setup
 
 sys.dont_write_bytecode = True
 
-os.system("./generate_docs.bat")
+os.system("generate_docs.bat")
 os.system('python aequilibrae/paths/setup_Assignment.py build_ext --inplace')
 
 
