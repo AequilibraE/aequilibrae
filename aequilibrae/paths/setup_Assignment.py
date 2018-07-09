@@ -21,6 +21,7 @@
 
 from __future__ import division, print_function, absolute_import
 import sys
+import os
 
 sys.dont_write_bytecode = True
 
@@ -39,8 +40,11 @@ import Cython.Compiler.Options
 
 Cython.Compiler.Options.annotate = True
 
+here = os.path.dirname(os.path.realpath(__file__))
+whole_path = os.path.join(here, 'AoN.pyx')
+
 ext_module = Extension('AoN',
-                       ["AoN.pyx"],
+                       [whole_path],
                        # extra_compile_args=['/fopenmp'],
                        # extra_link_args=['/fopenmp'],
                        include_dirs=[np.get_include()])
