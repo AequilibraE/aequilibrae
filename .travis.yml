@@ -6,8 +6,6 @@ python:
 #  - "3.7"
   - "3.7-dev"
 os: linux
-#virtualenv:
-#  system_site_packages: true
 before_install:
   - sudo apt-get install -y libspatialite-dev
 
@@ -19,12 +17,10 @@ install:
   - pip install pytest pytest-cov coveralls pycodestyle
 
 script:
-
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  # or pytest for Python versions 3.6 and higher
   - pytest --cov aequilibrae --cov-report term-missing
 after_success:
 - coveralls
