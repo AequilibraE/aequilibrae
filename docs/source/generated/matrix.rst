@@ -4,18 +4,18 @@ aequilibrae.matrix package
 Submodules
 ----------
 
-aequilibrae.matrix.aequilibrae\_data module
+matrix.aequilibrae\_data module
 -------------------------------------------
 
-.. automodule:: aequilibrae.matrix.aequilibrae_data
+.. automodule:: matrix.aequilibrae_data
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.matrix.aequilibrae\_matrix module
+matrix.aequilibrae\_matrix module
 ---------------------------------------------
 
-.. automodule:: aequilibrae.matrix.aequilibrae_matrix
+.. automodule:: matrix.aequilibrae_matrix
     :members:
     :undoc-members:
     :show-inheritance:
@@ -24,7 +24,7 @@ aequilibrae.matrix.aequilibrae\_matrix module
 Module contents
 ---------------
 
-.. automodule:: aequilibrae.matrix
+.. automodule:: matrix
     :members:
     :undoc-members:
     :show-inheritance:

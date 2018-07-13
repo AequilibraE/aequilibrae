@@ -1,4 +1,4 @@
-aequilibrae.paths package
+paths package
 =========================
 
 Subpackages
@@ -6,71 +6,71 @@ Subpackages
 
 .. toctree::
 
-    aequilibrae.paths.results
+    paths.results
 
 Submodules
 ----------
 
-aequilibrae.paths.AoN module
+paths.AoN module
 ----------------------------
 
-.. automodule:: aequilibrae.paths.AoN
+.. automodule:: paths.AoN
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.all\_or\_nothing module
+paths.all\_or\_nothing module
 -----------------------------------------
 
-.. automodule:: aequilibrae.paths.all_or_nothing
+.. automodule:: paths.all_or_nothing
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.basic\_path\_finding module
+paths.basic\_path\_finding module
 ---------------------------------------------
 
-.. automodule:: aequilibrae.paths.basic_path_finding
+.. automodule:: paths.basic_path_finding
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.graph module
+paths.graph module
 ------------------------------
 
-.. automodule:: aequilibrae.paths.graph
+.. automodule:: paths.graph
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.multi\_threaded\_aon module
+paths.multi\_threaded\_aon module
 ---------------------------------------------
 
-.. automodule:: aequilibrae.paths.multi_threaded_aon
+.. automodule:: paths.multi_threaded_aon
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.multi\_threaded\_skimming module
+paths.multi\_threaded\_skimming module
 --------------------------------------------------
 
-.. automodule:: aequilibrae.paths.multi_threaded_skimming
+.. automodule:: paths.multi_threaded_skimming
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.network\_skimming module
+paths.network\_skimming module
 ------------------------------------------
 
-.. automodule:: aequilibrae.paths.network_skimming
+.. automodule:: paths.network_skimming
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.paths.setup\_Assignment module
+paths.setup\_Assignment module
 ------------------------------------------
 
-.. automodule:: aequilibrae.paths.setup_Assignment
+.. automodule:: paths.setup_Assignment
     :members:
     :undoc-members:
     :show-inheritance:
@@ -79,7 +79,7 @@ aequilibrae.paths.setup\_Assignment module
 Module contents
 ---------------
 
-.. automodule:: aequilibrae.paths
+.. automodule:: paths
     :members:
     :undoc-members:
     :show-inheritance:

@@ -6,26 +6,26 @@ Subpackages
 
 .. toctree::
 
-    aequilibrae.distribution
-    aequilibrae.matrix
-    aequilibrae.paths
-    aequilibrae.transit
+    distribution
+    matrix
+    paths
+    transit
 
 Submodules
 ----------
 
-aequilibrae.parameters module
+parameters module
 -----------------------------
 
-.. automodule:: aequilibrae.parameters
+.. automodule:: parameters
     :members:
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.reserved\_fields module
+reserved\_fields module
 -----------------------------------
 
-.. automodule:: aequilibrae.reserved_fields
+.. automodule:: reserved_fields
     :members:
     :undoc-members:
     :show-inheritance:
