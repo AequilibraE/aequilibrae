@@ -6,12 +6,12 @@ Subpackages
 
 .. toctree::
 
-    aequilibrae.transit.gtfs
+    transit.gtfs
 
 Module contents
 ---------------
 
-.. automodule:: aequilibrae.transit
+.. automodule:: transit
     :members:
     :undoc-members:
     :show-inheritance:
