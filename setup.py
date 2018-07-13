@@ -10,16 +10,16 @@ sys.dont_write_bytecode = True
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, 'aequilibrae/paths','setup_Assignment.py')
 
-print('python ' + whole_path + ' build_ext --inplace')
 os.system('python ' + whole_path + ' build_ext --inplace')
 
+a = [pkg for pkg in find_packages('aequilibrae')]+ ['aequilibrae']
 
 if __name__ == "__main__":
     with open("README.md", "r") as fh:
         long_description = fh.read()
 
     setup(install_requires=['numpy', 'cython'],
-          packages=[pkg for pkg in find_packages('aequilibrae')],
+          packages=[pkg for pkg in find_packages('aequilibrae')] + ['aequilibrae'],
           package_dir={'': 'aequilibrae'},
           zip_safe=False,
           name='aequilibrae',
