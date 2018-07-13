@@ -1,5 +1,8 @@
 """
 Aequilibrae Matrix
+
+Implements a new class to represent multi-layer matrices that can be multi-threaded
+
 """
 """-----------------------------------------------------------------------------------------------------------
 Package:    AequilibraE
