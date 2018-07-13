@@ -4,7 +4,7 @@ aequilibrae.matrix package
 Submodules
 ----------
 
-aequilibrae.matrix.aequilibrae\_data module
+matrix.aequilibrae\_data module
 -------------------------------------------
 
 .. automodule:: matrix.aequilibrae_data
@@ -12,7 +12,7 @@ aequilibrae.matrix.aequilibrae\_data module
     :undoc-members:
     :show-inheritance:
 
-aequilibrae.matrix.aequilibrae\_matrix module
+matrix.aequilibrae\_matrix module
 ---------------------------------------------
 
 .. automodule:: matrix.aequilibrae_matrix
