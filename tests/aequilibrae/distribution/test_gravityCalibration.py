@@ -21,6 +21,7 @@ impedance.index[:] = np.arange(impedance.zones) + 100
 impedance.computational_view(['impedance'])
 
 args['matrix_names'] = ['base_matrix']
+args['file_name'] = AequilibraeMatrix().random_name()
 matrix = AequilibraeMatrix()
 matrix.create_empty(**args)
 matrix.base_matrix[:, :] = np.random.rand(zones, zones)[:,:]  * 1000

@@ -9,9 +9,11 @@ import copy
 import zipfile
 import csv
 import logging
+import csv
+from io import BytesIO
 from tempfile import gettempdir
 from ...reference_files import spatialite_database
-from ... import WorkerThread
+from ...utils import WorkerThread
 # from ...utils import WorkerThread
 from ...parameters import Parameters
 
@@ -625,11 +627,13 @@ class create_gtfsdb(WorkerThread):
         txt.flush()
         txt.close()
 
-        with codecs.open(tmp_file, 'r', 'utf-8') as feed_file:
-            data = feed_file.read().split('\n')
-            data[0] = data[0].encode('ascii', 'ignore')
-
-        data = np.genfromtxt(data, delimiter=',', names=True, dtype=None, )
+        with open(tmp_file, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            data = [','.join(row) for row in reader]
+        data[0] = data[0].encode('ascii', 'ignore')
+        data[0] = data[0].decode('UTF-8')
+        data = np.genfromtxt(BytesIO('\n'.join(data[1:]).encode()), delimiter=',', dtype=None,
+                          names=data[0].split(','))
 
         if column_order:
             col_names = [x for x in column_order.keys() if x in data.dtype.names]

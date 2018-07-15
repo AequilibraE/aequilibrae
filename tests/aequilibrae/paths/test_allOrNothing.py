@@ -4,6 +4,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import allOrNothing, Graph, AssignmentResults
 import sys, os
 import numpy as np
+from tempfile import gettempdir
 
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
@@ -21,7 +22,7 @@ class TestAllOrNothing(TestCase):
         # None implies that only the cost field will be skimmed
 
         # Prepares the matrix for assignment
-        args = {'file_name': '/tmp/my_matrix.aem',
+        args = {'file_name': os.path.join(gettempdir(),'my_matrix.aem'),
                 'zones': g.num_zones,
                 'matrix_names': ['cars', 'trucks'],
                 'index_names': ['my indices']}
@@ -41,8 +42,8 @@ class TestAllOrNothing(TestCase):
         assig = allOrNothing(matrix, g, res)
         assig.execute()
 
-        res.save_to_disk('/tmp/link_loads.aed')
-        res.save_to_disk('/tmp/link_loads.csv')
+        res.save_to_disk(os.path.join(gettempdir(),'link_loads.aed'))
+        res.save_to_disk(os.path.join(gettempdir(),'link_loads.csv'))
 
         matrix.computational_view()
         # Performs assignment
@@ -51,5 +52,5 @@ class TestAllOrNothing(TestCase):
 
         assig = allOrNothing(matrix, g, res)
         assig.execute()
-        res.save_to_disk('/tmp/link_loads_2_classes.aed')
-        res.save_to_disk('/tmp/link_loads_2_classes.csv')
+        res.save_to_disk(os.path.join(gettempdir(),'link_loads_2_classes.aed'))
+        res.save_to_disk(os.path.join(gettempdir(),'link_loads_2_classes.csv'))

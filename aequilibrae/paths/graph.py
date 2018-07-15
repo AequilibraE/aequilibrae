@@ -600,33 +600,34 @@ class Graph:
         mygraph['graph_id'] = self.__id__
         mygraph['graph_version'] = self.__version__
 
-        pickle.dump(mygraph, open(filename, 'wb'))
+        with open(filename, 'wb') as f:
+            pickle.dump(mygraph, f)
 
     def load_from_disk(self, filename):
-        mygraph = pickle.load(open(filename, 'rb'))
-        self.description = mygraph['description']
-        self.num_links = mygraph['num_links']
-        self.num_nodes = mygraph['num_nodes']
-        self.network = mygraph['network']
-        self.graph = mygraph['graph']
-        self.all_nodes = mygraph['all_nodes']
-        self.nodes_to_indices = mygraph['nodes_to_indices']
-        self.num_nodes = mygraph['num_nodes']
-        self.fs = mygraph['fs']
-        self.b_node = mygraph['b_node']
-        self.cost = mygraph['cost']
-        self.cost_field = mygraph['cost_field']
-        self.skims = mygraph['skims']
-        self.skim_fields = mygraph['skim_fields']
-        self.ids = mygraph['ids']
-        self.block_centroid_flows = mygraph['block_centroid_flows']
-        self.centroids = mygraph['centroids']
-        self.status = mygraph['status']
-        self.network_ok = mygraph['network_ok']
-        self.type_loaded = mygraph['type_loaded']
-        self.__id__ = mygraph['graph_id']
-        self.__version__ = mygraph['graph_version']
-        del mygraph
+        with open(filename, 'rb') as f:
+            mygraph = pickle.load(f)
+            self.description = mygraph['description']
+            self.num_links = mygraph['num_links']
+            self.num_nodes = mygraph['num_nodes']
+            self.network = mygraph['network']
+            self.graph = mygraph['graph']
+            self.all_nodes = mygraph['all_nodes']
+            self.nodes_to_indices = mygraph['nodes_to_indices']
+            self.num_nodes = mygraph['num_nodes']
+            self.fs = mygraph['fs']
+            self.b_node = mygraph['b_node']
+            self.cost = mygraph['cost']
+            self.cost_field = mygraph['cost_field']
+            self.skims = mygraph['skims']
+            self.skim_fields = mygraph['skim_fields']
+            self.ids = mygraph['ids']
+            self.block_centroid_flows = mygraph['block_centroid_flows']
+            self.centroids = mygraph['centroids']
+            self.status = mygraph['status']
+            self.network_ok = mygraph['network_ok']
+            self.type_loaded = mygraph['type_loaded']
+            self.__id__ = mygraph['graph_id']
+            self.__version__ = mygraph['graph_version']
         self.build_derived_properties()
 
     def build_derived_properties(self):
