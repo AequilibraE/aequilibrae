@@ -66,12 +66,13 @@ class SyntheticGravityModel:
 
     def load(self, file_name):
         try:
-            model = yaml.safe_load(open(file_name, 'r'))[self.model_type]
-            for key, value in model.items():
-                if key in self.members:
-                    self.__dict__[key] = value
-                else:
-                    raise ValueError('Model has unknown parameters: ' + str(key))
+            with open(file_name, 'r') as f:
+                model = yaml.safe_load(f)[self.model_type]
+                for key, value in model.items():
+                    if key in self.members:
+                        self.__dict__[key] = value
+                    else:
+                        raise ValueError('Model has unknown parameters: ' + str(key))
         except:
             raise ValueError('File provided is not a valid Synthetic Gravity Model')
 

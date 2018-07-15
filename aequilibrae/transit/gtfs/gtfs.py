@@ -6,7 +6,8 @@ from .calendar_dates import CalendarDates
 from .stop import Stop
 from .route import Route
 import copy
-
+import csv
+from io import BytesIO
 
 class GTFS:
     """
@@ -189,12 +190,14 @@ class GTFS:
 
     @staticmethod
     def open(file_name, column_order=False):
-        # Read the stops and cleans the names of the columns
-        with codecs.open(file_name, 'r', 'utf-8') as feed_file:
-            data = feed_file.read().split('\n')
-            data[0] = data[0].encode('ascii', 'ignore')
+        with open(file_name, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            data = [','.join(row) for row in reader]
+        data[0] = data[0].encode('ascii', 'ignore')
+        data[0] = data[0].decode('UTF-8')
+        data = np.genfromtxt(BytesIO('\n'.join(data[1:]).encode()), delimiter=',', dtype=None,
+                          names=data[0].split(','))
 
-        data = np.genfromtxt(data, delimiter=',', names=True, dtype=None, encoding='bytes')
         if column_order:
             col_names = [x for x in column_order.keys() if x in data.dtype.names]
             data = data[col_names]
