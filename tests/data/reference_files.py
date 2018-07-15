@@ -11,3 +11,7 @@ gtfs_zip = join(dirname(dirname(abspath(__file__))), 'data/gtfs.zip')
 gtfs_db_output = join(path_test, 'test.db')
 
 # For the skimming test
+
+
+# For project tests
+project_file = join(dirname(dirname(abspath(__file__))),'data', 'AequilibraE_Project.sqlite')

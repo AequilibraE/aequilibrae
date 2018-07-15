@@ -13,25 +13,17 @@
 -- Queries create structure for the supply model (network) and for the demand side. It is all under development
 --
 --
-
 #
 -- Creates the metadata table for the AequilibraE project
-CREATE TABLE 'model_metadata' (model_name VARCHAR, --
-                      author VARCHAR, -- Long description for mode
-                      contact_info VARCHAR,
-                      description VARCHAR,
-                      origin_of_network VARCHAR,
-                      origin_of_demand VARCHAR,
-                      license VARCHAR
-                     )
-                    
+CREATE TABLE 'model_metadata' (item VARCHAR PRIMARY KEY, --
+                      text VARCHAR);
 #
 -- Creates a log for model changes
 CREATE TABLE 'model_log' (ogc_fid INTEGER PRIMARY KEY,
                           log_type VARCHAR, -- Automatic Vs. Manual
                           change_date DATETIME,
                           description VARCHAR -- Long description for change
-                          )
+                          );
 
 #
 -- Creates a log for model changes
@@ -39,7 +31,7 @@ CREATE TABLE 'model_run_log' (ogc_fid INTEGER PRIMARY KEY,
                               log_type VARCHAR, -- Automatic Vs. Manual
                               run_description VARCHAR, -- Long description for mode
                               run_date DATETIME
-                              )
+                              );
 
 
 #
@@ -50,10 +42,10 @@ CREATE TABLE 'modes' (mode_id VARCHAR UNIQUE PRIMARY KEY NOT NULL, -- 1-characte
                             length("mode_id") = 1 AND
                             pce > 0
                           )
-                    )
+                    );
 
--- it is recommended to use the listed edit widgets in QGIS;
 #
+-- it is recommended to use the listed edit widgets in QGIS;
 CREATE TABLE 'links' (
   ogc_fid INTEGER PRIMARY KEY, -- Hidden widget
   link_id INTEGER UNIQUE NOT NULL, -- Text edit widget with 'Not null' constraint
@@ -77,7 +69,6 @@ CREATE INDEX links_a_node_idx ON links (a_node);
 CREATE INDEX links_b_node_idx ON links (b_node);
 #
 -- it is recommended to use the listed edit widgets in QGIS
-#
 CREATE TABLE 'nodes' (
   ogc_fid INTEGER PRIMARY KEY, -- Hidden widget
   node_id INTEGER UNIQUE NOT NULL, -- Text edit widget with 'Not null' constraint
@@ -97,6 +88,6 @@ CREATE VIEW centroids AS
     FROM nodes
     WHERE nodes.centroid = 1
         AND A.bool=1
-        AND B.bool=0
+        AND B.bool=0;
         
         
