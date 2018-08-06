@@ -165,8 +165,8 @@ class Graph:
 
             all_types.append(self.__float_type)
             all_types.append(self.__float_type)
-            all_titles.append((k + '_ab').encode('ascii', 'ignore'))
-            all_titles.append((k + '_ba').encode('ascii', 'ignore'))
+            all_titles.append((k + '_ab'))
+            all_titles.append((k + '_ba'))
             dict_field[k + '_ab'] = skim_index
             dict_field[k + '_ba'] = skim_index
 
