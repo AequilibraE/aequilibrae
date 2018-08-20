@@ -328,7 +328,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if origin_index > graph.num_nodes:
         return "Centroid " + str(orig) + " does not exist in the graph"
 
-    if graph_fs[orig] == graph_fs[orig + 1]:
+    if graph_fs[origin_index] == graph_fs[origin_index + 1]:
         return "Centroid " + str(orig) + " does not exist in the graph"
 
     if VERSION_COMPILED != graph.__version__:
