@@ -325,7 +325,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if orig not in graph.centroids:
         return "Centroid " + str(orig) + " is outside the range of zones in the graph"
 
-    if orig > graph.num_nodes:
+    if origin_index > graph.num_nodes:
         return "Centroid " + str(orig) + " does not exist in the graph"
 
     if graph_fs[orig] == graph_fs[orig + 1]:
