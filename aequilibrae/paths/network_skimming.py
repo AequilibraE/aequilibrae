@@ -75,9 +75,10 @@ class NetworkSkimming(WorkerThread):
         pool = ThreadPool(self.results.cores)
         all_threads = {'count': 0}
         for orig in list(self.graph.centroids):
-            if orig >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append("Centroid " + str(orig) + " does not exist in the graph")
-            elif self.graph.fs[int(orig)] == self.graph.fs[int(orig + 1)]:
+            i = int(self.graph.nodes_to_indices[orig])
+            if i >= self.graph.nodes_to_indices.shape[0]:
+                self.report.append("Centroid " + str(i) + " does not exist in the graph")
+            elif self.graph.fs[int(i)] == self.graph.fs[int(i + 1)]:
                 self.report.append("Centroid " + str(orig) + " does not exist in the graph")
             else:
                 pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
