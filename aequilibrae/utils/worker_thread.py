@@ -32,7 +32,7 @@ class WorkerThread(QThread):
     def run(self):
         self.running = True
         success = self.doWork()
-        self.jobFinished.emit()
+        self.jobFinished.emit(success)
 
     def stop(self):
         self.running = False
