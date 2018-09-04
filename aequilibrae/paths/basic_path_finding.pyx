@@ -23,6 +23,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
+from libc.math cimport isnan
 
 include 'parameters.pxi'
 from libc.stdlib cimport abort, malloc, free
@@ -51,7 +52,8 @@ cpdef void network_loading(long classes,
     # Loads the demand to the centroids
     for j in range(classes):
         for i in range(zones):
-            node_load[i, j] = demand[i, j]
+            if not isnan(demand[i, j]):
+                node_load[i, j] = demand[i, j]
 
     #Recursevely cascades to the origin
     for i in xrange(found, 0, -1):
