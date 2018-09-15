@@ -3,11 +3,6 @@
 set -eu
 
 main() {
-
-    which python
-    export PATH="/usr/local/opt/python/libexec/bin:$PATH"
-    which python
-
     setup_pip
     install_requirements
     build_libs
@@ -21,7 +16,6 @@ setup_pip() {
 install_requirements() {
     pip install -r requirements.txt
     pip install numpy --upgrade
-    pip install cython
     pip install codecov
     pip install pytest pytest-cov coveralls pycodestyle
 }
