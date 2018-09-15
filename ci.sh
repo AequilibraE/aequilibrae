@@ -3,6 +3,7 @@
 set -eu
 
 main() {
+    # stuff
     setup_pip
     install_requirements
     build_libs
