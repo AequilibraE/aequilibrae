@@ -8,12 +8,14 @@ main() {
     install_requirements
     build_libs
 
-    if [[ "$1" == "test" ]]; then
+    local command=$1
+    if [[ "${command}" == "test" ]]; then
         run_tests
-    elif [[ "$1" == "publish" ]]; then
-        package_for_publication
+    elif [[ "${command}" == "publish" ]]; then
+        local os=$2
+        package_for_publication os
     else
-        echo "Unknown option ${1}"
+        echo "Unknown option ${command}"
         exit -1
     fi
 
@@ -45,7 +47,9 @@ run_tests() {
 }
 
 package_for_publication() {
+    local os=$1
     echo "I'm a publishing it now!!!"
+    echo "Getting it ready for OS [${os}]"
 }
 
 main "$@"

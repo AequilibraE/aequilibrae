@@ -48,3 +48,16 @@ jobs:
   #   displayName: 'Build sdist'
 
   - script: ./ci.sh publish
+
+- job: 'Publish_Mac'
+  dependsOn: 'Test'
+  pool:
+    vmImage: 'macOS 10.13'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      architecture: 'x64'
+
+  - script: ./ci.sh publish
