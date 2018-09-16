@@ -28,7 +28,10 @@ build_libs() {
 }
 
 run_tests() {
-    pytest --cov aequilibrae --cov-report term-missing
+    pytest \
+        --cov aequilibrae \
+        --cov-report term-missing \
+        --junitxml=junit_report.xml
 }
 
 main "$@"
