@@ -73,4 +73,4 @@ jobs:
       versionSpec: '3.x'
       architecture: 'x64'
 
-  - script: ./ci.sh publish windows
+  - script: ./publish_on_windows.bat
