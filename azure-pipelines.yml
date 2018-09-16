@@ -47,7 +47,7 @@ jobs:
   # - script: python setup.py sdist
   #   displayName: 'Build sdist'
 
-  - script: ./ci.sh publish
+  - script: ./ci.sh publish linux
 
 - job: 'Publish_Mac'
   dependsOn: 'Test'
@@ -60,4 +60,17 @@ jobs:
       versionSpec: '3.x'
       architecture: 'x64'
 
-  - script: ./ci.sh publish
+  - script: ./ci.sh publish mac
+
+- job: 'Publish_Win'
+  dependsOn: 'Test'
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      architecture: 'x64'
+
+  - script: ./ci.sh publish windows
