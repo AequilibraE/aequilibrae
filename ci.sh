@@ -10,7 +10,7 @@ main() {
 
     if [[ "$1" == "test" ]]; then
         run_tests
-    else if [[ "$1" == "publish" ]]; then
+    elif [[ "$1" == "publish" ]]; then
         package_for_publication
     else
         echo "Unknown option ${1}"
