@@ -13,7 +13,7 @@ main() {
         run_tests
     elif [[ "${command}" == "publish" ]]; then
         local os=$2
-        package_for_publication os
+        package_for_publication ${os}
     else
         echo "Unknown option ${command}"
         exit -1
