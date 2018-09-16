@@ -33,7 +33,7 @@ jobs:
       testRunTitle: 'Python $(python.version)'
     condition: succeededOrFailed()
 
-- job: 'Publish for Linux'
+- job: 'Publish_Linux'
   dependsOn: 'Test'
   pool:
     vmImage: 'Ubuntu 16.04'
