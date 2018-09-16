@@ -7,6 +7,16 @@ main() {
     setup_pip
     install_requirements
     build_libs
+
+    if [[ "$1" == "test" ]]; then
+        run_tests
+    else if [[ "$1" == "publish" ]]; then
+        package_for_publication
+    else
+        echo "Unknown option ${1}"
+        exit(-1)
+    fi
+
     run_tests
 }
 
@@ -32,6 +42,10 @@ run_tests() {
         --cov aequilibrae \
         --cov-report term-missing \
         --junitxml=junit_report.xml
+}
+
+package_for_publication() {
+    echo "I'm a publishing it now!!!"
 }
 
 main "$@"

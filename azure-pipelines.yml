@@ -24,7 +24,7 @@ jobs:
       versionSpec: '$(python.version)'
       architecture: 'x64'
 
-  - script: ./ci.sh
+  - script: ./ci.sh test
     displayName: 'Run Tests'
 
   - task: PublishTestResults@2
@@ -33,7 +33,7 @@ jobs:
       testRunTitle: 'Python $(python.version)'
     condition: succeededOrFailed()
 
-- job: 'Publish'
+- job: 'Publish for Linux'
   dependsOn: 'Test'
   pool:
     vmImage: 'Ubuntu 16.04'
@@ -44,5 +44,7 @@ jobs:
       versionSpec: '3.x'
       architecture: 'x64'
 
-  - script: python setup.py sdist
-    displayName: 'Build sdist'
+  # - script: python setup.py sdist
+  #   displayName: 'Build sdist'
+
+  - script: ./ci.sh publish
