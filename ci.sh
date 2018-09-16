@@ -14,7 +14,7 @@ main() {
         package_for_publication
     else
         echo "Unknown option ${1}"
-        exit(-1)
+        exit -1
     fi
 
     run_tests
