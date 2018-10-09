@@ -10,7 +10,7 @@ before_install:
   - sudo apt-get install -y libspatialite-dev
 
 script:
-  - ./ci.sh
+  - ./ci.sh test
 
 after_success:
 - coveralls
