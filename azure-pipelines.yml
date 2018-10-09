@@ -63,10 +63,10 @@ jobs:
   - script: ./ci.sh publish mac
 
   - task: PublishBuildArtifacts@1
-  inputs:
-    pathToPublish: '$(build.artifactStagingDirectory)'
-    artifactName: 'ci.sh'
-    artifactType: 'file'
+    inputs:
+      pathToPublish: '$(build.artifactStagingDirectory)'
+      artifactName: 'ci.sh'
+      artifactType: 'file'
 
 - job: 'Publish_Win'
   dependsOn: 'Test'
