@@ -4,14 +4,15 @@ import numpy as np
 from setuptools import setup, find_packages
 from setuptools import Extension
 from distutils.core import setup as cython_setup
+from Cython.Distutils import build_ext
 
 sys.dont_write_bytecode = True
 
 here = os.path.dirname(os.path.realpath(__file__))
-whole_path = os.path.join(here, 'aequilibrae/paths','setup_Assignment.py')
-
-os.system('python ' + whole_path + ' build_ext --inplace')
-
+whole_path = os.path.join(here, 'aequilibrae/paths', 'AoN.pyx')
+ext_module = Extension('AoN',
+                       [whole_path],
+                       include_dirs=[np.get_include()])
 if __name__ == "__main__":
     with open("README.md", "r") as fh:
         long_description = fh.read()
@@ -35,4 +36,6 @@ if __name__ == "__main__":
               'Programming Language :: Python :: 3.6',
               'Programming Language :: Python :: 3.7',
           ],
+          cmdclass={"build_ext": build_ext},
+          ext_modules=[ext_module]
           )
