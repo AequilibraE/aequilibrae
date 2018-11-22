@@ -494,7 +494,7 @@ class create_gtfsdb(WorkerThread):
     def __create_geometry(self):
         # enable extension loading
         self.conn.enable_load_extension(True)
-        self.cursor.execute("SELECT load_extension('mod_spatialite.so')")
+        self.cursor.execute("SELECT load_extension('mod_spatialite')")
         self.conn.commit()
         # We need to create three things here:
         # 1. A geometry column in the stops table
