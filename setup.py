@@ -13,7 +13,7 @@ whole_path = os.path.join(here, 'aequilibrae/paths', 'AoN.pyx')
 ext_module = Extension('AoN',
                        [whole_path],
                        include_dirs=[np.get_include()])
-if __name__ == "_  _main__":
+if __name__ == "__main__":
     with open("README.md", "r") as fh:
         long_description = fh.read()
 
