@@ -1,0 +1,6 @@
+FROM python:3.6
+
+RUN \
+  pip install cython && \
+  pip install numpy && \
+  python3 -m pip install --user --upgrade setuptools wheel
