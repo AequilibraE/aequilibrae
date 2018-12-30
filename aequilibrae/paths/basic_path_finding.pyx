@@ -56,7 +56,7 @@ cpdef void network_loading(long classes,
                 node_load[i, j] = demand[i, j]
 
     #Recursevely cascades to the origin
-    for i in xrange(found, 0, -1):
+    for i in range(found, 0, -1):
         node = reached_first[i]
 
         # captures how we got to that node
@@ -156,10 +156,10 @@ cdef void blocking_centroid_flows(int action,
     cdef long long i
 
     if action == 0: # We are unblocking
-        for i in xrange(fs[orig], fs[orig + 1]):
+        for i in range(fs[orig], fs[orig + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
-        for i in xrange(fs[orig], fs[orig + 1]):
+        for i in range(fs[orig], fs[orig + 1]):
             temp_b_nodes[i] = orig
 
 
@@ -187,7 +187,7 @@ cdef void skim_single_path(long origin,
             node_skims[origin, j] = 0
 
     # Cascade skimming
-    for i in xrange(1, found + 1):
+    for i in range(1, found + 1):
         node = reached_first[i]
 
         # captures how we got to that node
@@ -224,7 +224,7 @@ cpdef void skim_multiple_fields(long origin,
             node_skims[origin, j] = 0
 
     # Cascade skimming
-    for i in xrange(1, found + 1):
+    for i in range(1, found + 1):
         node = reached_first[i]
 
         # captures how we got to that node
@@ -290,7 +290,7 @@ cpdef int path_finding(long origin,
         found += 1
         v.state = 1
 
-        for j in xrange(graph_fs[v.index],graph_fs[v.index + 1]):
+        for j in range(graph_fs[v.index],graph_fs[v.index + 1]):
             j_current = csr_indices[j]
             current_node = &nodes[j_current]
 
