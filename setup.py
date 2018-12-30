@@ -24,7 +24,7 @@ if __name__ == "__main__":
           name='aequilibrae',
           long_description=long_description,
           long_description_content_type="text/markdown",
-          version='0.5.0',
+          version='0.5.1',
           description="A package for transportation modeling",
           author="Pedro Camargo",
           author_email="pedro@xl-optim.com",
