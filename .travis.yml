@@ -14,13 +14,13 @@ install:
   - pip install numpy --upgrade
   - pip install cython
   - pip install codecov
-  - pip install pytest pytest-cov pycodestyle
+  - pip install pytest pytest-cov coveralls pycodestyle
 
 script:
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  - pytest --cov=./
+  - pytest --cov aequilibrae
 after_success:
 - codecov
