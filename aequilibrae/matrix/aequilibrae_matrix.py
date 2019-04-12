@@ -281,7 +281,7 @@ class AequilibraeMatrix(object):
         self.matrix = {}
         for i, v in enumerate(self.names):
             self.matrix[v] = self.matrices[:, :, i]
-        self.__builds_hash__()
+        self.matrix_hash = self.__builds_hash__()
 
     def __write__(self):
         np.memmap(self.file_path, dtype='uint8', offset=0, mode='w+', shape=1)[0] = self.__version__

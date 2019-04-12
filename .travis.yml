@@ -1,10 +1,13 @@
+dist: xenial
 language: python
 python:
   - "3.5"
   - "3.6"
+  - "3.7"
+  - "3.5-dev"
   - "3.6-dev"
-#  - "3.7"
   - "3.7-dev"
+#  - "3.8-dev"
 os: linux
 before_install:
   - sudo apt-get install -y libspatialite-dev
@@ -14,7 +17,8 @@ install:
   - pip install numpy --upgrade
   - pip install cython
   - pip install codecov
-  - pip install pytest pytest-cov coveralls pycodestyle
+  - pip install pytest>=3.6
+  - pip install pytest-cov coveralls pycodestyle
 
 script:
   - cd aequilibrae/paths
