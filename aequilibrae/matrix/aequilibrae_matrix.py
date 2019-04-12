@@ -651,7 +651,7 @@ class AequilibraeMatrix(object):
             output.indices[:] = self.indices[:]
             for i, c in enumerate(cores):
                 output.matrices[:, :, i] = self.matrices[:, :, self.names.index(c)]
-            output.__builds_hash__()
+            self.matrix_hash = output.__builds_hash__()
             output.matrices.flush()
 
         return output
