@@ -14,7 +14,7 @@ ext_module = Extension('AoN',
                        [whole_path],
                        include_dirs=[np.get_include()])
 if __name__ == "__main__":
-    with open("README.md", "r") as fh:
+    with open("README.rst", "r") as fh:
         long_description = fh.read()
 
     setup(install_requires=['numpy', 'cython'],
