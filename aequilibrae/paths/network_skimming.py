@@ -1,48 +1,43 @@
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Network skimming
- Purpose:    Implement skimming algorithms based on Cython's path finding and skimming
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camrgo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2017-07-03
- Updated:    2017-05-07
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-
+import importlib
 import sys
-
-sys.dont_write_bytecode = True
-
-import numpy as np
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
-try:
+from .AoN import skimming_single_origin
+from .multi_threaded_skimming import MultiThreadedNetworkSkimming
+from ..utils import WorkerThread
+
+have_pyqt5 = importlib.util.find_spec("PyQt5")
+if have_pyqt5 is None:
+    pyqt = False
+else:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
     pyqt = True
-except:
-    pyqt = False
 
-from .multi_threaded_skimming import MultiThreadedNetworkSkimming
-
-from .AoN import skimming_single_origin
-
-# from ..utils import WorkerThread
-from ..utils import WorkerThread
+sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
+    """
+     Package:    AequilibraE
+
+     Name:       Network skimming
+     Purpose:    Implement skimming algorithms based on Cython's path finding and skimming
+
+     Original Author:  Pedro Camargo (c@margo.co)
+     Contributors:
+     Last edited by: Pedro Camrgo
+
+     Website:    www.AequilibraE.com
+     Repository:  https://github.com/AequilibraE/AequilibraE
+
+     Created:    2017-07-03
+     Updated:    2017-05-07
+     Copyright:   (c) AequilibraE authors
+     Licence:     See LICENSE.TXT
+     """
+
     skimming = SIGNAL(object)
 
     def __init__(self, graph, results, origins=None):
@@ -56,14 +51,10 @@ class NetworkSkimming(WorkerThread):
         self.cumulative = 0
 
         if results.__graph_id__ != graph.__id__:
-            raise ValueError(
-                "Results object not prepared. Use --> results.prepare(graph)"
-            )
+            raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
         if results.__graph_id__ is None:
-            raise ValueError(
-                "The results object was not prepared. Use results.prepare(graph)"
-            )
+            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
 
         elif results.__graph_id__ != graph.__id__:
             raise ValueError("The results object was prepared for a different graph")
@@ -82,13 +73,9 @@ class NetworkSkimming(WorkerThread):
         for orig in list(self.graph.centroids):
             i = int(self.graph.nodes_to_indices[orig])
             if i >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append(
-                    "Centroid " + str(orig) + " is beyond the domain of the graph"
-                )
+                self.report.append("Centroid " + str(orig) + " is beyond the domain of the graph")
             elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
-                self.report.append(
-                    "Centroid " + str(orig) + " does not exist in the graph"
-                )
+                self.report.append("Centroid " + str(orig) + " does not exist in the graph")
             else:
                 pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()

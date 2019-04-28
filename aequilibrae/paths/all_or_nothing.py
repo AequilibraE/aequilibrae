@@ -8,7 +8,6 @@ from .AoN import one_to_all
 from ..utils import WorkerThread
 
 have_pyqt5 = importlib.util.find_spec("PyQt5")
-
 if have_pyqt5 is None:
     pyqt = False
 else:
