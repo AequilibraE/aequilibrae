@@ -1,10 +1,33 @@
+"""
+-----------------------------------------------------------------------------------------------------------
+ Package:    AequilibraE
+
+ Name:       Traffic assignment
+ Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
+
+ Original Author:  Pedro Camargo (c@margo.co)
+ Contributors:
+ Last edited by: Pedro Camargo
+
+ Website:    www.AequilibraE.com
+ Repository:  https://github.com/AequilibraE/AequilibraE
+
+ Created:    15/09/2013
+ Updated:    2018-07-01
+ Copyright:   (c) AequilibraE authors
+ Licence:     See LICENSE.TXT
+-----------------------------------------------------------------------------------------------------------
+ """
+
+import importlib
 import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
-import importlib
+
 import numpy as np
-from .multi_threaded_aon import MultiThreadedAoN
+
 from .AoN import one_to_all
+from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 
 have_pyqt5 = importlib.util.find_spec("PyQt5")
@@ -15,30 +38,10 @@ else:
 
     pyqt = True
 
-
 sys.dont_write_bytecode = True
 
 
 class allOrNothing(WorkerThread):
-    """
-     Package:    AequilibraE
-
-     Name:       Traffic assignment
-     Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
-
-     Original Author:  Pedro Camargo (c@margo.co)
-     Contributors:
-     Last edited by: Pedro Camargo
-
-     Website:    www.AequilibraE.com
-     Repository:  https://github.com/AequilibraE/AequilibraE
-
-     Created:    15/09/2013
-     Updated:    2018-07-01
-     Copyright:   (c) AequilibraE authors
-     Licence:     See LICENSE.TXT
-     """
-
     assignment = SIGNAL(object)
 
     def __init__(self, matrix, graph, results):
