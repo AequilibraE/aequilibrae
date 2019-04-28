@@ -1,8 +1,7 @@
 import os
 import tempfile
-import uuid
 from unittest import TestCase
-import tempfile
+
 import numpy as np
 
 from aequilibrae.matrix import AequilibraEData

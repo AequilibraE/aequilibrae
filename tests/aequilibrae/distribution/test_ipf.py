@@ -1,20 +1,15 @@
 from unittest import TestCase
+
 import numpy as np
-import os, tempfile
 
 from aequilibrae.distribution import Ipf
-from aequilibrae.matrix import AequilibraEData, AequilibraeMatrix
-from tests.clean_after_tests import clean_after_tests
+from aequilibrae.matrix import AequilibraEData
+from aequilibrae.matrix import AequilibraeMatrix
 
 zones = 100
 
 # row vector
-args = {
-    "entries": zones,
-    "field_names": ["rows"],
-    "data_types": [np.float64],
-    "memory_mode": True,
-}
+args = {"entries": zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
 row_vector = AequilibraEData()
 row_vector.create_empty(**args)
 row_vector.rows[:] = np.random.rand(zones)[:] * 1000
@@ -26,9 +21,7 @@ column_vector.create_empty(**args)
 column_vector.columns[:] = np.random.rand(zones)[:] * 1000
 column_vector.index[:] = np.arange(zones)[:]
 # balance vectors
-column_vector.columns[:] = column_vector.columns[:] * (
-    row_vector.rows.sum() / column_vector.columns.sum()
-)
+column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
 
 # seed matrix_procedures
 name_test = AequilibraeMatrix().random_name()
