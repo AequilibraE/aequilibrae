@@ -1,15 +1,12 @@
-from unittest import TestCase
-from unittest import TestCase
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import allOrNothing, Graph, AssignmentResults
-import sys, os
-import numpy as np
+import os
 from tempfile import gettempdir
+from unittest import TestCase
 
-# Adds the folder with the data to the path and collects the paths to the files
-# lib_path = os.path.abspath(os.path.join('..', '../tests'))
-# sys.path.append(lib_path)
-from ...data import path_test, test_graph
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths import allOrNothing
+from aequilibrae.paths import Graph
+from aequilibrae.paths import AssignmentResults
+from ...data import test_graph
 
 
 # TODO: Add checks for results for this test (Assignment AoN)
