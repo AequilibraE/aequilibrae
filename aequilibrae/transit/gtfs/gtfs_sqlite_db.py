@@ -22,8 +22,11 @@ from .parse_csv import parse_csv
 have_pyqt5 = importlib.util.find_spec("PyQt5")
 if have_pyqt5 is None:
     pyqt = False
+
 else:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
+
+    pyqt = True
 
 
 # TODO : Add control for mandatory and optional files
