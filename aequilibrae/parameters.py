@@ -31,7 +31,7 @@ class Parameters:
 
         file = os.path.join(self.path, 'parameters.yml')
         with open(file, 'r') as yml:
-            self.parameters = yaml.load(yml)
+            self.parameters = yaml.load(yml,Loader=yaml.SafeLoader)
 
     def write_back(self):
         stream = open(self.path + '/parameters.yaml', 'w')
