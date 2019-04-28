@@ -1,9 +1,9 @@
 from unittest import TestCase
 
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.distribution import GravityCalibration
 import numpy as np
-import os, tempfile
+
+from aequilibrae.distribution import GravityCalibration
+from aequilibrae.matrix import AequilibraeMatrix
 
 zones = 100
 
@@ -29,12 +29,7 @@ matrix.computational_view(["base_matrix"])
 
 class TestGravityCalibration(TestCase):
     def test_calibrate(self):
-        args = {
-            "impedance": impedance,
-            "matrix": matrix,
-            "function": "power",
-            "nan_to_zero": False,
-        }
+        args = {"impedance": impedance, "matrix": matrix, "function": "power", "nan_to_zero": False}
 
         distributed_matrix = GravityCalibration(**args)
         distributed_matrix.calibrate()
