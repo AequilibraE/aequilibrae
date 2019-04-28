@@ -25,7 +25,8 @@ from time import clock
 import numpy as np
 import yaml
 
-from ..matrix import AequilibraeMatrix, AequilibraEData
+from ..matrix import AequilibraEData
+from ..matrix import AequilibraeMatrix
 
 sys.dont_write_bytecode = True
 
