@@ -18,14 +18,12 @@
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
  """
-
-from __future__ import division, print_function, absolute_import
-import sys
 import os
+import sys
 
-sys.dont_write_bytecode = True
-
+import Cython.Compiler.Options
 import numpy as np
+from Cython.Distutils import build_ext
 
 try:
     from setuptools import setup
@@ -34,9 +32,7 @@ except ImportError:
     from distutils.core import setup
     from distutils.extension import Extension
 
-from Cython.Distutils import build_ext
-
-import Cython.Compiler.Options
+sys.dont_write_bytecode = True
 
 Cython.Compiler.Options.annotate = True
 
