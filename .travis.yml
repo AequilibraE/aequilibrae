@@ -21,6 +21,7 @@ install:
   - pip install pytest-cov coveralls pycodestyle
 
 script:
+  - flake8 cmdbox
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
   - cd ..
