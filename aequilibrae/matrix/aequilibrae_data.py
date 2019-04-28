@@ -1,3 +1,11 @@
+import os
+import sqlite3
+import tempfile
+import uuid
+
+import numpy as np
+from numpy.lib.format import open_memmap
+
 """"""
 """
  -----------------------------------------------------------------------------------------------------------
@@ -21,13 +29,6 @@
  -----------------------------------------------------------------------------------------------------------
  """
 
-import numpy as np
-import uuid
-import tempfile
-import os
-from numpy.lib.format import open_memmap
-import sqlite3
-
 MEMORY = 1
 DISK = 0
 data_export_types = ["aed", "csv", "sqlite"]
@@ -44,14 +45,7 @@ class AequilibraEData(object):
         self.aeq_index_type = None
         self.memory_mode = None
 
-    def create_empty(
-        self,
-        file_path=None,
-        entries=1,
-        field_names=None,
-        data_types=None,
-        memory_mode=False,
-    ):
+    def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False):
         """
         :param file_path: Optional. Full path for the output data file. If *memory_false* is 'false' and path is missing,
         then the file is created in the temp folder
@@ -97,24 +91,18 @@ class AequilibraEData(object):
 
             for field in self.fields:
                 if field in object.__dict__:
-                    raise Exception(
-                        field + " is a reserved name. You cannot use it as a field name"
-                    )
+                    raise Exception(field + " is a reserved name. You cannot use it as a field name")
 
             self.num_fields = len(self.fields)
 
             dtype = [("index", self.aeq_index_type)]
-            dtype.extend(
-                [(self.fields[i], self.data_types[i]) for i in range(self.num_fields)]
-            )
+            dtype.extend([(self.fields[i], self.data_types[i]) for i in range(self.num_fields)])
 
             # the file
             if self.memory_mode:
                 self.data = np.recarray((self.entries,), dtype=dtype)
             else:
-                self.data = open_memmap(
-                    self.file_path, mode="w+", dtype=dtype, shape=(self.entries,)
-                )
+                self.data = open_memmap(self.file_path, mode="w+", dtype=dtype, shape=(self.entries,))
 
     def __getattr__(self, field_name):
 
@@ -160,7 +148,6 @@ class AequilibraEData(object):
         headers = ["index"]
         headers.extend(self.fields)
 
-        a = self.data[np.newaxis, :][0]
         if file_type == ".csv":
             fmt = "%d"
             for dt in self.data_types:
@@ -169,19 +156,14 @@ class AequilibraEData(object):
                 elif np.issubdtype(dt, np.integer):
                     fmt += ",%d"
             np.savetxt(
-                file_name,
-                self.data[np.newaxis, :][0],
-                delimiter=",",
-                fmt=fmt,
-                header=",".join(headers),
-                comments="",
+                file_name, self.data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments=""
             )
 
         elif file_type in [".sqlite", ".sqlite3", ".db"]:
             # Connecting to the database file
             conn = sqlite3.connect(file_name)
             c = conn.cursor()
-            # Creating the flows table
+            # Creating the table, but before deletes if the table exists
             c.execute("""DROP TABLE IF EXISTS """ + table_name)
             fi = ""
             qm = "?"
@@ -189,22 +171,13 @@ class AequilibraEData(object):
                 fi += ", " + f + " REAL"
                 qm += ", ?"
 
-            c.execute(
-                """CREATE TABLE """
-                + table_name
-                + """ (link_id INTEGER PRIMARY KEY"""
-                + fi
-                + ")"
-                ""
-            )
+            c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")" "")
             c.execute("BEGIN TRANSACTION")
-            c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", res)
+            c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
             c.execute("END TRANSACTION")
             conn.commit()
             conn.close()
 
     @staticmethod
     def random_name():
-        return os.path.join(
-            tempfile.gettempdir(), "Aequilibrae_data_" + str(uuid.uuid4()) + ".aed"
-        )
+        return os.path.join(tempfile.gettempdir(), "Aequilibrae_data_" + str(uuid.uuid4()) + ".aed")
