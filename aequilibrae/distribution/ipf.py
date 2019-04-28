@@ -18,16 +18,16 @@
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
 """
+import os
 import sys
-
-sys.dont_write_bytecode = True
+from time import clock
 
 import numpy as np
-import os
 import yaml
-from time import clock
+
 from ..matrix import AequilibraeMatrix, AequilibraEData
-import uuid, tempfile
+
+sys.dont_write_bytecode = True
 
 
 class Ipf:
@@ -52,11 +52,7 @@ class Ipf:
 
         self.output = None
         self.error = None
-        self.__required_parameters = [
-            "convergence level",
-            "max iterations",
-            "balancing tolerance",
-        ]
+        self.__required_parameters = ["convergence level", "max iterations", "balancing tolerance"]
         self.error_free = True
         self.report = ["  #####    IPF computation    #####  ", ""]
         self.gap = None
@@ -87,9 +83,7 @@ class Ipf:
 
         # Check data dimensions
         if not np.array_equal(self.rows.index, self.columns.index):
-            raise ValueError(
-                "Indices from row vector do not match those from column vector"
-            )
+            raise ValueError("Indices from row vector do not match those from column vector")
 
         if not np.array_equal(self.matrix.index, self.columns.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
@@ -99,9 +93,7 @@ class Ipf:
             raise ValueError("Matrix needs to be set for computation")
         else:
             if len(self.matrix.matrix_view.shape[:]) > 2:
-                raise ValueError(
-                    "Matrix' computational view needs to be set for a single matrix core"
-                )
+                raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
         if self.error is None:
             # check balancing:
@@ -111,9 +103,9 @@ class Ipf:
                 self.error = "Vectors are not balanced"
             else:
                 # guarantees that they are precisely balanced
-                self.columns.data[self.column_field][:] = self.columns.data[
-                    self.column_field
-                ][:] * (sum_rows / sum_cols)
+                self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (
+                    sum_rows / sum_cols
+                )
 
         if self.error is not None:
             self.error_free = False
@@ -135,9 +127,7 @@ class Ipf:
 
             self.output = self.matrix.copy(self.output_name)
             if self.nan_as_zero:
-                self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[
-                    :, :
-                ]
+                self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
             rows = self.rows.data[self.row_field]
             columns = self.columns.data[self.column_field]
@@ -150,12 +140,8 @@ class Ipf:
             self.report.append("Rows:" + str(self.rows.entries))
             self.report.append("Columns: " + str(self.columns.entries))
 
-            self.report.append(
-                "Total of seed matrix: " + "{:28,.4f}".format(float(tot_matrix))
-            )
-            self.report.append(
-                "Total of target vectors: " + "{:25,.4f}".format(float(np.nansum(rows)))
-            )
+            self.report.append("Total of seed matrix: " + "{:28,.4f}".format(float(tot_matrix)))
+            self.report.append("Total of target vectors: " + "{:25,.4f}".format(float(np.nansum(rows))))
             self.report.append("")
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
@@ -168,8 +154,7 @@ class Ipf:
                 row_factor = self.factor(marg_rows, rows)
                 # applies factor
                 self.output.matrix_view[:, :] = np.transpose(
-                    np.transpose(self.output.matrix_view[:, :])
-                    * np.transpose(row_factor)
+                    np.transpose(self.output.matrix_view[:, :]) * np.transpose(row_factor)
                 )[:, :]
 
                 # computes factors for columns
@@ -177,9 +162,7 @@ class Ipf:
                 column_factor = self.factor(marg_cols, columns)
 
                 # applies factor
-                self.output.matrix_view[:, :] = (
-                    self.output.matrix_view[:, :] * column_factor
-                )
+                self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
 
                 # increments iterarions and computes errors
                 self.gap = max(
@@ -189,16 +172,10 @@ class Ipf:
                     abs(np.max(column_factor) - 1),
                 )
 
-                self.report.append(
-                    str(iter)
-                    + "   ,   "
-                    + str("{:4,.10f}".format(float(np.nansum(self.gap))))
-                )
+                self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
-            self.report.append(
-                "Running time: " + str("{:4,.3f}".format(clock() - t)) + "s"
-            )
+            self.report.append("Running time: " + str("{:4,.3f}".format(clock() - t)) + "s")
 
     def tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)
