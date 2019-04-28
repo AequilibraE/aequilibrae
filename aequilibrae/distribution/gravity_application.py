@@ -74,9 +74,7 @@ class GravityApplication:
         t = clock()
         max_cost = self.parameters["max trip length"]
         # We create the output
-        self.output = self.impedance.copy(
-            self.output_name, cores=self.impedance.view_names, names=[self.core_name]
-        )
+        self.output = self.impedance.copy(self.output_name, cores=self.impedance.view_names, names=[self.core_name])
         self.output.computational_view([self.core_name])
         if self.nan_as_zero:
             self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
@@ -90,9 +88,7 @@ class GravityApplication:
             self.output.matrix_view[:, :] = a * self.output.matrix_view[:, :]
 
         # We adjust the total of the self.output
-        total_factor = np.nansum(self.rows.data[self.row_field]) / np.nansum(
-            self.output.matrix_view[:, :]
-        )
+        total_factor = np.nansum(self.rows.data[self.row_field]) / np.nansum(self.output.matrix_view[:, :])
         self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * total_factor
 
         # And adjust with a fratar
@@ -123,21 +119,17 @@ class GravityApplication:
         self.report.append("")
         self.report.append("")
 
+        self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view))))
         self.report.append(
-            "Total of matrix: "
-            + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view)))
-        )
-        self.report.append(
-            "Intrazonal flow: "
-            + "{:15,.4f}".format(float(np.nansum(np.diagonal(self.output.matrix_view))))
+            "Intrazonal flow: " + "{:15,.4f}".format(float(np.nansum(np.diagonal(self.output.matrix_view))))
         )
         self.report.append("Running time: " + str(round(clock() - t, 3)))
 
         for i in glob.glob(tempfile.gettempdir() + "*.aem"):
             try:
                 os.unlink(i)
-            except:
-                self.logger.warning("Could not remove " + i)
+            except PermissionError as err:
+                self.logger.warning("Could not remove " + err.filename)
 
     def get_parameters(self):
         par = Parameters().parameters
@@ -171,15 +163,11 @@ class GravityApplication:
             raise TypeError("Column vector needs to be an instance of AequilibraEData")
 
         if not isinstance(self.impedance, AequilibraeMatrix):
-            raise TypeError(
-                "Impedance matrix needs to be an instance of AequilibraEMatrix"
-            )
+            raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
 
         # Check data dimensions
         if not np.array_equal(self.rows.index, self.columns.index):
-            raise ValueError(
-                "Indices from row vector do not match those from column vector"
-            )
+            raise ValueError("Indices from row vector do not match those from column vector")
 
         if not np.array_equal(self.impedance.index, self.columns.index):
             raise ValueError("Indices from vectors do not match those from seed matrix")
@@ -189,9 +177,7 @@ class GravityApplication:
             raise ValueError("Matrix needs to be set for computation")
         else:
             if len(self.impedance.matrix_view.shape[:]) > 2:
-                raise ValueError(
-                    "Matrix' computational view needs to be set for a single matrix core"
-                )
+                raise ValueError("Matrix' computational view needs to be set for a single matrix core")
 
         # check balancing:
         sum_rows = np.nansum(self.rows.data[self.row_field])
@@ -200,14 +186,11 @@ class GravityApplication:
             raise ValueError("Vectors are not balanced")
         else:
             # guarantees that they are precisely balanced
-            self.columns.data[self.column_field][:] = self.columns.data[
-                self.column_field
-            ][:] * (sum_rows / sum_cols)
+            self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (sum_rows / sum_cols)
 
         self.check_parameters()
 
     def check_parameters(self):
-        par = Parameters()
         # Check if parameters are configured properly
         for p in self.__required_parameters:
             if p not in self.parameters:
@@ -223,17 +206,13 @@ class GravityApplication:
             a = self.columns.data[self.column_field][:]
 
             if self.model.function == "EXPO":
-                self.output.matrix_view[i, :] = (
-                    np.exp(-self.model.beta * self.impedance.matrix_view[i, :]) * p * a
-                )
+                self.output.matrix_view[i, :] = np.exp(-self.model.beta * self.impedance.matrix_view[i, :]) * p * a
 
             elif self.model.function == "POWER":
                 # self.output.matrices[self.core_name][i, :] = (np.power(self.impedance.matrix_view[i, :, 0], - self.model.alpha) * p * a)[:]
-                self.output.matrix_view[i, :] = (
-                    np.power(self.impedance.matrix_view[i, :], -self.model.alpha)
-                    * p
-                    * a
-                )[:]
+                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p * a)[
+                    :
+                ]
             elif self.model.function == "GAMMA":
                 self.output.matrix_view[i, :] = (
                     np.power(self.impedance.matrix_view[i, :], self.model.alpha)
