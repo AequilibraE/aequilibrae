@@ -1,30 +1,12 @@
-"""
-=============
-Core AequilibraE
-=============
-
-Imports aequilibrae modules
-
-"""
+import logging
+import os
 import sys
-
-sys.dont_write_bytecode = True
-
-# from .utils import WorkerThread
-# from . import utils
-# from . import paths
-# from . import distribution
-# from . import matrix
-# from . import transit
-# from . import reserved_fields
-# from .parameters import Parameters
-# from .reference_files import spatialite_database
-name = "aequilibrae"
+import tempfile
 
 from .parameters import Parameters
-import logging
-import tempfile
-import os
+
+sys.dont_write_bytecode = True
+name = "aequilibrae"
 
 # CREATE THE LOGGER
 temp_folder = Parameters().parameters["system"]["temp directory"]
