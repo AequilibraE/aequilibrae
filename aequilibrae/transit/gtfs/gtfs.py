@@ -9,6 +9,7 @@ from .stop import Stop
 from .route import Route
 from .parse_csv import parse_csv
 
+
 class GTFS:
     """
      Reader for GTFS (from https://developers.google.com/transit/gtfs/reference/)
@@ -53,17 +54,19 @@ class GTFS:
 
         self.get_routes_shapes()
 
-    def load_agency(self):
+    def load_agency(self) -> None:
         agency_file = os.path.join(self.source_folder, 'agency.txt')
         self.available_files['agency.txt'] = True
         data = parse_csv(agency_file)
+        if not len(data):
+            return
         # TODO: Transfer to the database style
-        self.agency.email = str(data['agency_id'], "utf-8")
-        self.agency.name = str(data['agency_name'], "utf-8")
-        self.agency.url = str(data['agency_url'], "utf-8")
-        self.agency.timezone = str(data['agency_timezone'], "utf-8")
-        self.agency.lang = str(data['agency_lang'], "utf-8")
-        self.agency.phone = str(data['agency_phone'], "utf-8")
+        self.agency.email = str(data['agency_id'][0])
+        self.agency.name = str(data['agency_name'][0])
+        self.agency.url = str(data['agency_url'][0])
+        self.agency.timezone = str(data['agency_timezone'][0])
+        self.agency.lang = str(data['agency_lang'][0])
+        self.agency.phone = str(data['agency_phone'][0])
         del (data)
 
     def load_stops(self):
