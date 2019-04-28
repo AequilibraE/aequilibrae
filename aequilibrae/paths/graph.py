@@ -18,19 +18,20 @@
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
  """
+import logging
+import os
+import pickle
+import uuid
+from datetime import datetime
+
+import numpy as np
+
+from .__version__ import binary_version as VERSION
+
 
 # TODO: LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
 #
 # - Change logic of the information about centroids to include a list of centroids, not only the max number
-
-
-import numpy as np
-import os
-import pickle
-from datetime import datetime
-import uuid
-import logging
-from .__version__ import binary_version as VERSION
 
 
 class Graph:
@@ -68,9 +69,7 @@ class Graph:
         self.num_nodes = -1
         self.num_zones = -1
         self.network = False  # This method will hold ALL information on the network
-        self.graph = (
-            False
-        )  # This method will hold an array with ALL fields in the graph.
+        self.graph = False  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
         self.all_nodes = False  # Holds an array with all nodes in the original network
@@ -78,9 +77,7 @@ class Graph:
         self.fs = False  # This method will hold the forward star for the graph
         self.b_node = False  # b node for each directed link
 
-        self.cost = (
-            None
-        )  # This array holds the values being used in the shortest path routine
+        self.cost = None  # This array holds the values being used in the shortest path routine
         self.skims = False  # 2-D Array with the fields to be computed as skims
         self.skim_fields = False  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
@@ -115,15 +112,7 @@ class Graph:
 
     # Create a graph from a shapefile. To be upgraded to ANY geographic file in the future
     def create_from_geography(
-        self,
-        geo_file,
-        id_field,
-        dir_field,
-        cost_field,
-        centroids,
-        skim_fields=[],
-        anode="A_NODE",
-        bnode="B_NODE",
+        self, geo_file, id_field, dir_field, cost_field, centroids, skim_fields=[], anode="A_NODE", bnode="B_NODE"
     ):
         """
         :param geo_file:
@@ -150,9 +139,7 @@ class Graph:
                     return i - 1
 
             f = [str(x[0]) for x in fields]
-            raise ValueError(
-                field_name + " does not exist. Fields available are: " + ", ".join(f)
-            )
+            raise ValueError(field_name + " does not exist. Fields available are: " + ", ".join(f))
             return -1
 
         # collect the fields in the network
@@ -205,7 +192,6 @@ class Graph:
         for feat in records:
             for i, j in enumerate(check_fields):
                 k = feat[j]
-                u = type(k)
                 if not isinstance(k, types_to_check[i]):
                     error = check_titles[i], "field has wrong type or empty values"
                     break
@@ -445,20 +431,7 @@ class Graph:
                 self.num_links = negs.shape[0] + poss.shape[0]
                 self.num_links += zers.shape[0] * 2
 
-                dtype = [
-                    ("link_id", self.__integer_type),
-                    ("a_node", self.__integer_type),
-                    ("b_node", self.__integer_type),
-                    ("direction", np.int8),
-                    ("id", self.__integer_type),
-                ]
-                for i in all_titles:
-                    if (
-                        i not in self.required_default_fields
-                        and i[0:-3] not in self.required_default_fields
-                    ):
-                        if i[-3:] != "_ab":
-                            dtype.append((i[0:-3], self.network[i].dtype))
+                dtype = self.__build_dtype(all_titles)
 
                 self.graph = np.zeros(self.num_links, dtype=dtype)
                 a1 = negs.shape[0]
@@ -467,22 +440,16 @@ class Graph:
                 a4 = a3 + zers.shape[0]
 
                 # Create the graph-specific node numbers
-                self.all_nodes = np.unique(
-                    np.hstack((self.network["a_node"], self.network["b_node"]))
-                ).astype(self.__integer_type)
-                # We put the centroids as the first N elements of this array
-                for i in self.centroids:
-                    self.all_nodes = np.delete(
-                        self.all_nodes, np.argwhere(self.all_nodes == i)
-                    )
-
-                self.all_nodes = np.hstack((centroids, self.all_nodes)).astype(
+                self.all_nodes = np.unique(np.hstack((self.network["a_node"], self.network["b_node"]))).astype(
                     self.__integer_type
                 )
+                # We put the centroids as the first N elements of this array
+                for i in self.centroids:
+                    self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes == i))
+
+                self.all_nodes = np.hstack((centroids, self.all_nodes)).astype(self.__integer_type)
                 self.num_nodes = self.all_nodes.shape[0]
-                self.nodes_to_indices = np.empty(
-                    int(self.all_nodes.max()) + 1, self.__integer_type
-                )
+                self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
                 self.nodes_to_indices.fill(-1)
                 self.nodes_to_indices[self.all_nodes] = np.arange(self.num_nodes)
 
@@ -541,6 +508,20 @@ class Graph:
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
 
+    def __build_dtype(self, all_titles):
+        dtype = [
+            ("link_id", self.__integer_type),
+            ("a_node", self.__integer_type),
+            ("b_node", self.__integer_type),
+            ("direction", np.int8),
+            ("id", self.__integer_type),
+        ]
+        for i in all_titles:
+            if i not in self.required_default_fields and i[0:-3] not in self.required_default_fields:
+                if i[-3:] != "_ab":
+                    dtype.append((i[0:-3], self.network[i].dtype))
+        return dtype
+
     # We set which are the fields that are going to be minimized in this file
     # TODO: Change the call for all the uses on this function
     def set_graph(self, cost_field=None, skim_fields=False, block_centroid_flows=None):
@@ -567,10 +548,7 @@ class Graph:
                     Warning("Cost field with wrong type. Converting to float64")
 
             else:
-                raise ValueError(
-                    "cost_field not available in the graph:"
-                    + str(self.graph.dtype.names)
-                )
+                raise ValueError("cost_field not available in the graph:" + str(self.graph.dtype.names))
 
         if self.cost_field is not None:
             if not skim_fields:
@@ -584,12 +562,7 @@ class Graph:
                     else:
                         self.skim_fields = None
                         self.skims = None
-                        raise ValueError(
-                            "Skim",
-                            i,
-                            " not available in the graph:",
-                            self.graph.dtype.names,
-                        )
+                        raise ValueError("Skim", i, " not available in the graph:", self.graph.dtype.names)
                 skim_fields = s
         else:
             if skim_fields:
@@ -619,9 +592,7 @@ class Graph:
             self.block_centroid_flows = blocking
             self.b_node = np.array(self.graph["b_node"], self.__integer_type)
         else:
-            raise ValueError(
-                "You can only block flows through centroids after setting the centroids"
-            )
+            raise ValueError("You can only block flows through centroids after setting the centroids")
 
     # Procedure to pickle graph and save to disk
     def save_to_disk(self, filename):
@@ -685,13 +656,7 @@ class Graph:
 
     # We return the list of the fields that are the same for both directions to their initial states
     def reset_single_fields(self):
-        self.required_default_fields = [
-            "link_id",
-            "a_node",
-            "b_node",
-            "direction",
-            "id",
-        ]
+        self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
 
     # We add a new fields that is the same for both directions
     def add_single_field(self, new_field):
@@ -700,11 +665,7 @@ class Graph:
 
     def available_skims(self):
         graph_fields = list(self.graph.dtype.names)
-        return [
-            x
-            for x in graph_fields
-            if x not in ["link_id", "a_node", "b_node", "direction", "id"]
-        ]
+        return [x for x in graph_fields if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 
     # We check if all minimum fields are there
     def __network_error_checking__(self):
@@ -717,17 +678,11 @@ class Graph:
                 self.status = 'could not find field "%s" in the network array' % field
 
                 # checking data types
-        must_types = [
-            self.__integer_type,
-            self.__integer_type,
-            self.__integer_type,
-            np.int8,
-        ]
+        must_types = [self.__integer_type, self.__integer_type, self.__integer_type, np.int8]
         for field, ytype in zip(must_fields, must_types):
             if self.network[field].dtype != ytype:
                 self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation'
-                    % field
+                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
                 )
 
                 # Uniqueness of the id
@@ -736,10 +691,7 @@ class Graph:
             self.status = '"link_id" field not unique'
 
             # Direction values
-        if (
-            np.max(self.network["direction"]) > 1
-            or np.min(self.network["direction"]) < -1
-        ):
+        if np.max(self.network["direction"]) > 1 or np.min(self.network["direction"]) < -1:
             self.status = '"direction" field not limited to (-1,0,1) values'
 
     # Needed for when we load the graph directly
@@ -753,17 +705,11 @@ class Graph:
                 self.status = 'could not find field "%s" in the network array' % field
 
                 # checking data types
-        must_types = [
-            self.__integer_type,
-            self.__integer_type,
-            self.__integer_type,
-            self.__integer_type,
-        ]
+        must_types = [self.__integer_type, self.__integer_type, self.__integer_type, self.__integer_type]
         for field, ytype in zip(must_fields, must_types):
             if self.graph[field].dtype != ytype:
                 self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation'
-                    % field
+                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
                 )
 
                 # Uniqueness of the graph id
@@ -788,12 +734,12 @@ class Graph:
         else:
             try:
                 new_type = float(new_type)
-            except:
-                self.logger.warning("Could not convert " + str(new_type))
+            except ValueError as verr:
+                self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
         nt = type(new_type)
         def_type = None
-        if nt == int or nt == int:
-            def_type = long
+        if nt == int:
+            def_type = int
             if current_type == float:
                 def_type == float
             elif current_type == str:
@@ -807,19 +753,3 @@ class Graph:
         else:
             raise ValueError("WRONG TYPE OR NULL VALUE")
         return def_type
-
-
-import tempfile
-
-
-def logger(message):
-    debug_file = tempfile.gettempdir() + "/aequilibrae.log"
-    if not os.path.exists(debug_file):
-        o = open(debug_file, "w")
-    else:
-        o = open(debug_file, "a")
-    if type(message) in [list, tuple, dict]:
-        message = str(message)
-    o.write(message)
-    o.flush()
-    o.close()
