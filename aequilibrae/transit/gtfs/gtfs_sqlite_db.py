@@ -463,7 +463,7 @@ class create_gtfsdb(WorkerThread):
             zip_container = zipfile.ZipFile(self.source_path, 'r')
             if file_to_open in zip_container.namelist():
                 data_file = zip_container.open(file_to_open, 'r')
-                data_file = io.TextIOWrapper(data_file)
+                data_file = io.TextIOWrapper(data_file, encoding='utf-8-sig')
             else:
                 self.available_files[file_to_open] = False
                 self.logger.warning('          Table ' + table_name + ' not available')
@@ -472,6 +472,11 @@ class create_gtfsdb(WorkerThread):
         self.available_files[file_to_open] = True
         data = parse_csv(data_file, column_order=self.column_order[file_to_open])
 
+        if not isinstance(data_file, str):
+            data_file.close()
+
+        if data is None:
+            return
         # we check which columns in the table structure are available in the dataset
         correspondence = []
         for col in data.dtype.names:
