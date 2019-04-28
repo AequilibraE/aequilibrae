@@ -9,7 +9,13 @@ __version__ = "0.4.0"
 __revision__ = "$Revision: 2 $"
 __date__ = "$Date: 2017-02-25$"
 
-from .AoN import one_to_all, skimming_single_origin, path_computation, VERSION_COMPILED, update_path_trace
+from .AoN import (
+    one_to_all,
+    skimming_single_origin,
+    path_computation,
+    VERSION_COMPILED,
+    update_path_trace,
+)
 from .graph import Graph
 from .results import *
 from .multi_threaded_aon import MultiThreadedAoN

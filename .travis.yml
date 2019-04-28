@@ -14,13 +14,11 @@ before_install:
 
 install:
   - pip install -r requirements.txt
+  - pip install -r test_requirements.txt
   - pip install numpy --upgrade
-  - pip install cython
-  - pip install codecov
-  - pip install pytest>=3.6
-  - pip install pytest-cov coveralls pycodestyle
 
 script:
+  - flake8
   - cd aequilibrae/paths
   - python setup_Assignment.py build_ext --inplace
   - cd ..

@@ -25,6 +25,7 @@ from PyQt5.QtCore import pyqtSignal
 
 class WorkerThread(QThread):
     jobFinished = pyqtSignal(object)
+
     def __init__(self, parentThread):
         super().__init__()
         QThread.__init__(self, parentThread)

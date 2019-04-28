@@ -1,0 +1,28 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+sphinx = "*"
+flake8 = "*"
+flake8-checkstyle = "*"
+nose = "*"
+pre-commit = "*"
+
+[packages]
+numpy = ">=1.14.0"
+pyaml = "*"
+pyqt5 = "*"
+pyshp = "*"
+cython = "*"
+
+
+[scripts]
+notebook = "jupyter notebook"
+pre-commit-install = "pre-commit install"
+sphinx = "sphinx-build -b html -c sphinx aequilibrae build"
+python = "python"
+
+[requires]
+python_version = "3.6"

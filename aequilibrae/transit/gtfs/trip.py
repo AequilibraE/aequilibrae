@@ -2,7 +2,7 @@ class Trip:
     def __init__(self):
         # Some characteristics are not needed because they will be inherited from a parent class
         # self.route_id
-        
+
         # Others are needed
         self.service_id = None
         self.id = None
