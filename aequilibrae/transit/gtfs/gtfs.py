@@ -199,9 +199,9 @@ class GTFS:
             trips = self.trips[self.trips["route_id"] == rt]["shape_id"]
             if self.available_files["shapes.txt"]:
                 self.routes[rt].shapes = {t: self.shapes[t] for t in trips}
-            else:
-                for t in trips:
-                    stop_times = self.stop_times[self.stop_times["trip_id"] == t]
+            # else:
+            #     for t in trips:
+            #         stop_times = self.stop_times[self.stop_times["trip_id"] == t]
 
     def get_routes_stops(self):
         pass
