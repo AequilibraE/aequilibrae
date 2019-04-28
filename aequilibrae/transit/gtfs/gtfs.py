@@ -7,7 +7,7 @@ from .stop import Stop
 from .route import Route
 import copy
 import csv
-from io import BytesIO
+
 
 class GTFS:
     """
@@ -190,13 +190,14 @@ class GTFS:
 
     @staticmethod
     def open(file_name, column_order=False):
-        with open(file_name, newline='', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            data = [','.join(row) for row in reader]
-        data[0] = data[0].encode('ascii', 'ignore')
-        data[0] = data[0].decode('UTF-8')
-        data = np.genfromtxt(BytesIO('\n'.join(data[1:]).encode()), delimiter=',', dtype=None,
-                          names=data[0].split(','))
+
+        tot = []
+        with open(file_name, encoding='utf-8-sig') as csvfile:
+            contents = csv.reader(csvfile, delimiter=',', quotechar='\"')
+            for row in contents:
+                tot.append(row)
+        titles = tot.pop(0)
+        data = np.core.records.fromrecords(tot, titles=titles)
 
         if column_order:
             col_names = [x for x in column_order.keys() if x in data.dtype.names]
@@ -214,9 +215,8 @@ class GTFS:
             new_data_dt = [(f, column_order[f]) for f in col_names]
 
             if int(data.shape.__len__()) > 0:
-                new_data = np.array(data, new_data_dt)
+                return np.array(data, new_data_dt)
             else:
-                new_data = data
+                return data
         else:
-            new_data = data
-        return new_data
+            return data
