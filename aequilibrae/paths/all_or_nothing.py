@@ -1,47 +1,45 @@
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Traffic assignment
- Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    15/09/2013
- Updated:    2018-07-01
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-
 import sys
-
-sys.dont_write_bytecode = True
-
-import numpy as np
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
+import importlib
+import numpy as np
+from .multi_threaded_aon import MultiThreadedAoN
+from .AoN import one_to_all
+from ..utils import WorkerThread
 
-try:
+have_pyqt5 = importlib.util.find_spec("PyQt5")
+
+if have_pyqt5 is None:
+    pyqt = False
+else:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
     pyqt = True
-except:
-    pyqt = False
 
-from .multi_threaded_aon import MultiThreadedAoN
-from .AoN import one_to_all, path_computation
 
-# from ..utils import WorkerThread
-from ..utils import WorkerThread
+sys.dont_write_bytecode = True
 
 
 class allOrNothing(WorkerThread):
+    """
+     Package:    AequilibraE
+
+     Name:       Traffic assignment
+     Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
+
+     Original Author:  Pedro Camargo (c@margo.co)
+     Contributors:
+     Last edited by: Pedro Camargo
+
+     Website:    www.AequilibraE.com
+     Repository:  https://github.com/AequilibraE/AequilibraE
+
+     Created:    15/09/2013
+     Updated:    2018-07-01
+     Copyright:   (c) AequilibraE authors
+     Licence:     See LICENSE.TXT
+     """
+
     assignment = SIGNAL(object)
 
     def __init__(self, matrix, graph, results):
@@ -55,14 +53,10 @@ class allOrNothing(WorkerThread):
         self.cumulative = 0
 
         if results.__graph_id__ != graph.__id__:
-            raise ValueError(
-                "Results object not prepared. Use --> results.prepare(graph)"
-            )
+            raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
         if results.__graph_id__ is None:
-            raise ValueError(
-                "The results object was not prepared. Use results.prepare(graph)"
-            )
+            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
 
         elif results.__graph_id__ != graph.__id__:
             raise ValueError("The results object was prepared for a different graph")
@@ -74,9 +68,7 @@ class allOrNothing(WorkerThread):
             )
 
         elif not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError(
-                "Matrix and graph do not have compatible set of centroids."
-            )
+            raise ValueError("Matrix and graph do not have compatible set of centroids.")
 
     def doWork(self):
         self.execute()
