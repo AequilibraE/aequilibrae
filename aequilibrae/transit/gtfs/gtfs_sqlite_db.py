@@ -3,11 +3,11 @@ from collections import OrderedDict
 import os
 import shutil
 import io
+import importlib
 import numpy as np
 import codecs
 import copy
 import zipfile
-import csv
 import logging
 import csv
 from io import BytesIO
@@ -19,12 +19,11 @@ from ...utils import WorkerThread
 from ...parameters import Parameters
 from .parse_csv import parse_csv
 
-try:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
-
-    pyqt = True
-except:
+have_pyqt5 = importlib.util.find_spec("PyQt5")
+if have_pyqt5 is None:
     pyqt = False
+else:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 
 # TODO : Add control for mandatory and optional files
@@ -32,14 +31,7 @@ except:
 class create_gtfsdb(WorkerThread):
     converting_gtfs = SIGNAL(object)
 
-    def __init__(
-        self,
-        file_path,
-        save_db,
-        memory_db=False,
-        spatialite_enabled=False,
-        overwrite=False,
-    ):
+    def __init__(self, file_path, save_db, memory_db=False, spatialite_enabled=False, overwrite=False):
         WorkerThread.__init__(self, None)
         self.conn = None
         self.cursor = None
@@ -173,9 +165,7 @@ class create_gtfsdb(WorkerThread):
                     ("end_date", str),
                 ]
             ),
-            "calendar_dates.txt": OrderedDict(
-                [("service_id", str), ("date", str), ("exception_type", int)]
-            ),
+            "calendar_dates.txt": OrderedDict([("service_id", str), ("date", str), ("exception_type", int)]),
             "fare_attributes.txt": OrderedDict(
                 [
                     ("fare_id", str),
@@ -188,30 +178,13 @@ class create_gtfsdb(WorkerThread):
                 ]
             ),
             "fare_rules.txt": OrderedDict(
-                [
-                    ("fare_id", str),
-                    ("route_id", str),
-                    ("origin_id", str),
-                    ("destination_id", str),
-                    ("contains_id", str),
-                ]
+                [("fare_id", str), ("route_id", str), ("origin_id", str), ("destination_id", str), ("contains_id", str)]
             ),
             "frequencies.txt": OrderedDict(
-                [
-                    ("trip_id", str),
-                    ("start_time", str),
-                    ("end_time", str),
-                    ("headway_secs", str),
-                    ("exact_times", int),
-                ]
+                [("trip_id", str), ("start_time", str), ("end_time", str), ("headway_secs", str), ("exact_times", int)]
             ),
             "transfers.txt": OrderedDict(
-                [
-                    ("from_stop_id", str),
-                    ("to_stop_id", str),
-                    ("transfer_type", int),
-                    ("min_transfer_time", int),
-                ]
+                [("from_stop_id", str), ("to_stop_id", str), ("transfer_type", int), ("min_transfer_time", int)]
             ),
             "feed_info.txt": OrderedDict(
                 [
@@ -490,9 +463,7 @@ class create_gtfsdb(WorkerThread):
 
         # list fields from table
         cursor = self.cursor.execute("select * from " + table_name)
-        available_columns = [
-            description[0].lower() for description in cursor.description
-        ]
+        available_columns = [description[0].lower() for description in cursor.description]
 
         # create the file name
         file_to_open = table_name + ".txt"
@@ -538,14 +509,7 @@ class create_gtfsdb(WorkerThread):
             if not isinstance(dt[0], tuple):
                 dt = [dt]
             self.cursor.executemany(
-                "INSERT into "
-                + table_name
-                + " ("
-                + ",".join(cols)
-                + ") VALUES("
-                + fields
-                + ")",
-                dt,
+                "INSERT into " + table_name + " (" + ",".join(cols) + ") VALUES(" + fields + ")", dt
             )
             self.conn.commit()
         except Exception as e:
@@ -567,12 +531,8 @@ class create_gtfsdb(WorkerThread):
             self.converting_gtfs.emit(["text", "Creating stops' geometry"])
             self.converting_gtfs.emit(["files counter", 14])
 
-        self.cursor.execute(
-            "SELECT AddGeometryColumn( 'stops', 'geometry', 4326, 'POINT', 'XY' );"
-        )
-        self.cursor.execute(
-            "update stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);"
-        )
+        self.cursor.execute("SELECT AddGeometryColumn( 'stops', 'geometry', 4326, 'POINT', 'XY' );")
+        self.cursor.execute("update stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);")
         self.cursor.execute("SELECT CreateSpatialIndex( 'stops' , 'geometry' );")
 
         # 2
@@ -589,15 +549,11 @@ class create_gtfsdb(WorkerThread):
                                                        FOREIGN KEY(route_id) REFERENCES routes(route_id)
                                                        FOREIGN KEY(trip_id) REFERENCES trips(trip_id));"""
         self.cursor.execute(create_query)
-        self.cursor.execute(
-            "SELECT AddGeometryColumn( 'shape_routes', 'geometry', 4326, 'LINESTRING', 'XY' );"
-        )
+        self.cursor.execute("SELECT AddGeometryColumn( 'shape_routes', 'geometry', 4326, 'LINESTRING', 'XY' );")
         self.cursor.execute("SELECT CreateSpatialIndex( 'shape_routes' , 'geometry' );")
 
         # We check if we have shapes in the shape layer
-        shape_ids = self.cursor.execute(
-            "SELECT DISTINCT shape_id from shapes;"
-        ).fetchall()
+        shape_ids = self.cursor.execute("SELECT DISTINCT shape_id from shapes;").fetchall()
         shape_ids = [str(x[0], "utf-8") for x in shape_ids]
         if len(shape_ids) > 0:
             if pyqt:
@@ -607,9 +563,7 @@ class create_gtfsdb(WorkerThread):
                 if pyqt:
                     self.converting_gtfs.emit(["chunk counter", i])
 
-                qry = self.cursor.execute(
-                    "SELECT route_id, trip_id from trips where shape_id='" + shp + "'"
-                ).fetchall()
+                qry = self.cursor.execute("SELECT route_id, trip_id from trips where shape_id='" + shp + "'").fetchall()
                 if len(qry) > 0:
                     route_id, trip_id = qry[0]
 
@@ -618,15 +572,9 @@ class create_gtfsdb(WorkerThread):
                         + str(shp)
                         + "' order by shape_pt_sequence"
                     ).fetchall()
-                    txt = (
-                        "LINESTRING ("
-                        + ", ".join([str(x[0]) + " " + str(x[1]) for x in points])
-                        + ")"
-                    )
+                    txt = "LINESTRING (" + ", ".join([str(x[0]) + " " + str(x[1]) for x in points]) + ")"
                     route_text_color = self.cursor.execute(
-                        "SELECT route_text_color from routes where route_id='"
-                        + str(route_id)
-                        + "'"
+                        "SELECT route_text_color from routes where route_id='" + str(route_id) + "'"
                     ).fetchall()
                     if len(route_text_color):
                         route_text_color = route_text_color[0]
@@ -638,13 +586,9 @@ class create_gtfsdb(WorkerThread):
                                 + str(txt)
                                 + "', 4326))"
                             )
-                            self.cursor.execute(
-                                sql, (route_id, trip_id, shp, route_text_color[0])
-                            )
+                            self.cursor.execute(sql, (route_id, trip_id, shp, route_text_color[0]))
         else:
-            trip_ids = self.cursor.execute(
-                "SELECT DISTINCT trip_id from trips;"
-            ).fetchall()
+            trip_ids = self.cursor.execute("SELECT DISTINCT trip_id from trips;").fetchall()
             trip_ids = [str(x[0]) for x in trip_ids]
             if pyqt:
                 self.converting_gtfs.emit(["max chunk counter", len(trip_ids)])
@@ -664,15 +608,9 @@ class create_gtfsdb(WorkerThread):
                     + "' order by stop_times.stop_sequence"
                 )
                 qry = self.cursor.execute(sql).fetchall()
-                txt = (
-                    "LINESTRING ("
-                    + ", ".join([str(x[0]) + " " + str(x[1]) for x in qry])
-                    + ")"
-                )
+                txt = "LINESTRING (" + ", ".join([str(x[0]) + " " + str(x[1]) for x in qry]) + ")"
                 route_text_color = self.cursor.execute(
-                    "SELECT route_text_color from routes where route_id='"
-                    + str(route_id)
-                    + "'"
+                    "SELECT route_text_color from routes where route_id='" + str(route_id) + "'"
                 ).fetchall()[0]
                 sql = (
                     "INSERT INTO shape_routes (route_id, trip_id, route_text_color, geometry) "
@@ -682,9 +620,7 @@ class create_gtfsdb(WorkerThread):
 
         # creates the stops table with route ID info
         if pyqt:
-            self.converting_gtfs.emit(
-                ["text", "Associating routes and stops. Sit tight"]
-            )
+            self.converting_gtfs.emit(["text", "Associating routes and stops. Sit tight"])
 
         self.cursor.execute(
             """CREATE TABLE 'shape_stops'
@@ -706,11 +642,7 @@ class create_gtfsdb(WorkerThread):
                                 on a.trip_id = c.trip_id;"""
         )
 
-        self.cursor.execute(
-            "SELECT AddGeometryColumn( 'shape_stops', 'geometry', 4326, 'POINT', 'XY' );"
-        )
-        self.cursor.execute(
-            "update shape_stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);"
-        )
+        self.cursor.execute("SELECT AddGeometryColumn( 'shape_stops', 'geometry', 4326, 'POINT', 'XY' );")
+        self.cursor.execute("update shape_stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);")
         self.cursor.execute("SELECT CreateSpatialIndex( 'shape_stops' , 'geometry' );")
         self.conn.commit()
