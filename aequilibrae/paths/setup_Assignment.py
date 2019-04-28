@@ -41,13 +41,14 @@ import Cython.Compiler.Options
 Cython.Compiler.Options.annotate = True
 
 here = os.path.dirname(os.path.realpath(__file__))
-whole_path = os.path.join(here, 'AoN.pyx')
+whole_path = os.path.join(here, "AoN.pyx")
 
-ext_module = Extension('AoN',
-                       [whole_path],
-                       # extra_compile_args=['/fopenmp'],
-                       # extra_link_args=['/fopenmp'],
-                       include_dirs=[np.get_include()])
+ext_module = Extension(
+    "AoN",
+    [whole_path],
+    # extra_compile_args=['/fopenmp'],
+    # extra_link_args=['/fopenmp'],
+    include_dirs=[np.get_include()],
+)
 
-setup(cmdclass={'build_ext': build_ext},
-      ext_modules=[ext_module])
+setup(cmdclass={"build_ext": build_ext}, ext_modules=[ext_module])

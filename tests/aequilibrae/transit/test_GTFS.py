@@ -14,36 +14,36 @@ class TestGTFS(TestCase):
     def test_load_calendar_dates(self):
         self.get_data()
         self.gtfs.load_calendar_dates()
-        if self.gtfs.schedule_exceptions != set(['FULLW']):
-            self.fail('calendar_dates.txt was read wrong')
+        if self.gtfs.schedule_exceptions != set(["FULLW"]):
+            self.fail("calendar_dates.txt was read wrong")
 
     def test_load_agency(self):
         try:
             self.get_data()
             self.gtfs.load_agency()
         except:
-            self.fail('Agency loader returned an error')
-        if self.gtfs.agency.name != 'Public Transport':
-            self.fail('Agency name was read wrong')
+            self.fail("Agency loader returned an error")
+        if self.gtfs.agency.name != "Public Transport":
+            self.fail("Agency name was read wrong")
 
     def test_load_stops(self):
         try:
             self.get_data()
             self.gtfs.load_stops()
         except:
-            self.fail('stops loader returned an error')
-        self.assertEqual(len(self.gtfs.stops), 88, 'Not all values read')
-        if self.gtfs.stops['88'].name != 'Post Office':
-            self.fail('GTFS stops not read properly')
+            self.fail("stops loader returned an error")
+        self.assertEqual(len(self.gtfs.stops), 88, "Not all values read")
+        if self.gtfs.stops["88"].name != "Post Office":
+            self.fail("GTFS stops not read properly")
 
     def test_load_routes(self):
         self.get_data()
         self.gtfs.load_routes()
-        if self.gtfs.routes['1415'].long_name != 'Braitling and Ciccone':
-            self.fail('Route long name not read properly')
+        if self.gtfs.routes["1415"].long_name != "Braitling and Ciccone":
+            self.fail("Route long name not read properly")
 
-        if self.gtfs.routes['1825'].short_name != '500':
-            self.fail('Route long name not read properly')
+        if self.gtfs.routes["1825"].short_name != "500":
+            self.fail("Route long name not read properly")
 
     def test_load_trips(self):
         self.get_data()

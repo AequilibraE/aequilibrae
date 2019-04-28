@@ -27,8 +27,8 @@ class PathResults:
         self.__graph_id__ = None
 
     def prepare(self, graph):
-        self.__integer_type = graph.default_types('int')
-        self.__float_type = graph.default_types('float')
+        self.__integer_type = graph.default_types("int")
+        self.__float_type = graph.default_types("float")
         self.nodes = graph.num_nodes + 1
         self.zones = graph.centroids + 1
         self.links = graph.num_links + 1
@@ -50,21 +50,26 @@ class PathResults:
             self.milepost = None
 
         else:
-            raise ValueError('Exception: Path results object was not yet prepared/initialized')
-
+            raise ValueError(
+                "Exception: Path results object was not yet prepared/initialized"
+            )
 
     def update_trace(self, graph, destination):
         # type: (Graph, int) -> (None)
         if not isinstance(destination, int):
-            raise TypeError('destination needs to be an integer')
+            raise TypeError("destination needs to be an integer")
 
         if not isinstance(graph, Graph):
-            raise TypeError('graph needs to be an AequilibraE Graph')
+            raise TypeError("graph needs to be an AequilibraE Graph")
 
         if destination >= graph.nodes_to_indices.shape[0]:
-            raise ValueError('destination out of the range of node numbers in the graph')
+            raise ValueError(
+                "destination out of the range of node numbers in the graph"
+            )
 
         if self.__graph_id__ != graph.__id__:
-            raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
+            raise ValueError(
+                "Results object not prepared. Use --> results.prepare(graph)"
+            )
 
         update_path_trace(self, destination, graph)

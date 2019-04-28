@@ -6,11 +6,11 @@ import copy
 def parse_csv(file_name: str, column_order=[]):
     tot = []
     if isinstance(file_name, str):
-        csvfile = open(file_name, encoding='utf-8-sig')
+        csvfile = open(file_name, encoding="utf-8-sig")
     else:
         csvfile = file_name
 
-    contents = csv.reader(csvfile, delimiter=',', quotechar='\"')
+    contents = csv.reader(csvfile, delimiter=",", quotechar='"')
     for row in contents:
         tot.append(row)
     titles = tot.pop(0)
@@ -33,7 +33,7 @@ def parse_csv(file_name: str, column_order=[]):
                     column_order[c] = "S128"
             else:
                 if data[c].dtype.char.upper() in ["U", "S"]:
-                    data[c][data[c] == ""] = '0'
+                    data[c][data[c] == ""] = "0"
 
         new_data_dt = [(f, column_order[f]) for f in col_names]
 

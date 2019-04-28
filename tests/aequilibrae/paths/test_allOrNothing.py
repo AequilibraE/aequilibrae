@@ -18,14 +18,16 @@ class TestAllOrNothing(TestCase):
         # Loads and prepares the graph
         g = Graph()
         g.load_from_disk(test_graph)
-        g.set_graph(cost_field='distance', skim_fields=None)
+        g.set_graph(cost_field="distance", skim_fields=None)
         # None implies that only the cost field will be skimmed
 
         # Prepares the matrix for assignment
-        args = {'file_name': os.path.join(gettempdir(),'my_matrix.aem'),
-                'zones': g.num_zones,
-                'matrix_names': ['cars', 'trucks'],
-                'index_names': ['my indices']}
+        args = {
+            "file_name": os.path.join(gettempdir(), "my_matrix.aem"),
+            "zones": g.num_zones,
+            "matrix_names": ["cars", "trucks"],
+            "index_names": ["my indices"],
+        }
 
         matrix = AequilibraeMatrix()
         matrix.create_empty(**args)
@@ -33,7 +35,7 @@ class TestAllOrNothing(TestCase):
         matrix.index[:] = g.centroids[:]
         matrix.cars.fill(1)
         matrix.trucks.fill(2)
-        matrix.computational_view(['cars'])
+        matrix.computational_view(["cars"])
 
         # Performs assignment
         res = AssignmentResults()
@@ -42,8 +44,8 @@ class TestAllOrNothing(TestCase):
         assig = allOrNothing(matrix, g, res)
         assig.execute()
 
-        res.save_to_disk(os.path.join(gettempdir(),'link_loads.aed'))
-        res.save_to_disk(os.path.join(gettempdir(),'link_loads.csv'))
+        res.save_to_disk(os.path.join(gettempdir(), "link_loads.aed"))
+        res.save_to_disk(os.path.join(gettempdir(), "link_loads.csv"))
 
         matrix.computational_view()
         # Performs assignment
@@ -52,5 +54,5 @@ class TestAllOrNothing(TestCase):
 
         assig = allOrNothing(matrix, g, res)
         assig.execute()
-        res.save_to_disk(os.path.join(gettempdir(),'link_loads_2_classes.aed'))
-        res.save_to_disk(os.path.join(gettempdir(),'link_loads_2_classes.csv'))
+        res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes.aed"))
+        res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes.csv"))

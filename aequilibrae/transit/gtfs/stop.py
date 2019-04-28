@@ -55,11 +55,11 @@ class Stop:
         Initializes the class with members corresponding to all fields in the GTFS specification. See Stop class
         documentation
         """
-        
+
         self.id = None
-        self.code = ''
+        self.code = ""
         self.name = None
-        self.desc = ''
+        self.desc = ""
         self.lat = None
         self.lon = None
         self.zone_id = None
