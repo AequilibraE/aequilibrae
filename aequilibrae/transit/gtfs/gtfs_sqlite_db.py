@@ -16,7 +16,7 @@ from ...reference_files import spatialite_database
 from ...utils import WorkerThread
 # from ...utils import WorkerThread
 from ...parameters import Parameters
-
+from .parse_csv import parse_csv
 try:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
@@ -470,7 +470,7 @@ class create_gtfsdb(WorkerThread):
                 return
 
         self.available_files[file_to_open] = True
-        data = self.open(data_file, column_order=self.column_order[file_to_open])
+        data = parse_csv(data_file, column_order=self.column_order[file_to_open])
 
         # we check which columns in the table structure are available in the dataset
         correspondence = []
@@ -606,54 +606,3 @@ class create_gtfsdb(WorkerThread):
         self.cursor.execute("update shape_stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);")
         self.cursor.execute("SELECT CreateSpatialIndex( 'shape_stops' , 'geometry' );")
         self.conn.commit()
-
-    @staticmethod
-    def open(data_file, column_order=False):
-        # Read the stops and cleans the names of the columns
-        # TODO: Create a procedure to avoid interpreting commas inside text as new separators. See https://stackoverflow.com/questions/28444272/numpy-loadtxt-how-to-ignore-comma-delimiters-that-appear-inside-quotes
-        # Clean the file to remove the commas from inside text fields
-        tmp_file = os.path.join(gettempdir(), 'gtfs_temp_file.txt')
-
-        ft = csv.reader(data_file)
-        a = []
-        for x in ft:
-            # if isinstance(x, bytes):
-            #     x = str(x, 'utf-8')
-            a.append([y.replace(',', '-') for y in x])
-
-        txt = open(tmp_file, 'w')
-        for x in a:
-            txt.write(','.join(x) + '\n')
-        txt.flush()
-        txt.close()
-
-        with open(tmp_file, newline='', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            data = [','.join(row) for row in reader]
-        data[0] = data[0].encode('ascii', 'ignore')
-        data[0] = data[0].decode('UTF-8')
-        data = np.genfromtxt(BytesIO('\n'.join(data[1:]).encode()), delimiter=',', dtype=None,
-                          names=data[0].split(','))
-
-        if column_order:
-            col_names = [x for x in column_order.keys() if x in data.dtype.names]
-            data = data[col_names]
-
-            # Define sizes for the string variables
-            column_order = copy.deepcopy(column_order)
-            for c in col_names:
-                if column_order[c] is str:
-                    if data[c].dtype.char.upper() == "S":
-                        column_order[c] = data[c].dtype
-                    else:
-                        column_order[c] = "S16"
-
-            new_data_dt = [(f, column_order[f]) for f in col_names]
-
-            if int(data.shape.__len__()) > 0:
-                new_data = np.array(data, new_data_dt)
-            else:
-                new_data = data
-        else:
-            new_data = data
-        return new_data

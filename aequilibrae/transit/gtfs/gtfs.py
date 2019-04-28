@@ -1,13 +1,13 @@
-import numpy as np
 import os
-import codecs
+import copy
+import csv
+import numpy as np
+
 from .agency import Agency
 from .calendar_dates import CalendarDates
 from .stop import Stop
 from .route import Route
-import copy
-import csv
-
+from .parse_csv import parse_csv
 
 class GTFS:
     """
@@ -56,7 +56,7 @@ class GTFS:
     def load_agency(self):
         agency_file = os.path.join(self.source_folder, 'agency.txt')
         self.available_files['agency.txt'] = True
-        data = self.open(agency_file)
+        data = parse_csv(agency_file)
         # TODO: Transfer to the database style
         self.agency.email = str(data['agency_id'], "utf-8")
         self.agency.name = str(data['agency_name'], "utf-8")
@@ -69,7 +69,7 @@ class GTFS:
     def load_stops(self):
         stops_file = os.path.join(self.source_folder, 'stops.txt')
         self.available_files['stops.txt'] = True
-        data = self.open(stops_file)
+        data = parse_csv(stops_file)
 
         # Iterate over all the stops and puts them in the stops dictionary
         for i in range(data.shape[0]):
@@ -98,7 +98,7 @@ class GTFS:
     def load_routes(self):
         routes_file = os.path.join(self.source_folder, 'routes.txt')
         self.available_files['routes.txt'] = True
-        data = self.open(routes_file)
+        data = parse_csv(routes_file)
 
         # Iterate over all the stops and puts them in the stops dictionary
         for i in range(data.shape[0]):
@@ -125,12 +125,12 @@ class GTFS:
         trips_file = os.path.join(self.source_folder, 'trips.txt')
         self.available_files['trips.txt'] = True
 
-        self.trips = self.open(trips_file)
+        self.trips = parse_csv(trips_file)
 
     def load_stop_times(self):
         stop_times_file = os.path.join(self.source_folder, 'stop_times.txt')
         self.available_files['stop_times.txt'] = True
-        self.stop_times = self.open(stop_times_file)
+        self.stop_times = parse_csv(stop_times_file)
 
     def load_calendar(self):
         pass
@@ -142,7 +142,7 @@ class GTFS:
             return
 
         self.available_files['calendar_dates.txt'] = True
-        data = self.open(agency_file)
+        data = parse_csv(agency_file)
         all_exceptions = []
         for i in range(data.shape[0]):
             cd = CalendarDates()
@@ -164,7 +164,7 @@ class GTFS:
             return
 
         self.available_files['shapes.txt'] = True
-        data = self.open(shapes_file)
+        data = parse_csv(shapes_file)
 
         all_shapes = list(np.unique(data['shape_id']))
 
@@ -187,36 +187,3 @@ class GTFS:
 
     def get_routes_stops(self):
         pass
-
-    @staticmethod
-    def open(file_name, column_order=False):
-
-        tot = []
-        with open(file_name, encoding='utf-8-sig') as csvfile:
-            contents = csv.reader(csvfile, delimiter=',', quotechar='\"')
-            for row in contents:
-                tot.append(row)
-        titles = tot.pop(0)
-        data = np.core.records.fromrecords(tot, titles=titles)
-
-        if column_order:
-            col_names = [x for x in column_order.keys() if x in data.dtype.names]
-            data = data[col_names]
-
-            # Define sizes for the string variables
-            column_order = copy.deepcopy(column_order)
-            for c in col_names:
-                if column_order[c] is str:
-                    if data[c].dtype.char.upper() == "S":
-                        column_order[c] = data[c].dtype
-                    else:
-                        column_order[c] = "S16"
-
-            new_data_dt = [(f, column_order[f]) for f in col_names]
-
-            if int(data.shape.__len__()) > 0:
-                return np.array(data, new_data_dt)
-            else:
-                return data
-        else:
-            return data
