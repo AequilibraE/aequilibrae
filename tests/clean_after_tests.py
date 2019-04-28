@@ -1,6 +1,6 @@
-import tempfile
 import glob
 import os
+import tempfile
 
 
 def clean_after_tests():
@@ -8,8 +8,8 @@ def clean_after_tests():
     for f in glob.glob(p):
         try:
             os.unlink(f)
-        except:
-            pass
+        except Exception as err:
+            print(err.__str__())
 
 
 clean_after_tests()

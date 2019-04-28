@@ -25,23 +25,13 @@ class AssignmentResults:
         self.link_loads = None  # The actual results for assignment
         self.skims = None  # The array of skims
         self.no_path = None  # The list os paths
-        self.num_skims = (
-            None
-        )  # number of skims that will be computed. Depends on the setting of the graph provided
+        self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
         self.cores = mp.cpu_count()
         self.classes = {"number": 1, "names": ["flow"]}
 
-        self.critical_links = {
-            "save": False,
-            "queries": {},  # Queries are a dictionary
-            "results": False,
-        }
+        self.critical_links = {"save": False, "queries": {}, "results": False}  # Queries are a dictionary
 
-        self.link_extraction = {
-            "save": False,
-            "queries": {},  # Queries are a dictionary
-            "output": None,
-        }
+        self.link_extraction = {"save": False, "queries": {}, "output": None}  # Queries are a dictionary
 
         self.path_file = {"save": False, "results": None}
 
@@ -98,30 +88,18 @@ class AssignmentResults:
             self.skims.matrices.fill(0)
             self.no_path.fill(0)
         else:
-            raise ValueError(
-                "Exception: Assignment results object was not yet prepared/initialized"
-            )
+            raise ValueError("Exception: Assignment results object was not yet prepared/initialized")
 
     def __redim(self):
-        self.link_loads = np.zeros(
-            (self.links, self.classes["number"]), self.__float_type
-        )
-        self.skims = np.zeros(
-            (self.zones, self.zones, self.num_skims), self.__float_type
-        )
+        self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
+        self.skims = np.zeros((self.zones, self.zones, self.num_skims), self.__float_type)
         self.skims = AequilibraeMatrix()
 
-        self.skims.create_empty(
-            file_name=self.skims.random_name(),
-            zones=self.zones,
-            matrix_names=self.skim_names,
-        )
+        self.skims.create_empty(file_name=self.skims.random_name(), zones=self.zones, matrix_names=self.skim_names)
         self.skims.index[:] = self.centroids[:]
         self.skims.computational_view()
         if len(self.skims.matrix_view.shape[:]) == 2:
-            self.skims.matrix_view = self.skims.matrix_view.reshape(
-                (self.zones, self.zones, 1)
-            )
+            self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
         self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
 
         self.reset()
@@ -142,25 +120,15 @@ class AssignmentResults:
         a = AequilibraeMatrix()
         if save:
             if crit_res_result is None:
-                warnings.warn(
-                    "Critical Link analysis not set properly. Need to specify output file too"
-                )
+                warnings.warn("Critical Link analysis not set properly. Need to specify output file too")
             else:
                 if crit_res_result[-3:].lower() != "aem":
                     crit_res_result += ".aes"
 
                 if self.nodes > 0 and self.zones > 0:
                     if ["elements", "labels", "type"] in queries.keys():
-                        if (
-                            len(queries["labels"])
-                            == len(queries["elements"])
-                            == len(queries["type"])
-                        ):
-                            a.create_empty(
-                                file_name=crit_res_result,
-                                zones=self.zones,
-                                matrix_names=queries["labels"],
-                            )
+                        if len(queries["labels"]) == len(queries["elements"]) == len(queries["type"]):
+                            a.create_empty(file_name=crit_res_result, zones=self.zones, matrix_names=queries["labels"])
                         else:
                             raise ValueError(
                                 "Queries are inconsistent. 'Labels', 'elements' and 'type' need to have same dimensions"
@@ -170,11 +138,7 @@ class AssignmentResults:
                             "Queries are inconsistent. It needs to contain the following elements: 'Labels', 'elements' and 'type'"
                         )
         else:
-            a.create_empty(
-                file_name=a.random_name(),
-                zones=self.zones,
-                matrix_names=["empty", "nothing"],
-            )
+            a.create_empty(file_name=a.random_name(), zones=self.zones, matrix_names=["empty", "nothing"])
 
         a.computational_view()
         if len(a.matrix_view.shape[:]) == 2:
@@ -191,9 +155,7 @@ class AssignmentResults:
 
         if save:
             if path_result is None:
-                warnings.warn(
-                    "Path file not set properly. Need to specify output file too"
-                )
+                warnings.warn("Path file not set properly. Need to specify output file too")
             else:
                 # This is the only place where we keep 32bits, as going 64 bits would explode the file size
                 if self.nodes > 0 and self.zones > 0:
@@ -225,10 +187,10 @@ class AssignmentResults:
         Nothing"""
 
         if file_name is None:
-            memory = True
+            # memory = True
             file_type = "MEMORY"
         else:
-            memory = False
+            # memory = False
             fname, file_type = os.path.splitext(file_name.upper())
 
         fields = []
@@ -248,11 +210,7 @@ class AssignmentResults:
             entries = int(np.unique(self.lids).shape[0])
             res = AequilibraEData()
             res.create_empty(
-                file_path=aed_file_name,
-                memory_mode=memory_mode,
-                entries=entries,
-                field_names=fields,
-                data_types=types,
+                file_path=aed_file_name, memory_mode=memory_mode, entries=entries, field_names=fields, data_types=types
             )
 
             res.index[:] = np.unique(self.lids)[:]
