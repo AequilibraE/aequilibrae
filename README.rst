@@ -28,19 +28,42 @@ What is available
 
 * Synthetic gravity/IPF
 * Traffic assignment
+* Network Skimmin & node-to-node path computation
+* Fast Matrix format based on NumPy
+* GTFS Import
+
+What is available only in QGIS
+******************************
+
+Some common resources for transportation modelling are inherently visual, and therefore they make more sense if
+available within a GIS platform. For that reason, many resources are available only from AequilibraE's `QGIS plugin
+<http://plugins.qgis.org/plugins/AequilibraE/>`_,
+which uses AequilibraE as its computational workhorse and also provides GUIs for most of AequilibraE's tools. Said tool
+is developed independently, although in parallel, and more details can be found in its `GitHub repository
+<https://github.com/AequilibraE/AequilibraE-GUI>`_.
 
 
 What is not available yet
-#########################
+*************************
+
 * GTFS exporters
 * Traffic assignment
 * Thorough documentation
 * AEQ Project
 
-What is not planned to be available any time soon
-#################################################
-All resources that are 
 
+What is not planned to be available any time soon
+*************************************************
+
+As AequilibraE's focus is to provide resources that are not yet available in the open source world, particularly the
+Python ecosystem, some important tools for transportation model won't be part of AequilibraE any time soon. Examples
+of this are:
+
+    * Transit Assignment - `FastTrips <http://fast-trips.mtc.ca.gov>`_
+
+    * Discrete choice models - `BIOEGEME <http://biogeme.epfl.ch>`_ , `LARCH <http://larch.newman.me>`_
+
+    * Activity-Based models - `ActivitySim <http://www.activitysim.org/>`_
 
 History
 #######
