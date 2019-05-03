@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 AequilibraE
-=======================================
+===========
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
@@ -13,13 +13,13 @@ Contents
 --------
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    overview
    gettingstarted
    softwaredevelopment
    usageexamples
-
+   apidoc
 
 
 

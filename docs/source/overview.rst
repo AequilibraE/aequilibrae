@@ -4,9 +4,6 @@ An overview of AequilibraE
 .. toctree::
    :maxdepth: 4
 
-   aequilibrae
-
-
 Sub-modules
 -----------
 

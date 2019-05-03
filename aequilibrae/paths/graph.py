@@ -1,5 +1,14 @@
-"""
- -----------------------------------------------------------------------------------------------------------
+import logging
+import pickle
+import uuid
+from datetime import datetime
+
+import numpy as np
+
+from .__version__ import binary_version as VERSION
+
+""""""
+"""-----------------------------------------------------------------------------------------------------------
  Package:    AequilibraE
 
  Name:       Transportation graph class
@@ -16,17 +25,7 @@
  Updated:    03/Dec/2017
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-import logging
-import os
-import pickle
-import uuid
-from datetime import datetime
-
-import numpy as np
-
-from .__version__ import binary_version as VERSION
+ -----------------------------------------------------------------------------------------------------------"""
 
 
 # TODO: LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS. ARBITRARY NUMBERING
@@ -36,23 +35,24 @@ from .__version__ import binary_version as VERSION
 
 class Graph:
     def __init__(self):
-        """description: Description of the graph (OPTIONAL)
-            num_links: Number of directed links in the graph
-            num_nodes: number of nodes in the graph
+        """
+        description: Description of the graph (OPTIONAL)
+        num_links: Number of directed links in the graph
+        num_nodes: number of nodes in the graph
 
-            nodes_fs: Numpy array with the indices of each node in the forward star.
-                               DIMENSION: # Of nodes +1
-                               TYPE: numpy.int64
+        nodes_fs: Numpy array with the indices of each node in the forward star.
+                           DIMENSION: # Of nodes +1
+                           TYPE: numpy.int64
 
-            network:  Numpy record array with arbitrary number of fields (and titles of columns) corresponding to each link
-                               DIMENSION: # Of links
-                               TYPE: mixed
+        network:  Numpy record array with arbitrary number of fields (and titles of columns) corresponding to each link
+                           DIMENSION: # Of links
+                           TYPE: mixed
 
-            cost:     Name of the field to be minimized.
-                               TYPE: String
+        cost:     Name of the field to be minimized.
+                           TYPE: String
 
-            skims:    Name of the skim fields.
-                               TYPE: String list  (OPTIONAL)
+        skims:    Name of the skim fields.
+                           TYPE: String list  (OPTIONAL)
         """
         self.logger = logging.getLogger("aequilibrae")
         self.__integer_type = np.int64
