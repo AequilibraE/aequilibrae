@@ -171,5 +171,5 @@ AequilibraE releases are manually (and not often) uploaded to the `Python Packag
 Finally
 ~~~~~~~~~
 
-A lOT of the structure around the documentation was borrowed (copied) from the excellent project `ActivitySim
+A LOT of the structure around the documentation was borrowed (copied) from the excellent project `ActivitySim
 <https://activitysim.github.io/>`_
