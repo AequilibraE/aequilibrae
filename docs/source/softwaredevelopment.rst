@@ -161,21 +161,6 @@ Next, build the documentation in html format with the following command run from
 
     make html
 
-
-If the activitysim package is installed, then the documentation will be built from that version of
-the source code instead of the git repo version.  Make sure to ``pip uninstall activitysim`` before 
-bulding the documentation if needed.  
-
-When pushing revisions to the repo, the documentation is automatically built by Travis after 
-successfully passing the tests.  The documents are built with the ``bin/build_docs.sh`` script.  
-The script does the fol lowing:
-
-* installs the required python packages
-* runs ``make html``
-* copies the ``master`` branch ``../activitysim/docs/_build/html/*`` pages to the ``gh-pages`` branch
-
-GitHub automagically publishes the gh-pages branch at https://activitysim.github.io/activitysim.  
-
 Releases
 ~~~~~~~~~
 
