@@ -18,6 +18,7 @@ pyaml = "*"
 pyqt5 = "*"
 pyshp = "*"
 cython = "*"
+openmatrix = "*"
 
 
 [scripts]

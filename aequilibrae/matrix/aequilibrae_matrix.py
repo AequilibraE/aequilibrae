@@ -1,3 +1,4 @@
+import importlib.util as iutil
 import os
 import tempfile
 import uuid
@@ -196,6 +197,75 @@ class AequilibraeMatrix(object):
         self.cores = len(self.names)
         if None not in [self.file_path, self.zones]:
             self.__write__()
+
+    def create_from_omx(
+        self,
+        file_path: str,
+        omx_path: str,
+        cores: List[str] = None,
+        mappings: List[str] = None,
+        compressed: bool = False,
+    ):
+        """
+        :param file_path: Path for the output AequilibraEMatrix
+        :param omx_path: Path to the OMX file one wants to import
+        :param cores:
+        :param mappings:
+        :return:
+        """
+        spec = iutil.find_spec("openmatrix")
+        if spec is None:
+            print("Open Matrix is not installed. Cannot continue")
+            return
+
+        import openmatrix as omx
+
+        src = omx.open_file(omx_path, "r")
+
+        avail_cores = src.list_matrices()
+
+        if cores is None:
+            do_cores = avail_cores
+        else:
+            do_cores = [x for x in cores if x in avail_cores]
+            if cores != do_cores:
+                do_cores = [x for x in cores if x not in avail_cores]
+                raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
+
+        avail_idx = src.list_mappings()
+        if mappings is None:
+            do_idx = avail_idx
+            if not avail_idx:
+                do_idx = ["zero_base_index"]
+        else:
+            do_idx = [x for x in mappings if x in avail_idx]
+            if mappings != do_idx:
+                do_idx = [x for x in mappings if x not in avail_idx]
+                raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
+
+        shp = src.shape()
+        if shp[0] != shp[1]:
+            raise ValueError("AequilibraE only supports square matrices")
+        zones = shp[0]
+
+        self.create_empty(
+            file_name=file_path, zones=zones, matrix_names=do_cores, index_names=do_idx, compressed=compressed
+        )
+
+        # Copy all cores
+        for core in do_cores:
+            self.matrix[core][:, :] = np.array(src[core])[:, :]
+        self.matrices.flush()
+
+        # copy all indices
+        if avail_idx:
+            for idx in do_idx:
+                ix = np.array(list(src.mapping(idx).keys()))
+                self.indices[idx][:] = ix[:]
+        else:
+            self.index[:] = np.arange(zones)
+
+        self.indices.flush()
 
     def __load__(self):
         # GET File version
@@ -452,11 +522,11 @@ class AequilibraeMatrix(object):
 
     def export(self, output_name: str, cores: List[str] = None):
         """
-        Exports the matrix to other formats. Formats currently supported: CSV
+        Exports the matrix to other formats. Formats currently supported: CSV, OMX
 
-        When exporting to AEM, the user can chose to export only a set of cores, but all indices are exported
+        When exporting to AEM or OMX, the user can chose to export only a set of cores, but all indices are exported
 
-        When exporting to CSV, the active index wil;l be used, and all cores will be exported as separate columns in
+        When exporting to CSV, the active index will be used, and all cores will be exported as separate columns in
         the output file
 
         Parameters
@@ -485,7 +555,13 @@ class AequilibraeMatrix(object):
         """
         fname, file_extension = os.path.splitext(output_name.upper())
 
-        if file_extension not in [".AEM", ".CSV"]:
+        if file_extension == ".OMX":
+            spec = iutil.find_spec("openmatrix")
+            if spec is None:
+                raise ValueError("Open Matrix is not installed. Cannot continue")
+            import openmatrix as omx
+
+        if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise ValueError("File extension %d not implemented yet", file_extension)
 
         if cores is None:
@@ -494,7 +570,16 @@ class AequilibraeMatrix(object):
         if file_extension == ".AEM":
             self.copy(output_name=output_name, cores=cores)
 
-        if file_extension == ".CSV":
+        elif file_extension == ".OMX":
+            omx_export = omx.open_file(output_name, "w")
+            for c in cores:
+                omx_export[c] = self.matrix[c]
+
+            for i, idx in enumerate(self.index_names):
+                omx_export.create_mapping(idx, self.indices[:, i])
+            omx_export.close()
+
+        elif file_extension == ".CSV":
             names = self.view_names
             self.computational_view(cores)
             output = open(output_name, "w")
