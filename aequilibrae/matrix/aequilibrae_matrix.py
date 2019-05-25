@@ -63,13 +63,7 @@ matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.cs
 
 class AequilibraeMatrix(object):
     """
-    AequilibraeMatrix is a highly efficient matrix format that underlines all AequilibraE computation
-
-    It is capable of storing up to 256 different matrices (cores) per file, can have multiple indices to support matrix
-    aggregation and metadata of up to 144 caracters
-
-    It is based on NumPy's memory-mapped arrays, so it is highly efficient, and the format as a memory-blog on disk
-    makes it possible for other software to read the matrices as well.
+    Matrix class
     """
 
     def __init__(self):

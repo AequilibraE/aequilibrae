@@ -5,10 +5,12 @@ verify_ssl = true
 
 [dev-packages]
 sphinx = "*"
+sphinx-autodoc-annotation = "*"
 flake8 = "*"
 flake8-checkstyle = "*"
 nose = "*"
 pre-commit = "*"
+sphinx_rtd_theme = "*"
 
 [packages]
 numpy = ">=1.14.0"

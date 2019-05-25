@@ -4,3 +4,4 @@ PyQt5
 pyshp
 cython
 openmatrix
+pyshp
