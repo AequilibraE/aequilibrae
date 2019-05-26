@@ -19,10 +19,6 @@ Paths module
   from aequilibrae.paths.results import AssignmentResults as asgr
   from aequilibrae.paths.results import PathResults as pthr
 
-
-Building a graph
-~~~~~~~~~~~~~~~~
-
 Path computation
 ~~~~~~~~~~~~~~~~
 
@@ -113,6 +109,71 @@ Traffic Assignment
 ::
 
     some code
+
+
+Advanced usage: Building a Graph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Let's suppose now that you are interested in creating links from a bespoke procedure. For
+the purpose of this example, let's say you have a sparse matrix representing a graph as
+an adjacency matrix
+
+::
+
+    from aequilibrae.paths import Graph
+    from aequilibrae import reserved_fields
+    from scipy.sparse import coo_matrix
+
+    # original_adjacency_matrix is a sparse matrix where positive values are actual links
+    # where the value of the cell is the distance in that link
+
+    # We create the sparse matrix in proper sparse matrix format
+    sparse_graph = coo_matrix(original_adjacency_matrix)
+
+    # We create the structure to create the network
+    all_types = [k._Graph__integer_type,
+                 k._Graph__integer_type,
+                 k._Graph__integer_type,
+                 np.int8,
+                 k._Graph__float_type,
+                 k._Graph__float_type]
+
+    all_titles = [reserved_fields.link_id,
+                  reserved_fields.a_node,
+                  reserved_fields.b_node,
+                  reserved_fields.direction,
+                 "length_ab",
+                 "length_ba"]
+
+    dt = [(t, d) for t, d in zip(all_titles, all_types)]
+
+    # Number of links
+    num_links = sparse_graph.data.shape[0]
+
+    my_graph = Graph()
+    my_graph.network = np.zeros(links, dtype=dt)
+
+    my_graph.network[reserved_fields.link_id] = np.arange(links) + 1
+    my_graph.network[reserved_fields.a_node] = sparse_graph.row
+    my_graph.network[reserved_fields.b_node] = sparse_graph.col
+    my_graph.network["length_ab"] = sparse_graph.data
+
+    # If the links are directed (from A to B), direction is 1. If bi-directional, use zeros
+    my_graph.network[reserved_fields.direction] = np.ones(links)
+
+    # If uni-directional from A to B the value is not used
+    my_graph.network["length_ba"] = mat.data * 10000
+
+    # Let's say that all nodes in the network are centroids
+    list_of_centroids =  np.arange(max(sparse_graph.shape[0], sparse_graph.shape[0])+ 1)
+    centroids_list = np.array(list_of_centroids)
+
+    my_graph.type_loaded = 'NETWORK'
+    my_graph.status = 'OK'
+    my_graph.network_ok = True
+    my_graph.prepare_graph(centroids_list)
+
+This usage is really advanced, and very rarely not-necessary. Make sure to know what you are doing
+before going down this route
 
 Gravity Models
 --------------
