@@ -562,7 +562,7 @@ class AequilibraeMatrix(object):
             import openmatrix as omx
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
-            raise ValueError("File extension %d not implemented yet", file_extension)
+            raise ValueError("File extension {} not implemented yet".format(file_extension))
 
         if cores is None:
             cores = self.names
