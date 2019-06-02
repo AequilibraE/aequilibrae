@@ -204,15 +204,38 @@ class AequilibraeMatrix(object):
         omx_path: str,
         cores: List[str] = None,
         mappings: List[str] = None,
+        robust: bool = True,
         compressed: bool = False,
     ):
         """
         :param file_path: Path for the output AequilibraEMatrix
         :param omx_path: Path to the OMX file one wants to import
-        :param cores:
-        :param mappings:
+        :param cores: List of matrix cores to be imported
+        :param mappings: List of the matrix mappings (i.e. indices, centroid numbers) to be imoprted
+        :param: robust: Boolean for whether AequilibraE should try to adjust the names for cores and indices in case they are too long
+        :param: compressed
         :return:
         """
+
+        def robust_name(input_name: str, max_length: int, forbiden_names: List[str]) -> str:
+            return_name = input_name
+            if len(input_name) > max_length:
+                return_name = input_name[:max_length]
+
+            if return_name not in forbiden_names:
+                return return_name
+
+            for i in range(999999):
+                x = len(str(i))
+
+                if x + len(return_name) > max_length:
+                    trial_name = return_name[: max_length - x] + str(i)
+                else:
+                    trial_name = return_name + str(i)
+
+                if trial_name not in forbiden_names:
+                    return trial_name
+
         spec = iutil.find_spec("openmatrix")
         if spec is None:
             print("Open Matrix is not installed. Cannot continue")
@@ -248,20 +271,33 @@ class AequilibraeMatrix(object):
             raise ValueError("AequilibraE only supports square matrices")
         zones = shp[0]
 
+        if robust:
+            core_names = []
+            for c in do_cores:
+                core_names.append(robust_name(c, CORE_NAME_MAX_LENGTH, core_names))
+
+            idx_names = []
+            for i in do_idx:
+                idx_names.append(robust_name(i, INDEX_NAME_MAX_LENGTH, idx_names))
+
+        else:
+            core_names = [x for x in do_cores]
+            idx_names = [x for x in do_idx]
+
         self.create_empty(
-            file_name=file_path, zones=zones, matrix_names=do_cores, index_names=do_idx, compressed=compressed
+            file_name=file_path, zones=zones, matrix_names=core_names, index_names=idx_names, compressed=compressed
         )
 
         # Copy all cores
-        for core in do_cores:
-            self.matrix[core][:, :] = np.array(src[core])[:, :]
+        for ncore, core in zip(core_names, do_cores):
+            self.matrix[ncore][:, :] = np.array(src[core])[:, :]
         self.matrices.flush()
 
         # copy all indices
         if avail_idx:
-            for idx in do_idx:
+            for nidx, idx in zip(idx_names, do_idx):
                 ix = np.array(list(src.mapping(idx).keys()))
-                self.indices[idx][:] = ix[:]
+                self.indices[nidx][:] = ix[:]
         else:
             self.index[:] = np.arange(zones)
 
