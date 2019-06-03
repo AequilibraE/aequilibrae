@@ -5,6 +5,7 @@ import openmatrix as omx
 from unittest import TestCase
 
 import numpy as np
+from tables.exceptions import NoSuchNodeError
 
 from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example
@@ -114,7 +115,7 @@ class TestAequilibraeMatrix(TestCase):
         omxfile = omx.open_file(omx_example, "r")
 
         # Check if matrices values are compatible
-        for m in a.names:
+        for m in ["m1", "m2", "m3"]:
             sm = a.matrix[m].sum()
             sm2 = np.array(omxfile[m]).sum()
             if sm != sm2:
@@ -123,6 +124,14 @@ class TestAequilibraeMatrix(TestCase):
         if np.any(a.index[:] != np.arange(a.zones)):
             self.fail("Index was not created properly")
         a.close()
+
+    def test_copy_from_omx_long_name(self):
+
+        temp_file = AequilibraeMatrix().random_name()
+        a = AequilibraeMatrix()
+
+        with self.assertRaises(ValueError):
+            a.create_from_omx(temp_file, omx_example, robust=False)
 
     def test_copy_omx_wrong_content(self):
         # Check if we get a result if we try to copy non-existing cores
