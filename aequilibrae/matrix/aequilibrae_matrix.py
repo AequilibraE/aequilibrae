@@ -4,6 +4,7 @@ import tempfile
 import uuid
 from shutil import copyfile
 from typing import List
+import functools
 
 import numpy as np
 
@@ -272,14 +273,11 @@ class AequilibraeMatrix(object):
         zones = shp[0]
 
         if robust:
-            core_names = []
-            for c in do_cores:
-                core_names.append(robust_name(c, CORE_NAME_MAX_LENGTH, core_names))
-
-            idx_names = []
-            for i in do_idx:
-                idx_names.append(robust_name(i, INDEX_NAME_MAX_LENGTH, idx_names))
-
+            # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
+            core_names = functools.reduce(
+                lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+            )
+            idx_names = functools.reduce(lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, [])
         else:
             core_names = [x for x in do_cores]
             idx_names = [x for x in do_idx]
