@@ -25,7 +25,7 @@ copyright = "2018, Pedro Camargo"
 author = "Pedro Camargo"
 
 # The short X.Y version
-version = "0.5"
+version = "0.5.1"
 # The full version, including alpha/beta/rc tags
 release = "30/07/2018"
 
