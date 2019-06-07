@@ -71,25 +71,24 @@ class AequilibraeMatrix(object):
         """
         Creates a memory instance for a matrix, that can be used to load an existing matrix or to create an empty one
         """
-        self.file_path = None
-        self.dtype = None
-        self.num_indices = None
-        self.index_names = None
+        self.file_path: str = None
+        self.num_indices: int = None
+        self.index_names: List[str] = None
         self.compressed = NOT_COMPRESSED
-        self.matrix_view = None
-        self.view_names = None
+        self.matrix_view: np.array = None
+        self.view_names: List[str] = None
         self.matrix_hash = {}
-        self.index = None
-        self.indices = None
-        self.matrix = None
-        self.matrices = None
-        self.cores = None
-        self.zones = None
+        self.index: np.array = None
+        self.indices: List[np.array] = None
+        self.matrix: List[np.array] = None
+        self.matrices: np.array = None
+        self.cores: List[str] = None
+        self.zones: int = None
         self.dtype = None
-        self.names = None
-        self.name = None
-        self.description = None
-        self.current_index = None
+        self.names: List[str] = None
+        self.name: str = None
+        self.description: str = None
+        self.current_index: str = None
         self.__version__ = VERSION  # Writes file version
 
     def create_empty(

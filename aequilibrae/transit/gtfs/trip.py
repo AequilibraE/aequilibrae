@@ -4,12 +4,12 @@ class Trip:
         # self.route_id
 
         # Others are needed
-        self.service_id = None
-        self.id = None
-        self.head_sign = None
-        self.short_name = None
-        self.direction_id = None
-        self.block_id = None
-        self.shape_id = None
-        self.wheelchair_accessible = None
-        self.bikes_allowed = None
+        self.service_id: str = None
+        self.id: str = None
+        self.head_sign: str = None
+        self.short_name: str = None
+        self.direction_id: str = None
+        self.block_id: str = None
+        self.shape_id: str = None
+        self.wheelchair_accessible: int = None
+        self.bikes_allowed: int = None

@@ -2,9 +2,6 @@ class Stop:
     """
     Represents each one of the physical stops in a GTFS dataset (from https://developers.google.com/transit/gtfs/reference/)
 
-    Fields
-    ______
-
     * **id** `(stop_id)` **Required** - The stop_id field contains an ID that uniquely identifies a stop, station, or station entrance. Multiple routes may use the same stop. The stop_id is used by systems as an internal identifier of this record (e.g., primary key in database), and therefore the stop_id must be dataset unique.
 
     * **code** `(stop_code)` **Optional** - The stop_code field contains short text or a number that uniquely identifies the stop for passengers. Stop codes are often used in phone-based transit information systems or printed on stop signage to make it easier for riders to get a stop schedule or real-time arrival information for a particular stop. The stop_code field contains short text or a number that uniquely identifies the stop for passengers. The stop_code can be the same as stop_id if it is passenger-facing. This field should be left blank for stops without a code presented to passengers.

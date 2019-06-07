@@ -2,9 +2,6 @@ class Route:
     """
     Represents each one of the routes in a GTFS dataset (from https://developers.google.com/transit/gtfs/reference/)
 
-    Fields
-    ______
-
     * **id** `(route_id)` **Required** The route_id field contains an ID that uniquely identifies a route. The route_id is dataset unique.
     * **agency_id** `(agency_id)` **Optional** The agency_id field defines an agency for the specified route. This value is referenced from the agency.txt file. Use this field when you are providing data for routes from more than one agency.
     * **short_name** `(route_short_name)` **Required** The route_short_name contains the short name of a route. This will often be a short, abstract identifier like "32", "100X", or "Green" that riders use to identify a route, but which doesn't give any indication of what places the route serves. At least one of route_short_name or route_long_name must be specified, or potentially both if appropriate. If the route does not have a short name, please specify a route_long_name and use an empty string as the value for this field.

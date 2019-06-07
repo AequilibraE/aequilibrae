@@ -14,9 +14,8 @@ if not os.path.isdir(temp_folder):
     temp_folder = tempfile.gettempdir()
 
 log_file = os.path.join(temp_folder, "aequilibrae.log")
-if not os.path.isfile(log_file):
-    a = open(log_file, "w")
-    a.close()
+a = open(log_file, "a")
+a.close()
 
 logger = logging.getLogger("aequilibrae")
 logger.setLevel(logging.DEBUG)

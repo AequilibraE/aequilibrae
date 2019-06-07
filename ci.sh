@@ -39,7 +39,8 @@ run_unit_tests() {
 }
 
 generate_docs() {
-    python -m pipenv run sphinx
+    sphinx-apidoc -fT -o docs/source/generated zenith_model_run
+    ( cd docs && make html )
 }
 
 run_linting() {

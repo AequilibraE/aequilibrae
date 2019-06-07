@@ -1,4 +1,3 @@
-
 Software Development
 ====================
 
@@ -30,6 +29,8 @@ AequilibraE is currently tested for Python 3.5, 3.6 and 3.7, but we recommend us
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
+If you are using a different IDE, we would welcome if you could contribute with insctruction to set that up.
+
 Non-Windows
 ~~~~~~~~~~~
 ::
@@ -55,8 +56,8 @@ Python 3.6 needs to be installed, and the following instructions assume you are 
     python -m pipenv install
     python -m pipenv run pre-commit-install
 
-
 Setup Pycharm with the virtual environment you just created.
+
 ::
 
     Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
@@ -134,8 +135,8 @@ AequilibraE testing is done with three tools:
 To run the tests locally, you will need to figure out what to do...
 
 
-These same tests are run by Travis with each push to the repository.  These tests need to pass in order
-to merge the revisions into master.
+These same tests are run by Travis with each push to the repository.  These tests need to pass in order to somebody
+manually review the code before merging it into master (or returning for corrections).
 
 In some cases, test targets need to be updated to match the new results produced by the code since these 
 are now the correct results.  In order to update the test targets, first determine which tests are 
@@ -157,8 +158,10 @@ To build the documentation, first make sure the required packages are installed:
 
     pip install sphinx  sphinx_rtd_theme
 
-Next, build the documentation in html format with the following command run from the ``docs`` folder::
+Next, build the documentation in html format with the following commands run from the ``root`` folder::
 
+    sphinx-apidoc -T -o docs/source/generated aequilibrae
+    cd docs
     make html
 
 Releases

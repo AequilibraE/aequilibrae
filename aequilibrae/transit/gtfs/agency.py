@@ -3,9 +3,6 @@ class Agency:
     """
     contents of the **agency.txt** file  (from https://developers.google.com/transit/gtfs/reference/)
 
-    Fields
-    ______
-
     * **id** `(agency_id)` **Optional** - The agency_id field is an ID that uniquely identifies a transit agency. A transit feed may represent data from more than one agency. The agency_id is dataset unique. This field is optional for transit feeds that only contain data for a single agency.
 
     * **name** `(agency_name)` **Required** - The agency_name field contains the full name of the transit agency. Google Maps will display this name.

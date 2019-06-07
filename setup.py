@@ -11,19 +11,25 @@ sys.dont_write_bytecode = True
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
 ext_module = Extension("AoN", [whole_path], include_dirs=[np.get_include()])
+
+sys.path.append(here)
+# import aequilibrae.__version__ as version
+version = 0.9
+pkg = [pkg for pkg in find_packages("aequilibrae")]
+
 if __name__ == "__main__":
     with open("README.rst", "r") as fh:
         long_description = fh.read()
 
     setup(
         install_requires=["numpy", "cython"],
-        packages=[pkg for pkg in find_packages("aequilibrae")],
+        packages=pkg,
         package_dir={"": "aequilibrae"},
         zip_safe=False,
         name="aequilibrae",
         long_description=long_description,
         long_description_content_type="text/markdown",
-        version="0.5.1",
+        version=version,
         description="A package for transportation modeling",
         author="Pedro Camargo",
         author_email="pedro@xl-optim.com",

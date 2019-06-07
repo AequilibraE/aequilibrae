@@ -14,6 +14,7 @@
 
 import os
 import sys
+import aequilibrae.__version__ as v
 
 sys.path.insert(0, os.path.abspath("../.."))
 #
@@ -21,11 +22,12 @@ sys.path.insert(0, os.path.abspath("../.."))
 # -- Project information -----------------------------------------------------
 
 project = "AequilibraE"
-copyright = "2018, Pedro Camargo"
+copyright = "2018, AequilibraE developers"
 author = "Pedro Camargo"
 
-# The short X.Y version
-version = "0.5.1"
+
+# The short X.Y.Z version
+version = v
 # The full version, including alpha/beta/rc tags
 release = "30/07/2018"
 
@@ -45,6 +47,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.imgmath",
     "sphinx_autodoc_annotation",
+    "sphinx.ext.mathjax",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -171,3 +174,4 @@ texinfo_documents = [
 #     "aequilibrae.paths.AoN",
 #     "aequilibrae.distribution",
 # ]
+add_module_names = False
