@@ -1,4 +1,3 @@
-
 Use examples
 ============
 This page is still under development, so most of the headers are just place-holders for the actual examples
@@ -181,7 +180,7 @@ The support for trip distribution in AequilibraE is not very comprehensive, most
 such type of model has suffered in the last decade.
 
 However, it is possible to calibrate and apply synthetic gravity models and to perform Iterative Proportional Fitting
-(IPF) with really high performance, which might be of use
+(IPF) with really high performance, which might be of use in many applications other than traditional distribution.
 
 ::
 
@@ -204,9 +203,43 @@ Synthetic gravity application
 Iterative Proportional Fitting (IPF)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The implementation of IPF is fully vectorized and leverages all the speed of NumPy, but it does not include the
+fancy multithreading implemented in path computation.
+
 ::
 
-    some code
+    import pandas as pd
+    from aequilibrae.distribution import Ipf
+    from aequilibrae.matrix import AequilibraeMatrix
+    from aequilibrae.matrix import AequilibraeData
+
+    matrix = AequilibraeMatrix()
+    matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
+
+    source_vectors = pd.read_csv(path/to/csvs)
+    zones = source_vectors.zone.shape[0]
+
+    args = {"entries": zones, "field_names": ["productions", "attractions"],
+            "data_types": [np.float64, np.float64], "memory_mode": True}
+
+    vectors = AequilibraEData()
+    vectors.create_empty(**args)
+
+    vectors.productions[:] = source_vectors.productions[:]
+    vectors.attractions[:] = source_vectors.attractions[:]
+
+    # We assume that the indices would be sorted and that they would match the matrix indices
+    vectors.index[:] = source_vectors.zones[:]
+
+    args = {
+            "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
+            "column_field": "attractions", "nan_as_zero": False}
+
+    fratar = Ipf(**args)
+    fratar.fit()
+
+**Please note that the AequilibraE matrix we created from the OMX is OVERWRITTEN by the IPF**
+
 
 Transit
 -------
