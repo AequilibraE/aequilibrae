@@ -13,7 +13,6 @@ Paths module
 
 ::
 
-
   from aequilibrae.paths import allOrNothing
   from aequilibrae.paths import path_computation
   from aequilibrae.paths.results import AssignmentResults as asgr
@@ -175,8 +174,14 @@ an adjacency matrix
 This usage is really advanced, and very rarely not-necessary. Make sure to know what you are doing
 before going down this route
 
-Gravity Models
---------------
+Trip distribution
+-----------------
+
+The support for trip distribution in AequilibraE is not very comprehensive, mostly because of the loss of relevance that
+such type of model has suffered in the last decade.
+
+However, it is possible to calibrate and apply synthetic gravity models and to perform Iterative Proportional Fitting
+(IPF) with really high performance, which might be of use
 
 ::
 
