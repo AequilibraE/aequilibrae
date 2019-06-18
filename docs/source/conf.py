@@ -14,9 +14,16 @@
 
 import os
 import sys
-import aequilibrae.__version__ as v
 
-sys.path.insert(0, os.path.abspath("../.."))
+try:
+    import aequilibrae.__version__ as v
+except ImportError as e:
+    sys.path.insert(0, os.path.abspath("../.."))
+    import aequilibrae.__version__ as v
+
+    print(e.name)
+
+
 #
 
 # -- Project information -----------------------------------------------------
@@ -133,7 +140,15 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
+latex_documents = [
+    (
+        master_doc,
+        "AequilibraE.tex",
+        "AequilibraE Documentation",
+        "Pedro Camargo",
+        "manual",
+    )
+]
 
 
 # -- Options for manual page output ------------------------------------------
