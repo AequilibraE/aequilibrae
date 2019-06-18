@@ -6,7 +6,6 @@ main() {
     local command=$1; shift
     case $command in
     setup_dev )
-        setup_pyenv
         setup_pipenv
         setup_precommit
         ;;
@@ -59,11 +58,6 @@ setup_pipenv() {
     python --version
     python -m pip install pipenv
     python -m pipenv install --dev
-}
-
-setup_pyenv() {
-    which pyenv || curl https://pyenv.run | bash
-    (pyenv versions | grep 3.6) || pyenv install 3.6
 }
 
 echo "Running $0"

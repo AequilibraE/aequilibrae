@@ -3,6 +3,10 @@ name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
 
+
+[requires]
+python_version = "3.7"
+
 [dev-packages]
 sphinx = "*"
 sphinx-autodoc-annotation = "*"
@@ -27,5 +31,3 @@ pre-commit-install = "pre-commit install"
 sphinx = "sphinx-build -b html -c sphinx aequilibrae build"
 python = "python"
 
-[requires]
-python_version = "3.6"
