@@ -159,6 +159,7 @@ To build the documentation, first make sure the required packages are installed:
 
 Next, build the documentation in html format with the following command run from the ``docs`` folder::
 
+    sphinx-build -b html sourced build
     make html
 
 Releases
