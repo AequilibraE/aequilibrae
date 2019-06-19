@@ -83,12 +83,12 @@ class AequilibraeMatrix(object):
         self.matrix = None
         self.matrices = None
         self.cores = None
-        self.zones: int = None
+        self.zones = None
         self.dtype = None
         self.names = None
-        self.name: str = None
-        self.description: str = None
-        self.current_index: str = None
+        self.name = None
+        self.description = None
+        self.current_index = None
         self.__version__ = VERSION  # Writes file version
 
     def create_empty(
