@@ -53,7 +53,7 @@ Python 3.6 needs to be installed, and the following instructions assume you are 
     set PATH=C:\Python36;%PATH%
     python -m pip install pipenv
     virtualenv .venv
-    python -m pipenv install
+    python -m pipenv install --dev
     python -m pipenv run pre-commit-install
 
 Setup Pycharm with the virtual environment you just created.
@@ -154,9 +154,15 @@ All the AequilibraE documentation is (unfortunately) written in `reStructuredTex
 Although Restructured Text is often unecessarily convoluted to write, Sphinx is capable of converting it to standard-
 looking html pages, while also bringing the docstring documentation along for the ride.
 
-To build the documentation, first make sure the required packages are installed::
+To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev
+environment above, then nothing else is needed. However, if you have incorrectly only run::
 
-    pip install sphinx  sphinx_rtd_theme
+    python -m pipenv install
+
+Then you will have to run::
+
+    python -m pipenv install --dev
+
 
 Next, build the documentation in html format with the following commands run from the ``root`` folder::
 
