@@ -1,9 +1,7 @@
 """
-=============
 path computation related code
-=============
-
 """
+
 __author__ = "Pedro Camargo ($Author: Pedro Camargo $)"
 __version__ = "0.4.0"
 __revision__ = "$Revision: 2 $"

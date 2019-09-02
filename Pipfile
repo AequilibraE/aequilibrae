@@ -1,0 +1,33 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+
+[requires]
+python_version = "3.7"
+
+[dev-packages]
+sphinx = "*"
+sphinx-autodoc-annotation = "*"
+flake8 = "*"
+flake8-checkstyle = "*"
+nose = "*"
+pre-commit = "*"
+sphinx_rtd_theme = "*"
+
+[packages]
+numpy = ">=1.14.0"
+pyaml = "*"
+pyqt5 = "*"
+pyshp = "*"
+cython = "*"
+openmatrix = "*"
+
+
+[scripts]
+notebook = "jupyter notebook"
+pre-commit-install = "pre-commit install"
+sphinx = "sphinx-build -b html -c sphinx aequilibrae build"
+python = "python"
+

@@ -1,5 +1,5 @@
 """
- -----------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
  Package:    AequilibraE
 
  Name:       Traffic assignment
@@ -16,29 +16,34 @@
  Updated:    2018-07-01
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
  """
 
+import importlib
 import sys
-sys.dont_write_bytecode = True
-
-import numpy as np
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
-try:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
-    pyqt = True
-except:
-    pyqt = False
 
+import numpy as np
+
+from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
-from .AoN import one_to_all, path_computation
-
-# from ..utils import WorkerThread
 from ..utils import WorkerThread
+
+have_pyqt5 = importlib.util.find_spec("PyQt5")
+if have_pyqt5 is None:
+    pyqt = False
+else:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
+
+    pyqt = True
+
+sys.dont_write_bytecode = True
+
 
 class allOrNothing(WorkerThread):
     assignment = SIGNAL(object)
+
     def __init__(self, matrix, graph, results):
         WorkerThread.__init__(self, None)
 
@@ -53,35 +58,38 @@ class allOrNothing(WorkerThread):
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
         if results.__graph_id__ is None:
-            raise ValueError('The results object was not prepared. Use results.prepare(graph)')
+            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
 
         elif results.__graph_id__ != graph.__id__:
-            raise ValueError('The results object was prepared for a different graph')
+            raise ValueError("The results object was prepared for a different graph")
 
         elif matrix.matrix_view is None:
-            raise ValueError('Matrix was not prepared for assignment. '
-                             'Please create a matrix_procedures view with all classes you want to assign')
+            raise ValueError(
+                "Matrix was not prepared for assignment. "
+                "Please create a matrix_procedures view with all classes you want to assign"
+            )
 
         elif not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError('Matrix and graph do not have compatible set of centroids.')
+            raise ValueError("Matrix and graph do not have compatible set of centroids.")
 
     def doWork(self):
         self.execute()
 
     def execute(self):
         if pyqt:
-            self.assignment.emit(['zones finalized', 0])
+            self.assignment.emit(["zones finalized", 0])
 
         self.aux_res.prepare(self.graph, self.results)
-        self.matrix.matrix_view = self.matrix.matrix_view.reshape((self.graph.num_zones, self.graph.num_zones,
-                                                                   self.results.classes['number']))
+        self.matrix.matrix_view = self.matrix.matrix_view.reshape(
+            (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
+        )
         mat = self.matrix.matrix_view
         pool = ThreadPool(self.results.cores)
-        all_threads = {'count': 0}
+        all_threads = {"count": 0}
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
             if np.nansum(mat[i, :, :]) > 0:
-                if self.graph.fs[i] == self.graph.fs[i+1]:
+                if self.graph.fs[i] == self.graph.fs[i + 1]:
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
@@ -91,21 +99,21 @@ class allOrNothing(WorkerThread):
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
 
         if pyqt:
-            self.assignment.emit(['text AoN', "Saving Outputs"])
-            self.assignment.emit(['finished_threaded_procedure', None])
+            self.assignment.emit(["text AoN", "Saving Outputs"])
+            self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
         if threading.get_ident() in all_threads:
             th = all_threads[threading.get_ident()]
         else:
-            all_threads[threading.get_ident()] = all_threads['count']
-            th = all_threads['count']
-            all_threads['count'] += 1
+            all_threads[threading.get_ident()] = all_threads["count"]
+            th = all_threads["count"]
+            all_threads["count"] += 1
         x = one_to_all(O, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
         if x != O:
             self.report.append(x)
         if pyqt:
-            self.assignment.emit(['zones finalized', self.cumulative])
-            txt = str(self.cumulative) + ' / ' + str(self.matrix.zones)
-            self.assignment.emit(['text AoN', txt])
+            self.assignment.emit(["zones finalized", self.cumulative])
+            txt = str(self.cumulative) + " / " + str(self.matrix.zones)
+            self.assignment.emit(["text AoN", txt])

@@ -26,6 +26,7 @@ class CalendarDates:
     Suppose a route has one set of trips available on holidays and another set of trips available on all other days. You could have one service_id that corresponds to the regular service schedule and another service_id that corresponds to the holiday schedule. For a particular holiday, you would use the calendar_dates.txt file to add the holiday to the holiday service_id and to remove the holiday from the regular service_id schedule.
 
     """
+
     def __init__(self):
         self.service_id = []
         self.date = []

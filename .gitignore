@@ -61,3 +61,7 @@ aequilibrae/paths/AoN.pyd
 aequilibrae/paths/basic_path_finding.html
 aequilibrae/paths/parameters.html
 aequilibrae/paths/build/*
+
+#Virtual environment
+
+.venv/
