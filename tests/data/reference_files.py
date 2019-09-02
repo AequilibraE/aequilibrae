@@ -13,5 +13,9 @@ gtfs_db_output = join(path_test, "test.db")
 # For the skimming test
 
 
+
 # For the matrix test
 omx_example = join(dirname(dirname(abspath(__file__))), "data/test_omx.omx")
+
+# For project tests
+project_file = join(dirname(dirname(abspath(__file__))),'data', 'AequilibraE_Project.sqlite')
