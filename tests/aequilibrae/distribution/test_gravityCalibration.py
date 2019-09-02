@@ -29,7 +29,12 @@ matrix.computational_view(["base_matrix"])
 
 class TestGravityCalibration(TestCase):
     def test_calibrate(self):
-        args = {"impedance": impedance, "matrix": matrix, "function": "power", "nan_to_zero": False}
+        args = {
+            "impedance": impedance,
+            "matrix": matrix,
+            "function": "power",
+            "nan_to_zero": False,
+        }
 
         distributed_matrix = GravityCalibration(**args)
         distributed_matrix.calibrate()

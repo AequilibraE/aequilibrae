@@ -55,10 +55,14 @@ class allOrNothing(WorkerThread):
         self.cumulative = 0
 
         if results.__graph_id__ != graph.__id__:
-            raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
+            raise ValueError(
+                "Results object not prepared. Use --> results.prepare(graph)"
+            )
 
         if results.__graph_id__ is None:
-            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
+            raise ValueError(
+                "The results object was not prepared. Use results.prepare(graph)"
+            )
 
         elif results.__graph_id__ != graph.__id__:
             raise ValueError("The results object was prepared for a different graph")
@@ -70,7 +74,9 @@ class allOrNothing(WorkerThread):
             )
 
         elif not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible set of centroids.")
+            raise ValueError(
+                "Matrix and graph do not have compatible set of centroids."
+            )
 
     def doWork(self):
         self.execute()

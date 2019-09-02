@@ -45,7 +45,14 @@ class AequilibraEData(object):
         self.aeq_index_type = None
         self.memory_mode = None
 
-    def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False):
+    def create_empty(
+        self,
+        file_path=None,
+        entries=1,
+        field_names=None,
+        data_types=None,
+        memory_mode=False,
+    ):
         """
         :param file_path: Optional. Full path for the output data file. If *memory_false* is 'false' and path is missing,
         then the file is created in the temp folder
@@ -91,18 +98,24 @@ class AequilibraEData(object):
 
             for field in self.fields:
                 if field in object.__dict__:
-                    raise Exception(field + " is a reserved name. You cannot use it as a field name")
+                    raise Exception(
+                        field + " is a reserved name. You cannot use it as a field name"
+                    )
 
             self.num_fields = len(self.fields)
 
             dtype = [("index", self.aeq_index_type)]
-            dtype.extend([(self.fields[i], self.data_types[i]) for i in range(self.num_fields)])
+            dtype.extend(
+                [(self.fields[i], self.data_types[i]) for i in range(self.num_fields)]
+            )
 
             # the file
             if self.memory_mode:
                 self.data = np.recarray((self.entries,), dtype=dtype)
             else:
-                self.data = open_memmap(self.file_path, mode="w+", dtype=dtype, shape=(self.entries,))
+                self.data = open_memmap(
+                    self.file_path, mode="w+", dtype=dtype, shape=(self.entries,)
+                )
 
     def __getattr__(self, field_name):
 
@@ -156,7 +169,12 @@ class AequilibraEData(object):
                 elif np.issubdtype(dt, np.integer):
                     fmt += ",%d"
             np.savetxt(
-                file_name, self.data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments=""
+                file_name,
+                self.data[np.newaxis, :][0],
+                delimiter=",",
+                fmt=fmt,
+                header=",".join(headers),
+                comments="",
             )
 
         elif file_type in [".sqlite", ".sqlite3", ".db"]:
@@ -171,13 +189,24 @@ class AequilibraEData(object):
                 fi += ", " + f + " REAL"
                 qm += ", ?"
 
-            c.execute("""CREATE TABLE """ + table_name + """ (link_id INTEGER PRIMARY KEY""" + fi + ")" "")
+            c.execute(
+                """CREATE TABLE """
+                + table_name
+                + """ (link_id INTEGER PRIMARY KEY"""
+                + fi
+                + ")"
+                ""
+            )
             c.execute("BEGIN TRANSACTION")
-            c.executemany("INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data)
+            c.executemany(
+                "INSERT INTO " + table_name + " VALUES (" + qm + ")", self.data
+            )
             c.execute("END TRANSACTION")
             conn.commit()
             conn.close()
 
     @staticmethod
     def random_name():
-        return os.path.join(tempfile.gettempdir(), "Aequilibrae_data_" + str(uuid.uuid4()) + ".aed")
+        return os.path.join(
+            tempfile.gettempdir(), "Aequilibrae_data_" + str(uuid.uuid4()) + ".aed"
+        )

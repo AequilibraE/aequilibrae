@@ -39,16 +39,23 @@ class SyntheticGravityModel:
                 self.alpha = None
                 self.beta = None
                 if value not in self.valid_functions:
-                    raise ValueError("Function needs to be one of these: " + ", ".join(self.valid_functions))
+                    raise ValueError(
+                        "Function needs to be one of these: "
+                        + ", ".join(self.valid_functions)
+                    )
             else:
                 if isinstance(value, float) or isinstance(value, int):
                     if key == "alpha":
                         if self.__dict__.get("function") == "EXPO":
-                            raise ValueError("Exponential function does not have an alpha parameter")
+                            raise ValueError(
+                                "Exponential function does not have an alpha parameter"
+                            )
 
                     if key == "beta":
                         if self.function == "POWER":
-                            raise ValueError("Inverse power function does not have a beta parameter")
+                            raise ValueError(
+                                "Inverse power function does not have a beta parameter"
+                            )
                 else:
                     raise ValueError("Parameter needs to be numeric")
 
@@ -74,14 +81,24 @@ class SyntheticGravityModel:
                     else:
                         raise ValueError("Model has unknown parameters: " + str(key))
         except ValueError as err:
-            raise ValueError("File provided is not a valid Synthetic Gravity Model - {}".format(err.__str__()))
+            raise ValueError(
+                "File provided is not a valid Synthetic Gravity Model - {}".format(
+                    err.__str__()
+                )
+            )
 
     def save(self, file_name):
         file_name = str(file_name)
         if file_name[-4:].upper() != ".MOD":
             file_name += ".mod"
 
-        model = {model_type: {"function": self.function, "alpha": self.alpha, "beta": self.beta}}
+        model = {
+            model_type: {
+                "function": self.function,
+                "alpha": self.alpha,
+                "beta": self.beta,
+            }
+        }
 
         mod = open(file_name, "w")
         yaml.dump(model, mod, default_flow_style=False)

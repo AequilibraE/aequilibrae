@@ -72,7 +72,10 @@ class GravityCalibration:
         self.report.append("Functional form: " + deterrence_function)
         self.model = SyntheticGravityModel()
         if deterrence_function not in self.model.valid_functions:
-            raise ValueError("Function needs to be one of these: " + ", ".join(self.model.valid_functions))
+            raise ValueError(
+                "Function needs to be one of these: "
+                + ", ".join(self.model.valid_functions)
+            )
         else:
             self.model.function = deterrence_function
 
@@ -97,12 +100,16 @@ class GravityCalibration:
 
             a = 1
             if max_cost > 0:
-                a = (self.impedance.matrix[self.impedance_core][:, :] < max_cost).astype(int)
+                a = (
+                    self.impedance.matrix[self.impedance_core][:, :] < max_cost
+                ).astype(int)
 
             # weighted average cost
             self.report.append("Iteration: 1")
             cstar = np.nansum(
-                self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :] * a
+                self.impedance.matrix[self.impedance_core][:, :]
+                * self.result_matrix.gravity[:, :]
+                * a
             ) / np.nansum(self.result_matrix.gravity[:, :] * a)
 
             b0 = 1 / cstar
@@ -123,7 +130,9 @@ class GravityCalibration:
             cm = self.apply_gravity()
             for i in self.gravity.report:
                 self.report.append("       " + i)
-            self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
+            self.report.append(
+                "Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1))))
+            )
             self.report.append("")
             cm1 = c0
 
@@ -141,7 +150,9 @@ class GravityCalibration:
 
             for i in self.gravity.report:
                 self.report.append("       " + i)
-            self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
+            self.report.append(
+                "Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1))))
+            )
             self.report.append("")
 
             # compute convergence criteria
@@ -150,10 +161,18 @@ class GravityCalibration:
 
         if self.itera == self.max_iter:
             self.report.append(
-                "DID NOT CONVERGE. Stopped in  " + str(self.itera) + "  with a global error of " + str(self.gap)
+                "DID NOT CONVERGE. Stopped in  "
+                + str(self.itera)
+                + "  with a global error of "
+                + str(self.gap)
             )
         else:
-            self.report.append("Converged in " + str(self.itera) + "  iterations to a global error of " + str(self.gap))
+            self.report.append(
+                "Converged in "
+                + str(self.itera)
+                + "  iterations to a global error of "
+                + str(self.gap)
+            )
         s = clock() - t
         m, s1 = divmod(s, 60)
         s -= m * 60
@@ -164,14 +183,20 @@ class GravityCalibration:
 
     def check_inputs(self):
         if not isinstance(self.impedance, AequilibraeMatrix):
-            raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError(
+                "Impedance matrix needs to be an instance of AequilibraEMatrix"
+            )
 
         if not isinstance(self.matrix, AequilibraeMatrix):
-            raise TypeError("Observed matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError(
+                "Observed matrix needs to be an instance of AequilibraEMatrix"
+            )
 
         # Check data dimensions
         if not np.array_equal(self.impedance.index, self.impedance.index):
-            raise ValueError("Indices from impedance matrix do not match those from seed matrix")
+            raise ValueError(
+                "Indices from impedance matrix do not match those from seed matrix"
+            )
 
         # Check if matrices were set for computation
         mats = [(self.matrix, "Observed matrix"), (self.impedance, "Impedance matrix")]
@@ -180,7 +205,10 @@ class GravityCalibration:
                 raise ValueError(title + " needs to be set for computation")
             else:
                 if len(matrix.matrix_view.shape[:]) > 2:
-                    raise ValueError(title + "' computational view needs to be set for a single matrix core")
+                    raise ValueError(
+                        title
+                        + "' computational view needs to be set for a single matrix core"
+                    )
 
             if np.nansum(matrix.matrix_view.data) == 0:
                 raise ValueError(title + "has only zero values")
@@ -196,15 +224,21 @@ class GravityCalibration:
         # Prepare the data for computation
         self.comput_core = self.matrix.view_names[0]
 
-        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"])
+        self.result_matrix = self.matrix.copy(
+            cores=[self.comput_core], names=["gravity"]
+        )
 
         self.rows = AequilibraEData()
-        self.rows.create_empty(entries=self.matrix.zones, field_names=["rows"], memory_mode=True)
+        self.rows.create_empty(
+            entries=self.matrix.zones, field_names=["rows"], memory_mode=True
+        )
         self.rows.index[:] = self.matrix.index[:]
         self.rows.rows[:] = self.matrix.rows()[:]
 
         self.columns = AequilibraEData()
-        self.columns.create_empty(entries=self.matrix.zones, field_names=["columns"], memory_mode=True)
+        self.columns.create_empty(
+            entries=self.matrix.zones, field_names=["columns"], memory_mode=True
+        )
         self.columns.index[:] = self.matrix.index[:]
         self.columns.columns[:] = self.matrix.columns()[:]
 
@@ -227,7 +261,8 @@ class GravityCalibration:
         self.result_matrix = self.gravity.output
 
         return np.nansum(
-            self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :]
+            self.impedance.matrix[self.impedance_core][:, :]
+            * self.result_matrix.gravity[:, :]
         ) / np.nansum(self.result_matrix.gravity[:, :])
 
     def get_parameters(self):
