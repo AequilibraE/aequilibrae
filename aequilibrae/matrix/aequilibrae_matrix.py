@@ -8,6 +8,17 @@ import functools
 
 import numpy as np
 
+# Checks if we can display OMX
+try:
+    import openmatrix as omx
+
+    has_omx = True
+except ModuleNotFoundError as e:
+    logger = logging.getLogger("aequilibrae")
+    logger.error(e.name)
+    has_omx = False
+
+
 """"""
 """-----------------------------------------------------------------------------------------------------------
 Package:    AequilibraE
@@ -171,7 +182,9 @@ class AequilibraeMatrix(object):
                                 "than {}: {}".format(INDEX_NAME_MAX_LENGTH, ind_name)
                             )
                     else:
-                        raise ValueError("Index names need to be strings: " + str(ind_name))
+                        raise ValueError(
+                            "Index names need to be strings: " + str(ind_name)
+                        )
             else:
                 raise Exception("Index names need to be provided as a list")
         self.num_indices = len(self.index_names)
@@ -190,7 +203,9 @@ class AequilibraeMatrix(object):
                                 "than {}: {}".format(CORE_NAME_MAX_LENGTH, mat_name)
                             )
                     else:
-                        raise ValueError("Matrix core names need to be strings: " + str(mat_name))
+                        raise ValueError(
+                            "Matrix core names need to be strings: " + str(mat_name)
+                        )
             else:
                 raise Exception("Matrix names need to be provided as a list")
 
@@ -218,7 +233,9 @@ class AequilibraeMatrix(object):
         :return:
         """
 
-        def robust_name(input_name: str, max_length: int, forbiden_names: List[str]) -> str:
+        def robust_name(
+            input_name: str, max_length: int, forbiden_names: List[str]
+        ) -> str:
             return_name = input_name
             if len(input_name) > max_length:
                 return_name = input_name[:max_length]
@@ -254,7 +271,9 @@ class AequilibraeMatrix(object):
             do_cores = [x for x in cores if x in avail_cores]
             if cores != do_cores:
                 do_cores = [x for x in cores if x not in avail_cores]
-                raise ValueError("Cores listed not available in the OMX file: {}".format(do_cores))
+                raise ValueError(
+                    "Cores listed not available in the OMX file: {}".format(do_cores)
+                )
 
         avail_idx = src.list_mappings()
         if mappings is None:
@@ -265,7 +284,11 @@ class AequilibraeMatrix(object):
             do_idx = [x for x in mappings if x in avail_idx]
             if mappings != do_idx:
                 do_idx = [x for x in mappings if x not in avail_idx]
-                raise ValueError("Mappings/indices listed not available in the OMX file: {}".format(do_idx))
+                raise ValueError(
+                    "Mappings/indices listed not available in the OMX file: {}".format(
+                        do_idx
+                    )
+                )
 
         shp = src.shape()
         if shp[0] != shp[1]:
@@ -275,15 +298,25 @@ class AequilibraeMatrix(object):
         if robust:
             # Use reduce as we have to keep track of which generated names have been used (to avoid collisions)
             core_names = functools.reduce(
-                lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)], do_cores, []
+                lambda acc, n: acc + [robust_name(n, CORE_NAME_MAX_LENGTH, acc)],
+                do_cores,
+                [],
             )
-            idx_names = functools.reduce(lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, [])
+            idx_names = functools.reduce(
+                lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)],
+                do_idx,
+                [],
+            )
         else:
             core_names = [x for x in do_cores]
             idx_names = [x for x in do_idx]
 
         self.create_empty(
-            file_name=file_path, zones=zones, matrix_names=core_names, index_names=idx_names, compressed=compressed
+            file_name=file_path,
+            zones=zones,
+            matrix_names=core_names,
+            index_names=idx_names,
+            compressed=compressed,
         )
 
         # Copy all cores
@@ -303,31 +336,47 @@ class AequilibraeMatrix(object):
 
     def __load__(self):
         # GET File version
-        self.__version__ = np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0]
+        self.__version__ = np.memmap(
+            self.file_path, dtype="uint8", offset=0, mode="r+", shape=1
+        )[0]
 
         if self.__version__ != VERSION:
             raise ValueError("Matrix formats do not match")
 
         # If matrix is compressed or not
-        self.compressed = np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0]
+        self.compressed = np.memmap(
+            self.file_path, dtype="uint8", offset=1, mode="r+", shape=1
+        )[0]
 
         # number matrix cells if compressed
-        matrix_cells = np.memmap(self.file_path, dtype="uint64", offset=2, mode="r+", shape=1)[0]
+        matrix_cells = np.memmap(
+            self.file_path, dtype="uint64", offset=2, mode="r+", shape=1
+        )[0]
 
         # Zones
-        self.zones = np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0]
+        self.zones = np.memmap(
+            self.file_path, dtype="uint32", offset=10, mode="r+", shape=1
+        )[0]
 
         # Matrix cores
-        self.cores = np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0]
+        self.cores = np.memmap(
+            self.file_path, dtype="uint8", offset=14, mode="r+", shape=1
+        )[0]
 
         # Matrix indices
-        self.num_indices = np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0]
+        self.num_indices = np.memmap(
+            self.file_path, dtype="uint8", offset=15, mode="r+", shape=1
+        )[0]
 
         # Data type
-        data_class = np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0]
+        data_class = np.memmap(
+            self.file_path, dtype="uint8", offset=16, mode="r+", shape=1
+        )[0]
 
         # Data size
-        data_size = np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0]
+        data_size = np.memmap(
+            self.file_path, dtype="uint8", offset=17, mode="r+", shape=1
+        )[0]
 
         if data_class == INT:
             if data_size == 1:
@@ -352,18 +401,34 @@ class AequilibraeMatrix(object):
                 self.dtype = np.float128
 
         # matrix name
-        self.name = np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0]
+        self.name = np.memmap(
+            self.file_path,
+            dtype="S" + str(MATRIX_NAME_MAX_LENGTH),
+            offset=18,
+            mode="r+",
+            shape=1,
+        )[0]
 
         # matrix description
         offset = 18 + MATRIX_NAME_MAX_LENGTH
         self.description = np.memmap(
-            self.file_path, dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset, mode="r+", shape=1
+            self.file_path,
+            dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH),
+            offset=offset,
+            mode="r+",
+            shape=1,
         )[0]
 
         # core names
         offset += MATRIX_DESCRIPTION_MAX_LENGTH
         self.names = list(
-            np.memmap(self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.cores)
+            np.memmap(
+                self.file_path,
+                dtype="S" + str(CORE_NAME_MAX_LENGTH),
+                offset=offset,
+                mode="r+",
+                shape=self.cores,
+            )
         )
         self.names = [x.decode("utf-8") for x in self.names]
 
@@ -371,7 +436,11 @@ class AequilibraeMatrix(object):
         offset += CORE_NAME_MAX_LENGTH * self.cores
         self.index_names = list(
             np.memmap(
-                self.file_path, dtype="S" + str(INDEX_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.num_indices
+                self.file_path,
+                dtype="S" + str(INDEX_NAME_MAX_LENGTH),
+                offset=offset,
+                mode="r+",
+                shape=self.num_indices,
             )
         )
         self.index_names = [x.decode("utf-8") for x in self.index_names]
@@ -379,7 +448,11 @@ class AequilibraeMatrix(object):
         # Index
         offset += self.num_indices * INDEX_NAME_MAX_LENGTH
         self.indices = np.memmap(
-            self.file_path, dtype="uint64", offset=offset, mode="r+", shape=(self.zones, self.num_indices)
+            self.file_path,
+            dtype="uint64",
+            offset=offset,
+            mode="r+",
+            shape=(self.zones, self.num_indices),
         )
         self.set_index(self.index_names[0])
 
@@ -387,11 +460,19 @@ class AequilibraeMatrix(object):
         offset += self.zones * 8 * self.num_indices
         if self.compressed:
             self.matrices = np.memmap(
-                self.file_path, dtype=self.dtype, offset=offset, mode="r+", shape=(matrix_cells, self.cores + 2)
+                self.file_path,
+                dtype=self.dtype,
+                offset=offset,
+                mode="r+",
+                shape=(matrix_cells, self.cores + 2),
             )
         else:
             self.matrices = np.memmap(
-                self.file_path, dtype=self.dtype, offset=offset, mode="r+", shape=(self.zones, self.zones, self.cores)
+                self.file_path,
+                dtype=self.dtype,
+                offset=offset,
+                mode="r+",
+                shape=(self.zones, self.zones, self.cores),
             )
 
         self.matrix = {}
@@ -400,45 +481,75 @@ class AequilibraeMatrix(object):
         self.matrix_hash = self.__builds_hash__()
 
     def __write__(self):
-        np.memmap(self.file_path, dtype="uint8", offset=0, mode="w+", shape=1)[0] = self.__version__
+        np.memmap(self.file_path, dtype="uint8", offset=0, mode="w+", shape=1)[
+            0
+        ] = self.__version__
 
         # If matrix is compressed or not
-        np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[0] = self.compressed
+        np.memmap(self.file_path, dtype="uint8", offset=1, mode="r+", shape=1)[
+            0
+        ] = self.compressed
 
         # number matrix cells if compressed
         matrix_cells = self.zones * self.zones
-        np.memmap(self.file_path, dtype="uint64", offset=2, mode="r+", shape=1)[0] = matrix_cells
+        np.memmap(self.file_path, dtype="uint64", offset=2, mode="r+", shape=1)[
+            0
+        ] = matrix_cells
 
         # Zones
-        np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[0] = self.zones
+        np.memmap(self.file_path, dtype="uint32", offset=10, mode="r+", shape=1)[
+            0
+        ] = self.zones
 
         # Matrix cores
-        np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[0] = self.cores
+        np.memmap(self.file_path, dtype="uint8", offset=14, mode="r+", shape=1)[
+            0
+        ] = self.cores
 
         # Matrix indices
-        np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[0] = self.num_indices
+        np.memmap(self.file_path, dtype="uint8", offset=15, mode="r+", shape=1)[
+            0
+        ] = self.num_indices
 
         # Data type
         data_class = self.define_data_class()
-        np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[0] = data_class
+        np.memmap(self.file_path, dtype="uint8", offset=16, mode="r+", shape=1)[
+            0
+        ] = data_class
 
         # Data size
         data_size = np.dtype(self.dtype).itemsize
-        np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0] = data_size
+        np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[
+            0
+        ] = data_size
 
         # matrix name
-        np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0] = self.name
+        np.memmap(
+            self.file_path,
+            dtype="S" + str(MATRIX_NAME_MAX_LENGTH),
+            offset=18,
+            mode="r+",
+            shape=1,
+        )[0] = self.name
 
         # matrix description
         offset = 18 + MATRIX_NAME_MAX_LENGTH
-        np.memmap(self.file_path, dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset, mode="r+", shape=1)[
-            0
-        ] = self.description
+        np.memmap(
+            self.file_path,
+            dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH),
+            offset=offset,
+            mode="r+",
+            shape=1,
+        )[0] = self.description
 
         # core names
         offset += MATRIX_DESCRIPTION_MAX_LENGTH
         fp = np.memmap(
-            self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.cores
+            self.file_path,
+            dtype="S" + str(CORE_NAME_MAX_LENGTH),
+            offset=offset,
+            mode="r+",
+            shape=self.cores,
         )
         for i, v in enumerate(self.names):
             fp[i] = v
@@ -448,7 +559,11 @@ class AequilibraeMatrix(object):
         # Index names
         offset += CORE_NAME_MAX_LENGTH * self.cores
         fp = np.memmap(
-            self.file_path, dtype="S" + str(INDEX_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.num_indices
+            self.file_path,
+            dtype="S" + str(INDEX_NAME_MAX_LENGTH),
+            offset=offset,
+            mode="r+",
+            shape=self.num_indices,
         )
         for i, v in enumerate(self.index_names):
             fp[i] = v
@@ -458,7 +573,11 @@ class AequilibraeMatrix(object):
         # Index
         offset += self.num_indices * INDEX_NAME_MAX_LENGTH
         self.indices = np.memmap(
-            self.file_path, dtype="uint64", offset=offset, mode="r+", shape=(self.zones, self.num_indices)
+            self.file_path,
+            dtype="uint64",
+            offset=offset,
+            mode="r+",
+            shape=(self.zones, self.num_indices),
         )
         self.indices.fill(0)
         self.indices.flush()
@@ -467,11 +586,19 @@ class AequilibraeMatrix(object):
         offset += self.zones * 8 * self.num_indices
         if self.compressed:
             self.matrices = np.memmap(
-                self.file_path, dtype=self.dtype, offset=offset, mode="r+", shape=(matrix_cells, self.cores + 2)
+                self.file_path,
+                dtype=self.dtype,
+                offset=offset,
+                mode="r+",
+                shape=(matrix_cells, self.cores + 2),
             )
         else:
             self.matrices = np.memmap(
-                self.file_path, dtype=self.dtype, offset=offset, mode="r+", shape=(self.zones, self.zones, self.cores)
+                self.file_path,
+                dtype=self.dtype,
+                offset=offset,
+                mode="r+",
+                shape=(self.zones, self.zones, self.cores),
             )
 
         if np.issubdtype(self.dtype, np.integer):
@@ -517,7 +644,11 @@ class AequilibraeMatrix(object):
             self.index = self.indices[:, ind_index]
             self.current_index = index_to_set
         else:
-            raise ValueError("Index {} needs to be a string or its integer index.".format(str(index_to_set)))
+            raise ValueError(
+                "Index {} needs to be a string or its integer index.".format(
+                    str(index_to_set)
+                )
+            )
 
     def __getattr__(self, mat_name):
         if mat_name in object.__dict__:
@@ -596,7 +727,9 @@ class AequilibraeMatrix(object):
             import openmatrix as omx
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
-            raise ValueError("File extension {} not implemented yet".format(file_extension))
+            raise ValueError(
+                "File extension {} not implemented yet".format(file_extension)
+            )
 
         if cores is None:
             cores = self.names
@@ -691,14 +824,22 @@ class AequilibraeMatrix(object):
             if isinstance(core_list, list):
                 for i in core_list:
                     if i not in self.names:
-                        raise ValueError("Matrix core {} no available on this matrix".format(i))
+                        raise ValueError(
+                            "Matrix core {} no available on this matrix".format(i)
+                        )
 
                 if len(core_list) > 1:
                     for i, x in enumerate(core_list[1:]):
                         k = self.names.index(x)  # index of the first element
-                        k0 = self.names.index(core_list[i])  # index of the first element
+                        k0 = self.names.index(
+                            core_list[i]
+                        )  # index of the first element
                         if k - k0 != 1:
-                            raise ValueError("Matrix cores {} and {} are not adjacent".format(core_list[i - 1], x))
+                            raise ValueError(
+                                "Matrix cores {} and {} are not adjacent".format(
+                                    core_list[i - 1], x
+                                )
+                            )
             else:
                 raise TypeError("Please provide a list of matrices")
 
@@ -707,9 +848,19 @@ class AequilibraeMatrix(object):
             # self.matrix_view = self.matrix[:, :, self.names.index(core_list[0]):self.names.index(core_list[0])+1]
             self.matrix_view = self.matrices[:, :, self.names.index(core_list[0])]
         elif len(core_list) > 1:
-            self.matrix_view = self.matrices[:, :, self.names.index(core_list[0]) : self.names.index(core_list[-1]) + 1]
+            self.matrix_view = self.matrices[
+                :,
+                :,
+                self.names.index(core_list[0]) : self.names.index(core_list[-1]) + 1,
+            ]
 
-    def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None):
+    def copy(
+        self,
+        output_name: str = None,
+        cores: List[str] = None,
+        names: List[str] = None,
+        compress: bool = None,
+    ):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
 
@@ -765,7 +916,9 @@ class AequilibraeMatrix(object):
 
             for i in cores:
                 if i not in self.names:
-                    raise ValueError("Matrix core {} not available on this matrix".format(i))
+                    raise ValueError(
+                        "Matrix core {} not available on this matrix".format(i)
+                    )
 
             if names is None:
                 names = cores
@@ -774,7 +927,9 @@ class AequilibraeMatrix(object):
                     raise ValueError("Names need to be presented as list")
 
                 if len(names) != len(cores):
-                    raise ValueError("Number of cores to cpy and list of names are not compatible")
+                    raise ValueError(
+                        "Number of cores to cpy and list of names are not compatible"
+                    )
 
             output = AequilibraeMatrix()
             output.create_empty(
@@ -892,9 +1047,13 @@ class AequilibraeMatrix(object):
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
                 matrix_name = str(matrix_name)[0:MATRIX_NAME_MAX_LENGTH]
 
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[
-                0
-            ] = matrix_name
+            np.memmap(
+                self.file_path,
+                dtype="S" + str(MATRIX_NAME_MAX_LENGTH),
+                offset=18,
+                mode="r+",
+                shape=1,
+            )[0] = matrix_name
 
     def setDescription(self, matrix_description: str):
         """
@@ -917,7 +1076,9 @@ class AequilibraeMatrix(object):
         """
         if matrix_description is not None:
             if len(str(matrix_description)) > MATRIX_DESCRIPTION_MAX_LENGTH:
-                matrix_description = str(matrix_description)[0:MATRIX_DESCRIPTION_MAX_LENGTH]
+                matrix_description = str(matrix_description)[
+                    0:MATRIX_DESCRIPTION_MAX_LENGTH
+                ]
 
             np.memmap(
                 self.file_path,
@@ -939,4 +1100,6 @@ class AequilibraeMatrix(object):
         >>> name = AequilibraeMatrix().random_name()
         '/tmp/Aequilibrae_matrix_54625f36-bf41-4c85-80fb-7fc2e3f3d76e.aem'
         """
-        return os.path.join(tempfile.gettempdir(), "Aequilibrae_matrix_" + str(uuid.uuid4()) + ".aem")
+        return os.path.join(
+            tempfile.gettempdir(), "Aequilibrae_matrix_" + str(uuid.uuid4()) + ".aem"
+        )
