@@ -15,3 +15,4 @@ gtfs_db_output = join(path_test, "test.db")
 
 # For the matrix test
 omx_example = join(dirname(dirname(abspath(__file__))), "data/test_omx.omx")
+no_index_omx = join(dirname(dirname(abspath(__file__))), "data/no_index.omx")
