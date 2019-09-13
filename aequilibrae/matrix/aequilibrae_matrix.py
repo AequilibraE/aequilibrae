@@ -100,7 +100,7 @@ class AequilibraeMatrix(object):
         self.description = None
         self.current_index = None
         self.omx = False
-        self.omx_file: omx.File = None
+        self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
 
     def create_empty(
