@@ -861,7 +861,7 @@ class AequilibraeMatrix(object):
         Creates a memory view for a list of matrices that is compatible with Cython memory buffers
 
         It allows for AequilibraE matrices to be used in all parallelized algorithms within AequilibraE
-        
+
         In case of OMX matrices, the computational view is held only in memory
 
         Parameters
