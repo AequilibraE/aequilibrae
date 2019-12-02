@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.5'] #, '3.6', '3.7' ]
-        os: ['macos-latest']
+        os: ['windows-latest' ] #, 'macos-latest']
     steps:
     - uses: actions/checkout@v1
     - name: Set Python environment
@@ -26,7 +26,11 @@ jobs:
         pip install numpy cython
 
     - name: Build
-      run: python setup.py sdist bdist_wheel
+      run: |
+        if [ "$RUNNER_OS" == "Windows " ]; then
+             choco install visualstudio2019community
+        fi
+        python setup.py sdist bdist_wheel
 
     - name: Publish
       env:
