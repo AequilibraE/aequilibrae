@@ -29,6 +29,8 @@ jobs:
       run: |
         if [ "$RUNNER_OS" == "Windows" ]; then
              choco install visualstudio2019community
+        else
+             pip install auditwheel
         fi
         python setup.py sdist bdist_wheel
 
