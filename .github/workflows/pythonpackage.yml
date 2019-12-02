@@ -26,5 +26,9 @@ jobs:
         flake8
     - name: Test with pytest
       run: |
+        cd aequilibrae/paths
+        python setup_Assignment.py build_ext --inplace
+        cd ..
+        cd ..
         pip install pytest
         pytest
