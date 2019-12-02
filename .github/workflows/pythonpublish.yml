@@ -27,6 +27,7 @@ jobs:
 
     - name: Build
       run: |
+        choco install visualstudio2019community
         choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
         python setup.py sdist bdist_wheel
 #          if ["$RUNNER_OS" == "Windows"]; then
