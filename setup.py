@@ -4,6 +4,7 @@ import numpy as np
 from setuptools import setup, find_packages
 from setuptools import Extension
 from Cython.Distutils import build_ext
+from aequilibrae.paths.__version__ import release_version
 
 sys.dont_write_bytecode = True
 
@@ -24,7 +25,7 @@ loose_modules = ["__version__", "parameters", "reserved_fields"]
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
-        version="0.5.1",
+        version=release_version,
         install_requires=["numpy", "PyQt5", "pyaml"],
         packages=pkgs,
         package_dir={"": "."},
