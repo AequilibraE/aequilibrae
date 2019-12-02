@@ -27,7 +27,7 @@ jobs:
 
     - name: Build
       run: |
-        if [ "$RUNNER_OS" == "Windows " ]; then
+        if [ "$RUNNER_OS" == "Windows" ]; then
              choco install visualstudio2019community
         fi
         python setup.py sdist bdist_wheel
