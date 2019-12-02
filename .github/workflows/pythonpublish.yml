@@ -39,3 +39,4 @@ jobs:
                twine upload output/*
           else
                twine upload dist/*
+          fi
