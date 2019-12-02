@@ -19,8 +19,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        apt-get install -y libspatialite-dev
-        apt-get build-dep python-tables
+#        apt-get build-dep python-tables
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         cd aequilibrae/paths
