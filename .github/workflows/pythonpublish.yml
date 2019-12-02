@@ -1,14 +1,14 @@
 name: Upload Python Package
 
-on: push
+on: prerelease
 jobs:
   deploy:
-    runs-on: macos-latest
+    runs-on: [macos-latest, ubuntu-latest]
     strategy:
       matrix:
         python-version: [ '3.5', '3.6', '3.7' ]
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
     - name: Build and upload for Python 3.x
       uses: actions/setup-python@v1
       with:
@@ -26,4 +26,4 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         python setup.py sdist bdist_wheel
-#        twine upload dist/*
+        twine upload dist/*
