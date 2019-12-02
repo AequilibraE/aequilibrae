@@ -1,8 +1,8 @@
 name: Documentation
 
-on: push
-#  pull_request:
-#    types: [closed]
+on:
+  pull_request:
+    types: [closed]
 
 jobs:
   build:
