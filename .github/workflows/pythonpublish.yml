@@ -3,7 +3,7 @@ name: Upload Python Package
 on: push
 jobs:
   deploy:
-    runs-on: windows-latest
+    runs-on: macos-latest
     strategy:
       matrix:
         python-version: [ '3.5', '3.6', '3.7' ]
