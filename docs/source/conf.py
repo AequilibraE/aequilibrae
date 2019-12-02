@@ -14,6 +14,7 @@
 
 import os
 import sys
+from aequilibrae.paths.__version__ import release_version
 
 sys.path.insert(0, os.path.abspath("../.."))
 #
@@ -25,7 +26,7 @@ copyright = "2018, Pedro Camargo"
 author = "Pedro Camargo"
 
 # The short X.Y version
-version = "0.5.1"
+version = release_version
 # The full version, including alpha/beta/rc tags
 release = "30/07/2018"
 
