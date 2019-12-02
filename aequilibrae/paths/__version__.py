@@ -11,4 +11,4 @@ with open(os.path.join(os.path.dirname(__file__), "parameters.pxi"), "r") as a:
         if "binary" in i:
             binary_version = i[17:-1]
 
-release_version = str(version) + "." + str(minor_version)
+release_version = "{}.{}".format(version, minor_version)
