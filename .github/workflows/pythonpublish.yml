@@ -1,6 +1,6 @@
 name: Upload Python Package
 
-on: prerelease
+on: push
 jobs:
   deploy:
     runs-on:  ${{ matrix.os }}
