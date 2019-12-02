@@ -9,7 +9,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: ['3.5', '3.6', '3.7']
+        python-version: [ '3.5', '3.6', '3.7' ]
     steps:
     - uses: actions/checkout@v1
     - name: Build and upload for Python 3.x
