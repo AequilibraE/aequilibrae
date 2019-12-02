@@ -9,13 +9,14 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        pyv: ["3.5", "3.6", "3.7"]
+        python-version: ['3.5', '3.6', '3.7']
     steps:
     - uses: actions/checkout@v1
-    - name: Build and upload for Python ${{ matrix.pyv }}
+    - name: Build and upload for Python 3.x
       uses: actions/setup-python@v1
       with:
-        python-version: ${{ matrix.pyv }}
+        python-version: ${{ matrix.python-version }}
+        architecture: x64
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
