@@ -9,7 +9,7 @@ sys.dont_write_bytecode = True
 
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension("paths.AoN", [whole_path], include_dirs=[np.get_include()])
+ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include()])
 
 pkgs = [pkg for pkg in find_packages()]
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     setup(
         name="aequilibrae",
         version="0.5.1",
-        install_requires=["numpy", "cython"],
+        install_requires=["numpy", "PyQt5", "pyaml"],
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
