@@ -1,12 +1,16 @@
 name: Upload Python Package
 
 on: push
+#  push:
+#    # Sequence of patterns matched against refs/tags
+#    tags:
+#      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 jobs:
   deploy:
     runs-on:  ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: [ '3.5', '3.6', '3.7' ]
+        python-version: [ '3.5'] #, '3.6', '3.7' ]
         os: ['macos-latest', 'ubuntu-latest']
     steps:
     - uses: actions/checkout@v1
@@ -21,10 +25,26 @@ jobs:
         pip install setuptools wheel twine
         pip install numpy cython
 
-    - name: Build and publish
+    - name: Build
+      run: python setup.py sdist bdist_wheel
+
+
+    - auditwheel: Build and publish for Linux
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        pip install auditwheel
+        auditwheel repair dist/aequilibrae*whl -w /output
+        twine upload output/*
+      if: {{ <runner> }} == ubuntu-latest
+
+
+    - name: Build and publish for other platforms
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         python setup.py sdist bdist_wheel
         twine upload dist/*
+      if: {{ <runner> }} != ubuntu-latest
