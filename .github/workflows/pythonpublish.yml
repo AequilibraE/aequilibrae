@@ -21,7 +21,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
-        pip install numpy cython pyaml
+        pip install -r requirements.txt
 
     - name: Build
       run: |
