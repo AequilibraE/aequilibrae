@@ -6,11 +6,10 @@ on:
 
 jobs:
   deploy:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       matrix:
         pyv: ["3.5", "3.6", "3.7"]
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     steps:
     - uses: actions/checkout@v1
     - name: Build and upload for Python ${{ matrix.pyv }}
