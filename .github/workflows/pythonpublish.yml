@@ -3,7 +3,6 @@ name: Upload Python Package
 on:
   release:
     types: [published, prereleased]
-
 jobs:
   deploy:
     runs-on: windows-latest
@@ -11,7 +10,7 @@ jobs:
       matrix:
         python-version: [ '3.5', '3.6', '3.7' ]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@master
     - name: Build and upload for Python 3.x
       uses: actions/setup-python@v1
       with:
