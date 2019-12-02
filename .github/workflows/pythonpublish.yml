@@ -1,8 +1,8 @@
 name: Upload Python Package
 
-on:
-  release:
-    types: [published, prereleased]
+on: push
+#  release:
+#    types: [published, prereleased]
 jobs:
   deploy:
     runs-on: windows-latest
