@@ -1,17 +1,18 @@
 name: Upload Python Package
 
-on: push
-#  push:
-#    # Sequence of patterns matched against refs/tags
-#    tags:
-#      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
 jobs:
   deploy:
     runs-on:  ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: [ '3.5'] #, '3.6', '3.7' ]
-        os: ['windows-latest' ] #, 'macos-latest']
+        python-version: [ '3.5', '3.6', '3.7' ]
+        os: ['macos-latest' ] #, 'windows-latest']
     steps:
     - uses: actions/checkout@v1
     - name: Set Python environment
@@ -27,13 +28,11 @@ jobs:
 
     - name: Build
       run: |
-          ls
-#        choco install visualstudio2019community
-#        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
-#        python setup.py sdist bdist_wheel
-#          if ["$RUNNER_OS" == "Windows"]; then
-#
-#          fi
+          if ["$RUNNER_OS" == "Windows"]; then
+              choco install visualstudio2019community
+              choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
+          fi
+          python setup.py sdist bdist_wheel
 
     - name: Publish
       env:
