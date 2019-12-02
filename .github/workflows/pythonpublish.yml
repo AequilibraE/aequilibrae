@@ -33,7 +33,7 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-          if matrix.os == 'ubuntu-latest'; then
+          if [ "$RUNNER_OS" == "Linux" ]; then
                pip install auditwheel
                auditwheel repair dist/aequilibrae*whl -w /output
                twine upload output/*
