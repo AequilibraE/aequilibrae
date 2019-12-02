@@ -1,4 +1,4 @@
-name: Tests
+name: Documentation
 
 on: push
 #  pull_request:
@@ -26,3 +26,12 @@ jobs:
         sphinx-apidoc -T -o docs/source/generated aequilibrae
         cd docs
         make html
+
+    - name: Upload documentation
+      uses: SamKirkland/FTP-Deploy-Action@2.0.0
+      env:
+        FTP_SERVER: ${{ secrets.DOC_FTP_SERVER }}
+        FTP_USERNAME: ${{ secrets.DOC_FTP_USER }}
+        FTP_PASSWORD: ${{ secrets.DOC_FTP_PASSWORD }}
+        LOCAL_DIR: docs/build/html
+        ARGS: --delete
