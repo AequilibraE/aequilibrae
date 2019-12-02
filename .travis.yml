@@ -11,6 +11,7 @@ python:
 os: linux
 before_install:
   - sudo apt-get install -y libspatialite-dev
+  - apt-get build-dep python-tables
 
 install:
   - pip install -r requirements.txt
