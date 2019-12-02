@@ -3,10 +3,11 @@ name: Upload Python Package
 on: prerelease
 jobs:
   deploy:
-    runs-on: [macos-latest, ubuntu-latest]
+    runs-on:  ${{ matrix.os }}
     strategy:
       matrix:
         python-version: [ '3.5', '3.6', '3.7' ]
+        os: ['macos-latest', 'ubuntu-latest']
     steps:
     - uses: actions/checkout@v1
     - name: Build and upload for Python 3.x
