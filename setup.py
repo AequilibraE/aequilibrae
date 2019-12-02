@@ -22,8 +22,6 @@ loose_modules = ["__version__", "parameters", "reserved_fields"]
 
 
 if __name__ == "__main__":
-    with open("README.rst", "r") as fh:
-        long_description = fh.read()
     setup(
         name="aequilibrae",
         version="0.5.1",
@@ -33,8 +31,6 @@ if __name__ == "__main__":
         py_modules=loose_modules,
         package_data=pkg_data,
         zip_safe=False,
-        long_description=long_description,
-        long_description_content_type="text/markdown",
         description="A package for transportation modeling",
         author="Pedro Camargo",
         author_email="pedro@xl-optim.com",
