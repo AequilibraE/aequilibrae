@@ -19,6 +19,7 @@ Contents
    gettingstarted
    softwaredevelopment
    usageexamples
+   main_classes
    apidoc
 
 
