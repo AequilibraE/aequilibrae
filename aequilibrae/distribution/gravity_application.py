@@ -1,29 +1,24 @@
 """
------------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
+Algorithms to **apply** synthetic gravity models with power, exponential and gamma functions
 
- Name:      Synthetic gravity trip distribution model application
- Purpose:    Implementing the algorithms to apply trip distribution.
-                  Implemented: Synthetic gravity with power, exponential and gamma functions
-                  Still missing: 2nd stage: Friction factors
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2016-09-30
- Updated:    2017-08-11
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-# The procedures implemented in this code are some of those suggested in
-# Modelling Transport, 4th Edition
-# Ortuzar and Willumsen, Wiley 2011
-# The referred authors have no responsibility over this work, of course
+The procedures implemented in this code are some of those suggested in
+Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
+"""
+# -----------------------------------------------------------------------------------------------------------
+#  Package:    AequilibraE
+#
+#   Original Author:  Pedro Camargo (c@margo.co)
+#  Contributors:
+#  Last edited by: Pedro Camargo
+#
+#  Website:    www.AequilibraE.com
+#  Repository:  https://github.com/AequilibraE/AequilibraE
+#
+#  Created:    2016-09-30
+#  Updated:    2017-08-11
+#  Copyright:   (c) AequilibraE authors
+#  Licence:     See LICENSE.TXT
+#  -----------------------------------------------------------------------------------------------------------
 from .ipf import Ipf
 from .synthetic_gravity_model import SyntheticGravityModel
 from ..matrix import AequilibraeMatrix, AequilibraEData
@@ -36,6 +31,7 @@ import tempfile
 from time import clock
 import glob
 import logging
+
 
 sys.dont_write_bytecode = True
 
