@@ -1,24 +1,23 @@
 """
------------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:      Synthetic gravity model class
- Purpose:    Implementing a class object to represent synthetic gravity models
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2017-08-11
- Updated:
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
+Simple class object to represent synthetic gravity models
+"""
+# -----------------------------------------------------------------------------------------------------------
+#  Package:    AequilibraE
+#
+#  Original Author:  Pedro Camargo (c@margo.co)
+#  Contributors:
+#  Last edited by: Pedro Camargo
+#
+#  Website:    www.AequilibraE.com
+#  Repository:  https://github.com/AequilibraE/AequilibraE
+#
+#  Created:    2017-08-11
+#  Updated:
+#  Copyright:   (c) AequilibraE authors
+#  Licence:     See LICENSE.TXT
+#  -----------------------------------------------------------------------------------------------------------
 import yaml
+
 
 valid_functions = ["EXPO", "GAMMA", "POWER"]
 members = ["function", "alpha", "beta"]
