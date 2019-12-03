@@ -14,14 +14,12 @@ Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: Contents:
 
    overview
    gettingstarted
    softwaredevelopment
    usageexamples
-   main_classes
-   apidoc
-
 
 
 Indices and tables
