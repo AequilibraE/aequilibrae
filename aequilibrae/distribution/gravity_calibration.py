@@ -1,28 +1,26 @@
 """
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
+Algorithms to **calibrate** synthetic gravity models with power and exponential functions
 
- Name:       Gravity model calibration
- Purpose:    Implement a procedure to calibrate gravity models
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    22/10/2016
- Updated:    02/10/2017
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
+The procedures implemented in this code are some of those suggested in
+Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 """
-# The procedures implemented in this code are some of those suggested in
-# Modelling Transport, 4th Edition
-# Ortuzar and Willumsen, Wiley 2011
-# The referred authors have no responsability over this work, of course
-
+# -----------------------------------------------------------------------------------------------------------
+# Package:    AequilibraE
+#
+# Name:       Gravity model calibration
+#
+# Original Author:  Pedro Camargo (c@margo.co)
+# Contributors:
+# Last edited by: Pedro Camargo
+#
+# Website:    www.AequilibraE.com
+# Repository:  https://github.com/AequilibraE/AequilibraE
+#
+# Created:    22/10/2016
+# Updated:    02/10/2017
+# Copyright:   (c) AequilibraE authors
+# Licence:     See LICENSE.TXT
+# -----------------------------------------------------------------------------------------------------------
 from time import clock
 
 import numpy as np

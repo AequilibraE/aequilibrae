@@ -1,23 +1,21 @@
 """
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Iterative proportional fitting
- Purpose:    Implement Iterative proportional fitting
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    29/09/2016
- Updated:    11/08/2017
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
+Iterative Proportional Fitting (Fratar)
 """
+# -----------------------------------------------------------------------------------------------------------
+# Package:    AequilibraE
+#
+# Original Author:  Pedro Camargo (c@margo.co)
+# Contributors:
+# Last edited by: Pedro Camargo
+#
+# Website:    www.AequilibraE.com
+# Repository:  https://github.com/AequilibraE/AequilibraE
+#
+# Created:    29/09/2016
+# Updated:    11/08/2017
+# Copyright:   (c) AequilibraE authors
+# Licence:     See LICENSE.TXT
+# -----------------------------------------------------------------------------------------------------------
 import os
 import sys
 from time import clock
