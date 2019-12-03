@@ -16,12 +16,13 @@ import os
 import sys
 
 try:
-    import aequilibrae.__version__ as v
+    from aequilibrae.paths.__version__ import release_version
 except ImportError as e:
     sys.path.insert(0, os.path.abspath("../.."))
-    import aequilibrae.__version__ as v
+    from aequilibrae.paths.__version__ import release_version
+    import warnings
 
-    print(e.name)
+    warnings.warn("It is really annoying to deal with Flake8 sometimes. {}".format(e.args))
 
 
 #
@@ -29,12 +30,11 @@ except ImportError as e:
 # -- Project information -----------------------------------------------------
 
 project = "AequilibraE"
-copyright = "2018, AequilibraE developers"
+copyright = "2018, Pedro Camargo"
 author = "Pedro Camargo"
 
-
-# The short X.Y.Z version
-version = v
+# The short X.Y version
+version = release_version
 # The full version, including alpha/beta/rc tags
 release = "30/07/2018"
 
@@ -54,7 +54,6 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.imgmath",
     "sphinx_autodoc_annotation",
-    "sphinx.ext.mathjax",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -140,15 +139,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (
-        master_doc,
-        "AequilibraE.tex",
-        "AequilibraE Documentation",
-        "Pedro Camargo",
-        "manual",
-    )
-]
+latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
 
 # -- Options for manual page output ------------------------------------------
@@ -189,4 +180,3 @@ texinfo_documents = [
 #     "aequilibrae.paths.AoN",
 #     "aequilibrae.distribution",
 # ]
-add_module_names = False
