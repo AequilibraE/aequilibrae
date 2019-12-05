@@ -12,6 +12,7 @@ def parse_csv(file_name: str, column_order=[]):
 
     contents = csv.reader(csvfile, delimiter=",", quotechar='"')
     for row in contents:
+        row = [x.encode("ascii", errors="ignore").decode() for x in row]
         tot.append(row)
     titles = tot.pop(0)
     if tot:
@@ -30,7 +31,7 @@ def parse_csv(file_name: str, column_order=[]):
                 if data[c].dtype.char.upper() == "S":
                     column_order[c] = data[c].dtype
                 else:
-                    column_order[c] = "S128"
+                    column_order[c] = "S256"
             else:
                 if data[c].dtype.char.upper() in ["U", "S"]:
                     data[c][data[c] == ""] = "0"
