@@ -34,4 +34,4 @@ jobs:
         FTP_USERNAME: ${{ secrets.DOC_FTP_USER }}
         FTP_PASSWORD: ${{ secrets.DOC_FTP_PASSWORD }}
         LOCAL_DIR: docs/build/html
-        ARGS: --delete
+        ARGS: --transfer-all
