@@ -17,6 +17,7 @@ Contents
    :caption: Contents:
 
    overview
+   qgis
    gettingstarted
    softwaredevelopment
    usageexamples
