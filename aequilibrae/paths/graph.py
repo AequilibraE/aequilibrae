@@ -59,7 +59,7 @@ class Graph(object):
 
         self.cost = None  # This array holds the values being used in the shortest path routine
         self.skims = False  # 2-D Array with the fields to be computed as skims
-        self.skim_fields = False  # List of skim fields to be used in computation
+        self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
         self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
 
@@ -128,7 +128,6 @@ class Graph(object):
 
             f = [str(x[0]) for x in fields]
             raise ValueError(field_name + " does not exist. Fields available are: " + ", ".join(f))
-            return -1
 
         # collect the fields in the network
         check_titles = [id_field, dir_field, anode, bnode, cost_field]
@@ -356,54 +355,42 @@ class Graph(object):
 
     # We set which are the fields that are going to be minimized in this file
     # TODO: Change the call for all the uses on this function
-    def set_graph(self, cost_field=None, skim_fields=False, block_centroid_flows=None):
-        """
-        :type cost_field
-        :type block_centroid_flows
-        :type skim_fields: list of fields for skims
-        :type self: object
-        """
-        if block_centroid_flows is not None:
-            if isinstance(block_centroid_flows, bool):
-                self.set_blocked_centroid_flows(block_centroid_flows)
+    def set_graph(self, cost_field, block_centroid_flows=True) -> None:
 
-            else:
-                raise ValueError("block_c" "entroid_flows needs to be a boolean")
-
-        if cost_field is not None:
-            if cost_field in self.graph.dtype.names:
-                self.cost_field = cost_field
-                if self.graph[cost_field].dtype == self.__float_type:
-                    self.cost = self.graph[cost_field]
-                else:
-                    self.cost = self.graph[cost_field].astype(self.__float_type)
-                    Warning("Cost field with wrong type. Converting to float64")
-
-            else:
-                raise ValueError("cost_field not available in the graph:" + str(self.graph.dtype.names))
-
-        if self.cost_field is not None:
-            if not skim_fields:
-                skim_fields = [self.cost_field]
-            else:
-                s = [self.cost_field]
-                for i in skim_fields:
-                    if i in self.graph.dtype.names:
-                        if i not in s:
-                            s.append(i)
-                    else:
-                        self.skim_fields = None
-                        self.skims = None
-                        raise ValueError("Skim", i, " not available in the graph:", self.graph.dtype.names)
-                skim_fields = s
+        if isinstance(block_centroid_flows, bool):
+            self.set_blocked_centroid_flows(block_centroid_flows)
         else:
-            if skim_fields:
-                raise ValueError("Before setting skims, you need to set the cost field")
+            raise ValueError("block_centroid_flows needs to be a boolean")
 
-        t = False
-        for i in skim_fields:
-            if self.graph[i].dtype != self.__float_type:
-                t = True
+        if cost_field in self.graph.dtype.names:
+            self.cost_field = cost_field
+            if self.graph[cost_field].dtype == self.__float_type:
+                self.cost = self.graph[cost_field]
+            else:
+                self.cost = self.graph[cost_field].astype(self.__float_type)
+                Warning("Cost field with wrong type. Converting to float64")
+        else:
+            raise ValueError("cost_field not available in the graph:" + str(self.graph.dtype.names))
+
+        self.build_derived_properties()
+
+    def set_skimming(self, skim_fields: list) -> None:
+
+        if not skim_fields:
+            self.skim_fields = []
+            self.skims = None
+
+        if isinstance(skim_fields, str):
+            skim_fields = [skim_fields]
+        elif not isinstance(skim_fields, list):
+            raise ValueError("You need to provide a list of skims or the same of a single field")
+
+        # Check if list of fields make sense
+        k = [x for x in skim_fields if x not in self.graph.dtype.names]
+        if k:
+            raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
+
+        t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
 
@@ -415,9 +402,6 @@ class Graph(object):
             for i, j in enumerate(skim_fields):
                 self.skims[:, i] = self.graph[j]
         self.skim_fields = skim_fields
-
-        self.build_derived_properties()
-        return True
 
     def set_blocked_centroid_flows(self, blocking):
         if self.num_zones > 0:
