@@ -206,6 +206,8 @@ Iterative Proportional Fitting (IPF)
 The implementation of IPF is fully vectorized and leverages all the speed of NumPy, but it does not include the
 fancy multithreading implemented in path computation.
 
+**Please note that the AequilibraE matrix used as input is OVERWRITTEN by the IPF**
+
 ::
 
     import pandas as pd
@@ -214,9 +216,15 @@ fancy multithreading implemented in path computation.
     from aequilibrae.matrix import AequilibraeData
 
     matrix = AequilibraeMatrix()
+
+    # Here we can create from OMX or load from an AequilibraE matrix.
     matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
 
-    source_vectors = pd.read_csv(path/to/csvs)
+    # The matrix will be operated one (see the note on overwriting), so it does
+    # not make sense load an OMX matrix
+
+
+    source_vectors = pd.read_csv(path/to/CSVs)
     zones = source_vectors.zone.shape[0]
 
     args = {"entries": zones, "field_names": ["productions", "attractions"],
@@ -238,8 +246,8 @@ fancy multithreading implemented in path computation.
     fratar = Ipf(**args)
     fratar.fit()
 
-**Please note that the AequilibraE matrix we created from the OMX is OVERWRITTEN by the IPF**
-
+    # We can get back to our OMX matrix in the end
+    matrix.export(path/to_omx/output)
 
 Transit
 -------
@@ -343,6 +351,9 @@ We now import one matrix for each year, saving all the SCTG codes as different m
     for y in mat_years:
         mat = AequilibraeMatrix()
 
+        # Here it does not make sense to use OMX
+        # If one wants to create an OMX from other data sources, openmatrix is
+        # the library to use
         kwargs = {'file_name': os.path.join(output_folder, y + '.aem'),
                   'zones': num_zones,
                   'matrix_names': sctg_descr}

@@ -18,7 +18,7 @@ class TestAllOrNothing(TestCase):
         g.set_graph(cost_field="distance", skim_fields=None)
         # None implies that only the cost field will be skimmed
 
-        # Prepares the matrix for assignment
+        # Creates the matrix for assignment
         args = {
             "file_name": os.path.join(gettempdir(), "my_matrix.aem"),
             "zones": g.num_zones,
@@ -30,26 +30,46 @@ class TestAllOrNothing(TestCase):
         matrix.create_empty(**args)
 
         matrix.index[:] = g.centroids[:]
-        matrix.cars.fill(1)
-        matrix.trucks.fill(2)
-        matrix.computational_view(["cars"])
+        matrix.cars.fill(1.1)
+        matrix.trucks.fill(2.2)
 
-        # Performs assignment
-        res = AssignmentResults()
-        res.prepare(g, matrix)
+        # Exports matrix to OMX in order to have two matrices to work with
+        matrix.export(os.path.join(gettempdir(), "my_matrix.omx"))
+        matrix.close()
 
-        assig = allOrNothing(matrix, g, res)
-        assig.execute()
+        car_loads = []
+        two_class_loads = []
+        for extension in ["omx", "aem"]:
+            matrix = AequilibraeMatrix()
+            matrix.load(os.path.join(gettempdir(), "my_matrix." + extension))
 
-        res.save_to_disk(os.path.join(gettempdir(), "link_loads.aed"))
-        res.save_to_disk(os.path.join(gettempdir(), "link_loads.csv"))
+            matrix.computational_view(["cars"])
 
-        matrix.computational_view()
-        # Performs assignment
-        res = AssignmentResults()
-        res.prepare(g, matrix)
+            # Performs assignment
+            res = AssignmentResults()
+            res.prepare(g, matrix)
 
-        assig = allOrNothing(matrix, g, res)
-        assig.execute()
-        res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes.aed"))
-        res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes.csv"))
+            assig = allOrNothing(matrix, g, res)
+            assig.execute()
+            car_loads.append(res.link_loads)
+            res.save_to_disk(os.path.join(gettempdir(), "link_loads_{}.aed".format(extension)))
+            res.save_to_disk(os.path.join(gettempdir(), "link_loads_{}.csv".format(extension)))
+
+            matrix.computational_view()
+            # Performs assignment
+            res = AssignmentResults()
+            res.prepare(g, matrix)
+
+            assig = allOrNothing(matrix, g, res)
+            assig.execute()
+            two_class_loads.append(res.link_loads)
+            res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes_{}.aed".format(extension)))
+            res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes_{}.csv".format(extension)))
+
+        load_diff = two_class_loads[0] - two_class_loads[1]
+        if load_diff.max() > 0.0000000001 or load_diff.max() < -0.0000000001:
+            self.fail("Loads for two classes differ for OMX and AEM matrix types")
+
+        load_diff = car_loads[0] - car_loads[1]
+        if load_diff.max() > 0.0000000001 or load_diff.max() < -0.0000000001:
+            self.fail("Loads for a single class differ for OMX and AEM matrix types")

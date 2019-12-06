@@ -29,6 +29,15 @@ Dependencies
 Aequilibrae relies on a series of compiled libraries, such as NumPy and Scipy. If you are working on Windows and have
 trouble installing any of the requirements, you can look at `Christoph Gohlke's wonderful repository <https://www.lfd.uci.edu/~gohlke/pythonlibs/>`_ of compiled Python packages for windows.
 
+OMX support
++++++++++++
+AequilibraE also supports OMX starting on version 0.5.3, but that comes with a few extra dependencies. Installing
+**openmatrix** solves all those dependencies:
+
+::
+
+  pip install aequilibrae
+
 Hardware requirements
 ---------------------
 
