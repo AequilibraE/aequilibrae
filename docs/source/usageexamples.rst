@@ -37,9 +37,12 @@ you need only a graph that you have previously built, and the list of skims you 
     g.load_from_disk(aeg_pth)
 
     # You now have to set the graph for what you want
-    # In this case, we are computing fastest path (minimizing free flow time) and skimming **length** along the way
+    # In this case, we are computing fastest path (minimizing free flow time)
     # We are also **blocking** paths from going through centroids
-    g.set_graph(cost_field='fftime', skim_fields=['length'],block_centroid_flows=True)
+    g.set_graph(cost_field='fftime', block_centroid_flows=True)
+
+    # We will be skimming for fftime **AND** length along the way
+    g.set_skimming(['fftime', 'length'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided
     result = skmr()
@@ -80,7 +83,8 @@ the list of centroids in your graph is updated to include all nodes in the graph
 
     # And continue **almost** like we did before
     # We just need to remember to NOT block paths through centroids. Otherwise there will be no paths available
-    g.set_graph(cost_field='fftime', skim_fields=['length'],block_centroid_flows=False)
+    g.set_graph(cost_field='fftime', block_centroid_flows=False)
+    g.set_skimming('fftime')
 
     result = skmr()
     result.prepare(g)
@@ -88,7 +92,7 @@ the list of centroids in your graph is updated to include all nodes in the graph
     skm = NetworkSkimming(g, result)
     skm.execute()
 
-After it is all said and done, the skim matrices are part of the result object.
+Setting skimming after setting the graph is **CRITICAL**, and the skim matrices are part of the result object.
 
 You can save the results to your place of choice in AequilibraE format or export to OMX or CSV
 
