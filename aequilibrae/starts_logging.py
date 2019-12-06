@@ -27,3 +27,5 @@ def StartsLogging():
         ch.setFormatter(formatter)
         ch.setLevel(logging.DEBUG)
         logger.addHandler(ch)
+
+    return logger
