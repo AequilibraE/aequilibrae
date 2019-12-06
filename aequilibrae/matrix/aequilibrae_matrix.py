@@ -11,7 +11,9 @@ import numpy as np
 
 # Checks if we can display OMX
 spec = iutil.find_spec("openmatrix")
-has_omx = False
+has_omx = spec is not None
+if has_omx:
+    import openmatrix as omx
 if spec is not None:
     import openmatrix as omx
 
