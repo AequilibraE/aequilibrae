@@ -1,7 +1,6 @@
 numpy >= 1.14.0
 pyaml
 PyQt5
-pyshp
 cython
 openmatrix
 pyshp

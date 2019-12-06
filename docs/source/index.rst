@@ -14,13 +14,13 @@ Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: Contents:
 
    overview
+   qgis
    gettingstarted
    softwaredevelopment
    usageexamples
-   apidoc
-
 
 
 Indices and tables
