@@ -5,10 +5,9 @@ import openmatrix as omx
 from unittest import TestCase
 
 import numpy as np
-from tables.exceptions import NoSuchNodeError
 
 from aequilibrae.matrix import AequilibraeMatrix
-from ...data import omx_example
+from ...data import omx_example, no_index_omx
 
 zones = 50
 name_test = AequilibraeMatrix().random_name()
@@ -34,12 +33,19 @@ class TestAequilibraeMatrix(TestCase):
         matrix.mat[:, :] = np.random.rand(matrix.zones, matrix.zones)[:, :]
         matrix.mat[:, :] = matrix.mat[:, :] * (1000 / np.sum(matrix.mat[:, :]))
         matrix.setName("Test matrix - " + str(random.randint(1, 10)))
-        matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
+        matrix.setDescription(
+            "Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
+        )
         matrix.close()
         del matrix
 
     def test_load(self):
         # self.test___init__()
+        self.new_matrix = AequilibraeMatrix()
+        # Cannot load OMX file with no indices
+        with self.assertRaises(LookupError):
+            self.new_matrix.load(no_index_omx)
+
         self.new_matrix = AequilibraeMatrix()
         self.new_matrix.load(name_test)
 
@@ -56,8 +62,33 @@ class TestAequilibraeMatrix(TestCase):
         if np.sum(self.new_matrix.mat) != np.sum(self.new_matrix.matrix_view):
             self.fail("Assigning to matrix view did not work")
         self.new_matrix.setName("Test matrix - " + str(random.randint(1, 10)))
-        self.new_matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
+        self.new_matrix.setDescription(
+            "Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
+        )
         self.new_matrix.close()
+
+    def test_computational_view_with_omx(self):
+        self.new_matrix = AequilibraeMatrix()
+        self.new_matrix.load(omx_example)
+
+        arrays = ["m1", "m2"]
+        self.new_matrix.computational_view(arrays)
+        total_mats = np.sum(self.new_matrix.matrix_view)
+
+        self.new_matrix.computational_view([arrays[0]])
+        total_m1 = np.sum(self.new_matrix.matrix_view)
+
+        self.new_matrix.close()
+
+        omx_file = omx.open_file(omx_example, "r")
+
+        m1 = np.array(omx_file["m1"]).sum()
+        m2 = np.array(omx_file["m2"]).sum()
+
+        self.assertEqual(m1 + m2, total_mats)
+        self.assertEqual(m1, total_m1)
+
+        omx_file.close()
 
     def test_copy(self):
         self.test_load()
@@ -86,8 +117,11 @@ class TestAequilibraeMatrix(TestCase):
         for m in self.new_matrix.names:
             sm = np.nansum(self.new_matrix.matrix[m])
             sm2 = np.nansum(np.array(omxfile[m]))
-            if sm != sm2:
-                self.fail("Matrix {} was exported with the wrong value".format(m))
+
+            self.assertEqual(
+                sm, sm2, "Matrix {} was exported with the wrong value".format(m)
+            )
+
         self.new_matrix.close()
 
     def test_nan_to_num(self):
@@ -121,7 +155,7 @@ class TestAequilibraeMatrix(TestCase):
             if sm != sm2:
                 self.fail("Matrix {} was copied with the wrong value".format(m))
 
-        if np.any(a.index[:] != np.arange(a.zones)):
+        if np.any(a.index[:] != np.array(list(omxfile.mapping("taz").keys()))):
             self.fail("Index was not created properly")
         a.close()
 
