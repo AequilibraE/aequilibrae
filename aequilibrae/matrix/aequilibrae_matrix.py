@@ -641,7 +641,6 @@ class AequilibraeMatrix(object):
         if file_extension == ".OMX":
             if not has_omx:
                 raise ValueError("Open Matrix is not installed. Cannot continue")
-                return
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise ValueError("File extension {} not implemented yet".format(file_extension))
