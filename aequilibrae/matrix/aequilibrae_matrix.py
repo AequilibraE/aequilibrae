@@ -67,6 +67,8 @@ COMPRESSED = 1
 
 
 matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
+if has_omx:
+    matrix_export_types.append("Open matrix (*.omx)")
 
 
 class AequilibraeMatrix(object):
