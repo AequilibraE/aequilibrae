@@ -22,7 +22,8 @@ if pyqt:
 class AequilibraEProject(WorkerThread):
     """
     The AequilibraE Project is a wrapper around a the SQLite file that holds all the project information
-    and Python
+    and Python.
+    It gives access to all the algorithms provided by AequilibraE in its different modules
     """
 
     if pyqt:
