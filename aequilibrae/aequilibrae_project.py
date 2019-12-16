@@ -1,43 +1,22 @@
 """
 AequilibraE Project
 """
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       AequilibraE Project
- Purpose:    Implements a layer between the AequilibraE project in SQLite and Python
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/aequilibrae
-
- Created:    15/July/2018
- Updated:    
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-
+import importlib.util as iutil
 import sqlite3
 import os
 import numpy as np
 import logging
 from tempfile import gettempdir
-from ..reference_files import spatialite_database
-from ..utils import WorkerThread
+from reference_files import spatialite_database
+from utils import WorkerThread
+
 # from ..utils import WorkerThread
-from ..parameters import Parameters
+from parameters import Parameters
 
-try:
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
-
-    pyqt = True
-except:
-    pyqt = False
 
 
 class AequilibraEProject(WorkerThread):
@@ -45,6 +24,7 @@ class AequilibraEProject(WorkerThread):
     The AequilibraE Project is a wrapper around a the SQLite file that holds all the project information
     and Python
     """
+
     if pyqt:
         assignment = SIGNAL(object)
 
@@ -57,7 +37,7 @@ class AequilibraEProject(WorkerThread):
     def load_model(self, model_file: str):
         self.model_database = None
         if not os.path.isfile(model_file):
-            return 'File does not exist'
+            return "File does not exist"
 
         self.model_database = model_file
         self.__model_conn = sqlite3.connect(self.model_database)
@@ -68,7 +48,7 @@ class AequilibraEProject(WorkerThread):
         data1 = self.__cursor.fetchall()
         for db_item, db_text in data1:
             if db_item.upper() == item.upper():
-                return (db_text)
+                return db_text
         raise ValueError("No metadata item corresponds to {}".format(item))
 
     def write_metadata(self, item: str, text: str):
