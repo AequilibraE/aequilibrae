@@ -14,7 +14,7 @@ This page describes how to get started with AequilibraE.
 Installation
 ------------
 
-1. Install `Python 3.5, 3.6 or 3.7 <www.python.org>`__. We recommend Python 3.6 right now.
+1. Install `Python 3.5, 3.6 or 3.7 <www.python.org>`__. We recommend Python 3.7 As of late 2019.
 
 2. Install AequilibraE
   
@@ -28,6 +28,15 @@ Dependencies
 
 Aequilibrae relies on a series of compiled libraries, such as NumPy and Scipy. If you are working on Windows and have
 trouble installing any of the requirements, you can look at `Christoph Gohlke's wonderful repository <https://www.lfd.uci.edu/~gohlke/pythonlibs/>`_ of compiled Python packages for windows.
+
+OMX support
++++++++++++
+AequilibraE also supports OMX starting on version 0.5.3, but that comes with a few extra dependencies. Installing
+**openmatrix** solves all those dependencies:
+
+::
+
+  pip install aequilibrae
 
 Hardware requirements
 ---------------------

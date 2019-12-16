@@ -5,8 +5,15 @@ import uuid
 from shutil import copyfile
 from typing import List
 import functools
+import logging
 
 import numpy as np
+
+# Checks if we can display OMX
+spec = iutil.find_spec("openmatrix")
+has_omx = spec is not None
+if has_omx:
+    import openmatrix as omx
 
 """"""
 """-----------------------------------------------------------------------------------------------------------
@@ -60,6 +67,8 @@ COMPRESSED = 1
 
 
 matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
+if has_omx:
+    matrix_export_types.append("Open matrix (*.omx)")
 
 
 class AequilibraeMatrix(object):
@@ -90,6 +99,8 @@ class AequilibraeMatrix(object):
         self.name = None
         self.description = None
         self.current_index = None
+        self.omx = False
+        self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
 
     def create_empty(
@@ -161,19 +172,19 @@ class AequilibraeMatrix(object):
         if index_names is None:
             self.index_names = ["main_index"]
         else:
-            if isinstance(index_names, list) or isinstance(index_names, tuple):
-                self.index_names = index_names
-                for ind_name in index_names:
-                    if isinstance(ind_name, str):
-                        if len(ind_name) > INDEX_NAME_MAX_LENGTH:
-                            raise ValueError(
-                                "Index names need to be be shorter "
-                                "than {}: {}".format(INDEX_NAME_MAX_LENGTH, ind_name)
-                            )
-                    else:
-                        raise ValueError("Index names need to be strings: " + str(ind_name))
-            else:
+            if not isinstance(index_names, (list, tuple)):
                 raise Exception("Index names need to be provided as a list")
+
+            self.index_names = index_names
+            for ind_name in index_names:
+                if isinstance(ind_name, str):
+                    if len(ind_name) > INDEX_NAME_MAX_LENGTH:
+                        raise ValueError(
+                            "Index names need to be be shorter " "than {}: {}".format(INDEX_NAME_MAX_LENGTH, ind_name)
+                        )
+                else:
+                    raise ValueError("Index names need to be strings: " + str(ind_name))
+
         self.num_indices = len(self.index_names)
 
         if matrix_names is None:
@@ -242,8 +253,6 @@ class AequilibraeMatrix(object):
             print("Open Matrix is not installed. Cannot continue")
             return
 
-        import openmatrix as omx
-
         src = omx.open_file(omx_path, "r")
 
         avail_cores = src.list_matrices()
@@ -293,15 +302,15 @@ class AequilibraeMatrix(object):
 
         # copy all indices
         if avail_idx:
-            for nidx, idx in zip(idx_names, do_idx):
+            for nidx, idx in enumerate(do_idx):
                 ix = np.array(list(src.mapping(idx).keys()))
-                self.indices[nidx][:] = ix[:]
+                self.indices[:, nidx] = ix[:]
         else:
-            self.index[:] = np.arange(zones)
+            self.index[:, 0] = np.arange(zones)
 
         self.indices.flush()
 
-    def __load__(self):
+    def __load_aem__(self):
         # GET File version
         self.__version__ = np.memmap(self.file_path, dtype="uint8", offset=0, mode="r+", shape=1)[0]
 
@@ -365,6 +374,7 @@ class AequilibraeMatrix(object):
         self.names = list(
             np.memmap(self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.cores)
         )
+
         self.names = [x.decode("utf-8") for x in self.names]
 
         # Index names
@@ -397,6 +407,32 @@ class AequilibraeMatrix(object):
         self.matrix = {}
         for i, v in enumerate(self.names):
             self.matrix[v] = self.matrices[:, :, i]
+        self.matrix_hash = self.__builds_hash__()
+
+    def __load_omx__(self):
+        # GET File version
+        self.__version__ = VERSION
+
+        self.name = self.file_path
+        self.description = "OMX MATRIX"
+        self.names = self.omx_file.list_matrices()
+
+        if len(self.omx_file) == 0:
+            raise LookupError("Matrix file has cores")
+
+        self.index_names = self.omx_file.list_mappings()
+
+        if len(self.index_names) == 0:
+            raise LookupError("Matrix file has no indices (mappings). If you can't index it, you can't use it")
+
+        self.num_indices = len(self.index_names)
+        self.zones = len(list(self.omx_file.mapping(self.index_names[0]).keys()))
+
+        self.cores = len(self.names)
+        self.set_index(self.index_names[0])
+
+        self.matrices = np.zeros(1)
+        self.matrix = {}
         self.matrix_hash = self.__builds_hash__()
 
     def __write__(self):
@@ -440,6 +476,7 @@ class AequilibraeMatrix(object):
         fp = np.memmap(
             self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.cores
         )
+
         for i, v in enumerate(self.names):
             fp[i] = v
         fp.flush()
@@ -450,6 +487,7 @@ class AequilibraeMatrix(object):
         fp = np.memmap(
             self.file_path, dtype="S" + str(INDEX_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.num_indices
         )
+
         for i, v in enumerate(self.index_names):
             fp[i] = v
         fp.flush()
@@ -484,7 +522,7 @@ class AequilibraeMatrix(object):
         for i, v in enumerate(self.names):
             self.matrix[v] = self.matrices[:, :, i]
 
-    def set_index(self, index_to_set: str):
+    def set_index(self, index_to_set: str) -> None:
         """
                 Sets the standard index to be the one the user wants to have be the one being used in all operations
                 during run time. The first index is ALWAYS the default one every time the matrix is instantiated
@@ -511,20 +549,26 @@ class AequilibraeMatrix(object):
                 >>> mat.current_index
                 'census'
                 """
-
-        if index_to_set in self.index_names:
-            ind_index = self.index_names.index(index_to_set)
-            self.index = self.indices[:, ind_index]
+        if self.omx:
+            self.index = np.array(list(self.omx_file.mapping(index_to_set).keys()))
             self.current_index = index_to_set
         else:
-            raise ValueError("Index {} needs to be a string or its integer index.".format(str(index_to_set)))
+            if index_to_set in self.index_names:
+                ind_index = self.index_names.index(index_to_set)
+                self.index = self.indices[:, ind_index]
+                self.current_index = index_to_set
+            else:
+                raise ValueError("Index {} needs to be a string or its integer index.".format(str(index_to_set)))
 
-    def __getattr__(self, mat_name):
+    def __getattr__(self, mat_name: str):
         if mat_name in object.__dict__:
             return self.__dict__[mat_name]
 
         if mat_name in self.names:
-            return self.matrix[mat_name]
+            if self.omx:
+                return np.array(self.omx_file[mat_name])
+            else:
+                return self.matrix[mat_name]
 
         raise AttributeError("No such method or matrix core! --> " + str(mat_name))
 
@@ -546,11 +590,14 @@ class AequilibraeMatrix(object):
 
     def close(self):
         """
-        Removes matrix from memory and flushes all data to disk
+        Removes matrix from memory and flushes all data to disk, or closes the OMX file if that is the case
         """
 
-        self.matrices.flush()
-        self.index.flush()
+        if self.omx:
+            self.omx_file.close()
+        else:
+            self.matrices.flush()
+            self.index.flush()
         del self.matrices
         del self.index
 
@@ -587,13 +634,15 @@ class AequilibraeMatrix(object):
         >>> mat2.cores
         ['Car trips', 'bike trips']
         """
+
+        if self.omx:
+            raise NotImplementedError("This operation does not make sense for OMX matrices")
+
         fname, file_extension = os.path.splitext(output_name.upper())
 
         if file_extension == ".OMX":
-            spec = iutil.find_spec("openmatrix")
-            if spec is None:
+            if not has_omx:
                 raise ValueError("Open Matrix is not installed. Cannot continue")
-            import openmatrix as omx
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise ValueError("File extension {} not implemented yet".format(file_extension))
@@ -659,13 +708,21 @@ class AequilibraeMatrix(object):
                 """
 
         self.file_path = file_path
-        self.__load__()
+
+        if os.path.splitext(file_path)[-1].upper() == ".OMX":
+            self.omx = True
+            self.omx_file = omx.open_file(file_path, "r")
+            self.__load_omx__()
+        else:
+            self.__load_aem__()
 
     def computational_view(self, core_list: List[str] = None):
         """
         Creates a memory view for a list of matrices that is compatible with Cython memory buffers
 
         It allows for AequilibraE matrices to be used in all parallelized algorithms within AequilibraE
+
+        In case of OMX matrices, the computational view is held only in memory
 
         Parameters
         ----------
@@ -691,23 +748,32 @@ class AequilibraeMatrix(object):
             if isinstance(core_list, list):
                 for i in core_list:
                     if i not in self.names:
-                        raise ValueError("Matrix core {} no available on this matrix".format(i))
-
-                if len(core_list) > 1:
-                    for i, x in enumerate(core_list[1:]):
-                        k = self.names.index(x)  # index of the first element
-                        k0 = self.names.index(core_list[i])  # index of the first element
-                        if k - k0 != 1:
-                            raise ValueError("Matrix cores {} and {} are not adjacent".format(core_list[i - 1], x))
+                        raise ValueError("Matrix core   {}   no available on this matrix".format(i))
             else:
                 raise TypeError("Please provide a list of matrices")
 
-        self.view_names = core_list
-        if len(core_list) == 1:
-            # self.matrix_view = self.matrix[:, :, self.names.index(core_list[0]):self.names.index(core_list[0])+1]
-            self.matrix_view = self.matrices[:, :, self.names.index(core_list[0])]
-        elif len(core_list) > 1:
-            self.matrix_view = self.matrices[:, :, self.names.index(core_list[0]) : self.names.index(core_list[-1]) + 1]
+        if self.omx:
+            self.view_names = core_list
+            self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
+            for i, core in enumerate(core_list):
+                self.matrix_view[:, :, i] = np.array(self.omx_file[core])
+
+        else:
+            # Check if matrices are adjacent
+            if len(core_list) > 1:
+                for i, x in enumerate(core_list[1:]):
+                    k = self.names.index(x)  # index of the first element
+                    k0 = self.names.index(core_list[i])  # index of the first element
+                    if k - k0 != 1:
+                        raise ValueError("Matrix cores {} and {} are not adjacent".format(core_list[i - 1], x))
+
+            self.view_names = core_list
+            if len(core_list) == 1:
+                self.matrix_view = self.matrices[:, :, self.names.index(core_list[0])]
+            elif len(core_list) > 1:
+                self.matrix_view = self.matrices[
+                    :, :, self.names.index(core_list[0]) : self.names.index(core_list[-1]) + 1
+                ]
 
     def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None):
         """
@@ -740,6 +806,10 @@ class AequilibraeMatrix(object):
         >>> mat.cores
         ['bicycle', 'walking']
         """
+
+        if self.omx:
+            raise NotImplementedError("You can import an OMX file to AEM if you'd like")
+
         if output_name is None:
             output_name = self.random_name()
 
@@ -842,6 +912,10 @@ class AequilibraeMatrix(object):
         >>> mat.computational_view(mat.cores[0])
         >>> mat.nan_to_num()
         """
+
+        if self.omx:
+            raise NotImplementedError("This operation does not make sense for OMX matrices")
+
         if np.issubdtype(self.dtype, np.floating) and self.matrix_view is not None:
             for m in self.view_names:
                 self.matrix[m][:, :] = np.nan_to_num(self.matrix[m])[:, :]
@@ -857,6 +931,9 @@ class AequilibraeMatrix(object):
         return {self.index[i]: i for i in range(self.zones)}
 
     def define_data_class(self):
+        if self.omx:
+            raise NotImplementedError("This operation does not make sense for OMX matrices")
+
         if np.issubdtype(self.dtype, np.floating):
             data_class = FLOAT
         elif np.issubdtype(self.dtype, np.integer):
@@ -887,6 +964,8 @@ class AequilibraeMatrix(object):
         >>> mat.name
         'This is my example'
         """
+        if self.omx:
+            raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if matrix_name is not None:
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
@@ -915,6 +994,9 @@ class AequilibraeMatrix(object):
         >>> mat.description
         'This is some text about this matrix of mine'
         """
+        if self.omx:
+            raise NotImplementedError("This operation does not make sense for OMX matrices")
+
         if matrix_description is not None:
             if len(str(matrix_description)) > MATRIX_DESCRIPTION_MAX_LENGTH:
                 matrix_description = str(matrix_description)[0:MATRIX_DESCRIPTION_MAX_LENGTH]

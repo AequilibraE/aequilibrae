@@ -23,6 +23,8 @@ from .__version__ import binary_version as VERSION_COMPILED
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1
     cdef int critical_queries = 0
+    cdef int path_file = 0
+    cdef int skims
     cdef int link_extract_queries, query_type
 
     # Origin index is the index of the matrix we are assigning
@@ -32,6 +34,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     orig = origin
     origin_index = graph.nodes_to_indices[orig]
+
+    #We transform the python variables in Cython variables
+    nodes = graph.num_nodes
+
+
+    skims = len(graph.skim_fields)
 
     if VERSION_COMPILED != graph.__version__:
         raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
@@ -77,8 +85,13 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     # path file variables
     # 'origin', 'node', 'predecessor', 'connector'
-    posit = origin_index * graph.num_nodes * result.path_file['save']
-    posit1 = posit + graph.num_nodes
+    if result.path_file['save']:
+        path_file = 1
+        posit = origin_index * graph.num_nodes * result.path_file['save']
+        posit1 = posit + graph.num_nodes
+    else:
+        posit = 0
+        posit1 = 1
 
     cdef unsigned int [:] pred_view = result.path_file['results'].predecessor[posit:posit1]
     cdef unsigned int [:] c_view = result.path_file['results'].connector[posit:posit1]
@@ -116,7 +129,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         reached_first_view,
                         node_load_view,
                         w)
-
+        if skims > 0:
+            skim_single_path(origin_index,
+                     nodes,
+                     skims,
+                     skim_matrix_view,
+                     predecessors_view,
+                     conn_view,
+                     graph_skim_view,
+                     reached_first_view,
+                     w)
         if block_flows_through_centroids: # Re-blocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
@@ -128,8 +150,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         _copy_skims(skim_matrix_view,
                     final_skim_matrices_view)
 
-    if result.path_file['save']:
-        with nogil:
+        if path_file > 0:
             put_path_file_on_disk(orig,
                                   pred_view,
                                   predecessors_view,
@@ -185,7 +206,7 @@ def path_computation(origin, destination, graph, results):
     #We transform the python variables in Cython variables
     nodes = graph.num_nodes
 
-     # initializes skim_matrix for output
+    # initializes skim_matrix for output
     # initializes predecessors  and link connectors for output
     results.predecessors.fill(-1)
     results.connectors.fill(-1)

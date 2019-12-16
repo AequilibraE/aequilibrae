@@ -566,18 +566,20 @@ class create_gtfsdb(WorkerThread):
                 if pyqt:
                     self.converting_gtfs.emit(["chunk counter", i])
 
-                qry = self.cursor.execute("SELECT route_id, trip_id from trips where shape_id='" + shp + "'").fetchall()
+                qry = self.cursor.execute(
+                    "SELECT route_id, trip_id from trips where cast(shape_id as text)='" + shp + "'"
+                ).fetchall()
                 if len(qry) > 0:
                     route_id, trip_id = qry[0]
 
                     points = self.cursor.execute(
-                        "SELECT shape_pt_lon, shape_pt_lat from shapes where shape_id='"
+                        "SELECT shape_pt_lon, shape_pt_lat from shapes where cast(shape_id as text)='"
                         + str(shp)
                         + "' order by shape_pt_sequence"
                     ).fetchall()
                     txt = "LINESTRING (" + ", ".join([str(x[0]) + " " + str(x[1]) for x in points]) + ")"
                     route_text_color = self.cursor.execute(
-                        "SELECT route_text_color from routes where route_id='" + str(route_id) + "'"
+                        "SELECT route_text_color from routes where cast(route_id as text)='" + str(route_id) + "'"
                     ).fetchall()
                     if len(route_text_color):
                         route_text_color = route_text_color[0]
@@ -601,19 +603,19 @@ class create_gtfsdb(WorkerThread):
                     self.converting_gtfs.emit(["chunk counter", i])
 
                 route_id = self.cursor.execute(
-                    "SELECT route_id from trips where trip_id='" + str(trip_id) + "'"
+                    "SELECT route_id from trips where cast(trip_id as text)='" + str(trip_id) + "'"
                 ).fetchone()[0]
 
                 sql = (
                     "SELECT stop_lon, stop_lat FROM stop_times INNER JOIN stops"
-                    " ON stop_times.stop_id = stops.stop_id WHERE stop_times.trip_id='"
+                    " ON stop_times.stop_id = stops.stop_id WHERE cast(stop_times.trip_id as text)='"
                     + str(trip_id)
                     + "' order by stop_times.stop_sequence"
                 )
                 qry = self.cursor.execute(sql).fetchall()
                 txt = "LINESTRING (" + ", ".join([str(x[0]) + " " + str(x[1]) for x in qry]) + ")"
                 route_text_color = self.cursor.execute(
-                    "SELECT route_text_color from routes where route_id='" + str(route_id) + "'"
+                    "SELECT route_text_color from routes where cast(route_id as text)='" + str(route_id) + "'"
                 ).fetchall()[0]
                 sql = (
                     "INSERT INTO shape_routes (route_id, trip_id, route_text_color, geometry) "

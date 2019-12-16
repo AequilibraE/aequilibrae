@@ -1,4 +1,3 @@
-
 Software Development
 ====================
 
@@ -30,6 +29,8 @@ AequilibraE is currently tested for Python 3.5, 3.6 and 3.7, but we recommend us
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
+If you are using a different IDE, we would welcome if you could contribute with instructions to set that up.
+
 Non-Windows
 ~~~~~~~~~~~
 ::
@@ -51,12 +52,12 @@ Python 3.6 needs to be installed, and the following instructions assume you are 
 
     set PATH=C:\Python36;%PATH%
     python -m pip install pipenv
-    virtualenv .venv
-    python -m pipenv install
+    virtualenv .venv #Only if you want to save the virtual environment in the same folder
+    python -m pipenv install --dev
     python -m pipenv run pre-commit-install
 
-
 Setup Pycharm with the virtual environment you just created.
+
 ::
 
     Settings -> Project -> Project Interpreter -> Gear Icon -> Add -> Existing VEnv
@@ -134,8 +135,8 @@ AequilibraE testing is done with three tools:
 To run the tests locally, you will need to figure out what to do...
 
 
-These same tests are run by Travis with each push to the repository.  These tests need to pass in order
-to merge the revisions into master.
+These same tests are run by Travis with each push to the repository.  These tests need to pass in order to somebody
+manually review the code before merging it into master (or returning for corrections).
 
 In some cases, test targets need to be updated to match the new results produced by the code since these 
 are now the correct results.  In order to update the test targets, first determine which tests are 
@@ -153,12 +154,20 @@ All the AequilibraE documentation is (unfortunately) written in `reStructuredTex
 Although Restructured Text is often unecessarily convoluted to write, Sphinx is capable of converting it to standard-
 looking html pages, while also bringing the docstring documentation along for the ride.
 
-To build the documentation, first make sure the required packages are installed::
+To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev
+environment above, then nothing else is needed. However, if you have incorrectly only run::
 
-    pip install sphinx  sphinx_rtd_theme
+    python -m pipenv install
 
-Next, build the documentation in html format with the following command run from the ``docs`` folder::
+Then you will have to run::
 
+    python -m pipenv install --dev
+
+
+Next, build the documentation in html format with the following commands run from the ``root`` folder::
+
+    sphinx-apidoc -T -o docs/source/generated aequilibrae
+    cd docs
     make html
 
 Releases
