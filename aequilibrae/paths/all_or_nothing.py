@@ -42,7 +42,8 @@ sys.dont_write_bytecode = True
 
 
 class allOrNothing(WorkerThread):
-    assignment = SIGNAL(object)
+    if pyqt:
+        assignment = SIGNAL(object)
 
     def __init__(self, matrix, graph, results):
         WorkerThread.__init__(self, None)
