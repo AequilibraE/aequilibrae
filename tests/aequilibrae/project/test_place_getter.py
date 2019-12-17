@@ -1,0 +1,14 @@
+from unittest import TestCase
+from aequilibrae.project.network.osm_utils.place_getter import placegetter
+
+
+class Test(TestCase):
+    def test_placegetter(self):
+        place, report = placegetter("China")
+        place = [round(x, 1) for x in place]
+        if place != [73.5, 8.8, 134.8, 53.6]:
+            self.fail("Returned the wrong boundingbox for china")
+
+        place, report = placegetter("Just a random place with no bear in reality")
+        if place is not None:
+            self.fail("Returned a bounding box for a place that does not exist")

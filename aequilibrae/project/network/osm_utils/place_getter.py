@@ -33,7 +33,6 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     time.sleep(pause_duration)
     start_time = time.time()
     report.append("Requesting {} with timeout={}".format(prepared_url, timeout))
-    # response = requests.get(url, params=place, timeout=timeout, headers=http_headers)
     response = requests.get(url, params=params, timeout=timeout, headers=http_headers)
 
     # get the response size and the domain, log result
@@ -41,7 +40,6 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     domain = re.findall(r"(?s)//(.*?)/", url)[0]
     report.append("Downloaded {:,.1f}KB from {} in {:,.2f} seconds".format(size_kb, domain, time.time() - start_time))
 
-    response_json = None
     bbox = None
     for attempts in range(max_attempts):
         report.append("Attempt: {}".format(attempts))
@@ -58,22 +56,21 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
             continue
         elif response.status_code == 200:
             response_json = response.json()
-            report.append("COMPLETE QUERY RESPONSE FOR PLACE:", 1)
-            report.append(str(response_json), 1)
+            report.append("COMPLETE QUERY RESPONSE FOR PLACE:")
+            report.append(str(response_json))
             if len(response_json):
                 bbox = [float(x) for x in response_json[0]["boundingbox"]]
                 bbox = [bbox[2], bbox[0], bbox[3], bbox[1]]
-                report.append("PLACE FOUND:{}".format(response_json[0]["display_name"]), 1)
+                report.append("PLACE FOUND:{}".format(response_json[0]["display_name"]))
             return (bbox, report)
         else:
-            response_json = None
             bbox = None
 
-        if attempts == max_attempts - 1:
+        if attempts == max_attempts - 1 and bbox is None:
             report.append(
                 "Maximum download attempts was reached without success. " "Please wait a few minutes and try again"
             )
         else:
             report.append("We got error {} for place query. Error not currently well handled by the software")
 
-        return (None, report)
+        return (bbox, report)
