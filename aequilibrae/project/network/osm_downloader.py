@@ -19,80 +19,28 @@ from ...utils import WorkerThread
 
 
 class OSMDownloader(WorkerThread):
-    def __init__(self, poly, modes: List[str]):
-        """
-        Download OSM ways and nodes within some bounding box from the Overpass API.
+    def __init__(self, polygons: List[list], modes: List[str]) -> None:
 
-        Parameters
-        ----------
-        north : float
-            northern latitude of bounding box
-        south : float
-            southern latitude of bounding box
-        east : float
-            eastern longitude of bounding box
-        west : float
-            western longitude of bounding box
-        network_type : string
-            {'walk', 'bike', 'drive', 'drive_service', 'all', 'all_private'} what
-            type of street network to get
-        timeout : int
-            the timeout interval for requests and to pass to API
-        memory : int
-            server memory allocation size for the query, in bytes. If none, server
-            will use its default allocation size
-        max_query_area_size : float
-            max area for any part of the geometry, in the units the geometry is in:
-            any polygon bigger will get divided up for multiple queries to API
-            (default is 50,000 * 50,000 units [ie, 50km x 50km in area, if units are
-            meters])
-        infrastructure : string
-            download infrastructure of given type. default is streets, ie,
-            'way["highway"]') but other infrastructures may be selected like power
-            grids, ie, 'way["power"~"line"]'
-        custom_filter : string
-            a custom network filter to be used instead of the network_type presets
-
-        Returns
-        -------
-        response_jsons : list
-        """
-        self.poly = poly
+        self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
-        self.json = {}
+        self.json = []
 
     def doWork(self):
-
         infrastructure = 'way["highway"]'
-
-        # define the query to send the API
-        # specifying way["highway"] means that all ways returned must have a highway
-        # key. the {filters} then remove ways by key/value. the '>' makes it recurse
-        # so we get ways and way nodes. maxsize is in bytes.
-        # turn bbox into a polygon and project to local UTM
-
-        # loop through each polygon rectangle in the geometry (there will only
-        # be one if original bbox didn't exceed max area size)
-
-        # represent bbox as south,west,north,east and round lat-longs to 6
-        # decimal places (ie, ~100 mm) so URL strings aren't different
-        # due to float rounding issues (for consistent caching)
-        west = self.poly.xMinimum()
-        east = self.poly.xMaximum()
-        south = self.poly.yMinimum()
-        north = self.poly.yMaximum()
         query_template = "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},{north:.6f},{east:.6f});>;);out;"
-        query_str = query_template.format(
-            north=north,
-            south=south,
-            east=east,
-            west=west,
-            infrastructure=infrastructure,
-            filters=self.filter,
-            timeout=timeout,
-        )
-        self.json = self.overpass_request(data={"data": query_str}, timeout=timeout)
+        for poly in self.polygons:
+            west, south, east, north = poly
+            query_str = query_template.format(
+                north=north,
+                south=south,
+                east=east,
+                west=west,
+                infrastructure=infrastructure,
+                filters=self.filter,
+                timeout=timeout,
+            )
+            self.json.append(self.overpass_request(data={"data": query_str}, timeout=timeout))
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """
