@@ -10,17 +10,27 @@ detach them in order to use OSMNx as a dependency or submodule
 For the original work, please see https://github.com/gboeing/osmnx
 """
 import time
+
 import math
 import re
 from typing import List
 import requests
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from ...utils import WorkerThread
+import importlib.util as iutil
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 
 class OSMDownloader(WorkerThread):
-    def __init__(self, polygons: List[list], modes: List[str]) -> None:
+    if pyqt:
+        downloading = SIGNAL(object)
 
+    def __init__(self, polygons, modes):
+        super().__init__(self)
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
@@ -40,7 +50,13 @@ class OSMDownloader(WorkerThread):
                 filters=self.filter,
                 timeout=timeout,
             )
-            self.json.append(self.overpass_request(data={"data": query_str}, timeout=timeout))
+            json = self.overpass_request(data={"data": query_str}, timeout=timeout)
+            if json["elements"]:
+                self.json.append(json)
+
+        if pyqt:
+            self.downloading.emit(["text OSM", "Download complete"])
+            self.downloading.emit(["finished_threaded_procedure", None])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """

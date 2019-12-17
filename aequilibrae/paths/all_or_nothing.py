@@ -19,7 +19,7 @@
 -----------------------------------------------------------------------------------------------------------
  """
 
-import importlib
+import importlib.util as iutil
 import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
@@ -30,15 +30,10 @@ from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 
-have_pyqt5 = importlib.util.find_spec("PyQt5")
-if have_pyqt5 is None:
-    pyqt = False
-else:
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
-
-    pyqt = True
-
-sys.dont_write_bytecode = True
 
 
 class allOrNothing(WorkerThread):
