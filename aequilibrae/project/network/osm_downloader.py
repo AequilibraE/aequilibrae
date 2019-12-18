@@ -11,9 +11,7 @@ For the original work, please see https://github.com/gboeing/osmnx
 """
 import time
 
-import math
 import re
-from typing import List
 import requests
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from ...utils import WorkerThread
@@ -22,12 +20,12 @@ import importlib.util as iutil
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+    from PyQt5.QtCore import pyqtSignal
 
 
 class OSMDownloader(WorkerThread):
     if pyqt:
-        downloading = SIGNAL(object)
+        downloading = pyqtSignal(object)
 
     def __init__(self, polygons, modes):
         super().__init__(self)
@@ -38,7 +36,10 @@ class OSMDownloader(WorkerThread):
 
     def doWork(self):
         infrastructure = 'way["highway"]'
-        query_template = "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},{north:.6f},{east:.6f});>;);out;"
+        query_template = (
+            "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
+            "{north:.6f},{east:.6f});>;);out;"
+        )
         for poly in self.polygons:
             west, south, east, north = poly
             query_str = query_template.format(
@@ -108,9 +109,8 @@ class OSMDownloader(WorkerThread):
                 if error_pause_duration is None:
                     error_pause_duration = 10
                 self.report.append(
-                    "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
-                        domain, response.status_code, error_pause_duration
-                    )
+                    "Server at {} returned status code {} and no JSON data. Re-trying request in "
+                    "{:.2f} seconds.".format(domain, response.status_code, error_pause_duration)
                 )
                 time.sleep(error_pause_duration)
                 response_json = self.overpass_request(data=data, pause_duration=pause_duration, timeout=timeout)
@@ -152,6 +152,7 @@ class OSMDownloader(WorkerThread):
             "bus_guideway",
             "escape",
             "road",
+            "unclassified",
         ]
 
         transit = car_only + ["bus_guideway"]
@@ -168,9 +169,10 @@ class OSMDownloader(WorkerThread):
             "track",
             "trail",
             "bridleway",
+            "unclassified",
         ]
 
-        bike = ["cycleway", "corridor", "pedestrian", "path", "track", "trail"]
+        bike = ["cycleway", "corridor", "pedestrian", "path", "track", "trail", "unclassified"]
 
         all_tags = [
             "secondary_link",
@@ -207,6 +209,7 @@ class OSMDownloader(WorkerThread):
             "construction",
             "abandoned",
             "platform",
+            "unclassified",
         ]
 
         # Default to remove
@@ -229,6 +232,6 @@ class OSMDownloader(WorkerThread):
 
         filtered = "|".join(filtered)
 
-        filter = ('["area"!~"yes"]["highway"!~"{}"]{}{}').format(filtered, service, access)
+        filter = '["area"!~"yes"]["highway"!~"{}"]{}{}'.format(filtered, service, access)
 
         return filter

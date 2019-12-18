@@ -1,0 +1,27 @@
+import yaml
+import os
+
+
+class Link:
+    def __init__(self, link_id=None):
+        path = os.path.dirname(os.path.realpath(__file__))
+        file = os.path.join(path, "network.yml")
+        with open(file, "r") as yml:
+            fields = yaml.load(yml, Loader=yaml.SafeLoader)
+        fields = fields["network"]["links"]["fields"]
+        one_way_fields = [list(x.keys())[0] for x in fields["one-way"]]
+        one_way_fields = {x: None for x in one_way_fields}
+
+        twf = [list(x.keys())[0] for x in fields["two-way"]]
+        two_way_fields = {"{}_ab".format(x): None for x in twf}
+        two_way_fields.update({"{}_ba".format(x): None for x in twf})
+
+        one_way_fields.update(two_way_fields)
+        self.__dict__.update(one_way_fields)
+
+        if link_id is not None:
+            self.link_id = link_id
+            self._populate()
+
+    def _populate(self):
+        print(self.link_id)
