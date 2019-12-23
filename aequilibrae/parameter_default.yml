@@ -17,3 +17,4 @@ system:
   driving side: left
   logging: true
   report zeros: 1
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
