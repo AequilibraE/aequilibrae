@@ -48,6 +48,8 @@ Project components
 * Network
   * Links layer
   * Nodes layer
+* Supporting layers
+  * Zoning layer
 * Matrix index
 * Vectors
   * Vector index
@@ -73,6 +75,15 @@ All link data is stored in the link table itself
 Nodes
 +++++
  A bit about it
+
+Supporting layers
+~~~~~~~~~~~~~~~~~
+Will include zone layer, but may include Delaunay triangulation in the future as well
+
+Zone layer
+++++++++++
+Just for displaying purposes. No math involves this layer
+
 
 Matrix Index
 ~~~~~~~~~~~~

@@ -56,7 +56,6 @@ class OSMDownloader(WorkerThread):
                 self.json.append(json)
 
         if pyqt:
-            self.downloading.emit(["text OSM", "Download complete"])
             self.downloading.emit(["finished_threaded_procedure", None])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):

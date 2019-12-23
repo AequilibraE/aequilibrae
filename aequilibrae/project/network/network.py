@@ -15,18 +15,19 @@ from aequilibrae.parameters import Parameters
 class Network:
     def __init__(self, project):
         self.conn = project.conn
+        self.conn.enable_load_extension(True)
 
     def create_from_osm(
         self,
-        west: int = None,
-        south: int = None,
-        east: int = None,
-        north: int = None,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
         place_name: str = None,
         modes=("car, transit, bike, walk"),
     ):
 
-        if isinstance(modes, [tuple, list]):
+        if isinstance(modes, (tuple, list)):
             modes = list(modes)
         elif isinstance(modes, str):
             modes = [modes]
@@ -69,8 +70,12 @@ class Network:
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
 
-        downloader = OSMDownloader(polygons, modes)
-        downloader.start()
+        self.downloader = OSMDownloader(polygons, modes)
+        self.downloader.downloading.connect(self.finish_downloading_thread)
+        self.downloader.start()
+
+    def finish_downloading_thread(self, val):
+        self.json = self.downloader.json
 
     def count_links(self):
         print("quick query on number of links")
