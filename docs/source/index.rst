@@ -9,6 +9,9 @@ AequilibraE
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
 
+If you are looking for the documentation for AequilibraE for QGIS, you can
+see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qgis>`__
+
 Contents
 --------
 
@@ -17,10 +20,11 @@ Contents
    :caption: Contents:
 
    overview
-   qgis
+   project
    gettingstarted
    softwaredevelopment
    usageexamples
+   qgis
 
 
 Indices and tables
