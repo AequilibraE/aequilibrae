@@ -19,19 +19,17 @@ class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, osm_items: List, file_name: str, node_start=10000) -> None:
+    def __init__(self, osm_items: List, conn, node_start=10000) -> None:
         super().__init__(self)
         self.osm_items = osm_items
-        self.file_name = file_name
+        self.conn = conn
         self.node_start = node_start
-        self.conn = None
         self.report = []
 
     def doWork(self):
         curr = self.conn.cursor()
         self.osm_items = [x["elements"] for x in self.osm_items]
-        if len(self.osm_items) > 1:
-            self.osm_items = sum(self.osm_items, [])
+        self.osm_items = sum(self.osm_items, [])
 
         alinks = [x for x in self.osm_items if x["type"] == "way"]
         n = [x for x in self.osm_items if x["type"] == "node"]
@@ -55,15 +53,18 @@ class OSMBuilder(WorkerThread):
         node_count = self.unique_count(np.array(all_nodes))
         node_ids = {x: i + self.node_start for i, x in enumerate(node_count[:, 0])}
 
-        insert_qry = "INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText({}, 4326))"
+        insert_qry = 'INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))'
 
-        link_id = 1
+        vars = {}
+        vars["link_id"] = 1
         table = "links"
         fields = self.get_link_fields()
         field_names = ",".join(fields)
+        fn = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
         nodes_to_add = set()
         for osm_id, link in links.items():
+            vars["osm_id"] = osm_id
             linknodes = link["nodes"]
             linktags = link["tags"]
 
@@ -82,83 +83,78 @@ class OSMBuilder(WorkerThread):
                 jj = intersections[i + 1]
                 all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
 
-                node_a = node_ids[linknodes[ii]]
-                node_b = node_ids[linknodes[jj]]
-                direction = (linktags.get("oneway") == "yes") * 1
-                length = sum(
+                vars["a_node"] = node_ids[linknodes[ii]]
+                vars["b_node"] = node_ids[linknodes[jj]]
+                vars["direction"] = (linktags.get("oneway") == "yes") * 1
+                vars["length"] = sum(
                     [
                         haversine(nodes[x]["lon"], nodes[x]["lat"], nodes[y]["lon"], nodes[y]["lat"])
                         for x, y in zip(all_nodes[1:], all_nodes[:-1])
                     ]
                 )
-                name = linktags.get("name")
+                vars["name"] = linktags.get("name")
+                if vars["name"] is not None:
+                    vars["name"] = '"{}"'.format(vars["name"])
 
                 geometry = ["{} {}".format(nodes[x]["lon"], nodes[x]["lat"]) for x in all_nodes]
                 geometry = "LINESTRING ({})".format(", ".join(geometry))
-                link_type = linktags.get("highway")
+                vars["link_type"] = linktags.get("highway")
+                if vars["link_type"] is not None:
+                    vars["link_type"] = '"{}"'.format(vars["link_type"])
 
                 lanes = linktags.get("lanes", None)
 
                 if lanes is None:
-                    lanes_ab = None
-                    lanes_ba = None
+                    vars["lanes_ab"] = None
+                    vars["lanes_ba"] = None
                 else:
-                    lanes_ab = linktags.get("lanes:forward", math.ceil(lanes / 2))
-                    lanes_ba = linktags.get("lanes:backward", lanes - lanes_ab)
+                    vars["lanes_ab"] = linktags.get("lanes:forward", math.ceil(lanes / 2))
+                    vars["lanes_ba"] = linktags.get("lanes:backward", lanes - vars["lanes_ab"])
 
                 speed = linktags.get("maxspeed")
-                speed_ab = linktags.get("maxspeed:forward", speed)
-                speed_ba = linktags.get("maxspeed:backward", speed)
+                vars["speed_ab"] = linktags.get("maxspeed:forward", speed)
+                vars["speed_ba"] = linktags.get("maxspeed:backward", speed)
 
-                capacity_ab = None
-                capacity_ba = None
+                vars["capacity_ab"] = None
+                vars["capacity_ba"] = None
 
-                attributes = [globals()[x] for x in fields]
+                attributes = [vars[x] for x in fields]
 
-                sql = insert_qry.format(table, field_names, attributes, geometry)
-
+                attributes = ", ".join([str(x) for x in attributes])
+                sql = insert_qry.format(table, fn, attributes, geometry)
+                sql = sql.replace("None", "null")
                 try:
                     curr.execute(sql)
                     nodes_to_add.update(all_nodes)
                 except Exception as e:
-                    data = [
-                        node_a,
-                        node_b,
-                        direction,
-                        length,
-                        link_type,
-                        name,
-                        lanes_ab,
-                        lanes_ba,
-                        speed_ab,
-                        speed_ba,
-                        capacity_ab,
-                        capacity_ba,
-                        osm_id,
-                    ]
-
+                    data = list(vars.values())
                     logger.error("error when inserting link {}. Error {}".format(data, e.args))
-                link_id += 1
+                    logger.error(sql)
+                vars["link_id"] += 1
 
-        table = "links"
-        fields = self.get_link_fields()
+        table = "nodes"
+        fields = self.get_node_fields()
         field_names = ",".join(fields)
+        field_names = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
+        vars = {}
         for osm_id in nodes_to_add:
-            node_id = node_ids[osm_id]
-            is_centroid = 0
+            vars["node_id"] = node_ids[osm_id]
+            vars["osm_id"] = osm_id
+            vars["is_centroid"] = 0
             geometry = "POINT({} {})".format(nodes[osm_id]["lon"], nodes[osm_id]["lat"])
 
-            attributes = [globals()[x] for x in fields]
-
+            attributes = [vars.get(x) for x in fields]
+            attributes = ", ".join([str(x) for x in attributes])
             sql = insert_qry.format(table, field_names, attributes, geometry)
+            sql = sql.replace("None", "null")
 
             try:
                 curr.execute(sql)
-                nodes_to_add.update(all_nodes)
             except Exception as e:
-                data = [node_id, is_centroid, osm_id]
+                data = list(vars.values())
                 logger.error("error when inserting NODE {}. Error {}".format(data, e.args))
+                logger.error(sql)
 
         self.conn.commit()
         curr.close()
@@ -191,6 +187,5 @@ class OSMBuilder(WorkerThread):
         file = os.path.join(path, "network.yml")
         with open(file, "r") as yml:
             fields = yaml.load(yml, Loader=yaml.SafeLoader)
-        fields = fields["network"]["node"]["fields"]
-        nf = [list(x.keys())[0] for x in fields]
-        return nf + ["osm_id"]
+        fields = fields["network"]["nodes"]["fields"]
+        return fields + ["osm_id"]
