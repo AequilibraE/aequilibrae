@@ -1,60 +1,86 @@
-import importlib.util as iutil
-import os
 import math
 from typing import List
-import yaml
 import numpy as np
-from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
-from ...utils import WorkerThread
 from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 
 
-class OSMBuilder(WorkerThread):
-    if pyqt:
-        building = pyqtSignal(object)
+class OSMBuilder(QObject):
+    building = pyqtSignal(object)
 
     def __init__(self, osm_items: List, conn, node_start=10000) -> None:
-        super().__init__(self)
+        QObject.__init__(self, None)
         self.osm_items = osm_items
         self.conn = conn
+        self.curr = self.conn.cursor()
         self.node_start = node_start
         self.report = []
+        self.nodes = {}
+        self.links = {}
+        self.insert_qry = 'INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))'
 
     def doWork(self):
-        curr = self.conn.cursor()
-        self.osm_items = [x["elements"] for x in self.osm_items]
-        self.osm_items = sum(self.osm_items, [])
+        node_count = self.data_structures()
+        nodes_to_add, node_ids = self.importing_links(node_count)
+        self.import_nodes(nodes_to_add, node_ids)
 
-        alinks = [x for x in self.osm_items if x["type"] == "way"]
-        n = [x for x in self.osm_items if x["type"] == "node"]
+    def data_structures(self):
+
+        osmi = []
+        self.building.emit(["text", "Consolidating geo elements"])
+        self.building.emit(["maxValue", len(self.osm_items)])
+
+        for i, x in enumerate(self.osm_items):
+            osmi.append(x["elements"])
+            self.building.emit(["Value", i])
+        self.osm_items = sum(osmi, [])
+
+        self.building.emit(["text", "Separating nodes and links"])
+        self.building.emit(["maxValue", len(self.osm_items)])
+
+        alinks = []
+        n = []
+        for i, x in enumerate(self.osm_items):
+            if x["type"] == "way":
+                alinks.append(x)
+            elif x["type"] == "node":
+                n.append(x)
+            self.building.emit(["Value", i])
+
         self.osm_items = None
 
-        nodes = {}
-        for node in n:
+        self.building.emit(["text", "Setting data structures for nodes"])
+        self.building.emit(["maxValue", len(n)])
+
+        for i, node in enumerate(n):
             nid = node.pop("id")
             _ = node.pop("type")
-            nodes[nid] = node
+            self.nodes[nid] = node
+            self.building.emit(["Value", i])
         del n
 
-        links = {}
+        self.building.emit(["text", "Setting data structures for links"])
+        self.building.emit(["maxValue", len(alinks)])
+
         all_nodes = []
-        for link in alinks:
+        for i, link in enumerate(alinks):
             osm_id = link.pop("id")
             _ = link.pop("type")
             all_nodes.extend(link["nodes"])
-            links[osm_id] = link
+            self.links[osm_id] = link
+            self.building.emit(["Value", i])
         del alinks
-        node_count = self.unique_count(np.array(all_nodes))
-        node_ids = {x: i + self.node_start for i, x in enumerate(node_count[:, 0])}
 
-        insert_qry = 'INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))'
+        self.building.emit(["text", "Finalizing data structures"])
+
+        node_count = self.unique_count(np.array(all_nodes))
+
+        return node_count
+
+    def importing_links(self, node_count):
+        node_ids = {}
 
         vars = {}
         vars["link_id"] = 1
@@ -63,8 +89,13 @@ class OSMBuilder(WorkerThread):
         field_names = ",".join(fields)
         fn = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
+        self.building.emit(["text", "Adding network links"])
+        self.building.emit(["maxValue", len(self.links)])
+
         nodes_to_add = set()
-        for osm_id, link in links.items():
+        counter = 0
+        for osm_id, link in self.links.items():
+            self.building.emit(["Value", counter])
             vars["osm_id"] = osm_id
             linknodes = link["nodes"]
             linktags = link["tags"]
@@ -84,12 +115,22 @@ class OSMBuilder(WorkerThread):
                 jj = intersections[i + 1]
                 all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
 
-                vars["a_node"] = node_ids[linknodes[ii]]
-                vars["b_node"] = node_ids[linknodes[jj]]
+                vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
+                if vars["a_node"] == self.node_start:
+                    node_ids[linknodes[ii]] = vars["a_node"]
+                    self.node_start += 1
+
+                vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
+                if vars["b_node"] == self.node_start:
+                    node_ids[linknodes[jj]] = vars["b_node"]
+                    self.node_start += 1
+
                 vars["direction"] = (linktags.get("oneway") == "yes") * 1
                 vars["length"] = sum(
                     [
-                        haversine(nodes[x]["lon"], nodes[x]["lat"], nodes[y]["lon"], nodes[y]["lat"])
+                        haversine(
+                            self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
+                        )
                         for x, y in zip(all_nodes[1:], all_nodes[:-1])
                     ]
                 )
@@ -97,7 +138,7 @@ class OSMBuilder(WorkerThread):
                 if vars["name"] is not None:
                     vars["name"] = '"{}"'.format(vars["name"])
 
-                geometry = ["{} {}".format(nodes[x]["lon"], nodes[x]["lat"]) for x in all_nodes]
+                geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
                 geometry = "LINESTRING ({})".format(", ".join(geometry))
                 vars["link_type"] = linktags.get("highway")
                 if vars["link_type"] is not None:
@@ -132,43 +173,50 @@ class OSMBuilder(WorkerThread):
                 attributes = [vars[x] for x in fields]
 
                 attributes = ", ".join([str(x) for x in attributes])
-                sql = insert_qry.format(table, fn, attributes, geometry)
+                sql = self.insert_qry.format(table, fn, attributes, geometry)
                 sql = sql.replace("None", "null")
                 try:
-                    curr.execute(sql)
+                    self.curr.execute(sql)
                     nodes_to_add.update([linknodes[ii], linknodes[jj]])
                 except Exception as e:
                     data = list(vars.values())
                     logger.error("error when inserting link {}. Error {}".format(data, e.args))
                     logger.error(sql)
                 vars["link_id"] += 1
+            counter += 1
+        return nodes_to_add, node_ids
 
+    def import_nodes(self, nodes_to_add, node_ids):
         table = "nodes"
         fields = self.get_node_fields()
         field_names = ",".join(fields)
         field_names = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
+        self.building.emit(["text", "Adding network nodes"])
+        self.building.emit(["maxValue", len(nodes_to_add)])
+
         vars = {}
-        for osm_id in nodes_to_add:
+        for counter, osm_id in enumerate(nodes_to_add):
+            self.building.emit(["Value", counter])
             vars["node_id"] = node_ids[osm_id]
             vars["osm_id"] = osm_id
             vars["is_centroid"] = 0
-            geometry = "POINT({} {})".format(nodes[osm_id]["lon"], nodes[osm_id]["lat"])
+            geometry = "POINT({} {})".format(self.nodes[osm_id]["lon"], self.nodes[osm_id]["lat"])
 
             attributes = [vars.get(x) for x in fields]
             attributes = ", ".join([str(x) for x in attributes])
-            sql = insert_qry.format(table, field_names, attributes, geometry)
+            sql = self.insert_qry.format(table, field_names, attributes, geometry)
             sql = sql.replace("None", "null")
 
             try:
-                curr.execute(sql)
+                self.curr.execute(sql)
             except Exception as e:
                 data = list(vars.values())
                 logger.error("error when inserting NODE {}. Error {}".format(data, e.args))
                 logger.error(sql)
 
         self.conn.commit()
-        curr.close()
+        self.curr.close()
 
     @staticmethod
     def unique_count(a):

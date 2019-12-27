@@ -10,25 +10,17 @@ detach them in order to use OSMNx as a dependency or submodule
 For the original work, please see https://github.com/gboeing/osmnx
 """
 import time
-
 import re
 import requests
+from PyQt5.QtCore import pyqtSignal, QObject
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
-from ...utils import WorkerThread
-import importlib.util as iutil
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
 
 
-class OSMDownloader(WorkerThread):
-    if pyqt:
-        downloading = pyqtSignal(object)
+class OSMDownloader(QObject):
+    downloading = pyqtSignal(object)
 
     def __init__(self, polygons, modes):
-        super().__init__(self)
+        QObject.__init__(self, None)
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
@@ -40,7 +32,12 @@ class OSMDownloader(WorkerThread):
             "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        for poly in self.polygons:
+        self.downloading.emit(["text", "Downloading polygon {} of {}".format(1, len(self.polygons))])
+        self.downloading.emit(["maxValue", len(self.polygons)])
+        self.downloading.emit(["Value", 0])
+
+        for counter, poly in enumerate(self.polygons):
+            self.downloading.emit(["Value", counter])
             west, south, east, north = poly
             query_str = query_template.format(
                 north=north,
@@ -54,9 +51,7 @@ class OSMDownloader(WorkerThread):
             json = self.overpass_request(data={"data": query_str}, timeout=timeout)
             if json["elements"]:
                 self.json.append(json)
-
-        if pyqt:
-            self.downloading.emit(["finished_threaded_procedure", None])
+        self.downloading.emit(["Value", len(self.polygons)])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """

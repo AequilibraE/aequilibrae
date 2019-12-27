@@ -1,21 +1,16 @@
-import sqlite3
 import math
-import os
-import platform
-from typing import Union
 from warnings import warn
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
-from aequilibrae.parameters import Parameters
+from ...utils import WorkerThread
 
 
-class Network:
+class Network(WorkerThread):
     def __init__(self, project):
         self.conn = project.conn
-        self.conn.enable_load_extension(True)
 
     def create_from_osm(
         self,
@@ -40,6 +35,7 @@ class Network:
             bbox = [west, south, east, north]
         else:
             bbox, report = placegetter(place_name)
+            west, south, east, north = bbox
             if bbox is None:
                 warn('We could not find a reference for place name "{}"'.format(place_name))
                 return
@@ -71,11 +67,10 @@ class Network:
                     polygons.append(box)
 
         self.downloader = OSMDownloader(polygons, modes)
-        self.downloader.downloading.connect(self.finish_downloading_thread)
-        self.downloader.start()
+        self.downloader.doWork()
 
-    def finish_downloading_thread(self, val):
-        self.json = self.downloader.json
+        self.builder = OSMBuilder(self.downloader.json, self.conn)
+        self.builder.doWork()
 
     def count_links(self):
         print("quick query on number of links")
