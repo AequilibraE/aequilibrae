@@ -8,6 +8,7 @@ from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from ...utils import WorkerThread
 from .haversine import haversine
 from aequilibrae import logger
+from aequilibrae.parameters import Parameters
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -103,17 +104,27 @@ class OSMBuilder(WorkerThread):
                     vars["link_type"] = '"{}"'.format(vars["link_type"])
 
                 lanes = linktags.get("lanes", None)
-
                 if lanes is None:
                     vars["lanes_ab"] = None
                     vars["lanes_ba"] = None
                 else:
+                    lanes = int(lanes)
                     vars["lanes_ab"] = linktags.get("lanes:forward", math.ceil(lanes / 2))
+                    if not isinstance(vars["lanes_ab"], (int, float)):
+                        vars["lanes_ab"] = math.ceil(lanes / 2)
                     vars["lanes_ba"] = linktags.get("lanes:backward", lanes - vars["lanes_ab"])
+                    if not isinstance(vars["lanes_ba"], (int, float)):
+                        vars["lanes_ab"] = lanes - vars["lanes_ab"]
 
                 speed = linktags.get("maxspeed")
                 vars["speed_ab"] = linktags.get("maxspeed:forward", speed)
                 vars["speed_ba"] = linktags.get("maxspeed:backward", speed)
+
+                if vars["speed_ab"] is not None:
+                    vars["speed_ab"] = int(vars["speed_ab"])
+
+                if vars["speed_ba"] is not None:
+                    vars["speed_ba"] = int(vars["speed_ab"])
 
                 vars["capacity_ab"] = None
                 vars["capacity_ba"] = None
@@ -125,7 +136,7 @@ class OSMBuilder(WorkerThread):
                 sql = sql.replace("None", "null")
                 try:
                     curr.execute(sql)
-                    nodes_to_add.update(all_nodes)
+                    nodes_to_add.update([linknodes[ii], linknodes[jj]])
                 except Exception as e:
                     data = list(vars.values())
                     logger.error("error when inserting link {}. Error {}".format(data, e.args))
@@ -169,11 +180,8 @@ class OSMBuilder(WorkerThread):
 
     @staticmethod
     def get_link_fields():
-        path = os.path.dirname(os.path.realpath(__file__))
-        file = os.path.join(path, "network.yml")
-        with open(file, "r") as yml:
-            fields = yaml.load(yml, Loader=yaml.SafeLoader)
-        fields = fields["network"]["links"]["fields"]
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
         owf = [list(x.keys())[0] for x in fields["one-way"]]
 
         twf1 = ["{}_ab".format(list(x.keys())[0]) for x in fields["two-way"]]
@@ -183,9 +191,6 @@ class OSMBuilder(WorkerThread):
 
     @staticmethod
     def get_node_fields():
-        path = os.path.dirname(os.path.realpath(__file__))
-        file = os.path.join(path, "network.yml")
-        with open(file, "r") as yml:
-            fields = yaml.load(yml, Loader=yaml.SafeLoader)
-        fields = fields["network"]["nodes"]["fields"]
+        p = Parameters()
+        fields = p.parameters["network"]["nodes"]["fields"]
         return fields + ["osm_id"]
