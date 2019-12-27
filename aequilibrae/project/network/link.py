@@ -1,14 +1,12 @@
 import yaml
 import os
+from aequilibrae.parameters import Parameters
 
 
 class Link:
     def __init__(self, link_id=None):
-        path = os.path.dirname(os.path.realpath(__file__))
-        file = os.path.join(path, "network.yml")
-        with open(file, "r") as yml:
-            fields = yaml.load(yml, Loader=yaml.SafeLoader)
-        fields = fields["network"]["links"]["fields"]
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
         one_way_fields = [list(x.keys())[0] for x in fields["one-way"]]
         one_way_fields = {x: None for x in one_way_fields}
 

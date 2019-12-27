@@ -18,3 +18,42 @@ system:
   report zeros: 1
   temp directory: /temp
   spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
+network:
+  links:
+    fields:
+      one-way:
+        - link_id:
+            name: link_id
+            type: integer
+        - a_node:
+            name: a_node
+            type: integer
+        - b_node:
+            name: b_node
+            type: integer
+        - direction:
+            name: direction
+            type: integer
+        - length:
+            name: length
+            type: numeric
+        - name:
+            name: name
+            type: varchar
+        - link_type:
+            name: link_type
+            type: varchar
+      two-way:
+        - lanes:
+            name: name
+            type: integer
+        - capacity:
+            name: name
+            type: numeric
+        - speed:
+            name: name
+            type: numeric
+  nodes:
+    fields:
+      - node_id
+      - is_centroid
