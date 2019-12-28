@@ -23,37 +23,41 @@ network:
     fields:
       one-way:
         - link_id:
-            name: link_id
+            description: link_id
             type: integer
         - a_node:
-            name: a_node
+            description: a_node
             type: integer
         - b_node:
-            name: b_node
+            description: b_node
             type: integer
         - direction:
-            name: direction
+            description: direction
             type: integer
         - length:
-            name: length
+            description: length
             type: numeric
         - name:
-            name: name
+            description: name
             type: varchar
         - link_type:
-            name: link_type
+            description: link_type
             type: varchar
       two-way:
         - lanes:
-            name: name
+            description: lanes
             type: integer
         - capacity:
-            name: name
+            description: capacity
             type: numeric
         - speed:
-            name: name
+            description: speed
             type: numeric
   nodes:
     fields:
-      - node_id
-      - is_centroid
+      - node_id:
+          description: node_id
+          type: integer
+      - is_centroid:
+          description: is_centroid
+          type: integer

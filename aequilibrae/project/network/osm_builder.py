@@ -241,4 +241,5 @@ class OSMBuilder(QObject):
     def get_node_fields():
         p = Parameters()
         fields = p.parameters["network"]["nodes"]["fields"]
+        fields = [list(x.keys())[0] for x in fields]
         return fields + ["osm_id"]

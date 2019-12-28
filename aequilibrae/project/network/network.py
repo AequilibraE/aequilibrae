@@ -5,12 +5,23 @@ from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
+from aequilibrae.parameters import Parameters
+
 from ...utils import WorkerThread
 
 
 class Network(WorkerThread):
     def __init__(self, project):
+        WorkerThread.__init__(self, None)
+
         self.conn = project.conn
+
+    def _check_if_exists(self):
+        curr = self.conn.cursor()
+        curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
+        if curr.fetchone():
+            return True
+        return False
 
     def create_from_osm(
         self,
@@ -21,6 +32,16 @@ class Network(WorkerThread):
         place_name: str = None,
         modes=("car, transit, bike, walk"),
     ):
+
+        if not self._check_if_exists():
+            raise FileExistsError("You can only import an OSM network into a brand new model file")
+
+        self.create_empty_tables()
+
+        curr = self.conn.cursor()
+        curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
+        curr.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
+        self.conn.commit()
 
         if isinstance(modes, (tuple, list)):
             modes = list(modes)
@@ -71,6 +92,55 @@ class Network(WorkerThread):
 
         self.builder = OSMBuilder(self.downloader.json, self.conn)
         self.builder.doWork()
+
+    def create_empty_tables(self):
+        curr = self.conn.cursor()
+        # Create the links table
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        sql = """CREATE TABLE 'links' (
+                          ogc_fid INTEGER PRIMARY KEY,
+                          link_id INTEGER UNIQUE NOT NULL,
+                          {});"""
+
+        flds = fields["one-way"]
+
+        owlf = [
+            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
+            for f in flds
+            if list(f.keys())[0].upper() != "LINK_ID"
+        ]
+
+        flds = fields["two-way"]
+        twlf = []
+        for f in flds:
+            nm = list(f.keys())[0]
+            tp = f[nm]["type"]
+            twlf.extend(["{}_ab {}".format(nm, tp), "{}_ba {}".format(nm, tp)])
+
+        link_fields = owlf + twlf
+
+        sql = sql.format(",".join(link_fields))
+        curr.execute(sql)
+
+        sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
+                                 node_id INTEGER UNIQUE NOT NULL, {});"""
+
+        flds = p.parameters["network"]["nodes"]["fields"]
+
+        ndflds = [
+            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
+            for f in flds
+            if list(f.keys())[0].upper() != "NODE_ID"
+        ]
+
+        sql = sql.format(",".join(ndflds))
+        curr.execute(sql)
+
+        curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
+        curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
+        self.conn.commit()
 
     def count_links(self):
         print("quick query on number of links")
