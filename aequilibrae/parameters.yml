@@ -61,3 +61,126 @@ network:
       - is_centroid:
           description: is_centroid
           type: integer
+  osm:
+    modes:
+      car:
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - pedestrian
+          - track
+          - bus_guideway
+          - escape
+          - road
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          motor_vehicle: no
+        unknown_tags: true
+      transit:
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - pedestrian
+          - track
+          - bus_guideway
+          - escape
+          - road
+          - unclassified
+          - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+          - cycleway
+          - footway
+          - steps
+          - corridor
+          - pedestrian
+          - elevator
+          - escalator
+          - path
+          - track
+          - trail
+          - bridleway
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          pedestrian: no
+        unknown_tags: true
+      bycicle:
+        link_types:
+          - cycleway
+          - corridor
+          - pedestrian
+          - path
+          - track
+          - trail
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          pedestrian: no
+        unknown_tags: true
+    # DO NOT CHANGE THE VALUES BELOW UNLESS YOU ARE CERTAIN ABOUT WHAT YOU ARE DOING
+    # https://wiki:openstreetmap:org/wiki/Key:highway:
+    all_link_types:
+      - secondary_link
+      - escalator
+      - trail
+      - cycleway
+      - path
+      - trunk_link
+      - secondary
+      - escape
+      - track
+      - road
+      - motorway_link
+      - primary
+      - corridor
+      - residential
+      - footway
+      - motorway
+      - primary_link
+      - unclassified
+      - bus_guideway
+      - tertiary_link
+      - living_street
+      - pedestrian
+      - bridleway
+      - elevator
+      - motor
+      - trunk
+      - tertiary
+      - service
+      - steps
+      - proposed
+      - raceway
+      - construction
+      - abandoned
+      - platform
+      - unclassified

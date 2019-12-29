@@ -14,6 +14,7 @@ import re
 import requests
 from PyQt5.QtCore import pyqtSignal, QObject
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
+from aequilibrae.parameters import Parameters
 
 
 class OSMDownloader(QObject):
@@ -125,105 +126,24 @@ class OSMDownloader(QObject):
         loosely adapted from http://www.github.com/gboeing/osmnx
         """
 
-        car_only = [
-            "motor",
-            "motorway",
-            "trunk",
-            "primary",
-            "secondary",
-            "tertiary",
-            "unclassified",
-            "residential",
-            "motorway_link",
-            "trunk_link",
-            "primary_link",
-            "secondary_link",
-            "tertiary_link",
-            "living_street",
-            "service",
-            "pedestrian",
-            "track",
-            "bus_guideway",
-            "escape",
-            "road",
-            "unclassified",
-        ]
+        p = Parameters().parameters["network"]["osm"]
+        all_tags = p["all_link_types"]
 
-        transit = car_only + ["bus_guideway"]
+        p = p["modes"]
+        all_modes = list(p.keys())
 
-        walk = [
-            "cycleway",
-            "footway",
-            "steps",
-            "corridor",
-            "pedestrian",
-            "elevator",
-            "escalator",
-            "path",
-            "track",
-            "trail",
-            "bridleway",
-            "unclassified",
-        ]
-
-        bike = ["cycleway", "corridor", "pedestrian", "path", "track", "trail", "unclassified"]
-
-        all_tags = [
-            "secondary_link",
-            "escalator",
-            "trail",
-            "cycleway",
-            "path",
-            "trunk_link",
-            "secondary",
-            "escape",
-            "track",
-            "road",
-            "motorway_link",
-            "primary",
-            "corridor",
-            "residential",
-            "footway",
-            "motorway",
-            "primary_link",
-            "unclassified",
-            "bus_guideway",
-            "tertiary_link",
-            "living_street",
-            "pedestrian",
-            "bridleway",
-            "elevator",
-            "motor",
-            "trunk",
-            "tertiary",
-            "service",
-            "steps",
-            "proposed",
-            "raceway",
-            "construction",
-            "abandoned",
-            "platform",
-            "unclassified",
-        ]
+        tags_to_keep = []
+        for m in modes:
+            if m not in all_modes:
+                raise ValueError("Mode {} not listed in the parameters file".format(m))
+            tags_to_keep += p[m]["link_types"]
+        tags_to_keep = list(set(tags_to_keep))
 
         # Default to remove
         service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
-
         access = '["access"!~"private"]'
 
-        tags_to_keep = []
-        if "car" in modes:
-            tags_to_keep += car_only
-        if "transit" in modes:
-            tags_to_keep += transit
-        if "bike" in modes:
-            tags_to_keep += bike
-        if "walk" in modes:
-            tags_to_keep += walk
-
-        tags_to_keep = list(set(tags_to_keep))
         filtered = [x for x in all_tags if x not in tags_to_keep]
-
         filtered = "|".join(filtered)
 
         filter = '["area"!~"yes"]["highway"!~"{}"]{}{}'.format(filtered, service, access)

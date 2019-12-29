@@ -18,6 +18,16 @@ have already been added or are expected to be added in the future. The current m
 
 Contributions can be made to the existing modules or in the form of new modules.
 
+
+.. _overview_project:
+
+AequilibraE Project
+~~~~~~~~~~~~~~~~~~~
+General project features
+still under development
+OSM network downloading as key feature
+
+
 .. _overview_distribution:
 
 Trip distribution
@@ -86,4 +96,12 @@ an issue on GitHub.
 
 Global parameters
 ~~~~~~~~~~~~~~~~~
-parameters module
+As more features are added to AequilibraE, a large number of parameters start to be required, so the parameters module
+has also been growing in importance within the software.
+
+There are currently 4 main sessions with the parameters file: Assignment, Distribution, Network and System
+
+The parameters for assignment and distribution control only convergence criteria, while the System section controls
+things like the number of CPU cores used by the software, default directories and Spatialite location for Windows
+systems. The Network section, however, contains parameters that control the creation of networks and the import from
+Open Street Maps.

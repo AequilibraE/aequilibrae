@@ -63,6 +63,8 @@ Project components
 Network
 ~~~~~~~
 
+For more details on the API and capabilities of the AequilibraE network, see network_
+
 Transponet (Andrew's work)
 Link to the documentation on Transponet
 

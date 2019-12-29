@@ -20,3 +20,6 @@ class TestOSMDownloader(TestCase):
         self.o.doWork()
         if len(self.o.json[0]["elements"]) > 1000:
             self.fail("It found too many elements in the middle of the Grand Canyon")
+
+        if len(self.o.json[0]["elements"]) < 10:
+            self.fail("It found too few elements in the middle of the Grand Canyon")
