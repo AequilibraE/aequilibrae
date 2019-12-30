@@ -110,7 +110,10 @@ class OSMBuilder(QObject):
             intersections = np.where(nodedegree > 1)[0]
             segments = intersections.shape[0] - 1
 
+            owf, twf = self.field_osm_source()
+
             for i in range(segments):
+                # TODO: Deal with keys that are NOT LISTED IN ALL TAGS
                 ii = intersections[i]
                 jj = intersections[i + 1]
                 all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
@@ -134,43 +137,32 @@ class OSMBuilder(QObject):
                         for x, y in zip(all_nodes[1:], all_nodes[:-1])
                     ]
                 )
-                vars["name"] = linktags.get("name")
-                if vars["name"] is not None:
-                    vars["name"] = '"{}"'.format(vars["name"])
+
+                for k, v in owf.items():
+                    attr_value = linktags.get(v)
+                    if isinstance(attr_value, str):
+                        attr_value = '"{}"'.format(attr_value)
+                    vars[k] = attr_value
+
+                for k, v in twf.items():
+                    val = linktags.get(v["osm_source"])
+                    for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
+                        vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
+
+                        if vald is not None:
+                            if vald.isdigit():
+                                if vald == val and v["osm_behaviour"] == "divide":
+                                    vald = float(val) / 2
+                            else:
+                                if isinstance(vald, str):
+                                    vald = '"{}"'.format(vald)
+
+                        vars["{}_{}".format(k, d1)] = vald
 
                 geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
                 geometry = "LINESTRING ({})".format(", ".join(geometry))
-                vars["link_type"] = linktags.get("highway")
-                if vars["link_type"] is not None:
-                    vars["link_type"] = '"{}"'.format(vars["link_type"])
 
-                lanes = linktags.get("lanes", None)
-                if lanes is None:
-                    vars["lanes_ab"] = None
-                    vars["lanes_ba"] = None
-                else:
-                    lanes = int(lanes)
-                    vars["lanes_ab"] = linktags.get("lanes:forward", math.ceil(lanes / 2))
-                    if not isinstance(vars["lanes_ab"], (int, float)):
-                        vars["lanes_ab"] = math.ceil(lanes / 2)
-                    vars["lanes_ba"] = linktags.get("lanes:backward", lanes - vars["lanes_ab"])
-                    if not isinstance(vars["lanes_ba"], (int, float)):
-                        vars["lanes_ab"] = lanes - vars["lanes_ab"]
-
-                speed = linktags.get("maxspeed")
-                vars["speed_ab"] = linktags.get("maxspeed:forward", speed)
-                vars["speed_ba"] = linktags.get("maxspeed:backward", speed)
-
-                if vars["speed_ab"] is not None:
-                    vars["speed_ab"] = int(vars["speed_ab"])
-
-                if vars["speed_ba"] is not None:
-                    vars["speed_ba"] = int(vars["speed_ab"])
-
-                vars["capacity_ab"] = None
-                vars["capacity_ba"] = None
-
-                attributes = [vars[x] for x in fields]
+                attributes = [vars.get(x) for x in fields]
 
                 attributes = ", ".join([str(x) for x in attributes])
                 sql = self.insert_qry.format(table, fn, attributes, geometry)
@@ -236,6 +228,27 @@ class OSMBuilder(QObject):
         twf2 = ["{}_ba".format(list(x.keys())[0]) for x in fields["two-way"]]
 
         return owf + twf1 + twf2 + ["osm_id"]
+
+    @staticmethod
+    def field_osm_source():
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        owf = {
+            list(x.keys())[0]: x[list(x.keys())[0]]["osm_source"]
+            for x in fields["one-way"]
+            if "osm_source" in x[list(x.keys())[0]]
+        }
+
+        twf = {}
+        for x in fields["two-way"]:
+            if "osm_source" in x[list(x.keys())[0]]:
+                twf[list(x.keys())[0]] = {
+                    "osm_source": x[list(x.keys())[0]]["osm_source"],
+                    "osm_behaviour": x[list(x.keys())[0]]["osm_behaviour"],
+                }
+
+        return owf, twf
 
     @staticmethod
     def get_node_fields():

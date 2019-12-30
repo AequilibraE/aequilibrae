@@ -23,36 +23,42 @@ network:
     fields:
       one-way:
         - link_id:
-            description: link_id
+            description: Link ID. THIS FIELD CANNOT BE CHANGED
             type: integer
         - a_node:
-            description: a_node
+            description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
             type: integer
         - b_node:
-            description: b_node
+            description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
             type: integer
         - direction:
-            description: direction
+            description: Direction of the link. THIS FIELD CANNOT BE CHANGED
             type: integer
         - length:
-            description: length
+            description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
             type: numeric
         - name:
             description: name
             type: varchar
+            osm_source: name
         - link_type:
             description: link_type
             type: varchar
+            osm_source: highway
       two-way:
         - lanes:
             description: lanes
             type: integer
+            osm_source: lanes
+            osm_behaviour: divide
         - capacity:
             description: capacity
             type: numeric
         - speed:
             description: speed
             type: numeric
+            osm_source: maxspeed
+            osm_behaviour: copy
   nodes:
     fields:
       - node_id:

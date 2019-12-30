@@ -31,11 +31,12 @@ class TestNetwork(TestCase):
 
     def tearDown(self) -> None:
         self.conn.close()
-        # os.unlink(self.file)
+        os.unlink(self.file)
 
     def test_create_from_osm(self):
-        self.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60, modes=["car"])
 
+        # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
+        self.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60, modes=["car"])
         curr = self.conn.cursor()
 
         curr.execute("""select count(*) from links""")
