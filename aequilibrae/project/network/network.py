@@ -6,6 +6,7 @@ from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.parameters import Parameters
+from aequilibrae import logger
 
 from ...utils import WorkerThread
 
@@ -19,7 +20,8 @@ class Network(WorkerThread):
     def _check_if_exists(self):
         curr = self.conn.cursor()
         curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
-        if curr.fetchone():
+        tbls = curr.fetchone()[0]
+        if tbls > 0:
             return True
         return False
 
@@ -30,10 +32,10 @@ class Network(WorkerThread):
         east: float = None,
         north: float = None,
         place_name: str = None,
-        modes=("car, transit, bike, walk"),
+        modes=["car", "transit", "bycicle", "walk"],
     ):
 
-        if not self._check_if_exists():
+        if self._check_if_exists():
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
         self.create_empty_tables()
@@ -87,11 +89,14 @@ class Network(WorkerThread):
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
 
+        logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
         self.downloader.doWork()
 
+        logger.info("Building Network")
         self.builder = OSMBuilder(self.downloader.json, self.conn)
         self.builder.doWork()
+        logger.info("Network built successfully")
 
     def create_empty_tables(self):
         curr = self.conn.cursor()

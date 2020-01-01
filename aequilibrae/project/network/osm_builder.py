@@ -19,7 +19,7 @@ class OSMBuilder(QObject):
         self.report = []
         self.nodes = {}
         self.links = {}
-        self.insert_qry = 'INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))'
+        self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))"""
 
     def doWork(self):
         node_count = self.data_structures()
@@ -29,6 +29,7 @@ class OSMBuilder(QObject):
     def data_structures(self):
 
         osmi = []
+        logger.info("Consolidating geo elements")
         self.building.emit(["text", "Consolidating geo elements"])
         self.building.emit(["maxValue", len(self.osm_items)])
 
@@ -37,6 +38,7 @@ class OSMBuilder(QObject):
             self.building.emit(["Value", i])
         self.osm_items = sum(osmi, [])
 
+        logger.info("Separating nodes and links")
         self.building.emit(["text", "Separating nodes and links"])
         self.building.emit(["maxValue", len(self.osm_items)])
 
@@ -50,7 +52,7 @@ class OSMBuilder(QObject):
             self.building.emit(["Value", i])
 
         self.osm_items = None
-
+        logger.info("Setting data structures for nodes")
         self.building.emit(["text", "Setting data structures for nodes"])
         self.building.emit(["maxValue", len(n)])
 
@@ -61,6 +63,7 @@ class OSMBuilder(QObject):
             self.building.emit(["Value", i])
         del n
 
+        logger.info("Setting data structures for links")
         self.building.emit(["text", "Setting data structures for links"])
         self.building.emit(["maxValue", len(alinks)])
 
@@ -73,6 +76,7 @@ class OSMBuilder(QObject):
             self.building.emit(["Value", i])
         del alinks
 
+        logger.info("Finalizing data structures")
         self.building.emit(["text", "Finalizing data structures"])
 
         node_count = self.unique_count(np.array(all_nodes))
@@ -89,6 +93,7 @@ class OSMBuilder(QObject):
         field_names = ",".join(fields)
         fn = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
+        logger.info("Adding network links")
         self.building.emit(["text", "Adding network links"])
         self.building.emit(["maxValue", len(self.links)])
 
@@ -113,7 +118,6 @@ class OSMBuilder(QObject):
             owf, twf = self.field_osm_source()
 
             for i in range(segments):
-                # TODO: Deal with keys that are NOT LISTED IN ALL TAGS
                 ii = intersections[i]
                 jj = intersections[i + 1]
                 all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
@@ -141,20 +145,22 @@ class OSMBuilder(QObject):
                 for k, v in owf.items():
                     attr_value = linktags.get(v)
                     if isinstance(attr_value, str):
+                        attr_value = attr_value.replace('"', "'")
                         attr_value = '"{}"'.format(attr_value)
+
                     vars[k] = attr_value
 
                 for k, v in twf.items():
                     val = linktags.get(v["osm_source"])
                     for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
                         vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
-
                         if vald is not None:
                             if vald.isdigit():
                                 if vald == val and v["osm_behaviour"] == "divide":
                                     vald = float(val) / 2
                             else:
                                 if isinstance(vald, str):
+                                    vald = vald.replace('"', "'")
                                     vald = '"{}"'.format(vald)
 
                         vars["{}_{}".format(k, d1)] = vald
@@ -184,6 +190,7 @@ class OSMBuilder(QObject):
         field_names = ",".join(fields)
         field_names = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
+        logger.info("Adding network nodes")
         self.building.emit(["text", "Adding network nodes"])
         self.building.emit(["maxValue", len(nodes_to_add)])
 
