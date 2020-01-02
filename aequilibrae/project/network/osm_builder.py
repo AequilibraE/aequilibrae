@@ -99,6 +99,8 @@ class OSMBuilder(QObject):
 
         nodes_to_add = set()
         counter = 0
+        mode_codes = self.modes_per_link_type()
+
         for osm_id, link in self.links.items():
             self.building.emit(["Value", counter])
             vars["osm_id"] = osm_id
@@ -117,6 +119,34 @@ class OSMBuilder(QObject):
 
             owf, twf = self.field_osm_source()
 
+            # Attributes that are common to all individual links/segments
+            vars["direction"] = (linktags.get("oneway") == "yes") * 1
+
+            for k, v in owf.items():
+                attr_value = linktags.get(v)
+                if isinstance(attr_value, str):
+                    attr_value = attr_value.replace('"', "'")
+                    attr_value = '"{}"'.format(attr_value)
+
+                vars[k] = attr_value
+
+            for k, v in twf.items():
+                val = linktags.get(v["osm_source"])
+                for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
+                    vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
+                    if vald is not None:
+                        if vald.isdigit():
+                            if vald == val and v["osm_behaviour"] == "divide":
+                                vald = float(val) / 2
+                        else:
+                            if isinstance(vald, str):
+                                vald = vald.replace('"', "'")
+                                vald = '"{}"'.format(vald)
+
+                    vars["{}_{}".format(k, d1)] = vald
+
+            vars["modes"] = mode_codes.get(linktags.get("highway"))
+
             for i in range(segments):
                 ii = intersections[i]
                 jj = intersections[i + 1]
@@ -132,7 +162,6 @@ class OSMBuilder(QObject):
                     node_ids[linknodes[jj]] = vars["b_node"]
                     self.node_start += 1
 
-                vars["direction"] = (linktags.get("oneway") == "yes") * 1
                 vars["length"] = sum(
                     [
                         haversine(
@@ -141,29 +170,6 @@ class OSMBuilder(QObject):
                         for x, y in zip(all_nodes[1:], all_nodes[:-1])
                     ]
                 )
-
-                for k, v in owf.items():
-                    attr_value = linktags.get(v)
-                    if isinstance(attr_value, str):
-                        attr_value = attr_value.replace('"', "'")
-                        attr_value = '"{}"'.format(attr_value)
-
-                    vars[k] = attr_value
-
-                for k, v in twf.items():
-                    val = linktags.get(v["osm_source"])
-                    for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
-                        vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
-                        if vald is not None:
-                            if vald.isdigit():
-                                if vald == val and v["osm_behaviour"] == "divide":
-                                    vald = float(val) / 2
-                            else:
-                                if isinstance(vald, str):
-                                    vald = vald.replace('"', "'")
-                                    vald = '"{}"'.format(vald)
-
-                        vars["{}_{}".format(k, d1)] = vald
 
                 geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
                 geometry = "LINESTRING ({})".format(", ".join(geometry))
@@ -254,8 +260,26 @@ class OSMBuilder(QObject):
                     "osm_source": x[list(x.keys())[0]]["osm_source"],
                     "osm_behaviour": x[list(x.keys())[0]]["osm_behaviour"],
                 }
-
         return owf, twf
+
+    def modes_per_link_type(self):
+        p = Parameters()
+        modes = p.parameters["network"]["osm"]["modes"]
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT mode_name, mode_id from modes")
+        mode_codes = cursor.fetchall()
+        mode_codes = {p[0]: p[1] for p in mode_codes}
+
+        type_list = {}
+        for mode, val in modes.items():
+            all_types = val["link_types"]
+            md = mode_codes[mode]
+            for tp in all_types:
+                type_list[tp] = "{}{}".format(type_list.get(tp, ""), md)
+
+        type_list = {k: '"{}"'.format(v) for k, v in type_list.items()}
+        return type_list
 
     @staticmethod
     def get_node_fields():

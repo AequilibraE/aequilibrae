@@ -32,7 +32,7 @@ class Network(WorkerThread):
         east: float = None,
         north: float = None,
         place_name: str = None,
-        modes=["car", "transit", "bycicle", "walk"],
+        modes=["car", "transit", "bicycle", "walk"],
     ):
 
         if self._check_if_exists():

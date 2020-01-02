@@ -35,7 +35,6 @@ class Project:
             warn("AequilibraE might not work as intended without spatialite. {}".format(e.args))
         os.chdir(pth)
 
-        # Now we populate all the stuff we want from this guy
         self.source = path_to_file
         self.network = Network(self)
 

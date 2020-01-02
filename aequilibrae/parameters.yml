@@ -37,6 +37,9 @@ network:
         - length:
             description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
             type: numeric
+        - modes:
+            description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
+            type: text
         - name:
             description: name
             type: text
@@ -78,7 +81,7 @@ network:
         description: Linkes where walking is permitted
         letter: w
     - bicycle:
-        description: All Bycicles
+        description: All Bicycles
         letter: b
   osm:
     modes:
@@ -152,7 +155,7 @@ network:
           # The following tags will be removed from the mode
           pedestrian: no
         unknown_tags: true
-      bycicle:
+      bicycle:
         link_types:
           - cycleway
           - corridor
