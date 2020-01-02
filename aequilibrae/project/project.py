@@ -10,15 +10,17 @@ from aequilibrae.reference_files import spatialite_database
 
 class Project:
     def __init__(self, path_to_file: str, new_project=False):
+        self.path_to_file = path_to_file
+        self.parameters = Parameters().parameters
         if not os.path.isfile(path_to_file):
             if not new_project:
                 raise FileNotFoundError(
                     "Model does not exist. Check your path or use the new_project=True flag to create a new project"
                 )
             else:
-                shutil.copyfile(spatialite_database, path_to_file)
-        self.path_to_file = path_to_file
-        self.conn = sqlite3.connect(path_to_file)
+                self.__create_empty_project()
+        else:
+            self.conn = sqlite3.connect(self.path_to_file)
         self.conn.enable_load_extension(True)
         plat = platform.platform()
         pth = os.getcwd()
@@ -36,3 +38,27 @@ class Project:
         # Now we populate all the stuff we want from this guy
         self.source = path_to_file
         self.network = Network(self)
+
+    def __create_empty_project(self):
+        shutil.copyfile(spatialite_database, self.path_to_file)
+        self.conn = sqlite3.connect(self.path_to_file)
+        self.__create_modes_table()
+
+    def __create_modes_table(self):
+
+        create_query = """CREATE TABLE 'modes' (mode_name VARCHAR NOT NULL,
+                                                mode_id VARCHAR PRIMARY KEY UNIQUE,
+                                                description VARCHAR);"""
+        cursor = self.conn.cursor()
+        cursor.execute(create_query)
+        modes = self.parameters["network"]["modes"]
+
+        for mode in modes:
+            nm = list(mode.keys())[0]
+            descr = mode[nm]["description"]
+            mode_id = mode[nm]["letter"]
+            par = ['"{}"'.format(p) for p in [nm, mode_id, descr]]
+            par = ",".join(par)
+            sql = "INSERT INTO 'modes' (mode_name, mode_id, description) VALUES({})".format(par)
+            cursor.execute(sql)
+        self.conn.commit()

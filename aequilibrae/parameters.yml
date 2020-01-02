@@ -39,7 +39,7 @@ network:
             type: numeric
         - name:
             description: name
-            type: varchar
+            type: text
             osm_source: name
         - link_type:
             description: link_type
@@ -62,11 +62,24 @@ network:
   nodes:
     fields:
       - node_id:
-          description: node_id
+          description: node_id. THIS FIELD CANNOT BE CHANGED
           type: integer
       - is_centroid:
           description: is_centroid
           type: integer
+  modes:
+    - car:
+        description: All motorized vehicles
+        letter: c
+    - transit:
+        description: All links capable of supporting transit-vehicles
+        letter: t
+    - walk:
+        description: Linkes where walking is permitted
+        letter: w
+    - bicycle:
+        description: All Bycicles
+        letter: b
   osm:
     modes:
       car:
