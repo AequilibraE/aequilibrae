@@ -21,9 +21,10 @@ Contents
 
    overview
    project
-   networkf
+   network
    gettingstarted
    usageexamples
+   parameter_file
    softwaredevelopment
    qgis
 

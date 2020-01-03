@@ -6,6 +6,8 @@ This page is still under development, so most of the headers are just place-hold
    The examples provided here are not meant as a through description of AequilibraE's capabilities. For that, please
    look into the API documentation or email aequilibrae@googlegroups.com
 
+.. _example_usage_paths:
+
 Paths module
 ------------
 
@@ -177,14 +179,18 @@ an adjacency matrix
 This usage is really advanced, and very rarely not-necessary. Make sure to know what you are doing
 before going down this route
 
+.. _example_usage_distribution:
+
 Trip distribution
 -----------------
 
-The support for trip distribution in AequilibraE is not very comprehensive, mostly because of the loss of relevance that
-such type of model has suffered in the last decade.
+The support for trip distribution in AequilibraE is not very comprehensive,
+mostly because of the loss of relevance that such type of model has suffered
+in the last decade.
 
-However, it is possible to calibrate and apply synthetic gravity models and to perform Iterative Proportional Fitting
-(IPF) with really high performance, which might be of use in many applications other than traditional distribution.
+However, it is possible to calibrate and apply synthetic gravity models and
+to perform Iterative Proportional Fitting (IPF) with really high performance,
+which might be of use in many applications other than traditional distribution.
 
 ::
 
@@ -256,6 +262,8 @@ fancy multithreading implemented in path computation.
 Transit
 -------
 We only have import for now, and it is likely to not work on Windows if you want the geometries
+
+.. _example_usage_transit:
 
 GTFS import
 ~~~~~~~~~~~

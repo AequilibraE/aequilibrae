@@ -1,4 +1,4 @@
-.. index:: project
+.. _project:
 
 The AequilibraE project
 =======================
@@ -38,7 +38,7 @@ structure, and therefore are stored in the file system in parallel with the Sqli
 Project in a folder with the same name.
 
 For now, AequilibraE only supports one network per project file, as everything related
-to network names is hard-coded, and the work of re-factoring it is substantial. However,
+to network names is hard-coded, and the work of re-factoring it would be substantial. However,
 there is nothing in the SQLite architecture that prevents housing an arbitrarily large
 number of networks within the same file.
 
@@ -51,6 +51,8 @@ Project components
 * Supporting layers
   * Zoning layer
 * Matrix index
+* Configuration tables
+  * modes table
 * Vectors
   * Vector index
   * Vector data
@@ -80,39 +82,59 @@ Nodes
 
 Supporting layers
 ~~~~~~~~~~~~~~~~~
-Will include zone layer, but may include Delaunay triangulation in the future as well
+Upcoming features
+.. Will include zone layer, but may include Delaunay triangulation in the future as well
 
 Zone layer
 ++++++++++
-Just for displaying purposes. No math involves this layer
+Upcoming features
+.. Just for displaying purposes. No math involves this layer
 
 
 Matrix Index
 ~~~~~~~~~~~~
 
-Blah on the matrix index
+Upcoming features
+
+Configuration tables
+~~~~~~~~~~~~~~~~~~~~
+
+Many tables with information on the models (demographics, modes, metadata, etc.)
+are expected to exist, and this section will have the description of those tables
+as they are created.
+
+Modes table
++++++++++++
+
+The modes table exists to list all the modes available in the model's network,
+and its main role is to support the creation of graphs directly from the SQLite
+project.
+
+The modes table has three fields, being the *mode_name*, *description* and
+*mode_id*, where *mode_id* is a single letter that is used to codify mode
+permissions in the network, as further discussed in network_.
+
 
 Vectors
 ~~~~~~~
 
-Blah on the vectors. Some on the index and some on the data
+Upcoming features
 
 Scenario List
 ~~~~~~~~~~~~~
 
-Due to the consistency enforcement previously mentioned, all models when created will
-have a scenario called *default*, which cannot be deleted. This scenario is to be used
-as the value associated to vectors ...  FINISH THIS TEXT
+Upcoming features
 
 Summary of project tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - links
 - nodes
-- vector_index
-- vector_data
-- matrix_index
-- scenario_index
+- modes
+.. vector_index
+.. vector_data
+.. matrix_index
+.. scenario_index
 
 Project API
 -----------
