@@ -62,24 +62,27 @@ A number of elements are already default in the AequilibraE project, while
 others are still being developed. The tables that are currently part of
 the AequilibraE project are
 
-* Network
-  * Links layer
-  * Nodes layer
+* **Network**
 
-* Configuration tables
-  * modes table
+   - Links layer
+   - Nodes layer
+* **Configuration tables**
+
+   - modes table
 
 The following features are expected to be implemented within the next two
 versions of AequilibraE.
 
-* Supporting layers
-  * Zoning layer
-* Matrix index
-* Vectors
-  * Vector index
-  * Vector data
-* Scenario list
-* Assignment results
+* **Supporting layers**
+
+   - Zoning layer
+* **Matrix index**
+* **Vectors**
+
+   - Vector index
+   - Vector data
+* **Scenario list**
+* **Assignment results**
 
 
 .. index:: transponet
