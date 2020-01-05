@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       max-parallel: 4
       matrix:
@@ -26,6 +26,7 @@ jobs:
         flake8
     - name: Test with pytest
       run: |
+        brew install libspatialite
         cd aequilibrae/paths
         python setup_Assignment.py build_ext --inplace
         cd ..
