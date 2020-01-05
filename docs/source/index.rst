@@ -15,8 +15,10 @@ see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qg
 
 Contents
 --------
+.. sectnum::
 
 .. toctree::
+   :numbered:
    :maxdepth: 2
    :caption: Contents:
 
