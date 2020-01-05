@@ -18,6 +18,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
+      uses: dschep/install-pipenv-action@v1
+      with:
+        python-version: ${{ matrix.python-version }}
       run: |
         pipenv install -r requirements.txt
     - name: Lint with flake8
