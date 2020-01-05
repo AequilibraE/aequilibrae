@@ -115,10 +115,12 @@ An example of what the contents of the mode table look like is below:
 Summary of project tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The tables of
+The tables that are currently part of the AequilibraE project are the following:
+
 * links
 * nodes
 * modes
+
 .. vector_index
 .. vector_data
 .. matrix_index
@@ -127,6 +129,8 @@ The tables of
 Project API
 -----------
 
-The :ref:`test`
-
-.. TODO: TALK ABOUT THE API
+The project API is still not particularly powerful, and most of the procedures
+that exist within AequilibraE are not integrated with the project format.
+However, as each feature is made compatible with AequilibraE Project, the
+examples provided will be updated. For now, all the examples can be found under
+:ref:`example_usage_project`.
