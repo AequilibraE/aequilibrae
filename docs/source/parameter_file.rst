@@ -36,7 +36,7 @@ The data types available are those that exist within the
 to the use of **integer**, **numeric** and **varchar**.
 
 .. image:: images/parameters_links_example.png
-    :width: 800
+    :width: 704
     :align: center
     :alt: Link examples
 
@@ -61,7 +61,7 @@ to define what to do with numeric tag values that have not been tagged for both 
 the allowed values for this parameter are **copy** and **divide**, as shown below.
 
 .. image:: images/parameters_links_osm_behaviour.png
-    :width: 800
+    :width: 437
     :align: center
     :alt: OSM behaviour examples
 
