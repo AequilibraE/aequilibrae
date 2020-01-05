@@ -60,11 +60,13 @@ class Network(WorkerThread):
             bbox, report = placegetter(place_name)
             west, south, east, north = bbox
             if bbox is None:
-                warn('We could not find a reference for place name "{}"'.format(place_name))
+                msg = 'We could not find a reference for place name "{}"'.format(place_name)
+                warn(msg)
+                logger.warn(msg)
                 return
             for i in report:
                 if "PLACE FOUND" in i:
-                    print(i)
+                    logger.info(i)
 
         # Need to compute the size of the bounding box to not exceed it too much
         height = haversine((east + west) / 2, south, (east + west) / 2, north)
@@ -81,11 +83,11 @@ class Network(WorkerThread):
             dx = east - west
             dy = north - south
             for i in range(horizontal):
-                xmin = west + i * dx
-                xmax = west + (i + 1) * dx
+                xmin = max(-180, west + i * dx)
+                xmax = min(180, west + (i + 1) * dx)
                 for j in range(vertical):
-                    ymin = south + j * dy
-                    ymax = south + (j + 1) * dy
+                    ymin = max(-90, south + j * dy)
+                    ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
 
