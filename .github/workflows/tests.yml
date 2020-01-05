@@ -23,7 +23,7 @@ jobs:
     - name: Lint with flake8
       run: |
         pipenv install flake8
-        pipenv flake8
+        pipenv run flake8
     - name: Test with pytest
       run: |
         cd aequilibrae/paths
