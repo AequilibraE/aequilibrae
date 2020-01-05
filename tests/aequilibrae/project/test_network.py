@@ -6,16 +6,20 @@ import shutil
 import platform
 from time import sleep
 from functools import reduce
+from aequilibrae.project import Project
 from aequilibrae.project.network.network import Network
 from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
+from warnings import warn
 
 
 class TestNetwork(TestCase):
     def setUp(self) -> None:
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
-        shutil.copyfile(spatialite_database, self.file)
-        self.conn = sqlite3.connect(self.file)
+        self.project = Project(self.file, True)
+
+        self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
+        self.conn = sqlite3.connect(self.file2)
         self.conn.enable_load_extension(True)
         plat = platform.platform()
         pth = os.getcwd()
@@ -24,20 +28,25 @@ class TestNetwork(TestCase):
             spatialite_path = par.parameters["system"]["spatialite_path"]
             if os.path.isfile(os.path.join(spatialite_path, "mod_spatialite.dll")):
                 os.chdir(spatialite_path)
-        self.conn.load_extension("mod_spatialite")
+        try:
+            self.conn.load_extension("mod_spatialite")
+        except Exception as e:
+            warn("AequilibraE might not work as intended without spatialite. {}".format(e.args))
         os.chdir(pth)
-
         self.network = Network(self)
 
     def tearDown(self) -> None:
-        self.conn.close()
+        self.project.conn.close()
         os.unlink(self.file)
+
+        self.conn.close()
+        os.unlink(self.file2)
 
     def test_create_from_osm(self):
 
         # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
-        self.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60, modes=["car"])
-        curr = self.conn.cursor()
+        self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
+        curr = self.project.conn.cursor()
 
         curr.execute("""select count(*) from links""")
         lks = curr.fetchone()
