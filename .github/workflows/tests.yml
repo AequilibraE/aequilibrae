@@ -4,6 +4,7 @@ on: [pull_request]
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -11,27 +12,23 @@ jobs:
         python-version: [3.6, 3.7]
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
     - name: Set up Python ${{ matrix.python-version }}
-      uses: dschep/install-pipenv-action@v1
+      uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-
     - name: Install dependencies
-      uses: dschep/install-pipenv-action@v1
-      with:
-        python-version: ${{ matrix.python-version }}
       run: |
-        pipenv install -r requirements.txt
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
     - name: Lint with flake8
       run: |
-        pipenv install flake8
-        pipenv run flake8
+        pip install flake8
+        flake8
     - name: Test with pytest
       run: |
         cd aequilibrae/paths
-        pipenv -m python setup_Assignment.py build_ext --inplace
+        python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
-        pipenv install pytest
-        pipenv run python -m pytest
+        pip install pytest
+        pytest
