@@ -59,31 +59,8 @@ Project file components
 -----------------------
 
 A number of elements are already default in the AequilibraE project, while
-others are still being developed. The tables that are currently part of
-the AequilibraE project are
-
-* **Network**
-
-   - Links layer
-   - Nodes layer
-* **Configuration tables**
-
-   - modes table
-
-The following features are expected to be implemented within the next two
-versions of AequilibraE.
-
-* **Supporting layers**
-
-   - Zoning layer
-* **Matrix index**
-* **Vectors**
-
-   - Vector index
-   - Vector data
-* **Scenario list**
-* **Assignment results**
-
+others are still being developed. The components that are currently part of
+the AequilibraE project are:
 
 .. index:: transponet
 
@@ -93,25 +70,18 @@ Network
 Given the complexity of the Network tables, a dedicated documentation page has
 been created to discuss their implementation in :ref:`network`.
 
+.. TODO: Remove section if features not present by version 0.8
 .. Supporting layers
 .. ~~~~~~~~~~~~~~~~~
-
 .. As any SQLite file, the AequilibraE project is capable of supporting any number
 .. of layers inside the project, and therefore the user is welcome to load any needed
 .. layers in the database.
-
 .. However, special support for a few commonly used layers is expected to come to
 .. AequilibraE, particularly those related to zoning systems, census/demographic
 .. databases and Delaunay networks.
-
-
-.. TODO: Remove section if features not present by version 0.8
-
 .. Zone layer
 .. ++++++++++
 .. Just for displaying purposes. No math involves this layer
-
-
 .. Matrix Index
 .. ~~~~~~~~~~~~
 
@@ -142,24 +112,21 @@ An example of what the contents of the mode table look like is below:
     :alt: Link examples
 
 
-.. Vectors
-.. ~~~~~~~
-
-.. Scenario List
-.. ~~~~~~~~~~~~~
-
 Summary of project tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- links
-- nodes
-- modes
+The tables of
+* links
+* nodes
+* modes
 .. vector_index
 .. vector_data
 .. matrix_index
 .. scenario_index
 
-.. Project API
-.. -----------
+Project API
+-----------
+
+The :ref:`test`
 
 .. TODO: TALK ABOUT THE API

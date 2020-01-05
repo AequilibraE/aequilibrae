@@ -3,14 +3,116 @@ Use examples
 This page is still under development, so most of the headers are just place-holders for the actual examples
 
 .. note::
-   The examples provided here are not meant as a through description of AequilibraE's capabilities. For that, please
-   look into the API documentation or email aequilibrae@googlegroups.com
+   The examples provided here are not meant as a through description of
+   AequilibraE's capabilities. For that, please look into the API documentation
+   or email aequilibrae@googlegroups.com
+
+.. _example_logging:
+
+Logging
+-------
+AequilibraE uses Python's standard logging library to a file called
+*aequilibrae.log*, but the output folder for this logging can be changed to a
+custom system folder by altering the parameter **system --> logging_directory** on
+the parameters file.
+
+As an example, one could do programatically change the output folder to
+*'D:/myProject/logs'* by doing the following:
+
+::
+
+  from aequilibrae import Parameters
+
+  fldr = 'D:/myProject/logs'
+
+  p = Parameters()
+  p.parameters['system']['logging_directory'] =  fldr
+  p.writeback()
+
+The other useful resource, especially during model debugging it to also show
+all log messages directly on the screen. Doing that requires a little knowledge
+of the Python Logging library, but it is just as easy:
+
+::
+
+  from aequilibrae import logger
+  import logging
+
+  stdout_handler = logging.StreamHandler(sys.stdout)
+  logger.addHandler(stdout_handler)
+
+.. _example_usage_parameters:
+
+Parameters module
+-----------------
+Several examples on how to manipulate the parameters within AequilibraE have
+been shown in other parts of this tutorial.
+
+However, in case you ever have trouble with parameter changes you have made,
+you can always revert them to their default values. But remember, **ALL**
+**CHANGES WILL BE LOST**.
+
+::
+
+  from aequilibrae import Parameters
+
+  fldr = 'D:/myProject/logs'
+
+  p = Parameters()
+  p.reset_default()
+
+
+.. _example_usage_project:
+
+Project module
+--------------
+
+Let's suppose one wants to create project files for a list of 20 cities around
+the world with their complete networks downloaded from
+`Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
+folder for analysis at a later time.
+
+
+::
+
+  from time import sleep, clock
+  from aequilibrae.project import Project
+  import os
+
+  cities = ["Darwin, Australia",
+            "Karlsruhe, Germany",
+            "London, UK",
+            "Paris, France",
+            "Shanghai, China",
+            "Sao Paulo, Brazil",
+            "Rio de Janeiro, Brazil",
+            "Los Angeles, USA",
+            "New York, USA",
+            "Mexico City, Mexico",
+            "Berlin, Germany",
+            "Vancouver, Canada",
+            "Montreal, Canada",
+            "Toronto, Canada",
+            "Madrid, Spain",
+            "Lisbon, Portugal",
+            "Rome, Italy",
+            "Perth, Australia",
+            "Hobart, Australia",
+            "Auckland, New Zealand"]
+
+  for city in cities:
+      pth = 'd:/net_tests/{}.sqlite'.format(city)
+
+      p = Project(pth, True)
+      p.network.create_from_osm(place_name=city)
+      p.conn.close()
+      del p
+
 
 .. _example_usage_paths:
 
 Paths module
 ------------
-
 
 ::
 
