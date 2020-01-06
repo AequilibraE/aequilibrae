@@ -75,7 +75,6 @@ folder for analysis at a later time.
 
 ::
 
-  from time import sleep, clock
   from aequilibrae.project import Project
   import os
 

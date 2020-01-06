@@ -18,7 +18,7 @@ Iterative Proportional Fitting (Fratar)
 # -----------------------------------------------------------------------------------------------------------
 import os
 import sys
-from time import clock
+from time import perf_counter
 
 import numpy as np
 import yaml
@@ -118,7 +118,7 @@ class Ipf:
                 break
 
     def fit(self):
-        t = clock()
+        t = perf_counter()
         self.check_data()
         if self.error_free:
             max_iter = self.parameters["max iterations"]
@@ -174,7 +174,7 @@ class Ipf:
                 self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
-            self.report.append("Running time: " + str("{:4,.3f}".format(clock() - t)) + "s")
+            self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
     def tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)

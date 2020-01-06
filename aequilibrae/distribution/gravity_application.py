@@ -28,10 +28,9 @@ import sys
 import numpy as np
 import os
 import tempfile
-from time import clock
+from time import perf_counter
 import glob
 import logging
-
 
 sys.dont_write_bytecode = True
 
@@ -67,7 +66,7 @@ class GravityApplication:
 
     def apply(self):
         self.check_data()
-        t = clock()
+        t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
         self.output = self.impedance.copy(self.output_name, cores=self.impedance.view_names, names=[self.core_name])
@@ -119,7 +118,7 @@ class GravityApplication:
         self.report.append(
             "Intrazonal flow: " + "{:15,.4f}".format(float(np.nansum(np.diagonal(self.output.matrix_view))))
         )
-        self.report.append("Running time: " + str(round(clock() - t, 3)))
+        self.report.append("Running time: " + str(round(perf_counter() - t, 3)))
 
         for i in glob.glob(tempfile.gettempdir() + "*.aem"):
             try:
