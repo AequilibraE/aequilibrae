@@ -15,6 +15,7 @@ import requests
 from PyQt5.QtCore import pyqtSignal, QObject
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from aequilibrae.parameters import Parameters
+from aequilibrae import logger
 
 
 class OSMDownloader(QObject):
@@ -79,7 +80,7 @@ class OSMDownloader(QObject):
         # define the Overpass API URL, then construct a GET-style URL as a string to
         url = overpass_endpoint.rstrip("/") + "/interpreter"
         if pause_duration is None:
-            time.sleep(10)
+            time.sleep(5)
         start_time = time.time()
         self.report.append('Posting to {} with timeout={}, "{}"'.format(url, timeout, data))
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
@@ -87,14 +88,16 @@ class OSMDownloader(QObject):
         # get the response size and the domain, log result
         size_kb = len(response.content) / 1000.0
         domain = re.findall(r"(?s)//(.*?)/", url)[0]
-        self.report.append(
-            "Downloaded {:,.1f}KB from {} in {:,.2f} seconds".format(size_kb, domain, time.time() - start_time)
-        )
+        msg = "Downloaded {:,.1f}KB from {} in {:,.2f} seconds".format(size_kb, domain, time.time() - start_time)
+        self.report.append(msg)
+        logger.info(msg)
 
         try:
             response_json = response.json()
             if "remark" in response_json:
-                self.report.append('Server remark: "{}"'.format(response_json["remark"]))
+                msg = 'Server remark: "{}"'.format(response_json["remark"])
+                self.report.append(msg)
+                logger.info(msg)
         except Exception:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
@@ -102,11 +105,12 @@ class OSMDownloader(QObject):
             if response.status_code in [429, 504]:
                 # pause for error_pause_duration seconds before re-trying request
                 if error_pause_duration is None:
-                    error_pause_duration = 10
-                self.report.append(
-                    "Server at {} returned status code {} and no JSON data. Re-trying request in "
-                    "{:.2f} seconds.".format(domain, response.status_code, error_pause_duration)
+                    error_pause_duration = 5
+                msg = "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
+                    domain, response.status_code, error_pause_duration
                 )
+                self.report.append(msg)
+                logger.info(msg)
                 time.sleep(error_pause_duration)
                 response_json = self.overpass_request(data=data, pause_duration=pause_duration, timeout=timeout)
 
