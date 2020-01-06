@@ -1,4 +1,4 @@
-name: Documentation
+name: MultipleDocumentation
 
 on:  [pull_request]
 
