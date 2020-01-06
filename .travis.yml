@@ -22,7 +22,7 @@ script:
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  - pytest --cov aequilibrae --cov-report term-missing
+  - pytest --cov aequilibrae
 after_success:
 - coveralls
 - codecov
