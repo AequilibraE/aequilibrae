@@ -34,6 +34,7 @@ class Network(WorkerThread):
         north: float = None,
         place_name: str = None,
         modes=["car", "transit", "bicycle", "walk"],
+        spatial_index=False,
     ):
 
         if self._check_if_exists():
@@ -100,7 +101,11 @@ class Network(WorkerThread):
         self.builder = OSMBuilder(self.downloader.json, self.conn)
         self.builder.doWork()
 
-        self.__add_network_triggers()
+        self.add_network_triggers()
+
+        if spatial_index:
+            logger.info("Adding spatial indices")
+            self.add_spatial_index()
         logger.info("Network built successfully")
 
     def create_empty_tables(self):
@@ -150,11 +155,6 @@ class Network(WorkerThread):
 
         curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
-
-        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
-        curr.execute("""CREATE INDEX links_a_node_idx ON links (a_node);""")
-        curr.execute("""CREATE INDEX links_b_node_idx ON links (b_node);""")
-        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()
 
     def count_links(self):
@@ -166,8 +166,13 @@ class Network(WorkerThread):
     def many_more_queries_like_that(self):
         print("With all the work that goes with it")
 
-    def __add_network_triggers(self):
+    def add_network_triggers(self):
         curr = self.conn.cursor()
+        logger.info("Adding data indices")
+
+        curr.execute("""CREATE INDEX links_a_node_idx ON links (a_node);""")
+        curr.execute("""CREATE INDEX links_b_node_idx ON links (b_node);""")
+
         pth = os.path.dirname(os.path.realpath(__file__))
         qry_file = os.path.join(pth, "network_triggers.sql")
         sql_file = open(qry_file, "r")
@@ -182,4 +187,10 @@ class Network(WorkerThread):
                 msg = "Error creating trigger: {}".format(e.args)
                 logger.error(msg)
                 logger.info(cmd)
+        self.conn.commit()
+
+    def add_spatial_index(self):
+        curr = self.conn.cursor()
+        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
+        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()

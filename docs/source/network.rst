@@ -149,6 +149,40 @@ Please review the information :ref:`parameters`
    **re-downloading or fixed by re-running the failed SQL statements after**
    **manual fixing**
 
+.. _sqlite_python_limitations:
+
+Python limitations
+~~~~~~~~~~~~~~~~~~
+As it happens in other cases, Python's usual implementation of SQLite is
+incomplete, and does not include a R-TREE, a key extension for GIS operations.
+
+For this reason, AequilibraE's default option when importing a network from OSM
+is to **NOT create spatial indices**, which GREATLY affects the performance of
+the spatial triggers that implement network.
+
+If you are an expert user and made sure your Python installation was compiled
+against a complete SQLite set of extensions, then go ahead an import the network
+with the option for
+
+::
+
+  from aequilibrae.project import Project
+
+  p = Project('path/to/project/file.sqlite', True)
+  p.network.create_from_osm(place_name=city, spatial_index=True)
+  p.conn.close()
+
+If that is not the case, you can manually add the spatial index on QGIS by
+adding both links and nodes layers to the canvas, and selecting properties and
+clicking on *create spatial index* for each layer at a time. This action
+automatically saves the spatial indices to the sqlite database.
+
+
+.. image:: images/qgis_creating_spatial_indices.png
+    :width: 1383
+    :align: center
+    :alt: Adding Spatial indices with QGIS
+
 .. _network_triggers_behaviour:
 
 Network consistency behaviour
