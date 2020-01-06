@@ -22,7 +22,6 @@ script:
   - python setup_Assignment.py build_ext --inplace
   - cd ..
   - cd ..
-  - pytest --cov aequilibrae
+  - pytest
 after_success:
-- coveralls
 - codecov
