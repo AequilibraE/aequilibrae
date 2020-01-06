@@ -1,4 +1,5 @@
 import math
+import os
 from warnings import warn
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
@@ -98,6 +99,8 @@ class Network(WorkerThread):
         logger.info("Building Network")
         self.builder = OSMBuilder(self.downloader.json, self.conn)
         self.builder.doWork()
+
+        self.__add_network_triggers()
         logger.info("Network built successfully")
 
     def create_empty_tables(self):
@@ -157,3 +160,21 @@ class Network(WorkerThread):
 
     def many_more_queries_like_that(self):
         print("With all the work that goes with it")
+
+    def __add_network_triggers(self):
+        curr = self.conn.cursor()
+        pth = os.path.dirname(os.path.realpath(__file__))
+        qry_file = os.path.join(pth, "network_triggers.sql")
+        sql_file = open(qry_file, "r")
+        query_list = sql_file.read()
+        sql_file.close()
+        logger.info("Adding network triggers")
+        # Run one query/command at a time
+        for cmd in query_list.split("#"):
+            try:
+                curr.execute(cmd)
+            except Exception as e:
+                msg = "Error creating trigger: {}".format(e.args)
+                logger.error(msg)
+                logger.info(cmd)
+        self.conn.commit()
