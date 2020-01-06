@@ -4,10 +4,8 @@ on: [pull_request]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    uses: docker://python:3.7
-
+    - uses: docker://python:3.7
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
