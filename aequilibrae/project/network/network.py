@@ -150,6 +150,11 @@ class Network(WorkerThread):
 
         curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
+
+        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
+        curr.execute("""CREATE INDEX links_a_node_idx ON links (a_node);""")
+        curr.execute("""CREATE INDEX links_b_node_idx ON links (b_node);""")
+        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()
 
     def count_links(self):
