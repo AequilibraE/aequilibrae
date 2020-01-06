@@ -183,6 +183,11 @@ automatically saves the spatial indices to the sqlite database.
     :align: center
     :alt: Adding Spatial indices with QGIS
 
+
+If you want to learn a little more about this topic, you can access this
+`blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
+or the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
+
 .. _network_triggers_behaviour:
 
 Network consistency behaviour

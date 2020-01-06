@@ -25,6 +25,9 @@ jobs:
         cd docs
         make html
 
+    - name: change documentation address
+      run: python docs/website/redir.py
+
     - name: Upload documentation
       uses: SamKirkland/FTP-Deploy-Action@2.0.0
       env:
