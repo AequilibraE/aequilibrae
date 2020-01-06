@@ -86,6 +86,7 @@ On linux it is possible to install Spatialite by simply using apt-get
 
 ::
 
+  sudo apt-get install libsqlite3-mod-spatialite
   sudo apt-get install -y libspatialite-dev
 
 
