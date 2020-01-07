@@ -162,31 +162,44 @@ the spatial triggers that implement network.
 
 If you are an expert user and made sure your Python installation was compiled
 against a complete SQLite set of extensions, then go ahead an import the network
-with the option for
+with the option for creating such indices.
 
 ::
 
   from aequilibrae.project import Project
 
   p = Project('path/to/project/file.sqlite', True)
-  p.network.create_from_osm(place_name=city, spatial_index=True)
+  p.network.create_from_osm(place_name='my favorite place', spatial_index=True)
   p.conn.close()
 
-If that is not the case, you can manually add the spatial index on QGIS by
+If that is not the case, you can import the network without creating indices, as
+shown below.
+
+::
+
+  from aequilibrae.project import Project
+
+  p = Project('path/to/project/file.sqlite', True)
+  p.network.create_from_osm(place_name='my favorite place')
+  p.conn.close()
+
+And then manually add the spatial index on QGIS by
 adding both links and nodes layers to the canvas, and selecting properties and
 clicking on *create spatial index* for each layer at a time. This action
 automatically saves the spatial indices to the sqlite database.
-
 
 .. image:: images/qgis_creating_spatial_indices.png
     :width: 1383
     :align: center
     :alt: Adding Spatial indices with QGIS
 
-
 If you want to learn a little more about this topic, you can access this
 `blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
 or the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
+
+Please also note that the network consistency triggers will NOT work before
+spatial indices have been created and/or if the editing is being done on a
+platform that does not support both RTree and Spatialite.
 
 .. _network_triggers_behaviour:
 
