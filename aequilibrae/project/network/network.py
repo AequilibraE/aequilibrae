@@ -1,6 +1,7 @@
 import math
 import os
 from warnings import warn
+from sqlite3 import Connection as sqlc
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
@@ -16,7 +17,7 @@ class Network(WorkerThread):
     def __init__(self, project):
         WorkerThread.__init__(self, None)
 
-        self.conn = project.conn
+        self.conn = project.conn  # type: sqlc
 
     def _check_if_exists(self):
         curr = self.conn.cursor()
@@ -35,7 +36,7 @@ class Network(WorkerThread):
         place_name: str = None,
         modes=["car", "transit", "bicycle", "walk"],
         spatial_index=False,
-    ):
+    ) -> None:
 
         if self._check_if_exists():
             raise FileExistsError("You can only import an OSM network into a brand new model file")
@@ -101,14 +102,14 @@ class Network(WorkerThread):
         self.builder = OSMBuilder(self.downloader.json, self.conn)
         self.builder.doWork()
 
-        self.add_network_triggers()
-
         if spatial_index:
             logger.info("Adding spatial indices")
             self.add_spatial_index()
+
+        self.add_network_triggers()
         logger.info("Network built successfully")
 
-    def create_empty_tables(self):
+    def create_empty_tables(self) -> None:
         curr = self.conn.cursor()
         # Create the links table
         p = Parameters()
@@ -157,16 +158,17 @@ class Network(WorkerThread):
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
         self.conn.commit()
 
-    def count_links(self):
-        print("quick query on number of links")
+    def count_links(self) -> int:
+        c = self.conn.cursor()
+        c.execute("""select count(*) from links""")
+        return c.fetchone()[0]
 
-    def count_nodes(self):
-        print("quick query on number of nodes")
+    def count_nodes(self) -> int:
+        c = self.conn.cursor()
+        c.execute("""select count(*) from nodes""")
+        return c.fetchone()[0]
 
-    def many_more_queries_like_that(self):
-        print("With all the work that goes with it")
-
-    def add_network_triggers(self):
+    def add_network_triggers(self) -> None:
         curr = self.conn.cursor()
         logger.info("Adding data indices")
 
@@ -189,7 +191,7 @@ class Network(WorkerThread):
                 logger.info(cmd)
         self.conn.commit()
 
-    def add_spatial_index(self):
+    def add_spatial_index(self) -> None:
         curr = self.conn.cursor()
         curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
         curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
