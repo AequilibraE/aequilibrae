@@ -13,14 +13,6 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get install python${{matrix.python-version }}
-        pip install pipenv
-        python -m pipenv install --python ${{ matrix.python-version }}
-        python -m pipenv install -r requirements.txt
-        python -m pipenv install flake8
-
     - name: Set up Python ${{ matrix.python-version }} for compilation
       uses: actions/setup-python@v1
       with:
@@ -33,6 +25,15 @@ jobs:
         python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install python${{matrix.python-version }}
+        pip install pipenv
+        python -m pipenv install --python ${{ matrix.python-version }}
+        python -m pipenv install -r requirements.txt
+        python -m pipenv install flake8
+
 
     - name: Lint with flake8
       run: |
