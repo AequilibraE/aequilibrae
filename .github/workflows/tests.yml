@@ -22,11 +22,15 @@ jobs:
     - name: Lint with flake8
       run: |
         python -m pipenv run flake8
-    - name: Test with pytest
+    - name: Compile package
       run: |
+        sudo apt-get install gcc
         cd aequilibrae/paths
         python -m pipenv run python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
+
+    - name: Test with pytest
+      run: |
         pipenv install pytest
         pipenv run python -m pytest --cov-report term-missing --cov=auction
