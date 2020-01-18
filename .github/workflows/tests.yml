@@ -12,6 +12,7 @@ jobs:
         python-version: [3.6, 3.7, 3.8]
     steps:
     - uses: actions/checkout@v1
+
     - name: Install dependencies
       run: |
         sudo apt-get install python${{matrix.python-version }}
@@ -19,16 +20,24 @@ jobs:
         python -m pipenv install --python ${{ matrix.python-version }}
         python -m pipenv install -r requirements.txt
         python -m pipenv install flake8
+
+    - name: Set up Python ${{ matrix.python-version }} to compile library
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          cd aequilibrae/paths
+          python -m pipenv run python setup_Assignment.py build_ext --inplace
+          cd ..
+          cd ..
+
     - name: Lint with flake8
       run: |
         python -m pipenv run flake8
     - name: Compile package
       run: |
-        sudo apt-get install gcc
-        cd aequilibrae/paths
-        python -m pipenv run python setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
 
     - name: Test with pytest
       run: |
