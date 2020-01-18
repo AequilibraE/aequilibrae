@@ -15,12 +15,12 @@ jobs:
     - name: Install dependencies
       run: |
         pip install pipenv
-        pipenv install --python ${{ matrix.python-version }}
-        pipenv install -r requirements.txt
-        pipenv install flake8
+        python -m pipenv install --python ${{ matrix.python-version }}
+        python -m pipenv install -r requirements.txt
+        python -m pipenv install flake8
     - name: Lint with flake8
       run: |
-        pipenv run flake8
+        python -m pipenv run flake8
     - name: Test with pytest
       run: |
         cd aequilibrae/paths
