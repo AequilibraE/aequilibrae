@@ -28,23 +28,11 @@ jobs:
         cd ..
         cd ..
 
-#    - name: Install dependencies
-#      run: |
-#        sudo apt-get install python${{matrix.python-version }}
-#        pip install pipenv
-#        python -m pipenv install --python ${{ matrix.python-version }}
-#        python -m pipenv install -r requirements.txt
-#        python -m pipenv install flake8
-
-
     - name: Lint with flake8
       run: |
-#        python -m pipenv run flake8
         run flake8
 
     - name: Test with pytest
       run: |
-#        python -m pipenv install pytest
-#        python -m pipenv run python -m pytest
         pip install pytest
         python -m pytest
