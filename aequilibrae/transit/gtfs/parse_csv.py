@@ -15,6 +15,7 @@ def parse_csv(file_name: str, column_order=[]):
         row = [x.encode("ascii", errors="ignore").decode() for x in row]
         tot.append(row)
     titles = tot.pop(0)
+    csvfile.close()
     if tot:
         data = np.core.records.fromrecords(tot, names=titles)
     else:
