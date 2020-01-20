@@ -84,19 +84,19 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 +-----------------------+------------------------------------------------------------------+----------------+
 | speed_ab              | Modeling (Free flow) speed for the link in the B --> A direction | Float 32 bits  |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Volume delay function | Type of volume delay function to be used on that link            | String         |
+| volume delay function | Type of volume delay function to be used on that link            | String         |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Alfa_ab               | Alfa parameter for the BPR for the A->B direction of link        | Float 32 bits  |
+| alfa_ab               | Alfa parameter for the BPR for the A->B direction of link        | Float 32 bits  |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Alfa_ba               | Alfa parameter for the BPR for the B->A direction of link        | Float 32 bits  |
+| alfa_ba               | Alfa parameter for the BPR for the B->A direction of link        | Float 32 bits  |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Beta_ab               | Beta parameter for the BPR for the A->B direction of link        | Float 32 bits  |
+| beta_ab               | Beta parameter for the BPR for the A->B direction of link        | Float 32 bits  |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Beta_ba               | Beta parameter for the BPR for the B->A direction of link        | Float 32 bits  |
+| beta_ba               | Beta parameter for the BPR for the B->A direction of link        | Float 32 bits  |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Lanes_ba              | Number of lanes of the link for the direction A->B               | Integer 8 bits |
+| lanes_ba              | Number of lanes of the link for the direction A->B               | Integer 8 bits |
 +-----------------------+------------------------------------------------------------------+----------------+
-| Lanes_ba              | Number of lanes of the link for the direction B->A               | Integer 8 bits |
+| lanes_ba              | Number of lanes of the link for the direction B->A               | Integer 8 bits |
 +-----------------------+------------------------------------------------------------------+----------------+
 | ...                   | ...                                                              | ...            |
 +-----------------------+------------------------------------------------------------------+----------------+
@@ -120,10 +120,13 @@ directly linked to *a_node* and *b_node* in the links table.
 +=============+=======================================================================+=========================+
 | is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
-| TAZ         | Zone in which the zone is located                                     | Integer (32/64 bits)    |
+| taz         | Zone in which the zone is located                                     | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | ...         | ...                                                                   | ...                     |
 +-------------+-----------------------------------------------------------------------+-------------------------+
+
+It is good practice when working with the sqlite to keep all field names without
+spaces and all lowercase.
 
 Future components
 ~~~~~~~~~~~~~~~~~
@@ -154,11 +157,33 @@ Please review the information :ref:`parameters`
 Python limitations
 ~~~~~~~~~~~~~~~~~~
 As it happens in other cases, Python's usual implementation of SQLite is
-incomplete, and does not include a R-TREE, a key extension for GIS operations.
+incomplete, and does not include R-Tree, a key extension used by Spatialite for
+GIS operations.
 
 For this reason, AequilibraE's default option when importing a network from OSM
-is to **NOT create spatial indices**, which GREATLY affects the performance of
-the spatial triggers that implement network.
+is to **NOT create spatial indices**, which renders the network consistency
+triggers useless.
+
+If you are using a vanilla Python installation (your case if you are not sure),
+you can import the network without creating indices, as shown below.
+
+::
+
+  from aequilibrae.project import Project
+
+  p = Project('path/to/project/file.sqlite', True)
+  p.network.create_from_osm(place_name='my favorite place')
+  p.conn.close()
+
+And then manually add the spatial index on QGIS by adding both links and nodes
+layers to the canvas, and selecting properties and clicking on *create spatial*
+*index* for each layer at a time. This action automatically saves the spatial
+indices to the sqlite database.
+
+.. image:: images/qgis_creating_spatial_indices.png
+    :width: 1383
+    :align: center
+    :alt: Adding Spatial indices with QGIS
 
 If you are an expert user and made sure your Python installation was compiled
 against a complete SQLite set of extensions, then go ahead an import the network
@@ -171,27 +196,6 @@ with the option for creating such indices.
   p = Project('path/to/project/file.sqlite', True)
   p.network.create_from_osm(place_name='my favorite place', spatial_index=True)
   p.conn.close()
-
-If that is not the case, you can import the network without creating indices, as
-shown below.
-
-::
-
-  from aequilibrae.project import Project
-
-  p = Project('path/to/project/file.sqlite', True)
-  p.network.create_from_osm(place_name='my favorite place')
-  p.conn.close()
-
-And then manually add the spatial index on QGIS by
-adding both links and nodes layers to the canvas, and selecting properties and
-clicking on *create spatial index* for each layer at a time. This action
-automatically saves the spatial indices to the sqlite database.
-
-.. image:: images/qgis_creating_spatial_indices.png
-    :width: 1383
-    :align: center
-    :alt: Adding Spatial indices with QGIS
 
 If you want to learn a little more about this topic, you can access this
 `blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
