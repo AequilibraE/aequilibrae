@@ -21,7 +21,7 @@ Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 #  -----------------------------------------------------------------------------------------------------------
 from .ipf import Ipf
 from .synthetic_gravity_model import SyntheticGravityModel
-from ..matrix import AequilibraeMatrix, AequilibraEData
+from ..matrix import AequilibraeMatrix, AequilibraeData
 from ..parameters import Parameters
 
 import sys
@@ -39,7 +39,7 @@ class GravityApplication:
     """"
     Model is an instance of SyntheticGravityModel class
     Impedance is an instance of AequilibraEMatrix
-    Row and Column vectors are instances of AequilibraEData
+    Row and Column vectors are instances of AequilibraeData
     """
 
     def __init__(self, **kwargs):
@@ -151,14 +151,14 @@ class GravityApplication:
 
         # check dimensions
         # check data types
-        if not isinstance(self.rows, AequilibraEData):
-            raise TypeError("Row vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.rows, AequilibraeData):
+            raise TypeError("Row vector needs to be an instance of AequilibraeData")
 
-        if not isinstance(self.columns, AequilibraEData):
-            raise TypeError("Column vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.columns, AequilibraeData):
+            raise TypeError("Column vector needs to be an instance of AequilibraeData")
 
         if not isinstance(self.impedance, AequilibraeMatrix):
-            raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Impedance matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data dimensions
         if not np.array_equal(self.rows.index, self.columns.index):

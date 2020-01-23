@@ -293,9 +293,6 @@ However, it is possible to calibrate and apply synthetic gravity models and
 to perform Iterative Proportional Fitting (IPF) with really high performance,
 which might be of use in many applications other than traditional distribution.
 
-::
-
-    some code
 
 Synthetic gravity calibration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -307,9 +304,81 @@ Synthetic gravity calibration
 Synthetic gravity application
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+In this example, imagine that you have your demographic information in an
+sqlite database and that you have already computed your skim matrix.
+
+It is also important to notice that it is crucial to have consistent data, such
+as same set of zones (indices) in both the demographics and the impedance
+matrix.
+
 ::
 
-    some code
+    import pandas as pd
+    import sqlite3
+
+    from aequilibrae.matrix import AequilibraeMatrix
+    from aequilibrae.matrix import AequilibraeData
+
+    from aequilibrae.distribution import SyntheticGravityModel
+    from aequilibrae.distribution import GravityApplication
+
+
+    # We define the model we will use
+    model = SyntheticGravityModel()
+
+    # Before adding a parameter to the model, you need to define the model functional form
+    model.function = "GAMMA" # "EXPO" or "POWER"
+
+    # Only the parameter(s) applicable to the chosen functional form will have any effect
+    model.alpha = 0.1
+    model.beta = 0.0001
+
+    # Or you can load the model from a file
+    model.load('path/to/model/file')
+
+    # We load the impedance matrix
+    matrix = AequilibraeMatrix()
+    matrix.load('path/to/impedance_matrix.aem')
+    matrix.computational_view(['distance'])
+
+    # We create the vectors we will use
+    conn = sqlite3.connect('path/to/demographics/database')
+    query = "SELECT zone_id, population, employment FROM demographics;"
+    df = pd.read_sql_query(query,conn)
+
+    index = df.zone_id.values[:]
+    zones = index.shape[0]
+
+    # You create the vectors you would have
+    df = df.assign(production=df.population * 3.0)
+    df = df.assign(attraction=df.employment * 4.0)
+
+    # We create the vector database
+    args = {"entries": zones, "field_names": ["productions", "attractions"],
+        "data_types": [np.float64, np.float64], "memory_mode": True}
+    vectors = AequilibraeData()
+    vectors.create_empty(**args)
+
+    # Assign the data to the vector object
+    vectors.productions[:] = df.production.values[:]
+    vectors.attractions[:] = df.attraction.values[:]
+    vectors.index[:] = zones[:]
+
+    # Balance the vectors
+    vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+
+    args = {"impedance": matrix,
+            "rows": vectors,
+            "row_field": "productions",
+            "model": model,
+            "columns": vectors,
+            "column_field": "attractions",
+            "output": 'path/to/output/matrix.aem',
+            "nan_as_zero":True
+            }
+
+    gravity = GravityApplication(**args)
+    gravity.apply()
 
 Iterative Proportional Fitting (IPF)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

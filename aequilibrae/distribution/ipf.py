@@ -23,7 +23,7 @@ from time import perf_counter
 import numpy as np
 import yaml
 
-from ..matrix import AequilibraEData
+from ..matrix import AequilibraeData
 from ..matrix import AequilibraeMatrix
 
 sys.dont_write_bytecode = True
@@ -61,14 +61,14 @@ class Ipf:
         self.check_parameters()
 
         # check data types
-        if not isinstance(self.rows, AequilibraEData):
-            raise TypeError("Row vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.rows, AequilibraeData):
+            raise TypeError("Row vector needs to be an instance of AequilibraeData")
 
-        if not isinstance(self.columns, AequilibraEData):
-            raise TypeError("Column vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.columns, AequilibraeData):
+            raise TypeError("Column vector needs to be an instance of AequilibraeData")
 
         if not isinstance(self.matrix, AequilibraeMatrix):
-            raise TypeError("Seed matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Seed matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data type
         if not np.issubdtype(self.matrix.dtype, np.floating):

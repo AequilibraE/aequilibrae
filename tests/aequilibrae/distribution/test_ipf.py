@@ -3,20 +3,20 @@ from unittest import TestCase
 import numpy as np
 
 from aequilibrae.distribution import Ipf
-from aequilibrae.matrix import AequilibraEData
+from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 
 zones = 100
 
 # row vector
 args = {"entries": zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
-row_vector = AequilibraEData()
+row_vector = AequilibraeData()
 row_vector.create_empty(**args)
 row_vector.rows[:] = np.random.rand(zones)[:] * 1000
 row_vector.index[:] = np.arange(zones)[:]
 # column vector
 args["field_names"] = ["columns"]
-column_vector = AequilibraEData()
+column_vector = AequilibraeData()
 column_vector.create_empty(**args)
 column_vector.columns[:] = np.random.rand(zones)[:] * 1000
 column_vector.index[:] = np.arange(zones)[:]

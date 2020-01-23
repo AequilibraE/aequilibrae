@@ -1,5 +1,5 @@
 from unittest import TestCase
-from aequilibrae.matrix import AequilibraEData, AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
 from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 import numpy as np
 import tempfile
@@ -8,29 +8,22 @@ import os
 zones = 10
 
 # row vector
-args = {
-    "entries": zones,
-    "field_names": [u"rows"],
-    "data_types": [np.float64],
-    "memory_mode": True,
-}
+args = {"entries": zones, "field_names": [u"rows"], "data_types": [np.float64], "memory_mode": True}
 
-row_vector = AequilibraEData()
+row_vector = AequilibraeData()
 row_vector.create_empty(**args)
 row_vector.index[:] = np.arange(row_vector.entries) + 100
 row_vector.rows[:] = row_vector.index[:] + np.random.rand(zones)[:]
 
 # column vector
 args["field_names"] = ["columns"]
-column_vector = AequilibraEData()
+column_vector = AequilibraeData()
 column_vector.create_empty(**args)
 column_vector.index[:] = np.arange(column_vector.entries) + 100
 column_vector.columns[:] = column_vector.index[:] + np.random.rand(zones)[:]
 
 # balance vectors
-column_vector.columns[:] = column_vector.columns[:] * (
-    row_vector.rows.sum() / column_vector.columns.sum()
-)
+column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
 
 # Impedance matrix_procedures
 name_test = os.path.join(tempfile.gettempdir(), "aequilibrae_matrix_test.aem")
@@ -76,10 +69,5 @@ class TestGravityApplication(TestCase):
             distributed_matrix = GravityApplication(**args)
             distributed_matrix.apply()
 
-            if (
-                distributed_matrix.gap
-                > distributed_matrix.parameters["convergence level"]
-            ):
-                self.fail(
-                    "Gravity application did not converge for model " + model_name
-                )
+            if distributed_matrix.gap > distributed_matrix.parameters["convergence level"]:
+                self.fail("Gravity application did not converge for model " + model_name)
