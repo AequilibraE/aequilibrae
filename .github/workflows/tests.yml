@@ -6,7 +6,8 @@ jobs:
   testing:
     runs-on: ubuntu-latest
     container:
-      image: docker://rizwan937/helm
+#      image: docker://rizwan937/helm
+      image: Dockerfile
     strategy:
       max-parallel: 4
       matrix:
