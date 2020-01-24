@@ -5,6 +5,7 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
+    steps:
     - uses: docker://python:3.7
     - name: Install dependencies
       run: |
