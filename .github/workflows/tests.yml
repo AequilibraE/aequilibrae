@@ -5,7 +5,9 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
-    container: docker://python:python3.7
+    using: 'docker'
+    image: 'Dockerfile'
+#    container: Dockerfile
     strategy:
       max-parallel: 4
       matrix:
