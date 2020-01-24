@@ -10,6 +10,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Install dependencies
       run: |
+        pip3 install --upgrade setuptools
         pip3 install -r requirements.txt
 
     - name: Compile library
@@ -25,5 +26,5 @@ jobs:
 
     - name: Test with pytest
       run: |
-        pip install pytest
+        pip3 install pytest
         python -m pytest
