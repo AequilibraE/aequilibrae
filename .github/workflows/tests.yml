@@ -5,7 +5,8 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
-    container: Dockerfile
+    container:
+      image: docker://rizwan937/helm
     strategy:
       max-parallel: 4
       matrix:
