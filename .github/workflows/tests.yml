@@ -5,6 +5,11 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
+#    strategy:
+#      max-parallel: 4
+#      matrix:
+#        docker-version: [docker://python:3.6, docker://python:3.7, docker://python:3.8]
+#        ${{ matrix.python-version }}
     steps:
     - uses: docker://python:3.7
     - uses: actions/checkout@v1
@@ -19,10 +24,6 @@ jobs:
         pip3 install openmatrix
         pip3 install pyshp
         pip3 install requests
-      #        pip3 install --upgrade cryptography
-      #        pip3 install --upgrade setuptools
-      #        pip3 install --upgrade pyOpenSSL
-#        pip3 install -r requirements.txt
 
     - name: Compile library
       run: |
@@ -31,9 +32,9 @@ jobs:
         cd ..
         cd ..
 
-    - name: Lint with flake8
-      run: |
-        flake8
+#    - name: Lint with flake8
+#      run: |
+#        flake8
 
     - name: Test with pytest
       run: |
