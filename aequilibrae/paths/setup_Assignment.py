@@ -21,8 +21,8 @@
 import os
 import sys
 
-import Cython.Compiler.Options
 import numpy as np
+import Cython.Compiler.Options
 from Cython.Distutils import build_ext
 
 try:
