@@ -11,7 +11,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip3 install setuptools
-        apt-get install python3-pyqt5
+        sudo apt-get install python3-pyqt5
         pip3 install numpy
         sudo -H python3 -m pip install pyaml
         sudo -H python3 -m pip install cython
