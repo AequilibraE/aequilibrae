@@ -27,7 +27,7 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python setup_Assignment.py build_ext --inplace
+        python3 setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
 
@@ -38,4 +38,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip3 install pytest
-        python -m pytest
+        python3 -m pytest
