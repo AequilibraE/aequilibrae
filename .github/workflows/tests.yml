@@ -12,7 +12,12 @@ jobs:
       run: |
         sudo -H python3 -m pip install setuptools
         sudo apt-get install python3-pyqt5
-        sudo -H python3 -m pip install -r requirements.txt
+        sudo -H python3 -m pip install numpy
+        sudo -H python3 -m pip install pyaml
+        sudo -H python3 -m pip install cython
+        sudo -H python3 -m pip install openmatrix
+        sudo -H python3 -m pip install pyshp
+        sudo -H python3 -m pip install requests
       #        pip3 install --upgrade cryptography
       #        pip3 install --upgrade setuptools
       #        pip3 install --upgrade pyOpenSSL
