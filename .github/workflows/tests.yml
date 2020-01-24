@@ -11,9 +11,10 @@ jobs:
     - name: Install dependencies
       run: |
         pip3 install --upgrade setuptools
+        sudo -H python3 -m pip install -r requirements.txt
 #        pip3 install --upgrade cryptography
-        pip3 install --upgrade pyOpenSSL
-        pip3 install -r requirements.txt
+#        pip3 install --upgrade pyOpenSSL
+#        pip3 install -r requirements.txt
 
     - name: Compile library
       run: |
