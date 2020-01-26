@@ -7,7 +7,7 @@ on:  [pull_request]
 
 jobs:
   deploy:
-    runs-on:  macos-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         python-version: [ '3.5', '3.6', '3.7', '3.8' ]
