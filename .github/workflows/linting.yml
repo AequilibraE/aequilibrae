@@ -1,6 +1,9 @@
 name: Linting
 
-on: [pull_request]
+#on: [pull_request]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   lints:
