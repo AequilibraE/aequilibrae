@@ -3,8 +3,7 @@ name: Linting
 on: [pull_request]
 
 jobs:
-  build:
-
+  lints:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
