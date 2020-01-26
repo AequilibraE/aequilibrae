@@ -35,7 +35,7 @@ jobs:
         ls
         for whl in *.whl; do
             sudo chmod 777 *.whl
-            auditwheel repair "$whl" --plat manylinux1_x86_64 -w /wheelhouse/
+            auditwheel repair "$whl" --plat manylinux1_x86_64
         done
 
 #    - name: Build manylinux Python wheels
