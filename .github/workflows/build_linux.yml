@@ -1,10 +1,9 @@
 name: Upload Linux Python Package
 
-name: Python package build and publish
-
-on:
-  release:
-    types: [created]
+on: [pull_request]
+#on:
+#  release:
+#    types: [prereleased, published]
 
 jobs:
   deploy:
