@@ -29,7 +29,9 @@ jobs:
 
     - name: build and correct
       run: |
+        mkdir wheelhouse
         python setup.py sdist bdist_wheel -d wheelhouse
+        sudo chmod 777 -R /wheelhouse
         for whl in wheelhouse/*.whl; do
             sudo auditwheel repair "$whl" --plat manylinux1_x86_64 -w /wheelhouse/
         done
