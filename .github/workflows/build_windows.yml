@@ -1,9 +1,9 @@
 name: Upload Windows Python Package
 
-on:  [pull_request]
-#on:
-#  release:
-#    types: [prereleased, published]
+#on:  [pull_request]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   deploy:
