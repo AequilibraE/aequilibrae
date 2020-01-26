@@ -27,9 +27,9 @@ jobs:
 
     - name: build and correct
       run: |
-        python setup.py sdist bdist_wheel
-        for whl in dist/*.whl; do
-            auditwheel repair "$whl" --plat manylinux1_x86_64 -w /dist/
+        python setup.py sdist bdist_wheel -d wheelhouse
+        for whl in wheelhouse/*.whl; do
+            auditwheel repair "$whl" --plat manylinux1_x86_64 -w /wheelhouse/
         done
 
 #    - name: Build manylinux Python wheels
@@ -50,6 +50,6 @@ jobs:
         FTP_SERVER: ${{ secrets.DOC_FTP_SERVER }}
         FTP_USERNAME: ${{ secrets.DOC_FTP_USER }}
         FTP_PASSWORD: ${{ secrets.DOC_FTP_PASSWORD }}
-        LOCAL_DIR: dist/
+        LOCAL_DIR: wheelhouse/
         REMOTE_DIR: wheels/
         ARGS: --transfer-all
