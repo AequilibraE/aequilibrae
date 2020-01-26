@@ -10,7 +10,8 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: [ '3.5', '3.6', '3.7', '3.8' ]
+#        python-version: [ '3.5', '3.6', '3.7', '3.8' ]
+        python-version: [ '3.7' ]
     steps:
     - uses: actions/checkout@v1
     - name: Set Python environment
@@ -29,7 +30,7 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
+        python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
 
