@@ -28,7 +28,7 @@ jobs:
     - name: build and correct
       run: |
         python setup.py sdist bdist_wheel
-        for whl in /dist/*.whl; do
+        for whl in dist/*.whl; do
             auditwheel repair "$whl" --plat manylinux1_x86_64 -w /dist/
         done
 
