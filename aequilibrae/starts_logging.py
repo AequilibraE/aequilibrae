@@ -29,3 +29,6 @@ def StartsLogging():
         logger.addHandler(ch)
 
     return logger
+
+
+logger = StartsLogging()
