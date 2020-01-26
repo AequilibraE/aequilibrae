@@ -38,6 +38,7 @@ jobs:
 
     - name: Lint with flake8
       run: |
+        pip3 install flake8
         flake8
 
     - name: Test with pytest
