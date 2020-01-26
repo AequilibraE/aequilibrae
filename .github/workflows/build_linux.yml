@@ -28,8 +28,9 @@ jobs:
     - name: build and correct
       run: |
         python setup.py sdist bdist_wheel
-        cd dist
-        auditwheel repair "$whl" --plat manylinux1_x86_64
+        for whl in /dist/*.whl; do
+            auditwheel repair "$whl" --plat manylinux1_x86_64 -w /dist/
+        done
 
 #    - name: Build manylinux Python wheels
 #      uses: RalfG/python-wheels-manylinux-build@v0.1
