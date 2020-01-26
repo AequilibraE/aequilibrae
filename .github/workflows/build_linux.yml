@@ -22,8 +22,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        python -m pip install --upgrade cffi setuptools wheel twine auditwheel
         pip install -r requirements.txt
-        pip install cffi setuptools wheel twine auditwheel
         sudo apt-get install patchelf
 
     - name: build and correct
