@@ -1,17 +1,15 @@
 name: Upload MacOS Python Package
 
-on:  [pull_request]
-#on:
-#  release:
-#    types: [prereleased, published]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   deploy:
     runs-on:  macos-latest
     strategy:
       matrix:
-        python-version: [ '3.8' ]
-#        python-version: [ '3.5', '3.6', '3.7', '3.8' ]
+        python-version: [ '3.5', '3.6', '3.7', '3.8' ]
     steps:
     - uses: actions/checkout@v1
     - name: Set Python environment
