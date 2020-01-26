@@ -33,18 +33,12 @@ jobs:
         pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
-
     - name: Compile library
       run: |
         cd aequilibrae/paths
         python3 setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
-
-    - name: Lint with flake8
-      run: |
-        pip3 install flake8
-        flake8
 
     - name: Test with pytest
       run: |
