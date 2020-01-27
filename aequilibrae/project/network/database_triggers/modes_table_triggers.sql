@@ -1,5 +1,5 @@
 -- Guarantees that the mode records have a single letter for mode_id
-CREATE TRIGGER mode_single_letter_update BEFORE UPDATE ON "modes"
+CREATE TRIGGER mode_single_letter_update BEFORE UPDATE OF mode_id ON "modes"
 WHEN
 length(new.mode_id)!= 1
 BEGIN
@@ -17,7 +17,7 @@ END;
 #
 
 -- Prevents a mode record to be changed when it is in use for any link
-CREATE TRIGGER mode_keep_if_in_use_updating BEFORE UPDATE ON "modes"
+CREATE TRIGGER mode_keep_if_in_use_updating BEFORE UPDATE OF mode_id ON "modes"
 WHEN
 (Select count(*) from links where instr(modes, old.mode_id) > 0)>0
 
@@ -36,7 +36,7 @@ END;
 
 #
 -- Ensures an ALTERED link does not reference a non existing mode
-CREATE TRIGGER modes_on_links_update BEFORE UPDATE ON "links"
+CREATE TRIGGER modes_on_links_update BEFORE UPDATE OF 'modes' ON "links"
 WHEN
 (select count(*) from modes where instr(new.modes, mode_id)>0)<length(new.modes)
 BEGIN
@@ -54,7 +54,7 @@ END;
 
 #
 -- Ensures an ALTERED link has at least one mode added to it
-CREATE TRIGGER modes_length_on_links_update BEFORE UPDATE ON "links"
+CREATE TRIGGER modes_length_on_links_update BEFORE UPDATE OF 'modes' ON "links"
 WHEN
 length(new.modes)<1
 BEGIN
