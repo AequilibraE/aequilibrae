@@ -2,11 +2,14 @@ import math
 import os
 from warnings import warn
 from sqlite3 import Connection as sqlc
+from typing import List
+import numpy as np
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
+from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 
@@ -18,6 +21,7 @@ class Network(WorkerThread):
         WorkerThread.__init__(self, None)
 
         self.conn = project.conn  # type: sqlc
+        self.graphs = {}
 
     def _check_if_exists(self):
         curr = self.conn.cursor()
@@ -106,7 +110,7 @@ class Network(WorkerThread):
             logger.info("Adding spatial indices")
             self.add_spatial_index()
 
-        self.add_network_triggers()
+        self.add_triggers()
         logger.info("Network built successfully")
 
     def create_empty_tables(self) -> None:
@@ -158,6 +162,33 @@ class Network(WorkerThread):
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
         self.conn.commit()
 
+    def build_graphs(self, modes: List[str], fields=["length"]) -> None:
+        # curr.execute("select * from links where link_id < 0")
+        for mode in modes:
+            print(mode)
+
+    def custom_graph(self, mode: str, centroids: np.array, fields=["length"]) -> Graph:
+        curr = self.conn.cursor()
+        curr.execute("select * from links where link_id < 0")
+        available_fields = [x[0] for x in curr.description if x[0] not in ["ogc_fid", "geometry"]]
+
+        required_fields = ["link_id", "a_node", "b_node", "direction"]
+        for f in fields:
+            if f in available_fields:
+                required_fields.append(f)
+            else:
+                if "{}_ab".format(f) not in available_fields or "{}_ba".format(f) not in available_fields:
+                    raise ValueError("Field {} does not exist on your network".format(f))
+                required_fields.extend(["{}_ab".format(f), "{}_ba".format(f)])
+
+        curr.execute("select {} from links where  instr(modes, '{}') > 0;".format(",".join(required_fields), mode))
+
+        # data = curr.fetchall()
+
+        g = Graph()
+
+        return g
+
     def count_links(self) -> int:
         c = self.conn.cursor()
         c.execute("""select count(*) from links""")
@@ -168,19 +199,28 @@ class Network(WorkerThread):
         c.execute("""select count(*) from nodes""")
         return c.fetchone()[0]
 
-    def add_network_triggers(self) -> None:
-        curr = self.conn.cursor()
-        logger.info("Adding data indices")
+    def add_triggers(self):
+        self.__add_network_triggers()
+        self.__add_mode_triggers()
 
-        curr.execute("""CREATE INDEX links_a_node_idx ON links (a_node);""")
-        curr.execute("""CREATE INDEX links_b_node_idx ON links (b_node);""")
-
+    def __add_network_triggers(self) -> None:
+        logger.info("Adding network triggers")
         pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "network_triggers.sql")
+        qry_file = os.path.join(pth, "database_triggers", "network_triggers.sql")
+        self.__add_trigger_from_file(qry_file)
+
+    def __add_mode_triggers(self) -> None:
+        logger.info("Adding mode table triggers")
+        pth = os.path.dirname(os.path.realpath(__file__))
+        qry_file = os.path.join(pth, "database_triggers", "modes_table_triggers.sql")
+        self.__add_trigger_from_file(qry_file)
+
+    def __add_trigger_from_file(self, qry_file: str):
+        curr = self.conn.cursor()
         sql_file = open(qry_file, "r")
         query_list = sql_file.read()
         sql_file.close()
-        logger.info("Adding network triggers")
+
         # Run one query/command at a time
         for cmd in query_list.split("#"):
             try:

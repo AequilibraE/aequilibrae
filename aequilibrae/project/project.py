@@ -46,7 +46,7 @@ class Project:
     def __create_modes_table(self):
 
         create_query = """CREATE TABLE 'modes' (mode_name VARCHAR NOT NULL,
-                                                mode_id VARCHAR PRIMARY KEY UNIQUE,
+                                                mode_id VARCHAR PRIMARY KEY UNIQUE NOT NULL,
                                                 description VARCHAR);"""
         cursor = self.conn.cursor()
         cursor.execute(create_query)
