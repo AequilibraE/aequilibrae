@@ -90,30 +90,12 @@ Configuration tables
 ~~~~~~~~~~~~~~~~~~~~
 
 Many tables with information on the models (demographics, modes, metadata, etc.)
-are expected to exist, and this section will have the description of those
-tables as they are created.
-
-Modes table
-+++++++++++
-
-The modes table exists to list all the modes available in the model's network,
-and its main role is to support the creation of graphs directly from the SQLite
-project.
-
-The modes table has three fields, being the *mode_name*, *description* and
-*mode_id*, where *mode_id* is a single letter that is used to codify mode
-permissions in the network, as further discussed in :ref:`network`.
-
-An example of what the contents of the mode table look like is below:
-
-.. image:: images/modes_table.png
-    :width: 750
-    :align: center
-    :alt: Link examples
+are expected to exist, so a dedicated page on them is advisable, even though the
+content of such a page is not yet too extensive.  :ref:`project_tables`.
 
 
-Summary of project tables
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Summary of all tables in the project database
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The tables that are currently part of the AequilibraE project are the following:
 
