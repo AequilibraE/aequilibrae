@@ -35,7 +35,7 @@ network:
         - direction:
             description: Direction of the link. THIS FIELD CANNOT BE CHANGED
             type: integer
-        - length:
+        - distance:
             description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
             type: numeric
         - modes:

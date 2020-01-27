@@ -144,8 +144,8 @@ you need only a graph that you have previously built, and the list of skims you 
     # We are also **blocking** paths from going through centroids
     g.set_graph(cost_field='fftime', block_centroid_flows=True)
 
-    # We will be skimming for fftime **AND** length along the way
-    g.set_skimming(['fftime', 'length'])
+    # We will be skimming for fftime **AND** distance along the way
+    g.set_skimming(['fftime', 'distance'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided
     result = skmr()
@@ -246,8 +246,8 @@ an adjacency matrix
                   reserved_fields.a_node,
                   reserved_fields.b_node,
                   reserved_fields.direction,
-                 "length_ab",
-                 "length_ba"]
+                 "distance_ab",
+                 "distance_ba"]
 
     dt = [(t, d) for t, d in zip(all_titles, all_types)]
 
@@ -260,13 +260,13 @@ an adjacency matrix
     my_graph.network[reserved_fields.link_id] = np.arange(links) + 1
     my_graph.network[reserved_fields.a_node] = sparse_graph.row
     my_graph.network[reserved_fields.b_node] = sparse_graph.col
-    my_graph.network["length_ab"] = sparse_graph.data
+    my_graph.network["distance_ab"] = sparse_graph.data
 
     # If the links are directed (from A to B), direction is 1. If bi-directional, use zeros
     my_graph.network[reserved_fields.direction] = np.ones(links)
 
     # If uni-directional from A to B the value is not used
-    my_graph.network["length_ba"] = mat.data * 10000
+    my_graph.network["distance_ba"] = mat.data * 10000
 
     # Let's say that all nodes in the network are centroids
     list_of_centroids =  np.arange(max(sparse_graph.shape[0], sparse_graph.shape[0])+ 1)

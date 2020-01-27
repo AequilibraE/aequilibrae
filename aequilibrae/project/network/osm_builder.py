@@ -162,7 +162,7 @@ class OSMBuilder(QObject):
                     node_ids[linknodes[jj]] = vars["b_node"]
                     self.node_start += 1
 
-                vars["length"] = sum(
+                vars["distance"] = sum(
                     [
                         haversine(
                             self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]

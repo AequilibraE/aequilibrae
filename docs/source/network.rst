@@ -63,7 +63,7 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | direction   | Direction of flow allowed for the link (A-->B: 1, B-->A:-1, Both:0)   | Integer 8 bits          |
 +-------------+-----------------------------------------------------------------------+-------------------------+
-| length      | Length of the link in meters                                          | Float 64 bits           |
+| distance    | Length of the link in meters                                          | Float 64 bits           |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | modes       | Modes allowed in this link. (Concatenation of mode ids)               | String                  |
 +-------------+-----------------------------------------------------------------------+-------------------------+
@@ -381,35 +381,50 @@ Re-shaping a link
 Nothing is expected to change in the database (other than the link's shape), as
 long as the extremities of the link remain in the same position.
 
-.. _net_section5.1.2.4:
+.. .. _net_section5.1.2.4:
 
-Splitting a link
-^^^^^^^^^^^^^^^^
-*To come*
+.. Splitting a link
+.. ^^^^^^^^^^^^^^^^
+.. *To come*
 
 .. _net_section5.1.2.5:
 
-Merging two links
-^^^^^^^^^^^^^^^^^
-*To come*
+.. Merging two links
+.. ^^^^^^^^^^^^^^^^^
+.. *To come*
 
-.. _net_section5.1.2.6:
+.. .. _net_section5.1.2.6:
 
-Adding data field
-^^^^^^^^^^^^^^^^^
-*To come*
+.. Adding data field
+.. ^^^^^^^^^^^^^^^^^
+.. *To come*
 
-.. _net_section5.1.2.7:
+.. .. _net_section5.1.2.7:
 
-Deleting data field
-^^^^^^^^^^^^^^^^^^^
-*To come*
+.. Deleting data field
+.. ^^^^^^^^^^^^^^^^^^^
+.. *To come*
 
-.. _net_section5.1.2.8:
+.. .. _net_section5.1.2.8:
+
+.. Changing data
+.. ^^^^^^^^^^^^^
+.. *To come*
+
+
+.. _net_section5.1.3:
+
+Field-specific data consistency
+++++++++++++++++++++++++++++++
+ Some data fields are specially
+
+
+.. _net_section5.1.3.1:
 
 Changing data
 ^^^^^^^^^^^^^
-*To come*
+
+
 
 # 4	References
 http://tfresource.org/Category:Transportation_networks

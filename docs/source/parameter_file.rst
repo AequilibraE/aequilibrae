@@ -24,7 +24,7 @@ The section for link fields are divided into *one-way* fields and *two-way* fiel
 two-way fields will be created by appending *_ab* and *_ba* to the end of each field's name.
 
 There are 5 fields which cannot be changed, as they are mandatory fields for an AequilibraE
-network, and they are **link_id**, **a_node**, **b_node**, **direction**, **length** and
+network, and they are **link_id**, **a_node**, **b_node**, **direction**, **distance** and
 **modes**. The field **geometry** is also default, but it is not listed in the parameter file
 due to its distinct nature.
 

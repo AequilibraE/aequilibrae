@@ -34,8 +34,8 @@ network:
         - direction:
             description: direction
             type: integer
-        - length:
-            description: length
+        - distance:
+            description: distance
             type: numeric
         - name:
             description: name
