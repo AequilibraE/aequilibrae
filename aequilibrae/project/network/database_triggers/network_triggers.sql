@@ -20,6 +20,12 @@
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
 #
+CREATE INDEX links_a_node_idx ON links (a_node);
+
+#
+CREATE INDEX links_b_node_idx ON links (b_node);
+
+#
 CREATE TRIGGER new_link_a_node BEFORE INSERT ON links
   WHEN
     (SELECT count(*)
