@@ -105,7 +105,6 @@ network:
           - service
           - escape
           - road
-          - unclassified
         mode_filter:
           # The following tags will be removed from the mode
           motor_vehicle: "no"
@@ -129,7 +128,6 @@ network:
           - service
           - escape
           - road
-          - unclassified
           - bus_guideway
         unknown_tags: true
       walk:
