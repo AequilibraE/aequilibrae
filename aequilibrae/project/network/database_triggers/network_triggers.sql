@@ -268,3 +268,17 @@ CREATE TRIGGER updated_node_id AFTER UPDATE OF node_id ON nodes
     WHERE links.b_node = old.node_id;
   END;
 #
+
+-- Guarantees that link direction is one of the required values
+CREATE TRIGGER links_direction_update BEFORE UPDATE ON links
+WHEN new.direction != -1 AND new.direction != 0 AND new.direction != 1
+BEGIN
+  SELECT RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
+END;
+
+#
+CREATE TRIGGER links_direction_insert BEFORE INSERT ON links
+WHEN new.direction != -1 AND new.direction != 0 AND new.direction != 1
+BEGIN
+  SELECT RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
+END;
