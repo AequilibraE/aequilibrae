@@ -285,3 +285,9 @@ WHEN new.direction != -1 AND new.direction != 0 AND new.direction != 1
 BEGIN
   SELECT RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
 END;
+
+#
+CREATE TRIGGER enforces_link_length BEFORE UPDATE distance ON links
+BEGIN
+  UPDATE links SET distance = GeodesicLength(new.geometry)
+END;
