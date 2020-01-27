@@ -139,7 +139,10 @@ CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
           search_frame = EndPoint(links.geometry)) OR
         nodes.node_id = new.b_node))
     WHERE links.ROWID = new.ROWID;
-    
+    UPDATE links
+    SET distance = GeodesicLength(new.geometry)
+    WHERE links.ROWID = new.ROWID;
+
     -- now delete nodes which no-longer have attached links
     -- limit search to nodes which were attached to this link.
     DELETE FROM nodes
