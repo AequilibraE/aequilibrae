@@ -119,9 +119,15 @@ class Network(WorkerThread):
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
+        mandatory = ["LINK_ID", "A_NODE", "B_NODE", "DIRECTION", "DISTANCE", "MODES"]
         sql = """CREATE TABLE 'links' (
                           ogc_fid INTEGER PRIMARY KEY,
                           link_id INTEGER UNIQUE NOT NULL,
+                          a_node INTEGER NOT NULL,
+                          b_node INTEGER NOT NULL,
+                          direction INTEGER NOT NULL,
+                          distance NUMERIC NOT NULL,
+                          modes TEXT NOT NULL,
                           {});"""
 
         flds = fields["one-way"]
@@ -129,7 +135,7 @@ class Network(WorkerThread):
         owlf = [
             "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
             for f in flds
-            if list(f.keys())[0].upper() != "LINK_ID"
+            if list(f.keys())[0].upper() not in mandatory
         ]
 
         flds = fields["two-way"]
@@ -162,12 +168,12 @@ class Network(WorkerThread):
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
         self.conn.commit()
 
-    def build_graphs(self, modes: List[str], fields=["length"]) -> None:
+    def build_graphs(self, modes: List[str], fields=["distance"]) -> None:
         # curr.execute("select * from links where link_id < 0")
         for mode in modes:
             print(mode)
 
-    def custom_graph(self, mode: str, centroids: np.array, fields=["length"]) -> Graph:
+    def custom_graph(self, mode: str, centroids: np.array, fields=["distance"]) -> Graph:
         curr = self.conn.cursor()
         curr.execute("select * from links where link_id < 0")
         available_fields = [x[0] for x in curr.description if x[0] not in ["ogc_fid", "geometry"]]
