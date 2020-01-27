@@ -421,9 +421,18 @@ Field-specific data consistency
 
 .. _net_section5.1.3.1:
 
-Changing data
+Link distance
 ^^^^^^^^^^^^^
 
+Link distance cannot be changed by the user, as it is automatically recalculated
+using the Spatialite function *GeodesicLength*, which always returns distances
+in meters.
+
+Link direction
+^^^^^^^^^^^^^^
+
+Triggers enforce link direction to be -1, 0 or 1, and any other value results in
+an SQL exception.
 
 
 # 4	References
