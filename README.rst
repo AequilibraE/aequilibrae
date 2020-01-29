@@ -7,16 +7,26 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
     :alt: Documentation Status
 
-![Linting](https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg)
 
-![Python 3.5](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
+    :alt: Linting
 
-![Python 3.6](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+    :alt: Python 3.5
 
-![Python 3.7](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+    :alt: Python 3.6
 
-![Python 3.8](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+    :alt: Python 3.7
 
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
+    :alt: Python 3.8
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
