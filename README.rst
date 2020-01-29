@@ -2,18 +2,13 @@
 AequilibraE
 ###########
 
-.. image:: https://travis-ci.org/AequilibraE/aequilibrae.svg?branch=master
-    :target: https://travis-ci.org/AequilibraE/aequilibrae
+![Documentation](https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg)
+![Linting](https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg)
+![Python 3.5](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+![Python 3.6](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+![Python 3.7](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+![Python 3.8](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
 
-.. image:: https://coveralls.io/repos/github/AequilibraE/aequilibrae/badge.svg?branch=master
-    :target: https://coveralls.io/github/AequilibraE/aequilibrae?branch=master
-
-.. image:: https://codecov.io/gh/AequilibraE/aequilibrae/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/AequilibraE/aequilibrae
-
-.. image:: https://readthedocs.org/projects/aequilibrae/badge/?version=latest
-    :target: https://aequilibrae.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
