@@ -3,10 +3,15 @@ AequilibraE
 ###########
 
 ![Documentation](https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg)
+
 ![Linting](https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg)
+
 ![Python 3.5](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+
 ![Python 3.6](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+
 ![Python 3.7](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+
 ![Python 3.8](https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
 
 
