@@ -2,7 +2,10 @@
 AequilibraE
 ###########
 
-![Documentation](https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg)
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
+    :alt: Documentation Status
 
 ![Linting](https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg)
 
