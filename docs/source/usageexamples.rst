@@ -82,21 +82,6 @@ folder for analysis at a later time.
             "Karlsruhe, Germany",
             "London, UK",
             "Paris, France",
-            "Shanghai, China",
-            "Sao Paulo, Brazil",
-            "Rio de Janeiro, Brazil",
-            "Los Angeles, USA",
-            "New York, USA",
-            "Mexico City, Mexico",
-            "Berlin, Germany",
-            "Vancouver, Canada",
-            "Montreal, Canada",
-            "Toronto, Canada",
-            "Madrid, Spain",
-            "Lisbon, Portugal",
-            "Rome, Italy",
-            "Perth, Australia",
-            "Hobart, Australia",
             "Auckland, New Zealand"]
 
   for city in cities:
@@ -106,6 +91,24 @@ folder for analysis at a later time.
       p.network.create_from_osm(place_name=city)
       p.conn.close()
       del p
+
+If one wants to load a project and check some of its properties, it is easy:
+
+::
+
+  >>> from aequilibrae.project import Project
+
+  >>> p = Project('path/to_project')
+
+  # for the modes available in the model
+  >>> p.network.modes()
+  ['car', 'walk', 'bicycle']
+
+  >>> p.network.count_links()
+  157926
+
+  >>> p.network.count_nodes()
+  793200
 
 
 .. _example_usage_paths:
