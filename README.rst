@@ -12,21 +12,34 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
     :alt: Linting
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg
     :alt: Python 3.5
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg
     :alt: Python 3.6
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
     :alt: Python 3.7
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg)
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg
     :alt: Python 3.8
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
+    :alt: PyPi - Mac OS
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
+    :alt: PyPi - Windows
+
+.. .. image::
+..    :target:
+..    :alt:
+
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
