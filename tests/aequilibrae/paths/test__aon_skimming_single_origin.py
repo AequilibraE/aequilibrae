@@ -17,7 +17,7 @@ class TestSkimming_single_origin(unittest.TestCase):
         g.set_graph(cost_field="distance")
         g.set_skimming("distance")
 
-        origin = np.random.choice(g.centroids, 1)[0]
+        origin = np.random.choice(g.centroids[:-1], 1)[0]
 
         # skimming results
         res = SkimResults()
