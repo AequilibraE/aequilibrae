@@ -133,7 +133,7 @@ class Network(WorkerThread):
                           direction INTEGER NOT NULL,
                           distance NUMERIC NOT NULL,
                           modes TEXT NOT NULL,
-                          link_type TEXT NOT NULL DEFAULT 'link type not defined',
+                          link_type TEXT NOT NULL DEFAULT 'link type not defined'
                           {});"""
 
         flds = fields["one-way"]
@@ -153,12 +153,16 @@ class Network(WorkerThread):
 
         link_fields = owlf + twlf
 
-        sql = sql.format(",".join(link_fields))
+        if link_fields:
+            sql = sql.format("," + ",".join(link_fields))
+        else:
+            sql = sql.format("")
+
         curr.execute(sql)
 
         sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
                                  node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0, {});"""
+                                 is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
 
         flds = p.parameters["network"]["nodes"]["fields"]
 
@@ -169,7 +173,10 @@ class Network(WorkerThread):
             if list(f.keys())[0].upper() not in default_fields
         ]
 
-        sql = sql.format(",".join(ndflds))
+        if ndflds:
+            sql = sql.format("," + ",".join(ndflds))
+        else:
+            sql = sql.format("")
         curr.execute(sql)
 
         curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
