@@ -67,6 +67,8 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | modes       | Modes allowed in this link. (Concatenation of mode ids)               | String                  |
 +-------------+-----------------------------------------------------------------------+-------------------------+
+| link_type   | Link type classification. Can be the highway tag for OSM or other     | String                  |
++-------------+-----------------------------------------------------------------------+-------------------------+
 
 
 **The optional fields may include, but are not limited to the following:**
@@ -104,13 +106,16 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 Nodes
 ~~~~~
 
-The nodes table only has one mandatory field as of now: *node_id*, which can be
-directly linked to *a_node* and *b_node* in the links table.
+The nodes table only has two mandatory fields as of now: *node_id*, which can be
+directly linked to *a_node* and *b_node* in the links table, and *is_centroid*,
+which is a 1/0 value identifying nodes as centroids or not.
 
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
 +=============+=======================================================================+=========================+
 | node_id     | Unique identifier. Tied to the link table's a_node & b_node           | Integer (32/64 bits)    |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
 **The optional fields may include, but are not limited to the following:**
@@ -118,8 +123,6 @@ directly linked to *a_node* and *b_node* in the links table.
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
 +=============+=======================================================================+=========================+
-| is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
 | taz         | Zone in which the zone is located                                     | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | ...         | ...                                                                   | ...                     |

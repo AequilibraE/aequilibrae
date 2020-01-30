@@ -41,14 +41,14 @@ network:
         - modes:
             description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
             type: text
+        - link_type:
+            description: Classification of link (local, arterial, etc). THIS FIELD CANNOT BE CHANGED
+            type: varchar
+            osm_source: highway
         - name:
             description: name
             type: text
             osm_source: name
-        - link_type:
-            description: link_type
-            type: varchar
-            osm_source: highway
       two-way:
         - lanes:
             description: lanes

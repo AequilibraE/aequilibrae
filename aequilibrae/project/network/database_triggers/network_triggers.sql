@@ -291,3 +291,18 @@ CREATE TRIGGER enforces_link_length BEFORE UPDATE distance ON links
 BEGIN
   UPDATE links SET distance = GeodesicLength(new.geometry)
 END;
+
+#
+-- Guarantees that link direction is one of the required values
+CREATE TRIGGER nodes_iscentroid_update BEFORE UPDATE ON nodes
+WHEN new.is_centroid != 0 AND new.is_centroid != 1
+BEGIN
+  SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+END;
+
+#
+CREATE TRIGGER nodes_iscentroid_insert BEFORE INSERT ON nodes
+WHEN new.is_centroid != 0 AND new.is_centroid != 1
+BEGIN
+  SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+END;

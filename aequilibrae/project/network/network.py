@@ -124,7 +124,7 @@ class Network(WorkerThread):
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
-        mandatory = ["LINK_ID", "A_NODE", "B_NODE", "DIRECTION", "DISTANCE", "MODES"]
+        mandatory = ["LINK_ID", "A_NODE", "B_NODE", "DIRECTION", "DISTANCE", "MODES", "LINK_TYPE"]
         sql = """CREATE TABLE 'links' (
                           ogc_fid INTEGER PRIMARY KEY,
                           link_id INTEGER UNIQUE NOT NULL,
@@ -133,6 +133,7 @@ class Network(WorkerThread):
                           direction INTEGER NOT NULL,
                           distance NUMERIC NOT NULL,
                           modes TEXT NOT NULL,
+                          link_type TEXT NOT NULL DEFAULT 'link type not defined',
                           {});"""
 
         flds = fields["one-way"]
@@ -156,14 +157,16 @@ class Network(WorkerThread):
         curr.execute(sql)
 
         sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
-                                 node_id INTEGER UNIQUE NOT NULL, {});"""
+                                 node_id INTEGER UNIQUE NOT NULL,
+                                 is_centroid INTEGER NOT NULL DEFAULT 0, {});"""
 
         flds = p.parameters["network"]["nodes"]["fields"]
 
+        default_fields = ["NODE_ID", "IS_CENTROID"]
         ndflds = [
             "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
             for f in flds
-            if list(f.keys())[0].upper() != "NODE_ID"
+            if list(f.keys())[0].upper() not in default_fields
         ]
 
         sql = sql.format(",".join(ndflds))
