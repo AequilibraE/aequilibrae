@@ -38,3 +38,4 @@ jobs:
           twine upload dist/*.whl
           if [${{ matrix.python-version }} == '3.7']; then
             twine upload dist/*.gz
+          fi
