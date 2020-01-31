@@ -26,6 +26,12 @@ CREATE INDEX links_a_node_idx ON links (a_node);
 CREATE INDEX links_b_node_idx ON links (b_node);
 
 #
+CREATE INDEX links_link_type ON links (link_type);
+
+#
+CREATE INDEX nodes_node_id ON nodes (node_id);
+
+#
 CREATE TRIGGER new_link_a_node BEFORE INSERT ON links
   WHEN
     (SELECT count(*)
