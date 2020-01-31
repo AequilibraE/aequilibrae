@@ -127,11 +127,11 @@ class Network(WorkerThread):
         mandatory = ["LINK_ID", "A_NODE", "B_NODE", "DIRECTION", "DISTANCE", "MODES", "LINK_TYPE"]
         sql = """CREATE TABLE 'links' (
                           ogc_fid INTEGER PRIMARY KEY,
-                          link_id INTEGER UNIQUE NOT NULL,
-                          a_node INTEGER NOT NULL,
-                          b_node INTEGER NOT NULL,
+                          link_id INTEGER UNIQUE,
+                          a_node INTEGER,
+                          b_node INTEGER,
                           direction INTEGER NOT NULL DEFAULT 0,
-                          distance NUMERIC NOT NULL,
+                          distance NUMERIC,
                           modes TEXT NOT NULL,
                           link_type TEXT NOT NULL DEFAULT 'link type not defined'
                           {});"""
