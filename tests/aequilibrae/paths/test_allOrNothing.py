@@ -11,17 +11,15 @@ from ...data import test_graph
 
 # TODO: Add checks for results for this test (Assignment AoN)
 class TestAllOrNothing(TestCase):
-    def test_execute(self):
-        # Loads and prepares the graph
-        g = Graph()
-        g.load_from_disk(test_graph)
-        g.set_graph(cost_field="distance", skim_fields=None)
-        # None implies that only the cost field will be skimmed
+    def setUp(self) -> None:
+        self.g = Graph()
+        self.g.load_from_disk(test_graph)
+        self.g.set_graph(cost_field="distance")
 
         # Creates the matrix for assignment
         args = {
             "file_name": os.path.join(gettempdir(), "my_matrix.aem"),
-            "zones": g.num_zones,
+            "zones": self.g.num_zones,
             "matrix_names": ["cars", "trucks"],
             "index_names": ["my indices"],
         }
@@ -29,7 +27,7 @@ class TestAllOrNothing(TestCase):
         matrix = AequilibraeMatrix()
         matrix.create_empty(**args)
 
-        matrix.index[:] = g.centroids[:]
+        matrix.index[:] = self.g.centroids[:]
         matrix.cars.fill(1.1)
         matrix.trucks.fill(2.2)
 
@@ -37,8 +35,36 @@ class TestAllOrNothing(TestCase):
         matrix.export(os.path.join(gettempdir(), "my_matrix.omx"))
         matrix.close()
 
+    def test_skimming_on_assignment(self):
+        matrix = AequilibraeMatrix()
+        matrix.load(os.path.join(gettempdir(), "my_matrix.aem"))
+        matrix.computational_view(["cars"])
+
+        res = AssignmentResults()
+
+        res.prepare(self.g, matrix)
+
+        self.g.set_skimming([])
+        assig = allOrNothing(matrix, self.g, res)
+        assig.execute()
+
+        if res.skims.distance.sum() > 0:
+            self.fail("skimming for nothing during assignment returned something different than zero")
+
+        self.g.set_skimming("distance")
+        res.prepare(self.g, matrix)
+
+        assig = allOrNothing(matrix, self.g, res)
+        assig.execute()
+        if res.skims.distance.sum() != 2912922.0:
+            self.fail("skimming during assignment returned the wrong value")
+
+    def test_execute(self):
+        # Loads and prepares the graph
+
         car_loads = []
         two_class_loads = []
+
         for extension in ["omx", "aem"]:
             matrix = AequilibraeMatrix()
             matrix.load(os.path.join(gettempdir(), "my_matrix." + extension))
@@ -47,9 +73,9 @@ class TestAllOrNothing(TestCase):
 
             # Performs assignment
             res = AssignmentResults()
-            res.prepare(g, matrix)
+            res.prepare(self.g, matrix)
 
-            assig = allOrNothing(matrix, g, res)
+            assig = allOrNothing(matrix, self.g, res)
             assig.execute()
             car_loads.append(res.link_loads)
             res.save_to_disk(os.path.join(gettempdir(), "link_loads_{}.aed".format(extension)))
@@ -58,13 +84,14 @@ class TestAllOrNothing(TestCase):
             matrix.computational_view()
             # Performs assignment
             res = AssignmentResults()
-            res.prepare(g, matrix)
+            res.prepare(self.g, matrix)
 
-            assig = allOrNothing(matrix, g, res)
+            assig = allOrNothing(matrix, self.g, res)
             assig.execute()
             two_class_loads.append(res.link_loads)
             res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes_{}.aed".format(extension)))
             res.save_to_disk(os.path.join(gettempdir(), "link_loads_2_classes_{}.csv".format(extension)))
+            matrix.close()
 
         load_diff = two_class_loads[0] - two_class_loads[1]
         if load_diff.max() > 0.0000000001 or load_diff.max() < -0.0000000001:

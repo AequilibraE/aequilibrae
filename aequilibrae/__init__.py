@@ -7,4 +7,4 @@ from aequilibrae.paths import release_version as __version__
 
 name = "aequilibrae"
 
-StartsLogging()
+logger = StartsLogging()

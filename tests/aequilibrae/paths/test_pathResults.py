@@ -19,7 +19,7 @@ class TestPathResults(TestCase):
         # graph
         self.g = Graph()
         self.g.load_from_disk(test_graph)
-        self.g.set_graph(cost_field="distance", skim_fields=None)
+        self.g.set_graph(cost_field="distance")
 
         self.r = PathResults()
         try:

@@ -27,9 +27,7 @@ class TestGraph(TestCase):
             bnode="B_NODE",
         )
         self.graph.set_graph(cost_field="distance", block_centroid_flows=True)
-
-    def test_load_network_from_csv(self):
-        pass
+        self.graph.set_skimming("distance")
 
     def test_prepare_graph(self):
         self.test_create_from_geography()
@@ -74,45 +72,25 @@ class TestGraph(TestCase):
             ("link ids", new_graph.ids, reference_graph.ids),
             ("Network", new_graph.network, reference_graph.network),
             ("All Nodes", new_graph.all_nodes, reference_graph.all_nodes),
-            (
-                "Nodes to indices",
-                new_graph.nodes_to_indices,
-                reference_graph.nodes_to_indices,
-            ),
+            ("Nodes to indices", new_graph.nodes_to_indices, reference_graph.nodes_to_indices),
         ]
 
         for comparison, newg, refg in comparisons:
             if not np.array_equal(newg, refg):
-                self.fail(
-                    "Reference %s and %s created and saved to disk are not equal"
-                    % (comparison, comparison)
-                )
+                self.fail("Reference %s and %s created and saved to disk are not equal" % (comparison, comparison))
 
         comparisons = [
             ("nodes", new_graph.num_nodes, reference_graph.num_nodes),
             ("links", new_graph.num_links, reference_graph.num_links),
             ("zones", new_graph.num_zones, reference_graph.num_zones),
-            (
-                "block through centroids",
-                new_graph.block_centroid_flows,
-                reference_graph.block_centroid_flows,
-            ),
+            ("block through centroids", new_graph.block_centroid_flows, reference_graph.block_centroid_flows),
             ("Graph ID", new_graph.__id__, self.graph_id),
             ("Graph Version", new_graph.__version__, self.graph_version),
         ]
 
         for comparison, newg, refg in comparisons:
             if newg != refg:
-                self.fail(
-                    "Reference %s and %s created and saved to disk are not equal"
-                    % (comparison, comparison)
-                )
-
-    def test_reset_single_fields(self):
-        pass
-
-    def test_add_single_field(self):
-        pass
+                self.fail("Reference %s and %s created and saved to disk are not equal" % (comparison, comparison))
 
     def test_available_skims(self):
         self.test_set_graph()

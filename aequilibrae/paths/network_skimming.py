@@ -80,7 +80,7 @@ class NetworkSkimming(WorkerThread):
             elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
                 self.report.append("Centroid " + str(orig) + " does not exist in the graph")
             else:
-                pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
+                pool.apply_async(self.func_skim_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
 
@@ -88,7 +88,7 @@ class NetworkSkimming(WorkerThread):
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
 
-    def func_assig_thread(self, O, all_threads):
+    def func_skim_thread(self, O, all_threads):
         if threading.get_ident() in all_threads:
             th = all_threads[threading.get_ident()]
         else:
