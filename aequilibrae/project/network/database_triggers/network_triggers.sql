@@ -146,7 +146,7 @@ CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
         nodes.node_id = new.b_node))
     WHERE links.ROWID = new.ROWID;
     UPDATE links
-    SET distance = GeodesicLength(new.geometry)
+    SET distance = 0
     WHERE links.ROWID = new.ROWID;
 
     -- now delete nodes which no-longer have attached links
@@ -293,9 +293,9 @@ BEGIN
 END;
 
 #
-CREATE TRIGGER enforces_link_length BEFORE UPDATE distance ON links
+CREATE TRIGGER enforces_link_length_update AFTER UPDATE OF distance ON links
 BEGIN
-  UPDATE links SET distance = GeodesicLength(new.geometry)
+  UPDATE links SET distance = GeodesicLength(new.geometry);
 END;
 
 #
@@ -312,3 +312,14 @@ WHEN new.is_centroid != 0 AND new.is_centroid != 1
 BEGIN
   SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
 END;
+
+#
+CREATE TRIGGER links_null_link_id_insert BEFORE INSERT ON nodes
+WHEN new.link_id is NULL
+BEGIN
+    UPDATE links SET
+        link_id=(SELECT MAX(link_id)+1 FROM links)
+    WHERE rowid=NEW.rowid;
+END;
+
+
