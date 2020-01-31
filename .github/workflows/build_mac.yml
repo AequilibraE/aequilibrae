@@ -1,4 +1,4 @@
-name: Upload Python Package
+name: Upload MacOS Python Package
 
 on:
   release:
@@ -9,7 +9,7 @@ jobs:
     runs-on:  macos-latest
     strategy:
       matrix:
-        python-version: [ '3.5', '3.6', '3.7' ]
+        python-version: [ '3.5', '3.6', '3.7', '3.8' ]
     steps:
     - uses: actions/checkout@v1
     - name: Set Python environment
@@ -24,22 +24,11 @@ jobs:
         pip install numpy cython pyaml pyqt5 pyshp
 
     - name: Build
-      run: |
-          if ["$RUNNER_OS" == "Windows"]; then
-              choco install visualstudio2019community
-              choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
-          fi
-          python setup.py sdist bdist_wheel
+      run: python setup.py sdist bdist_wheel
 
     - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-               pip install auditwheel
-               auditwheel repair dist/aequilibrae*whl -w /output
-               twine upload output/*
-          else
-               twine upload dist/*
-          fi
+      run: twine upload dist/*.whl
+
