@@ -22,32 +22,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
         pip install numpy cython pyaml pyqt5 pyshp
-    - name: Build
-<<<<<<<< HEAD:.github/workflows/build_mac.yml
-      run: python setup.py sdist bdist_wheel
 
-========
-      run: |
-          if ["$RUNNER_OS" == "Windows"]; then
-              choco install visualstudio2019community
-              choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
-          fi
-          python setup.py sdist bdist_wheel
->>>>>>>> 4124b10c694b8ad08b251c6cd534e9601de8f572:.github/workflows/pythonpublish.yml
+    - name: Build
+      run:  |
+        python setup.py sdist bdist_wheel
+
     - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-<<<<<<<< HEAD:.github/workflows/build_mac.yml
       run: twine upload dist/*.whl
-
-========
-      run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-               pip install auditwheel
-               auditwheel repair dist/aequilibrae*whl -w /output
-               twine upload output/*
-          else
-               twine upload dist/*
-          fi
->>>>>>>> 4124b10c694b8ad08b251c6cd534e9601de8f572:.github/workflows/pythonpublish.yml
