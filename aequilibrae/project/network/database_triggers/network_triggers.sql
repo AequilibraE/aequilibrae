@@ -314,7 +314,7 @@ BEGIN
 END;
 
 #
-CREATE TRIGGER links_null_link_id_insert BEFORE INSERT ON nodes
+CREATE TRIGGER links_null_link_id_insert BEFORE INSERT ON links
 WHEN new.link_id is NULL
 BEGIN
     UPDATE links SET
