@@ -99,7 +99,7 @@ class OSMBuilder(QObject):
 
         nodes_to_add = set()
         counter = 0
-        mode_codes = self.modes_per_link_type()
+        mode_codes, not_found_tags = self.modes_per_link_type()
 
         for osm_id, link in self.links.items():
             self.building.emit(["Value", counter])
@@ -145,48 +145,49 @@ class OSMBuilder(QObject):
 
                     vars["{}_{}".format(k, d1)] = vald
 
-            vars["modes"] = mode_codes.get(linktags.get("highway"))
+            vars["modes"] = mode_codes.get(linktags.get("highway"), not_found_tags)
 
-            for i in range(segments):
-                ii = intersections[i]
-                jj = intersections[i + 1]
-                all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
+            if len(vars["modes"]) > 0:
+                for i in range(segments):
+                    ii = intersections[i]
+                    jj = intersections[i + 1]
+                    all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
 
-                vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
-                if vars["a_node"] == self.node_start:
-                    node_ids[linknodes[ii]] = vars["a_node"]
-                    self.node_start += 1
+                    vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
+                    if vars["a_node"] == self.node_start:
+                        node_ids[linknodes[ii]] = vars["a_node"]
+                        self.node_start += 1
 
-                vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
-                if vars["b_node"] == self.node_start:
-                    node_ids[linknodes[jj]] = vars["b_node"]
-                    self.node_start += 1
+                    vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
+                    if vars["b_node"] == self.node_start:
+                        node_ids[linknodes[jj]] = vars["b_node"]
+                        self.node_start += 1
 
-                vars["distance"] = sum(
-                    [
-                        haversine(
-                            self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
-                        )
-                        for x, y in zip(all_nodes[1:], all_nodes[:-1])
-                    ]
-                )
+                    vars["distance"] = sum(
+                        [
+                            haversine(
+                                self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
+                            )
+                            for x, y in zip(all_nodes[1:], all_nodes[:-1])
+                        ]
+                    )
 
-                geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
-                geometry = "LINESTRING ({})".format(", ".join(geometry))
+                    geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
+                    geometry = "LINESTRING ({})".format(", ".join(geometry))
 
-                attributes = [vars.get(x) for x in fields]
+                    attributes = [vars.get(x) for x in fields]
 
-                attributes = ", ".join([str(x) for x in attributes])
-                sql = self.insert_qry.format(table, fn, attributes, geometry)
-                sql = sql.replace("None", "null")
-                try:
-                    self.curr.execute(sql)
-                    nodes_to_add.update([linknodes[ii], linknodes[jj]])
-                except Exception as e:
-                    data = list(vars.values())
-                    logger.error("error when inserting link {}. Error {}".format(data, e.args))
-                    logger.error(sql)
-                vars["link_id"] += 1
+                    attributes = ", ".join([str(x) for x in attributes])
+                    sql = self.insert_qry.format(table, fn, attributes, geometry)
+                    sql = sql.replace("None", "null")
+                    try:
+                        self.curr.execute(sql)
+                        nodes_to_add.update([linknodes[ii], linknodes[jj]])
+                    except Exception as e:
+                        data = list(vars.values())
+                        logger.error("error when inserting link {}. Error {}".format(data, e.args))
+                        logger.error(sql)
+                    vars["link_id"] += 1
             counter += 1
         return nodes_to_add, node_ids
 
@@ -272,14 +273,18 @@ class OSMBuilder(QObject):
         mode_codes = {p[0]: p[1] for p in mode_codes}
 
         type_list = {}
+        notfound = ""
         for mode, val in modes.items():
             all_types = val["link_types"]
             md = mode_codes[mode]
             for tp in all_types:
                 type_list[tp] = "{}{}".format(type_list.get(tp, ""), md)
+            if val["unknown_tags"]:
+                notfound += md
 
-        type_list = {k: '"{}"'.format(v) for k, v in type_list.items()}
-        return type_list
+        type_list = {k: '"{}"'.format("".join(set(v))) for k, v in type_list.items()}
+
+        return type_list, '"{}"'.format(notfound)
 
     @staticmethod
     def get_node_fields():
