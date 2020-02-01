@@ -23,6 +23,10 @@ pyqt5 = "*"
 pyshp = "*"
 cython = "*"
 openmatrix = "*"
+pandas = "*"
+jupyter = "*"
+jupyter-contrib-nbextensions = "*"
+jupyter-nbextensions-configurator = "*"
 
 [scripts]
 notebook = "jupyter notebook"

@@ -29,8 +29,6 @@ class MSA:
             aon = allOrNothing(self.matrix, self.graph, self.aon_results)
             aon.execute()
 
-            np.savetxt('trash0.csv', self.aon_results.link_loads, delimiter=',')
-
             self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * ((float(self.iter) - 1.0) / float(self.iter))
             self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * (1.0 / float(self.iter))
 
