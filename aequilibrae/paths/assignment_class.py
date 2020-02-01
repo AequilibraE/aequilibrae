@@ -12,14 +12,11 @@ class AssignmentClass():
 
         self.graph = graph
         self.matrix = matrix
-        self.class_flow: np.array
-
-        self.results = AssignmentResults()
-        self.results.prepare(self.graph, self.matrix)
         self.pce = 1
 
-    def total_class_flow(self) -> None:
-        self.class_flow = np.sum(self.results.link_loads, axis=1)
+        self.class_flow: np.array
+        self.results = AssignmentResults()
+        self.results.prepare(self.graph, self.matrix)
 
     def set_pce(self, pce: int) -> None:
         self.pce = pce

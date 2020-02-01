@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class vdf:
+class VDF:
     def __init__(self):
         pass
 

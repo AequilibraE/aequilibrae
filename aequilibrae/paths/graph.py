@@ -58,6 +58,8 @@ class Graph(object):
         self.b_node = False  # b node for each directed link
 
         self.cost = None  # This array holds the values being used in the shortest path routine
+        self.capacity = None # Array holds the capacity for links
+        self.free_flow_time = None # Array holds the free flow travel time by link
         self.skims = False  # 2-D Array with the fields to be computed as skims
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field

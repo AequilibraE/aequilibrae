@@ -16,6 +16,7 @@ try:
     from .multi_threaded_skimming import MultiThreadedNetworkSkimming
     from .network_skimming import NetworkSkimming
     from .all_or_nothing import allOrNothing
+    from .assignment_class import AssignmentClass
 except ImportError as e:
     warnings.warn("The AoN extension has not been compiled. {}".format(e.name))
 from .graph import Graph
