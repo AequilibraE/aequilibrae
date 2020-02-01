@@ -29,6 +29,9 @@ import numpy as np
 from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
+from .results import AssignmentResults
+from . graph import Graph
+from aequilibrae.matrix import AequilibraeMatrix
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -40,7 +43,7 @@ class allOrNothing(WorkerThread):
     if pyqt:
         assignment = SIGNAL(object)
 
-    def __init__(self, matrix, graph, results):
+    def __init__(self, matrix: AequilibraeMatrix, graph: Graph, results: AssignmentResults):
         WorkerThread.__init__(self, None)
 
         self.matrix = matrix
@@ -53,9 +56,6 @@ class allOrNothing(WorkerThread):
         if results.__graph_id__ != graph.__id__:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
-        if results.__graph_id__ is None:
-            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
-
         elif results.__graph_id__ != graph.__id__:
             raise ValueError("The results object was prepared for a different graph")
 
@@ -66,7 +66,7 @@ class allOrNothing(WorkerThread):
             )
 
         elif not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible set of centroids.")
+            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
     def doWork(self):
         self.execute()

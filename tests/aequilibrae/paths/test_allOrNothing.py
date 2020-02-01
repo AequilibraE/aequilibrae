@@ -1,7 +1,7 @@
 import os
 from tempfile import gettempdir
 from unittest import TestCase
-
+import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import allOrNothing
 from aequilibrae.paths import Graph
