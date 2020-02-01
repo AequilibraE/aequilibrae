@@ -17,6 +17,7 @@ class AssignmentClass():
         self.class_flow: np.array
         self.results = AssignmentResults()
         self.results.prepare(self.graph, self.matrix)
+        self.results.reset()
 
     def set_pce(self, pce: int) -> None:
         self.pce = pce

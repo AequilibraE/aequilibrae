@@ -45,6 +45,17 @@ cpdef void network_loading(long classes,
     cdef long long zones = demand.shape[0]
     cdef long long N = node_load.shape[0]
 
+#    for i in range(zones):
+#        node = i
+#        predecessor = pred[node]
+#        connector = conn[node]
+#        while predecessor >= 0:
+#            for j in range(classes):
+#                link_loads[connector, j] += demand[i, j]
+#            
+#            predecessor = pred[predecessor]
+#            connector = conn[predecessor]
+            
     # Clean the node load array
     for i in range(N):
         node_load[i] = 0
@@ -64,8 +75,8 @@ cpdef void network_loading(long classes,
         connector = conn[node]
 
         # loads the flow to the links for each class
-        for j in range(classes):
             link_loads[connector, j] += node_load[node, j]
+        for j in range(classes):
 
             # Cascades the load from the node to their predecessor
             node_load[predecessor, j] += node_load[node, j]
@@ -276,6 +287,7 @@ cpdef int path_finding(long origin,
     for i in range(M):
         pred[i] = -1
         connectors[i] = -1
+        reached_first[i] = -1
 
     j_source = origin
     for k in range(N):

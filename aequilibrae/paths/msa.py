@@ -22,33 +22,40 @@ class MSA:
         self.aon_results.prepare(self.graph, self.matrix)
         self.iter = 0
         self.rgap = np.inf
+        self.vdf = VDF()
 
     def execute(self):
-        for i in range(1, self.max_iter + 1):
-            allOrNothing(self.matrix, self.graph, self.aon_results)
-            allOrNothing.execute()
+        for self.iter in range(1, self.max_iter + 1):
+            aon = allOrNothing(self.matrix, self.graph, self.aon_results)
+            aon.execute()
 
-            self.aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
+            np.savetxt('trash0.csv', self.aon_results.link_loads, delimiter=',')
 
-            self.congested_time = VDF(link_flows=self.aon_class_flow, capacity=self.graph.capacity,
-                                      fftime=self.graph.free_flow_time)
+            self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * ((float(self.iter) - 1.0) / float(self.iter))
+            self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * (1.0 / float(self.iter))
+
+            self.msa_class_flow = np.sum(self.final_results.link_loads, axis=1)
+
+            self.congested_time = self.vdf.apply_vdf("BPR",link_flows=self.msa_class_flow, capacity=self.graph.capacity,
+                                                     fftime=self.graph.free_flow_time)
             self.graph.cost = self.congested_time
-            self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * ((i - 1.0) / i)
-            self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * (1.0 / i)
 
             # Check convergence
             if self.check_convergence() and self.iter > 1:
                 break
+            self.aon_results.reset()
 
         if self.rgap > self.rgap_target:
             logger.error('Desired RGap of {} was NOT reached'.format(self.rgap_target))
         logger.info('MSA Assignment finished. {} iterations and {} final gap'.format(self.iter, self.rgap))
 
     def check_convergence(self):
-        class_flow = np.sum(self.final_results.link_loads, axis=1)
-        msa_cost = np.sum(self.congested_time * class_flow)
-        aon_cost = np.sum(self.congested_time * self.aon_class_flow)
+        aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
+
+        aon_cost = np.sum(self.congested_time * aon_class_flow)
+        msa_cost = np.sum(self.congested_time * self.msa_class_flow)
         self.rgap = abs(msa_cost - aon_cost) / msa_cost
+        print(self.iter, self.rgap)
         if self.rgap_target >= self.rgap:
             return True
         return False
