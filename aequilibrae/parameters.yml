@@ -12,7 +12,7 @@ distribution:
     convergence level: 0.0001
     max iterations: 5000
 system:
-  cpus: 1
+  cpus: 12
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
   driving side: right
   logging: true

@@ -45,6 +45,7 @@ cpdef void network_loading(long classes,
     cdef long long zones = demand.shape[0]
     cdef long long N = node_load.shape[0]
 
+# Traditional loading, without cascading
 #    for i in range(zones):
 #        node = i
 #        predecessor = pred[node]
@@ -75,9 +76,8 @@ cpdef void network_loading(long classes,
         connector = conn[node]
 
         # loads the flow to the links for each class
-            link_loads[connector, j] += node_load[node, j]
         for j in range(classes):
-
+            link_loads[connector, j] += node_load[node, j]
             # Cascades the load from the node to their predecessor
             node_load[predecessor, j] += node_load[node, j]
 
@@ -161,17 +161,21 @@ cpdef void put_path_file_on_disk(unsigned int orig,
 @cython.boundscheck(False)
 cdef void blocking_centroid_flows(int action,
                                   long long orig,
+                                  long long centroids,
                                   long long [:] fs,
                                   long long [:] temp_b_nodes,
                                   long long [:] real_b_nodes) nogil:
     cdef long long i
 
     if action == 0: # We are unblocking
-        for i in range(fs[orig], fs[orig + 1]):
+        for i in range(fs[centroids + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
-        for i in range(fs[orig], fs[orig + 1]):
+        for i in range(fs[centroids + 1]):
             temp_b_nodes[i] = orig
+
+        for i in range(fs[orig], fs[orig + 1]):
+            temp_b_nodes[i] = real_b_nodes[i]
 
 
 @cython.wraparound(False)

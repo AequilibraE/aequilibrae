@@ -108,6 +108,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             b = 0
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
@@ -143,6 +144,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             b = 1
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
@@ -184,7 +186,7 @@ def path_computation(origin, destination, graph, results):
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     """
-    cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector
+    cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
 
     results.origin = origin
@@ -205,6 +207,7 @@ def path_computation(origin, destination, graph, results):
 
     #We transform the python variables in Cython variables
     nodes = graph.num_nodes
+    zones = graph.num_zones
 
     # initializes skim_matrix for output
     # initializes predecessors  and link connectors for output
@@ -235,6 +238,7 @@ def path_computation(origin, destination, graph, results):
             b = 0
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
@@ -262,6 +266,7 @@ def path_computation(origin, destination, graph, results):
             b = 1
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
@@ -385,6 +390,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
             b = 0
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
@@ -412,6 +418,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
             b = 1
             blocking_centroid_flows(b,
                                     origin_index,
+                                    zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
