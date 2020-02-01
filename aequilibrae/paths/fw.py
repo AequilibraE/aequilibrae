@@ -33,13 +33,17 @@ class FW:
             aon.execute()
             self.aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
 
-            # calculate stepsize
-            self.stepsize = self.calculate_stepsize()
+            if self.iter == 1:
+                self.final_results.link_loads[:, :] = self.aon_results.link_loads[:, :]
+                self.fw_class_flow = np.sum(self.final_results.link_loads, axis=1)
+            else:
+                # calculate stepsize
+                self.fw_class_flow = np.sum(self.final_results.link_loads, axis=1)
+                self.stepsize = self.calculate_stepsize()
+                print("FW stepsize is {}".format(self.stepsize))
 
-            self.final_results.link_loads[:, :] *= 1.0 - self.stepsize
-            self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * self.stepsize
-
-            self.fw_class_flow = np.sum(self.final_results.link_loads, axis=1)
+                self.final_results.link_loads[:, :] *= 1.0 - self.stepsize
+                self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * self.stepsize
 
             self.congested_time = self.vdf.apply_vdf(
                 "BPR", link_flows=self.fw_class_flow, capacity=self.graph.capacity, fftime=self.graph.free_flow_time
@@ -69,7 +73,7 @@ class FW:
             return np.sum(congested_value * (self.aon_class_flow - self.fw_class_flow))
 
         min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
-        print(min_res)
+        # print(min_res)
         stepsize = min_res.root
         assert 0 <= stepsize <= 1.0
         if not min_res.converged:
