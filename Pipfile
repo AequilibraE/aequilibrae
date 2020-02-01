@@ -22,11 +22,13 @@ pyaml = "*"
 pyqt5 = "*"
 pyshp = "*"
 cython = "*"
+scipy = "*"
 openmatrix = "*"
 pandas = "*"
 jupyter = "*"
 jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
+matplotlib = "*"
 
 [scripts]
 notebook = "jupyter notebook"
