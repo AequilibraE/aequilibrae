@@ -92,6 +92,7 @@ class FW:
             print(f_0, f_1)
             if f_0 < f_1:
                 # prevent from stalling by making stepsize slightly non-zero
+                # TODO: this should depend on the iteration number
                 self.stepsize = 1e-5
                 return False
             else:
