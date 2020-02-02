@@ -32,7 +32,7 @@ class FW:
         # ensure a better result. We could also demand that the solution is that many consecutive times below,
         # but we are talking about small oscillations so not really necessary.
         self.steps_below = 0
-        self.steps_below_needed_to_terminate = 1
+        self.steps_below_needed_to_terminate = 2
 
     def execute(self):
         for self.iter in range(1, self.max_iter + 1):
@@ -40,11 +40,13 @@ class FW:
             aon.execute()
             self.aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
 
-            _ = self.calculate_stepsize()
-            # self.stepsize = 1. / float(self.iter)
-            # print(self.stepsize)
-            self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * (1.0 - self.stepsize)
-            self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * self.stepsize
+            if self.iter == 1:
+                self.final_results.link_loads[:, :] = self.aon_results.link_loads[:, :].copy()
+            else:
+                self.calculate_stepsize()
+                # self.stepsize = 1. / float(self.iter)
+                self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * (1.0 - self.stepsize)
+                self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * self.stepsize
 
             self.fw_class_flow = np.sum(self.final_results.link_loads, axis=1)
 
@@ -67,23 +69,37 @@ class FW:
         logger.info("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
         # print("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
 
+    def derivative_of_objective(self, stepsize):
+        x = (1.0 - stepsize) * self.fw_class_flow + stepsize * self.aon_class_flow
+        congested_value = self.vdf.apply_vdf(
+            "BPR", link_flows=x, capacity=self.graph.capacity, fftime=self.graph.free_flow_time
+        )
+        return np.sum(congested_value * (self.aon_class_flow - self.fw_class_flow))
+
     def calculate_stepsize(self):
         """Calculate optimal stepsize in gradient direction"""
         # First iteration gets 100% of shortest path
         if self.iter == 1:
             self.stepsize = 1.0
             return True
+        try:
+            min_res = root_scalar(self.derivative_of_objective, bracket=[0, 1], method="brentq")
+        except ValueError:
+            # We see not strictly monotone functions in practice, scipy cannot deal with this
+            print("function not convex, need to take either 0 or 1")
+            f_0 = self.derivative_of_objective(0.0)
+            f_1 = self.derivative_of_objective(1.0)
+            print(f_0, f_1)
+            if f_0 < f_1:
+                # prevent from stalling by making stepsize slightly non-zero
+                self.stepsize = 1e-5
+                return False
+            else:
+                # Do we actually want this in practice? We throw away everything so far
+                # for new solution. I guess that's reasonable
+                self.stepsize = 1.0
+                return False
 
-        def derivative_of_objective(stepsize):
-            x = self.fw_class_flow + stepsize * (
-                self.aon_class_flow - self.fw_class_flow
-            )  # fw_class_flow was calculated on last iteration
-            congested_value = self.vdf.apply_vdf(
-                "BPR", link_flows=x, capacity=self.graph.capacity, fftime=self.graph.free_flow_time
-            )
-            return np.sum(congested_value * (self.aon_class_flow - self.fw_class_flow))
-
-        min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
         # print(min_res)
         self.stepsize = min_res.root
         assert 0 <= self.stepsize <= 1.0
@@ -94,10 +110,16 @@ class FW:
 
     def check_convergence(self):
         """Calculate relative gap and return True if it is smaller than desired precision"""
-        aon_cost = np.sum(self.congested_time * self.aon_class_flow)
+        aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
+        aon_cost = np.sum(self.congested_time * aon_class_flow)
+        # aon_cost = np.sum(self.congested_time * self.aon_class_flow)
         current_cost = np.sum(self.congested_time * self.fw_class_flow)
         self.rgap = abs(current_cost - aon_cost) / current_cost
-        # print("Iter {}: rgap = {}, stepsize = {}".format(self.iter, self.rgap, self.stepsize))
+        print(
+            "Iter {}: rgap = {}, stepsize = {}, {:.2f}, {:.2f}".format(
+                self.iter, self.rgap, self.stepsize, current_cost, aon_cost
+            )
+        )
         if self.rgap_target >= self.rgap:
             return True
         return False
