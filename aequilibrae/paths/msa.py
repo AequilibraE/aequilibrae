@@ -56,7 +56,6 @@ class MSA:
         aon_cost = np.sum(self.congested_time * aon_class_flow)
         msa_cost = np.sum(self.congested_time * self.msa_class_flow)
         self.rgap = abs(msa_cost - aon_cost) / msa_cost
-        print(self.iter, self.rgap)
         if self.rgap_target >= self.rgap:
             return True
         return False

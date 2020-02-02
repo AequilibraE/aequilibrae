@@ -35,6 +35,8 @@ class FW:
         self.steps_below_needed_to_terminate = 1
 
     def execute(self):
+        logger.info('Frank-Wolfe Assignment STATS')
+        logger.info('Iteration,RelativeGap,Fran-WolfeStep')
         for self.iter in range(1, self.max_iter + 1):
             aon = allOrNothing(self.matrix, self.graph, self.aon_results)
             aon.execute()
@@ -54,13 +56,14 @@ class FW:
             self.graph.cost = self.congested_time
 
             # Check convergence
-            if self.check_convergence() and self.iter > 1:
+            if self.check_convergence() and self.iter > 100:
                 if self.steps_below >= self.steps_below_needed_to_terminate:
                     break
                 else:
                     self.steps_below += 1
 
             self.aon_results.reset()
+            logger.info('{},{},{}'.format(self.iter, self.rgap, self.stepsize))
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
@@ -84,7 +87,6 @@ class FW:
             return np.sum(congested_value * (self.aon_class_flow - self.fw_class_flow))
 
         min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
-        # print(min_res)
         self.stepsize = min_res.root
         assert 0 <= self.stepsize <= 1.0
         if not min_res.converged:

@@ -53,10 +53,10 @@ cpdef void network_loading(long classes,
 #        while predecessor >= 0:
 #            for j in range(classes):
 #                link_loads[connector, j] += demand[i, j]
-#            
+#
 #            predecessor = pred[predecessor]
 #            connector = conn[predecessor]
-            
+
     # Clean the node load array
     for i in range(N):
         node_load[i] = 0
@@ -167,12 +167,12 @@ cdef void blocking_centroid_flows(int action,
                                   long long [:] real_b_nodes) nogil:
     cdef long long i
 
-    if action == 0: # We are unblocking
+    if action == 1: # We are unblocking
         for i in range(fs[centroids + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
         for i in range(fs[centroids + 1]):
-            temp_b_nodes[i] = orig
+            temp_b_nodes[i] = -1
 
         for i in range(fs[orig], fs[orig + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
