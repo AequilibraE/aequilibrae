@@ -172,7 +172,7 @@ cdef void blocking_centroid_flows(int action,
             temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
         for i in range(fs[centroids + 1]):
-            temp_b_nodes[i] = -1
+            temp_b_nodes[i] = orig
 
         for i in range(fs[orig], fs[orig + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
