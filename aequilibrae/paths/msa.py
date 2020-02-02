@@ -25,6 +25,8 @@ class MSA:
         self.vdf = VDF()
 
     def execute(self):
+        logger.info('MSA Assignment STATS')
+        logger.info('Iteration,RelativeGap')
         for self.iter in range(1, self.max_iter + 1):
             aon = allOrNothing(self.matrix, self.graph, self.aon_results)
             aon.execute()
@@ -42,6 +44,7 @@ class MSA:
             if self.check_convergence() and self.iter > 1:
                 break
             self.aon_results.reset()
+            logger.info('{},{}'.format(self.iter, self.rgap))
 
         if self.rgap > self.rgap_target:
             logger.error('Desired RGap of {} was NOT reached'.format(self.rgap_target))
