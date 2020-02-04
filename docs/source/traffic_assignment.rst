@@ -103,15 +103,15 @@ References
 ++++++++++
 
 [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
-    Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
+Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
 
 [2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) "An efficient
-    approach to solving the road network equilibrium traffic assignment problem"
-    Transpn Res. 9, 309-318.
+approach to solving the road network equilibrium traffic assignment problem"
+Transpn Res. 9, 309-318.
 
-[5] Maria Mitradjieva and Per Olov Lindberg "The Stiff Is Moving—Conjugate
-    Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
-    `Transportation Science 2013 47:2, 280-293 <https://doi.org/10.1287/trsc.1120.0409>`_
+[3] Maria Mitradjieva and Per Olov Lindberg "The Stiff Is Moving—Conjugate
+Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
+`Transportation Science 2013 47:2, 280-293 <https://doi.org/10.1287/trsc.1120.0409>`_
 
 
 
