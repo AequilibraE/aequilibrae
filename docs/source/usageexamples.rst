@@ -279,7 +279,7 @@ available for doing that work.
     # Execute the assignment
     assig.execute()
 
-    # the results are within each traffic class (oly one, in this case
+    # the results are within each traffic class only one, in this case
     assigclass.results.link_loads
 
 Advanced usage: Building a Graph

@@ -113,8 +113,3 @@ class TrafficAssignment(object):
 
     def execute(self) -> None:
         self.assignment.execute()
-
-
-a = TrafficAssignment()
-a.set_vdf('BPR')
-print(dir(a.vdf))
