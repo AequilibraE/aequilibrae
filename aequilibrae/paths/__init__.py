@@ -17,6 +17,7 @@ try:
     from aequilibrae.paths.network_skimming import NetworkSkimming
     from aequilibrae.paths.all_or_nothing import allOrNothing
     from aequilibrae.paths.traffic_class import TrafficClass
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment
 except ImportError as e:
     warnings.warn("The AoN extension has not been compiled. {}".format(e.name))
 from aequilibrae.paths.graph import Graph

@@ -8,6 +8,7 @@ class VDF:
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__:
             raise AttributeError('This class does not have "{}" attribute'.format(instance))
+        self.__dict__[instance] = value
 
     def apply_vdf(self, **kwargs):
         if self.function == "BPR":
@@ -21,14 +22,11 @@ class VDF:
         else:
             raise ValueError("Sorry, only BPR allowed")
 
-    def BPR(self, link_flows: np.array, capacity: np.array, fftime: np.array) -> np.array:
-        alpha = 0.15
-        beta = 4
+    def BPR(self, link_flows: np.array, capacity: np.array, fftime: np.array, alpha: float, beta: float) -> np.array:
         congested_time = fftime * (1 + alpha * np.power(link_flows / capacity, beta))
         return congested_time
 
-    def BPR_delta(self, link_flows: np.array, capacity: np.array, fftime: np.array) -> np.array:
-        alpha = 0.15
-        beta = 4
+    def BPR_delta(self, link_flows: np.array, capacity: np.array, fftime: np.array, alpha: float,
+                  beta: float) -> np.array:
         dbpr = fftime * (alpha * beta * np.power(link_flows / capacity, beta - 1)) / capacity
         return dbpr
