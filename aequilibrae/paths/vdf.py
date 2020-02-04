@@ -3,16 +3,20 @@ import numpy as np
 
 class VDF:
     def __init__(self):
-        pass
+        self.__dict__['function'] = ''
 
-    def apply_vdf(self, vdf: str, **kwargs):
-        if vdf == "BPR":
+    def __setattr__(self, instance, value) -> None:
+        if instance not in self.__dict__:
+            raise AttributeError('This class does not have "{}" attribute'.format(instance))
+
+    def apply_vdf(self, **kwargs):
+        if self.function == "BPR":
             return self.BPR(**kwargs)
         else:
             raise ValueError("Sorry, only BPR allowed")
 
     def apply_derivative(self, vdf: str, **kwargs):
-        if vdf == "BPR":
+        if self.function == "BPR":
             return self.BPR_delta(**kwargs)
         else:
             raise ValueError("Sorry, only BPR allowed")
