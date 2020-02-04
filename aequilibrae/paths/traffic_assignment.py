@@ -8,18 +8,18 @@ from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.traffic_class import TrafficClass
 
 bpr_parameters = ['alpha', 'beta']
-available_algorithms = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw']
+all_algorithms = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw']
 
 
 class TrafficAssignment(object):
     def __init__(self) -> None:
-        self.__dict__['vdf'] = ''
-        self.__dict__['classes'] = ''
-        self.__dict__['algorithm'] = ''
-        self.__dict__['vdf_parameters'] = ''
-        self.__dict__['time_field'] = ''
-        self.__dict__['capacity_field'] = ''
-        self.__dict__['assignment'] = None
+        self.__dict__['vdf'] = None # type: VDF
+        self.__dict__['classes'] = None # type: List[TrafficClass]
+        self.__dict__['algorithm'] = None # type: str
+        self.__dict__['vdf_parameters'] = None # type: dict
+        self.__dict__['time_field'] = None # type: str
+        self.__dict__['capacity_field'] = None # type: str
+        self.__dict__['assignment'] = None # type: MSA
 
     def __setattr__(self, instance, value) -> None:
         if instance == 'assignment':
@@ -58,22 +58,28 @@ class TrafficAssignment(object):
         self.classes = classes
 
     def available_algorithms(self) -> list:
-        return (available_algorithms)
+        return (all_algorithms)
 
+    # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
+    # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm. e.g. 'frank-wolfe'
         """
-        if self.assignment == 'all-or-nothing':
+        if algorithm.lower() == 'all-or-nothing':
             self.assignment = allOrNothing(self)
-        if self.assignment == 'msa':
+        if algorithm.lower() == 'msa':
             self.assignment = MSA(self)
+        if algorithm.lower() == 'frank-wolfe':
+            self.assignment = FW(self)
+        else:
+            raise AttributeError("Assignment algorithm not available. Choose from: {}".format(','.join(all_algorithms)))
 
     def set_vdf_parameters(self, **kwargs) -> None:
         """
         Sets the parameters for the Volume-delay function. e.g. {'alpha': 0.15, 'beta':4.0}
         """
-        self.parameters = kwargs
+        self.vdf_parameters = kwargs
 
     def set_time_field(self, time_field: str) -> None:
         """
@@ -99,7 +105,7 @@ class TrafficAssignment(object):
             raise ValueError('First you need to set the Volume-Delay Function to use')
 
         par = list(kwargs.keys())
-        if self.vdf == 'BPR':
+        if self.vdf.function == 'BPR':
             q = [x for x in par if x not in bpr_parameters] + [x for x in bpr_parameters if x not in par]
         if len(q) > 0:
             raise ValueError('List of functions {} for vdf {} has an inadequate set of parameters'.format(q, self.vdf))

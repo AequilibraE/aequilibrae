@@ -1,49 +1,78 @@
 import numpy as np
 from typing import List
-from aequilibrae.paths.assignment_class import AssignmentClass
+from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae import Parameters
 from aequilibrae.paths.vdf import VDF
 from aequilibrae import logger
 
+if False:
+    from aequilibrae.paths.traffic_assignment import TrafficAssignment
+
+
 class MSA:
-    def __init__(self, traffic_classes: List[AssignmentClass]):
+    def __init__(self, assig_spec) -> None:
         parameters = Parameters().parameters['assignment']['equilibrium']
         self.rgap_target = parameters['rgap']
         self.max_iter = parameters['maximum_iterations']
+        self.assig = assig_spec  # type: TrafficAssignment
 
-        # A single class for now
-        self.graph = traffic_classes[0].graph
-        self.matrix = traffic_classes[0].matrix
-        self.final_results = traffic_classes[0].results
+        if None in [assig_spec.classes, assig_spec.vdf, assig_spec.capacity_field, assig_spec.time_field,
+                    assig_spec.vdf_parameters]:
+            raise Exception("Parameters missing. Setting the algorithm is the last thing to do when assigning")
 
-        self.aon_results = AssignmentResults()
-        self.aon_results.prepare(self.graph, self.matrix)
+        self.traffic_classes = assig_spec.classes  # type: List[TrafficAssignment]
+        self.num_classes = len(assig_spec.classes)
+
+        self.cap_field = assig_spec.capacity_field
+        self.time_field = assig_spec.time_field
+        self.vdf = assig_spec.vdf
+
+        self.vdf_parameters = {}
+        for k, v in assig_spec.vdf_parameters.items():
+            if isinstance(v, str):
+                self.vdf_parameters[k] = assig_spec.classes[0].graph.graph[k]
+            else:
+                self.vdf_parameters[k] = v
+
         self.iter = 0
         self.rgap = np.inf
-        self.vdf = VDF()
 
     def execute(self):
-        logger.info('MSA Assignment STATS')
+        logger.info('MSA Assignment STATS for {} classes'.format(len(self.traffic_classes)))
+
         logger.info('Iteration,RelativeGap')
         for self.iter in range(1, self.max_iter + 1):
-            aon = allOrNothing(self.matrix, self.graph, self.aon_results)
-            aon.execute()
+            flows = []
+            aon_flows = []
+            for c in self.traffic_classes:
+                aon = allOrNothing(c.matrix, c.graph, c._aon_results)
+                aon.execute()
+                c.results.link_loads[:, :] = c.results.link_loads[:, :] * ((float(self.iter) - 1.0) / float(self.iter))
+                c.results.link_loads[:, :] += c._aon_results.link_loads[:, :] * (1.0 / float(self.iter))
 
-            self.final_results.link_loads[:, :] = self.final_results.link_loads[:, :] * ((float(self.iter) - 1.0) / float(self.iter))
-            self.final_results.link_loads[:, :] += self.aon_results.link_loads[:, :] * (1.0 / float(self.iter))
+                # We already get the total traffic class, in PCEs, corresponding to the total for the user classes
+                flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
+                aon_flows.append(np.sum(c._aon_results.link_loads, axis=1) * c.pce)
 
-            self.msa_class_flow = np.sum(self.final_results.link_loads, axis=1)
+            self.msa_total_flow = np.sum(flows, axis=0)
+            self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            self.congested_time = self.vdf.apply_vdf("BPR",link_flows=self.msa_class_flow, capacity=self.graph.capacity,
-                                                     fftime=self.graph.free_flow_time)
-            self.graph.cost = self.congested_time
+            pars = {'link_flows': self.msa_total_flow, 'capacity': c.graph.graph[self.cap_field],
+                    'fftime': c.graph.graph[self.time_field]}
+
+            self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
+
+            for c in self.traffic_classes:
+                c.graph.cost = self.congested_time
 
             # Check convergence
             if self.check_convergence() and self.iter > 1:
                 break
-            self.aon_results.reset()
+            for c in self.traffic_classes:
+                c._aon_results.reset()
+
             logger.info('{},{}'.format(self.iter, self.rgap))
 
         if self.rgap > self.rgap_target:
@@ -51,12 +80,10 @@ class MSA:
         logger.info('MSA Assignment finished. {} iterations and {} final gap'.format(self.iter, self.rgap))
 
     def check_convergence(self):
-        aon_class_flow = np.sum(self.aon_results.link_loads, axis=1)
 
-        aon_cost = np.sum(self.congested_time * aon_class_flow)
-        msa_cost = np.sum(self.congested_time * self.msa_class_flow)
+        aon_cost = np.sum(self.congested_time * self.aon_total_flow)
+        msa_cost = np.sum(self.congested_time * self.msa_total_flow)
         self.rgap = abs(msa_cost - aon_cost) / msa_cost
         if self.rgap_target >= self.rgap:
             return True
         return False
-

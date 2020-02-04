@@ -60,7 +60,12 @@ Need to create this guy.  Will hold
 Volume delay functions
 ++++++++++++++++++++++
 
-For now, only the traditional BPR is available for assignment using AequilibraE
+For now, only the traditional BPR is available for assignment using AequilibraE.
+
+Parameters for VDF functions can be passed as a fixed value to use for all links,
+or as graph fields. As it is the case for the travel time and capacity fields,
+VDF parameters need to be consistent across all graphs.
+
 .. We need something on VDFs here, more specifically on how they work
 
 
