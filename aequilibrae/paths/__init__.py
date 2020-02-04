@@ -19,5 +19,5 @@ try:
 except ImportError as e:
     warnings.warn("The AoN extension has not been compiled. {}".format(e.name))
 from .graph import Graph
-from .assignment_class import AssignmentClass
+from aequilibrae.paths.traffic_class import TrafficClass
 from .__version__ import binary_version, release_name, minor_version, release_version

@@ -28,6 +28,7 @@ Contents
    project
    network
    project_tables
+   traffic_assignment
    usageexamples
    softwaredevelopment
    qgis
