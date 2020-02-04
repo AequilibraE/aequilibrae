@@ -68,9 +68,9 @@ class TrafficAssignment(object):
         """
         if algorithm.lower() == 'all-or-nothing':
             self.assignment = allOrNothing(self)
-        if algorithm.lower() == 'msa':
+        elif algorithm.lower() == 'msa':
             self.assignment = MSA(self)
-        if algorithm.lower() == 'frank-wolfe':
+        elif algorithm.lower() == 'frank-wolfe':
             self.assignment = FW(self)
         else:
             raise AttributeError("Assignment algorithm not available. Choose from: {}".format(','.join(all_algorithms)))
