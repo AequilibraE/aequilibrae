@@ -126,9 +126,9 @@ class FW:
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value of 1e-6 seems to work well in practice.
-            heuristic_stepsize_at_zero = 1e-6
+            heuristic_stepsize_at_zero = 1 / self.iter
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                logger.warn("Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                logger.warn("alert,alert,Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                 self.stepsize = heuristic_stepsize_at_zero
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
