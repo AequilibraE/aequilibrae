@@ -103,12 +103,11 @@ class FW:
         logger.info("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
 
     def calculate_stepsize(self):
+        """Calculate optimal stepsize in gradient direction"""
         # First iteration gets 100% of shortest path
         if self.iter == 1:
             self.stepsize = 1.0
             return True
-
-        """Calculate optimal stepsize in gradient direction"""
 
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.aon_total_flow - self.fw_total_flow)
@@ -120,6 +119,8 @@ class FW:
         try:
             min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
             self.stepsize = min_res.root
+            if not min_res.converged:
+                logger.warn("Frank Wolfe stepsize finder is not converged")
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
@@ -134,10 +135,6 @@ class FW:
                 self.stepsize = 1.0
 
         assert 0 <= self.stepsize <= 1.0
-        if not min_res.converged:
-            logger.warn("Frank Wolfe stepsize finder is not converged")
-            return False
-        return True
 
     def check_convergence(self):
         """Calculate relative gap and return True if it is smaller than desired precision"""
