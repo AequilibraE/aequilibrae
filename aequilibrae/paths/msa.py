@@ -42,15 +42,18 @@ class MSA:
     def execute(self):
         logger.info('MSA Assignment STATS for {} classes'.format(len(self.traffic_classes)))
 
-        logger.info('Iteration,RelativeGap')
+        logger.info('Iteration,RelativeGap,BlendingFraction')
         for self.iter in range(1, self.max_iter + 1):
             flows = []
             aon_flows = []
             for c in self.traffic_classes:
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 aon.execute()
-                c.results.link_loads[:, :] = c.results.link_loads[:, :] * ((float(self.iter) - 1.0) / float(self.iter))
-                c.results.link_loads[:, :] += c._aon_results.link_loads[:, :] * (1.0 / float(self.iter))
+
+                stepsize = 1.0 / float(self.iter)
+
+                c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1 - stepsize)
+                c.results.link_loads[:, :] += c._aon_results.link_loads[:, :] * stepsize
 
                 # We already get the total traffic class, in PCEs, corresponding to the total for the user classes
                 flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
@@ -73,7 +76,7 @@ class MSA:
             for c in self.traffic_classes:
                 c._aon_results.reset()
 
-            logger.info('{},{}'.format(self.iter, self.rgap))
+            logger.info('{},{},{}'.format(self.iter, self.rgap, stepsize))
 
         if self.rgap > self.rgap_target:
             logger.error('Desired RGap of {} was NOT reached'.format(self.rgap_target))
