@@ -21,8 +21,13 @@ class FW:
 
         self.assig = assig_spec  # type: TrafficAssignment
 
-        if None in [assig_spec.classes, assig_spec.vdf, assig_spec.capacity_field, assig_spec.time_field,
-                    assig_spec.vdf_parameters]:
+        if None in [
+            assig_spec.classes,
+            assig_spec.vdf,
+            assig_spec.capacity_field,
+            assig_spec.time_field,
+            assig_spec.vdf_parameters,
+        ]:
             raise Exception("Parameters missing. Setting the algorithm is the last thing to do when assigning")
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
@@ -50,11 +55,11 @@ class FW:
         # ensure a better result. We could also demand that the solution is that many consecutive times below,
         # but we are talking about small oscillations so not really necessary.
         self.steps_below = 0
-        self.steps_below_needed_to_terminate = 2
+        self.steps_below_needed_to_terminate = 1
 
     def execute(self):
-        logger.info('Frank-Wolfe Assignment STATS')
-        logger.info('Iteration,RelativeGap,Frank-WolfeStep')
+        logger.info("Frank-Wolfe Assignment STATS")
+        logger.info("Iteration,RelativeGap,Frank-WolfeStep")
         for self.iter in range(1, self.max_iter + 1):
             flows = []
             aon_flows = []
@@ -75,7 +80,7 @@ class FW:
             self.fw_total_flow = np.sum(flows, axis=0)
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            pars = {'link_flows': self.fw_total_flow, 'capacity': self.capacity, 'fftime': self.free_flow_time}
+            pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
 
             self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
@@ -92,19 +97,12 @@ class FW:
 
             for c in self.traffic_classes:
                 c._aon_results.reset()
-            logger.info('{},{},{}'.format(self.iter, self.rgap, self.stepsize))
+            logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
         logger.info("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
         # print("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
-
-    def derivative_of_objective(self, stepsize):
-        x = (1.0 - stepsize) * self.fw_class_flow + stepsize * self.aon_class_flow
-        congested_value = self.vdf.apply_vdf(
-            "BPR", link_flows=x, capacity=self.graph.capacity, fftime=self.graph.free_flow_time
-        )
-        return np.sum(congested_value * (self.aon_class_flow - self.fw_class_flow))
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in gradient direction"""
@@ -112,30 +110,12 @@ class FW:
         if self.iter == 1:
             self.stepsize = 1.0
             return True
-        try:
-            min_res = root_scalar(self.derivative_of_objective, bracket=[0, 1], method="brentq")
-        except ValueError:
-            # We see not strictly monotone functions in practice, scipy cannot deal with this
-            print("function not convex, need to take either 0 or 1")
-            f_0 = self.derivative_of_objective(0.0)
-            f_1 = self.derivative_of_objective(1.0)
-            print(f_0, f_1)
-            if f_0 < f_1:
-                # prevent from stalling by making stepsize slightly non-zero
-                # TODO: this should depend on the iteration number
-                self.stepsize = 1e-5
-                return False
-            else:
-                # Do we actually want this in practice? We throw away everything so far
-                # for new solution. I guess that's reasonable
-                self.stepsize = 1.0
-                return False
 
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.aon_total_flow - self.fw_total_flow)
             # fw_total_flow was calculated on last iteration
 
-            pars = {'link_flows': x, 'capacity': self.capacity, 'fftime': self.free_flow_time}
+            pars = {"link_flows": x, "capacity": self.capacity, "fftime": self.free_flow_time}
             congested_value = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
             return np.sum(congested_value * (self.aon_total_flow - self.fw_total_flow))
 
@@ -152,11 +132,7 @@ class FW:
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
         current_cost = np.sum(self.congested_time * self.fw_total_flow)
         self.rgap = abs(current_cost - aon_cost) / current_cost
-        print(
-            "Iter {}: rgap = {}, stepsize = {}, {:.2f}, {:.2f}".format(
-                self.iter, self.rgap, self.stepsize, current_cost, aon_cost
-            )
-        )
+        # print("Iter {}: rgap = {}, stepsize = {}".format(self.iter, self.rgap, self.stepsize))
         if self.rgap_target >= self.rgap:
             return True
         return False
