@@ -113,12 +113,26 @@ class FW:
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.aon_total_flow - self.fw_total_flow)
             # fw_total_flow was calculated on last iteration
-            pars = {'link_flows': x, 'capacity': self.capacity, 'fftime': self.free_flow_time}
+            pars = {"link_flows": x, "capacity": self.capacity, "fftime": self.free_flow_time}
             congested_value = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
             return np.sum(congested_value * (self.aon_total_flow - self.fw_total_flow))
 
-        min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
-        self.stepsize = min_res.root
+        try:
+            min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
+            self.stepsize = min_res.root
+        except ValueError:
+            # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
+            # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
+            # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
+            # in order to add a small fraction of the AoN. A heuristic value of 1e-6 seems to work well in practice.
+            heuristic_stepsize_at_zero = 1e-6
+            if derivative_of_objective(0.0) < derivative_of_objective(1.0):
+                logger.warn("Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                self.stepsize = heuristic_stepsize_at_zero
+            else:
+                # Do we want to keep some of the old solution, or just throw away everything?
+                self.stepsize = 1.0
+
         assert 0 <= self.stepsize <= 1.0
         if not min_res.converged:
             logger.warn("Frank Wolfe stepsize finder is not converged")
