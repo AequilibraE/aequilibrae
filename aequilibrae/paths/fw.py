@@ -54,8 +54,6 @@ class FW:
         # but we are talking about small oscillations so not really necessary.
         self.steps_below = 0
         self.steps_below_needed_to_terminate = 1
-        self.all_aons = []
-        self.all_times = []
 
     def execute(self):
         logger.info("Frank-Wolfe Assignment STATS")
@@ -84,22 +82,19 @@ class FW:
 
             pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
 
+            # Check convergence
+            # This needs ot be done with the current costs, and not the future ones
+            if self.iter > 1:
+                if self.check_convergence():
+                    if self.steps_below >= self.steps_below_needed_to_terminate:
+                        break
+                    else:
+                        self.steps_below += 1
+
             self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
-
-            self.all_aons.append(self.aon_total_flow)
-            self.all_times.append(self.congested_time)
-
-            # Check convergence
-            if self.check_convergence() and self.iter > 1:
-                if self.steps_below >= self.steps_below_needed_to_terminate:
-                    break
-                else:
-                    self.steps_below += 1
-
-            for c in self.traffic_classes:
                 c._aon_results.reset()
             logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
 
@@ -114,6 +109,7 @@ class FW:
             return True
 
         """Calculate optimal stepsize in gradient direction"""
+
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.aon_total_flow - self.fw_total_flow)
             # fw_total_flow was calculated on last iteration

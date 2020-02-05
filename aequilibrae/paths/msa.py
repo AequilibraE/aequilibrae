@@ -65,15 +65,15 @@ class MSA:
             pars = {'link_flows': self.msa_total_flow, 'capacity': c.graph.graph[self.cap_field],
                     'fftime': c.graph.graph[self.time_field]}
 
+            # Check convergence
+            if self.iter > 1:
+                if self.check_convergence():
+                    break
+
             self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
-
-            # Check convergence
-            if self.check_convergence() and self.iter > 1:
-                break
-            for c in self.traffic_classes:
                 c._aon_results.reset()
 
             logger.info('{},{},{}'.format(self.iter, self.rgap, stepsize))
