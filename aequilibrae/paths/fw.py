@@ -4,9 +4,7 @@ from typing import List
 
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.results import AssignmentResults
 from aequilibrae import Parameters
-from aequilibrae.paths.vdf import VDF
 from aequilibrae import logger
 
 if False:
@@ -51,6 +49,8 @@ class FW:
         # but we are talking about small oscillations so not really necessary.
         self.steps_below = 0
         self.steps_below_needed_to_terminate = 1
+        self.all_aons = []
+        self.all_times = []
 
     def execute(self):
         logger.info('Frank-Wolfe Assignment STATS')
@@ -58,30 +58,34 @@ class FW:
         for self.iter in range(1, self.max_iter + 1):
             flows = []
             aon_flows = []
-            _ = self.calculate_stepsize()
-            # self.stepsize = 1. / float(self.iter)
 
             for c in self.traffic_classes:
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 aon.execute()
 
+                aon_flows.append(np.sum(c._aon_results.link_loads, axis=1) * c.pce)
+
+            self.aon_total_flow = np.sum(aon_flows, axis=0)
+            _ = self.calculate_stepsize()
+
+            for c in self.traffic_classes:
                 c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1.0 - self.stepsize)
                 c.results.link_loads[:, :] += c._aon_results.link_loads[:, :] * self.stepsize
 
                 # We already get the total traffic class, in PCEs, corresponding to the total for the user classes
                 flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
-                aon_flows.append(np.sum(c._aon_results.link_loads, axis=1) * c.pce)
 
             self.fw_total_flow = np.sum(flows, axis=0)
-            self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             pars = {'link_flows': self.fw_total_flow, 'capacity': self.capacity, 'fftime': self.free_flow_time}
 
             self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
-            # Assign same congested time to ALL class graphs
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
+
+            self.all_aons.append(self.aon_total_flow)
+            self.all_times.append(self.congested_time)
 
             # Check convergence
             if self.check_convergence() and self.iter > 1:
@@ -97,19 +101,17 @@ class FW:
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
         logger.info("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
-        # print("FW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
 
     def calculate_stepsize(self):
-        """Calculate optimal stepsize in gradient direction"""
         # First iteration gets 100% of shortest path
         if self.iter == 1:
             self.stepsize = 1.0
             return True
 
+        """Calculate optimal stepsize in gradient direction"""
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.aon_total_flow - self.fw_total_flow)
             # fw_total_flow was calculated on last iteration
-
             pars = {'link_flows': x, 'capacity': self.capacity, 'fftime': self.free_flow_time}
             congested_value = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
             return np.sum(congested_value * (self.aon_total_flow - self.fw_total_flow))
@@ -127,7 +129,6 @@ class FW:
         aon_cost = np.sum(self.congested_time * self.aon_total_flow)
         current_cost = np.sum(self.congested_time * self.fw_total_flow)
         self.rgap = abs(current_cost - aon_cost) / current_cost
-        # print("Iter {}: rgap = {}, stepsize = {}".format(self.iter, self.rgap, self.stepsize))
         if self.rgap_target >= self.rgap:
             return True
         return False
