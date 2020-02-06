@@ -18,12 +18,12 @@
  Licence:     See LICENSE.TXT
 -----------------------------------------------------------------------------------------------------------
  """
-
 from typing import List
 import importlib.util as iutil
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
-from .assignment_class import AssignmentClass
+from .traffic_class import TrafficClass
+from ..utils import WorkerThread
 import numpy as np
 
 from .all_or_nothing import allOrNothing
@@ -33,21 +33,19 @@ pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
+
 class bfw(WorkerThread):
     if pyqt:
         assignment = SIGNAL(object)
 
-    def __init__(self, traffic_classes:[AssignmentClass]):
+    def __init__(self, traffic_classes: List[TrafficClass]):
         WorkerThread.__init__(self, None)
 
         # To get the result of all the slices assigned to the class
-        #
         self.traffic_classes = traffic_classes
-
 
         self.report = []
         self.cumulative = 0
-
 
     def doWork(self):
         self.execute()
@@ -55,4 +53,3 @@ class bfw(WorkerThread):
     def execute(self):
         if pyqt:
             self.assignment.emit(["zones finalized", 0])
-
