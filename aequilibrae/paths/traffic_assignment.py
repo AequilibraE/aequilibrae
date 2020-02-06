@@ -13,13 +13,13 @@ all_algorithms = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw']
 
 class TrafficAssignment(object):
     def __init__(self) -> None:
-        self.__dict__['vdf'] = None # type: VDF
-        self.__dict__['classes'] = None # type: List[TrafficClass]
-        self.__dict__['algorithm'] = None # type: str
-        self.__dict__['vdf_parameters'] = None # type: dict
-        self.__dict__['time_field'] = None # type: str
-        self.__dict__['capacity_field'] = None # type: str
-        self.__dict__['assignment'] = None # type: MSA
+        self.__dict__['vdf'] = None  # type: VDF
+        self.__dict__['classes'] = None  # type: List[TrafficClass]
+        self.__dict__['algorithm'] = None  # type: str
+        self.__dict__['vdf_parameters'] = None  # type: dict
+        self.__dict__['time_field'] = None  # type: str
+        self.__dict__['capacity_field'] = None  # type: str
+        self.__dict__['assignment'] = None  # type: MSA
 
     def __setattr__(self, instance, value) -> None:
         if instance == 'assignment':
