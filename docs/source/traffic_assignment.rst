@@ -294,14 +294,14 @@ Zones: 110
 MSA
 +++
 
-.. image:: images/chicago regional_msa-500_iter.png
+.. image:: images/chicago_regional_msa-500_iter.png
     :width: 590
     :align: center
     :alt: Chicago MSA 500 iterations
 
 Frank-Wolfe
 +++++++++++
-.. image:: images/chicago regional_frank-wolfe-500_iter.png
+.. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
     :align: center
     :alt: Chicago Frank-Wolfe 500 iterations
@@ -318,11 +318,10 @@ Regional), as that instance has a comparable size to real-world models.
     :align: center
     :alt: Algorithm convergence comparison
 
-
 Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
-reaching 1.0e-04, while MSA never reaches that convergence level even after
-1,000 iterations.
+reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
+after 1,000 iterations.
 
 Computational performance
 -------------------------
