@@ -45,6 +45,18 @@ cpdef void network_loading(long classes,
     cdef long long zones = demand.shape[0]
     cdef long long N = node_load.shape[0]
 
+# Traditional loading, without cascading
+#    for i in range(zones):
+#        node = i
+#        predecessor = pred[node]
+#        connector = conn[node]
+#        while predecessor >= 0:
+#            for j in range(classes):
+#                link_loads[connector, j] += demand[i, j]
+#
+#            predecessor = pred[predecessor]
+#            connector = conn[predecessor]
+
     # Clean the node load array
     for i in range(N):
         node_load[i] = 0
@@ -66,7 +78,6 @@ cpdef void network_loading(long classes,
         # loads the flow to the links for each class
         for j in range(classes):
             link_loads[connector, j] += node_load[node, j]
-
             # Cascades the load from the node to their predecessor
             node_load[predecessor, j] += node_load[node, j]
 
@@ -150,17 +161,21 @@ cpdef void put_path_file_on_disk(unsigned int orig,
 @cython.boundscheck(False)
 cdef void blocking_centroid_flows(int action,
                                   long long orig,
+                                  long long centroids,
                                   long long [:] fs,
                                   long long [:] temp_b_nodes,
                                   long long [:] real_b_nodes) nogil:
     cdef long long i
 
-    if action == 0: # We are unblocking
-        for i in range(fs[orig], fs[orig + 1]):
+    if action == 1: # We are unblocking
+        for i in range(fs[centroids + 1]):
             temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
-        for i in range(fs[orig], fs[orig + 1]):
+        for i in range(fs[centroids + 1]):
             temp_b_nodes[i] = orig
+
+        for i in range(fs[orig], fs[orig + 1]):
+            temp_b_nodes[i] = real_b_nodes[i]
 
 
 @cython.wraparound(False)
@@ -276,6 +291,7 @@ cpdef int path_finding(long origin,
     for i in range(M):
         pred[i] = -1
         connectors[i] = -1
+        reached_first[i] = -1
 
     j_source = origin
     for k in range(N):

@@ -211,13 +211,76 @@ You can save the results to your place of choice in AequilibraE format or export
     result.skims.copy('path/to/desired/folder/file_name.aem')
 
 
-Traffic Assignment
-~~~~~~~~~~~~~~~~~~
+Assigning traffic on TNTP instances
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is a set of well known traffic assignment problems used in the literature
+maintained on `GitHub <https://github.com/bstabler/TransportationNetworks/>`_
+that is often used for tests, so we will use one of those problems here.
+
+Let's suppose we want to perform traffic assignment for one of those problems
+and check the results against the reference results.
+
+The parsing and importing of those networks are not really the case here, but
+there is `online code <https://gist.github.com/pedrocamargo/d565f545667fd473ea0590c7866965de>`_
+available for doing that work.
 
 ::
 
-    some code
+    import os
+    import sys
+    import numpy as np
+    import pandas as pd
+    from aequilibrae.paths import TrafficAssignment
+    from aequilibrae.paths import Graph
+    from aequilibrae.paths.traffic_class import TrafficClass
+    from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+    import matplotlib.pyplot as plt
 
+    from aequilibrae import logger
+    import logging
+
+    # We redirect the logging output to the terminal
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(stdout_handler)
+
+    # Let's work with Sioux Falls
+    os.chdir('D:/src/TransportationNetworks/SiouxFalls')
+    result_file = 'SiouxFalls_flow.tntp'
+
+    # Loads and prepares the graph
+    g = Graph()
+    g.load_from_disk('graph.aeg')
+    g.set_graph('time')
+    g.cost = np.array(g.cost, copy=True)
+    g.set_skimming(['time'])
+    g.set_blocked_centroid_flows(True)
+
+    # Loads and prepares the matrix
+    mat = AequilibraeMatrix()
+    mat.load('demand.aem')
+    mat.computational_view(['matrix'])
+
+    # Creates the assignment class
+    assigclass = TrafficClass(g, mat)
+
+    # Instantiates the traffic assignment problem
+    assig = TrafficAssignment()
+
+    # configures it properly
+    assig.set_vdf('BPR')
+    assig.set_vdf_parameters(**{'alpha': 0.15, 'beta': 4.0})
+    assig.set_capacity_field('capacity')
+    assig.set_time_field('time')
+    assig.set_classes(assigclass)
+    # could be assig.set_algorithm('frank-wolfe')
+    assig.set_algorithm('msa')
+
+    # Execute the assignment
+    assig.execute()
+
+    # the results are within each traffic class only one, in this case
+    assigclass.results.link_loads
 
 Advanced usage: Building a Graph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

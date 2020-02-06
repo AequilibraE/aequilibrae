@@ -1,7 +1,7 @@
 import os
 from tempfile import gettempdir
 from unittest import TestCase
-
+import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import allOrNothing
 from aequilibrae.paths import Graph
@@ -12,13 +12,14 @@ from ...data import test_graph
 # TODO: Add checks for results for this test (Assignment AoN)
 class TestAllOrNothing(TestCase):
     def setUp(self) -> None:
+        self.mat_name = AequilibraeMatrix().random_name()
         self.g = Graph()
         self.g.load_from_disk(test_graph)
         self.g.set_graph(cost_field="distance")
 
         # Creates the matrix for assignment
         args = {
-            "file_name": os.path.join(gettempdir(), "my_matrix.aem"),
+            "file_name": os.path.join(gettempdir(), self.mat_name),
             "zones": self.g.num_zones,
             "matrix_names": ["cars", "trucks"],
             "index_names": ["my indices"],
@@ -37,7 +38,7 @@ class TestAllOrNothing(TestCase):
 
     def test_skimming_on_assignment(self):
         matrix = AequilibraeMatrix()
-        matrix.load(os.path.join(gettempdir(), "my_matrix.aem"))
+        matrix.load(os.path.join(gettempdir(), self.mat_name))
         matrix.computational_view(["cars"])
 
         res = AssignmentResults()
@@ -56,7 +57,7 @@ class TestAllOrNothing(TestCase):
 
         assig = allOrNothing(matrix, self.g, res)
         assig.execute()
-        if res.skims.distance.sum() != 2912922.0:
+        if res.skims.distance.sum() != 2914644.0:
             self.fail("skimming during assignment returned the wrong value")
 
     def test_execute(self):
@@ -67,7 +68,11 @@ class TestAllOrNothing(TestCase):
 
         for extension in ["omx", "aem"]:
             matrix = AequilibraeMatrix()
-            matrix.load(os.path.join(gettempdir(), "my_matrix." + extension))
+            if extension == 'omx':
+                mat_name = os.path.join(gettempdir(), "my_matrix." + extension)
+            else:
+                mat_name = self.mat_name
+            matrix.load(mat_name)
 
             matrix.computational_view(["cars"])
 
