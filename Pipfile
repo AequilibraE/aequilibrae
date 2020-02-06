@@ -29,6 +29,7 @@ jupyter = "*"
 jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
+statsmodels = "*"
 
 [scripts]
 notebook = "jupyter notebook"

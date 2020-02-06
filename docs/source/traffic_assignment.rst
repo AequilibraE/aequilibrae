@@ -97,12 +97,50 @@ Method of successive Averages (MSA)
 Frank-Wolfe (FW)
 ++++++++++++++++
 
+The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
+implementation point of view, as we use a generic optimizer from SciPy as an
+engine for the line search.
+
+Implementation details & tricks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A few implementation details and tricks are worth mentioning not because it is
+needed to use the software, but because they were things we grappled with during
+implementation, and it would be a shame not register it for those looking to
+implement their own variations of this algorithm or to slight change it for
+their own purposes.
+
+* The relative gap is computed with the cost used to compute the All-or-Nothing
+  portion of the iteration, and although the literature on this is obvious, we
+  took some time to realize that we should re-compute the travel costs only
+  **AFTER** checking for convergence.
+
+* In some instances, Frank-Wolfe is extremely unstable during the first
+  iterations on assignment, resulting on numerical errors on our line search.
+  We found that setting the step size to the corresponding MSA value (1/
+  current iteration) resulted in the problem quickly becoming stable and moving
+  towards a state where the line search started working properly.
+
 Conjugate Frank-Wolfe
 +++++++++++++++++++++
 
 
 Biconjugate Frank-Wolfe
 +++++++++++++++++++++++
+
+Opportunities for multi-threading
++++++++++++++++++++++++++++++++++
+
+Most multi-threading opportunities have already been taken advantage of during
+the implementation of the All-or-Nothing portion of the assignment. However, the
+optimization engine using for line search, as well as a few functions from NumPy
+could still be paralellized for maximum performance on system with high number
+of cores, such as the latest Threadripper CPUs.  These numpy functions are the
+following:
+
+* np.sum
+* np.power
+* np.fill
+
 
 References
 ++++++++++
@@ -139,3 +177,158 @@ Graph format remains the same, but should describe it well
 
 * free-flow time
 *
+
+Numerical Study
+---------------
+Similar to other complex algorthms that handle a large amount of data through
+complex computations, traffic assignment procedures can always be subject to at
+least one very reasonable question:  Are the results right?
+
+For this reason, we have used all equilibrium traffic assignment algorithms
+available in AequilibraE to solve standard instances used in academia for
+comparing algorithm results, some of which have are available with highly
+converged solutions (~1e-14):
+`<https://github.com/bstabler/TransportationNetworks/>`_
+
+Sioux Falls
+~~~~~~~~~~~~
+
+Network has:
+Links: 76
+Nodes: 24
+Zones: 24
+
+MSA
++++
+
+.. image:: images/sioux falls_msa-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Sioux Falls MSA 500 iterations
+
+Frank-Wolfe
++++++++++++
+.. image:: images/sioux falls_frank-wolfe-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Sioux Falls Frank-Wolfe 500 iterations
+
+
+Anaheim
+~~~~~~~
+
+Network has:
+Links: 914
+Nodes: 416
+Zones: 38
+
+MSA
++++
+
+.. image:: images/anaheim_msa-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Anaheim MSA 500 iterations
+
+Frank-Wolfe
++++++++++++
+.. image:: images/anaheim_frank-wolfe-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Anaheim Frank-Wolfe 500 iterations
+
+Winnipeg
+~~~~~~~~
+
+Network has:
+Links: 914
+Nodes: 416
+Zones: 38
+
+MSA
++++
+
+.. image:: images/winnipeg_msa-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Winnipeg MSA 500 iterations
+
+Frank-Wolfe
++++++++++++
+.. image:: images/winnipeg_frank-wolfe-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Winnipeg Frank-Wolfe 500 iterations
+
+Barcelona
+~~~~~~~~~
+
+Network has:
+Links: 2,522
+Nodes: 1,020
+Zones: 110
+
+MSA
++++
+
+.. image:: images/barcelona_msa-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Barcelona MSA 500 iterations
+
+Frank-Wolfe
++++++++++++
+.. image:: images/barcelona_frank-wolfe-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Barcelona Frank-Wolfe 500 iterations
+
+Chicago Regional
+~~~~~~~~~~~~~~~~
+
+Network has:
+Links: 2,522
+Nodes: 1,020
+Zones: 110
+
+MSA
++++
+
+.. image:: images/chicago regional_msa-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Chicago MSA 500 iterations
+
+Frank-Wolfe
++++++++++++
+.. image:: images/chicago regional_frank-wolfe-500_iter.png
+    :width: 590
+    :align: center
+    :alt: Chicago Frank-Wolfe 500 iterations
+
+Convergence Study
+---------------
+
+Besides validating the final results from the algorithms, we have also compared
+how well they converge for the largest instance we have tested (Chicago
+Regional), as that instance has a comparable size to real-world models.
+
+.. image:: images/convergence_comparison.png
+    :width: 590
+    :align: center
+    :alt: Algorithm convergence comparison
+
+
+Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
+Successive Averages for a number of iterations larger than 25, and is capable of
+reaching 1.0e-04, while MSA never reaches that convergence level even after
+1,000 iterations.
+
+Computational performance
+-------------------------
+Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
+2667Hz RAM, AequilibraE performed 1,000 iterations of Frank-Wolfe assignment
+on the Chicago Network in just under 46 minutes.
+
+During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz,
+which suggests that performance in modern desktops would be substantially better
