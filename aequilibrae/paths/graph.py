@@ -58,8 +58,8 @@ class Graph(object):
         self.b_node = False  # b node for each directed link
 
         self.cost = None  # This array holds the values being used in the shortest path routine
-        self.capacity = None # Array holds the capacity for links
-        self.free_flow_time = None # Array holds the free flow travel time by link
+        self.capacity = None  # Array holds the capacity for links
+        self.free_flow_time = None  # Array holds the free flow travel time by link
         self.skims = False  # 2-D Array with the fields to be computed as skims
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
@@ -94,15 +94,15 @@ class Graph(object):
 
     # Create a graph from a shapefile. To be upgraded to ANY geographic file in the future
     def create_from_geography(
-        self,
-        geo_file: str,
-        id_field: str,
-        dir_field: str,
-        cost_field: str,
-        centroids: np.ndarray,
-        skim_fields=[],
-        anode="A_NODE",
-        bnode="B_NODE",
+            self,
+            geo_file: str,
+            id_field: str,
+            dir_field: str,
+            cost_field: str,
+            centroids: np.ndarray,
+            skim_fields=[],
+            anode="A_NODE",
+            bnode="B_NODE",
     ) -> None:
         """
         :param geo_file: Path to the geographic file to be used. File is usually the output of the network preparation
@@ -166,7 +166,7 @@ class Graph(object):
             types_to_check.append(float)
 
             all_types.append(self.__float_type)
-            all_titles.append((k ))
+            all_titles.append((k))
             dict_field[k] = skim_index
 
         dt = [(t, d) for t, d in zip(all_titles, all_types)]
@@ -507,11 +507,10 @@ class Graph(object):
         must_types = [self.__integer_type, self.__integer_type, self.__integer_type, np.int8]
         for field, ytype in zip(must_fields, must_types):
             if self.network[field].dtype != ytype:
-                self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
-                )
+                self.status = ('Field "%s" in the network array has the wrong type. '
+                               'Please refer to the documentation' % field)
 
-                # Uniqueness of the id
+        # Uniqueness of the id
         link_ids = self.network["link_id"].astype(np.int)
         if link_ids.shape[0] != np.unique(link_ids).shape[0]:
             self.status = '"link_id" field not unique'
@@ -534,11 +533,10 @@ class Graph(object):
         must_types = [self.__integer_type, self.__integer_type, self.__integer_type, self.__integer_type]
         for field, ytype in zip(must_fields, must_types):
             if self.graph[field].dtype != ytype:
-                self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
-                )
+                self.status = ('Field "%s" in the network array has the wrong type. '
+                               'Please refer to the documentation' % field)
 
-                # Uniqueness of the graph id
+        # Uniqueness of the graph id
         a = self.graph["id"].astype(np.int)
         if a.shape[0] != np.unique(a).shape[0]:
             self.status = '"id" field not unique'

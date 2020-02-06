@@ -6,7 +6,6 @@ from aequilibrae.paths.results import AssignmentResults
 
 class TrafficClass():
     def __init__(self, graph: Graph, matrix: Matrix) -> None:
-
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
@@ -21,5 +20,6 @@ class TrafficClass():
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
+
     def set_pce(self, pce: int) -> None:
         self.pce = pce
