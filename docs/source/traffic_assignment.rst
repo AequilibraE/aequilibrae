@@ -201,14 +201,14 @@ Zones: 24
 MSA
 +++
 
-.. image:: images/sioux falls_msa-500_iter.png
+.. image:: images/sioux_falls_msa-500_iter.png
     :width: 590
     :align: center
     :alt: Sioux Falls MSA 500 iterations
 
 Frank-Wolfe
 +++++++++++
-.. image:: images/sioux falls_frank-wolfe-500_iter.png
+.. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
     :align: center
     :alt: Sioux Falls Frank-Wolfe 500 iterations
