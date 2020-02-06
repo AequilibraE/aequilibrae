@@ -194,9 +194,10 @@ Sioux Falls
 ~~~~~~~~~~~~
 
 Network has:
-Links: 76
-Nodes: 24
-Zones: 24
+
+* Links: 76
+* Nodes: 24
+* Zones: 24
 
 MSA
 +++
@@ -218,9 +219,10 @@ Anaheim
 ~~~~~~~
 
 Network has:
-Links: 914
-Nodes: 416
-Zones: 38
+
+* Links: 914
+* Nodes: 416
+* Zones: 38
 
 MSA
 +++
@@ -241,9 +243,10 @@ Winnipeg
 ~~~~~~~~
 
 Network has:
-Links: 914
-Nodes: 416
-Zones: 38
+
+* Links: 914
+* Nodes: 416
+* Zones: 38
 
 MSA
 +++
@@ -264,9 +267,10 @@ Barcelona
 ~~~~~~~~~
 
 Network has:
-Links: 2,522
-Nodes: 1,020
-Zones: 110
+
+* Links: 2,522
+* Nodes: 1,020
+* Zones: 110
 
 MSA
 +++
@@ -287,9 +291,10 @@ Chicago Regional
 ~~~~~~~~~~~~~~~~
 
 Network has:
-Links: 2,522
-Nodes: 1,020
-Zones: 110
+
+* Links: 2,522
+* Nodes: 1,020
+* Zones: 110
 
 MSA
 +++
