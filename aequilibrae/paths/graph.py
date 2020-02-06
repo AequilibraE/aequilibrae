@@ -145,15 +145,13 @@ class Graph(object):
             self.__integer_type,
             self.__integer_type,
             self.__float_type,
-            self.__float_type,
             np.int8,
         ]
         all_titles = [
             "link_id",
             "a_node",
             "b_node",
-            cost_field_name.lower() + "_ab",
-            cost_field_name.lower() + "_ba",
+            cost_field_name,
             "direction",
         ]
         check_fields = [id_field, dir_field, anode, bnode, cost_field]
@@ -168,11 +166,8 @@ class Graph(object):
             types_to_check.append(float)
 
             all_types.append(self.__float_type)
-            all_types.append(self.__float_type)
-            all_titles.append((k + "_ab"))
-            all_titles.append((k + "_ba"))
-            dict_field[k + "_ab"] = skim_index
-            dict_field[k + "_ba"] = skim_index
+            all_titles.append((k ))
+            dict_field[k] = skim_index
 
         dt = [(t, d) for t, d in zip(all_titles, all_types)]
 
@@ -203,7 +198,6 @@ class Graph(object):
                 line.append(feat[id_field])
                 line.append(feat[anode])
                 line.append(feat[bnode])
-                line.append(feat[cost_field])
                 line.append(feat[cost_field])
                 line.append(feat[dir_field])
 
