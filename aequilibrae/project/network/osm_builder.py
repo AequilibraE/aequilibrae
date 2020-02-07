@@ -133,56 +133,18 @@ class OSMBuilder(QObject):
             for k, v in twf.items():
                 val = linktags.get(v["osm_source"])
                 for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
-                    vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
-                    if vald is not None:
-                        if vald.isdigit():
-                            if vald == val and v["osm_behaviour"] == "divide":
-                                vald = float(val) / 2
-                        else:
-                            if isinstance(vald, str):
-                                vald = vald.replace('"', "'")
-                                vald = '"{}"'.format(vald)
-
-                    vars["{}_{}".format(k, d1)] = vald
+                    vars["{}_{}".format(k, d1)] = self.__get_link_property(d2, val, linktags, v)
 
             vars["modes"] = mode_codes.get(linktags.get("highway"), not_found_tags)
 
             if len(vars["modes"]) > 0:
                 for i in range(segments):
-                    ii = intersections[i]
-                    jj = intersections[i + 1]
-                    all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
-
-                    vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
-                    if vars["a_node"] == self.node_start:
-                        node_ids[linknodes[ii]] = vars["a_node"]
-                        self.node_start += 1
-
-                    vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
-                    if vars["b_node"] == self.node_start:
-                        node_ids[linknodes[jj]] = vars["b_node"]
-                        self.node_start += 1
-
-                    vars["distance"] = sum(
-                        [
-                            haversine(
-                                self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
-                            )
-                            for x, y in zip(all_nodes[1:], all_nodes[:-1])
-                        ]
-                    )
-
-                    geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
-                    geometry = "LINESTRING ({})".format(", ".join(geometry))
-
-                    attributes = [vars.get(x) for x in fields]
-
-                    attributes = ", ".join([str(x) for x in attributes])
+                    geometry, attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
                     sql = self.insert_qry.format(table, fn, attributes, geometry)
                     sql = sql.replace("None", "null")
                     try:
                         self.curr.execute(sql)
-                        nodes_to_add.update([linknodes[ii], linknodes[jj]])
+                        nodes_to_add.update([linknodes[intersections[i]], linknodes[intersections[i + 1]]])
                     except Exception as e:
                         data = list(vars.values())
                         logger.error("error when inserting link {}. Error {}".format(data, e.args))
@@ -223,6 +185,51 @@ class OSMBuilder(QObject):
 
         self.conn.commit()
         self.curr.close()
+
+    def __build_link_data(self, vars, intersections, i, linknodes, node_ids, fields):
+        ii = intersections[i]
+        jj = intersections[i + 1]
+        all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
+
+        vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
+        if vars["a_node"] == self.node_start:
+            node_ids[linknodes[ii]] = vars["a_node"]
+            self.node_start += 1
+
+        vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
+        if vars["b_node"] == self.node_start:
+            node_ids[linknodes[jj]] = vars["b_node"]
+            self.node_start += 1
+
+        vars["distance"] = sum(
+            [
+                haversine(
+                    self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
+                )
+                for x, y in zip(all_nodes[1:], all_nodes[:-1])
+            ]
+        )
+
+        geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
+        geometry = "LINESTRING ({})".format(", ".join(geometry))
+
+        attributes = [vars.get(x) for x in fields]
+
+        attributes = ", ".join([str(x) for x in attributes])
+
+        return geometry, attributes
+
+    def __get_link_property(self, d2, val, linktags, v):
+        vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
+        if vald is not None:
+            if vald.isdigit():
+                if vald == val and v["osm_behaviour"] == "divide":
+                    vald = float(val) / 2
+            else:
+                if isinstance(vald, str):
+                    vald = vald.replace('"', "'")
+                    vald = '"{}"'.format(vald)
+        return vald
 
     @staticmethod
     def unique_count(a):

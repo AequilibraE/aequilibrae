@@ -76,7 +76,6 @@ folder for analysis at a later time.
 ::
 
   from aequilibrae.project import Project
-  import os
 
   cities = ["Darwin, Australia",
             "Karlsruhe, Germany",
@@ -85,6 +84,7 @@ folder for analysis at a later time.
             "Auckland, New Zealand"]
 
   for city in cities:
+      print(city)
       pth = f'd:/net_tests/{city}.sqlite'
 
       p = Project(pth, True)
