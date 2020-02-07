@@ -57,7 +57,7 @@ class TestAllOrNothing(TestCase):
 
         assig = allOrNothing(matrix, self.g, res)
         assig.execute()
-        if res.skims.distance.sum() != 2912922.0
+        if res.skims.distance.sum() != 2912922.0:
             self.fail("skimming during assignment returned the wrong value")
 
     def test_execute(self):
