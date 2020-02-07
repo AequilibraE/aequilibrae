@@ -34,7 +34,7 @@ class OSMDownloader(QObject):
             "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.downloading.emit(["text", "Downloading polygon {} of {}".format(1, len(self.polygons))])
+        self.downloading.emit(["text", f"Downloading polygon 1 of {len(self.polygons)}"])
         self.downloading.emit(["maxValue", len(self.polygons)])
         self.downloading.emit(["Value", 0])
 
@@ -82,7 +82,7 @@ class OSMDownloader(QObject):
         if pause_duration is None:
             time.sleep(5)
         start_time = time.time()
-        self.report.append('Posting to {} with timeout={}, "{}"'.format(url, timeout, data))
+        self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
 
         # get the response size and the domain, log result
@@ -95,7 +95,7 @@ class OSMDownloader(QObject):
         try:
             response_json = response.json()
             if "remark" in response_json:
-                msg = 'Server remark: "{}"'.format(response_json["remark"])
+                msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
                 logger.info(msg)
         except Exception:
@@ -116,12 +116,8 @@ class OSMDownloader(QObject):
 
             # else, this was an unhandled status_code, throw an exception
             else:
-                self.report.append(
-                    "Server at {} returned status code {} and no JSON data".format(domain, response.status_code)
-                )
-                raise Exception(
-                    "Server returned no JSON data.\n{} {}\n{}".format(response, response.reason, response.text)
-                )
+                self.report.append(f"Server at {domain} returned status code {response.status_code} and no JSON data")
+                raise Exception(f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}")
 
         return response_json
 
@@ -139,7 +135,7 @@ class OSMDownloader(QObject):
         tags_to_keep = []
         for m in modes:
             if m not in all_modes:
-                raise ValueError("Mode {} not listed in the parameters file".format(m))
+                raise ValueError(f"Mode {m} not listed in the parameters file")
             tags_to_keep += p[m]["link_types"]
         tags_to_keep = list(set(tags_to_keep))
 
@@ -150,6 +146,6 @@ class OSMDownloader(QObject):
         filtered = [x for x in all_tags if x not in tags_to_keep]
         filtered = "|".join(filtered)
 
-        filter = '["area"!~"yes"]["highway"!~"{}"]{}{}'.format(filtered, service, access)
+        filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter

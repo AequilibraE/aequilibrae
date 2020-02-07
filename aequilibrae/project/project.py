@@ -21,6 +21,12 @@ class Project:
                 self.__create_empty_project()
         else:
             self.conn = sqlite3.connect(self.path_to_file)
+
+        self.source = self.path_to_file
+        self.get_spatialite_connection()
+        self.network = Network(self)
+
+    def get_spatialite_connection(self):
         self.conn.enable_load_extension(True)
         plat = platform.platform()
         pth = os.getcwd()
@@ -32,11 +38,8 @@ class Project:
         try:
             self.conn.load_extension("mod_spatialite")
         except Exception as e:
-            warn("AequilibraE might not work as intended without spatialite. {}".format(e.args))
+            warn(f"AequilibraE might not work as intended without spatialite. {e.args}")
         os.chdir(pth)
-
-        self.source = path_to_file
-        self.network = Network(self)
 
     def __create_empty_project(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
@@ -56,8 +59,8 @@ class Project:
             nm = list(mode.keys())[0]
             descr = mode[nm]["description"]
             mode_id = mode[nm]["letter"]
-            par = ['"{}"'.format(p) for p in [nm, mode_id, descr]]
+            par = [f'"{p}"' for p in [nm, mode_id, descr]]
             par = ",".join(par)
-            sql = "INSERT INTO 'modes' (mode_name, mode_id, description) VALUES({})".format(par)
+            sql = f"INSERT INTO 'modes' (mode_name, mode_id, description) VALUES({par})"
             cursor.execute(sql)
         self.conn.commit()

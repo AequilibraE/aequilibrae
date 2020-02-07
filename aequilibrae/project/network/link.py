@@ -11,8 +11,8 @@ class Link:
         one_way_fields = {x: None for x in one_way_fields}
 
         twf = [list(x.keys())[0] for x in fields["two-way"]]
-        two_way_fields = {"{}_ab".format(x): None for x in twf}
-        two_way_fields.update({"{}_ba".format(x): None for x in twf})
+        two_way_fields = {f"{x}_ab": None for x in twf}
+        two_way_fields.update({f"{x}_ba": None for x in twf})
 
         one_way_fields.update(two_way_fields)
         self.__dict__.update(one_way_fields)

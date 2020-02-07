@@ -23,19 +23,17 @@ class Network(WorkerThread):
         curr = self.conn.cursor()
         curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
         tbls = curr.fetchone()[0]
-        if tbls > 0:
-            return True
-        return False
+        return tbls > 0
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
-        spatial_index=False,
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
+            spatial_index=False,
     ) -> None:
 
         if self._check_if_exists():
@@ -63,7 +61,7 @@ class Network(WorkerThread):
             bbox, report = placegetter(place_name)
             west, south, east, north = bbox
             if bbox is None:
-                msg = 'We could not find a reference for place name "{}"'.format(place_name)
+                msg = f'We could not find a reference for place name "{place_name}"'
                 warn(msg)
                 logger.warn(msg)
                 return
@@ -133,7 +131,7 @@ class Network(WorkerThread):
         for f in flds:
             nm = list(f.keys())[0]
             tp = f[nm]["type"]
-            twlf.extend(["{}_ab {}".format(nm, tp), "{}_ba {}".format(nm, tp)])
+            twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
 
         link_fields = owlf + twlf
 
@@ -177,16 +175,15 @@ class Network(WorkerThread):
 
         pth = os.path.dirname(os.path.realpath(__file__))
         qry_file = os.path.join(pth, "network_triggers.sql")
-        sql_file = open(qry_file, "r")
-        query_list = sql_file.read()
-        sql_file.close()
+        with open(qry_file, "r") as sql_file:
+            query_list = sql_file.read()
         logger.info("Adding network triggers")
         # Run one query/command at a time
         for cmd in query_list.split("#"):
             try:
                 curr.execute(cmd)
             except Exception as e:
-                msg = "Error creating trigger: {}".format(e.args)
+                msg = f"Error creating trigger: {e.args}"
                 logger.error(msg)
                 logger.info(cmd)
         self.conn.commit()

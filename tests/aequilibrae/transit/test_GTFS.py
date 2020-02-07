@@ -20,7 +20,7 @@ class TestGTFS(TestCase):
         try:
             self.gtfs.load_agency()
         except Exception as err:
-            self.fail("Agency loader returned an error - {}".format(err.__str__()))
+            self.fail(f"Agency loader returned an error - {err.__str__()}")
         if self.gtfs.agency.name != "Public Transport":
             self.fail("Agency name was read wrong")
 
@@ -28,7 +28,7 @@ class TestGTFS(TestCase):
         try:
             self.gtfs.load_stops()
         except Exception as err:
-            self.fail("stops loader returned an error - {}".format(err.__str__()))
+            self.fail(f"stops loader returned an error - {err.__str__()}")
         self.assertEqual(len(self.gtfs.stops), 88, "Not all values read")
         if self.gtfs.stops["88"].name != "Post Office":
             self.fail("GTFS stops not read properly")

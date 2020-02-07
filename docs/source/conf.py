@@ -24,7 +24,7 @@ except ImportError as e:
     from aequilibrae.paths.__version__ import release_version
     import warnings
 
-    warnings.warn("It is really annoying to deal with Flake8 sometimes. {}".format(e.args))
+    warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
 
 
 #
