@@ -46,7 +46,7 @@ class TestAllOrNothing(TestCase):
         res.prepare(self.g, matrix)
 
         self.g.set_skimming([])
-        self.g.set_blocked_centroid_flows(False)
+        self.g.set_blocked_centroid_flows(True)
         assig = allOrNothing(matrix, self.g, res)
         assig.execute()
 
