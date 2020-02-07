@@ -18,6 +18,7 @@ from ...utils import WorkerThread
 
 class Network(WorkerThread):
     req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
+    req_node_flds = ["node_id", "is_centroid"]
 
     def __init__(self, project):
         WorkerThread.__init__(self, None)
@@ -164,8 +165,7 @@ class Network(WorkerThread):
                                  is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
 
         flds = p.parameters["network"]["nodes"]["fields"]
-        default_fields = ["NODE_ID", "IS_CENTROID"]
-        ndflds = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() not in default_fields]
+        ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in self.req_node_flds]
 
         if ndflds:
             sql = sql.format("," + ",".join(ndflds))
