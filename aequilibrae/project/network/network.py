@@ -120,16 +120,16 @@ class Network(WorkerThread):
 
         flds = fields["one-way"]
 
-        owlf = [
-            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
-            for f in flds
-            if list(f.keys())[0].upper() != "LINK_ID"
-        ]
+        # returns first key in the dictionary
+        def fkey(f):
+            return list(f.keys())[0]
+
+        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() != "LINK_ID"]
 
         flds = fields["two-way"]
         twlf = []
         for f in flds:
-            nm = list(f.keys())[0]
+            nm = fkey(f)
             tp = f[nm]["type"]
             twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
 
@@ -143,11 +143,7 @@ class Network(WorkerThread):
 
         flds = p.parameters["network"]["nodes"]["fields"]
 
-        ndflds = [
-            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
-            for f in flds
-            if list(f.keys())[0].upper() != "NODE_ID"
-        ]
+        ndflds = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() != "NODE_ID"]
 
         sql = sql.format(",".join(ndflds))
         curr.execute(sql)
