@@ -14,7 +14,7 @@ cdef ITYPE_t NULL_IDX = 18446744073709551615
 
 cdef double INFINITE = 1.79769313e+308
 
-VERSION = 0.5
-MINOR_VRSN = 3
-binary_version = "0.5.3"
-release_name = "Karlsruhe"
+VERSION = 0.6
+MINOR_VRSN = 0
+binary_version = "0.6.0"
+release_name = "Rio de Janeiro"
