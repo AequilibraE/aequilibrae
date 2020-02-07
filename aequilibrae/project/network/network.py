@@ -27,9 +27,7 @@ class Network(WorkerThread):
         curr = self.conn.cursor()
         curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
         tbls = curr.fetchone()[0]
-        if tbls > 0:
-            return True
-        return False
+        return tbls > 0
 
     def modes(self):
         curr = self.conn.cursor()
@@ -37,14 +35,14 @@ class Network(WorkerThread):
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
-        spatial_index=False,
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
+            spatial_index=False,
     ) -> None:
 
         if self._check_if_exists():
@@ -72,7 +70,7 @@ class Network(WorkerThread):
             bbox, report = placegetter(place_name)
             west, south, east, north = bbox
             if bbox is None:
-                msg = 'We could not find a reference for place name "{}"'.format(place_name)
+                msg = f'We could not find a reference for place name "{place_name}"'
                 warn(msg)
                 logger.warn(msg)
                 return
@@ -138,18 +136,18 @@ class Network(WorkerThread):
 
         flds = fields["one-way"]
 
-        owlf = [
-            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
-            for f in flds
-            if list(f.keys())[0].upper() not in mandatory
-        ]
+        # returns first key in the dictionary
+        def fkey(f):
+            return list(f.keys())[0]
+
+        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() not in mandatory]
 
         flds = fields["two-way"]
         twlf = []
         for f in flds:
-            nm = list(f.keys())[0]
+            nm = fkey(f)
             tp = f[nm]["type"]
-            twlf.extend(["{}_ab {}".format(nm, tp), "{}_ba {}".format(nm, tp)])
+            twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
 
         link_fields = owlf + twlf
 
@@ -165,13 +163,8 @@ class Network(WorkerThread):
                                  is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
 
         flds = p.parameters["network"]["nodes"]["fields"]
-
         default_fields = ["NODE_ID", "IS_CENTROID"]
-        ndflds = [
-            "{} {}".format(list(f.keys())[0], f[list(f.keys())[0]]["type"])
-            for f in flds
-            if list(f.keys())[0].upper() not in default_fields
-        ]
+        ndflds = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() not in default_fields]
 
         if ndflds:
             sql = sql.format("," + ",".join(ndflds))
@@ -247,7 +240,7 @@ class Network(WorkerThread):
             try:
                 curr.execute(cmd)
             except Exception as e:
-                msg = "Error creating trigger: {}".format(e.args)
+                msg = f"Error creating trigger: {e.args}"
                 logger.error(msg)
                 logger.info(cmd)
         self.conn.commit()

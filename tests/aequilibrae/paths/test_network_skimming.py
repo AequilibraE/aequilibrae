@@ -1,7 +1,5 @@
 from unittest import TestCase
-
 import numpy as np
-
 from aequilibrae.paths import Graph
 from aequilibrae.paths import NetworkSkimming
 from aequilibrae.paths import skimming_single_origin

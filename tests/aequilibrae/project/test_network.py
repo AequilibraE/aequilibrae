@@ -11,6 +11,7 @@ from aequilibrae.project.network.network import Network
 from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
 from warnings import warn
+from random import random
 
 
 class TestNetwork(TestCase):
@@ -31,7 +32,7 @@ class TestNetwork(TestCase):
         try:
             self.conn.load_extension("mod_spatialite")
         except Exception as e:
-            warn("AequilibraE might not work as intended without spatialite. {}".format(e.args))
+            warn(f"AequilibraE might not work as intended without spatialite. {e.args}")
         os.chdir(pth)
         self.network = Network(self)
 
@@ -43,25 +44,27 @@ class TestNetwork(TestCase):
         os.unlink(self.file2)
 
     def test_create_from_osm(self):
+        if random() < 0.05:
+            # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
+            self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
+            curr = self.project.conn.cursor()
 
-        # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
-        self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
-        curr = self.project.conn.cursor()
+            curr.execute("""select count(*) from links""")
+            lks = curr.fetchone()
 
-        curr.execute("""select count(*) from links""")
-        lks = curr.fetchone()
+            curr.execute("""select count(distinct osm_id) from links""")
+            osmids = curr.fetchone()
 
-        curr.execute("""select count(distinct osm_id) from links""")
-        osmids = curr.fetchone()
+            if osmids >= lks:
+                self.fail("OSM links not broken down properly")
 
-        if osmids >= lks:
-            self.fail("OSM links not broken down properly")
+            curr.execute("""select count(*) from nodes""")
+            nds = curr.fetchone()
 
-        curr.execute("""select count(*) from nodes""")
-        nds = curr.fetchone()
-
-        if lks > nds:
-            self.fail("We imported more links than nodes. Something wrong here")
+            if lks > nds:
+                self.fail("We imported more links than nodes. Something wrong here")
+        else:
+            print('Skipped check to not load OSM servers')
 
     def test_create_empty_tables(self):
         self.network.create_empty_tables()
@@ -77,11 +80,11 @@ class TestNetwork(TestCase):
         twoway = reduce(lambda a, b: dict(a, **b), p["links"]["fields"]["two-way"])
         twf = []
         for k in list(twoway.keys()):
-            twf.extend(["{}_ab".format(k), "{}_ba".format(k)])
+            twf.extend([f"{k}_ab", f"{k}_ba"])
 
         for f in owf + twf:
             if f not in fields:
-                self.fail("Field {} not added to links table".format(f))
+                self.fail(f"Field {f} not added to links table")
 
         curr = self.conn.cursor()
         curr.execute("""PRAGMA table_info(nodes);""")
@@ -93,7 +96,7 @@ class TestNetwork(TestCase):
 
         for f in flds:
             if f not in nfields:
-                self.fail("Field {} not added to nodes table".format(f))
+                self.fail(f"Field {f} not added to nodes table")
 
     # def test_count_links(self):
     #     self.fail()

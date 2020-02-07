@@ -13,8 +13,7 @@ class TestProject(TestCase):
 
     def test_creation(self):
         test_file = temp_proj_name
-        with self.assertRaises(FileNotFoundError):
-            p = Project(test_file)
+        self.assertRaises(FileNotFoundError, Project, test_file)
 
         p = Project(test_file, True)
         p.conn.close()

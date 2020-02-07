@@ -85,7 +85,7 @@ folder for analysis at a later time.
             "Auckland, New Zealand"]
 
   for city in cities:
-      pth = 'd:/net_tests/{}.sqlite'.format(city)
+      pth = f'd:/net_tests/{city}.sqlite'
 
       p = Project(pth, True)
       p.network.create_from_osm(place_name=city)

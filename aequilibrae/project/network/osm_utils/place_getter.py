@@ -32,7 +32,7 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     report.append("Pausing {:,.2f} seconds before making API GET request".format(pause_duration))
     time.sleep(pause_duration)
     start_time = time.time()
-    report.append("Requesting {} with timeout={}".format(prepared_url, timeout))
+    report.append(f"Requesting {prepared_url} with timeout={timeout}")
     response = requests.get(url, params=params, timeout=timeout, headers=http_headers)
 
     # get the response size and the domain, log result
@@ -42,7 +42,7 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
 
     bbox = None
     for attempts in range(max_attempts):
-        report.append("Attempt: {}".format(attempts))
+        report.append(f"Attempt: {attempts}")
         if response.status_code != 200:
             report.append(
                 "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
@@ -61,16 +61,14 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
             if len(response_json):
                 bbox = [float(x) for x in response_json[0]["boundingbox"]]
                 bbox = [bbox[2], bbox[0], bbox[3], bbox[1]]
-                report.append("PLACE FOUND:{}".format(response_json[0]["display_name"]))
+                report.append(f"PLACE FOUND:{response_json[0]['display_name']}")
             return (bbox, report)
         else:
             bbox = None
 
         if attempts == max_attempts - 1 and bbox is None:
-            report.append(
-                "Maximum download attempts was reached without success. " "Please wait a few minutes and try again"
-            )
+            report.append("Reached maximum download attempts. Please wait a few minutes and try again")
         else:
-            report.append("We got error {} for place query. Error not currently well handled by the software")
+            report.append(f"We got an error for place query.")
 
         return (bbox, report)
