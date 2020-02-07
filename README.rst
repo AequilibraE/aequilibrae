@@ -2,14 +2,6 @@
 AequilibraE
 ###########
 
-AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
-resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
-
-
-Project status
-##############
-
-
 .. image:: https://travis-ci.org/AequilibraE/aequilibrae.svg?branch=master
     :target: https://travis-ci.org/AequilibraE/aequilibrae
 
@@ -23,12 +15,21 @@ Project status
     :target: https://aequilibrae.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
+AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
+resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
+
+Comprehensive documentation
+###########################
+
+`AequilibraE documentation built with Sphinx <http://www.aequilibrae.com>`_
+
 What is available
 #################
 
+* Importing networks from OSM
 * Synthetic gravity/IPF
 * Traffic assignment
-* Network Skimmin & node-to-node path computation
+* Network Skimming & node-to-node path computation
 * Fast Matrix format based on NumPy
 * GTFS Import
 

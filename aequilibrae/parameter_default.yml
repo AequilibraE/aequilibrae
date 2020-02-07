@@ -17,3 +17,47 @@ system:
   driving side: left
   logging: true
   report zeros: 1
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
+network:
+  links:
+    fields:
+      one-way:
+        - link_id:
+            description: link_id
+            type: integer
+        - a_node:
+            description: a_node
+            type: integer
+        - b_node:
+            description: b_node
+            type: integer
+        - direction:
+            description: direction
+            type: integer
+        - length:
+            description: length
+            type: numeric
+        - name:
+            description: name
+            type: varchar
+        - link_type:
+            description: link_type
+            type: varchar
+      two-way:
+        - lanes:
+            description: lanes
+            type: integer
+        - capacity:
+            description: capacity
+            type: numeric
+        - speed:
+            description: speed
+            type: numeric
+  nodes:
+    fields:
+      - node_id:
+          description: node_id
+          type: integer
+      - is_centroid:
+          description: is_centroid
+          type: integer

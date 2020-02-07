@@ -18,12 +18,12 @@ Iterative Proportional Fitting (Fratar)
 # -----------------------------------------------------------------------------------------------------------
 import os
 import sys
-from time import clock
+from time import perf_counter
 
 import numpy as np
 import yaml
 
-from ..matrix import AequilibraEData
+from ..matrix import AequilibraeData
 from ..matrix import AequilibraeMatrix
 
 sys.dont_write_bytecode = True
@@ -61,14 +61,14 @@ class Ipf:
         self.check_parameters()
 
         # check data types
-        if not isinstance(self.rows, AequilibraEData):
-            raise TypeError("Row vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.rows, AequilibraeData):
+            raise TypeError("Row vector needs to be an instance of AequilibraeData")
 
-        if not isinstance(self.columns, AequilibraEData):
-            raise TypeError("Column vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.columns, AequilibraeData):
+            raise TypeError("Column vector needs to be an instance of AequilibraeData")
 
         if not isinstance(self.matrix, AequilibraeMatrix):
-            raise TypeError("Seed matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Seed matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data type
         if not np.issubdtype(self.matrix.dtype, np.floating):
@@ -118,7 +118,7 @@ class Ipf:
                 break
 
     def fit(self):
-        t = clock()
+        t = perf_counter()
         self.check_data()
         if self.error_free:
             max_iter = self.parameters["max iterations"]
@@ -174,7 +174,7 @@ class Ipf:
                 self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
-            self.report.append("Running time: " + str("{:4,.3f}".format(clock() - t)) + "s")
+            self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
     def tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)

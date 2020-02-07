@@ -21,17 +21,16 @@ Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 #  -----------------------------------------------------------------------------------------------------------
 from .ipf import Ipf
 from .synthetic_gravity_model import SyntheticGravityModel
-from ..matrix import AequilibraeMatrix, AequilibraEData
+from ..matrix import AequilibraeMatrix, AequilibraeData
 from ..parameters import Parameters
 
 import sys
 import numpy as np
 import os
 import tempfile
-from time import clock
+from time import perf_counter
 import glob
 import logging
-
 
 sys.dont_write_bytecode = True
 
@@ -40,7 +39,7 @@ class GravityApplication:
     """"
     Model is an instance of SyntheticGravityModel class
     Impedance is an instance of AequilibraEMatrix
-    Row and Column vectors are instances of AequilibraEData
+    Row and Column vectors are instances of AequilibraeData
     """
 
     def __init__(self, **kwargs):
@@ -67,7 +66,7 @@ class GravityApplication:
 
     def apply(self):
         self.check_data()
-        t = clock()
+        t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
         self.output = self.impedance.copy(self.output_name, cores=self.impedance.view_names, names=[self.core_name])
@@ -119,7 +118,7 @@ class GravityApplication:
         self.report.append(
             "Intrazonal flow: " + "{:15,.4f}".format(float(np.nansum(np.diagonal(self.output.matrix_view))))
         )
-        self.report.append("Running time: " + str(round(clock() - t, 3)))
+        self.report.append("Running time: " + str(round(perf_counter() - t, 3)))
 
         for i in glob.glob(tempfile.gettempdir() + "*.aem"):
             try:
@@ -152,14 +151,14 @@ class GravityApplication:
 
         # check dimensions
         # check data types
-        if not isinstance(self.rows, AequilibraEData):
-            raise TypeError("Row vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.rows, AequilibraeData):
+            raise TypeError("Row vector needs to be an instance of AequilibraeData")
 
-        if not isinstance(self.columns, AequilibraEData):
-            raise TypeError("Column vector needs to be an instance of AequilibraEData")
+        if not isinstance(self.columns, AequilibraeData):
+            raise TypeError("Column vector needs to be an instance of AequilibraeData")
 
         if not isinstance(self.impedance, AequilibraeMatrix):
-            raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
+            raise TypeError("Impedance matrix needs to be an instance of AequilibraeMatrix")
 
         # Check data dimensions
         if not np.array_equal(self.rows.index, self.columns.index):

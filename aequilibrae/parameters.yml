@@ -17,3 +17,187 @@ system:
   logging: true
   report zeros: 1
   temp directory: /temp
+  logging_directory: /temp
+  spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
+network:
+  links:
+    fields:
+      one-way:
+        - link_id:
+            description: Link ID. THIS FIELD CANNOT BE CHANGED
+            type: integer
+        - a_node:
+            description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
+            type: integer
+        - b_node:
+            description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
+            type: integer
+        - direction:
+            description: Direction of the link. THIS FIELD CANNOT BE CHANGED
+            type: integer
+        - length:
+            description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
+            type: numeric
+        - modes:
+            description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
+            type: text
+        - name:
+            description: name
+            type: text
+            osm_source: name
+        - link_type:
+            description: link_type
+            type: varchar
+            osm_source: highway
+      two-way:
+        - lanes:
+            description: lanes
+            type: integer
+            osm_source: lanes
+            osm_behaviour: divide
+        - capacity:
+            description: capacity
+            type: numeric
+        - speed:
+            description: speed
+            type: numeric
+            osm_source: maxspeed
+            osm_behaviour: copy
+  nodes:
+    fields:
+      - node_id:
+          description: node_id. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - is_centroid:
+          description: is_centroid
+          type: integer
+  modes:
+    - car:
+        description: All motorized vehicles
+        letter: c
+    - transit:
+        description: All links capable of supporting transit-vehicles
+        letter: t
+    - walk:
+        description: Linkes where walking is permitted
+        letter: w
+    - bicycle:
+        description: All Bicycles
+        letter: b
+  osm:
+    modes:
+      car:
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - escape
+          - road
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          motor_vehicle: "no"
+        unknown_tags: true
+      transit:
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - escape
+          - road
+          - unclassified
+          - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+          - cycleway
+          - footway
+          - steps
+          - corridor
+          - pedestrian
+          - elevator
+          - escalator
+          - path
+          - track
+          - trail
+          - bridleway
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          pedestrian: "no"
+        unknown_tags: true
+      bicycle:
+        link_types:
+          - cycleway
+          - corridor
+          - pedestrian
+          - path
+          - track
+          - trail
+          - unclassified
+        mode_filter:
+          # The following tags will be removed from the mode
+          bicycle: "no"
+        unknown_tags: true
+    # DO NOT CHANGE THE VALUES BELOW UNLESS YOU ARE CERTAIN ABOUT WHAT YOU ARE DOING
+    # https://wiki:openstreetmap:org/wiki/Key:highway:
+    all_link_types:
+      - secondary_link
+      - escalator
+      - trail
+      - cycleway
+      - path
+      - trunk_link
+      - secondary
+      - escape
+      - track
+      - road
+      - motorway_link
+      - primary
+      - corridor
+      - residential
+      - footway
+      - motorway
+      - primary_link
+      - unclassified
+      - bus_guideway
+      - tertiary_link
+      - living_street
+      - pedestrian
+      - bridleway
+      - elevator
+      - motor
+      - trunk
+      - tertiary
+      - service
+      - steps
+      - proposed
+      - raceway
+      - construction
+      - abandoned
+      - platform
+      - unclassified

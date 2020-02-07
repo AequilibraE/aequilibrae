@@ -21,12 +21,12 @@ Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 # Copyright:   (c) AequilibraE authors
 # Licence:     See LICENSE.TXT
 # -----------------------------------------------------------------------------------------------------------
-from time import clock
+from time import perf_counter
 
 import numpy as np
 
 from .gravity_application import GravityApplication, SyntheticGravityModel
-from ..matrix import AequilibraeMatrix, AequilibraEData
+from ..matrix import AequilibraeMatrix, AequilibraeData
 from ..parameters import Parameters
 
 
@@ -82,7 +82,7 @@ class GravityCalibration:
             self.model.alpha = float(b1)
 
     def calibrate(self):
-        t = clock()
+        t = perf_counter()
         # initialize auxiliary variables
         max_cost = self.parameters["max trip length"]
         self.max_iter = self.parameters["max iterations"]
@@ -152,7 +152,7 @@ class GravityCalibration:
             )
         else:
             self.report.append("Converged in " + str(self.itera) + "  iterations to a global error of " + str(self.gap))
-        s = clock() - t
+        s = perf_counter() - t
         m, s1 = divmod(s, 60)
         s -= m * 60
         h, m = divmod(m, 60)
@@ -196,12 +196,12 @@ class GravityCalibration:
 
         self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"])
 
-        self.rows = AequilibraEData()
+        self.rows = AequilibraeData()
         self.rows.create_empty(entries=self.matrix.zones, field_names=["rows"], memory_mode=True)
         self.rows.index[:] = self.matrix.index[:]
         self.rows.rows[:] = self.matrix.rows()[:]
 
-        self.columns = AequilibraEData()
+        self.columns = AequilibraeData()
         self.columns.create_empty(entries=self.matrix.zones, field_names=["columns"], memory_mode=True)
         self.columns.index[:] = self.matrix.index[:]
         self.columns.columns[:] = self.matrix.columns()[:]

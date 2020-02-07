@@ -3,12 +3,115 @@ Use examples
 This page is still under development, so most of the headers are just place-holders for the actual examples
 
 .. note::
-   The examples provided here are not meant as a through description of AequilibraE's capabilities. For that, please
-   look into the API documentation or email aequilibrae@googlegroups.com
+   The examples provided here are not meant as a through description of
+   AequilibraE's capabilities. For that, please look into the API documentation
+   or email aequilibrae@googlegroups.com
+
+.. _example_logging:
+
+Logging
+-------
+AequilibraE uses Python's standard logging library to a file called
+*aequilibrae.log*, but the output folder for this logging can be changed to a
+custom system folder by altering the parameter **system --> logging_directory** on
+the parameters file.
+
+As an example, one could do programatically change the output folder to
+*'D:/myProject/logs'* by doing the following:
+
+::
+
+  from aequilibrae import Parameters
+
+  fldr = 'D:/myProject/logs'
+
+  p = Parameters()
+  p.parameters['system']['logging_directory'] =  fldr
+  p.writeback()
+
+The other useful resource, especially during model debugging it to also show
+all log messages directly on the screen. Doing that requires a little knowledge
+of the Python Logging library, but it is just as easy:
+
+::
+
+  from aequilibrae import logger
+  import logging
+
+  stdout_handler = logging.StreamHandler(sys.stdout)
+  logger.addHandler(stdout_handler)
+
+.. _example_usage_parameters:
+
+Parameters module
+-----------------
+Several examples on how to manipulate the parameters within AequilibraE have
+been shown in other parts of this tutorial.
+
+However, in case you ever have trouble with parameter changes you have made,
+you can always revert them to their default values. But remember, **ALL**
+**CHANGES WILL BE LOST**.
+
+::
+
+  from aequilibrae import Parameters
+
+  fldr = 'D:/myProject/logs'
+
+  p = Parameters()
+  p.reset_default()
+
+
+.. _example_usage_project:
+
+Project module
+--------------
+
+Let's suppose one wants to create project files for a list of 20 cities around
+the world with their complete networks downloaded from
+`Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
+folder for analysis at a later time.
+
+
+::
+
+  from aequilibrae.project import Project
+  import os
+
+  cities = ["Darwin, Australia",
+            "Karlsruhe, Germany",
+            "London, UK",
+            "Paris, France",
+            "Shanghai, China",
+            "Sao Paulo, Brazil",
+            "Rio de Janeiro, Brazil",
+            "Los Angeles, USA",
+            "New York, USA",
+            "Mexico City, Mexico",
+            "Berlin, Germany",
+            "Vancouver, Canada",
+            "Montreal, Canada",
+            "Toronto, Canada",
+            "Madrid, Spain",
+            "Lisbon, Portugal",
+            "Rome, Italy",
+            "Perth, Australia",
+            "Hobart, Australia",
+            "Auckland, New Zealand"]
+
+  for city in cities:
+      pth = f'd:/net_tests/{city}.sqlite'
+
+      p = Project(pth, True)
+      p.network.create_from_osm(place_name=city)
+      p.conn.close()
+      del p
+
+
+.. _example_usage_paths:
 
 Paths module
 ------------
-
 
 ::
 
@@ -177,18 +280,19 @@ an adjacency matrix
 This usage is really advanced, and very rarely not-necessary. Make sure to know what you are doing
 before going down this route
 
+.. _example_usage_distribution:
+
 Trip distribution
 -----------------
 
-The support for trip distribution in AequilibraE is not very comprehensive, mostly because of the loss of relevance that
-such type of model has suffered in the last decade.
+The support for trip distribution in AequilibraE is not very comprehensive,
+mostly because of the loss of relevance that such type of model has suffered
+in the last decade.
 
-However, it is possible to calibrate and apply synthetic gravity models and to perform Iterative Proportional Fitting
-(IPF) with really high performance, which might be of use in many applications other than traditional distribution.
+However, it is possible to calibrate and apply synthetic gravity models and
+to perform Iterative Proportional Fitting (IPF) with really high performance,
+which might be of use in many applications other than traditional distribution.
 
-::
-
-    some code
 
 Synthetic gravity calibration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,9 +304,81 @@ Synthetic gravity calibration
 Synthetic gravity application
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+In this example, imagine that you have your demographic information in an
+sqlite database and that you have already computed your skim matrix.
+
+It is also important to notice that it is crucial to have consistent data, such
+as same set of zones (indices) in both the demographics and the impedance
+matrix.
+
 ::
 
-    some code
+    import pandas as pd
+    import sqlite3
+
+    from aequilibrae.matrix import AequilibraeMatrix
+    from aequilibrae.matrix import AequilibraeData
+
+    from aequilibrae.distribution import SyntheticGravityModel
+    from aequilibrae.distribution import GravityApplication
+
+
+    # We define the model we will use
+    model = SyntheticGravityModel()
+
+    # Before adding a parameter to the model, you need to define the model functional form
+    model.function = "GAMMA" # "EXPO" or "POWER"
+
+    # Only the parameter(s) applicable to the chosen functional form will have any effect
+    model.alpha = 0.1
+    model.beta = 0.0001
+
+    # Or you can load the model from a file
+    model.load('path/to/model/file')
+
+    # We load the impedance matrix
+    matrix = AequilibraeMatrix()
+    matrix.load('path/to/impedance_matrix.aem')
+    matrix.computational_view(['distance'])
+
+    # We create the vectors we will use
+    conn = sqlite3.connect('path/to/demographics/database')
+    query = "SELECT zone_id, population, employment FROM demographics;"
+    df = pd.read_sql_query(query,conn)
+
+    index = df.zone_id.values[:]
+    zones = index.shape[0]
+
+    # You create the vectors you would have
+    df = df.assign(production=df.population * 3.0)
+    df = df.assign(attraction=df.employment * 4.0)
+
+    # We create the vector database
+    args = {"entries": zones, "field_names": ["productions", "attractions"],
+        "data_types": [np.float64, np.float64], "memory_mode": True}
+    vectors = AequilibraeData()
+    vectors.create_empty(**args)
+
+    # Assign the data to the vector object
+    vectors.productions[:] = df.production.values[:]
+    vectors.attractions[:] = df.attraction.values[:]
+    vectors.index[:] = zones[:]
+
+    # Balance the vectors
+    vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+
+    args = {"impedance": matrix,
+            "rows": vectors,
+            "row_field": "productions",
+            "model": model,
+            "columns": vectors,
+            "column_field": "attractions",
+            "output": 'path/to/output/matrix.aem',
+            "nan_as_zero":True
+            }
+
+    gravity = GravityApplication(**args)
+    gravity.apply()
 
 Iterative Proportional Fitting (IPF)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,6 +432,8 @@ fancy multithreading implemented in path computation.
 Transit
 -------
 We only have import for now, and it is likely to not work on Windows if you want the geometries
+
+.. _example_usage_transit:
 
 GTFS import
 ~~~~~~~~~~~

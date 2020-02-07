@@ -34,7 +34,7 @@ DISK = 0
 data_export_types = ["aed", "csv", "sqlite"]
 
 
-class AequilibraEData(object):
+class AequilibraeData(object):
     def __init__(self):
         self.data = None
         self.file_path = None
@@ -54,7 +54,7 @@ class AequilibraEData(object):
         :param data_types: List of data types for the dataset. Types need to be NumPy data types (e.g. np.int16,
         np.float64). If no list of types are provided, type will be *np.float64*
         :param memory_mode: If true, dataset will be kept in memory. If false, the dataset will  be a memory-mapped numpy array
-        :return: # nothing. Associates a dataset with the AequilibraEData object
+        :return: # nothing. Associates a dataset with the AequilibraeData object
         """
 
         if file_path is not None or memory_mode:
@@ -122,8 +122,8 @@ class AequilibraEData(object):
 
     def load(self, file_path):
         """
-        :param file_path: Full file path to the AequilibraEDataset to be loaded
-        :return: Loads the dataset into the AequilibraEData instance
+        :param file_path: Full file path to the AequilibraeData to be loaded
+        :return: Loads the dataset into the AequilibraeData instance
         """
         f = open(file_path)
         self.file_path = os.path.realpath(f.name)

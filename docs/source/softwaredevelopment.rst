@@ -1,5 +1,5 @@
-Software Development
-====================
+Contributing to AequilibraE
+===========================
 
 This page presents some initial instructions on how to setup your system to start contributing to AequilibraE and lists
 the requirements for all pull-requests to be merged into master.

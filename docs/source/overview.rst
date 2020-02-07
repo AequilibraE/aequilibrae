@@ -10,34 +10,104 @@ Sub-modules
 AequilibraE is organized in submodules that are often derived from the traditional 4-step model. However, other modules
 have already been added or are expected to be added in the future. The current modules are:
 
+- :ref:`overview_project`
+- :ref:`overview_parameters`
 - :ref:`overview_distribution`
 - :ref:`overview_paths`
 - :ref:`overview_transit`
 - :ref:`overview_matrix`
-- :ref:`overview_parameters`
 
 Contributions can be made to the existing modules or in the form of new modules.
+
+
+.. _overview_project:
+
+AequilibraE Project
+~~~~~~~~~~~~~~~~~~~
+The AequilibraE Project, as a consistent model file, comes from the vision of
+having a complete model system that would have capabilities to support the vast
+majority of analysis usually performed with traditional transport models.
+
+In a nutshell, the AequilibraE project file is designed to behave like many of
+the commercial platforms available in the market, where a single file hosts the
+majority of the data. Differently then these platforms, however, AequilibraE is
+designed on top of an open data format, SQLite.
+
+This concept is still under heavy development, but it is already possible to use
+its structure to download full, routable networks directly from
+`Open Street Maps <https://www.openstreetmap.org/>`_ .
+
+More detailed is provided in - :ref:`project`.
+
+
+.. _overview_parameters:
+
+Global parameters
+~~~~~~~~~~~~~~~~~
+As more features are added to AequilibraE, a large number of parameters start to
+be required, so the parameters module has also been growing in importance within
+the software.
+
+There are currently 4 main sessions with the parameters file: *Assignment*,
+*Distribution*, *Network* and *System*.
+
+The parameters for *assignment* and *distribution* control only convergence criteria,
+while the *System* section controls things like the number of CPU cores used by the
+software, default directories and Spatialite location for Windows systems. The
+*Network* section, however, contains parameters that control the creation of networks
+and the import from Open Street Maps.
+
+The parameters file is built using the `YAML <https://yaml.org/>`_ format, and detailed
+instructions on how to configure it are provided on :ref:`parameters_file`.
+
 
 .. _overview_distribution:
 
 Trip distribution
 ~~~~~~~~~~~~~~~~~
-Synthetic gravity calib and appl
-IPF
+
+The trip distribution module is the second oldest piece of code in AequilibraE, and
+includes only code for calibration and application of Synthetic gravity models and
+Iterative Proportional Fitting. Not much documentation has been written for this module,
+but a some examples are available on the usage examples page :ref:`example_usage_distribution`.
+
 
 .. _overview_paths:
 
 Path computation
 ~~~~~~~~~~~~~~~~
-Traffic assignment
-Path computation
-Skimming
+
+The path computation module contains some of the oldest code in AequilibraE, some of
+which preceed the existance of AequilibraE as a proper Python package.
+
+The package is built around a shortest path algorithm ported from SciPy and adapted
+to support proper multi-threading, network loading and multi-field skimming.
+
+As of now, this module has three main capabilities:
+
+* Traffic assignment
+* Path computation
+* Skimming
+
+It is worth noting that turn-penalties and turn-prohibitions are currently not
+supported in AequilibraE, and that there is no built-in support for multiple
+concurrent shortest paths computation.
+
+A wealth of usage examples are available in the examples page under
+:ref:`example_usage_paths`.
+
 
 .. _overview_transit:
 
 Transit
 ~~~~~~~
-GTFS import
+
+For now the only transit-related capability of AequilibraE is to import GTFS into
+SQLite/Spatialite. The results of this import is NOT integrated with the AequilibraE
+project.
+
+Usage examples can be found on :ref:`example_usage_transit`.
+
 
 .. _overview_matrix:
 
@@ -81,9 +151,3 @@ and link loads from traffic assignment.
 AequilibraE data currently supports export to **csv** and **sqlite**. Extending it to other binary files such as HDF5
 or `Arrow <https://arrow.apache.org/>`_ are being considered for future development. If you require them, please file
 an issue on GitHub.
-
-.. _overview_parameters:
-
-Global parameters
-~~~~~~~~~~~~~~~~~
-parameters module

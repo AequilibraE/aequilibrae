@@ -4,9 +4,9 @@ from unittest import TestCase
 
 import numpy as np
 
-from aequilibrae.matrix import AequilibraEData
+from aequilibrae.matrix import AequilibraeData
 
-file_path = AequilibraEData().random_name()
+file_path = AequilibraeData().random_name()
 args = {
     "file_path": file_path,
     "entries": 100,
@@ -18,7 +18,7 @@ args = {
 class TestAequilibraEData(TestCase):
     def test___init__(self):
         # Generates the dataset
-        dataset = AequilibraEData()
+        dataset = AequilibraeData()
         dataset.create_empty(**args)
 
         dataset.index[:] = np.arange(dataset.entries) + 100
@@ -34,7 +34,7 @@ class TestAequilibraEData(TestCase):
 
     def test_load(self):
         # re-imports the dataset
-        self.ad = AequilibraEData()
+        self.ad = AequilibraeData()
         self.ad.load(file_path)
 
         # checks if the values were properly saved

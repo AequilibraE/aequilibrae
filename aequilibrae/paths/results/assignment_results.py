@@ -5,7 +5,7 @@ import sqlite3
 import sys
 import os
 from numpy.lib.format import open_memmap
-from ...matrix import AequilibraeMatrix, AequilibraEData
+from ...matrix import AequilibraeMatrix, AequilibraeData
 from ..graph import Graph
 
 """
@@ -148,7 +148,7 @@ class AssignmentResults:
     def setSavePathFile(self, save=False, path_result=None):
         # Fields: Origin, Node, Predecessor
         # Number of records: Origins * Nodes
-        a = AequilibraEData()
+        a = AequilibraeData()
         d1 = max(1, self.zones)
         d2 = 1
         memory_mode = True
@@ -208,7 +208,7 @@ class AssignmentResults:
                 aed_file_name = None
 
             entries = int(np.unique(self.lids).shape[0])
-            res = AequilibraEData()
+            res = AequilibraeData()
             res.create_empty(
                 file_path=aed_file_name, memory_mode=memory_mode, entries=entries, field_names=fields, data_types=types
             )
