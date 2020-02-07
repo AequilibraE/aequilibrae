@@ -381,8 +381,9 @@ updated according to the ID for the node the link now terminates in.
 Re-shaping a link
 ^^^^^^^^^^^^^^^^^
 
-Nothing is expected to change in the database (other than the link's shape), as
-long as the extremities of the link remain in the same position.
+When reshaping a link, the only thing other than we expect to be updated in the
+link database is their length (or distance, in AequilibraE's field structure).
+As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 
 .. .. _net_section.1.2.4:
 
