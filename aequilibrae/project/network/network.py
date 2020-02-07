@@ -15,6 +15,7 @@ from aequilibrae import logger
 
 from ...utils import WorkerThread
 
+
 class Network(WorkerThread):
     req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
     req_node_flds = ["node_id", "is_centroid"]
