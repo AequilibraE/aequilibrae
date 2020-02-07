@@ -45,6 +45,7 @@ class TestAllOrNothing(TestCase):
         res.prepare(self.g, matrix)
 
         self.g.set_skimming([])
+        self.g.set_blocked_centroid_flows(False)
         assig = allOrNothing(matrix, self.g, res)
         assig.execute()
 
@@ -56,7 +57,7 @@ class TestAllOrNothing(TestCase):
 
         assig = allOrNothing(matrix, self.g, res)
         assig.execute()
-        if res.skims.distance.sum() != 2914644.0:
+        if res.skims.distance.sum() != 2912922.0
             self.fail("skimming during assignment returned the wrong value")
 
     def test_execute(self):
