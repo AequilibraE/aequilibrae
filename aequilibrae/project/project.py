@@ -3,7 +3,7 @@ import os
 import platform
 import shutil
 from warnings import warn
-from aequilibrae.project.network.network import Network
+from aequilibrae.project.network import Network
 from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
 

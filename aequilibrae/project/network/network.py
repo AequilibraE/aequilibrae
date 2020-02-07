@@ -2,7 +2,7 @@ import math
 import os
 from warnings import warn
 from sqlite3 import Connection as sqlc
-from typing import List
+from typing import List, Dict
 import numpy as np
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
@@ -17,11 +17,13 @@ from ...utils import WorkerThread
 
 
 class Network(WorkerThread):
+    req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
+
     def __init__(self, project):
         WorkerThread.__init__(self, None)
 
         self.conn = project.conn  # type: sqlc
-        self.graphs = {}
+        self.graphs = {}  # type: Dict[Graph]
 
     def _check_if_exists(self):
         curr = self.conn.cursor()
@@ -122,7 +124,6 @@ class Network(WorkerThread):
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
-        mandatory = ["LINK_ID", "A_NODE", "B_NODE", "DIRECTION", "DISTANCE", "MODES", "LINK_TYPE"]
         sql = """CREATE TABLE 'links' (
                           ogc_fid INTEGER PRIMARY KEY,
                           link_id INTEGER UNIQUE,
@@ -140,7 +141,7 @@ class Network(WorkerThread):
         def fkey(f):
             return list(f.keys())[0]
 
-        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).upper() not in mandatory]
+        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).lower() not in self.req_link_flds]
 
         flds = fields["two-way"]
         twlf = []
@@ -176,32 +177,52 @@ class Network(WorkerThread):
         curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
         self.conn.commit()
 
-    def build_graphs(self, modes: List[str], fields=["distance"]) -> None:
-        # curr.execute("select * from links where link_id < 0")
-        for mode in modes:
-            print(mode)
-
-    def custom_graph(self, mode: str, centroids: np.array, fields=["distance"]) -> Graph:
+    def build_graphs(self) -> None:
         curr = self.conn.cursor()
-        curr.execute("select * from links where link_id < 0")
-        available_fields = [x[0] for x in curr.description if x[0] not in ["ogc_fid", "geometry"]]
+        curr.execute('PRAGMA table_info(links);')
+        field_names = curr.fetchall()
 
-        required_fields = ["link_id", "a_node", "b_node", "direction"]
-        for f in fields:
-            if f in available_fields:
-                required_fields.append(f)
+        ignore_fields = ['ogc_fid', 'geometry']
+        all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+
+        links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
+        data = np.core.records.fromrecords(links, names=all_fields)
+
+        valid_fields = []
+        removed_fields = []
+        for f in all_fields:
+            if np.issubdtype(data[f].dtype, np.floating) or np.issubdtype(data[f].dtype, np.integer):
+                valid_fields.append(f)
             else:
-                if "{}_ab".format(f) not in available_fields or "{}_ba".format(f) not in available_fields:
-                    raise ValueError("Field {} does not exist on your network".format(f))
-                required_fields.extend(["{}_ab".format(f), "{}_ba".format(f)])
+                removed_fields.append(f)
+        if len(removed_fields) > 1:
+            warn(f'Fields were removed form Graph for being non-numeric: {",".join(removed_fields)}')
 
-        curr.execute("select {} from links where  instr(modes, '{}') > 0;".format(",".join(required_fields), mode))
+        curr.execute('select node_id from nodes where is_centroid=1;')
+        centroids = np.array([i[0] for i in curr.fetchall()])
 
-        # data = curr.fetchall()
+        modes = curr.execute('select mode_id from modes;').fetchall()
+        modes = [m[0] for m in modes]
 
-        g = Graph()
+        for m in modes:
+            w = np.core.defchararray.find(data['modes'], m)
+            net = np.array(data[valid_fields], copy=True)
+            net['b_node'][w < 0] = net['a_node'][w < 0]
 
-        return g
+            g = Graph()
+            g.network = net
+            g.network_ok = True
+            g.status = 'OK'
+            g.prepare_graph(centroids)
+            self.graphs[m] = g
+
+    def set_time_field(self, time_field: str) -> None:
+        for m, g in self.graphs.items():  # type: str, Graph
+            if time_field not in list(g.graph.dtype.names):
+                raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
+            g.free_flow_time = time_field
+            g.set_graph(time_field)
+            self.graphs[m] = g
 
     def count_links(self) -> int:
         c = self.conn.cursor()
