@@ -118,6 +118,14 @@ CREATE TRIGGER new_link AFTER INSERT ON links
           search_frame = EndPoint(links.geometry)) OR
         nodes.node_id = new.b_node))
     WHERE links.ROWID = new.ROWID;
+    UPDATE links
+    SET distance = GeodesicLength(new.geometry)
+    WHERE links.ROWID = new.ROWID;
+
+    UPDATE links SET
+        link_id=(SELECT MAX(link_id)+1 FROM links)
+    WHERE rowid=NEW.rowid and new.link_id is NULL;
+
   END;
 #
 CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
@@ -295,8 +303,9 @@ END;
 #
 CREATE TRIGGER enforces_link_length_update AFTER UPDATE OF distance ON links
 BEGIN
-  UPDATE links SET distance = GeodesicLength(new.geometry);
-END;
+  UPDATE links SET distance = GeodesicLength(new.geometry)
+  WHERE links.ROWID = new.ROWID;END;
+
 
 #
 -- Guarantees that link direction is one of the required values
@@ -312,14 +321,3 @@ WHEN new.is_centroid != 0 AND new.is_centroid != 1
 BEGIN
   SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
 END;
-
-#
-CREATE TRIGGER links_null_link_id_insert BEFORE INSERT ON links
-WHEN new.link_id is NULL
-BEGIN
-    UPDATE links SET
-        link_id=(SELECT MAX(link_id)+1 FROM links)
-    WHERE rowid=NEW.rowid;
-END;
-
-
