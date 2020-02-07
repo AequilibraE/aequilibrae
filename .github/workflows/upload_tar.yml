@@ -1,4 +1,4 @@
-name: Upload MacOS Python Package
+name: Upload Tar to PyPI
 
 on:
   release:
