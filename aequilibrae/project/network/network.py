@@ -18,6 +18,7 @@ from ...utils import WorkerThread
 class Network(WorkerThread):
     req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
     req_node_flds = ["node_id", "is_centroid"]
+    protected_fields = ['ogc_fid', 'geometry']
 
     def __init__(self, project):
         WorkerThread.__init__(self, None)
