@@ -2,10 +2,11 @@ import importlib.util as iutil
 from unittest import TestCase
 from time import sleep
 from aequilibrae.project.network.osm_downloader import OSMDownloader
+from random import random
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
-from random import random
+
 
 class TestOSMDownloader(TestCase):
     def test_do_work(self):
@@ -16,6 +17,7 @@ class TestOSMDownloader(TestCase):
                 self.fail("It found links in the middle of the ocean")
         else:
             print('Skipped check to not load OSM servers')
+
     def test_do_work2(self):
 
         if random() < 0.05:

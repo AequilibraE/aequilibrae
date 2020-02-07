@@ -13,6 +13,7 @@ from aequilibrae.reference_files import spatialite_database
 from warnings import warn
 from random import random
 
+
 class TestNetwork(TestCase):
     def setUp(self) -> None:
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
