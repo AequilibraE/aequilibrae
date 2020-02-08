@@ -291,7 +291,7 @@ an adjacency matrix
 ::
 
     from aequilibrae.paths import Graph
-    from aequilibrae import reserved_fields
+    from aequilibrae.project.network import Network
     from scipy.sparse import coo_matrix
 
     # original_adjacency_matrix is a sparse matrix where positive values are actual links
@@ -308,12 +308,14 @@ an adjacency matrix
                  k._Graph__float_type,
                  k._Graph__float_type]
 
-    all_titles = [reserved_fields.link_id,
-                  reserved_fields.a_node,
-                  reserved_fields.b_node,
-                  reserved_fields.direction,
-                 "distance_ab",
-                 "distance_ba"]
+    # List of all required link fields for a network
+    # Network.req_link_flds
+
+    # List of all required node fields for a network
+    # Network.req_node_flds
+
+    # List of fields that are reserved for internal workings
+    # Network.protected_fields
 
     dt = [(t, d) for t, d in zip(all_titles, all_types)]
 
@@ -323,16 +325,13 @@ an adjacency matrix
     my_graph = Graph()
     my_graph.network = np.zeros(links, dtype=dt)
 
-    my_graph.network[reserved_fields.link_id] = np.arange(links) + 1
-    my_graph.network[reserved_fields.a_node] = sparse_graph.row
-    my_graph.network[reserved_fields.b_node] = sparse_graph.col
-    my_graph.network["distance_ab"] = sparse_graph.data
+    my_graph.network['link_id'] = np.arange(links) + 1
+    my_graph.network['a_node'] = sparse_graph.row
+    my_graph.network['b_node'] = sparse_graph.col
+    my_graph.network["distance"] = sparse_graph.data
 
     # If the links are directed (from A to B), direction is 1. If bi-directional, use zeros
-    my_graph.network[reserved_fields.direction] = np.ones(links)
-
-    # If uni-directional from A to B the value is not used
-    my_graph.network["distance_ba"] = mat.data * 10000
+    my_graph.network['direction'] = np.ones(links)
 
     # Let's say that all nodes in the network are centroids
     list_of_centroids =  np.arange(max(sparse_graph.shape[0], sparse_graph.shape[0])+ 1)
