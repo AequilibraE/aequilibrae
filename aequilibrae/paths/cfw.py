@@ -56,10 +56,49 @@ class CFW:
         self.steps_below = 0
 
         self.step_direction = {}
+        # if this is one, we do not have a new direction and will get stuck. Make it 1.
+        self.conjugate_direction_max = 0.99999
 
     def calculate_conjugate_stepsize(self):
-        # pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
-        # vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
+        # if the previous step replaced the aggregated solution so far, we need to start anew.
+        if self.stepsize == 1.0:
+            self.conjugate_stepsize = 0.0
+            return
+
+        pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
+        vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
+
+        prev_dir_minus_current_sol = {}
+        aon_minus_current_sol = {}
+        aon_minus_prev_dir = {}
+        for c in self.traffic_classes:
+            prev_dir_minus_current_sol[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
+            aon_minus_current_sol[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
+            aon_minus_prev_dir[c] = c._aon_results.link_loads[:, :] - self.step_direction[c][:, :]
+
+        # TODO: This is a sum over all supernetwork links, it's not tested for multi-class yet
+        # double-sum over user classes
+        numerator = 0.0
+        denominator = 0.0
+        for c in self.traffic_classes:
+            for cp in self.traffic_classes:
+                numerator += prev_dir_minus_current_sol[c] * aon_minus_current_sol[cp]
+                denominator += prev_dir_minus_current_sol[c] * aon_minus_prev_dir[cp]
+
+        numerator = np.sum(numerator * vdf_der)
+        denominator = np.sum(denominator * vdf_der)
+
+        alpha = numerator / denominator
+        if alpha < 0.0:
+            self.stepdirection = 0.0
+        elif alpha > self.conjugate_direction_max:
+            self.stepdirection = self.conjugate_direction_max
+        else:
+            self.conjugate_stepsize = alpha
+
+        print(" could be {}".format(self.conjugate_stepsize))
+
+        # set to zero to emulate FW
         self.conjugate_stepsize = 0.0
 
     def calculate_step_direction(self):
