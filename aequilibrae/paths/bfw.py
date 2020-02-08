@@ -108,17 +108,17 @@ class BFW:
         prevs_minus_cur = {}
         aon_minus_cur = {}
         pre_pre_minus_pre = {}
-        prev_minus_cur = {}
+        previous_minus_cur = {}
 
         for c in self.traffic_classes:
             prevs_minus_cur[c] = (
                 self.step_direction[c][:, :] * self.stepsize
-                + self.previous_step_direction[c] * (1.0 - self.stepsize)
+                + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
                 - c.results.link_loads[:, :]
             )
             aon_minus_cur[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
             pre_pre_minus_pre[c] = self.previous_step_direction[c] - self.step_direction[c][:, :]
-            prev_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
+            previous_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -131,15 +131,16 @@ class BFW:
             for cp in self.traffic_classes:
                 mu_numerator += prevs_minus_cur[c] * aon_minus_cur[cp]
                 mu_denominator += prevs_minus_cur[c] * pre_pre_minus_pre[cp]
-                nu_nom += prev_minus_cur[c] * aon_minus_cur[cp]
-                nu_denom += prev_minus_cur[c] * prev_minus_cur[cp]
+                nu_nom += previous_minus_cur[c] * aon_minus_cur[cp]
+                nu_denom += previous_minus_cur[c] * previous_minus_cur[cp]
 
         mu_numerator = np.sum(mu_numerator * vdf_der)
         mu_denominator = np.sum(mu_denominator * vdf_der)
         if mu_denominator == 0.0:
             mu = 0.0
         else:
-            mu = mu_numerator / mu_denominator
+            mu = -mu_numerator / mu_denominator
+            # logger.info("mu before max = {}".format(mu))
             mu = max(0.0, mu)
 
         nu_nom = np.sum(nu_nom * vdf_der)
@@ -147,7 +148,8 @@ class BFW:
         if nu_denom == 0.0:
             nu = 0.0
         else:
-            nu = nu_nom / nu_denom + mu * self.stepsize / (1.0 - self.stepsize)
+            nu = -(nu_nom / nu_denom) + mu * self.stepsize / (1.0 - self.stepsize)
+            # logger.info("nu before max = {}".format(nu))
             nu = max(0.0, nu)
 
         self.betas[0] = 1.0 / (1.0 + nu + mu)
@@ -179,7 +181,7 @@ class BFW:
             self.calculate_conjugate_stepsize()
             logger.info("CFW step, conjugate stepsize = {}".format(self.conjugate_stepsize))
             for c in self.traffic_classes:
-                self.previous_step_direction[c] = self.step_direction[c]  # save for bfw
+                self.previous_step_direction[c] = self.step_direction[c].copy()  # save for bfw
                 self.step_direction[c] *= self.conjugate_stepsize
                 self.step_direction[c] += c._aon_results.link_loads[:, :] * (1.0 - self.conjugate_stepsize)
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
@@ -256,10 +258,6 @@ class BFW:
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in gradient direction"""
-        # First iteration gets 100% of shortest path
-        if self.iter == 1:
-            self.stepsize = 1.0
-            return
 
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
@@ -269,7 +267,7 @@ class BFW:
             return np.sum(congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:
-            min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
+            min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
             self.stepsize = min_res.root
             if not min_res.converged:
                 logger.warn("Biconjugate Frank Wolfe stepsize finder is not converged")
