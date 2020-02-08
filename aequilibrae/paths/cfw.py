@@ -55,27 +55,31 @@ class CFW:
         self.steps_below_needed_to_terminate = 1
         self.steps_below = 0
 
-        self.step_direction = None
+        self.step_direction = {}
 
     def calculate_conjugate_stepsize(self):
+        # pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
+        # vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
         self.conjugate_stepsize = 0.0
 
     def calculate_step_direction(self):
-        # instead of aon direction, calculate CF direction
-        self.step_direction = {}
-
+        """Caculate step direction such that it is conjugate to previous direction"""
         # current load: c.results.link_loads[:, :]
         # aon load: c._aon_results.link_loads[:, :]
-
-        self.calculate_conjugate_stepsize()
-
         sd_flows = []
-        for c in self.traffic_classes:
-            self.step_direction[c] = c.results.link_loads[:, :] * self.conjugate_stepsize + c._aon_results.link_loads[
-                :, :
-            ] * (1.0 - self.conjugate_stepsize)
 
-            sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+        if self.iter == 2:
+            # we want a fw step on the second interation
+            for c in self.traffic_classes:
+                self.step_direction[c] = c._aon_results.link_loads[:, :]
+                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+        else:
+            self.calculate_conjugate_stepsize()
+            for c in self.traffic_classes:
+                self.step_direction[c] *= self.conjugate_stepsize
+                self.step_direction[c] += c._aon_results.link_loads[:, :] * (1.0 - self.conjugate_stepsize)
+                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
     def execute(self):
@@ -92,18 +96,16 @@ class CFW:
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            # for now: emulate fw, then add cfw
-            self.calculate_step_direction()
-
-            self.step_direction_flow = np.sum(aon_flows, axis=0)
-
-            _ = self.calculate_stepsize()
-
             if self.iter == 1:
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c._aon_results.link_loads[:, :]
                     flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
+
             else:
+                self.calculate_step_direction()
+
+                self.calculate_stepsize()
+
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1.0 - self.stepsize)
                     c.results.link_loads[:, :] += self.step_direction[c] * self.stepsize
