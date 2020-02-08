@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import root_scalar
 from typing import List
+from copy import deepcopy
 
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
@@ -11,7 +12,7 @@ if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
 
-class CFW:
+class BFW:
     def __init__(self, assig_spec) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
         self.rgap_target = parameters["rgap"]
@@ -55,6 +56,7 @@ class CFW:
         self.steps_below_needed_to_terminate = 1
         self.steps_below = 0
 
+        self.previous_step_direction = {}
         self.step_direction = {}
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
@@ -63,13 +65,11 @@ class CFW:
         # the step direction conjugate to the previous direction.
         self.no_conjugate_step = False
 
-    def calculate_conjugate_stepsize(self):
-        # if the previous step replaced the aggregated solution so far, we need to start anew.
-        if self.stepsize == 1.0 or self.no_conjugate_step:
-            self.no_conjugate_step = False
-            self.conjugate_stepsize = 0.0
-            return
+        # BFW specific stuff
+        self.no_biconjugate_step = False
+        self.betas = np.array([1.0, 0.0, 0.0])
 
+    def calculate_conjugate_stepsize(self):
         pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
         vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
 
@@ -102,10 +102,23 @@ class CFW:
         else:
             self.conjugate_stepsize = alpha
 
-        # print(" could be {}".format(self.conjugate_stepsize))
+    def calculate_biconjugate_direction(self):
+        # mu_nom =
+        # mu_denom =
+        mu = 0.0
+        # nu_nom =
+        # nu_denom =
+        nu = 0.0
 
-        # set to zero to emulate FW
-        # self.conjugate_stepsize = 0.0
+        mu = np.max(0.0, mu)
+        nu = np.max(0.0, nu)
+
+        self.betas[0] = 1.0 / (1.0 + nu + mu)
+        self.betas[1] = nu * self.betas[0]
+        self.betas[2] = mu * self.betas[0]
+
+        # by construction ok
+        # if np.sum(self.betas) != 1.0 or (np.any(self.betas < 0.0)):
 
     def calculate_step_direction(self):
         """Caculate step direction such that it is conjugate to previous direction"""
@@ -113,22 +126,44 @@ class CFW:
         # aon load: c._aon_results.link_loads[:, :]
         sd_flows = []
 
-        if self.iter == 2:
-            # we want a fw step on the second interation
+        # 2nd iteration is a fw step. if the previous step replaced the aggregated
+        # solution so far, we need to start anew.
+        if (self.iter == 2) or (self.stepsize == 1.0) or (self.no_conjugate_step):
+            self.no_conjugate_step = False
+            self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
                 self.step_direction[c] = c._aon_results.link_loads[:, :]
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
-        else:
+        # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
+        elif (self.iter == 3) or (self.no_biconjugate_step):
+            self.no_biconjugate_step = False
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
+                self.previous_step_direction[c] = self.step_direction[c]  # save for bfw
                 self.step_direction[c] *= self.conjugate_stepsize
                 self.step_direction[c] += c._aon_results.link_loads[:, :] * (1.0 - self.conjugate_stepsize)
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+        # biconjugate
+        else:
+            self.calculate_biconjugate_direction()
+            # deep copy because we overwrite step_direction but need it on next iteration
+            previous_step_dir_temp_copy = deepcopy(self.step_direction)
+
+            for c in self.traffic_classes:
+                self.step_direction[c] = (
+                    c._aon_results.link_loads[:, :] * self.beta[0]
+                    + self.step_direction[c] * self.beta[1]
+                    + self.previous_step_direction[c] * self.beta[2]
+                )
+                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+
+                # self.previous_step_direction[c] = previous_step_dir_temp_copy[c]
+            self.previous_step_direction = previous_step_dir_temp_copy
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
     def execute(self):
-        logger.info("Conjugate Frank-Wolfe Assignment STATS")
+        logger.info("Biconjugate Frank-Wolfe Assignment STATS")
         logger.info("Iteration,RelativeGap,stepsize,conjugate_stepsize")
         for self.iter in range(1, self.max_iter + 1):
             flows = []
@@ -138,19 +173,15 @@ class CFW:
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 aon.execute()
                 aon_flows.append(np.sum(c._aon_results.link_loads, axis=1) * c.pce)
-
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             if self.iter == 1:
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c._aon_results.link_loads[:, :]
                     flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
-
             else:
                 self.calculate_step_direction()
-
                 self.calculate_stepsize()
-
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1.0 - self.stepsize)
                     c.results.link_loads[:, :] += self.step_direction[c] * self.stepsize
@@ -178,7 +209,7 @@ class CFW:
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
-        logger.info("CFW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
+        logger.info("BFW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in gradient direction"""
@@ -198,7 +229,7 @@ class CFW:
             min_res = root_scalar(derivative_of_objective, bracket=(0, 1))
             self.stepsize = min_res.root
             if not min_res.converged:
-                logger.warn("Conjugate Frank Wolfe stepsize finder is not converged")
+                logger.warn("Biconjugate Frank Wolfe stepsize finder is not converged")
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
@@ -210,6 +241,7 @@ class CFW:
                 self.stepsize = heuristic_stepsize_at_zero
                 # need
                 self.no_conjugate_step = True
+                self.no_biconjugate_step = True
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0

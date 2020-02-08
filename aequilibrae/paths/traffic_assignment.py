@@ -5,11 +5,12 @@ from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.msa import MSA
 from aequilibrae.paths.fw import FW
 from aequilibrae.paths.cfw import CFW
+from aequilibrae.paths.bfw import BFW
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.traffic_class import TrafficClass
 
 bpr_parameters = ["alpha", "beta"]
-all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw"]
+all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
 
 
 class TrafficAssignment(object):
@@ -75,6 +76,8 @@ class TrafficAssignment(object):
             self.assignment = FW(self)
         elif algorithm.lower() == "cfw":
             self.assignment = CFW(self)
+        elif algorithm.lower() == "bfw":
+            self.assignment = BFW(self)
         else:
             raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
 
