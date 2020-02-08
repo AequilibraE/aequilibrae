@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.optimize import root_scalar
 from typing import List
-from copy import deepcopy
 
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
@@ -110,8 +109,8 @@ class BFW:
         # nu_denom =
         nu = 0.0
 
-        mu = np.max(0.0, mu)
-        nu = np.max(0.0, nu)
+        mu = max(0.0, mu)
+        nu = max(0.0, nu)
 
         self.betas[0] = 1.0 / (1.0 + nu + mu)
         self.betas[1] = nu * self.betas[0]
@@ -146,19 +145,20 @@ class BFW:
         # biconjugate
         else:
             self.calculate_biconjugate_direction()
+
             # deep copy because we overwrite step_direction but need it on next iteration
-            previous_step_dir_temp_copy = deepcopy(self.step_direction)
+            previous_step_dir_temp_copy = {}
 
             for c in self.traffic_classes:
+                previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
                 self.step_direction[c] = (
-                    c._aon_results.link_loads[:, :] * self.beta[0]
-                    + self.step_direction[c] * self.beta[1]
-                    + self.previous_step_direction[c] * self.beta[2]
+                    c._aon_results.link_loads[:, :] * self.betas[0]
+                    + self.step_direction[c] * self.betas[1]
+                    + self.previous_step_direction[c] * self.betas[2]
                 )
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
 
-                # self.previous_step_direction[c] = previous_step_dir_temp_copy[c]
-            self.previous_step_direction = previous_step_dir_temp_copy
+                self.previous_step_direction[c] = previous_step_dir_temp_copy[c]
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
