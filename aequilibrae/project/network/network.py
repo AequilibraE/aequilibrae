@@ -35,7 +35,7 @@ class Network(WorkerThread):
 
     def modes(self):
         curr = self.conn.cursor()
-        curr.execute("""select mode_name from modes""")
+        curr.execute("""select mode_id from modes""")
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
