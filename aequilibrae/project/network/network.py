@@ -33,6 +33,7 @@ class Network(WorkerThread):
         tbls = curr.fetchone()[0]
         return tbls > 0
 
+    # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
         curr = self.conn.cursor()
         curr.execute('PRAGMA table_info(links);')
