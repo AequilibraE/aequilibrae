@@ -48,14 +48,17 @@ class CFW:
         self.iter = 0
         self.rgap = np.inf
         self.stepsize = 1.0
+        self.conjugate_stepsize = 0.0
         self.fw_class_flow = 0
         # rgap can be a bit wiggly, specifying how many times we need to be below target rgap is a quick way to
-        # ensure a better result. We could also demand that the solution is that many consecutive times below,
-        # but we are talking about small oscillations so not really necessary.
+        # ensure a better result. We might want to demand that the solution is that many consecutive times below.
         self.steps_below_needed_to_terminate = 1
         self.steps_below = 0
 
         self.step_direction = None
+
+    def calculate_conjugate_stepsize(self):
+        self.conjugate_stepsize = 0.0
 
     def calculate_step_direction(self):
         # instead of aon direction, calculate CF direction
@@ -63,10 +66,16 @@ class CFW:
 
         # current load: c.results.link_loads[:, :]
         # aon load: c._aon_results.link_loads[:, :]
+
+        self.calculate_conjugate_stepsize()
+
         sd_flows = []
         for c in self.traffic_classes:
-            self.step_direction[c] = c._aon_results.link_loads[:, :]
-            sd_flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
+            self.step_direction[c] = c.results.link_loads[:, :] * self.conjugate_stepsize + c._aon_results.link_loads[
+                :, :
+            ] * (1.0 - self.conjugate_stepsize)
+
+            sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
     def execute(self):
@@ -97,15 +106,11 @@ class CFW:
             else:
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1.0 - self.stepsize)
-                    c.results.link_loads[:, :] += (
-                        self.step_direction[c] * self.stepsize
-                    )  # c._aon_results.link_loads[:, :]
+                    c.results.link_loads[:, :] += self.step_direction[c] * self.stepsize
                     # We already get the total traffic class, in PCEs, corresponding to the total for the user classes
                     flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
 
             self.fw_total_flow = np.sum(flows, axis=0)
-
-            pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
 
             # Check convergence
             # This needs ot be done with the current costs, and not the future ones
@@ -116,12 +121,13 @@ class CFW:
                     else:
                         self.steps_below += 1
 
+            pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
             self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
                 c._aon_results.reset()
-            logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
+            logger.info("{},{},{},{}".format(self.iter, self.rgap, self.stepsize, self.conjugate_stepsize))
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
