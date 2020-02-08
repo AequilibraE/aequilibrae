@@ -44,6 +44,8 @@ class Network(WorkerThread):
                      'INT2', 'INT8', 'REAL', 'DOUBLE', 'DOUBLE PRECISION', 'FLOAT', 'DECIMAL', 'NUMERIC']
         all_fields = []
         for f in field_names:
+            if f in ignore_fields:
+                continue
             for i in skimmable:
                 if i in f[2].upper():
                     all_fields.append(f[1])
