@@ -62,10 +62,10 @@ class BFW:
 
         # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
         # the step direction conjugate to the previous direction.
-        self.no_conjugate_step = False
+        self.do_fw_step = False
+        self.do_conjugate_step = False
 
         # BFW specific stuff
-        self.no_biconjugate_step = False
         self.betas = np.array([1.0, 0.0, 0.0])
 
     def calculate_conjugate_stepsize(self):
@@ -102,15 +102,53 @@ class BFW:
             self.conjugate_stepsize = alpha
 
     def calculate_biconjugate_direction(self):
-        # mu_nom =
-        # mu_denom =
-        mu = 0.0
-        # nu_nom =
-        # nu_denom =
-        nu = 0.0
+        pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
+        vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
 
-        mu = max(0.0, mu)
-        nu = max(0.0, nu)
+        prevs_minus_cur = {}
+        aon_minus_cur = {}
+        pre_pre_minus_pre = {}
+        prev_minus_cur = {}
+
+        for c in self.traffic_classes:
+            prevs_minus_cur[c] = (
+                self.step_direction[c][:, :] * self.stepsize
+                + self.previous_step_direction[c] * (1.0 - self.stepsize)
+                - c.results.link_loads[:, :]
+            )
+            aon_minus_cur[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
+            pre_pre_minus_pre[c] = self.previous_step_direction[c] - self.step_direction[c][:, :]
+            prev_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
+
+        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
+        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
+        # this needs more work
+        mu_numerator = 0.0
+        mu_denominator = 0.0
+        nu_nom = 0.0
+        nu_denom = 0.0
+        for c in self.traffic_classes:
+            for cp in self.traffic_classes:
+                mu_numerator += prevs_minus_cur[c] * aon_minus_cur[cp]
+                mu_denominator += prevs_minus_cur[c] * pre_pre_minus_pre[cp]
+                nu_nom += prev_minus_cur[c] * aon_minus_cur[cp]
+                nu_denom += prev_minus_cur[c] * prev_minus_cur[cp]
+
+        mu_numerator = np.sum(mu_numerator * vdf_der)
+        mu_denominator = np.sum(mu_denominator * vdf_der)
+        if mu_denominator == 0.0:
+            mu = 0.0
+        else:
+            mu = mu_numerator / mu_denominator
+            mu = max(0.0, mu)
+
+        nu_nom = np.sum(nu_nom * vdf_der)
+        nu_denom = np.sum(nu_denom * vdf_der)
+        if nu_denom == 0.0:
+            nu = 0.0
+        else:
+            nu = nu_nom / nu_denom + mu * self.stepsize / (1.0 - self.stepsize)
+            nu = max(0.0, nu)
 
         self.betas[0] = 1.0 / (1.0 + nu + mu)
         self.betas[1] = nu * self.betas[0]
@@ -127,16 +165,19 @@ class BFW:
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if (self.iter == 2) or (self.stepsize == 1.0) or (self.no_conjugate_step):
-            self.no_conjugate_step = False
+        if (self.iter == 2) or (self.stepsize == 1.0) or (self.do_fw_step):
+            logger.info("FW step")
+            self.do_fw_step = False
+            self.do_conjugate_step = True
             self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
                 self.step_direction[c] = c._aon_results.link_loads[:, :]
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
-        elif (self.iter == 3) or (self.no_biconjugate_step):
-            self.no_biconjugate_step = False
+        elif (self.iter == 3) or (self.do_conjugate_step):
+            self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
+            logger.info("CFW step, conjugate stepsize = {}".format(self.conjugate_stepsize))
             for c in self.traffic_classes:
                 self.previous_step_direction[c] = self.step_direction[c]  # save for bfw
                 self.step_direction[c] *= self.conjugate_stepsize
@@ -145,10 +186,8 @@ class BFW:
         # biconjugate
         else:
             self.calculate_biconjugate_direction()
-
             # deep copy because we overwrite step_direction but need it on next iteration
             previous_step_dir_temp_copy = {}
-
             for c in self.traffic_classes:
                 previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
                 self.step_direction[c] = (
@@ -164,7 +203,7 @@ class BFW:
 
     def execute(self):
         logger.info("Biconjugate Frank-Wolfe Assignment STATS")
-        logger.info("Iteration,RelativeGap,stepsize,conjugate_stepsize")
+        logger.info("Iteration,RelativeGap,stepsize, beta_0, beta_1, beta_2")
         for self.iter in range(1, self.max_iter + 1):
             flows = []
             aon_flows = []
@@ -205,7 +244,11 @@ class BFW:
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
                 c._aon_results.reset()
-            logger.info("{},{},{},{}".format(self.iter, self.rgap, self.stepsize, self.conjugate_stepsize))
+            logger.info(
+                "{},{},{},{},{},{}".format(
+                    self.iter, self.rgap, self.stepsize, self.betas[0], self.betas[1], self.betas[2]
+                )
+            )
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
@@ -216,7 +259,7 @@ class BFW:
         # First iteration gets 100% of shortest path
         if self.iter == 1:
             self.stepsize = 1.0
-            return True
+            return
 
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
@@ -240,8 +283,7 @@ class BFW:
                 logger.warn("alert,alert,Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                 self.stepsize = heuristic_stepsize_at_zero
                 # need
-                self.no_conjugate_step = True
-                self.no_biconjugate_step = True
+                self.do_fw_step = True
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
