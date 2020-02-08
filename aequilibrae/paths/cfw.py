@@ -59,7 +59,8 @@ class CFW:
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
 
-        # if FW stepsize is zero, we change the
+        # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
+        # the step direction conjugate to the previous direction.
         self.no_conjugate_step = False
 
     def calculate_conjugate_stepsize(self):
