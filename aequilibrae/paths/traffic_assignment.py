@@ -4,51 +4,52 @@ import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.msa import MSA
 from aequilibrae.paths.fw import FW
+from aequilibrae.paths.cfw import CFW
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.traffic_class import TrafficClass
 
-bpr_parameters = ['alpha', 'beta']
-all_algorithms = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw']
+bpr_parameters = ["alpha", "beta"]
+all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw"]
 
 
 class TrafficAssignment(object):
     def __init__(self) -> None:
-        self.__dict__['vdf'] = None  # type: VDF
-        self.__dict__['classes'] = None  # type: List[TrafficClass]
-        self.__dict__['algorithm'] = None  # type: str
-        self.__dict__['vdf_parameters'] = None  # type: dict
-        self.__dict__['time_field'] = None  # type: str
-        self.__dict__['capacity_field'] = None  # type: str
-        self.__dict__['assignment'] = None  # type: MSA
+        self.__dict__["vdf"] = None  # type: VDF
+        self.__dict__["classes"] = None  # type: List[TrafficClass]
+        self.__dict__["algorithm"] = None  # type: str
+        self.__dict__["vdf_parameters"] = None  # type: dict
+        self.__dict__["time_field"] = None  # type: str
+        self.__dict__["capacity_field"] = None  # type: str
+        self.__dict__["assignment"] = None  # type: MSA
 
     def __setattr__(self, instance, value) -> None:
-        if instance == 'assignment':
+        if instance == "assignment":
             pass
-        elif instance == 'vdf':
-            if value not in ['BPR']:
-                raise ValueError('Volume-delay function {} is not available'.format(value))
+        elif instance == "vdf":
+            if value not in ["BPR"]:
+                raise ValueError("Volume-delay function {} is not available".format(value))
             value = VDF()
-            value.function = 'BPR'
-        elif instance == 'classes':
+            value.function = "BPR"
+        elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
             elif isinstance(value, list):
                 for v in value:
                     if not isinstance(v, TrafficClass):
-                        raise ValueError('Traffic classes need to be proper AssignmentClass objects')
+                        raise ValueError("Traffic classes need to be proper AssignmentClass objects")
             else:
-                raise ValueError('Traffic classes need to be proper AssignmentClass objects')
-        elif instance == 'vdf_parameters':
+                raise ValueError("Traffic classes need to be proper AssignmentClass objects")
+        elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
-                raise ValueError('Parameter set is not valid:  '.format(value))
-        elif instance == 'time_field':
+                raise ValueError("Parameter set is not valid:  ".format(value))
+        elif instance == "time_field":
             if not isinstance(value, str):
-                raise ValueError('Value for time field is not string')
-        elif instance == 'capacity_field':
+                raise ValueError("Value for time field is not string")
+        elif instance == "capacity_field":
             if not isinstance(value, str):
-                raise ValueError('Value for capacity field is not string')
+                raise ValueError("Value for capacity field is not string")
         else:
-            raise ValueError('trafficAssignment class does not have property {}'.format(instance))
+            raise ValueError("trafficAssignment class does not have property {}".format(instance))
         self.__dict__[instance] = value
 
     def set_vdf(self, vdf_function: str) -> None:
@@ -58,7 +59,7 @@ class TrafficAssignment(object):
         self.classes = classes
 
     def available_algorithms(self) -> list:
-        return (all_algorithms)
+        return all_algorithms
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -66,14 +67,16 @@ class TrafficAssignment(object):
         """
         Chooses the assignment algorithm. e.g. 'frank-wolfe'
         """
-        if algorithm.lower() == 'all-or-nothing':
+        if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
-        elif algorithm.lower() == 'msa':
+        elif algorithm.lower() == "msa":
             self.assignment = MSA(self)
-        elif algorithm.lower() == 'frank-wolfe':
+        elif algorithm.lower() == "frank-wolfe":
             self.assignment = FW(self)
+        elif algorithm.lower() == "cfw":
+            self.assignment = CFW(self)
         else:
-            raise AttributeError("Assignment algorithm not available. Choose from: {}".format(','.join(all_algorithms)))
+            raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
 
     def set_vdf_parameters(self, **kwargs) -> None:
         """
@@ -101,14 +104,14 @@ class TrafficAssignment(object):
         return deepcopy(self.__dict__)
 
     def __validate_parameters(self, kwargs) -> bool:
-        if self.vdf == '':
-            raise ValueError('First you need to set the Volume-Delay Function to use')
+        if self.vdf == "":
+            raise ValueError("First you need to set the Volume-Delay Function to use")
 
         par = list(kwargs.keys())
-        if self.vdf.function == 'BPR':
+        if self.vdf.function == "BPR":
             q = [x for x in par if x not in bpr_parameters] + [x for x in bpr_parameters if x not in par]
         if len(q) > 0:
-            raise ValueError('List of functions {} for vdf {} has an inadequate set of parameters'.format(q, self.vdf))
+            raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
     def execute(self) -> None:
