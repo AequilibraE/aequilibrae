@@ -59,9 +59,13 @@ class CFW:
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
 
+        # if FW stepsize is zero, we change the
+        self.no_conjugate_step = False
+
     def calculate_conjugate_stepsize(self):
         # if the previous step replaced the aggregated solution so far, we need to start anew.
-        if self.stepsize == 1.0:
+        if self.stepsize == 1.0 or self.no_conjugate_step:
+            self.no_conjugate_step = False
             self.conjugate_stepsize = 0.0
             return
 
@@ -76,8 +80,9 @@ class CFW:
             aon_minus_current_sol[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
             aon_minus_prev_dir[c] = c._aon_results.link_loads[:, :] - self.step_direction[c][:, :]
 
-        # TODO: This is a sum over all supernetwork links, it's not tested for multi-class yet
-        # double-sum over user classes
+        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
+        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
+        # this needs more work
         numerator = 0.0
         denominator = 0.0
         for c in self.traffic_classes:
@@ -96,10 +101,10 @@ class CFW:
         else:
             self.conjugate_stepsize = alpha
 
-        print(" could be {}".format(self.conjugate_stepsize))
+        # print(" could be {}".format(self.conjugate_stepsize))
 
         # set to zero to emulate FW
-        self.conjugate_stepsize = 0.0
+        # self.conjugate_stepsize = 0.0
 
     def calculate_step_direction(self):
         """Caculate step direction such that it is conjugate to previous direction"""
@@ -202,6 +207,8 @@ class CFW:
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 logger.warn("alert,alert,Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                 self.stepsize = heuristic_stepsize_at_zero
+                # need
+                self.no_conjugate_step = True
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
