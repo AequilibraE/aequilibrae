@@ -34,7 +34,7 @@ except ImportError:
 
 sys.dont_write_bytecode = True
 
-Cython.Compiler.Options.annotate = True
+# Cython.Compiler.Options.annotate = True
 
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "AoN.pyx")
@@ -42,8 +42,8 @@ whole_path = os.path.join(here, "AoN.pyx")
 ext_module = Extension(
     "AoN",
     [whole_path],
-    # extra_compile_args=['/fopenmp'],
-    # extra_link_args=['/fopenmp'],
+    extra_compile_args=['/openmp'],
+    extra_link_args=['/openmp'],
     include_dirs=[np.get_include()],
 )
 

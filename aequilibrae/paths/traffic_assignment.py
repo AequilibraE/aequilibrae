@@ -18,10 +18,14 @@ class TrafficAssignment(object):
         self.__dict__["vdf"] = None  # type: VDF
         self.__dict__["classes"] = None  # type: List[TrafficClass]
         self.__dict__["algorithm"] = None  # type: str
-        self.__dict__["vdf_parameters"] = None  # type: dict
+        self.__dict__["vdf_parameters"] = None  # type: list
         self.__dict__["time_field"] = None  # type: str
         self.__dict__["capacity_field"] = None  # type: str
         self.__dict__["assignment"] = None  # type: MSA
+        self.__dict__["capacity"] = None  # type: np.ndarray
+        self.__dict__["free_flow_tt"] = None  # type: np.ndarray
+        self.__dict__["total_flow"] = None  # type: np.ndarray
+        self.__dict__["congested_time"] = None  # type: np.ndarray
 
     def __setattr__(self, instance, value) -> None:
         if instance == "assignment":
@@ -66,8 +70,16 @@ class TrafficAssignment(object):
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
     def set_algorithm(self, algorithm: str):
         """
-        Chooses the assignment algorithm. e.g. 'frank-wolfe'
+        Chooses the assignment algorithm. e.g. 'frank-wolfe', 'bfw', 'msa'
         """
+
+        # First we instantiate the arrays we will be using over and over
+        c = self.classes[0]
+        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field], copy=True).astype(np.float64)
+        self.__dict__["capacity"] = np.array(c.graph.graph[self.capacity_field], copy=True).astype(np.float64)
+        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
+        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
+
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
         elif algorithm.lower() == "msa":
@@ -81,11 +93,21 @@ class TrafficAssignment(object):
         else:
             raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
 
-    def set_vdf_parameters(self, **kwargs) -> None:
+    def set_vdf_parameters(self, par: dict) -> None:
         """
         Sets the parameters for the Volume-delay function. e.g. {'alpha': 0.15, 'beta':4.0}
         """
-        self.vdf_parameters = kwargs
+        self.__dict__['vdf_parameters'] = par
+        pars = []
+        if self.vdf.function == "BPR":
+            for par in ['alpha', 'beta']:
+                if isinstance(self.vdf_parameters[par], str):
+                    array = np.array(self.classes[0].graph.graph[par], copy=True).astype(np.float64)
+                else:
+                    array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
+                    array.fill(self.vdf_parameters[par])
+                pars.append(array)
+        self.__dict__["vdf_parameters"] = pars
 
     def set_time_field(self, time_field: str) -> None:
         """

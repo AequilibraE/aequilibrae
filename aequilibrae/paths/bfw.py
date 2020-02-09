@@ -6,7 +6,9 @@ from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae import Parameters
 from aequilibrae import logger
-
+from aequilibrae.paths.equilibrium_directions import composition, subtraction, multiplication
+from time import perf_counter
+import sys
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
@@ -35,15 +37,9 @@ class BFW:
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
 
-        self.capacity = self.traffic_classes[0].graph.graph[self.cap_field]
-        self.free_flow_time = self.traffic_classes[0].graph.graph[self.time_field]
+        self.capacity = assig_spec.capacity
 
-        self.vdf_parameters = {}
-        for k, v in assig_spec.vdf_parameters.items():
-            if isinstance(v, str):
-                self.vdf_parameters[k] = assig_spec.classes[0].graph.graph[k]
-            else:
-                self.vdf_parameters[k] = v
+        self.vdf_parameters = assig_spec.vdf_parameters
 
         self.iter = 0
         self.rgap = np.inf
@@ -68,9 +64,27 @@ class BFW:
         # BFW specific stuff
         self.betas = np.array([1.0, 0.0, 0.0])
 
+        # Instantiates the arrays that we will use over and over
+        self.free_flow_tt = assig_spec.free_flow_tt
+        self.msa_total_flow = assig_spec.total_flow
+        self.congested_time = assig_spec.congested_time
+        self.vdf_der = np.array(assig_spec.congested_time, copy=True)
+        self.congested_value = np.array(assig_spec.congested_time, copy=True)
+        self.prevs_minus_cur = {}
+        self.aon_minus_cur = {}
+        self.pre_pre_minus_pre = {}
+        self.previous_minus_cur = {}
+        for c in self.traffic_classes:
+            self.prevs_minus_cur[c] = np.array(c.results.link_loads[:, :], copy=True)
+            self.aon_minus_cur[c] = np.array(c.results.link_loads[:, :], copy=True)
+            self.pre_pre_minus_pre[c] = np.array(c.results.link_loads[:, :], copy=True)
+            self.previous_minus_cur[c] = np.array(c.results.link_loads[:, :], copy=True)
+
     def calculate_conjugate_stepsize(self):
-        pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
-        vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
+        pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_tt}
+        # vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
+        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt,
+                                  *self.vdf_parameters)
 
         prev_dir_minus_current_sol = {}
         aon_minus_current_sol = {}
@@ -90,8 +104,8 @@ class BFW:
                 numerator += prev_dir_minus_current_sol[c] * aon_minus_current_sol[cp]
                 denominator += prev_dir_minus_current_sol[c] * aon_minus_prev_dir[cp]
 
-        numerator = np.sum(numerator * vdf_der)
-        denominator = np.sum(denominator * vdf_der)
+        numerator = np.sum(numerator * self.vdf_der)
+        denominator = np.sum(denominator * self.vdf_der)
 
         alpha = numerator / denominator
         if alpha < 0.0:
@@ -102,23 +116,24 @@ class BFW:
             self.conjugate_stepsize = alpha
 
     def calculate_biconjugate_direction(self):
-        pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
-        vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
-
-        prevs_minus_cur = {}
-        aon_minus_cur = {}
-        pre_pre_minus_pre = {}
-        previous_minus_cur = {}
+        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt,
+                                  *self.vdf_parameters)
+        # pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_tt}
+        # vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
 
         for c in self.traffic_classes:
-            prevs_minus_cur[c] = (
-                self.step_direction[c][:, :] * self.stepsize
-                + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
-                - c.results.link_loads[:, :]
-            )
-            aon_minus_cur[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
-            pre_pre_minus_pre[c] = self.previous_step_direction[c] - self.step_direction[c][:, :]
-            previous_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
+            composition(self.prevs_minus_cur[c], self.step_direction[c], self.previous_step_direction[c], self.stepsize)
+            subtraction(self.prevs_minus_cur[c], self.prevs_minus_cur[c], c.results.link_loads)
+
+            subtraction(self.aon_minus_cur[c], c._aon_results.link_loads, c.results.link_loads)
+            subtraction(self.pre_pre_minus_pre[c], self.previous_step_direction[c], self.step_direction[c])
+            subtraction(self.previous_minus_cur[c], self.step_direction[c], c.results.link_loads)
+            # self.prevs_minus_cur[c] = (self.step_direction[c][:, :] * self.stepsize - c.results.link_loads[:, :]
+            #                            + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize))
+
+            # self.aon_minus_cur[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
+            # self.pre_pre_minus_pre[c] = self.previous_step_direction[c] - self.step_direction[c][:, :]
+            # self.previous_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -128,14 +143,18 @@ class BFW:
         nu_nom = 0.0
         nu_denom = 0.0
         for c in self.traffic_classes:
-            for cp in self.traffic_classes:
-                mu_numerator += prevs_minus_cur[c] * aon_minus_cur[cp]
-                mu_denominator += prevs_minus_cur[c] * pre_pre_minus_pre[cp]
-                nu_nom += previous_minus_cur[c] * aon_minus_cur[cp]
-                nu_denom += previous_minus_cur[c] * previous_minus_cur[cp]
+            mu_numerator += np.sum(self.prevs_minus_cur[c], axis=1) * np.sum(self.aon_minus_cur[c], axis=1)
+            mu_denominator += np.sum(self.prevs_minus_cur[c], axis=1) * np.sum(self.pre_pre_minus_pre[c], axis=1)
+            nu_nom += np.sum(self.previous_minus_cur[c], axis=1) * np.sum(self.aon_minus_cur[c], axis=1)
+            nu_denom += np.sum(self.previous_minus_cur[c], axis=1) * np.sum(self.previous_minus_cur[c], axis=1)
+            # for cp in self.traffic_classes:
+            #     mu_numerator += self.prevs_minus_cur[c] * self.aon_minus_cur[cp]
+            #     mu_denominator += self.prevs_minus_cur[c] * self.pre_pre_minus_pre[cp]
+            #     nu_nom += self.previous_minus_cur[c] * self.aon_minus_cur[cp]
+            #     nu_denom += self.previous_minus_cur[c] * self.previous_minus_cur[cp]
 
-        mu_numerator = np.sum(mu_numerator * vdf_der)
-        mu_denominator = np.sum(mu_denominator * vdf_der)
+        mu_numerator = np.sum(mu_numerator * self.vdf_der)
+        mu_denominator = np.sum(mu_denominator * self.vdf_der)
         if mu_denominator == 0.0:
             mu = 0.0
         else:
@@ -143,8 +162,8 @@ class BFW:
             # logger.info("mu before max = {}".format(mu))
             mu = max(0.0, mu)
 
-        nu_nom = np.sum(nu_nom * vdf_der)
-        nu_denom = np.sum(nu_denom * vdf_der)
+        nu_nom = np.sum(nu_nom * self.vdf_der)
+        nu_denom = np.sum(nu_denom * self.vdf_der)
         if nu_denom == 0.0:
             nu = 0.0
         else:
@@ -193,9 +212,9 @@ class BFW:
             for c in self.traffic_classes:
                 previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
                 self.step_direction[c] = (
-                    c._aon_results.link_loads[:, :] * self.betas[0]
-                    + self.step_direction[c] * self.betas[1]
-                    + self.previous_step_direction[c] * self.betas[2]
+                        c._aon_results.link_loads[:, :] * self.betas[0]
+                        + self.step_direction[c] * self.betas[1]
+                        + self.previous_step_direction[c] * self.betas[2]
                 )
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
 
@@ -240,8 +259,10 @@ class BFW:
                     else:
                         self.steps_below += 1
 
-            pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
-            self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
+            self.vdf.apply_vdf(self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt,
+                               *self.vdf_parameters)
+            # pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_tt}
+            # self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
@@ -262,9 +283,13 @@ class BFW:
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
             # fw_total_flow was calculated on last iteration
-            pars = {"link_flows": x, "capacity": self.capacity, "fftime": self.free_flow_time}
-            congested_value = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
-            return np.sum(congested_value * (self.step_direction_flow - self.fw_total_flow))
+            # pars = {"link_flows": x, "capacity": self.capacity, "fftime": self.free_flow_tt}
+            # congested_value = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
+
+            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt,
+                               *self.vdf_parameters)
+
+            return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1])

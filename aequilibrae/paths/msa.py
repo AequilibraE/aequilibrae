@@ -25,16 +25,13 @@ class MSA:
         self.traffic_classes = assig_spec.classes  # type: List[TrafficAssignment]
         self.num_classes = len(assig_spec.classes)
 
-        self.cap_field = assig_spec.capacity_field
-        self.time_field = assig_spec.time_field
+        self.capacity = assig_spec.capacity
+        self.free_flow_tt = assig_spec.free_flow_tt
+        self.msa_total_flow = assig_spec.total_flow
+        self.congested_time = assig_spec.congested_time
         self.vdf = assig_spec.vdf
 
-        self.vdf_parameters = {}
-        for k, v in assig_spec.vdf_parameters.items():
-            if isinstance(v, str):
-                self.vdf_parameters[k] = assig_spec.classes[0].graph.graph[k]
-            else:
-                self.vdf_parameters[k] = v
+        self.vdf_parameters = assig_spec.vdf_parameters
 
         self.iter = 0
         self.rgap = np.inf
@@ -62,15 +59,13 @@ class MSA:
             self.msa_total_flow = np.sum(flows, axis=0)
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
-            pars = {'link_flows': self.msa_total_flow, 'capacity': c.graph.graph[self.cap_field],
-                    'fftime': c.graph.graph[self.time_field]}
-
             # Check convergence
             if self.iter > 1:
                 if self.check_convergence():
                     break
 
-            self.congested_time = self.vdf.apply_vdf(**{**pars, **self.vdf_parameters})
+            self.vdf.apply_vdf(self.congested_time, self.msa_total_flow, self.capacity, self.free_flow_tt,
+                               *self.vdf_parameters)
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
