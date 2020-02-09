@@ -12,7 +12,8 @@ if False:
 
 
 class BFW:
-    def __init__(self, assig_spec) -> None:
+    def __init__(self, assig_spec, algorithm) -> None:
+        self.algorithm = algorithm
         parameters = Parameters().parameters["assignment"]["equilibrium"]
         self.rgap_target = parameters["rgap"]
         self.max_iter = parameters["maximum_iterations"]
@@ -156,18 +157,21 @@ class BFW:
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
-        # by construction ok
-        # if np.sum(self.betas) != 1.0 or (np.any(self.betas < 0.0)):
-
     def calculate_step_direction(self):
-        """Caculate step direction such that it is conjugate to previous direction"""
+        """Caculate step direction depending on the method."""
         # current load: c.results.link_loads[:, :]
         # aon load: c._aon_results.link_loads[:, :]
         sd_flows = []
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if (self.iter == 2) or (self.stepsize == 1.0) or (self.do_fw_step):
+        if (
+            (self.iter == 2)
+            or (self.stepsize == 1.0)
+            or (self.do_fw_step)
+            or (self.algorithm == "frank-wolfe")
+            or (self.algorithm == "msa")
+        ):
             logger.info("FW step")
             self.do_fw_step = False
             self.do_conjugate_step = True
@@ -176,7 +180,7 @@ class BFW:
                 self.step_direction[c] = c._aon_results.link_loads[:, :]
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
-        elif (self.iter == 3) or (self.do_conjugate_step):
+        elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
             logger.info("CFW step, conjugate stepsize = {}".format(self.conjugate_stepsize))
@@ -204,8 +208,8 @@ class BFW:
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
     def execute(self):
-        logger.info("Biconjugate Frank-Wolfe Assignment STATS")
-        logger.info("Iteration,RelativeGap,stepsize, beta_0, beta_1, beta_2")
+        logger.info("{} Assignment STATS".format(self.algorithm))
+        logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):
             flows = []
             aon_flows = []
@@ -246,18 +250,19 @@ class BFW:
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
                 c._aon_results.reset()
-            logger.info(
-                "{},{},{},{},{},{}".format(
-                    self.iter, self.rgap, self.stepsize, self.betas[0], self.betas[1], self.betas[2]
-                )
-            )
+            logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
-        logger.info("BFW Assignment finished. {} iterations and {} final gap".format(self.iter, self.rgap))
+        logger.info(
+            "{} Assignment finished. {} iterations and {} final gap".format(self.algorithm, self.iter, self.rgap)
+        )
 
     def calculate_stepsize(self):
-        """Calculate optimal stepsize in gradient direction"""
+        """Calculate optimal stepsize in descent direction"""
+        if self.algorithm == "msa":
+            self.stepsize = 1.0 / self.iter
+            return
 
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
@@ -270,17 +275,18 @@ class BFW:
             min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
             self.stepsize = min_res.root
             if not min_res.converged:
-                logger.warn("Biconjugate Frank Wolfe stepsize finder is not converged")
+                logger.warn("Descent direction stepsize finder is not converged")
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
-            # in order to add a small fraction of the AoN. A heuristic value of 1e-6 seems to work well in practice.
-            heuristic_stepsize_at_zero = 1 / self.iter
+            # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
+            # seems to work well in practice.
+            heuristic_stepsize_at_zero = 1.0 / self.iter
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                logger.warn("alert,alert,Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                logger.warn("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                 self.stepsize = heuristic_stepsize_at_zero
-                # need
+                # need to reset conjugate / bi-conjugate direction search
                 self.do_fw_step = True
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?

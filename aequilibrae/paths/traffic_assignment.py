@@ -70,14 +70,16 @@ class TrafficAssignment(object):
         """
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
-        elif algorithm.lower() == "msa":
-            self.assignment = MSA(self)
-        elif algorithm.lower() == "frank-wolfe":
-            self.assignment = FW(self)
-        elif algorithm.lower() == "cfw":
-            self.assignment = CFW(self)
-        elif algorithm.lower() == "bfw":
-            self.assignment = BFW(self)
+        #         elif algorithm.lower() == "msa":
+        #             self.assignment = MSA(self)
+        #         elif algorithm.lower() == "frank-wolfe":
+        #             self.assignment = FW(self)
+        #         elif algorithm.lower() == "cfw":
+        #             self.assignment = CFW(self)
+        #         elif algorithm.lower() == "bfw":
+        #             self.assignment = BFW(self)
+        elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
+            self.assignment = BFW(self, algorithm.lower())
         else:
             raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
 
