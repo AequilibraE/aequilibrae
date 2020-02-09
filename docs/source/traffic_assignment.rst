@@ -199,21 +199,15 @@ Network has:
 * Nodes: 24
 * Zones: 24
 
-MSA
-+++
-
 .. image:: images/sioux_falls_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Sioux Falls MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Sioux Falls Frank-Wolfe 500 iterations
-
+.. image:: images/sioux_falls_regional_bfw-500_iter.png
+    :width: 590
+    :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
 
 Anaheim
 ~~~~~~~
@@ -224,20 +218,15 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-MSA
-+++
-
 .. image:: images/anaheim_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Anaheim MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/anaheim_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Anaheim Frank-Wolfe 500 iterations
+.. image:: images/Anaheim_regional_bfw-500_iter.png
+    :width: 590
+    :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
 
 Winnipeg
 ~~~~~~~~
@@ -248,19 +237,11 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-MSA
-+++
-
 .. image:: images/winnipeg_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Winnipeg MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Winnipeg Frank-Wolfe 500 iterations
 
 Barcelona
@@ -272,19 +253,11 @@ Network has:
 * Nodes: 1,020
 * Zones: 110
 
-MSA
-+++
-
 .. image:: images/barcelona_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Barcelona MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/barcelona_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Barcelona Frank-Wolfe 500 iterations
 
 Chicago Regional
@@ -302,9 +275,9 @@ Network has:
 .. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
-.. image:: images/chicago_regional_frank-wolfe-500_iter.png
+.. image:: images/chicago_regional_bfw-500_iter.png
     :width: 590
-    :alt: Chicago Frank-Wolfe 500 iterations
+    :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
 
 
 Convergence Study
