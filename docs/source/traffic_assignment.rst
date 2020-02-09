@@ -296,20 +296,16 @@ Network has:
 * Nodes: 1,020
 * Zones: 110
 
-MSA
-+++
-
 .. image:: images/chicago_regional_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Chicago MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Chicago Frank-Wolfe 500 iterations
+.. image:: images/chicago_regional_frank-wolfe-500_iter.png
+    :width: 590
+    :alt: Chicago Frank-Wolfe 500 iterations
+
 
 Convergence Study
 ---------------
@@ -320,8 +316,11 @@ Regional), as that instance has a comparable size to real-world models.
 
 .. image:: images/convergence_comparison.png
     :width: 590
-    :align: center
     :alt: Algorithm convergence comparison
+.. image:: images/convergence_comparison.png
+    :width: 590
+    :alt: Algorithm convergence comparison
+
 
 Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
@@ -332,7 +331,8 @@ Computational performance
 -------------------------
 Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
 2667Hz RAM, AequilibraE performed 1,000 iterations of Frank-Wolfe assignment
-on the Chicago Network in just under 46 minutes.
+on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
+takes just under 47 minutes.
 
 During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz,
 which suggests that performance in modern desktops would be substantially better
