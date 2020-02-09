@@ -2,10 +2,7 @@ from typing import List
 from copy import deepcopy
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.msa import MSA
-from aequilibrae.paths.fw import FW
-from aequilibrae.paths.cfw import CFW
-from aequilibrae.paths.bfw import BFW
+from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.traffic_class import TrafficClass
 
@@ -21,7 +18,7 @@ class TrafficAssignment(object):
         self.__dict__["vdf_parameters"] = None  # type: dict
         self.__dict__["time_field"] = None  # type: str
         self.__dict__["capacity_field"] = None  # type: str
-        self.__dict__["assignment"] = None  # type: MSA
+        self.__dict__["assignment"] = None  # type: LinearApproximation
 
     def __setattr__(self, instance, value) -> None:
         if instance == "assignment":
@@ -70,16 +67,8 @@ class TrafficAssignment(object):
         """
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
-        #         elif algorithm.lower() == "msa":
-        #             self.assignment = MSA(self)
-        #         elif algorithm.lower() == "frank-wolfe":
-        #             self.assignment = FW(self)
-        #         elif algorithm.lower() == "cfw":
-        #             self.assignment = CFW(self)
-        #         elif algorithm.lower() == "bfw":
-        #             self.assignment = BFW(self)
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = BFW(self, algorithm.lower())
+            self.assignment = LinearApproximation(self, algorithm.lower())
         else:
             raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
 
