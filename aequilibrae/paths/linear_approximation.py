@@ -73,23 +73,17 @@ class LinearApproximation:
         pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
         vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
 
-        prev_dir_minus_current_sol = {}
-        aon_minus_current_sol = {}
-        aon_minus_prev_dir = {}
-        for c in self.traffic_classes:
-            prev_dir_minus_current_sol[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
-            aon_minus_current_sol[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
-            aon_minus_prev_dir[c] = c._aon_results.link_loads[:, :] - self.step_direction[c][:, :]
-
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
         # this needs more work
         numerator = 0.0
         denominator = 0.0
         for c in self.traffic_classes:
-            for cp in self.traffic_classes:
-                numerator += prev_dir_minus_current_sol[c] * aon_minus_current_sol[cp]
-                denominator += prev_dir_minus_current_sol[c] * aon_minus_prev_dir[cp]
+            prev_dir_minus_current_sol = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_current_sol = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - self.step_direction[c][:, :], axis=1)
+            numerator += prev_dir_minus_current_sol * aon_minus_current_sol
+            denominator += prev_dir_minus_current_sol * aon_minus_prev_dir
 
         numerator = np.sum(numerator * vdf_der)
         denominator = np.sum(denominator * vdf_der)
@@ -106,21 +100,6 @@ class LinearApproximation:
         pars = {"link_flows": self.fw_total_flow, "capacity": self.capacity, "fftime": self.free_flow_time}
         vdf_der = self.vdf.apply_derivative(**{**pars, **self.vdf_parameters})
 
-        prevs_minus_cur = {}
-        aon_minus_cur = {}
-        pre_pre_minus_pre = {}
-        previous_minus_cur = {}
-
-        for c in self.traffic_classes:
-            prevs_minus_cur[c] = (
-                self.step_direction[c][:, :] * self.stepsize
-                + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
-                - c.results.link_loads[:, :]
-            )
-            aon_minus_cur[c] = c._aon_results.link_loads[:, :] - c.results.link_loads[:, :]
-            pre_pre_minus_pre[c] = self.previous_step_direction[c] - self.step_direction[c][:, :]
-            previous_minus_cur[c] = self.step_direction[c][:, :] - c.results.link_loads[:, :]
-
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
         # this needs more work
@@ -129,15 +108,20 @@ class LinearApproximation:
         nu_nom = 0.0
         nu_denom = 0.0
         for c in self.traffic_classes:
-            mu_numerator += np.sum(prevs_minus_cur[c], axis=1) * np.sum(aon_minus_cur[c], axis=1)
-            mu_denominator += np.sum(prevs_minus_cur[c], axis=1) * np.sum(pre_pre_minus_pre[c], axis=1)
-            nu_nom += np.sum(previous_minus_cur[c], axis=1) * np.sum(aon_minus_cur[c], axis=1)
-            nu_denom += np.sum(previous_minus_cur[c], axis=1) * np.sum(previous_minus_cur[c], axis=1)
-            # for cp in self.traffic_classes:
-            #     mu_numerator += prevs_minus_cur[c] * aon_minus_cur[cp]
-            #     mu_denominator += prevs_minus_cur[c] * pre_pre_minus_pre[cp]
-            #     nu_nom += previous_minus_cur[c] * aon_minus_cur[cp]
-            #     nu_denom += previous_minus_cur[c] * previous_minus_cur[cp]
+            x_ = np.sum(
+                (
+                    self.step_direction[c][:, :] * self.stepsize
+                    + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
+                ),
+                axis=1,
+            )
+            y_ = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            z_ = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
+            mu_numerator += x_ * y_
+            mu_denominator += x_ * np.sum(self.previous_step_direction[c] - self.step_direction[c][:, :], axis=1)
+            nu_nom += x_ * y_
+            nu_denom += z_ * z_
 
         mu_numerator = np.sum(mu_numerator * vdf_der)
         mu_denominator = np.sum(mu_denominator * vdf_der)
