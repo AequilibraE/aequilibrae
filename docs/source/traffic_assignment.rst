@@ -205,7 +205,7 @@ Network has:
 .. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
-.. image:: images/sioux_falls_regional_bfw-500_iter.png
+.. image:: images/sioux_falls_bfw-500_iter.png
     :width: 590
     :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
 
@@ -224,7 +224,7 @@ Network has:
 .. image:: images/anaheim_frank-wolfe-500_iter.png
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
-.. image:: images/Anaheim_regional_bfw-500_iter.png
+.. image:: images/anaheim_bfw-500_iter.png
     :width: 590
     :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
 
@@ -243,6 +243,9 @@ Network has:
 .. image:: images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
+.. image:: images/winnipeg_bfw-500_iter.png
+    :width: 590
+    :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
 Barcelona
 ~~~~~~~~~
@@ -259,6 +262,9 @@ Network has:
 .. image:: images/barcelona_frank-wolfe-500_iter.png
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
+.. image:: images/barcelona_bfw-500_iter.png
+    :width: 590
+    :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
 
 Chicago Regional
 ~~~~~~~~~~~~~~~~
@@ -287,9 +293,6 @@ Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago
 Regional), as that instance has a comparable size to real-world models.
 
-.. image:: images/convergence_comparison.png
-    :width: 590
-    :alt: Algorithm convergence comparison
 .. image:: images/convergence_comparison.png
     :width: 590
     :alt: Algorithm convergence comparison
