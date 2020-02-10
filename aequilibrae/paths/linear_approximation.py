@@ -63,14 +63,15 @@ class LinearApproximation:
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
         self.free_flow_tt = assig_spec.free_flow_tt
-        self.msa_total_flow = assig_spec.total_flow
+        self.fw_total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
     def calculate_conjugate_stepsize(self):
-        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt,
-                                  *self.vdf_parameters)
+        self.vdf.apply_derivative(
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
+        )
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -96,8 +97,9 @@ class LinearApproximation:
             self.conjugate_stepsize = alpha
 
     def calculate_biconjugate_direction(self):
-        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt,
-                                  *self.vdf_parameters)
+        self.vdf.apply_derivative(
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
+        )
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -231,8 +233,9 @@ class LinearApproximation:
                     else:
                         self.steps_below += 1
 
-            self.vdf.apply_vdf(self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt,
-                               *self.vdf_parameters)
+            self.vdf.apply_vdf(
+                self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
+            )
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
@@ -254,8 +257,7 @@ class LinearApproximation:
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
 
-            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt,
-                               *self.vdf_parameters)
+            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters)
             return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:
@@ -269,12 +271,17 @@ class LinearApproximation:
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
-            heuristic_stepsize_at_zero = 1.0 / self.iter
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                logger.warn("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
-                self.stepsize = heuristic_stepsize_at_zero
-                # need to reset conjugate / bi-conjugate direction search
-                self.do_fw_step = True
+                if self.algorithm == "frank-wolfe":
+                    heuristic_stepsize_at_zero = 1.0 / self.iter
+                    logger.warn("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                    self.stepsize = heuristic_stepsize_at_zero
+                else:
+                    # for cf/bfw: don't add a bad step, just reset the stepdirection calculation to start with fw again
+                    # TODO: test which works better, msa stepsize or not adding anything
+                    self.stepsize = 0.0
+                    # need to reset conjugate / bi-conjugate direction search
+                    self.do_fw_step = True
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
