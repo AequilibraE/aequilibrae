@@ -7,6 +7,7 @@ import os
 from numpy.lib.format import open_memmap
 from ...matrix import AequilibraeMatrix, AequilibraeData
 from ..graph import Graph
+from aequilibrae.paths.AoN import sum_axis1
 
 """
 TO-DO:
@@ -23,6 +24,7 @@ class AssignmentResults:
         self.critical={required:{"links":[lnk_id1, lnk_id2, ..., lnk_idn], "path file": False}, results:{}}
         """
         self.link_loads: np.array  # The actual results for assignment
+        self.total_link_loads: np.array  # The result of the assignment for all user classes summed
         self.skims = None  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
@@ -87,11 +89,14 @@ class AssignmentResults:
         if self.link_loads is not None:
             self.skims.matrices.fill(0)
             self.no_path.fill(0)
+            self.link_loads.fill(0)
+            self.total_link_loads.fill(0)
         else:
             raise ValueError("Exception: Assignment results object was not yet prepared/initialized")
 
     def __redim(self):
         self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
+        self.total_link_loads = np.zeros(self.links, self.__float_type)
         self.skims = np.zeros((self.zones, self.zones, self.num_skims), self.__float_type)
         self.skims = AequilibraeMatrix()
 
@@ -103,6 +108,10 @@ class AssignmentResults:
         self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
 
         self.reset()
+
+    def total_flows(self):
+        """ Totals all link flows for this class into a single link load"""
+        sum_axis1(self.total_link_loads, self.link_loads)
 
     def set_cores(self, cores):
         if isinstance(cores, int):

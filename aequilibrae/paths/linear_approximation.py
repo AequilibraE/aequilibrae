@@ -4,6 +4,7 @@ from typing import List
 
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.AoN import linear_combination
 from aequilibrae import Parameters
 from aequilibrae import logger
 
@@ -206,21 +207,22 @@ class LinearApproximation:
             for c in self.traffic_classes:
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 aon.execute()
-                aon_flows.append(np.sum(c._aon_results.link_loads, axis=1) * c.pce)
+                c._aon_results.total_flows()
+                aon_flows.append(c._aon_results.total_link_loads * c.pce)
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             if self.iter == 1:
                 for c in self.traffic_classes:
                     c.results.link_loads[:, :] = c._aon_results.link_loads[:, :]
-                    flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
+                    c.results.total_link_loads[:] = c._aon_results.total_link_loads[:]
+                    flows.append(c.results.total_link_loads * c.pce)
             else:
                 self.calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
-                    c.results.link_loads[:, :] = c.results.link_loads[:, :] * (1.0 - self.stepsize)
-                    c.results.link_loads[:, :] += self.step_direction[c] * self.stepsize
-                    # We already get the total traffic class, in PCEs, corresponding to the total for the user classes
-                    flows.append(np.sum(c.results.link_loads, axis=1) * c.pce)
+                    linear_combination(c.results.link_loads, self.step_direction[c], c.results.link_loads, self.stepsize)
+                    c.results.total_flows()
+                    flows.append(c.results.total_link_loads * c.pce)
 
             self.fw_total_flow = np.sum(flows, axis=0)
 
