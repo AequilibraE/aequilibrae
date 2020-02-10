@@ -1,5 +1,6 @@
 from typing import List
 from copy import deepcopy
+from warnings import warn
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
@@ -98,6 +99,17 @@ class TrafficAssignment(object):
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
                     array.fill(self.vdf_parameters[par])
                 pars.append(array)
+
+                if np.any(np.isnan(array)):
+                    warn(f'At least one {par} is NaN. Results will make no sense')
+
+                if par == 'alpha':
+                    if array.min() < 0:
+                        warn(f'At least one {par} is smaller than zero. Results will make no sense')
+                else:
+                    if array.min() < 1:
+                        warn(f'At least one {par} is smaller than one. Results will make no sense')
+
         self.__dict__["vdf_parameters"] = pars
 
     def set_time_field(self, time_field: str) -> None:

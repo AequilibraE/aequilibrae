@@ -182,6 +182,40 @@ class AssignmentResults:
 
         self.path_file = {"save": save, "results": a}
 
+    def get_load_results(self):
+        fields = ['link_id']
+        for n in self.classes['names']:
+            fields.extend([f'{n}_ab', f'{n}_ba', f'{n}_tot'])
+        types = [np.float64] * len(fields)
+
+        entries = int(np.unique(self.lids).shape[0])
+        res = AequilibraeData()
+        res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
+
+        res.index[:] = np.unique(self.lids)[:]
+        res.link_id[:] = res.index[:]
+
+        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
+        indexing[res.index[:]] = np.arange(entries)
+
+        # Indices of links BA and AB
+        ABs = self.direcs > 0
+        BAs = self.direcs < 0
+        ab_ids = indexing[self.lids[ABs]]
+        ba_ids = indexing[self.lids[BAs]]
+
+        # Link flows
+        link_flows = self.link_loads[:, :]
+        for i, n in enumerate(self.classes["names"]):
+            # AB Flows
+            res.data[n + "_ab"][ab_ids] = np.nan_to_num(link_flows[ABs, i])
+            # BA Flows
+            res.data[n + "_ba"][ba_ids] = np.nan_to_num(link_flows[BAs, i])
+
+            # Tot Flow
+            res.data[n + "_tot"] = res.data[n + "_ab"] + res.data[n + "_ba"]
+        return res
+
     def save_to_disk(self, file_name=None, output="loads"):
         """ Function to write to disk all outputs computed during assignment
     Args:
@@ -195,62 +229,9 @@ class AssignmentResults:
     Returns:
         Nothing"""
 
-        if file_name is None:
-            # memory = True
-            file_type = "MEMORY"
-        else:
-            # memory = False
-            fname, file_type = os.path.splitext(file_name.upper())
-
-        fields = []
         if output == "loads":
-            table_name = "link_loads"
-            for n in self.classes["names"]:
-                fields.extend([n + "_ab", n + "_ba", n + "_tot"])
-            types = [np.float64] * len(fields)
-
-            if file_type == ".AED":
-                aed_file_name = file_name
-                memory_mode = False
-            else:
-                memory_mode = True
-                aed_file_name = None
-
-            entries = int(np.unique(self.lids).shape[0])
-            res = AequilibraeData()
-            res.create_empty(
-                file_path=aed_file_name, memory_mode=memory_mode, entries=entries, field_names=fields, data_types=types
-            )
-
-            res.index[:] = np.unique(self.lids)[:]
-
-            indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
-            indexing[res.index[:]] = np.arange(entries)
-
-            # Indices of links BA and AB
-            ABs = self.direcs > 0
-            BAs = self.direcs < 0
-            ab_ids = indexing[self.lids[ABs]]
-            ba_ids = indexing[self.lids[BAs]]
-
-            # Link flows
-            link_flows = self.link_loads[:, :]
-            for i, n in enumerate(self.classes["names"]):
-                # AB Flows
-                res.data[n + "_ab"][ab_ids] = np.nan_to_num(link_flows[ABs, i])
-                # BA Flows
-                res.data[n + "_ba"][ba_ids] = np.nan_to_num(link_flows[BAs, i])
-
-                # Tot Flow
-                res.data[n + "_tot"] = res.data[n + "_ab"] + res.data[n + "_ba"]
-
-            # Save to disk
-            if file_name is None:
-                return res
-            else:
-                if file_type != "aed":
-                    res.export(file_name, table_name=table_name)
-                del res
+            res = self.get_load_results()
+            res.export(file_name)
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":

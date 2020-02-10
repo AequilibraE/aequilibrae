@@ -148,7 +148,16 @@ class AequilibraeData(object):
         headers = ["index"]
         headers.extend(self.fields)
 
-        if file_type == ".csv":
+        if file_type.lower() == ".aed":
+            dtype = [("index", self.aeq_index_type)]
+            dtype.extend([(self.fields[i], self.data_types[i]) for i in range(self.num_fields)])
+            data = open_memmap(file_name, mode="w+", dtype=dtype, shape=(self.entries,))
+            for field in data.dtype.names:
+                data[field] = self.data[field]
+            data.flush()
+            del data
+
+        elif file_type.lower() == ".csv":
             fmt = "%d"
             for dt in self.data_types:
                 if np.issubdtype(dt, np.floating):
@@ -159,7 +168,7 @@ class AequilibraeData(object):
                 file_name, self.data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments=""
             )
 
-        elif file_type in [".sqlite", ".sqlite3", ".db"]:
+        elif file_type.lower() in [".sqlite", ".sqlite3", ".db"]:
             # Connecting to the database file
             conn = sqlite3.connect(file_name)
             c = conn.cursor()

@@ -1,7 +1,7 @@
 assignment:
   equilibrium:
-    rgap: 1.0e-11
-    maximum_iterations: 1000
+    rgap: 1.0e-4
+    maximum_iterations: 10
 distribution:
   gravity:
     max error: 0.0001
