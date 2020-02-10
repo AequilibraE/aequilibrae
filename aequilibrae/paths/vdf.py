@@ -1,32 +1,26 @@
 import numpy as np
+from aequilibrae.paths.AoN import bpr, delta_bpr
+
+all_vdf_functions = ['bpr']
 
 
 class VDF:
     def __init__(self):
-        self.__dict__['function'] = ''
+        self.__dict__["function"] = ""
+        self.__dict__["apply_vdf"] = None
+        self.__dict__["apply_derivative"] = None
 
     def __setattr__(self, instance, value) -> None:
-        if instance not in self.__dict__:
-            raise AttributeError('This class does not have "{}" attribute'.format(instance))
-        self.__dict__[instance] = value
-
-    def apply_vdf(self, **kwargs):
-        if self.function == "BPR":
-            return self.BPR(**kwargs)
+        if instance == "function":
+            value = value.upper()
+            self.__dict__[instance] = value
+            if value == "BPR":
+                self.__dict__["apply_vdf"] = bpr
+                self.__dict__["apply_derivative"] = delta_bpr
+            else:
+                raise AttributeError('VDF function not available')
         else:
-            raise ValueError("Sorry, only BPR allowed")
+            raise AttributeError('This class only allows you to set the VDF to use')
 
-    def apply_derivative(self, vdf: str, **kwargs):
-        if self.function == "BPR":
-            return self.BPR_delta(**kwargs)
-        else:
-            raise ValueError("Sorry, only BPR allowed")
-
-    def BPR(self, link_flows: np.array, capacity: np.array, fftime: np.array, alpha: float, beta: float) -> np.array:
-        congested_time = fftime * (1 + alpha * np.power(link_flows / capacity, beta))
-        return congested_time
-
-    def BPR_delta(self, link_flows: np.array, capacity: np.array, fftime: np.array, alpha: float,
-                  beta: float) -> np.array:
-        dbpr = fftime * (alpha * beta * np.power(link_flows / capacity, beta - 1)) / capacity
-        return dbpr
+    def functions_available(self):
+        return all_vdf_functions

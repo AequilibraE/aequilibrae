@@ -13,9 +13,7 @@ making it overly complex to use, develop and maintain (we know how subjective
    AequilibraE has had efficient multi-threaded All-or-Nothing (AoN) assignment
    for a while, but since the Method-of-Successive-Averages, Frank-Wolfe,
    Conjugate-Frank-Wolfe and Biconjugate-Frank-Wolfe are new in the software, it
-   should take some time for these implementations to reach full maturity
-
-
+   should take some time for these implementations to reach full maturity.
 
 Traffic assignment
 ------------------
@@ -38,11 +36,64 @@ gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
 
 There are also some strict technical requirements for multi-class equilibrium
-assignment, which listed in :ref:`_technical_requirements_multi_class`
+assignment, which listed in :ref:`_technical_requirements_multi_class` .
+
+::
+
+    assig = TrafficAssignment()
+
+    # The first thing to do is to add at list of traffic classes to be assigned
+    assig.set_classes([assigclass])
+
+    # Then we set the volume delay function
+    assig.set_vdf("BPR")
+
+    # And its parameters
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+
+    # The capacity and free flow travel times as they exist in the graph
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+
+    # And the algorithm we want to use to assign
+    assig.set_algorithm('bfw')
+    # if one wants to know what are the algorithms available
+    assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+
+    # we then execute the assignment
+    assig.execute()
+
+If you want to see the assignment log on your terminal during the assignment,
+please look in the :ref:`example_logging` section of the use cases.
+
 
 .. _assignment_class_object:
 Assignment class object
 ~~~~~~~~~~~~~~~~~~~~~~~
+
+The assignment class object holds all the information pertaining to a specific
+traffic class to be assigned.  There are three pieces of information that are
+required in the composition of this class:
+
+* **graph** - It is the Graph object corresponding to that particular traffic class/
+  mode
+
+* **matrix** - It is the AequilibraE matrix with the demand for that traffic class,
+  but which can have an arbitrary number of user-classes, setup as different
+  layers of the matrix object (see the :ref:`multiple_user_classes`
+
+* **pce** - The passenger-car equivalent is the standard way of modelling
+  multi-class traffic assignment equilibrium in a consistent manner (see
+  `Zill et all <https://doi.org/10.1177%2F0361198119837496>`_ for the technical
+  detail), and it is set to 1 by default.  If the **pce** for a certain class
+  should be different than one, one can make a quick method call:
+
+::
+
+  tc = TrafficClass(graph, matrix)
+  tc.set_pce(1.4)
+
+
 
 Need to describe the assignment class object (graph, matrix, results)
 
@@ -62,12 +113,22 @@ Volume delay functions
 
 For now, only the traditional BPR is available for assignment using AequilibraE.
 
-Parameters for VDF functions can be passed as a fixed value to use for all links,
-or as graph fields. As it is the case for the travel time and capacity fields,
-VDF parameters need to be consistent across all graphs.
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
 
-.. We need something on VDFs here, more specifically on how they work
+Parameters for VDF functions can be passed as a fixed value to use for all
+links, or as graph fields. As it is the case for the travel time and capacity
+fields, VDF parameters need to be consistent across all graphs.
 
+Because AequilibraE supports different parameters for each link, its
+implementation is the most general possible while still preserving the desired
+properties for multi-class assignment.
+
+The implementation of the VDF functions in AequilibraE is written in Cython and
+fully multi-threaded, and therefore descent methods that may evaluate such
+function multiple times per iteration should not become unecessarily slow,
+especially in modern multi-core systems.
+
+Other volume delay functions will be
 
 Multi-class Equilibrium assignment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -205,6 +266,9 @@ Network has:
 .. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
+.. image:: images/sioux_falls_cfw-500_iter.png
+    :width: 590
+    :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
 .. image:: images/sioux_falls_bfw-500_iter.png
     :width: 590
     :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
@@ -224,6 +288,9 @@ Network has:
 .. image:: images/anaheim_frank-wolfe-500_iter.png
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
+.. image:: images/anaheim_cfw-500_iter.png
+    :width: 590
+    :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
 .. image:: images/anaheim_bfw-500_iter.png
     :width: 590
     :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
@@ -243,10 +310,14 @@ Network has:
 .. image:: images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
+.. image:: images/winnipeg_cfw-500_iter.png
+    :width: 590
+    :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
 .. image:: images/winnipeg_bfw-500_iter.png
     :width: 590
     :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
+The results for Winnipeg
 Barcelona
 ~~~~~~~~~
 
@@ -262,6 +333,9 @@ Network has:
 .. image:: images/barcelona_frank-wolfe-500_iter.png
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
+.. image:: images/barcelona_cfw-500_iter.png
+    :width: 590
+    :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
 .. image:: images/barcelona_bfw-500_iter.png
     :width: 590
     :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
@@ -281,10 +355,12 @@ Network has:
 .. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
+.. image:: images/chicago_regional_cfw-500_iter.png
+    :width: 590
+    :alt: Chicago Conjugate Frank-Wolfe 500 iterations
 .. image:: images/chicago_regional_bfw-500_iter.png
     :width: 590
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
-
 
 Convergence Study
 ---------------
@@ -297,11 +373,18 @@ Regional), as that instance has a comparable size to real-world models.
     :width: 590
     :alt: Algorithm convergence comparison
 
-
 Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
 reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
 after 1,000 iterations.
+
+The actual show, however, is left for the Biconjugate Frank-Wolfe
+implementation, which delivers a relative gap of under 1.0e-04 in under 200
+iterations, and a relative gap of under 1.0e-05 in just over 700 iterations.
+
+This convergence capability, allied to its computational performance described
+below suggest that AequilibraE is ready to be used in large real-world
+applications.
 
 Computational performance
 -------------------------
@@ -310,5 +393,6 @@ Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
 on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
 takes just under 47 minutes.
 
-During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz,
-which suggests that performance in modern desktops would be substantially better
+During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz
+due to the laptop's thermal constraints, suggesting that performance in modern
+desktops would be better

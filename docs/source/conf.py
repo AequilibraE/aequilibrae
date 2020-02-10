@@ -54,7 +54,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.coverage",
-    "sphinx.ext.imgmath",
+    "sphinx.ext.mathjax",
     "sphinx_autodoc_annotation",
 ]
 
