@@ -64,6 +64,17 @@ the AequilibraE project are:
 
 .. index:: transponet
 
+Projection
+----------
+
+Although GIS technology allows for a number of different projections to be used
+in pretty much any platform, we have decided to have all AequilibraE's project
+using a single projection, WGS84 - CRS 4326.
+
+This should not affect users too much, as GIS platforms allow for on-the-fly
+reprojection for mapping purposes.
+
+
 Network
 ~~~~~~~
 

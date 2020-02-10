@@ -19,7 +19,7 @@ pkg_data = {
     "aequilibrae.paths": ["parameters.pxi"],
     "aequilibrae": ["parameter_default.yml", "parameters.yml"],
 }
-loose_modules = ["__version__", "parameters", "reserved_fields"]
+loose_modules = ["__version__", "parameters"]
 
 
 if __name__ == "__main__":

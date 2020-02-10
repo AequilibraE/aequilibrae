@@ -199,21 +199,15 @@ Network has:
 * Nodes: 24
 * Zones: 24
 
-MSA
-+++
-
 .. image:: images/sioux_falls_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Sioux Falls MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Sioux Falls Frank-Wolfe 500 iterations
-
+.. image:: images/sioux_falls_bfw-500_iter.png
+    :width: 590
+    :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
 
 Anaheim
 ~~~~~~~
@@ -224,20 +218,15 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-MSA
-+++
-
 .. image:: images/anaheim_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Anaheim MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/anaheim_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Anaheim Frank-Wolfe 500 iterations
+.. image:: images/anaheim_bfw-500_iter.png
+    :width: 590
+    :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
 
 Winnipeg
 ~~~~~~~~
@@ -248,20 +237,15 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-MSA
-+++
-
 .. image:: images/winnipeg_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Winnipeg MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Winnipeg Frank-Wolfe 500 iterations
+.. image:: images/winnipeg_bfw-500_iter.png
+    :width: 590
+    :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
 Barcelona
 ~~~~~~~~~
@@ -272,20 +256,15 @@ Network has:
 * Nodes: 1,020
 * Zones: 110
 
-MSA
-+++
-
 .. image:: images/barcelona_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Barcelona MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/barcelona_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Barcelona Frank-Wolfe 500 iterations
+.. image:: images/barcelona_bfw-500_iter.png
+    :width: 590
+    :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
 
 Chicago Regional
 ~~~~~~~~~~~~~~~~
@@ -296,20 +275,16 @@ Network has:
 * Nodes: 1,020
 * Zones: 110
 
-MSA
-+++
-
 .. image:: images/chicago_regional_msa-500_iter.png
     :width: 590
-    :align: center
     :alt: Chicago MSA 500 iterations
-
-Frank-Wolfe
-+++++++++++
 .. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
-    :align: center
     :alt: Chicago Frank-Wolfe 500 iterations
+.. image:: images/chicago_regional_bfw-500_iter.png
+    :width: 590
+    :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
+
 
 Convergence Study
 ---------------
@@ -320,8 +295,8 @@ Regional), as that instance has a comparable size to real-world models.
 
 .. image:: images/convergence_comparison.png
     :width: 590
-    :align: center
     :alt: Algorithm convergence comparison
+
 
 Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
@@ -332,7 +307,8 @@ Computational performance
 -------------------------
 Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
 2667Hz RAM, AequilibraE performed 1,000 iterations of Frank-Wolfe assignment
-on the Chicago Network in just under 46 minutes.
+on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
+takes just under 47 minutes.
 
 During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz,
 which suggests that performance in modern desktops would be substantially better

@@ -33,9 +33,30 @@ class Network(WorkerThread):
         tbls = curr.fetchone()[0]
         return tbls > 0
 
+    # TODO: DOCUMENT THESE FUNCTIONS
+    def skimmable_fields(self):
+        curr = self.conn.cursor()
+        curr.execute('PRAGMA table_info(links);')
+        field_names = curr.fetchall()
+        ignore_fields = ['ogc_fid', 'geometry'] + self.req_link_flds
+
+        skimmable = ['INT', 'INTEGER', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'BIGINT', 'UNSIGNED BIG INT',
+                     'INT2', 'INT8', 'REAL', 'DOUBLE', 'DOUBLE PRECISION', 'FLOAT', 'DECIMAL', 'NUMERIC']
+        all_fields = []
+        for f in field_names:
+            if f[1] in ignore_fields:
+                continue
+            for i in skimmable:
+                if i in f[2].upper():
+                    all_fields.append(f[1])
+                    break
+
+        all_fields.append('distance')
+        return all_fields
+
     def modes(self):
         curr = self.conn.cursor()
-        curr.execute("""select mode_name from modes""")
+        curr.execute("""select mode_id from modes""")
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
