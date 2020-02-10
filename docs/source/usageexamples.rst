@@ -62,6 +62,15 @@ you can always revert them to their default values. But remember, **ALL**
   p.reset_default()
 
 
+.. _example_usage_matrix:
+
+Matrix module
+-------------
+
+* **AeuqilibraEMatrix**
+* **AeuqilibraEData**
+
+
 .. _example_usage_project:
 
 Project module
@@ -210,6 +219,35 @@ You can save the results to your place of choice in AequilibraE format or export
 
     result.skims.copy('path/to/desired/folder/file_name.aem')
 
+Traffic assignment
+~~~~~~~~~~~~~~~~~~
+
+A simple example of assignment of
+
+::
+
+    assig = TrafficAssignment()
+
+    # The first thing to do is to add at list of traffic classes to be assigned
+    assig.set_classes([assigclass])
+
+    # Then we set the volume delay function
+    assig.set_vdf("BPR")
+
+    # And its parameters
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+
+    # The capacity and free flow travel times as they exist in the graph
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+
+    # And the algorithm we want to use to assign
+    assig.set_algorithm('bfw')
+    # if one wants to know what are the algorithms available
+    assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+
+    # we then execute the assignment
+    assig.execute()
 
 Assigning traffic on TNTP instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

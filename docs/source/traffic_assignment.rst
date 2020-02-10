@@ -15,59 +15,75 @@ making it overly complex to use, develop and maintain (we know how subjective
    Conjugate-Frank-Wolfe and Biconjugate-Frank-Wolfe are new in the software, it
    should take some time for these implementations to reach full maturity.
 
-Traffic assignment class
-------------------------
+Performing traffic assignment
+-----------------------------
+
+Traffic Assignment Class
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Traffic assignment is organized within a object new to version 0.6.1 that
 includes a small list of member variables which should be populated by the user,
 providing a complete specification of the assignment procedure:
 
-* **classes**:  List of :ref:`assignment_class_object`
-* **algorithm**: The assignment algorithm to be used. e.g. "all-or-nothing" or "bfw"
-* **vdf_parameters**: The Volume delay function to be used
+* **classes**:  List of objects :ref:`assignment_class_object` , each of which
+  are a completely specified traffic class
+
+* **algorithm**: The assignment algorithm to be used. e.g. "all-or-nothing" or
+  "bfw"
+
+* **vdf**: The Volume delay function (VDF) to be used
+
+* **vdf_parameters**: The parameters to be used in the volume delay function,
+  other than volume, capacity and free flow time
+
 * **time_field**: The field of the graph that corresponds to **free-flow**
   **travel time**. The procedure will collect this information from the graph
   associated with the first traffic class provided, but will check if all graphs
   have the same information on free-flow travel time
-* **capacity_field**:
 
-Assignment paramters such as maximum number of iterations and target relative
+* **capacity_field**: The field of the graph that corresponds to **link**
+  **capacity**. The procedure will collect this information from the graph
+  associated with the first traffic class provided, but will check if all graphs
+  have the same information on free-flow travel time
+
+Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
 
 There are also some strict technical requirements for multi-class equilibrium
 assignment, which listed in :ref:`_technical_requirements_multi_class` .
 
-::
-
-    assig = TrafficAssignment()
-
-    # The first thing to do is to add at list of traffic classes to be assigned
-    assig.set_classes([assigclass])
-
-    # Then we set the volume delay function
-    assig.set_vdf("BPR")
-
-    # And its parameters
-    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
-
-    # The capacity and free flow travel times as they exist in the graph
-    assig.set_capacity_field("capacity")
-    assig.set_time_field("free_flow_time")
-
-    # And the algorithm we want to use to assign
-    assig.set_algorithm('bfw')
-    # if one wants to know what are the algorithms available
-    assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
-
-    # we then execute the assignment
-    assig.execute()
-
 If you want to see the assignment log on your terminal during the assignment,
 please look in the :ref:`example_logging` section of the use cases.
 
+To begin building the assignment it is easy:
+
+::
+    from aequilibrae.paths import TrafficAssignment
+
+    assig = TrafficAssignment()
 
 .. _assignment_class_object:
+
+Volume Delay Function
++++++++++++++++++++++
+
+For now, the only available VDF function in AequilibraE is the BPR, but more
+functions will be added as needed/requested/possible.
+
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
+
+Setting the volume delay function is one of the first things you should do after
+instantiating and assignment problem in AequilibraE, and it is as simple as:
+
+::
+
+    assig.set_vdf('BPR')
+
+The implementation of the VDF functions in AequilibraE is written in Cython and
+fully multi-threaded, and therefore descent methods that may evaluate such
+function multiple times per iteration should not become unecessarily slow,
+especially in modern multi-core systems.
 
 Traffic class
 ~~~~~~~~~~~~~
@@ -87,34 +103,26 @@ required in the composition of this class:
   multi-class traffic assignment equilibrium in a consistent manner (see
   `Zill et all <https://doi.org/10.1177%2F0361198119837496>`_ for the technical
   detail), and it is set to 1 by default.  If the **pce** for a certain class
-  should be different than one, one can make a quick method call:
+  should be different than one, one can make a quick method call. Example:
 
 ::
 
-  tc = TrafficClass(graph, matrix)
-  tc.set_pce(1.4)
+  tc = TrafficClass(graph_car, matrix_car)
+
+  tc2 = TrafficClass(graph_truck, matrix_truck)
+  tc2.set_pce(1.9)
 
 
+To add traffic classes to the assignment instance it is just a matter of making
+a method call:
 
-Need to describe the assignment class object (graph, matrix, results)
+::
 
-
-Assignment specifications
-+++++++++++++++++++++++++
-
-Need to create this guy.  Will hold
-
-* VDF to be used (e.g. "BPR")
-* Name of the fields from the graph to use for vdf parameters (e.g. {"alpha": "a", "beta": "b"}), or
-  the individual values to use if that is the case
+  assig.set_classes([tc, tc2])
 
 
-Volume delay functions
-++++++++++++++++++++++
-
-For now, only the traditional BPR is available for assignment using AequilibraE.
-
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
+setting VDF Parameters
+~~~~~~~~~~~~~~~~~~~~~~
 
 Parameters for VDF functions can be passed as a fixed value to use for all
 links, or as graph fields. As it is the case for the travel time and capacity
@@ -122,17 +130,57 @@ fields, VDF parameters need to be consistent across all graphs.
 
 Because AequilibraE supports different parameters for each link, its
 implementation is the most general possible while still preserving the desired
-properties for multi-class assignment.
+properties for multi-class assignment, but the user needs to provide individual
+values for each link **OR** a single value for the entire network.
 
-The implementation of the VDF functions in AequilibraE is written in Cython and
-fully multi-threaded, and therefore descent methods that may evaluate such
-function multiple times per iteration should not become unecessarily slow,
-especially in modern multi-core systems.
+Setting the VDF parameters should be done **AFTER** setting the VDF function of
+choice and adding traffic classes to the assignment, or it will **fail**.
 
-Other volume delay functions will be
+To choose a field that exists in the graph, we just pass the parameters as
+follows:
+
+::
+
+  assig.set_vdf_parameters({"alpha": "alphas", "beta": "betas"})
+
+
+To pass global values, it is simply a matter of doing the following:
+
+::
+
+  assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
+
+
+Setting final parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are still three parameters missing for the assignment.
+
+* Capacity field
+
+* Travel time field
+
+* Equilibrium algorithm to use
+
+::
+
+  assig.set_capacity_field("capacity")
+  assig.set_time_field("free_flow_time")
+  assig.set_algorithm(algorithm)
+
+
+
+Setting final parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Finally, one can execute assignment:
+
+::
+
+  assig.execute()
 
 Multi-class Equilibrium assignment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------
 
 By introducing equilibrium assignment [1] with as many algorithms as we have, it
 becomes necessary to also introduce multi-class assignment, which goes along
@@ -142,7 +190,7 @@ having to compute the same paths set multiple times.
 .. _technical_requirements_multi_class:
 
 Technical requirements
-++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~
 
 - Identical free-flow travel time for all links
 - Unique Passenger Car Equivalency (PCE) for each class
@@ -154,17 +202,26 @@ For a mathematically strict discussion, see
 
 
 Method of successive Averages (MSA)
-+++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Frank-Wolfe (FW)
-++++++++++++++++
+~~~~~~~~~~~~~~~~
 
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
 engine for the line search.
 
+
+Conjugate Frank-Wolfe
+~~~~~~~~~~~~~~~~~~~~~
+
+
+Biconjugate Frank-Wolfe
+~~~~~~~~~~~~~~~~~~~~~~~
+
+
 Implementation details & tricks
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A few implementation details and tricks are worth mentioning not because it is
 needed to use the software, but because they were things we grappled with during
 implementation, and it would be a shame not register it for those looking to
@@ -182,15 +239,9 @@ their own purposes.
   current iteration) resulted in the problem quickly becoming stable and moving
   towards a state where the line search started working properly.
 
-Conjugate Frank-Wolfe
-+++++++++++++++++++++
-
-
-Biconjugate Frank-Wolfe
-+++++++++++++++++++++++
 
 Opportunities for multi-threading
-+++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Most multi-threading opportunities have already been taken advantage of during
 the implementation of the All-or-Nothing portion of the assignment. However, the
@@ -237,8 +288,6 @@ The Graph class
 
 Graph format remains the same, but should describe it well
 
-* free-flow time
-*
 
 Numerical Study
 ---------------
