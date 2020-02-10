@@ -60,7 +60,7 @@ class TrafficAssignment(object):
     def set_classes(self, classes: List[TrafficClass]) -> None:
         self.classes = classes
 
-    def available_algorithms(self) -> list:
+    def algorithms_available(self) -> list:
         return all_algorithms
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs

@@ -13,9 +13,7 @@ making it overly complex to use, develop and maintain (we know how subjective
    AequilibraE has had efficient multi-threaded All-or-Nothing (AoN) assignment
    for a while, but since the Method-of-Successive-Averages, Frank-Wolfe,
    Conjugate-Frank-Wolfe and Biconjugate-Frank-Wolfe are new in the software, it
-   should take some time for these implementations to reach full maturity
-
-
+   should take some time for these implementations to reach full maturity.
 
 Traffic assignment
 ------------------
@@ -40,16 +38,33 @@ gap come from the global software parameters, that can be set using the
 There are also some strict technical requirements for multi-class equilibrium
 assignment, which listed in :ref:`_technical_requirements_multi_class` .
 
-
 ::
 
     assig = TrafficAssignment()
+
+    # The first thing to do is to add at list of traffic classes to be assigned
+    assig.set_classes([assigclass])
+
+    # Then we set the volume delay function
     assig.set_vdf("BPR")
-    assig.set_classes(assigclass)
+
+    # And its parameters
     assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+
+    # The capacity and free flow travel times as they exist in the graph
     assig.set_capacity_field("capacity")
     assig.set_time_field("free_flow_time")
-    assig.set_algorithm(algorithm)
+
+    # And the algorithm we want to use to assign
+    assig.set_algorithm('bfw')
+    # if one wants to know what are the algorithms available
+    assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+
+    # we then execute the assignment
+    assig.execute()
+
+If you want to see the assignment log on your terminal during the assignment,
+please look in the :ref:`example_logging` section of the use cases.
 
 
 .. _assignment_class_object:
@@ -98,7 +113,7 @@ Volume delay functions
 
 For now, only the traditional BPR is available for assignment using AequilibraE.
 
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta`
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
 
 Parameters for VDF functions can be passed as a fixed value to use for all
 links, or as graph fields. As it is the case for the travel time and capacity
