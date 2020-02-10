@@ -36,8 +36,10 @@ cpdef void bpr_cython(double[:] congested_time,
   cdef long long l = congested_time.shape[0]
 
   for i in prange(l, nogil=True):
-     congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
-
+      if link_flows[i] > 0:
+        congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
+      else:
+        congested_time[i] = fftime[i]
 
 #@cython.wraparound(False)
 #@cython.embedsignature(True)
@@ -52,4 +54,7 @@ cpdef void dbpr_cython(double[:] deltaresult,
   cdef long long l = deltaresult.shape[0]
 
   for i in prange(l, nogil=True):
-     deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
+    if link_flows[i] > 0:
+        deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
+    else:
+        deltaresult[i] = fftime[i]

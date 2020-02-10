@@ -56,9 +56,6 @@ class allOrNothing(WorkerThread):
         if results.__graph_id__ != graph.__id__:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
-        elif results.__graph_id__ != graph.__id__:
-            raise ValueError("The results object was prepared for a different graph")
-
         elif matrix.matrix_view is None:
             raise ValueError(
                 "Matrix was not prepared for assignment. "
