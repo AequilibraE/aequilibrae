@@ -120,7 +120,7 @@ class LinearApproximation:
             z_ = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
             mu_numerator += x_ * y_
             mu_denominator += x_ * np.sum(self.previous_step_direction[c] - self.step_direction[c][:, :], axis=1)
-            nu_nom += x_ * y_
+            nu_nom += z_ * y_
             nu_denom += z_ * z_
 
         mu_numerator = np.sum(mu_numerator * vdf_der)
