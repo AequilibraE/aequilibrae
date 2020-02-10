@@ -1,6 +1,7 @@
 import numpy as np
 from aequilibrae.paths.AoN import bpr, delta_bpr
 
+
 class VDF:
     def __init__(self):
         self.__dict__["function"] = ""
