@@ -1,6 +1,8 @@
 import numpy as np
 from aequilibrae.paths.AoN import bpr, delta_bpr
 
+all_vdf_functions = ['bpr']
+
 
 class VDF:
     def __init__(self):
@@ -19,3 +21,6 @@ class VDF:
                 raise AttributeError('VDF function not available')
         else:
             raise AttributeError('This class only allows you to set the VDF to use')
+
+    def functions_available(self):
+        return all_vdf_functions

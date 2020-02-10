@@ -38,7 +38,19 @@ gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
 
 There are also some strict technical requirements for multi-class equilibrium
-assignment, which listed in :ref:`_technical_requirements_multi_class`
+assignment, which listed in :ref:`_technical_requirements_multi_class` .
+
+
+::
+
+    assig = TrafficAssignment()
+    assig.set_vdf("BPR")
+    assig.set_classes(assigclass)
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+    assig.set_algorithm(algorithm)
+
 
 .. _assignment_class_object:
 Assignment class object
@@ -86,12 +98,22 @@ Volume delay functions
 
 For now, only the traditional BPR is available for assignment using AequilibraE.
 
-Parameters for VDF functions can be passed as a fixed value to use for all links,
-or as graph fields. As it is the case for the travel time and capacity fields,
-VDF parameters need to be consistent across all graphs.
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta`
 
-.. We need something on VDFs here, more specifically on how they work
+Parameters for VDF functions can be passed as a fixed value to use for all
+links, or as graph fields. As it is the case for the travel time and capacity
+fields, VDF parameters need to be consistent across all graphs.
 
+Because AequilibraE supports different parameters for each link, its
+implementation is the most general possible while still preserving the desired
+properties for multi-class assignment.
+
+The implementation of the VDF functions in AequilibraE is written in Cython and
+fully multi-threaded, and therefore descent methods that may evaluate such
+function multiple times per iteration should not become unecessarily slow,
+especially in modern multi-core systems.
+
+Other volume delay functions will be
 
 Multi-class Equilibrium assignment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
