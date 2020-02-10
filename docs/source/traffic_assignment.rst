@@ -44,6 +44,30 @@ assignment, which listed in :ref:`_technical_requirements_multi_class`
 Assignment class object
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+The assignment class object holds all the information pertaining to a specific
+traffic class to be assigned.  There are three pieces of information that are
+required in the composition of this class:
+
+* **graph** - It is the Graph object corresponding to that particular traffic class/
+  mode
+
+* **matrix** - It is the AequilibraE matrix with the demand for that traffic class,
+  but which can have an arbitrary number of user-classes, setup as different
+  layers of the matrix object (see the :ref:`multiple_user_classes`
+
+* **pce** - The passenger-car equivalent is the standard way of modelling
+  multi-class traffic assignment equilibrium in a consistent manner (see
+  `Zill et all <https://doi.org/10.1177%2F0361198119837496>`_ for the technical
+  detail), and it is set to 1 by default.  If the **pce** for a certain class
+  should be different than one, one can make a quick method call:
+
+::
+
+  tc = TrafficClass(graph, matrix)
+  tc.set_pce(1.4)
+
+
+
 Need to describe the assignment class object (graph, matrix, results)
 
 

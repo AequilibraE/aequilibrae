@@ -282,6 +282,24 @@ available for doing that work.
     # the results are within each traffic class only one, in this case
     assigclass.results.link_loads
 
+.. _multiple_user_classes:
+
+Setting multiple user classes before assignment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Let's suppose one wants to setup a matrix for assignment that has two user
+classes, *red_cars* and *blue cars* for a single traffic class. To do that, one
+needs only to call the *computational_view* method with a list of the two
+matrices of interest.  Both matrices need to be contained in the same file (and
+to be contiguous if an *.aem instead of a *.omx file) however.
+
+::
+
+    mat = AequilibraeMatrix()
+    mat.load('demand.aem')
+    mat.computational_view(['red_cars', 'blue_cars'])
+
+
 Advanced usage: Building a Graph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Let's suppose now that you are interested in creating links from a bespoke procedure. For
