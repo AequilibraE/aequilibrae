@@ -15,8 +15,8 @@ making it overly complex to use, develop and maintain (we know how subjective
    Conjugate-Frank-Wolfe and Biconjugate-Frank-Wolfe are new in the software, it
    should take some time for these implementations to reach full maturity.
 
-Traffic assignment
-------------------
+Traffic assignment class
+------------------------
 
 Traffic assignment is organized within a object new to version 0.6.1 that
 includes a small list of member variables which should be populated by the user,
@@ -68,10 +68,11 @@ please look in the :ref:`example_logging` section of the use cases.
 
 
 .. _assignment_class_object:
-Assignment class object
-~~~~~~~~~~~~~~~~~~~~~~~
 
-The assignment class object holds all the information pertaining to a specific
+Traffic class
+~~~~~~~~~~~~~
+
+The Traffic class object holds all the information pertaining to a specific
 traffic class to be assigned.  There are three pieces of information that are
 required in the composition of this class:
 
