@@ -205,6 +205,9 @@ Network has:
 .. image:: images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
+.. image:: images/sioux_falls_cfw-500_iter.png
+    :width: 590
+    :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
 .. image:: images/sioux_falls_bfw-500_iter.png
     :width: 590
     :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
@@ -224,6 +227,9 @@ Network has:
 .. image:: images/anaheim_frank-wolfe-500_iter.png
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
+.. image:: images/anaheim_cfw-500_iter.png
+    :width: 590
+    :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
 .. image:: images/anaheim_bfw-500_iter.png
     :width: 590
     :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
@@ -243,10 +249,14 @@ Network has:
 .. image:: images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
+.. image:: images/winnipeg_cfw-500_iter.png
+    :width: 590
+    :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
 .. image:: images/winnipeg_bfw-500_iter.png
     :width: 590
     :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
+The results for Winnipeg
 Barcelona
 ~~~~~~~~~
 
@@ -262,6 +272,9 @@ Network has:
 .. image:: images/barcelona_frank-wolfe-500_iter.png
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
+.. image:: images/barcelona_cfw-500_iter.png
+    :width: 590
+    :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
 .. image:: images/barcelona_bfw-500_iter.png
     :width: 590
     :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
@@ -281,10 +294,12 @@ Network has:
 .. image:: images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
+.. image:: images/chicago_regional_cfw-500_iter.png
+    :width: 590
+    :alt: Chicago Conjugate Frank-Wolfe 500 iterations
 .. image:: images/chicago_regional_bfw-500_iter.png
     :width: 590
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
-
 
 Convergence Study
 ---------------
@@ -297,11 +312,18 @@ Regional), as that instance has a comparable size to real-world models.
     :width: 590
     :alt: Algorithm convergence comparison
 
-
 Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
 reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
 after 1,000 iterations.
+
+The actual show, however, is left for the Biconjugate Frank-Wolfe
+implementation, which delivers a relative gap of under 1.0e-04 in under 200
+iterations, and a relative gap of under 1.0e-05 in just over 700 iterations.
+
+This convergence capability, allied to its computational performance described
+below suggest that AequilibraE is ready to be used in large real-world
+applications.
 
 Computational performance
 -------------------------
@@ -310,5 +332,6 @@ Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
 on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
 takes just under 47 minutes.
 
-During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz,
-which suggests that performance in modern desktops would be substantially better
+During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz
+due to the laptop's thermal constraints, suggesting that performance in modern
+desktops would be better
