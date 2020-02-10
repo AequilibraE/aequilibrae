@@ -67,7 +67,7 @@ cpdef void network_loading(long classes,
             if not isnan(demand[i, j]):
                 node_load[i, j] = demand[i, j]
 
-    #Recursevely cascades to the origin
+    #Recursively cascades to the origin
     for i in range(found, 0, -1):
         node = reached_first[i]
 
