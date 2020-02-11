@@ -35,6 +35,11 @@ technological limitations of SQLite, some of the desired behaviors identified in
 usefulness of this implementation or its robustness in face proper use of the
 tool.
 
+.. note::
+   AequilibraE does not currently support turn penalties and/or bans. Their
+   implementation requires a complete overahaul of the path-building code, so
+   that is still a long-term goal, barred specific developed efforts.
+
 Network Fields
 --------------
 

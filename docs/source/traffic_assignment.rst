@@ -420,7 +420,11 @@ Network has:
     :width: 590
     :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
-The results for Winnipeg
+The results for Winnipeg do not seem extremely good when compared to a highly,
+but we believe posting its results would suggest deeper investigation by one
+of our users :-),
+
+
 Barcelona
 ~~~~~~~~~
 
@@ -499,3 +503,12 @@ takes just under 47 minutes.
 During this process, the sustained CPU clock fluctuated between 3.05 and 3.2GHz
 due to the laptop's thermal constraints, suggesting that performance in modern
 desktops would be better
+
+Noteworthy items
+----------------
+
+.. note::
+   The biggest opportunity for performance in AequilibraE right now it to apply
+   network contraction hierarchies to the building of the graph, but that is
+   still a long-term goal
+
