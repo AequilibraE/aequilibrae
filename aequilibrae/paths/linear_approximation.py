@@ -5,7 +5,6 @@ from typing import List
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.AoN import linear_combination
-from aequilibrae import Parameters
 from aequilibrae import logger
 
 if False:
@@ -15,9 +14,8 @@ if False:
 class LinearApproximation:
     def __init__(self, assig_spec, algorithm) -> None:
         self.algorithm = algorithm
-        parameters = Parameters().parameters["assignment"]["equilibrium"]
-        self.rgap_target = parameters["rgap"]
-        self.max_iter = parameters["maximum_iterations"]
+        self.rgap_target = assig_spec.rgap_target
+        self.max_iter = assig_spec.max_iter
 
         self.assig = assig_spec  # type: TrafficAssignment
 
@@ -112,9 +110,9 @@ class LinearApproximation:
         for c in self.traffic_classes:
             x_ = np.sum(
                 (
-                    self.step_direction[c][:, :] * self.stepsize
-                    + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
-                    - c.results.link_loads[:, :]
+                        self.step_direction[c][:, :] * self.stepsize
+                        + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
+                        - c.results.link_loads[:, :]
                 ),
                 axis=1,
             )
@@ -148,7 +146,7 @@ class LinearApproximation:
         self.betas[2] = mu * self.betas[0]
 
     def calculate_step_direction(self):
-        """Caculate step direction depending on the method."""
+        """Caculate step direction depending on the method. Not intended for direct user """
         # current load: c.results.link_loads[:, :]
         # aon load: c._aon_results.link_loads[:, :]
         sd_flows = []
@@ -156,11 +154,11 @@ class LinearApproximation:
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if (
-            (self.iter == 2)
-            or (self.stepsize == 1.0)
-            or (self.do_fw_step)
-            or (self.algorithm == "frank-wolfe")
-            or (self.algorithm == "msa")
+                (self.iter == 2)
+                or (self.stepsize == 1.0)
+                or (self.do_fw_step)
+                or (self.algorithm == "frank-wolfe")
+                or (self.algorithm == "msa")
         ):
             # logger.info("FW step")
             self.do_fw_step = False
@@ -187,9 +185,9 @@ class LinearApproximation:
             for c in self.traffic_classes:
                 previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
                 self.step_direction[c] = (
-                    c._aon_results.link_loads[:, :] * self.betas[0]
-                    + self.step_direction[c] * self.betas[1]
-                    + self.previous_step_direction[c] * self.betas[2]
+                        c._aon_results.link_loads[:, :] * self.betas[0]
+                        + self.step_direction[c] * self.betas[1]
+                        + self.previous_step_direction[c] * self.betas[2]
                 )
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
 
@@ -220,7 +218,8 @@ class LinearApproximation:
                 self.calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
-                    linear_combination(c.results.link_loads, self.step_direction[c], c.results.link_loads, self.stepsize)
+                    linear_combination(c.results.link_loads, self.step_direction[c], c.results.link_loads,
+                                       self.stepsize)
                     c.results.total_flows()
                     flows.append(c.results.total_link_loads * c.pce)
 

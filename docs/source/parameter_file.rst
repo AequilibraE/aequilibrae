@@ -3,10 +3,49 @@
 Parameter File
 ==============
 
+The parameter file has 4 distinct sections, each of which hold parameters for a
+certain portion of the software.
+
+* System
+* Assignment
+* Distribution
+* Network
+
+
 System
+-------
+
+The system section of the parameters file holds information on things like the
+number of threads used in multi-threaded processes, logging and temp folders
+and whether we should be saving information to a log file at all, as exemplified
+below.
+
+.. image:: images/parameters_system_example.png
+    :width: 100%
+    :align: center
+    :alt: Link examples
+
+A few of these parameters, however, are targeted at its QGIS plugin, which is
+the case of the *driving side* and  *default_directory* parameters.
+
+*spatialite_path* is a parameter needed only by Windows users. Please refer to
+the instructions on how to set :ref:`installing_spatialite_on_windows` on
+Windows.
+
+.. _parameter_assignment:
+
 Assignment
-Distribution
-Network
+----------
+The assignment section of the parameter file is the smallest one, and it
+contains only the convergence criteria for assignment in terms of maximum number
+of iterations and target Relative Gap.
+
+
+
+.. image:: images/parameters_assignment_example.png
+    :width: 100%
+    :align: center
+    :alt: Link examples
 
 
 Network

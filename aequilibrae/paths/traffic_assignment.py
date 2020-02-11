@@ -6,13 +6,17 @@ from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.traffic_class import TrafficClass
-
-bpr_parameters = ["alpha", "beta"]
-all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+from aequilibrae import Parameters
 
 
 class TrafficAssignment(object):
+    bpr_parameters = ["alpha", "beta"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+
     def __init__(self) -> None:
+        parameters = Parameters().parameters["assignment"]["equilibrium"]
+        self.__dict__["rgap_target"] = parameters["rgap"]
+        self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = None  # type: VDF
         self.__dict__["classes"] = None  # type: List[TrafficClass]
         self.__dict__["algorithm"] = None  # type: str
@@ -26,7 +30,18 @@ class TrafficAssignment(object):
         self.__dict__["congested_time"] = None  # type: np.ndarray
 
     def __setattr__(self, instance, value) -> None:
-        if instance == "assignment":
+
+        if instance == "rgap_target":
+            if not isinstance(value, float):
+                ValueError('Relative gap needs to be a float')
+            if isinstance(self.assignment, LinearApproximation):
+                self.assignment.rgap_target = value
+        elif instance == "max_iter":
+            if not isinstance(value, int):
+                ValueError('Number of iterations needs to be an integer')
+            if isinstance(self.assignment, LinearApproximation):
+                self.assignment.max_iter = value
+        elif instance == "assignment":
             pass
         elif instance == "vdf":
             if value not in ["BPR"]:
@@ -52,7 +67,7 @@ class TrafficAssignment(object):
             if not isinstance(value, str):
                 raise ValueError("Value for capacity field is not string")
         else:
-            raise ValueError("trafficAssignment class does not have property {}".format(instance))
+            raise ValueError(f"trafficAssignment class does not have property {instance}")
         self.__dict__[instance] = value
 
     def set_vdf(self, vdf_function: str) -> None:
@@ -62,7 +77,7 @@ class TrafficAssignment(object):
         self.classes = classes
 
     def algorithms_available(self) -> list:
-        return all_algorithms
+        return self.all_algorithms
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
@@ -83,7 +98,7 @@ class TrafficAssignment(object):
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
         else:
-            raise AttributeError("Assignment algorithm not available. Choose from: {}".format(",".join(all_algorithms)))
+            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
@@ -137,7 +152,7 @@ class TrafficAssignment(object):
 
         par = list(kwargs.keys())
         if self.vdf.function == "BPR":
-            q = [x for x in par if x not in bpr_parameters] + [x for x in bpr_parameters if x not in par]
+            q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
         if len(q) > 0:
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True

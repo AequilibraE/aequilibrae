@@ -43,6 +43,7 @@ few extra dependencies. Installing **openmatrix** solves all those dependencies:
 
   pip install openmatrix
 
+.. _installing_spatialite_on_windows:
 
 Spatialite
 ++++++++++

@@ -175,6 +175,8 @@ Finally, one can execute assignment:
 
   assig.execute()
 
+:ref:`convergence_criteria` is discussed below.
+
 Multi-class Equilibrium assignment
 ----------------------------------
 
@@ -211,6 +213,28 @@ A few requirements, however, need to be made clear.
 
 For the conjugate and Biconjugate Frank-Wolfe algorithms it is also necessary
 that the VDFs are differentiable.
+
+.. _convergence_criteria:
+
+Convergence criteria
+~~~~~~~~~~~~~~~~~~~~
+
+
+:math:`RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}`
+
+
+The algorithm's two stop criteria currently used are the maximum number of
+iterations and the target Relative Gap, as specified above. These two parameters
+are collected directly from the :ref:`parameters_file`, described in detail in
+the :ref:`parameter_assignment` section.
+
+In order to override the parameter file values, one can set the assignment
+object member variables directly before execution.
+
+::
+
+  assig.max_iter = 250
+  assig.rgap_target = 0.0001
 
 
 Algorithms available

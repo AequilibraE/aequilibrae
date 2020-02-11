@@ -16,7 +16,6 @@ system:
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
   driving side: right
   logging: true
-  report zeros: 1
   temp directory: /temp
   logging_directory: /temp
   spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
