@@ -28,9 +28,6 @@ providing a complete specification of the assignment procedure:
 * **classes**:  List of objects :ref:`assignment_class_object` , each of which
   are a completely specified traffic class
 
-* **algorithm**: The assignment algorithm to be used. e.g. "all-or-nothing" or
-  "bfw"
-
 * **vdf**: The Volume delay function (VDF) to be used
 
 * **vdf_parameters**: The parameters to be used in the volume delay function,
@@ -46,6 +43,9 @@ providing a complete specification of the assignment procedure:
   associated with the first traffic class provided, but will check if all graphs
   have the same information on free-flow travel time
 
+* **algorithm**: The assignment algorithm to be used. e.g. "all-or-nothing" or
+  "bfw"
+
 Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
@@ -59,11 +59,10 @@ please look in the :ref:`example_logging` section of the use cases.
 To begin building the assignment it is easy:
 
 ::
+
     from aequilibrae.paths import TrafficAssignment
 
     assig = TrafficAssignment()
-
-.. _assignment_class_object:
 
 Volume Delay Function
 +++++++++++++++++++++
@@ -84,6 +83,8 @@ The implementation of the VDF functions in AequilibraE is written in Cython and
 fully multi-threaded, and therefore descent methods that may evaluate such
 function multiple times per iteration should not become unecessarily slow,
 especially in modern multi-core systems.
+
+.. _assignment_class_object:
 
 Traffic class
 ~~~~~~~~~~~~~
@@ -168,11 +169,6 @@ There are still three parameters missing for the assignment.
   assig.set_time_field("free_flow_time")
   assig.set_algorithm(algorithm)
 
-
-
-Setting final parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
-
 Finally, one can execute assignment:
 
 ::
@@ -183,42 +179,92 @@ Multi-class Equilibrium assignment
 ----------------------------------
 
 By introducing equilibrium assignment [1] with as many algorithms as we have, it
-becomes necessary to also introduce multi-class assignment, which goes along
-with the pre-existing capability of assigning multiple user-classes without
-having to compute the same paths set multiple times.
+makes sense to also introduce multi-class assignment, adding to the pre-existing
+capability of assigning multiple user-classes at once.  However, multi-class
+equilibrium assignments have strict technical requirements and different
+equilibrium algorithms have slightly different resource requirements.
+
+Cost function
+~~~~~~~~~~~~~
+
+It is currently not possible to use custom cost functions for assignment, and
+the only cost function available to be minimized is simply travel time.
 
 .. _technical_requirements_multi_class:
 
 Technical requirements
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- Identical free-flow travel time for all links
-- Unique Passenger Car Equivalency (PCE) for each class
-- Monotonically increasing volume-delay functions
-- Differentiable volume-delay functions
+This documentation is not intended to discuss in detail the mathematical
+requirements of multi-class traffic assignment, which can be found discussed in
+detail on `Zill et all. <https://doi.org/10.1177%2F0361198119837496>`_
 
-For a mathematically strict discussion, see
-`Zill et all <https://doi.org/10.1177%2F0361198119837496>`_
+A few requirements, however, need to be made clear.
+
+* All traffic classes shall have identical free-flow travel times throughout the
+  network
+
+* Each class shall have an unique Passenger Car Equivalency (PCE) factor
+
+* Volume delay functions shall be monotonically increasing. *Well behaved*
+  functions are always something we are after
+
+For the conjugate and Biconjugate Frank-Wolfe algorithms it is also necessary
+that the VDFs are differentiable.
 
 
-Method of successive Averages (MSA)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Algorithms available
+~~~~~~~~~~~~~~~~~~~~
+
+All algorithms have been implemented as a single software class, as the
+differences between them are simply the step direction and step size after each
+iteration of all-or-nothing assignment, as shown in the table below
+
++-------------------------------+-----------------------------------------------------------+--------------------------------- ---------------+
+| Algorithm                     | Step direction                                            | Step Size                                       |
++===============================+===========================================================+=================================================+
+| Method of Successive Averages | All-or-Nothing assignment (AoN)                           | function of the iteration number                |
++-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
+| Frank-Wolfe                   | All-or-Nothing assignment                                 | Optimal value derived from Wardrop's principle  |
++-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
+| Conjugate Frank-Wolfe         | Conjugate direction (Current and previous AoN)            | Optimal value derived from Wardrop's principle  |
++-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
+| Biconjugate Frank-Wolfe       | Biconjugate direction (Current and two previous AoN)      | Optimal value derived from Wardrop's principle  |
++-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
+
+Method of Successive Averages
++++++++++++++++++++++++++++++
+
+This algorithm has been included largely for hystorical reasons, and we see very
+little reason to use it.  Yet, it has been implemented with the appropriate
+computation of relative gap computation and supports all the analysis features
+available.
 
 Frank-Wolfe (FW)
-~~~~~~~~~~~~~~~~
+++++++++++++++++
 
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
-engine for the line search.
+engine for the line search, and it is a standard implementation of the algorithm
+introduced by LeBlanc in 1975 [2].
 
 
 Conjugate Frank-Wolfe
-~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++
 
+The conjugate direction algorithm was introduced in 2013 [3], which is quite
+recent if you consider that the Frank-Wolfe algorithm was first applied in the
+early 1970's, and it was introduced at the same as its Biconjugate evolution,
+so it was born outdated.
 
 Biconjugate Frank-Wolfe
-~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
+The Biconjugate Frank-Wolfe algorithm is currently the fastest converging link-
+based traffic assignment algorithm used in practice, and it is the recommended
+algorithm for AequilibraE users. Due to its need for previous iteration data,
+it **requires more memory** during runtime, but very large networks should still
+fit nicely in systems with 16Gb of RAM.
 
 Implementation details & tricks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -237,11 +283,12 @@ their own purposes.
   iterations on assignment, resulting on numerical errors on our line search.
   We found that setting the step size to the corresponding MSA value (1/
   current iteration) resulted in the problem quickly becoming stable and moving
-  towards a state where the line search started working properly.
+  towards a state where the line search started working properly. This technique
+  was generalized to the conjugate and biconjugate Frank-Wolfe algorithms.
 
 
 Opportunities for multi-threading
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++
 
 Most multi-threading opportunities have already been taken advantage of during
 the implementation of the All-or-Nothing portion of the assignment. However, the
@@ -254,6 +301,12 @@ following:
 * np.power
 * np.fill
 
+A few NumPy operations have already been parallelized, and can be seen on a file
+called *parallel_numpy.pyx* if you are curious to look at.
+
+Most of the gains of going back to Cython to paralelize these functions came
+from making in-place computation using previously existing arrays, as the
+instantiation of large NumPy arrays can be computationally expensive.
 
 References
 ++++++++++
@@ -269,11 +322,13 @@ Transpn Res. 9, 309-318.
 Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
 `Transportation Science 2013 47:2, 280-293 <https://doi.org/10.1287/trsc.1120.0409>`_
 
-
-
 Handling the network
 --------------------
-The under the hood
+The other important topic when dealing with multi-class assignment is to have
+a single consistent handling of networks, as in the end there is only physical
+network being handled, regardless of access differences to each mode (e.g. truck
+lanes, High-Occupancy Lanes, etc.). This handling is often done with something
+called a **super-network**.
 
 Super-network
 ~~~~~~~~~~~~~
@@ -283,11 +338,9 @@ link is not available for a certain user class.
 It is slightly less efficient when we are computing shortest paths, but a LOT
 more efficient when we are aggregating flows.
 
-The Graph class
-~~~~~~~~~~~~~~~
-
-Graph format remains the same, but should describe it well
-
+The use of the AequilibraE project and its built-in methods to build graphs
+ensure that all graphs will be built in a consistent manner and multi-class
+assignment is possible.
 
 Numerical Study
 ---------------
