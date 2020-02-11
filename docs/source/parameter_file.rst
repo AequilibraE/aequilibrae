@@ -6,11 +6,18 @@ Parameter File
 The parameter file has 4 distinct sections, each of which hold parameters for a
 certain portion of the software.
 
-* System
-* Assignment
-* Distribution
-* Network
+* :ref:`parameters_system`
 
+* :ref:`parameters_assignment`
+
+* :ref:`parameters_distribution`
+
+* :ref:`parameters_network`
+
+Basic use of the parameters module is exemplified through the AequilibraE API
+is detailed in the :red:`example_usage_parameters` section of the use cases.
+
+.. _parameters_system:
 
 System
 -------
@@ -32,7 +39,7 @@ the case of the *driving side* and  *default_directory* parameters.
 the instructions on how to set :ref:`installing_spatialite_on_windows` on
 Windows.
 
-.. _parameter_assignment:
+.. _parameters_assignment:
 
 Assignment
 ----------
@@ -40,13 +47,31 @@ The assignment section of the parameter file is the smallest one, and it
 contains only the convergence criteria for assignment in terms of maximum number
 of iterations and target Relative Gap.
 
-
-
 .. image:: images/parameters_assignment_example.png
     :width: 100%
     :align: center
     :alt: Link examples
 
+Although these parameters are required to exist in the parameters file, one can
+override them during assignment, as detailed in :ref:`convergence_criteria`.
+
+
+.. _parameters_distribution:
+
+Distribution
+----------
+
+The distribution section of the parameter file is also fairly short, as it
+contains only the parameters for number of maximum iterations, convergence level
+and maximum trip length to be applied in Iterative Proportional Fitting and
+synthetic gravity models, as shown below.
+
+.. image:: images/parameters_distribution_example.png
+    :width: 100%
+    :align: center
+    :alt: Link examples
+
+.. _parameters_network:
 
 Network
 -------
