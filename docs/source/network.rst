@@ -397,23 +397,13 @@ As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 .. ^^^^^^^^^^^^^^^^^
 .. *To come*
 
-.. .. _net_section.1.2.6:
+.. _net_section.1.2.6:
 
-.. Adding data field
-.. ^^^^^^^^^^^^^^^^^
-.. *To come*
-
-.. .. _net_section.1.2.7:
-
-.. Deleting data field
-.. ^^^^^^^^^^^^^^^^^^^
-.. *To come*
-
-.. .. _net_section.1.2.8:
-
-.. Changing data
-.. ^^^^^^^^^^^^^
-.. *To come*
+Deleting a required field
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Unfortunately, SQLite does not have the resources to prevent a user to remove a
+data field from the table. For this reason, if the user removes a required
+field, they will most likely corrupt the project.
 
 
 .. _net_section.1.3:
@@ -432,11 +422,23 @@ Link distance cannot be changed by the user, as it is automatically recalculated
 using the Spatialite function *GeodesicLength*, which always returns distances
 in meters.
 
+.. _net_section.1.3.2:
+
 Link direction
 ^^^^^^^^^^^^^^
 
 Triggers enforce link direction to be -1, 0 or 1, and any other value results in
 an SQL exception.
+
+
+.. _net_section.1.3.3:
+
+*modes* field
+^^^^^^^^^^^^^
+Editing of the modes field will only be allowed to contain a string of mode_ids
+that exist in the *modes* table, and an error will be thrown if the user
+attempts to leave the field empty or to insert a non-existing mode_id.
+
 
 
 # 4	References

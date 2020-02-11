@@ -220,7 +220,7 @@ All algorithms have been implemented as a single software class, as the
 differences between them are simply the step direction and step size after each
 iteration of all-or-nothing assignment, as shown in the table below
 
-+-------------------------------+-----------------------------------------------------------+--------------------------------- ---------------+
++-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
 | Algorithm                     | Step direction                                            | Step Size                                       |
 +===============================+===========================================================+=================================================+
 | Method of Successive Averages | All-or-Nothing assignment (AoN)                           | function of the iteration number                |

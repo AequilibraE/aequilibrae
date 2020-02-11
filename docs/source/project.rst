@@ -9,6 +9,10 @@ by the fact that it is easier to develop and maintain documentation for models
 if they are kept in a format that favors data integrity and that supports a
 variety of data types and uses.
 
+.. note::
+  As of now, only projection WGS84, 4326 is supported in AequilibraE.
+  Generalization is not guaranteed, but should come with time.
+
 The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
 with all the GIS capability supported by
 `SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. Their
