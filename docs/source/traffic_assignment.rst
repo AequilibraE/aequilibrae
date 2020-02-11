@@ -101,10 +101,11 @@ required in the composition of this class:
   layers of the matrix object (see the :ref:`multiple_user_classes`
 
 * **pce** - The passenger-car equivalent is the standard way of modelling
-  multi-class traffic assignment equilibrium in a consistent manner (see
-  `Zill et all <https://doi.org/10.1177%2F0361198119837496>`_ for the technical
-  detail), and it is set to 1 by default.  If the **pce** for a certain class
-  should be different than one, one can make a quick method call. Example:
+  multi-class traffic assignment equilibrium in a consistent manner (see [4] for
+  the technical detail), and it is set to 1 by default.  If the **pce** for a
+  certain class should be different than one, one can make a quick method call.
+
+Example:
 
 ::
 
@@ -219,9 +220,11 @@ that the VDFs are differentiable.
 Convergence criteria
 ~~~~~~~~~~~~~~~~~~~~
 
+Convergence in AequilibraE is measured solely in terms of relative gap, which is
+a somewhat old recommendation [5], but it still the most used measure in
+practice, and is detailed below.
 
 :math:`RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}`
-
 
 The algorithm's two stop criteria currently used are the maximum number of
 iterations and the target Relative Gap, as specified above. These two parameters
@@ -342,9 +345,17 @@ Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
 approach to solving the road network equilibrium traffic assignment problem"
 Transpn Res. 9, 309-318.
 
-[3] Maria Mitradjieva and Per Olov Lindberg "The Stiff Is Moving—Conjugate
+[3] Maria Mitradjieva and Per Olov Lindberg (2013)"The Stiff Is Moving—Conjugate
 Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
 `Transportation Science 2013 47:2, 280-293 <https://doi.org/10.1287/trsc.1120.0409>`_
+
+[4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and
+Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research
+Record, Vol 2673, Issue 4 `DOI <https://doi.org/10.1177%2F0361198119837496>`_
+
+[5] Rose, G., Daskin, M., Koppelman, F. "An examination of convergence error in
+equilibrium traffic assignment models",  Transportation Res. B, Vol 22 Issue 4,
+PP 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
 
 Handling the network
 --------------------

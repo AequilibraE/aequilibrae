@@ -31,21 +31,26 @@ class TrafficAssignment(object):
 
     def __setattr__(self, instance, value) -> None:
 
+        check, value, message = self.__check_attributes(instance, value)
+        if check:
+            self.__dict__[instance] = value
+        else:
+            ValueError(message)
+
+    def __check_attributes(self, instance, value):
         if instance == "rgap_target":
             if not isinstance(value, float):
-                ValueError('Relative gap needs to be a float')
+                return False, value, 'Relative gap needs to be a float'
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.rgap_target = value
         elif instance == "max_iter":
             if not isinstance(value, int):
-                ValueError('Number of iterations needs to be an integer')
+                return False, value, 'Number of iterations needs to be an integer'
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
-        elif instance == "assignment":
-            pass
         elif instance == "vdf":
             if value not in ["BPR"]:
-                raise ValueError("Volume-delay function {} is not available".format(value))
+                return False, value, f"Volume-delay function {value} is not available"
             value = VDF()
             value.function = "BPR"
         elif instance == "classes":
@@ -54,21 +59,18 @@ class TrafficAssignment(object):
             elif isinstance(value, list):
                 for v in value:
                     if not isinstance(v, TrafficClass):
-                        raise ValueError("Traffic classes need to be proper AssignmentClass objects")
+                        return False, value, "Traffic classes need to be proper AssignmentClass objects"
             else:
                 raise ValueError("Traffic classes need to be proper AssignmentClass objects")
         elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
-                raise ValueError("Parameter set is not valid:  ".format(value))
-        elif instance == "time_field":
+                return False, value, f"Parameter set is not valid: {value} "
+        elif instance in ["time_field", "capacity_field"]:
             if not isinstance(value, str):
-                raise ValueError("Value for time field is not string")
-        elif instance == "capacity_field":
-            if not isinstance(value, str):
-                raise ValueError("Value for capacity field is not string")
-        else:
-            raise ValueError(f"trafficAssignment class does not have property {instance}")
-        self.__dict__[instance] = value
+                return False, value, f"Value for {instance} is not string"
+        if instance not in self.__dict__:
+            return False, value, f"trafficAssignment class does not have property {instance}"
+        return True, value, ''
 
     def set_vdf(self, vdf_function: str) -> None:
         self.vdf = vdf_function

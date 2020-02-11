@@ -108,14 +108,10 @@ class LinearApproximation:
         nu_nom = 0.0
         nu_denom = 0.0
         for c in self.traffic_classes:
-            x_ = np.sum(
-                (
-                        self.step_direction[c][:, :] * self.stepsize
-                        + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
-                        - c.results.link_loads[:, :]
-                ),
-                axis=1,
-            )
+            x_ = np.sum((self.step_direction[c][:, :] * self.stepsize
+                         + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
+                         - c.results.link_loads[:, :]), axis=1)
+
             y_ = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_ = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
             mu_numerator += x_ * y_
@@ -184,11 +180,10 @@ class LinearApproximation:
             previous_step_dir_temp_copy = {}
             for c in self.traffic_classes:
                 previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
-                self.step_direction[c] = (
-                        c._aon_results.link_loads[:, :] * self.betas[0]
-                        + self.step_direction[c] * self.betas[1]
-                        + self.previous_step_direction[c] * self.betas[2]
-                )
+                self.step_direction[c] = (c._aon_results.link_loads[:, :] * self.betas[0]
+                                          + self.step_direction[c] * self.betas[1]
+                                          + self.previous_step_direction[c] * self.betas[2]
+                                          )
                 sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
 
                 self.previous_step_direction[c] = previous_step_dir_temp_copy[c]
