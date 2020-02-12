@@ -222,7 +222,6 @@ class LinearApproximation:
         else:
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
-            previous_step_dir_temp_copy = {}
             for c in self.traffic_classes:
                 ppst = self.pre_previous_step_direction[c.mode]  # type: AssignmentResults
                 prev_stp_dir = self.previous_step_direction[c.mode]  # type: AssignmentResults
