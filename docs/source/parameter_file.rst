@@ -15,7 +15,7 @@ certain portion of the software.
 * :ref:`parameters_network`
 
 Basic use of the parameters module is exemplified through the AequilibraE API
-is detailed in the :red:`example_usage_parameters` section of the use cases.
+is detailed in the :ref:`example_usage_parameters` section of the use cases.
 
 .. _parameters_system:
 
@@ -28,7 +28,7 @@ and whether we should be saving information to a log file at all, as exemplified
 below.
 
 .. image:: images/parameters_system_example.png
-    :width: 100%
+    :width: 812
     :align: center
     :alt: Link examples
 
@@ -48,7 +48,7 @@ contains only the convergence criteria for assignment in terms of maximum number
 of iterations and target Relative Gap.
 
 .. image:: images/parameters_assignment_example.png
-    :width: 100%
+    :width: 487
     :align: center
     :alt: Link examples
 
@@ -67,7 +67,7 @@ and maximum trip length to be applied in Iterative Proportional Fitting and
 synthetic gravity models, as shown below.
 
 .. image:: images/parameters_distribution_example.png
-    :width: 100%
+    :width: 546
     :align: center
     :alt: Link examples
 

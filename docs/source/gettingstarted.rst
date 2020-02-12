@@ -5,9 +5,9 @@ Getting Started
 This page describes how to get started with AequilibraE.
 
 .. note::
-   Although AequilibraE is under intense development, you don't need to expect
-   important API changes, but you should check for new features often.
-
+   Although AequilibraE is under intense development, we try to avoid making
+   breaking changes to the API. In any case, you should check for new features
+   and possible API changes often.
 
 .. index:: installation
 
@@ -80,10 +80,10 @@ the *Parameters* module as follows:
 It is not possible to use Spatialite with AequilibraE on windows by simply
 editing environment variables.
 
-Linux
-^^^^^
+Ubuntu Linux
+^^^^^^^^^^^^
 
-On linux it is possible to install Spatialite by simply using apt-get
+On Ubuntu it is possible to install Spatialite by simply using apt-get
 
 ::
 
@@ -114,9 +114,9 @@ things to keep an eye on are:
 
 * Number of links and nodes on your network (far less likely to create trouble)
 
-Substantial testing has been done with large real-world models (up to 6,000
+Substantial testing has been done with large real-world models (up to 8,000
 zones) and memory requirements did not exceed the traditional 32Gb found in most
 modelling computers these days. In most cases 16Gb of RAM is enough even for
-large models.  Parallelization is fully implemented for graph computation, and
-can make use of as many CPUs as there are available in the system when doing
-traffic assignment.
+large models (2,000+ zones).  Parallelization is fully implemented for graph
+computation, and can make use of as many CPUs as there are available in the
+system when doing traffic assignment.
