@@ -111,7 +111,7 @@ class TrafficAssignment(object):
         if self.vdf.function == "BPR":
             for p1 in ['alpha', 'beta']:
                 if p1 not in par:
-                    raise ValueError (f'{p1} should exist in the set of parameters provided')
+                    raise ValueError(f'{p1} should exist in the set of parameters provided')
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
                     array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
