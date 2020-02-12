@@ -23,9 +23,9 @@ def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta):
 
     dbpr_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view)
 
-#@cython.wraparound(False)
-#@cython.embedsignature(True)
-#@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
 cpdef void bpr_cython(double[:] congested_time,
                       double[:] link_flows,
                       double [:] capacity,
@@ -41,9 +41,9 @@ cpdef void bpr_cython(double[:] congested_time,
       else:
         congested_time[i] = fftime[i]
 
-#@cython.wraparound(False)
-#@cython.embedsignature(True)
-#@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
 cpdef void dbpr_cython(double[:] deltaresult,
                        double[:] link_flows,
                        double [:] capacity,

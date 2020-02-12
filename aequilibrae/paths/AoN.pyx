@@ -71,15 +71,25 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long long [:] ids_graph_view = graph.ids
     cdef long long [:] all_nodes_view = graph.all_nodes
     cdef long long [:] original_b_nodes_view = graph.graph['b_node']
-    cdef double [:, :] graph_skim_view = graph.skims
+
+    if skims > 0:
+        gskim = graph.skims
+        tskim = aux_result.temporary_skims[:, :, curr_thread]
+        fskm = result.skims.matrix_view[origin_index, :, :]
+    else:
+        gskim = np.zeros((1,1))
+        tskim = np.zeros((1,1))
+        fskm = np.zeros((1,1))
+
+    cdef double [:, :] graph_skim_view = gskim
+    cdef double [:, :] skim_matrix_view = tskim
+    cdef double [:, :] final_skim_matrices_view = fskm
 
     # views from the result object
-    cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
 
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[:, :, curr_thread]
     cdef long long [:] reached_first_view = aux_result.reached_first[:, curr_thread]
     cdef long long [:] conn_view = aux_result.connectors[:, curr_thread]
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[:, :, curr_thread]
@@ -143,6 +153,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                      graph_skim_view,
                      reached_first_view,
                      w)
+            _copy_skims(skim_matrix_view,
+                        final_skim_matrices_view)
+
         if block_flows_through_centroids: # Re-blocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
@@ -151,9 +164,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
-
-        _copy_skims(skim_matrix_view,
-                    final_skim_matrices_view)
 
         if path_file > 0:
             put_path_file_on_disk(orig,

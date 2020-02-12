@@ -75,7 +75,10 @@ class AssignmentResults:
             self.zones = graph.num_zones
             self.centroids = graph.centroids
             self.links = graph.num_links
-            self.num_skims = graph.skims.shape[1]
+            if graph.skims is not False:
+                self.num_skims = graph.skims.shape[1]
+            else:
+                self.num_skims = 0
             self.skim_names = [x for x in graph.skim_fields]
             self.lids = graph.graph["link_id"]
             self.direcs = graph.graph["direction"]
@@ -86,8 +89,9 @@ class AssignmentResults:
             self.setCriticalLinks(False)
 
     def reset(self):
-        if self.link_loads is not None:
+        if self.num_skims > 0:
             self.skims.matrices.fill(0)
+        if self.link_loads is not None:
             self.no_path.fill(0)
             self.link_loads.fill(0)
             self.total_link_loads.fill(0)
@@ -98,14 +102,16 @@ class AssignmentResults:
         self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
         self.total_link_loads = np.zeros(self.links, self.__float_type)
         self.skims = np.zeros((self.zones, self.zones, self.num_skims), self.__float_type)
-        self.skims = AequilibraeMatrix()
-
-        self.skims.create_empty(file_name=self.skims.random_name(), zones=self.zones, matrix_names=self.skim_names)
-        self.skims.index[:] = self.centroids[:]
-        self.skims.computational_view()
-        if len(self.skims.matrix_view.shape[:]) == 2:
-            self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
         self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
+
+        if self.num_skims > 0:
+            self.skims = AequilibraeMatrix()
+
+            self.skims.create_empty(file_name=self.skims.random_name(), zones=self.zones, matrix_names=self.skim_names)
+            self.skims.index[:] = self.centroids[:]
+            self.skims.computational_view()
+            if len(self.skims.matrix_view.shape[:]) == 2:
+                self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
 
         self.reset()
 
