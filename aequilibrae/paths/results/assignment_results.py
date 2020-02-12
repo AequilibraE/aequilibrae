@@ -75,10 +75,7 @@ class AssignmentResults:
             self.zones = graph.num_zones
             self.centroids = graph.centroids
             self.links = graph.num_links
-            if graph.skims is not False:
-                self.num_skims = graph.skims.shape[1]
-            else:
-                self.num_skims = 0
+            self.num_skims = len(graph.skim_fields)
             self.skim_names = [x for x in graph.skim_fields]
             self.lids = graph.graph["link_id"]
             self.direcs = graph.graph["direction"]
