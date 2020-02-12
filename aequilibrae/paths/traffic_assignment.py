@@ -28,6 +28,7 @@ class TrafficAssignment(object):
         self.__dict__["free_flow_tt"] = None  # type: np.ndarray
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
+        self.__dict__["cores"] = None  # type: int
 
     def __setattr__(self, instance, value) -> None:
 
@@ -94,6 +95,7 @@ class TrafficAssignment(object):
         self.__dict__["capacity"] = np.array(c.graph.graph[self.capacity_field], copy=True).astype(np.float64)
         self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
+        self.__dict__["cores"] = c.results.cores
 
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)

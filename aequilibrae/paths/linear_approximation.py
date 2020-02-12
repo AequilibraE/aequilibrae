@@ -19,6 +19,7 @@ class LinearApproximation:
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
+        self.cores = assig_spec.cores
 
         self.assig = assig_spec  # type: TrafficAssignment
 
@@ -192,9 +193,9 @@ class LinearApproximation:
             for c in self.traffic_classes:
                 aon_res = c._aon_results
                 stp_dir_res = self.step_direction[c.mode]
-                copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads)
+                copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads, self.cores)
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view)
+                    copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores)
                     aon_res.total_flows()
                 sd_flows.append(aon_res.total_link_loads * c.pce)
 
@@ -206,16 +207,16 @@ class LinearApproximation:
             for c in self.traffic_classes:
                 stp_dr = self.step_direction[c.mode]
                 pre_previous = self.pre_previous_step_direction[c.mode]
-                copy_two_dimensions(pre_previous.link_loads, stp_dr.link_loads)
+                copy_two_dimensions(pre_previous.link_loads, stp_dr.link_loads, self.cores)
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(pre_previous.skims.matrix_view, stp_dr.skims.matrix_view)
+                    copy_three_dimensions(pre_previous.skims.matrix_view, stp_dr.skims.matrix_view, self.cores)
 
                 linear_combination(stp_dr.link_loads, stp_dr.link_loads,
-                                   c._aon_results.link_loads, self.conjugate_stepsize)
+                                   c._aon_results.link_loads, self.conjugate_stepsize, self.cores)
 
                 if c.results.num_skims > 0:
                     linear_combination_skims(stp_dr.skims.matrix_view, stp_dr.skims.matrix_view,
-                                             c._aon_results.skims.matrix_view, self.conjugate_stepsize)
+                                             c._aon_results.skims.matrix_view, self.conjugate_stepsize, self.cores)
 
                 sd_flows.append(np.sum(stp_dr.link_loads, axis=1) * c.pce)
         # biconjugate
@@ -227,23 +228,23 @@ class LinearApproximation:
                 prev_stp_dir = self.previous_step_direction[c.mode]  # type: AssignmentResults
                 stp_dir = self.step_direction[c.mode]  # type: AssignmentResults
 
-                copy_two_dimensions(ppst.link_loads, stp_dir.link_loads)
+                copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view)
+                    copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
 
                 triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
-                                          prev_stp_dir.link_loads, self.betas)
+                                          prev_stp_dir.link_loads, self.betas, self.cores)
 
                 if c.results.num_skims > 0:
                     triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
                                                     stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
-                                                    self.betas)
+                                                    self.betas, self.cores)
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1) * c.pce)
 
-                copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads)
+                copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads, self.cores)
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view)
+                    copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
@@ -268,10 +269,10 @@ class LinearApproximation:
 
             if self.iter == 1:
                 for c in self.traffic_classes:
-                    copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads)
+                    copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads, self.cores)
                     c.results.total_flows()
-                    copy_one_dimension(c.results.total_link_loads, c._aon_results.total_link_loads)
-                    copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view)
+                    copy_one_dimension(c.results.total_link_loads, c._aon_results.total_link_loads, self.cores)
+                    copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
                     flows.append(c.results.total_link_loads * c.pce)
             else:
                 self.calculate_step_direction()
@@ -279,7 +280,8 @@ class LinearApproximation:
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c.mode]
                     cls_res = c.results
-                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize)
+                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize,
+                                       self.cores)
                     # TODO: We need to compute the step direction for skims as well.
                     #       It is probably a matter of transforming the step_direction values from numpy arrays to
                     #       full AssignmentResults() ones, and cleaning the stuff we don't need
@@ -287,7 +289,8 @@ class LinearApproximation:
                         linear_combination_skims(cls_res.skims.matrix_view,
                                                  stp_dir.skims.matrix_view,
                                                  cls_res.skims.matrix_view,
-                                                 self.stepsize)
+                                                 self.stepsize,
+                                                 self.cores)
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads * c.pce)
 

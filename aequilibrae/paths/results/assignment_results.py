@@ -114,7 +114,7 @@ class AssignmentResults:
 
     def total_flows(self):
         """ Totals all link flows for this class into a single link load"""
-        sum_axis1(self.total_link_loads, self.link_loads)
+        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
 
     def set_cores(self, cores):
         if isinstance(cores, int):
