@@ -109,23 +109,26 @@ class TrafficAssignment(object):
         self.__dict__['vdf_parameters'] = par
         pars = []
         if self.vdf.function == "BPR":
-            for par in ['alpha', 'beta']:
-                if isinstance(self.vdf_parameters[par], str):
-                    array = np.array(self.classes[0].graph.graph[par], copy=True).astype(np.float64)
+            for p1 in ['alpha', 'beta']:
+                if p1 not in par:
+                    raise ValueError (f'{p1} should exist in the set of parameters provided')
+                p = par[p1]
+                if isinstance(self.vdf_parameters[p1], str):
+                    array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
                 else:
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                    array.fill(self.vdf_parameters[par])
+                    array.fill(self.vdf_parameters[p])
                 pars.append(array)
 
                 if np.any(np.isnan(array)):
-                    warn(f'At least one {par} is NaN. Results will make no sense')
+                    warn(f'At least one {p} is NaN. Results will make no sense')
 
-                if par == 'alpha':
+                if p1 == 'alpha':
                     if array.min() < 0:
-                        warn(f'At least one {par} is smaller than zero. Results will make no sense')
+                        warn(f'At least one {p1} is smaller than zero. Results will make no sense')
                 else:
                     if array.min() < 1:
-                        warn(f'At least one {par} is smaller than one. Results will make no sense')
+                        warn(f'At least one {p1} is smaller than one. Results will make no sense')
 
         self.__dict__["vdf_parameters"] = pars
 

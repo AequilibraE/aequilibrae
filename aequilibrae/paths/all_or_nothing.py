@@ -86,6 +86,7 @@ class allOrNothing(WorkerThread):
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
+                    # self.func_assig_thread(orig, all_threads)
         pool.close()
         pool.join()
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)

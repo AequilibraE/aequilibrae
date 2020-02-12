@@ -236,6 +236,7 @@ class Network(WorkerThread):
             g.network_ok = True
             g.status = 'OK'
             g.prepare_graph(centroids)
+            g.set_graph('distance', True)
             self.graphs[m] = g
 
     def set_time_field(self, time_field: str) -> None:

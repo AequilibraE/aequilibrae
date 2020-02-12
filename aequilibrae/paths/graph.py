@@ -310,6 +310,8 @@ class Graph(object):
                             self.graph[i[0:-3]][a1:a2] = poss[i]
                             self.graph[i[0:-3]][a2:a3] = zers[i[0:-3] + "_ba"]
                             self.graph[i[0:-3]][a3:a4] = zers[i]
+                        elif i[-3:] == "_ba":
+                            pass
                         else:
                             if i in all_titles:
                                 self.graph[i][0:a1] = negs[i]
@@ -352,12 +354,12 @@ class Graph(object):
         for i in all_titles:
             if i not in self.required_default_fields and i[0:-3] not in self.required_default_fields:
                 if i[-3:] == "_ab":
-                    if i[-3:] + '_ba' in all_titles:
-                        dtype.append((i[0:-3], self.network[i].dtype))
+                    if i[:-3] + '_ba' in all_titles:
+                        dtype.append((i[:-3], self.network[i].dtype))
                     else:
                         raise ValueError('Field {} exists for ab direction but does not exist for ba'.format(i))
                 elif i[-3:] == "_ba":
-                    if i[-3:] + '_ab' not in all_titles:
+                    if i[:-3] + '_ab' not in all_titles:
                         raise ValueError('Field {} exists for ba direction but does not exist for ab'.format(i))
                 else:
                     dtype.append((i, self.network[i].dtype))
