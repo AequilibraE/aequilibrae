@@ -207,7 +207,13 @@ class Network(WorkerThread):
         ignore_fields = ['ogc_fid', 'geometry']
         all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
 
-        links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
+        raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
+        links = []
+        for l in raw_links:
+            lk = list(map(lambda x: np.nan if x is None else x, l))
+            links.append(lk)
+        # links =
+
         data = np.core.records.fromrecords(links, names=all_fields)
 
         valid_fields = []

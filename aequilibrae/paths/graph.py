@@ -2,6 +2,7 @@ import logging
 import pickle
 import uuid
 from datetime import datetime
+from warnings import warn
 
 import numpy as np
 
@@ -342,6 +343,9 @@ class Graph(object):
                 self.fs[self.num_nodes] = self.graph.shape[0]
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+                for i in self.graph.dtype.names:
+                    if np.any(np.isnan(self.graph[i])):
+                        warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
 
     def __build_dtype(self, all_titles):
         dtype = [
