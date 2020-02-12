@@ -42,6 +42,7 @@ class Graph(object):
         self.required_default_fields = []
         self.reset_single_fields()
         self.other_fields = ""
+        self.mode = ''
         self.date = str(datetime.now())
 
         self.description = "No description added so far"
@@ -451,6 +452,7 @@ class Graph(object):
         mygraph["type_loaded"] = self.type_loaded
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
+        mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)
@@ -480,6 +482,7 @@ class Graph(object):
             self.type_loaded = mygraph["type_loaded"]
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
+            # self.mode = mygraph["mode"]
         self.build_derived_properties()
 
     def build_derived_properties(self):

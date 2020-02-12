@@ -1,10 +1,13 @@
 import numpy as np
 from scipy.optimize import root_scalar
-from typing import List
+from typing import List, Dict
 
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.AoN import linear_combination
+from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
+from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
 
 if False:
@@ -46,8 +49,6 @@ class LinearApproximation:
         self.steps_below_needed_to_terminate = 1
         self.steps_below = 0
 
-        self.previous_step_direction = {}
-        self.step_direction = {}
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
         self.conjugate_direction_max = 0.99999
 
@@ -67,6 +68,32 @@ class LinearApproximation:
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
+        self.step_direction = {}  # type: Dict[AssignmentResults]
+        self.previous_step_direction = {}  # type: Dict[AssignmentResults]
+        self.pre_previous_step_direction = {}  # type: Dict[AssignmentResults]
+
+        for c in self.traffic_classes:
+            r = AssignmentResults()
+            r.prepare(c.graph, c.matrix)
+            self.step_direction[c.mode] = r
+
+        if self.algorithm in ['cfw', 'bfw']:
+
+            for c in self.traffic_classes:
+                r = AssignmentResults()
+                r.prepare(c.graph, c.matrix)
+                self.previous_step_direction[c.mode] = r
+
+                r = AssignmentResults()
+                r.prepare(c.graph, c.matrix)
+                self.step_direction[c.mode] = r
+
+        if self.algorithm in ['bfw']:
+            for c in self.traffic_classes:
+                r = AssignmentResults()
+                r.prepare(c.graph, c.matrix)
+                self.pre_previous_step_direction[c.mode] = r
+
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
@@ -78,9 +105,10 @@ class LinearApproximation:
         numerator = 0.0
         denominator = 0.0
         for c in self.traffic_classes:
-            prev_dir_minus_current_sol = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
+            stp_dir = self.step_direction[c.mode]
+            prev_dir_minus_current_sol = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             aon_minus_current_sol = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - self.step_direction[c][:, :], axis=1)
+            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
             numerator += prev_dir_minus_current_sol * aon_minus_current_sol
             denominator += prev_dir_minus_current_sol * aon_minus_prev_dir
 
@@ -108,14 +136,15 @@ class LinearApproximation:
         nu_nom = 0.0
         nu_denom = 0.0
         for c in self.traffic_classes:
-            x_ = np.sum((self.step_direction[c][:, :] * self.stepsize
-                         + self.previous_step_direction[c][:, :] * (1.0 - self.stepsize)
+            x_ = np.sum((self.step_direction[c.mode].link_loads[:, :] * self.stepsize
+                         + self.previous_step_direction[c.mode].link_loads[:, :] * (1.0 - self.stepsize)
                          - c.results.link_loads[:, :]), axis=1)
 
             y_ = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            z_ = np.sum(self.step_direction[c][:, :] - c.results.link_loads[:, :], axis=1)
+            z_ = np.sum(self.step_direction[c.mode].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             mu_numerator += x_ * y_
-            mu_denominator += x_ * np.sum(self.previous_step_direction[c] - self.step_direction[c][:, :], axis=1)
+            mu_denominator += x_ * np.sum(
+                self.previous_step_direction[c.mode].link_loads - self.step_direction[c.mode].link_loads[:, :], axis=1)
             nu_nom += z_ * y_
             nu_denom += z_ * z_
 
@@ -161,32 +190,61 @@ class LinearApproximation:
             self.do_conjugate_step = True
             self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
-                self.step_direction[c] = c._aon_results.link_loads[:, :]
-                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+                aon_res = c._aon_results
+                stp_dir_res = self.step_direction[c.mode]
+                copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads)
+                if c.results.num_skims > 0:
+                    copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view)
+                    aon_res.total_flows()
+                sd_flows.append(aon_res.total_link_loads * c.pce)
+
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
             # logger.info("CFW step, conjugate stepsize = {}".format(self.conjugate_stepsize))
             for c in self.traffic_classes:
-                self.previous_step_direction[c] = self.step_direction[c].copy()  # save for bfw
-                self.step_direction[c] *= self.conjugate_stepsize
-                self.step_direction[c] += c._aon_results.link_loads[:, :] * (1.0 - self.conjugate_stepsize)
-                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+                stp_dr = self.step_direction[c.mode]
+                pre_previous = self.pre_previous_step_direction[c.mode]
+                copy_two_dimensions(pre_previous.link_loads, stp_dr.link_loads)
+                if c.results.num_skims > 0:
+                    copy_three_dimensions(pre_previous.skims.matrix_view, stp_dr.skims.matrix_view)
+
+                linear_combination(stp_dr.link_loads, stp_dr.link_loads,
+                                   c._aon_results.link_loads, self.conjugate_stepsize)
+
+                if c.results.num_skims > 0:
+                    linear_combination_skims(stp_dr.skims.matrix_view, stp_dr.skims.matrix_view,
+                                             c._aon_results.skims.matrix_view, self.conjugate_stepsize)
+
+                sd_flows.append(np.sum(stp_dr.link_loads, axis=1) * c.pce)
         # biconjugate
         else:
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             previous_step_dir_temp_copy = {}
             for c in self.traffic_classes:
-                previous_step_dir_temp_copy[c] = self.step_direction[c].copy()
-                self.step_direction[c] = (c._aon_results.link_loads[:, :] * self.betas[0]
-                                          + self.step_direction[c] * self.betas[1]
-                                          + self.previous_step_direction[c] * self.betas[2]
-                                          )
-                sd_flows.append(np.sum(self.step_direction[c], axis=1) * c.pce)
+                ppst = self.pre_previous_step_direction[c.mode]  # type: AssignmentResults
+                prev_stp_dir = self.previous_step_direction[c.mode]  # type: AssignmentResults
+                stp_dir = self.step_direction[c.mode]  # type: AssignmentResults
 
-                self.previous_step_direction[c] = previous_step_dir_temp_copy[c]
+                copy_two_dimensions(ppst.link_loads, stp_dir.link_loads)
+                if c.results.num_skims > 0:
+                    copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view)
+
+                triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
+                                          prev_stp_dir.link_loads, self.betas)
+
+                if c.results.num_skims > 0:
+                    triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
+                                                    stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
+                                                    self.betas)
+
+                sd_flows.append(np.sum(stp_dir.link_loads, axis=1) * c.pce)
+
+                copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads)
+                if c.results.num_skims > 0:
+                    copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
@@ -211,17 +269,28 @@ class LinearApproximation:
 
             if self.iter == 1:
                 for c in self.traffic_classes:
-                    c.results.link_loads[:, :] = c._aon_results.link_loads[:, :]
-                    c.results.total_link_loads[:] = c._aon_results.total_link_loads[:]
+                    copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads)
+                    c.results.total_flows()
+                    copy_one_dimension(c.results.total_link_loads, c._aon_results.total_link_loads)
+                    copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view)
                     flows.append(c.results.total_link_loads * c.pce)
             else:
                 self.calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
-                    linear_combination(c.results.link_loads, self.step_direction[c], c.results.link_loads,
-                                       self.stepsize)
-                    c.results.total_flows()
-                    flows.append(c.results.total_link_loads * c.pce)
+                    stp_dir = self.step_direction[c.mode]
+                    cls_res = c.results
+                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize)
+                    # TODO: We need to compute the step direction for skims as well.
+                    #       It is probably a matter of transforming the step_direction values from numpy arrays to
+                    #       full AssignmentResults() ones, and cleaning the stuff we don't need
+                    if cls_res.num_skims > 0:
+                        linear_combination_skims(cls_res.skims.matrix_view,
+                                                 stp_dir.skims.matrix_view,
+                                                 cls_res.skims.matrix_view,
+                                                 self.stepsize)
+                    cls_res.total_flows()
+                    flows.append(cls_res.total_link_loads * c.pce)
 
             self.fw_total_flow = np.sum(flows, axis=0)
 

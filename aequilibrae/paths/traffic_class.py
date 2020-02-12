@@ -12,7 +12,7 @@ class TrafficClass():
         self.graph = graph
         self.matrix = matrix
         self.pce = 1
-
+        self.mode = graph.mode
         self.class_flow: np.array
         self.results = AssignmentResults()
         self.results.prepare(self.graph, self.matrix)

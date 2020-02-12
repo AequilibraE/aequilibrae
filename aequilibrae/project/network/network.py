@@ -238,6 +238,7 @@ class Network(WorkerThread):
             net['b_node'][w < 0] = net['a_node'][w < 0]
 
             g = Graph()
+            g.mode = m
             g.network = net
             g.network_ok = True
             g.status = 'OK'

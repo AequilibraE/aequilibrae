@@ -194,7 +194,7 @@ class AssignmentResults:
         entries = int(np.unique(self.lids).shape[0])
         res = AequilibraeData()
         res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
-
+        res.data.fill(np.nan)
         res.index[:] = np.unique(self.lids)[:]
         res.link_id[:] = res.index[:]
 
@@ -216,7 +216,7 @@ class AssignmentResults:
             res.data[n + "_ba"][ba_ids] = np.nan_to_num(link_flows[BAs, i])
 
             # Tot Flow
-            res.data[n + "_tot"] = res.data[n + "_ab"] + res.data[n + "_ba"]
+            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
         return res
 
     def save_to_disk(self, file_name=None, output="loads"):
