@@ -6,7 +6,7 @@ from random import random
 class Test(TestCase):
     def test_placegetter(self):
 
-        if random() < 0.05:
+        if random() < 2:
             place, report = placegetter("China")
             place = [round(x, 1) for x in place]
             if place != [73.5, 8.8, 134.8, 53.6]:
