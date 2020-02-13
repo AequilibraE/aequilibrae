@@ -482,7 +482,7 @@ class Graph(object):
             self.type_loaded = mygraph["type_loaded"]
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
-            # self.mode = mygraph["mode"]
+            self.mode = mygraph["mode"]
         self.build_derived_properties()
 
     def build_derived_properties(self):
