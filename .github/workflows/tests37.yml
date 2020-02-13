@@ -8,15 +8,16 @@ on: [pull_request]
 jobs:
   testing:
     runs-on: ubuntu-latest
-#    strategy:
-#      max-parallel: 4
-#      matrix:
-#        docker-version: ["docker://python:3.5", "docker://python:3.6", "docker://python:3.7", "docker://python:3.8"]
-    uses: docker://python:3.7
+    strategy:
+      matrix:
+        python-version: [ '3.7']
     steps:
-      #    - uses: ${{ matrix.docker-version }}
-    - uses: actions/checkout@v1
-    - name: Install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v1
+      - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install libsqlite3-mod-spatialite
