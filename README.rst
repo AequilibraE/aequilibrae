@@ -12,21 +12,12 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
     :alt: Linting
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.5/badge.svg
-    :alt: Python 3.5
-
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.6/badge.svg
-    :alt: Python 3.6
-
 .. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
-    :alt: Python 3.7
+    :alt: Unit tests
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.8/badge.svg
-    :alt: Python 3.8
+.. image:: https://codecov.io/gh/AequilibraE/aequilibrae/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/AequilibraE/aequilibrae
 
 .. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
