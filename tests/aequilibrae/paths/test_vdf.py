@@ -1,5 +1,5 @@
 from unittest import TestCase
-from aequilibrae.paths import VDF
+from aequilibrae.paths.vdf import VDF
 
 
 class TestVDF(TestCase):
