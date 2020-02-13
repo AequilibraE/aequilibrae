@@ -9,6 +9,7 @@ from ...matrix import AequilibraeMatrix, AequilibraeData
 from ..graph import Graph
 from aequilibrae.paths.AoN import sum_axis1
 from aequilibrae import Parameters
+
 """
 TO-DO:
 1. Create a file type for memory-mapped path files
@@ -23,8 +24,8 @@ class AssignmentResults:
         @type graph: Set of numpy arrays to store Computation results
         self.critical={required:{"links":[lnk_id1, lnk_id2, ..., lnk_idn], "path file": False}, results:{}}
         """
-        self.link_loads: np.array  # The actual results for assignment
-        self.total_link_loads: np.array  # The result of the assignment for all user classes summed
+        self.link_loads = None  # type: np.array  # The actual results for assignment
+        self.total_link_loads = None  # type: np.array  # The result of the assignment for all user classes summed
         self.skims = None  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided

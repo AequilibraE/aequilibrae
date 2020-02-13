@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix as Matrix
@@ -16,10 +17,11 @@ class TrafficClass():
         self.class_flow: np.array
         self.results = AssignmentResults()
         self.results.prepare(self.graph, self.matrix)
-        self.results.prepare(self.graph, self.matrix)
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
 
-    def set_pce(self, pce: int) -> None:
+    def set_pce(self, pce: Union[float, int]) -> None:
+        if not isinstance(pce, (float, int)):
+            raise ValueError('PCE needs to be either integer or float ')
         self.pce = pce

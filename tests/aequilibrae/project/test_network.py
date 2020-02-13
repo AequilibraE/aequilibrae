@@ -44,7 +44,7 @@ class TestNetwork(TestCase):
         os.unlink(self.file2)
 
     def test_create_from_osm(self):
-        if random() < 0.05:
+        if random() < 0:
             # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
             self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
             curr = self.project.conn.cursor()
