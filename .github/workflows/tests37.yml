@@ -31,7 +31,6 @@ jobs:
         pip3 install requests
         pip3 install pytest
         pip3 install spatialite
-        pip3 install pyqt5
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Compile library
