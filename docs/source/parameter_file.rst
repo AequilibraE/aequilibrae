@@ -32,6 +32,16 @@ below.
     :align: center
     :alt: Link examples
 
+The number of CPUs have a special behaviour defined, as follows:
+
+* **cpus<0** : The system will use the total number logical processors
+  **MINUS** the absolute value of **cpus**
+
+* **cpus=0** : The system will use the total number logical processors available
+
+* **cpus>0** : The system will use exactly **cpus** for computation, limited to
+   the total number logical processors available
+
 A few of these parameters, however, are targeted at its QGIS plugin, which is
 the case of the *driving side* and  *default_directory* parameters.
 

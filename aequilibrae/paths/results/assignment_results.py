@@ -8,7 +8,7 @@ from numpy.lib.format import open_memmap
 from ...matrix import AequilibraeMatrix, AequilibraeData
 from ..graph import Graph
 from aequilibrae.paths.AoN import sum_axis1
-
+from aequilibrae import Parameters
 """
 TO-DO:
 1. Create a file type for memory-mapped path files
@@ -28,7 +28,16 @@ class AssignmentResults:
         self.skims = None  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
-        self.cores = mp.cpu_count()
+        p = Parameters().parameters['system']['cpus']
+        if not isinstance(p, int):
+            p = 0
+        if p < 0:
+            self.cores = min(1, mp.cpu_count() - p)
+        elif p == 0:
+            self.cores = mp.cpu_count()
+        else:
+            self.cores = min(p, mp.cpu_count())
+
         self.classes = {"number": 1, "names": ["flow"]}
 
         self.critical_links = {"save": False, "queries": {}, "results": False}  # Queries are a dictionary

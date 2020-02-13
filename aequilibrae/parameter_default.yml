@@ -1,7 +1,7 @@
 assignment:
   equilibrium:
-    rgap: 1.0e-03
-    maximum_iterations: 100
+    rgap: 1.0e-4
+    maximum_iterations: 250
 distribution:
   gravity:
     max error: 0.0001
@@ -12,7 +12,7 @@ distribution:
     convergence level: 0.0001
     max iterations: 5000
 system:
-  cpus: 8
+  cpus: 0
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
   driving side: right
   logging: true
