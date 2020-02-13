@@ -1,23 +1,28 @@
-name: Tests Python 3.8
+name: Tests Python 3.7
 
-#on: [pull_request]
-on:
-  release:
-    types: [prereleased, published]
+on: [pull_request]
+#on:
+#  release:
+#    types: [prereleased, published]
 
 jobs:
   testing:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
     steps:
-    - uses: docker://python:3.8
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+#    - name: Set up Python
+#      uses: actions/setup-python@v1
+#      with:
+#        python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install libsqlite3-mod-spatialite
         sudo apt-get install -y libspatialite-dev
         pip3 install setuptools --upgrade
-        sudo apt-get install python3-pyqt5
         pip3 install numpy
         pip3 install pyaml
         pip3 install cython
@@ -28,7 +33,6 @@ jobs:
         pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
-
     - name: Compile library
       run: |
         cd aequilibrae/paths
@@ -36,6 +40,17 @@ jobs:
         cd ..
         cd ..
 
-    - name: Test with pytest
+    - name: Generate coverage report
       run: |
-        python3 -m pytest
+        pip install pytest
+        pip install pytest-cov
+        pytest --cov=./ --cov-report=xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+#        yml: ./codecov.yml
+        fail_ci_if_error: true
