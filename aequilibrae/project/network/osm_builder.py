@@ -34,7 +34,8 @@ class OSMBuilder(QObject):
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))"""
 
     def __emit_all(self, *args):
-        self.building.emit(*args)
+        if pyqt:
+            self.building.emit(*args)
 
     def doWork(self):
         node_count = self.data_structures()
