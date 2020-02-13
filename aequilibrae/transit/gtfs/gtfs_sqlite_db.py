@@ -34,7 +34,8 @@ class create_gtfsdb(WorkerThread):
         converting_gtfs = SIGNAL(object)
 
     def __emit_all(self, *args):
-        self.converting_gtfs.emit(*args)
+        if pyqt:
+            self.converting_gtfs.emit(*args)
 
     def __init__(self, file_path, save_db, memory_db=False, spatialite_enabled=False, overwrite=False):
         WorkerThread.__init__(self, None)
@@ -268,7 +269,6 @@ class create_gtfsdb(WorkerThread):
     def create_database(self):
         if pyqt:
             self.__emit_all(["text", "Creating empty database"])
-            # self.__emit_all(SIGNAL("converting_gtfs"), ['text', 'Creating empty database'])
 
         if self.spatialite_enabled:
             shutil.copy(spatialite_database, self.save_db)
