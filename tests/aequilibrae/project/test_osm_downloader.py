@@ -10,7 +10,7 @@ pyqt = spec is not None
 
 class TestOSMDownloader(TestCase):
     def test_do_work(self):
-        if random() < 0:
+        if random() < 2:
             self.o = OSMDownloader([[0.0, 0.0, 0.1, 0.1]], ["car"])
             self.o.doWork()
             if self.o.json:
@@ -20,7 +20,7 @@ class TestOSMDownloader(TestCase):
 
     def test_do_work2(self):
 
-        if random() < 0:
+        if random() < 2:
             # LITTLE PLACE IN THE MIDDLE OF THE Grand Canyon North Rim
             self.o = OSMDownloader([[-112.185, 36.59, -112.179, 36.60]], ["car"])
             self.o.doWork()
