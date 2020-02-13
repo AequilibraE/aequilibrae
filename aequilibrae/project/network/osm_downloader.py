@@ -17,7 +17,6 @@ from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 import importlib.util as iutil
 
-
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
@@ -26,6 +25,7 @@ if pyqt:
 else:
     class QObject:
         pass
+
 
 class OSMDownloader(QObject):
     if pyqt:

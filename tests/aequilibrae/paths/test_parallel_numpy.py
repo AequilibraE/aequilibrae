@@ -11,21 +11,21 @@ class TestParallel(unittest.TestCase):
         b = np.sum(source, axis=1)
 
         sum_axis1(target, source, 1)
-        self.assertEqual((b-target).max(), 0, 'Sum Axis 1 failed' )
+        self.assertEqual((b - target).max(), 0, 'Sum Axis 1 failed')
 
     def test_linear_combination(self):
         target = np.zeros((50, 1))
-        source = np.random.rand(50).reshape(50,1)
+        source = np.random.rand(50).reshape(50, 1)
 
         linear_combination(target, source, target, 0.05, 1)
-        self.assertEqual((source - target*20).max(), 0, 'Linear combination failed')
+        self.assertEqual((source - target * 20).max(), 0, 'Linear combination failed')
 
     def test_linear_combination_skims(self):
         target = np.zeros((5, 5, 1))
         source = np.random.rand(25).reshape(5, 5, 1)
 
         linear_combination_skims(target, source, target, 0.8, 1)
-        self.assertEqual((source - target * 5/4).max(), 0, 'Linear combination failed')
+        self.assertEqual((source - target * 5 / 4).max(), 0, 'Linear combination failed')
 
     def test_triple_linear_combination(self):
         pass
@@ -52,7 +52,6 @@ class TestParallel(unittest.TestCase):
         self.assertEqual(target.sum(), source.sum(), 'Copying one dimension returned different values')
         if target.sum() == 0:
             self.fail('Target and source are the other way around for copying one dimension')
-
 
     def test_copy_three_dimensions(self):
         target = np.zeros(50).reshape(5, 2, 5)
