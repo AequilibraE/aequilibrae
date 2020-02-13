@@ -1,9 +1,9 @@
 name: Tests Python 3.7
 
-on: [pull_request]
-#on:
-#  release:
-#    types: [prereleased, published]
+#on: [pull_request]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   testing:
@@ -40,6 +40,16 @@ jobs:
         cd ..
         cd ..
 
-    - name: Test with pytest
+    - name: Test with coverage report
       run: |
-        python3 -m pytest
+
+        python3 -m pytest --cov=./ --cov-report=xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        yml: ./codecov.yml
+        fail_ci_if_error: true

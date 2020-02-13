@@ -8,26 +8,6 @@ import numpy as np
 
 from .__version__ import binary_version as VERSION
 
-""""""
-"""-----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Transportation graph class
- Purpose:    Implement a standard graph class to support all network computation
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    05/June/2015
- Updated:    03/Dec/2017
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------"""
-
 
 class Graph(object):
     """

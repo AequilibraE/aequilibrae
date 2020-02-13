@@ -1,10 +1,6 @@
 import multiprocessing as mp
 import numpy as np
 import warnings
-import sqlite3
-import sys
-import os
-from numpy.lib.format import open_memmap
 from ...matrix import AequilibraeMatrix, AequilibraeData
 from ..graph import Graph
 from aequilibrae.paths.AoN import sum_axis1

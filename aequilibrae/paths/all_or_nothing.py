@@ -1,26 +1,4 @@
-"""
------------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Traffic assignment
- Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    15/09/2013
- Updated:    2018-07-01
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
------------------------------------------------------------------------------------------------------------
- """
-
 import importlib.util as iutil
-import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
