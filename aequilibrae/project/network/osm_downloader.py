@@ -32,10 +32,12 @@ class OSMDownloader(QObject):
         downloading = pyqtSignal(object)
 
     def __emit_all(self, *args):
-        self.downloading.emit(*args)
+        if pyqt:
+            self.downloading.emit(*args)
 
     def __init__(self, polygons, modes):
-        QObject.__init__(self, None)
+        if pyqt:
+            QObject.__init__(self, None)
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []

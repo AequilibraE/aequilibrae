@@ -22,7 +22,8 @@ class OSMBuilder(QObject):
         building = pyqtSignal(object)
 
     def __init__(self, osm_items: List, conn, node_start=10000) -> None:
-        QObject.__init__(self, None)
+        if pyqt:
+            QObject.__init__(self, None)
         self.osm_items = osm_items
         self.conn = conn
         self.curr = self.conn.cursor()
