@@ -17,12 +17,7 @@ class TestTrafficAssignment(TestCase):
         self.matrix.load(siouxfalls_demand)
         self.matrix.computational_view()
 
-        pth = siouxfalls_project[:-3] + 'sqlite'
-
-        if not os.path.isfile(pth):
-            with zipfile.ZipFile(siouxfalls_project, 'r') as zip_ref:
-                zip_ref.extractall(data_folder)
-        self.project = Project(pth)
+        self.project = Project(siouxfalls_project)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs['c']
 

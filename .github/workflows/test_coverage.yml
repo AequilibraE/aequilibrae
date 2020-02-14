@@ -1,9 +1,9 @@
 name: Code coverage
 
-#on: [pull_request]
+
 on:
   pull_request:
-    types: [opened, edited, synchronize, ready_for_review]
+    types: [ready_for_review, merge]
 
 jobs:
   testing:
