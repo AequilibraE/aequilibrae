@@ -60,6 +60,7 @@ class TestAllOrNothing(TestCase):
         assig.execute()
         if res.skims.distance.sum() != 2914644.0:
             self.fail("skimming during assignment returned the wrong value")
+        matrix.close()
 
     def test_execute(self):
         # Loads and prepares the graph
