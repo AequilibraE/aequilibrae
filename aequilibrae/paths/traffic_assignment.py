@@ -4,7 +4,7 @@ from warnings import warn
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.vdf import VDF
+from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae import Parameters
 
@@ -17,7 +17,7 @@ class TrafficAssignment(object):
         parameters = Parameters().parameters["assignment"]["equilibrium"]
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
-        self.__dict__["vdf"] = None  # type: VDF
+        self.__dict__["vdf"] = VDF()
         self.__dict__["classes"] = None  # type: List[TrafficClass]
         self.__dict__["algorithm"] = None  # type: str
         self.__dict__["vdf_parameters"] = None  # type: list
@@ -36,7 +36,7 @@ class TrafficAssignment(object):
         if check:
             self.__dict__[instance] = value
         else:
-            ValueError(message)
+            raise ValueError(message)
 
     def __check_attributes(self, instance, value):
         if instance == "rgap_target":
@@ -50,10 +50,11 @@ class TrafficAssignment(object):
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
-            if value not in ["BPR"]:
+            v = value.lower()
+            if v not in all_vdf_functions:
                 return False, value, f"Volume-delay function {value} is not available"
             value = VDF()
-            value.function = "BPR"
+            value.function = v
         elif instance == "classes":
             if isinstance(value, TrafficClass):
                 value = [value]
@@ -69,6 +70,9 @@ class TrafficAssignment(object):
         elif instance in ["time_field", "capacity_field"]:
             if not isinstance(value, str):
                 return False, value, f"Value for {instance} is not string"
+        elif instance == 'cores':
+            if not isinstance(value, int):
+                return False, value, f"Value for {instance} is not integer"
         if instance not in self.__dict__:
             return False, value, f"trafficAssignment class does not have property {instance}"
         return True, value, ''
@@ -78,6 +82,7 @@ class TrafficAssignment(object):
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         self.classes = classes
+        self.__collect_data()
 
     def algorithms_available(self) -> list:
         return self.all_algorithms
@@ -90,27 +95,45 @@ class TrafficAssignment(object):
         """
 
         # First we instantiate the arrays we will be using over and over
-        c = self.classes[0]
-        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field], copy=True).astype(np.float64)
-        self.__dict__["capacity"] = np.array(c.graph.graph[self.capacity_field], copy=True).astype(np.float64)
-        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
-        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
-        self.__dict__["cores"] = c.results.cores
+        if algorithm not in self.all_algorithms:
+            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
         else:
-            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+            raise Exception('Algorithm not listed in the case selection')
+
+        self.__collect_data()
+
+    def __collect_data(self):
+        if not isinstance(self.classes, list):
+            return
+
+        c = self.classes[0]
+        if self.time_field not in c.graph.graph.dtype.names:
+            return
+
+        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field], copy=True).astype(np.float64)
+        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
+        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
+        self.__dict__["cores"] = c.results.cores
+
+        if self.capacity_field not in c.graph.graph.dtype.names:
+            return
+
+        self.__dict__["capacity"] = np.array(c.graph.graph[self.capacity_field], copy=True).astype(np.float64)
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
         Sets the parameters for the Volume-delay function. e.g. {'alpha': 0.15, 'beta':4.0}
         """
+        if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
+            raise Exception('Before setting vdf parameters, you need to set traffic classes and choose a VDF function')
         self.__dict__['vdf_parameters'] = par
         pars = []
-        if self.vdf.function == "BPR":
+        if self.vdf.function in ["BPR"]:
             for p1 in ['alpha', 'beta']:
                 if p1 not in par:
                     raise ValueError(f'{p1} should exist in the set of parameters provided')
@@ -134,24 +157,38 @@ class TrafficAssignment(object):
 
         self.__dict__["vdf_parameters"] = pars
 
+    def set_cores(self, cores: int) -> None:
+        """Allows one to set the number of cores to be used AFTER traffic classes have been added"""
+        self.cores = cores
+        if self.classes is not None:
+            for c in self.classes:
+                c.results.set_cores(cores)
+                c._aon_results.set_cores(cores)
+        else:
+            raise Exception('You need load traffic classes before overwriting the number of cores')
+
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'fftime'
         """
         self.time_field = time_field
+        self.__collect_data()
 
     def set_capacity_field(self, capacity_field: str) -> None:
         """
         Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
         """
         self.capacity_field = capacity_field
+        self.__collect_data()
 
-    def load_assignment_spec(self, specs: dict) -> None:
-        pass
+    # def load_assignment_spec(self, specs: dict) -> None:
+    #     pass
 
-    def get_spec(self, specs: dict) -> dict:
-        """Gets the entire specification of the assignment"""
-        return deepcopy(self.__dict__)
+    # TODO: This function actually needs to return a human-readable dictionary, and not one with
+    #       tons of classes. Feeds into the class above
+    # def get_spec(self) -> dict:
+    #     """Gets the entire specification of the assignment"""
+    #     return deepcopy(self.__dict__)
 
     def __validate_parameters(self, kwargs) -> bool:
         if self.vdf == "":
