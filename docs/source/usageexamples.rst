@@ -219,23 +219,34 @@ You can save the results to your place of choice in AequilibraE format or export
 
     result.skims.copy('path/to/desired/folder/file_name.aem')
 
+.. _comprehensive_traffic_assignment_case:
+
 Traffic assignment
 ~~~~~~~~~~~~~~~~~~
 
-A simple example of assignment of
+A simple example of assignment
 
 ::
 
     assig = TrafficAssignment()
 
+    # If you want to know which assignment algorithms are available:
+    assig.algorithms_available()
+
+    # If you want to know which Volume-Delay functions are available
+    assig.vdf.functions_available()
+
     # The first thing to do is to add at list of traffic classes to be assigned
     assig.set_classes([assigclass])
 
     # Then we set the volume delay function
-    assig.set_vdf("BPR")
+    assig.set_vdf("BPR")  # This is not case-sensitive
 
     # And its parameters
     assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+
+    # If you don't have parameters in the network, but rather global ones
+    # assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
 
     # The capacity and free flow travel times as they exist in the graph
     assig.set_capacity_field("capacity")
@@ -245,6 +256,13 @@ A simple example of assignment of
     assig.set_algorithm('bfw')
     # if one wants to know what are the algorithms available
     assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+
+    # To overwrite the number of iterations and the relative gap intended
+    assig.max_iter = 250
+    assig.rgap_target = 0.0001
+
+    # To overwrite the number of CPU cores to be used
+    assig.set_cores(3)
 
     # we then execute the assignment
     assig.execute()

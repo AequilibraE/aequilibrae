@@ -18,6 +18,11 @@ making it overly complex to use, develop and maintain (we know how subjective
 Performing traffic assignment
 -----------------------------
 
+
+For a comprehensive use case for the traffic assignment module, please see the
+:ref:`comprehensive_traffic_assignment_case` section of the use cases page.
+
+
 Traffic Assignment Class
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -18,7 +18,7 @@ class WorkerThread(QThread):
         jobFinished = pyqtSignal(object)
 
     def __init__(self, parentThread):
-        super().__init__()
+        super(WorkerThread).__init__(QThread)
         if pyqt:
             QThread.__init__(self, parentThread)
 

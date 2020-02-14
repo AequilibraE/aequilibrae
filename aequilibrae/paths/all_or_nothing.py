@@ -8,7 +8,7 @@ from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 from .results import AssignmentResults
-from . graph import Graph
+from .graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 
 spec = iutil.find_spec("PyQt5")
@@ -74,12 +74,12 @@ class allOrNothing(WorkerThread):
             self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
-        if threading.get_ident() in all_threads:
-            th = all_threads[threading.get_ident()]
-        else:
-            all_threads[threading.get_ident()] = all_threads["count"]
-            th = all_threads["count"]
+        thread_id = threading.get_ident()
+        th = all_threads.get(thread_id, all_threads["count"])
+        if th == all_threads["count"]:
+            all_threads[thread_id] = all_threads["count"]
             all_threads["count"] += 1
+
         x = one_to_all(O, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
         if x != O:
