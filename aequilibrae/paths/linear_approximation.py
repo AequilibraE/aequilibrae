@@ -30,7 +30,9 @@ class LinearApproximation:
             assig_spec.time_field,
             assig_spec.vdf_parameters,
         ]:
-            raise Exception("Parameters missing. Setting the algorithm is the last thing to do when assigning")
+            all_par = 'Traffic classes, VDF, VDF_parameters, capacity field & time_field'
+            raise Exception("Parameter missing. Setting the algorithm is the last thing to do "
+                            f"when assigning. Check if you have all of these: {all_par}")
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
         self.num_classes = len(assig_spec.classes)
@@ -89,8 +91,6 @@ class LinearApproximation:
                 r.prepare(c.graph, c.matrix)
                 self.step_direction[c.mode] = r
 
-        if self.algorithm in ['bfw']:
-            for c in self.traffic_classes:
                 r = AssignmentResults()
                 r.prepare(c.graph, c.matrix)
                 self.pre_previous_step_direction[c.mode] = r
@@ -272,7 +272,8 @@ class LinearApproximation:
                     copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads, self.cores)
                     c.results.total_flows()
                     copy_one_dimension(c.results.total_link_loads, c._aon_results.total_link_loads, self.cores)
-                    copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
+                    if c.results.num_skims > 0:
+                        copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
                     flows.append(c.results.total_link_loads * c.pce)
             else:
                 self.calculate_step_direction()
