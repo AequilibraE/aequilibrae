@@ -6,7 +6,7 @@ import zipfile
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project import Project
-from aequilibrae.paths import TrafficAssignment, TrafficClass
+from aequilibrae.paths import TrafficAssignment, TrafficClass, Graph
 
 from ...data import siouxfalls_project, siouxfalls_demand, data_folder
 
@@ -19,7 +19,9 @@ class TestTrafficAssignment(TestCase):
 
         self.project = Project(siouxfalls_project)
         self.project.network.build_graphs()
-        self.car_graph = self.project.network.graphs['c']
+        self.car_graph = self.project.network.graphs['c']  # type: Graph
+        self.car_graph.set_graph('free_flow_time')
+        self.car_graph.set_blocked_centroid_flows(False)
 
         self.assignment = TrafficAssignment()
         self.assigclass = TrafficClass(self.car_graph, self.matrix)
