@@ -434,7 +434,7 @@ class Graph(object):
         mygraph["type_loaded"] = self.type_loaded
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
-        # mygraph["mode"] = self.mode
+        mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)

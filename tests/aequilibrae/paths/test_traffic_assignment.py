@@ -106,17 +106,17 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_capacity_field(val)
         self.assertEqual(self.assignment.capacity_field, val)
 
-    # def test_execute(self):
-    #
-    #     self.assignment.set_classes(self.assigclass)
-    #     self.assignment.set_vdf("BPR")
-    #     self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-    #
-    #     self.assignment.set_capacity_field("capacity")
-    #     self.assignment.set_time_field("free_flow_time")
-    #
-    #     self.assignment.max_iter = 10
-    #     self.assignment.set_algorithm('msa')
+    def test_execute(self):
+
+        self.assignment.set_classes(self.assigclass)
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+
+        self.assignment.max_iter = 10
+        self.assignment.set_algorithm('msa')
     #     self.assignment.execute()
     #     msa10 = self.assignment.assignment.rgap
     #
