@@ -26,7 +26,8 @@ class TestGraph(TestCase):
             anode="A_NODE",
             bnode="B_NODE",
         )
-        self.graph.set_graph(cost_field="distance", block_centroid_flows=True)
+        self.graph.set_graph(cost_field="distance")
+        self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
         self.graph.set_skimming("distance")
 
     def test_prepare_graph(self):
@@ -40,7 +41,8 @@ class TestGraph(TestCase):
 
     def test_set_graph(self):
         self.test_prepare_graph()
-        self.graph.set_graph(cost_field="distance", block_centroid_flows=True)
+        self.graph.set_graph(cost_field="distance")
+        self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
         if self.graph.num_zones != centroids.shape[0]:
             self.fail("Number of centroids not properly set")
         if self.graph.num_links != 222:
