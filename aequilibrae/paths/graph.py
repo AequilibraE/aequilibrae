@@ -396,12 +396,15 @@ class Graph(object):
                 self.skims[:, i] = self.graph[j]
         self.skim_fields = skim_fields
 
-    def set_blocked_centroid_flows(self, blocking):
-        if self.num_zones > 0:
-            self.block_centroid_flows = blocking
-            self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+    def set_blocked_centroid_flows(self, block_centroid_flows):
+        if isinstance(block_centroid_flows, bool):
+            if self.num_zones > 0:
+                self.block_centroid_flows = block_centroid_flows
+                self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+            else:
+                raise ValueError("You can only block flows through centroids after setting the centroids")
         else:
-            raise ValueError("You can only block flows through centroids after setting the centroids")
+            raise TypeError("Blocking flows through centroids needs to be boolean")
 
     # Procedure to pickle graph and save to disk
     def save_to_disk(self, filename):
