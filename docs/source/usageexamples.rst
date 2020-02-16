@@ -153,10 +153,12 @@ you need only a graph that you have previously built, and the list of skims you 
 
     # You now have to set the graph for what you want
     # In this case, we are computing fastest path (minimizing free flow time)
-    # We are also **blocking** paths from going through centroids
-    g.set_graph(cost_field='fftime', block_centroid_flows=True)
+    g.set_graph(cost_field='fftime')
 
-    # We will be skimming for fftime **AND** distance along the way
+    # We are also **blocking** paths from going through centroids
+    g.set_blocked_centroid_flows(block_centroid_flows=True)
+
+# We will be skimming for fftime **AND** distance along the way
     g.set_skimming(['fftime', 'distance'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided

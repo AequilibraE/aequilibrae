@@ -251,7 +251,7 @@ class LinearApproximation:
     def execute(self):
 
         for c in self.traffic_classes:
-            c.graph.set_graph(self.time_field, c.graph.block_centroid_flows)
+            c.graph.set_graph(self.time_field)
 
         logger.info("{} Assignment STATS".format(self.algorithm))
         logger.info("Iteration, RelativeGap, stepsize")
