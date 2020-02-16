@@ -48,7 +48,7 @@ class Graph(object):
         self.cost_field = False  # Name of the cost field
         self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
 
-        self.block_centroid_flows = False
+        self.block_centroid_flows = True
         self.penalty_through_centroids = np.inf
 
         self.centroids = None  # NumPy array of centroid IDs
@@ -354,13 +354,7 @@ class Graph(object):
 
     # We set which are the fields that are going to be minimized in this file
     # TODO: Change the call for all the uses on this function
-    def set_graph(self, cost_field, block_centroid_flows=True) -> None:
-
-        if isinstance(block_centroid_flows, bool):
-            self.set_blocked_centroid_flows(block_centroid_flows)
-        else:
-            raise ValueError("block_centroid_flows needs to be a boolean")
-
+    def set_graph(self, cost_field) -> None:
         if cost_field in self.graph.dtype.names:
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:

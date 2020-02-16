@@ -20,6 +20,7 @@ class TestTrafficAssignment(TestCase):
         self.project = Project(siouxfalls_project)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs['c']  # type: Graph
+        self.car_graph.set_graph('free_flow_time')
         self.car_graph.set_blocked_centroid_flows(False)
 
         self.assignment = TrafficAssignment()
