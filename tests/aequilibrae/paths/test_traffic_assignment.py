@@ -117,7 +117,7 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.max_iter = 10
         self.assignment.set_algorithm('msa')
-    #     self.assignment.execute()
+        self.assignment.execute()
     #     msa10 = self.assignment.assignment.rgap
     #
     #     self.assigclass.results.total_flows()
