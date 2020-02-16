@@ -252,7 +252,6 @@ class LinearApproximation:
 
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field, c.graph.block_centroid_flows)
-            c.graph.set_blocked_centroid_flows(True)
 
         logger.info("{} Assignment STATS".format(self.algorithm))
         logger.info("Iteration, RelativeGap, stepsize")
