@@ -10,7 +10,8 @@ if pyqt:
     from PyQt5.QtCore import pyqtSignal
 else:
     class QThread:
-        pass
+        def __init__(self, *arg):
+            pass
 
 
 class WorkerThread(QThread):
@@ -18,9 +19,7 @@ class WorkerThread(QThread):
         jobFinished = pyqtSignal(object)
 
     def __init__(self, parentThread):
-        super(WorkerThread).__init__(QThread)
-        if pyqt:
-            QThread.__init__(self, parentThread)
+        QThread.__init__(self, parentThread)
 
     def run(self):
         self.running = True
