@@ -116,7 +116,7 @@ class AssignmentResults:
                 self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
         else:
             self.skims = AequilibraeMatrix()
-            self.skims.matrix_view = np.array((1,1,1))
+            self.skims.matrix_view = np.array((1, 1, 1))
 
         self.reset()
 

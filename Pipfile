@@ -30,6 +30,7 @@ jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
 statsmodels = "*"
+pytest = "*"
 
 [scripts]
 notebook = "jupyter notebook"

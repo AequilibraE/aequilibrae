@@ -34,15 +34,15 @@ main() {
 }
 
 run_unit_tests() {
-    python -m unittest discover -s test -p *_test.py
+    python3 -m unittest discover -s test -p *_test.py
 }
 
 generate_docs() {
-    python -m pipenv run sphinx
+    python3 -m pipenv run sphinx
 }
 
 run_linting() {
-    python -m flake8 --format=checkstyle > flake8.xml
+    python3 -m flake8 --format=checkstyle > flake8.xml
 }
 
 setup_venv() {
@@ -51,13 +51,13 @@ setup_venv() {
 }
 
 setup_precommit() {
-    python -m pipenv run pre-commit-install
+    python3 -m pipenv run pre-commit-install
 }
 
 setup_pipenv() {
-    python --version
-    python -m pip install pipenv
-    python -m pipenv install --dev
+    python3 --version
+    python3 -m pip install pipenv
+    python3 -m pipenv install --dev
 }
 
 echo "Running $0"
