@@ -42,7 +42,8 @@ class Graph(object):
         self.cost = None  # This array holds the values being used in the shortest path routine
         self.capacity = None  # Array holds the capacity for links
         self.free_flow_time = None  # Array holds the free flow travel time by link
-        self.skims = False  # 2-D Array with the fields to be computed as skims
+        self.skims = np.zeros((1, 1), self.__float_type)  # Skimming array that we initialize with something for the
+        # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
         self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
@@ -310,6 +311,7 @@ class Graph(object):
                 a = self.graph["a_node"][0]
                 p = 0
                 k = 0
+
                 for i in range(1, self.num_links):
                     if a != self.graph["a_node"][i]:
                         for j in range(p, self.graph["a_node"][i]):
@@ -432,7 +434,7 @@ class Graph(object):
         mygraph["type_loaded"] = self.type_loaded
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
-        mygraph["mode"] = self.mode
+        # mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)

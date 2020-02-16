@@ -104,7 +104,6 @@ class AssignmentResults:
     def __redim(self):
         self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
         self.total_link_loads = np.zeros(self.links, self.__float_type)
-        self.skims = np.zeros((self.zones, self.zones, self.num_skims), self.__float_type)
         self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
 
         if self.num_skims > 0:
@@ -115,6 +114,9 @@ class AssignmentResults:
             self.skims.computational_view()
             if len(self.skims.matrix_view.shape[:]) == 2:
                 self.skims.matrix_view = self.skims.matrix_view.reshape((self.zones, self.zones, 1))
+        else:
+            self.skims = AequilibraeMatrix()
+            self.skims.matrix_view = np.array((1,1,1))
 
         self.reset()
 

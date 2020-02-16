@@ -25,7 +25,10 @@ class MultiThreadedAoN:
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         self.predecessors = np.zeros((results.nodes, results.cores), dtype=itype)
-        self.temporary_skims = np.zeros((results.nodes, results.num_skims, results.cores), dtype=ftype)
+        if results.num_skims > 0:
+            self.temporary_skims = np.zeros((results.nodes, results.num_skims, results.cores), dtype=ftype)
+        else:
+            self.temporary_skims = np.zeros((1, 1, results.cores), dtype=ftype)
         self.reached_first = np.zeros((results.nodes, results.cores), dtype=itype)
         self.connectors = np.zeros((results.nodes, results.cores), dtype=itype)
         self.temp_link_loads = np.zeros((results.links, results.classes["number"], results.cores), dtype=ftype)
