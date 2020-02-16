@@ -1,9 +1,9 @@
 name: Code coverage
 
-
-on:
-  pull_request:
-    types: [ready_for_review, merge]
+on: [pull_request]
+#on:
+#  pull_request:
+#    types: [ready_for_review, merge]
 
 jobs:
   testing:
@@ -41,8 +41,8 @@ jobs:
 
     - name: Generate coverage report
       run: |
-
         python3 -m pytest --cov=./ --cov-report=xml
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
