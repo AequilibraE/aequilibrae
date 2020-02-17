@@ -15,7 +15,7 @@ certain portion of the software.
 * :ref:`parameters_network`
 
 Basic use of the parameters module is exemplified through the AequilibraE API
-is detailed in the :ref:`example_usage_parameters` section of the use cases.
+as detailed in the :ref:`example_usage_parameters` section of the use cases.
 
 .. _parameters_system:
 

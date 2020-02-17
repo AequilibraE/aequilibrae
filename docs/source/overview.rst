@@ -154,7 +154,7 @@ matrices. This capability, available in the openmatrix format, is one that was
 reproduced in the AequilibraE matrix and API.
 
 Because the `Open Matrix Format <https://github.com/osPlanning/omx>`_ has
-established itself as the de-factor standard for matrix exchange in the
+established itself as the de-facto standard for matrix exchange in the
 industry, AequilibraE aims to allow users to never touch the AEM data format if
 they so decide. However, all underlying computation will be done using our
 custom format, so the importing/exporting being done under the hood will mean
