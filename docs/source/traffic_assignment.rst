@@ -56,7 +56,7 @@ gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
 
 There are also some strict technical requirements for multi-class equilibrium
-assignment, which listed in :ref:`_technical_requirements_multi_class` .
+assignment, which are listed in :ref:`_technical_requirements_multi_class` .
 
 If you want to see the assignment log on your terminal during the assignment,
 please look in the :ref:`example_logging` section of the use cases.
@@ -78,7 +78,7 @@ functions will be added as needed/requested/possible.
 :math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
 
 Setting the volume delay function is one of the first things you should do after
-instantiating and assignment problem in AequilibraE, and it is as simple as:
+instantiating an assignment problem in AequilibraE, and it is as simple as:
 
 ::
 
@@ -226,7 +226,7 @@ Convergence criteria
 ~~~~~~~~~~~~~~~~~~~~
 
 Convergence in AequilibraE is measured solely in terms of relative gap, which is
-a somewhat old recommendation [5], but it still the most used measure in
+a somewhat old recommendation [5], but it is still the most used measure in
 practice, and is detailed below.
 
 :math:`RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}`
