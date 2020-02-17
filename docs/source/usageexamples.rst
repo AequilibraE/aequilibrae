@@ -76,7 +76,7 @@ Matrix module
 Project module
 --------------
 
-Let's suppose one wants to create project files for a list of 20 cities around
+Let's suppose one wants to create project files for a list of 5 cities around
 the world with their complete networks downloaded from
 `Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
 folder for analysis at a later time.
