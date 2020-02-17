@@ -18,7 +18,6 @@ making it overly complex to use, develop and maintain (we know how subjective
 Performing traffic assignment
 -----------------------------
 
-
 For a comprehensive use case for the traffic assignment module, please see the
 :ref:`comprehensive_traffic_assignment_case` section of the use cases page.
 
@@ -55,8 +54,10 @@ Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
 :ref:`example_usage_parameters`
 
-There are also some strict technical requirements for multi-class equilibrium
-assignment, which are listed in :ref:`_technical_requirements_multi_class` .
+There are also some strict technical requirements for formulating the
+multi-class equilibrium assignment as a contrained convex optimization problem,
+as we have implemented it. These requirements are loosely listed in
+:ref:`_technical_requirements_multi_class` .
 
 If you want to see the assignment log on your terminal during the assignment,
 please look in the :ref:`example_logging` section of the use cases.
@@ -191,6 +192,11 @@ makes sense to also introduce multi-class assignment, adding to the pre-existing
 capability of assigning multiple user-classes at once.  However, multi-class
 equilibrium assignments have strict technical requirements and different
 equilibrium algorithms have slightly different resource requirements.
+
+.. note::
+   Our implementations of the conjudate and Biconjugate-Frank-Wolfe methods
+   should be inherently proportional [6], but we have not yet carried the
+   appropriate testing that would be required for an empirical proof
 
 Cost function
 ~~~~~~~~~~~~~
@@ -358,9 +364,13 @@ Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
 Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research
 Record, Vol 2673, Issue 4 `DOI <https://doi.org/10.1177%2F0361198119837496>`_
 
-[5] Rose, G., Daskin, M., Koppelman, F. "An examination of convergence error in
-equilibrium traffic assignment models",  Transportation Res. B, Vol 22 Issue 4,
-PP 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
+[5] Rose, G., Daskin, M., Koppelman, F. (1988) "An examination of convergence
+error in equilibrium traffic assignment models",  Transportation Res. B, Vol 22
+Issue 4, PP 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
+
+[6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in
+multi-class equilibrium assignment", Transportation Research Part B, Volume 70,
+pg 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
 
 Handling the network
 --------------------
