@@ -171,10 +171,8 @@ class LinearApproximation:
         self.betas[1] = nu * self.betas[0]
         self.betas[2] = mu * self.betas[0]
 
-    def calculate_step_direction(self):
-        """Caculate step direction depending on the method. Not intended for direct user """
-        # current load: c.results.link_loads[:, :]
-        # aon load: c._aon_results.link_loads[:, :]
+    def __calculate_step_direction(self):
+        """Calculates step direction depending on the method"""
         sd_flows = []
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
@@ -275,7 +273,7 @@ class LinearApproximation:
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
                     flows.append(c.results.total_link_loads * c.pce)
             else:
-                self.calculate_step_direction()
+                self.__calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c.mode]
