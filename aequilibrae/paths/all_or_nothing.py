@@ -43,12 +43,15 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
+    def __emit_all(self, *args):
+        if pyqt:
+            self.__emit_all(*args)
+            
     def doWork(self):
         self.execute()
 
     def execute(self):
-        if pyqt:
-            self.assignment.emit(["zones finalized", 0])
+        self.__emit_all(["zones finalized", 0])
 
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
@@ -69,9 +72,8 @@ class allOrNothing(WorkerThread):
         pool.join()
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
 
-        if pyqt:
-            self.assignment.emit(["text AoN", "Saving Outputs"])
-            self.assignment.emit(["finished_threaded_procedure", None])
+        self.__emit_all(["text AoN", "Saving Outputs"])
+        self.__emit_all(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
         thread_id = threading.get_ident()
@@ -84,7 +86,6 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != O:
             self.report.append(x)
-        if pyqt:
-            self.assignment.emit(["zones finalized", self.cumulative])
-            txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-            self.assignment.emit(["text AoN", txt])
+        self.__emit_all(["zones finalized", self.cumulative])
+        txt = str(self.cumulative) + " / " + str(self.matrix.zones)
+        self.__emit_all(["text AoN", txt])
