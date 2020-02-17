@@ -79,7 +79,7 @@ Trip distribution
 The trip distribution module is the second oldest piece of code in AequilibraE,
 and includes only code for calibration and application of Synthetic gravity
 models and Iterative Proportional Fitting. Not much documentation has been
-written for this module, but a some examples are available on the usage examples
+written for this module, but some examples are available on the usage examples
 page :ref:`example_usage_distribution`.
 
 
