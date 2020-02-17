@@ -67,8 +67,8 @@ you can always revert them to their default values. But remember, **ALL**
 Matrix module
 -------------
 
-* **AeuqilibraEMatrix**
-* **AeuqilibraEData**
+* **AequilibraEMatrix**
+* **AequilibraEData**
 
 
 .. _example_usage_project:
@@ -229,8 +229,25 @@ Traffic assignment
 A simple example of assignment
 
 ::
+    from aequilibrae.project import Project
+    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.matrix import AequilibraeMatrix
 
     assig = TrafficAssignment()
+
+    proj = Project('path/to/folder/SiouxFalls.sqlite')
+    proj.network.build_graphs()
+    # Mode c is car
+    car_graph = proj.network.graphs['c']
+
+
+    mat = AequilibraeMatrix()
+    mat.load('path/to/folder/demand.omx')
+    # We will only assign one user class stored as 'matrix' inside the OMX file
+    mat.computational_view(['matrix'])
+
+    # Creates the assignment class
+    assigclass = TrafficClass(g, mat)
 
     # If you want to know which assignment algorithms are available:
     assig.algorithms_available()
@@ -256,8 +273,6 @@ A simple example of assignment
 
     # And the algorithm we want to use to assign
     assig.set_algorithm('bfw')
-    # if one wants to know what are the algorithms available
-    assig.algorithms_available()  # ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
 
     # To overwrite the number of iterations and the relative gap intended
     assig.max_iter = 250
