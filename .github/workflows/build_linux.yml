@@ -27,17 +27,6 @@ jobs:
         pip install -r requirements.txt
         sudo apt-get install patchelf
 
-    - name: build and correct
-      run: |
-        mkdir wheelhouse
-        python setup.py sdist bdist_wheel -d wheelhouse
-        cd wheelhouse
-        ls
-        for whl in *.whl; do
-            sudo chmod 777 *.whl
-            auditwheel repair "$whl" --plat manylinux1_x86_64
-        done
-
     - name: Build manylinux Python wheels
       uses: RalfG/python-wheels-manylinux-build@v0.2-manylinux2014_x86_64
       with:
