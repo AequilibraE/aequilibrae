@@ -36,11 +36,6 @@ except ImportError:
     from distutils.core import setup
     from distutils.extension import Extension
 
-vdfs = ['bpr', 'parallel_numpy']
-
-for v in vdfs:
-    shutil.copy(f'./cython/{v}.pyx', f'./{v}.pyx')
-
 sys.dont_write_bytecode = True
 
 if "WINDOWS" in platform.platform().upper():
@@ -65,6 +60,3 @@ else:
     ]
 
 setup(name='AoN', ext_modules=cythonize(ext_modules), )
-
-for v in vdfs:
-    os.unlink(f'./{v}.pyx')
