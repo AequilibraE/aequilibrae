@@ -1,6 +1,8 @@
 import tempfile
 from os.path import dirname, abspath, join
 
+data_folder = join(dirname(dirname(abspath(__file__))), 'data')
+
 # For the graph tests
 test_network = join(dirname(dirname(abspath(__file__))), "data", "Final_Network.shp")
 test_graph = join(dirname(dirname(abspath(__file__))), "data", "test_graph.aeg")
@@ -19,3 +21,7 @@ no_index_omx = join(dirname(dirname(abspath(__file__))), "data/no_index.omx")
 
 # For project tests
 project_file = join(dirname(dirname(abspath(__file__))), "data", "AequilibraE_Project.sqlite")
+
+# For Traffic Assignment tests
+siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.sqlite")
+siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.omx")

@@ -12,17 +12,32 @@ For the original work, please see https://github.com/gboeing/osmnx
 import time
 import re
 import requests
-from PyQt5.QtCore import pyqtSignal, QObject
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
+import importlib.util as iutil
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import QObject
+    from PyQt5.QtCore import pyqtSignal
+else:
+    class QObject:
+        pass
 
 
 class OSMDownloader(QObject):
-    downloading = pyqtSignal(object)
+    if pyqt:
+        downloading = pyqtSignal(object)
+
+    def __emit_all(self, *args):
+        if pyqt:
+            self.downloading.emit(*args)
 
     def __init__(self, polygons, modes):
-        QObject.__init__(self, None)
+        if pyqt:
+            QObject.__init__(self, None)
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
@@ -34,12 +49,12 @@ class OSMDownloader(QObject):
             "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.downloading.emit(["text", f"Downloading polygon 1 of {len(self.polygons)}"])
-        self.downloading.emit(["maxValue", len(self.polygons)])
-        self.downloading.emit(["Value", 0])
+        self.__emit_all(["text", f"Downloading polygon 1 of {len(self.polygons)}"])
+        self.__emit_all(["maxValue", len(self.polygons)])
+        self.__emit_all(["Value", 0])
 
         for counter, poly in enumerate(self.polygons):
-            self.downloading.emit(["Value", counter])
+            self.__emit_all(["Value", counter])
             west, south, east, north = poly
             query_str = query_template.format(
                 north=north,
@@ -53,7 +68,7 @@ class OSMDownloader(QObject):
             json = self.overpass_request(data={"data": query_str}, timeout=timeout)
             if json["elements"]:
                 self.json.append(json)
-        self.downloading.emit(["Value", len(self.polygons)])
+        self.__emit_all(["Value", len(self.polygons)])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """

@@ -22,17 +22,20 @@ from .parse_csv import parse_csv
 have_pyqt5 = importlib.util.find_spec("PyQt5")
 if have_pyqt5 is None:
     pyqt = False
-
 else:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
-
     pyqt = True
 
 
 # TODO : Add control for mandatory and optional files
 # TODO: Add constraints for non-negative and limited options (0,1,2, etc) for fields through foreign keys
 class create_gtfsdb(WorkerThread):
-    converting_gtfs = SIGNAL(object)
+    if pyqt:
+        converting_gtfs = SIGNAL(object)
+
+    def __emit_all(self, *args):
+        if pyqt:
+            self.converting_gtfs.emit(*args)
 
     def __init__(self, file_path, save_db, memory_db=False, spatialite_enabled=False, overwrite=False):
         WorkerThread.__init__(self, None)
@@ -237,36 +240,31 @@ class create_gtfsdb(WorkerThread):
     def import_gtfs(self):
         # In case we have not create the database yet
         if self.conn is None:
-            if pyqt:
-                self.converting_gtfs.emit(["text", "Creating container database"])
+            self.__emit_all(["text", "Creating container database"])
             self.create_database()
 
         # Import all tables to SQLITE
         tables = [x.split(".")[0] for x in self.column_order.keys()]
         if self.spatialite_enabled:
-            self.converting_gtfs.emit(["total files", 16])
+            self.__emit_all(["total files", 16])
         else:
-            self.converting_gtfs.emit(["total files", 14])
+            self.__emit_all(["total files", 14])
 
         for i, tbl in enumerate(tables):
-            if pyqt:
-                self.converting_gtfs.emit(["text", "Loading data from file: " + tbl])
+            self.__emit_all(["text", "Loading data from file: " + tbl])
             self.logger.info("      loading table " + tbl)
             self.__load_tables(tbl)
-            if pyqt:
-                self.converting_gtfs.emit(["files counter", i + 1])
+            self.__emit_all(["files counter", i + 1])
 
         # Creates the geometry
         if self.spatialite_enabled:
             self.__create_geometry()
         self.conn.commit()
         self.conn.close()
-        self.converting_gtfs.emit(["finished_threaded_procedure", 0])
+        self.__emit_all(["finished_threaded_procedure", 0])
 
     def create_database(self):
-        if pyqt:
-            self.converting_gtfs.emit(["text", "Creating empty database"])
-            # self.converting_gtfs.emit(SIGNAL("converting_gtfs"), ['text', 'Creating empty database'])
+        self.__emit_all(["text", "Creating empty database"])
 
         if self.spatialite_enabled:
             shutil.copy(spatialite_database, self.save_db)
@@ -530,18 +528,16 @@ class create_gtfsdb(WorkerThread):
         # 3. A layer of shapes with all the stops for each trip that can be query'd by route_id
 
         # 1
-        if pyqt:
-            self.converting_gtfs.emit(["text", "Creating stops' geometry"])
-            self.converting_gtfs.emit(["files counter", 14])
+        self.__emit_all(["text", "Creating stops' geometry"])
+        self.__emit_all(["files counter", 14])
 
         self.cursor.execute("SELECT AddGeometryColumn( 'stops', 'geometry', 4326, 'POINT', 'XY' );")
         self.cursor.execute("update stops set geometry=MakePoint(stop_lon ,stop_lat, 4326);")
         self.cursor.execute("SELECT CreateSpatialIndex( 'stops' , 'geometry' );")
 
         # 2
-        if pyqt:
-            self.converting_gtfs.emit(["text", "Creating routes' geometry"])
-            self.converting_gtfs.emit(["files counter", 15])
+        self.__emit_all(["text", "Creating routes' geometry"])
+        self.__emit_all(["files counter", 15])
         # We create the table to hold the shapes for each route
         self.cursor.execute("DROP TABLE IF EXISTS shape_routes")
         # TODO: Add foreign key to calendar_dates.txt
@@ -559,12 +555,10 @@ class create_gtfsdb(WorkerThread):
         shape_ids = self.cursor.execute("SELECT DISTINCT shape_id from shapes;").fetchall()
         shape_ids = [str(x[0], "utf-8") for x in shape_ids]
         if len(shape_ids) > 0:
-            if pyqt:
-                self.converting_gtfs.emit(["max chunk counter", len(shape_ids)])
+            self.__emit_all(["max chunk counter", len(shape_ids)])
 
             for i, shp in enumerate(shape_ids):
-                if pyqt:
-                    self.converting_gtfs.emit(["chunk counter", i])
+                self.__emit_all(["chunk counter", i])
 
                 qry = self.cursor.execute(
                     "SELECT route_id, trip_id from trips where cast(shape_id as text)='" + shp + "'"
@@ -595,12 +589,10 @@ class create_gtfsdb(WorkerThread):
         else:
             trip_ids = self.cursor.execute("SELECT DISTINCT trip_id from trips;").fetchall()
             trip_ids = [str(x[0]) for x in trip_ids]
-            if pyqt:
-                self.converting_gtfs.emit(["max chunk counter", len(trip_ids)])
+            self.__emit_all(["max chunk counter", len(trip_ids)])
 
             for i, trip_id in enumerate(trip_ids):
-                if pyqt:
-                    self.converting_gtfs.emit(["chunk counter", i])
+                self.__emit_all(["chunk counter", i])
 
                 route_id = self.cursor.execute(
                     "SELECT route_id from trips where cast(trip_id as text)='" + str(trip_id) + "'"
@@ -624,8 +616,7 @@ class create_gtfsdb(WorkerThread):
                 self.cursor.execute(sql, (route_id, trip_id, route_text_color))
 
         # creates the stops table with route ID info
-        if pyqt:
-            self.converting_gtfs.emit(["text", "Associating routes and stops. Sit tight"])
+        self.__emit_all(["text", "Associating routes and stops. Sit tight"])
 
         self.cursor.execute(
             """CREATE TABLE 'shape_stops'

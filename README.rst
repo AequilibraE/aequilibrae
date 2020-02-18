@@ -2,18 +2,35 @@
 AequilibraE
 ###########
 
-.. image:: https://travis-ci.org/AequilibraE/aequilibrae.svg?branch=master
-    :target: https://travis-ci.org/AequilibraE/aequilibrae
 
-.. image:: https://coveralls.io/repos/github/AequilibraE/aequilibrae/badge.svg?branch=master
-    :target: https://coveralls.io/github/AequilibraE/aequilibrae?branch=master
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
+    :alt: Documentation Status
+
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
+    :alt: Linting
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
+    :alt: Unit tests
 
 .. image:: https://codecov.io/gh/AequilibraE/aequilibrae/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/AequilibraE/aequilibrae
 
-.. image:: https://readthedocs.org/projects/aequilibrae/badge/?version=latest
-    :target: https://aequilibrae.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
+    :alt: PyPi - Mac OS
+
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
+    :alt: PyPi - Windows
+
+.. .. image::
+..    :target:
+..    :alt:
+
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.

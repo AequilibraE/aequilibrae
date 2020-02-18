@@ -62,12 +62,21 @@ you can always revert them to their default values. But remember, **ALL**
   p.reset_default()
 
 
+.. _example_usage_matrix:
+
+Matrix module
+-------------
+
+* **AequilibraEMatrix**
+* **AequilibraEData**
+
+
 .. _example_usage_project:
 
 Project module
 --------------
 
-Let's suppose one wants to create project files for a list of 20 cities around
+Let's suppose one wants to create project files for a list of 5 cities around
 the world with their complete networks downloaded from
 `Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
 folder for analysis at a later time.
@@ -76,36 +85,39 @@ folder for analysis at a later time.
 ::
 
   from aequilibrae.project import Project
-  import os
 
   cities = ["Darwin, Australia",
             "Karlsruhe, Germany",
             "London, UK",
             "Paris, France",
-            "Shanghai, China",
-            "Sao Paulo, Brazil",
-            "Rio de Janeiro, Brazil",
-            "Los Angeles, USA",
-            "New York, USA",
-            "Mexico City, Mexico",
-            "Berlin, Germany",
-            "Vancouver, Canada",
-            "Montreal, Canada",
-            "Toronto, Canada",
-            "Madrid, Spain",
-            "Lisbon, Portugal",
-            "Rome, Italy",
-            "Perth, Australia",
-            "Hobart, Australia",
             "Auckland, New Zealand"]
 
   for city in cities:
+      print(city)
       pth = f'd:/net_tests/{city}.sqlite'
 
       p = Project(pth, True)
       p.network.create_from_osm(place_name=city)
       p.conn.close()
       del p
+
+If one wants to load a project and check some of its properties, it is easy:
+
+::
+
+  >>> from aequilibrae.project import Project
+
+  >>> p = Project('path/to_project')
+
+  # for the modes available in the model
+  >>> p.network.modes()
+  ['car', 'walk', 'bicycle']
+
+  >>> p.network.count_links()
+  157926
+
+  >>> p.network.count_nodes()
+  793200
 
 
 .. _example_usage_paths:
@@ -141,11 +153,13 @@ you need only a graph that you have previously built, and the list of skims you 
 
     # You now have to set the graph for what you want
     # In this case, we are computing fastest path (minimizing free flow time)
-    # We are also **blocking** paths from going through centroids
-    g.set_graph(cost_field='fftime', block_centroid_flows=True)
+    g.set_graph(cost_field='fftime')
 
-    # We will be skimming for fftime **AND** length along the way
-    g.set_skimming(['fftime', 'length'])
+    # We are also **blocking** paths from going through centroids
+    g.set_blocked_centroid_flows(block_centroid_flows=True)
+
+# We will be skimming for fftime **AND** distance along the way
+    g.set_skimming(['fftime', 'distance'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided
     result = skmr()
@@ -207,13 +221,156 @@ You can save the results to your place of choice in AequilibraE format or export
 
     result.skims.copy('path/to/desired/folder/file_name.aem')
 
+.. _comprehensive_traffic_assignment_case:
 
-Traffic Assignment
+Traffic assignment
 ~~~~~~~~~~~~~~~~~~
+
+A simple example of assignment
+
+::
+    from aequilibrae.project import Project
+    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    from aequilibrae.matrix import AequilibraeMatrix
+
+    assig = TrafficAssignment()
+
+    proj = Project('path/to/folder/SiouxFalls.sqlite')
+    proj.network.build_graphs()
+    # Mode c is car
+    car_graph = proj.network.graphs['c']
+
+
+    mat = AequilibraeMatrix()
+    mat.load('path/to/folder/demand.omx')
+    # We will only assign one user class stored as 'matrix' inside the OMX file
+    mat.computational_view(['matrix'])
+
+    # Creates the assignment class
+    assigclass = TrafficClass(g, mat)
+
+    # If you want to know which assignment algorithms are available:
+    assig.algorithms_available()
+
+    # If you want to know which Volume-Delay functions are available
+    assig.vdf.functions_available()
+
+    # The first thing to do is to add at list of traffic classes to be assigned
+    assig.set_classes([assigclass])
+
+    # Then we set the volume delay function
+    assig.set_vdf("BPR")  # This is not case-sensitive
+
+    # And its parameters
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+
+    # If you don't have parameters in the network, but rather global ones
+    # assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
+
+    # The capacity and free flow travel times as they exist in the graph
+    assig.set_capacity_field("capacity")
+    assig.set_time_field("free_flow_time")
+
+    # And the algorithm we want to use to assign
+    assig.set_algorithm('bfw')
+
+    # To overwrite the number of iterations and the relative gap intended
+    assig.max_iter = 250
+    assig.rgap_target = 0.0001
+
+    # To overwrite the number of CPU cores to be used
+    assig.set_cores(3)
+
+    # we then execute the assignment
+    assig.execute()
+
+Assigning traffic on TNTP instances
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is a set of well known traffic assignment problems used in the literature
+maintained on `GitHub <https://github.com/bstabler/TransportationNetworks/>`_
+that is often used for tests, so we will use one of those problems here.
+
+Let's suppose we want to perform traffic assignment for one of those problems
+and check the results against the reference results.
+
+The parsing and importing of those networks are not really the case here, but
+there is `online code <https://gist.github.com/pedrocamargo/d565f545667fd473ea0590c7866965de>`_
+available for doing that work.
 
 ::
 
-    some code
+    import os
+    import sys
+    import numpy as np
+    import pandas as pd
+    from aequilibrae.paths import TrafficAssignment
+    from aequilibrae.paths import Graph
+    from aequilibrae.paths.traffic_class import TrafficClass
+    from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+    import matplotlib.pyplot as plt
+
+    from aequilibrae import logger
+    import logging
+
+    # We redirect the logging output to the terminal
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(stdout_handler)
+
+    # Let's work with Sioux Falls
+    os.chdir('D:/src/TransportationNetworks/SiouxFalls')
+    result_file = 'SiouxFalls_flow.tntp'
+
+    # Loads and prepares the graph
+    g = Graph()
+    g.load_from_disk('graph.aeg')
+    g.set_graph('time')
+    g.cost = np.array(g.cost, copy=True)
+    g.set_skimming(['time'])
+    g.set_blocked_centroid_flows(True)
+
+    # Loads and prepares the matrix
+    mat = AequilibraeMatrix()
+    mat.load('demand.aem')
+    mat.computational_view(['matrix'])
+
+    # Creates the assignment class
+    assigclass = TrafficClass(g, mat)
+
+    # Instantiates the traffic assignment problem
+    assig = TrafficAssignment()
+
+    # configures it properly
+    assig.set_vdf('BPR')
+    assig.set_vdf_parameters(**{'alpha': 0.15, 'beta': 4.0})
+    assig.set_capacity_field('capacity')
+    assig.set_time_field('time')
+    assig.set_classes(assigclass)
+    # could be assig.set_algorithm('frank-wolfe')
+    assig.set_algorithm('msa')
+
+    # Execute the assignment
+    assig.execute()
+
+    # the results are within each traffic class only one, in this case
+    assigclass.results.link_loads
+
+.. _multiple_user_classes:
+
+Setting multiple user classes before assignment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Let's suppose one wants to setup a matrix for assignment that has two user
+classes, *red_cars* and *blue cars* for a single traffic class. To do that, one
+needs only to call the *computational_view* method with a list of the two
+matrices of interest.  Both matrices need to be contained in the same file (and
+to be contiguous if an *.aem instead of a *.omx file) however.
+
+::
+
+    mat = AequilibraeMatrix()
+    mat.load('demand.aem')
+    mat.computational_view(['red_cars', 'blue_cars'])
 
 
 Advanced usage: Building a Graph
@@ -225,7 +382,7 @@ an adjacency matrix
 ::
 
     from aequilibrae.paths import Graph
-    from aequilibrae import reserved_fields
+    from aequilibrae.project.network import Network
     from scipy.sparse import coo_matrix
 
     # original_adjacency_matrix is a sparse matrix where positive values are actual links
@@ -242,12 +399,14 @@ an adjacency matrix
                  k._Graph__float_type,
                  k._Graph__float_type]
 
-    all_titles = [reserved_fields.link_id,
-                  reserved_fields.a_node,
-                  reserved_fields.b_node,
-                  reserved_fields.direction,
-                 "length_ab",
-                 "length_ba"]
+    # List of all required link fields for a network
+    # Network.req_link_flds
+
+    # List of all required node fields for a network
+    # Network.req_node_flds
+
+    # List of fields that are reserved for internal workings
+    # Network.protected_fields
 
     dt = [(t, d) for t, d in zip(all_titles, all_types)]
 
@@ -257,16 +416,13 @@ an adjacency matrix
     my_graph = Graph()
     my_graph.network = np.zeros(links, dtype=dt)
 
-    my_graph.network[reserved_fields.link_id] = np.arange(links) + 1
-    my_graph.network[reserved_fields.a_node] = sparse_graph.row
-    my_graph.network[reserved_fields.b_node] = sparse_graph.col
-    my_graph.network["length_ab"] = sparse_graph.data
+    my_graph.network['link_id'] = np.arange(links) + 1
+    my_graph.network['a_node'] = sparse_graph.row
+    my_graph.network['b_node'] = sparse_graph.col
+    my_graph.network["distance"] = sparse_graph.data
 
     # If the links are directed (from A to B), direction is 1. If bi-directional, use zeros
-    my_graph.network[reserved_fields.direction] = np.ones(links)
-
-    # If uni-directional from A to B the value is not used
-    my_graph.network["length_ba"] = mat.data * 10000
+    my_graph.network['direction'] = np.ones(links)
 
     # Let's say that all nodes in the network are centroids
     list_of_centroids =  np.arange(max(sparse_graph.shape[0], sparse_graph.shape[0])+ 1)

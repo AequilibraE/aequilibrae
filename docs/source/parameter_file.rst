@@ -3,11 +3,85 @@
 Parameter File
 ==============
 
-System
-Assignment
-Distribution
-Network
+The parameter file has 4 distinct sections, each of which hold parameters for a
+certain portion of the software.
 
+* :ref:`parameters_system`
+
+* :ref:`parameters_assignment`
+
+* :ref:`parameters_distribution`
+
+* :ref:`parameters_network`
+
+Basic use of the parameters module is exemplified through the AequilibraE API
+as detailed in the :ref:`example_usage_parameters` section of the use cases.
+
+.. _parameters_system:
+
+System
+-------
+
+The system section of the parameters file holds information on things like the
+number of threads used in multi-threaded processes, logging and temp folders
+and whether we should be saving information to a log file at all, as exemplified
+below.
+
+.. image:: images/parameters_system_example.png
+    :width: 812
+    :align: center
+    :alt: Link examples
+
+The number of CPUs have a special behaviour defined, as follows:
+
+* **cpus<0** : The system will use the total number logical processors
+  **MINUS** the absolute value of **cpus**
+
+* **cpus=0** : The system will use the total number logical processors available
+
+* **cpus>0** : The system will use exactly **cpus** for computation, limited to
+   the total number logical processors available
+
+A few of these parameters, however, are targeted at its QGIS plugin, which is
+the case of the *driving side* and  *default_directory* parameters.
+
+*spatialite_path* is a parameter needed only by Windows users. Please refer to
+the instructions on how to set :ref:`installing_spatialite_on_windows` on
+Windows.
+
+.. _parameters_assignment:
+
+Assignment
+----------
+The assignment section of the parameter file is the smallest one, and it
+contains only the convergence criteria for assignment in terms of maximum number
+of iterations and target Relative Gap.
+
+.. image:: images/parameters_assignment_example.png
+    :width: 487
+    :align: center
+    :alt: Link examples
+
+Although these parameters are required to exist in the parameters file, one can
+override them during assignment, as detailed in :ref:`convergence_criteria`.
+
+
+.. _parameters_distribution:
+
+Distribution
+----------
+
+The distribution section of the parameter file is also fairly short, as it
+contains only the parameters for number of maximum iterations, convergence level
+and maximum trip length to be applied in Iterative Proportional Fitting and
+synthetic gravity models, as shown below.
+
+.. image:: images/parameters_distribution_example.png
+    :width: 546
+    :align: center
+    :alt: Link examples
+
+.. _parameters_network:
 
 Network
 -------
@@ -24,7 +98,7 @@ The section for link fields are divided into *one-way* fields and *two-way* fiel
 two-way fields will be created by appending *_ab* and *_ba* to the end of each field's name.
 
 There are 5 fields which cannot be changed, as they are mandatory fields for an AequilibraE
-network, and they are **link_id**, **a_node**, **b_node**, **direction**, **length** and
+network, and they are **link_id**, **a_node**, **b_node**, **direction**, **distance** and
 **modes**. The field **geometry** is also default, but it is not listed in the parameter file
 due to its distinct nature.
 

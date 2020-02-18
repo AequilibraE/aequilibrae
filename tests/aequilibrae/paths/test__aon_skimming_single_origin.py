@@ -5,7 +5,8 @@ from aequilibrae.paths import skimming_single_origin
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 import numpy as np
 
-from ...data import test_graph
+# Adds the folder with the data to the path and collects the paths to the files
+from ...data import path_test, test_graph
 
 
 class TestSkimming_single_origin(unittest.TestCase):
@@ -16,7 +17,7 @@ class TestSkimming_single_origin(unittest.TestCase):
         g.set_graph(cost_field="distance")
         g.set_skimming("distance")
 
-        origin = np.random.choice(g.centroids, 1)[0]
+        origin = np.random.choice(g.centroids[:-1], 1)[0]
 
         # skimming results
         res = SkimResults()

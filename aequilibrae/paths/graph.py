@@ -2,30 +2,11 @@ import logging
 import pickle
 import uuid
 from datetime import datetime
+from warnings import warn
 
 import numpy as np
 
 from .__version__ import binary_version as VERSION
-
-""""""
-"""-----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Transportation graph class
- Purpose:    Implement a standard graph class to support all network computation
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    05/June/2015
- Updated:    03/Dec/2017
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------"""
 
 
 class Graph(object):
@@ -41,6 +22,7 @@ class Graph(object):
         self.required_default_fields = []
         self.reset_single_fields()
         self.other_fields = ""
+        self.mode = ''
         self.date = str(datetime.now())
 
         self.description = "No description added so far"
@@ -58,12 +40,15 @@ class Graph(object):
         self.b_node = False  # b node for each directed link
 
         self.cost = None  # This array holds the values being used in the shortest path routine
-        self.skims = False  # 2-D Array with the fields to be computed as skims
+        self.capacity = None  # Array holds the capacity for links
+        self.free_flow_time = None  # Array holds the free flow travel time by link
+        self.skims = np.zeros((1, 1), self.__float_type)  # Skimming array that we initialize with something for the
+        # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
         self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
 
-        self.block_centroid_flows = False
+        self.block_centroid_flows = True
         self.penalty_through_centroids = np.inf
 
         self.centroids = None  # NumPy array of centroid IDs
@@ -92,15 +77,15 @@ class Graph(object):
 
     # Create a graph from a shapefile. To be upgraded to ANY geographic file in the future
     def create_from_geography(
-        self,
-        geo_file: str,
-        id_field: str,
-        dir_field: str,
-        cost_field: str,
-        centroids: np.ndarray,
-        skim_fields=[],
-        anode="A_NODE",
-        bnode="B_NODE",
+            self,
+            geo_file: str,
+            id_field: str,
+            dir_field: str,
+            cost_field: str,
+            centroids: np.ndarray,
+            skim_fields=[],
+            anode="A_NODE",
+            bnode="B_NODE",
     ) -> None:
         """
         :param geo_file: Path to the geographic file to be used. File is usually the output of the network preparation
@@ -143,15 +128,13 @@ class Graph(object):
             self.__integer_type,
             self.__integer_type,
             self.__float_type,
-            self.__float_type,
             np.int8,
         ]
         all_titles = [
             "link_id",
             "a_node",
             "b_node",
-            cost_field_name.lower() + "_ab",
-            cost_field_name.lower() + "_ba",
+            cost_field_name,
             "direction",
         ]
         check_fields = [id_field, dir_field, anode, bnode, cost_field]
@@ -166,11 +149,8 @@ class Graph(object):
             types_to_check.append(float)
 
             all_types.append(self.__float_type)
-            all_types.append(self.__float_type)
-            all_titles.append((k + "_ab"))
-            all_titles.append((k + "_ba"))
-            dict_field[k + "_ab"] = skim_index
-            dict_field[k + "_ba"] = skim_index
+            all_titles.append((k))
+            dict_field[k] = skim_index
 
         dt = [(t, d) for t, d in zip(all_titles, all_types)]
 
@@ -201,7 +181,6 @@ class Graph(object):
                 line.append(feat[id_field])
                 line.append(feat[anode])
                 line.append(feat[bnode])
-                line.append(feat[cost_field])
                 line.append(feat[cost_field])
                 line.append(feat[dir_field])
 
@@ -314,6 +293,14 @@ class Graph(object):
                             self.graph[i[0:-3]][a1:a2] = poss[i]
                             self.graph[i[0:-3]][a2:a3] = zers[i[0:-3] + "_ba"]
                             self.graph[i[0:-3]][a3:a4] = zers[i]
+                        elif i[-3:] == "_ba":
+                            pass
+                        else:
+                            if i in all_titles:
+                                self.graph[i][0:a1] = negs[i]
+                                self.graph[i][a1:a2] = poss[i]
+                                self.graph[i][a2:a3] = zers[i]
+                                self.graph[i][a3:a4] = zers[i]
 
                 ind = np.lexsort((self.graph["b_node"], self.graph["a_node"]))
                 self.graph = self.graph[ind]
@@ -324,6 +311,7 @@ class Graph(object):
                 a = self.graph["a_node"][0]
                 p = 0
                 k = 0
+
                 for i in range(1, self.num_links):
                     if a != self.graph["a_node"][i]:
                         for j in range(p, self.graph["a_node"][i]):
@@ -338,6 +326,9 @@ class Graph(object):
                 self.fs[self.num_nodes] = self.graph.shape[0]
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+                for i in self.graph.dtype.names:
+                    if np.any(np.isnan(self.graph[i])):
+                        warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
 
     def __build_dtype(self, all_titles):
         dtype = [
@@ -349,19 +340,21 @@ class Graph(object):
         ]
         for i in all_titles:
             if i not in self.required_default_fields and i[0:-3] not in self.required_default_fields:
-                if i[-3:] != "_ab":
-                    dtype.append((i[0:-3], self.network[i].dtype))
+                if i[-3:] == "_ab":
+                    if i[:-3] + '_ba' in all_titles:
+                        dtype.append((i[:-3], self.network[i].dtype))
+                    else:
+                        raise ValueError('Field {} exists for ab direction but does not exist for ba'.format(i))
+                elif i[-3:] == "_ba":
+                    if i[:-3] + '_ab' not in all_titles:
+                        raise ValueError('Field {} exists for ba direction but does not exist for ab'.format(i))
+                else:
+                    dtype.append((i, self.network[i].dtype))
         return dtype
 
     # We set which are the fields that are going to be minimized in this file
     # TODO: Change the call for all the uses on this function
-    def set_graph(self, cost_field, block_centroid_flows=True) -> None:
-
-        if isinstance(block_centroid_flows, bool):
-            self.set_blocked_centroid_flows(block_centroid_flows)
-        else:
-            raise ValueError("block_centroid_flows needs to be a boolean")
-
+    def set_graph(self, cost_field) -> None:
         if cost_field in self.graph.dtype.names:
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:
@@ -403,12 +396,15 @@ class Graph(object):
                 self.skims[:, i] = self.graph[j]
         self.skim_fields = skim_fields
 
-    def set_blocked_centroid_flows(self, blocking):
-        if self.num_zones > 0:
-            self.block_centroid_flows = blocking
-            self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+    def set_blocked_centroid_flows(self, block_centroid_flows):
+        if isinstance(block_centroid_flows, bool):
+            if self.num_zones > 0:
+                self.block_centroid_flows = block_centroid_flows
+                self.b_node = np.array(self.graph["b_node"], self.__integer_type)
+            else:
+                raise ValueError("You can only block flows through centroids after setting the centroids")
         else:
-            raise ValueError("You can only block flows through centroids after setting the centroids")
+            raise TypeError("Blocking flows through centroids needs to be boolean")
 
     # Procedure to pickle graph and save to disk
     def save_to_disk(self, filename):
@@ -435,6 +431,7 @@ class Graph(object):
         mygraph["type_loaded"] = self.type_loaded
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
+        mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)
@@ -464,6 +461,7 @@ class Graph(object):
             self.type_loaded = mygraph["type_loaded"]
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
+            self.mode = mygraph["mode"]
         self.build_derived_properties()
 
     def build_derived_properties(self):
@@ -497,11 +495,10 @@ class Graph(object):
         must_types = [self.__integer_type, self.__integer_type, self.__integer_type, np.int8]
         for field, ytype in zip(must_fields, must_types):
             if self.network[field].dtype != ytype:
-                self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
-                )
+                self.status = ('Field "%s" in the network array has the wrong type. '
+                               'Please refer to the documentation' % field)
 
-                # Uniqueness of the id
+        # Uniqueness of the id
         link_ids = self.network["link_id"].astype(np.int)
         if link_ids.shape[0] != np.unique(link_ids).shape[0]:
             self.status = '"link_id" field not unique'
@@ -524,11 +521,10 @@ class Graph(object):
         must_types = [self.__integer_type, self.__integer_type, self.__integer_type, self.__integer_type]
         for field, ytype in zip(must_fields, must_types):
             if self.graph[field].dtype != ytype:
-                self.status = (
-                    'Field "%s" in the network array has the wrong type. Please refer to the documentation' % field
-                )
+                self.status = ('Field "%s" in the network array has the wrong type. '
+                               'Please refer to the documentation' % field)
 
-                # Uniqueness of the graph id
+        # Uniqueness of the graph id
         a = self.graph["id"].astype(np.int)
         if a.shape[0] != np.unique(a).shape[0]:
             self.status = '"id" field not unique'

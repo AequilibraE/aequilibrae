@@ -1,26 +1,4 @@
-"""
------------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Traffic assignment
- Purpose:    Implement traffic assignment algorithms based on Cython's network loading procedures
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    15/09/2013
- Updated:    2018-07-01
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
------------------------------------------------------------------------------------------------------------
- """
-
 import importlib.util as iutil
-import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
 
@@ -29,6 +7,9 @@ import numpy as np
 from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
+from .results import AssignmentResults
+from .graph import Graph
+from aequilibrae.matrix import AequilibraeMatrix
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -40,7 +21,7 @@ class allOrNothing(WorkerThread):
     if pyqt:
         assignment = SIGNAL(object)
 
-    def __init__(self, matrix, graph, results):
+    def __init__(self, matrix: AequilibraeMatrix, graph: Graph, results: AssignmentResults):
         WorkerThread.__init__(self, None)
 
         self.matrix = matrix
@@ -53,12 +34,6 @@ class allOrNothing(WorkerThread):
         if results.__graph_id__ != graph.__id__:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
-        if results.__graph_id__ is None:
-            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
-
-        elif results.__graph_id__ != graph.__id__:
-            raise ValueError("The results object was prepared for a different graph")
-
         elif matrix.matrix_view is None:
             raise ValueError(
                 "Matrix was not prepared for assignment. "
@@ -66,7 +41,7 @@ class allOrNothing(WorkerThread):
             )
 
         elif not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible set of centroids.")
+            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
     def doWork(self):
         self.execute()
@@ -89,7 +64,7 @@ class allOrNothing(WorkerThread):
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
-                    # one_to_all(orig, self.matrix, self.graph, self.results, self.aux_res, 0)
+                    # self.func_assig_thread(orig, all_threads)
         pool.close()
         pool.join()
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
@@ -99,12 +74,12 @@ class allOrNothing(WorkerThread):
             self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
-        if threading.get_ident() in all_threads:
-            th = all_threads[threading.get_ident()]
-        else:
-            all_threads[threading.get_ident()] = all_threads["count"]
-            th = all_threads["count"]
+        thread_id = threading.get_ident()
+        th = all_threads.get(thread_id, all_threads["count"])
+        if th == all_threads["count"]:
+            all_threads[thread_id] = all_threads["count"]
             all_threads["count"] += 1
+
         x = one_to_all(O, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
         if x != O:

@@ -14,8 +14,8 @@ network:
         - direction:
             name: direction
             type: integer
-        - length:
-            name: length
+        - distance:
+            name: distance
             type: numeric
         - name:
             name: name

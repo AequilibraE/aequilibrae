@@ -2,14 +2,11 @@ from unittest import TestCase
 import sqlite3
 from tempfile import gettempdir
 import os
-import shutil
 import platform
-from time import sleep
 from functools import reduce
 from aequilibrae.project import Project
 from aequilibrae.project.network.network import Network
 from aequilibrae.parameters import Parameters
-from aequilibrae.reference_files import spatialite_database
 from warnings import warn
 from random import random
 
@@ -44,7 +41,11 @@ class TestNetwork(TestCase):
         os.unlink(self.file2)
 
     def test_create_from_osm(self):
-        if random() < 0.05:
+        thresh = 0.05
+        if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
+            thresh = 1.01
+
+        if random() < thresh:
             # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
             self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
             curr = self.project.conn.cursor()

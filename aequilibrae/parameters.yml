@@ -1,6 +1,7 @@
 assignment:
-  Equilibrium:
-    rgap: 1.0e-03
+  equilibrium:
+    rgap: 1.0e-4
+    maximum_iterations: 250
 distribution:
   gravity:
     max error: 0.0001
@@ -11,11 +12,10 @@ distribution:
     convergence level: 0.0001
     max iterations: 5000
 system:
-  cpus: 8
+  cpus: 0
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
   driving side: right
   logging: true
-  report zeros: 1
   temp directory: /temp
   logging_directory: /temp
   spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
@@ -35,20 +35,20 @@ network:
         - direction:
             description: Direction of the link. THIS FIELD CANNOT BE CHANGED
             type: integer
-        - length:
+        - distance:
             description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
             type: numeric
         - modes:
             description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
             type: text
+        - link_type:
+            description: Classification of link (local, arterial, etc). THIS FIELD CANNOT BE CHANGED
+            type: varchar
+            osm_source: highway
         - name:
             description: name
             type: text
             osm_source: name
-        - link_type:
-            description: link_type
-            type: varchar
-            osm_source: highway
       two-way:
         - lanes:
             description: lanes
@@ -105,7 +105,6 @@ network:
           - service
           - escape
           - road
-          - unclassified
         mode_filter:
           # The following tags will be removed from the mode
           motor_vehicle: "no"
@@ -129,7 +128,6 @@ network:
           - service
           - escape
           - road
-          - unclassified
           - bus_guideway
         unknown_tags: true
       walk:

@@ -3,7 +3,7 @@ import os
 import platform
 import shutil
 from warnings import warn
-from aequilibrae.project.network.network import Network
+from aequilibrae.project.network import Network
 from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
 
@@ -48,8 +48,8 @@ class Project:
 
     def __create_modes_table(self):
 
-        create_query = """CREATE TABLE 'modes' (mode_name VARCHAR NOT NULL,
-                                                mode_id VARCHAR PRIMARY KEY UNIQUE,
+        create_query = """CREATE TABLE 'modes' (mode_name VARCHAR UNIQUE NOT NULL,
+                                                mode_id VARCHAR PRIMARY KEY UNIQUE NOT NULL,
                                                 description VARCHAR);"""
         cursor = self.conn.cursor()
         cursor.execute(create_query)

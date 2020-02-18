@@ -4,14 +4,26 @@ import numpy as np
 from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from PyQt5.QtCore import QObject, pyqtSignal
+
+import importlib.util as iutil
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import QObject
+    from PyQt5.QtCore import pyqtSignal
+else:
+    class QObject:
+        pass
 
 
 class OSMBuilder(QObject):
-    building = pyqtSignal(object)
+    if pyqt:
+        building = pyqtSignal(object)
 
     def __init__(self, osm_items: List, conn, node_start=10000) -> None:
-        QObject.__init__(self, None)
+        if pyqt:
+            QObject.__init__(self, None)
         self.osm_items = osm_items
         self.conn = conn
         self.curr = self.conn.cursor()
@@ -20,6 +32,10 @@ class OSMBuilder(QObject):
         self.nodes = {}
         self.links = {}
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))"""
+
+    def __emit_all(self, *args):
+        if pyqt:
+            self.building.emit(*args)
 
     def doWork(self):
         node_count = self.data_structures()
@@ -30,17 +46,17 @@ class OSMBuilder(QObject):
 
         osmi = []
         logger.info("Consolidating geo elements")
-        self.building.emit(["text", "Consolidating geo elements"])
-        self.building.emit(["maxValue", len(self.osm_items)])
+        self.__emit_all(["text", "Consolidating geo elements"])
+        self.__emit_all(["maxValue", len(self.osm_items)])
 
         for i, x in enumerate(self.osm_items):
             osmi.append(x["elements"])
-            self.building.emit(["Value", i])
+            self.__emit_all(["Value", i])
         self.osm_items = sum(osmi, [])
 
         logger.info("Separating nodes and links")
-        self.building.emit(["text", "Separating nodes and links"])
-        self.building.emit(["maxValue", len(self.osm_items)])
+        self.__emit_all(["text", "Separating nodes and links"])
+        self.__emit_all(["maxValue", len(self.osm_items)])
 
         alinks = []
         n = []
@@ -49,23 +65,23 @@ class OSMBuilder(QObject):
                 alinks.append(x)
             elif x["type"] == "node":
                 n.append(x)
-            self.building.emit(["Value", i])
+            self.__emit_all(["Value", i])
 
         self.osm_items = None
         logger.info("Setting data structures for nodes")
-        self.building.emit(["text", "Setting data structures for nodes"])
-        self.building.emit(["maxValue", len(n)])
+        self.__emit_all(["text", "Setting data structures for nodes"])
+        self.__emit_all(["maxValue", len(n)])
 
         for i, node in enumerate(n):
             nid = node.pop("id")
             _ = node.pop("type")
             self.nodes[nid] = node
-            self.building.emit(["Value", i])
+            self.__emit_all(["Value", i])
         del n
 
         logger.info("Setting data structures for links")
-        self.building.emit(["text", "Setting data structures for links"])
-        self.building.emit(["maxValue", len(alinks)])
+        self.__emit_all(["text", "Setting data structures for links"])
+        self.__emit_all(["maxValue", len(alinks)])
 
         all_nodes = []
         for i, link in enumerate(alinks):
@@ -73,11 +89,11 @@ class OSMBuilder(QObject):
             _ = link.pop("type")
             all_nodes.extend(link["nodes"])
             self.links[osm_id] = link
-            self.building.emit(["Value", i])
+            self.__emit_all(["Value", i])
         del alinks
 
         logger.info("Finalizing data structures")
-        self.building.emit(["text", "Finalizing data structures"])
+        self.__emit_all(["text", "Finalizing data structures"])
 
         node_count = self.unique_count(np.array(all_nodes))
 
@@ -94,15 +110,15 @@ class OSMBuilder(QObject):
         fn = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
         logger.info("Adding network links")
-        self.building.emit(["text", "Adding network links"])
-        self.building.emit(["maxValue", len(self.links)])
+        self.__emit_all(["text", "Adding network links"])
+        self.__emit_all(["maxValue", len(self.links)])
 
         nodes_to_add = set()
         counter = 0
-        mode_codes = self.modes_per_link_type()
+        mode_codes, not_found_tags = self.modes_per_link_type()
 
         for osm_id, link in self.links.items():
-            self.building.emit(["Value", counter])
+            self.__emit_all(["Value", counter])
             vars["osm_id"] = osm_id
             linknodes = link["nodes"]
             linktags = link["tags"]
@@ -133,60 +149,23 @@ class OSMBuilder(QObject):
             for k, v in twf.items():
                 val = linktags.get(v["osm_source"])
                 for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
-                    vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
-                    if vald is not None:
-                        if vald.isdigit():
-                            if vald == val and v["osm_behaviour"] == "divide":
-                                vald = float(val) / 2
-                        else:
-                            if isinstance(vald, str):
-                                vald = vald.replace('"', "'")
-                                vald = '"{}"'.format(vald)
+                    vars["{}_{}".format(k, d1)] = self.__get_link_property(d2, val, linktags, v)
 
-                    vars["{}_{}".format(k, d1)] = vald
+            vars["modes"] = mode_codes.get(linktags.get("highway"), not_found_tags)
 
-            vars["modes"] = mode_codes.get(linktags.get("highway"))
-
-            for i in range(segments):
-                ii = intersections[i]
-                jj = intersections[i + 1]
-                all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
-
-                vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
-                if vars["a_node"] == self.node_start:
-                    node_ids[linknodes[ii]] = vars["a_node"]
-                    self.node_start += 1
-
-                vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
-                if vars["b_node"] == self.node_start:
-                    node_ids[linknodes[jj]] = vars["b_node"]
-                    self.node_start += 1
-
-                vars["length"] = sum(
-                    [
-                        haversine(
-                            self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
-                        )
-                        for x, y in zip(all_nodes[1:], all_nodes[:-1])
-                    ]
-                )
-
-                geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
-                geometry = "LINESTRING ({})".format(", ".join(geometry))
-
-                attributes = [vars.get(x) for x in fields]
-
-                attributes = ", ".join([str(x) for x in attributes])
-                sql = self.insert_qry.format(table, fn, attributes, geometry)
-                sql = sql.replace("None", "null")
-                try:
-                    self.curr.execute(sql)
-                    nodes_to_add.update([linknodes[ii], linknodes[jj]])
-                except Exception as e:
-                    data = list(vars.values())
-                    logger.error("error when inserting link {}. Error {}".format(data, e.args))
-                    logger.error(sql)
-                vars["link_id"] += 1
+            if len(vars["modes"]) > 0:
+                for i in range(segments):
+                    geometry, attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
+                    sql = self.insert_qry.format(table, fn, attributes, geometry)
+                    sql = sql.replace("None", "null")
+                    try:
+                        self.curr.execute(sql)
+                        nodes_to_add.update([linknodes[intersections[i]], linknodes[intersections[i + 1]]])
+                    except Exception as e:
+                        data = list(vars.values())
+                        logger.error("error when inserting link {}. Error {}".format(data, e.args))
+                        logger.error(sql)
+                    vars["link_id"] += 1
             counter += 1
         return nodes_to_add, node_ids
 
@@ -197,12 +176,12 @@ class OSMBuilder(QObject):
         field_names = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
         logger.info("Adding network nodes")
-        self.building.emit(["text", "Adding network nodes"])
-        self.building.emit(["maxValue", len(nodes_to_add)])
+        self.__emit_all(["text", "Adding network nodes"])
+        self.__emit_all(["maxValue", len(nodes_to_add)])
 
         vars = {}
         for counter, osm_id in enumerate(nodes_to_add):
-            self.building.emit(["Value", counter])
+            self.__emit_all(["Value", counter])
             vars["node_id"] = node_ids[osm_id]
             vars["osm_id"] = osm_id
             vars["is_centroid"] = 0
@@ -222,6 +201,51 @@ class OSMBuilder(QObject):
 
         self.conn.commit()
         self.curr.close()
+
+    def __build_link_data(self, vars, intersections, i, linknodes, node_ids, fields):
+        ii = intersections[i]
+        jj = intersections[i + 1]
+        all_nodes = [linknodes[x] for x in range(ii, jj + 1)]
+
+        vars["a_node"] = node_ids.get(linknodes[ii], self.node_start)
+        if vars["a_node"] == self.node_start:
+            node_ids[linknodes[ii]] = vars["a_node"]
+            self.node_start += 1
+
+        vars["b_node"] = node_ids.get(linknodes[jj], self.node_start)
+        if vars["b_node"] == self.node_start:
+            node_ids[linknodes[jj]] = vars["b_node"]
+            self.node_start += 1
+
+        vars["distance"] = sum(
+            [
+                haversine(
+                    self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
+                )
+                for x, y in zip(all_nodes[1:], all_nodes[:-1])
+            ]
+        )
+
+        geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
+        geometry = "LINESTRING ({})".format(", ".join(geometry))
+
+        attributes = [vars.get(x) for x in fields]
+
+        attributes = ", ".join([str(x) for x in attributes])
+
+        return geometry, attributes
+
+    def __get_link_property(self, d2, val, linktags, v):
+        vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
+        if vald is not None:
+            if vald.isdigit():
+                if vald == val and v["osm_behaviour"] == "divide":
+                    vald = float(val) / 2
+            else:
+                if isinstance(vald, str):
+                    vald = vald.replace('"', "'")
+                    vald = '"{}"'.format(vald)
+        return vald
 
     @staticmethod
     def unique_count(a):
@@ -272,14 +296,18 @@ class OSMBuilder(QObject):
         mode_codes = {p[0]: p[1] for p in mode_codes}
 
         type_list = {}
+        notfound = ""
         for mode, val in modes.items():
             all_types = val["link_types"]
             md = mode_codes[mode]
             for tp in all_types:
                 type_list[tp] = "{}{}".format(type_list.get(tp, ""), md)
+            if val["unknown_tags"]:
+                notfound += md
 
-        type_list = {k: '"{}"'.format(v) for k, v in type_list.items()}
-        return type_list
+        type_list = {k: '"{}"'.format("".join(set(v))) for k, v in type_list.items()}
+
+        return type_list, '"{}"'.format(notfound)
 
     @staticmethod
     def get_node_fields():

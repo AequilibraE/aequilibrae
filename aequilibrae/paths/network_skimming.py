@@ -19,7 +19,6 @@
 -----------------------------------------------------------------------------------------------------------
  """
 
-import importlib
 import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
@@ -27,21 +26,19 @@ from multiprocessing.dummy import Pool as ThreadPool
 from .AoN import skimming_single_origin
 from .multi_threaded_skimming import MultiThreadedNetworkSkimming
 from ..utils import WorkerThread
+import importlib.util as iutil
 
-have_pyqt5 = importlib.util.find_spec("PyQt5")
-if have_pyqt5 is None:
-    pyqt = False
-else:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
-
-    pyqt = True
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal
 
 sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
-
-    skimming = SIGNAL(object)
+    if pyqt:
+        skimming = pyqtSignal(object)
 
     def __init__(self, graph, results, origins=None):
         WorkerThread.__init__(self, None)

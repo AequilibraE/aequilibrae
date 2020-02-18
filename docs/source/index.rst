@@ -27,6 +27,8 @@ Contents
    parameter_file
    project
    network
+   project_tables
+   traffic_assignment
    usageexamples
    softwaredevelopment
    qgis

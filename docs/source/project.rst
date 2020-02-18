@@ -9,6 +9,10 @@ by the fact that it is easier to develop and maintain documentation for models
 if they are kept in a format that favors data integrity and that supports a
 variety of data types and uses.
 
+.. note::
+  As of now, only projection WGS84, 4326 is supported in AequilibraE.
+  Generalization is not guaranteed, but should come with time.
+
 The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
 with all the GIS capability supported by
 `SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. Their
@@ -64,6 +68,17 @@ the AequilibraE project are:
 
 .. index:: transponet
 
+Projection
+----------
+
+Although GIS technology allows for a number of different projections to be used
+in pretty much any platform, we have decided to have all AequilibraE's project
+using a single projection, WGS84 - CRS 4326.
+
+This should not affect users too much, as GIS platforms allow for on-the-fly
+reprojection for mapping purposes.
+
+
 Network
 ~~~~~~~
 
@@ -90,30 +105,12 @@ Configuration tables
 ~~~~~~~~~~~~~~~~~~~~
 
 Many tables with information on the models (demographics, modes, metadata, etc.)
-are expected to exist, and this section will have the description of those
-tables as they are created.
-
-Modes table
-+++++++++++
-
-The modes table exists to list all the modes available in the model's network,
-and its main role is to support the creation of graphs directly from the SQLite
-project.
-
-The modes table has three fields, being the *mode_name*, *description* and
-*mode_id*, where *mode_id* is a single letter that is used to codify mode
-permissions in the network, as further discussed in :ref:`network`.
-
-An example of what the contents of the mode table look like is below:
-
-.. image:: images/modes_table.png
-    :width: 750
-    :align: center
-    :alt: Link examples
+are expected to exist, so a dedicated page on them is advisable, even though the
+content of such a page is not yet too extensive.  :ref:`project_tables`.
 
 
-Summary of project tables
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Summary of all tables in the project database
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The tables that are currently part of the AequilibraE project are the following:
 

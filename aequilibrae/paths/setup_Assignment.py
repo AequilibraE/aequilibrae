@@ -13,17 +13,21 @@
  Repository:  https://github.com/AequilibraE/AequilibraE
 
  Created:    01/01/2013
- Updated:    30/09/2016
+ Updated:    2020/02/10
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
  """
 import os
 import sys
-
+import platform
 import numpy as np
 import Cython.Compiler.Options
 from Cython.Distutils import build_ext
+from Cython.Build import cythonize
+import shutil
+
+# Cython.Compiler.Options.annotate = True
 
 try:
     from setuptools import setup
@@ -32,19 +36,35 @@ except ImportError:
     from distutils.core import setup
     from distutils.extension import Extension
 
+vdfs = ['bpr', 'parallel_numpy']
+
+for v in vdfs:
+    shutil.copy(f'./cython/{v}.pyx', f'./{v}.pyx')
+
 sys.dont_write_bytecode = True
 
-Cython.Compiler.Options.annotate = True
+if "WINDOWS" in platform.platform().upper():
+    ext_modules = [
+        Extension(
+            "AoN",
+            ["AoN.pyx"],
+            extra_compile_args=['/openmp'],
+            extra_link_args=['/openmp'],
+            include_dirs=[np.get_include()],
+        )
+    ]
+else:
+    ext_modules = [
+        Extension(
+            "AoN",
+            ["AoN.pyx"],
+            extra_compile_args=['-fopenmp'],
+            extra_link_args=['-fopenmp'],
+            include_dirs=[np.get_include()],
+        )
+    ]
 
-here = os.path.dirname(os.path.realpath(__file__))
-whole_path = os.path.join(here, "AoN.pyx")
+setup(name='AoN', ext_modules=cythonize(ext_modules), )
 
-ext_module = Extension(
-    "AoN",
-    [whole_path],
-    # extra_compile_args=['/fopenmp'],
-    # extra_link_args=['/fopenmp'],
-    include_dirs=[np.get_include()],
-)
-
-setup(cmdclass={"build_ext": build_ext}, ext_modules=[ext_module])
+for v in vdfs:
+    os.unlink(f'./{v}.pyx')

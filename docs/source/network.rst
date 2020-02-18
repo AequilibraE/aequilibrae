@@ -27,13 +27,18 @@ other changes to the layers or preventing the changes.
 Although the behaviour of these trigger is expected to be mostly intuitive
 to anybody used to editing transportation networks within commercial modeling
 platforms, we have detailed the behaviour for all different network changes in
-:ref:`net_section5.1` .
+:ref:`net_section.1` .
 
 This implementation choice is not, however, free of caveats. Due to
 technological limitations of SQLite, some of the desired behaviors identified in
-:ref:`net_section5.1` cannot be implemented, but such caveats do not impact the
+:ref:`net_section.1` cannot be implemented, but such caveats do not impact the
 usefulness of this implementation or its robustness in face proper use of the
 tool.
+
+.. note::
+   AequilibraE does not currently support turn penalties and/or bans. Their
+   implementation requires a complete overahaul of the path-building code, so
+   that is still a long-term goal, barred specific developed efforts.
 
 Network Fields
 --------------
@@ -63,9 +68,11 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | direction   | Direction of flow allowed for the link (A-->B: 1, B-->A:-1, Both:0)   | Integer 8 bits          |
 +-------------+-----------------------------------------------------------------------+-------------------------+
-| length      | Length of the link in meters                                          | Float 64 bits           |
+| distance    | Length of the link in meters                                          | Float 64 bits           |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | modes       | Modes allowed in this link. (Concatenation of mode ids)               | String                  |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| link_type   | Link type classification. Can be the highway tag for OSM or other     | String                  |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
 
@@ -104,13 +111,16 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 Nodes
 ~~~~~
 
-The nodes table only has one mandatory field as of now: *node_id*, which can be
-directly linked to *a_node* and *b_node* in the links table.
+The nodes table only has two mandatory fields as of now: *node_id*, which can be
+directly linked to *a_node* and *b_node* in the links table, and *is_centroid*,
+which is a 1/0 value identifying nodes as centroids or not.
 
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
 +=============+=======================================================================+=========================+
 | node_id     | Unique identifier. Tied to the link table's a_node & b_node           | Integer (32/64 bits)    |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
 **The optional fields may include, but are not limited to the following:**
@@ -118,8 +128,6 @@ directly linked to *a_node* and *b_node* in the links table.
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
 +=============+=======================================================================+=========================+
-| is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
 | taz         | Zone in which the zone is located                                     | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | ...         | ...                                                                   | ...                     |
@@ -229,7 +237,7 @@ problem:
 2. Automatically applying the tests and consistency checks (and changes)
 required on one
 
-.. _net_section5.1:
+.. _net_section.1:
 
 Change behavior
 ~~~~~~~~~~~~~~~
@@ -238,7 +246,7 @@ In this section we present the mapping of all meaningful changes that a user can
 do to each part of the transportation network, doing so for each element of the
 transportation network.
 
-.. _net_section5.1.1:
+.. _net_section.1.1:
 
 Node layer changes and expected behavior
 ++++++++++++++++++++++++++++++++++++++++
@@ -248,7 +256,7 @@ geographic nature and 3 of data-only nature. The possible variations for each
 change are also discussed, and all the points where alternative behavior is
 conceivable are also explored.
 
-.. _net_section5.1.1.1:
+.. _net_section.1.1.1:
 
 Creating a node
 ^^^^^^^^^^^^^^^
@@ -266,7 +274,7 @@ traffic and transit assignments, this behavior would not be considered valid.
 All other edits that result in the creation of un-connected nodes or that result
  in such case should result in an error that prevents such operation
 
-.. _net_section5.1.1.2:
+.. _net_section.1.1.2:
 
 Deleting a node
 ^^^^^^^^^^^^^^^
@@ -287,7 +295,7 @@ A node can only be eliminated as a consequence of all links that terminated/
 originated at it being eliminated. If the user tries to delete a node, the
 network should return an error and not perform such operation.
 
-.. _net_section5.1.1.3:
+.. _net_section.1.1.3:
 
 Moving a node
 ^^^^^^^^^^^^^
@@ -305,9 +313,9 @@ associated with that node.
 All the links that connected to the node on the bottom have their extremities
 switched to the node on top
 The node on the bottom gets eliminated as a consequence of the behavior listed
-on :ref:`net_section5.1.1.2`
+on :ref:`net_section.1.1.2`
 
-.. _net_section5.1.1.4:
+.. _net_section.1.1.4:
 
 Adding a data field
 ^^^^^^^^^^^^^^^^^^^
@@ -315,7 +323,7 @@ Adding a data field
 No consistency check is needed other than ensuring that no repeated data field
 names exist
 
-.. _net_section5.1.1.5:
+.. _net_section.1.1.5:
 
 Deleting a data field
 ^^^^^^^^^^^^^^^^^^^^^
@@ -324,7 +332,7 @@ If the data field whose attempted deletion is mandatory, the network should
 return an error and not perform such operation. Otherwise the operation can be
 performed.
 
-.. _net_section5.1.1.6:
+.. _net_section.1.1.6:
 
 Modifying a data entry
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -333,7 +341,7 @@ If the field being edited is the node_id field, then all the related tables need
 to be edited as well (e.g. a_b and b_node in the link layer, the node_id tagged
 to turn restrictions and to transit stops)
 
-.. _net_section5.1.2:
+.. _net_section.1.2:
 
 Link layer changes and expected behavior
 ++++++++++++++++++++++++++++++++++++++++
@@ -341,7 +349,7 @@ Link layer changes and expected behavior
 There are 8 possible changes envisioned for the network links layer, being 5 of
 geographic nature and 3 of data-only nature.
 
-.. _net_section5.1.2.1:
+.. _net_section.1.2.1:
 
 Deleting a link
 ^^^^^^^^^^^^^^^
@@ -352,9 +360,9 @@ elements are:
 * turn penalties
 
 In case a link is deleted, it is necessary to check for orfan nodes, and deal
-with them as prescribed in :ref:`net_section5.1.1.2`
+with them as prescribed in :ref:`net_section.1.1.2`
 
-.. _net_section5.1.2.2:
+.. _net_section.1.2.2:
 
 Moving a link extremity
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -364,7 +372,7 @@ This change can happen in two different forms:
 - **The link extremity is moved to an empty space**
 
 In this case, a new node needs to be created, according to the behavior
-described in :ref:`net_section5.1.1.1` . The information of node ID (A or B
+described in :ref:`net_section.1.1.1` . The information of node ID (A or B
 node, depending on the extremity) needs to be updated according to the ID for
 the new node created.
 
@@ -373,43 +381,70 @@ the new node created.
 The information of node ID (A or B node, depending on the extremety) needs to be
 updated according to the ID for the node the link now terminates in.
 
-.. _net_section5.1.2.3:
+.. _net_section.1.2.3:
 
 Re-shaping a link
 ^^^^^^^^^^^^^^^^^
 
-Nothing is expected to change in the database (other than the link's shape), as
-long as the extremities of the link remain in the same position.
+When reshaping a link, the only thing other than we expect to be updated in the
+link database is their length (or distance, in AequilibraE's field structure).
+As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 
-.. _net_section5.1.2.4:
+.. .. _net_section.1.2.4:
 
-Splitting a link
-^^^^^^^^^^^^^^^^
-*To come*
+.. Splitting a link
+.. ^^^^^^^^^^^^^^^^
+.. *To come*
 
-.. _net_section5.1.2.5:
+.. _net_section.1.2.5:
 
-Merging two links
-^^^^^^^^^^^^^^^^^
-*To come*
+.. Merging two links
+.. ^^^^^^^^^^^^^^^^^
+.. *To come*
 
-.. _net_section5.1.2.6:
+.. _net_section.1.2.6:
 
-Adding data field
-^^^^^^^^^^^^^^^^^
-*To come*
+Deleting a required field
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Unfortunately, SQLite does not have the resources to prevent a user to remove a
+data field from the table. For this reason, if the user removes a required
+field, they will most likely corrupt the project.
 
-.. _net_section5.1.2.7:
 
-Deleting data field
-^^^^^^^^^^^^^^^^^^^
-*To come*
+.. _net_section.1.3:
 
-.. _net_section5.1.2.8:
+Field-specific data consistency
+++++++++++++++++++++++++++++++
+ Some data fields are specially
 
-Changing data
+
+.. _net_section.1.3.1:
+
+Link distance
 ^^^^^^^^^^^^^
-*To come*
+
+Link distance cannot be changed by the user, as it is automatically recalculated
+using the Spatialite function *GeodesicLength*, which always returns distances
+in meters.
+
+.. _net_section.1.3.2:
+
+Link direction
+^^^^^^^^^^^^^^
+
+Triggers enforce link direction to be -1, 0 or 1, and any other value results in
+an SQL exception.
+
+
+.. _net_section.1.3.3:
+
+*modes* field
+^^^^^^^^^^^^^
+Editing of the modes field will only be allowed to contain a string of mode_ids
+that exist in the *modes* table, and an error will be thrown if the user
+attempts to leave the field empty or to insert a non-existing mode_id.
+
+
 
 # 4	References
 http://tfresource.org/Category:Transportation_networks
