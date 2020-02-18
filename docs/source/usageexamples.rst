@@ -229,6 +229,7 @@ Traffic assignment
 A simple example of assignment
 
 ::
+
     from aequilibrae.project import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
     from aequilibrae.matrix import AequilibraeMatrix
@@ -450,12 +451,12 @@ to perform Iterative Proportional Fitting (IPF) with really high performance,
 which might be of use in many applications other than traditional distribution.
 
 
-Synthetic gravity calibration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. Synthetic gravity calibration
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-::
+.. ::
 
-    some code
+..    some code
 
 Synthetic gravity application
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -585,18 +586,18 @@ fancy multithreading implemented in path computation.
     # We can get back to our OMX matrix in the end
     matrix.export(path/to_omx/output)
 
-Transit
--------
+.. Transit
+.. -------
 We only have import for now, and it is likely to not work on Windows if you want the geometries
 
 .. _example_usage_transit:
 
-GTFS import
-~~~~~~~~~~~
+.. GTFS import
+.. ~~~~~~~~~~~
 
-::
+.. ::
 
-    some code
+..    some code
 
 Matrices
 --------
