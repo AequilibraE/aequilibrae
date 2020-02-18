@@ -158,7 +158,7 @@ you need only a graph that you have previously built, and the list of skims you 
     # We are also **blocking** paths from going through centroids
     g.set_blocked_centroid_flows(block_centroid_flows=True)
 
-# We will be skimming for fftime **AND** distance along the way
+    # We will be skimming for fftime **AND** distance along the way
     g.set_skimming(['fftime', 'distance'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided
