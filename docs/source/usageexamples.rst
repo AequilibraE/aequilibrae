@@ -158,7 +158,7 @@ you need only a graph that you have previously built, and the list of skims you 
     # We are also **blocking** paths from going through centroids
     g.set_blocked_centroid_flows(block_centroid_flows=True)
 
-# We will be skimming for fftime **AND** distance along the way
+    # We will be skimming for fftime **AND** distance along the way
     g.set_skimming(['fftime', 'distance'])
 
     # We instantiate the skim results and prepare it to have results compatible with the graph provided
@@ -229,6 +229,7 @@ Traffic assignment
 A simple example of assignment
 
 ::
+
     from aequilibrae.project import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
     from aequilibrae.matrix import AequilibraeMatrix
@@ -450,12 +451,12 @@ to perform Iterative Proportional Fitting (IPF) with really high performance,
 which might be of use in many applications other than traditional distribution.
 
 
-Synthetic gravity calibration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. Synthetic gravity calibration
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-::
+.. ::
 
-    some code
+..    some code
 
 Synthetic gravity application
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -585,18 +586,18 @@ fancy multithreading implemented in path computation.
     # We can get back to our OMX matrix in the end
     matrix.export(path/to_omx/output)
 
-Transit
--------
+.. Transit
+.. -------
 We only have import for now, and it is likely to not work on Windows if you want the geometries
 
 .. _example_usage_transit:
 
-GTFS import
-~~~~~~~~~~~
+.. GTFS import
+.. ~~~~~~~~~~~
 
-::
+.. ::
 
-    some code
+..    some code
 
 Matrices
 --------
