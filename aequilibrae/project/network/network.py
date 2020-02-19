@@ -57,7 +57,7 @@ class Network(WorkerThread):
         for f in all_fields:
             if f[-2:] == "ab":
                 if f[:-2] + 'ba' in all_fields:
-                    real_fields.append(f[-3:])
+                    real_fields.append(f[:-3])
             elif f[-3:] == "_ba":
                 pass
             else:
