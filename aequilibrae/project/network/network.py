@@ -43,6 +43,7 @@ class Network(WorkerThread):
         skimmable = ['INT', 'INTEGER', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'BIGINT', 'UNSIGNED BIG INT',
                      'INT2', 'INT8', 'REAL', 'DOUBLE', 'DOUBLE PRECISION', 'FLOAT', 'DECIMAL', 'NUMERIC']
         all_fields = []
+
         for f in field_names:
             if f[1] in ignore_fields:
                 continue
@@ -52,7 +53,17 @@ class Network(WorkerThread):
                     break
 
         all_fields.append('distance')
-        return all_fields
+        real_fields = []
+        for f in all_fields:
+            if f[-2:] == "ab":
+                if f[:-2] + 'ba' in all_fields:
+                    real_fields.append(f[-3:])
+            elif f[-3:] == "_ba":
+                pass
+            else:
+                real_fields.append(f)
+
+        return real_fields
 
     def modes(self):
         curr = self.conn.cursor()

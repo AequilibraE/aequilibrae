@@ -1,6 +1,10 @@
 import numpy as np
-from scipy.optimize import root_scalar
 from typing import List, Dict
+
+try:
+    from scipy.optimize import root_scalar
+except:
+    from scipy.optimize import root as root_scalar
 
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
