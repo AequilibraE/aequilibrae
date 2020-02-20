@@ -8,17 +8,12 @@ on: [pull_request]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 4
-      matrix:
-        python-version: [3.7]
-#        python-version: [3.6, 3.7, 3.8]
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.7
       uses: actions/setup-python@v1
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.7
     - name: Install packages
       run: |
         python -m pip install --upgrade pip
@@ -36,7 +31,7 @@ jobs:
 #        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
 #        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
 #      run: |
-#        twine upload wheelhouse/*-manylinux1_x86_64.whl
+#        twine upload wheelhouse/*-manylinux2014_x86_64.whl
 
     - name: Upload to site
       uses: SamKirkland/FTP-Deploy-Action@2.0.0
