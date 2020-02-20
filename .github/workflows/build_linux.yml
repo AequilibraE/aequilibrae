@@ -29,7 +29,7 @@ jobs:
       uses: RalfG/python-wheels-manylinux-build@v0.2.2-manylinux2014_x86_64
       with:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38'
-        build-requirements: 'setuptools numpy cython'
+        build-requirements: 'setuptools numpy cython pyaml pyqt5'
         pip-wheel-args: '--no-deps'
 #    - name: Publish wheels to PyPI
 #      env:
