@@ -70,7 +70,6 @@ class allOrNothing(WorkerThread):
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
 
         if pyqt:
-            self.assignment.emit(["text AoN", "Saving Outputs"])
             self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
@@ -86,5 +85,4 @@ class allOrNothing(WorkerThread):
             self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
-            txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-            self.assignment.emit(["text AoN", txt])
+            self.assignment.emit(["text AoN", f'{self.cumulative:,}/{self.matrix.zones:,}'])

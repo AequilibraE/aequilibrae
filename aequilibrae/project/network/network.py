@@ -270,6 +270,11 @@ class Network(WorkerThread):
         c.execute("""select count(*) from links""")
         return c.fetchone()[0]
 
+    def count_centroids(self) -> int:
+        c = self.conn.cursor()
+        c.execute("""select count(*) from nodes where is_centroid=1;""")
+        return c.fetchone()[0]
+
     def count_nodes(self) -> int:
         c = self.conn.cursor()
         c.execute("""select count(*) from nodes""")

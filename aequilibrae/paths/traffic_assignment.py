@@ -1,5 +1,4 @@
 from typing import List
-from copy import deepcopy
 from warnings import warn
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
