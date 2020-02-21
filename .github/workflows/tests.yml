@@ -17,7 +17,6 @@ jobs:
 #      uses: actions/setup-python@v1
 #      with:
 #        python-version: ${{ matrix.python-version }}
-      #        sudo apt-get update
     - name: Install dependencies
       run: |
         sudo apt-get install libsqlite3-mod-spatialite
