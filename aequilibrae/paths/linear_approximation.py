@@ -271,8 +271,6 @@ class LinearApproximation(WorkerThread):
         self.execute()
 
     def execute(self):
-        if pyqt:
-            self.equilibration.emit(['text', f'{self.algorithm} - setup'])
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
@@ -280,7 +278,7 @@ class LinearApproximation(WorkerThread):
         logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):
             if pyqt:
-                self.equilibration.emit(['text', f'{self.iter} iterations - Current relative gap is {self.rgap:.3E}'])
+                self.equilibration.emit(['rgap', self.rgap])
                 self.equilibration.emit(['iterations', self.iter])
             flows = []
             aon_flows = []
@@ -343,7 +341,7 @@ class LinearApproximation(WorkerThread):
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
         logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         if pyqt:
-            self.equilibration.emit(['text', f'{self.iter} iterations - Current relative gap is {self.rgap:.3E}'])
+            self.equilibration.emit(['rgap', self.rgap])
             self.equilibration.emit(['iterations', self.iter])
             self.equilibration.emit(['finished_threaded_procedure'])
 
