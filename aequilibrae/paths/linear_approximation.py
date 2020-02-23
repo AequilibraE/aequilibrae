@@ -1,17 +1,7 @@
 import importlib.util as iutil
 import numpy as np
 from typing import List, Dict
-from distutils.version import LooseVersion
-import scipy
-
-if LooseVersion(scipy.__version__) < LooseVersion("1.2.0"):
-    from scipy.optimize import root as root_scalar
-
-    recent_scipy = False
-else:
-    from scipy.optimize import root_scalar
-    recent_scipy = True
-
+from warnings import warn
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
@@ -20,6 +10,16 @@ from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
 from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
 from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
+
+try:
+    from scipy.optimize import root_scalar
+
+    recent_scipy = True
+except ImportError as e:
+    from scipy.optimize import root as root_scalar
+
+    recent_scipy = False
+    logger.info(f"Using older version of Scipy. For better performance, use Scipy >= 1.4. {e.args}")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
