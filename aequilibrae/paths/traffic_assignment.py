@@ -141,11 +141,11 @@ class TrafficAssignment(object):
                     array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
                 else:
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
-                    array.fill(self.vdf_parameters[p])
+                    array.fill(self.vdf_parameters[p1])
                 pars.append(array)
 
                 if np.any(np.isnan(array)):
-                    warn(f'At least one {p} is NaN. Results will make no sense')
+                    warn(f'At least one {p1} is NaN. Results will make no sense')
 
                 if p1 == 'alpha':
                     if array.min() < 0:
