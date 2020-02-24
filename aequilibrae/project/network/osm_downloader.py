@@ -16,18 +16,15 @@ from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 import importlib.util as iutil
+from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
-    from PyQt5.QtCore import QObject
     from PyQt5.QtCore import pyqtSignal
-else:
-    class QObject:
-        pass
 
 
-class OSMDownloader(QObject):
+class OSMDownloader(WorkerThread):
     if pyqt:
         downloading = pyqtSignal(object)
 
@@ -36,8 +33,7 @@ class OSMDownloader(QObject):
             self.downloading.emit(*args)
 
     def __init__(self, polygons, modes):
-        if pyqt:
-            QObject.__init__(self, None)
+        WorkerThread.__init__(self, None)
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []

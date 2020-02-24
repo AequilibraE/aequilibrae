@@ -25,6 +25,7 @@ class Network(WorkerThread):
         WorkerThread.__init__(self, None)
 
         self.conn = project.conn  # type: sqlc
+        self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
 
     def _check_if_exists(self):
@@ -142,7 +143,7 @@ class Network(WorkerThread):
         self.downloader.doWork()
 
         logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.conn)
+        self.builder = OSMBuilder(self.downloader.json, self.source)
         self.builder.doWork()
 
         if spatial_index:
