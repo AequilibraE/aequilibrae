@@ -59,7 +59,7 @@ class allOrNothing(WorkerThread):
         all_threads = {"count": 0}
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
-            if np.nansum(mat[i, :, :]) > 0:
+            if np.nansum(mat[i, :, :]) > 0 or self.results.num_skims > 0:
                 if self.graph.fs[i] == self.graph.fs[i + 1]:
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
