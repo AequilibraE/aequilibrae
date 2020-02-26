@@ -6,6 +6,7 @@ from warnings import warn
 from aequilibrae.project.network import Network
 from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
+from .spatialite_connection import spatialite_connection
 
 
 class Project:
@@ -23,23 +24,8 @@ class Project:
             self.conn = sqlite3.connect(self.path_to_file)
 
         self.source = self.path_to_file
-        self.get_spatialite_connection()
+        self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
-
-    def get_spatialite_connection(self):
-        self.conn.enable_load_extension(True)
-        plat = platform.platform()
-        pth = os.getcwd()
-        if "WINDOWS" in plat.upper():
-            par = Parameters()
-            spatialite_path = par.parameters["system"]["spatialite_path"]
-            if os.path.isfile(os.path.join(spatialite_path, "mod_spatialite.dll")):
-                os.chdir(spatialite_path)
-        try:
-            self.conn.load_extension("mod_spatialite")
-        except Exception as e:
-            warn(f"AequilibraE might not work as intended without spatialite. {e.args}")
-        os.chdir(pth)
 
     def __create_empty_project(self):
         shutil.copyfile(spatialite_database, self.path_to_file)

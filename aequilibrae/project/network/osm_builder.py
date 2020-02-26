@@ -4,29 +4,31 @@ import numpy as np
 from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-
+from ...utils import WorkerThread
 import importlib.util as iutil
+import sqlite3
+from ..spatialite_connection import spatialite_connection
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
-    from PyQt5.QtCore import QObject
     from PyQt5.QtCore import pyqtSignal
-else:
-    class QObject:
-        pass
+
+spec = iutil.find_spec("qgis")
+isqgis = spec is not None
+if isqgis:
+    import qgis
 
 
-class OSMBuilder(QObject):
+class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, osm_items: List, conn, node_start=10000) -> None:
-        if pyqt:
-            QObject.__init__(self, None)
+    def __init__(self, osm_items: List, path: str, node_start=10000) -> None:
+        WorkerThread.__init__(self, None)
         self.osm_items = osm_items
-        self.conn = conn
-        self.curr = self.conn.cursor()
+        self.path = path
+        self.conn = None
         self.node_start = node_start
         self.report = []
         self.nodes = {}
@@ -38,6 +40,13 @@ class OSMBuilder(QObject):
             self.building.emit(*args)
 
     def doWork(self):
+        if isqgis:
+            self.conn = qgis.utils.spatialite_connect(self.path)
+        else:
+            conn = sqlite3.connect(self.path)
+            self.conn = spatialite_connection(conn)
+        self.curr = self.conn.cursor()
+
         node_count = self.data_structures()
         nodes_to_add, node_ids = self.importing_links(node_count)
         self.import_nodes(nodes_to_add, node_ids)
@@ -111,7 +120,8 @@ class OSMBuilder(QObject):
 
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
-        self.__emit_all(["maxValue", len(self.links)])
+        L = len(list(self.links.keys()))
+        self.__emit_all(["maxValue", L])
 
         nodes_to_add = set()
         counter = 0
@@ -119,6 +129,7 @@ class OSMBuilder(QObject):
 
         for osm_id, link in self.links.items():
             self.__emit_all(["Value", counter])
+            counter += 1
             vars["osm_id"] = osm_id
             linknodes = link["nodes"]
             linktags = link["tags"]
@@ -166,7 +177,8 @@ class OSMBuilder(QObject):
                         logger.error("error when inserting link {}. Error {}".format(data, e.args))
                         logger.error(sql)
                     vars["link_id"] += 1
-            counter += 1
+            self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
+
         return nodes_to_add, node_ids
 
     def import_nodes(self, nodes_to_add, node_ids):
@@ -201,6 +213,7 @@ class OSMBuilder(QObject):
 
         self.conn.commit()
         self.curr.close()
+        self.__emit_all(["finished_threaded_procedure", 0])
 
     def __build_link_data(self, vars, intersections, i, linknodes, node_ids, fields):
         ii = intersections[i]
