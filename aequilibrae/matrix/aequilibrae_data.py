@@ -164,9 +164,11 @@ class AequilibraeData(object):
                     fmt += ",%f"
                 elif np.issubdtype(dt, np.integer):
                     fmt += ",%d"
-            np.savetxt(
-                file_name, self.data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments=""
-            )
+            data = np.array(self.data, copy=True)
+            for nm in self.data.dtype.names:
+                np.nan_to_num(data[nm], copy=False)
+
+            np.savetxt(file_name, data[np.newaxis, :][0], delimiter=",", fmt=fmt, header=",".join(headers), comments="")
 
         elif file_type.lower() in [".sqlite", ".sqlite3", ".db"]:
             # Connecting to the database file

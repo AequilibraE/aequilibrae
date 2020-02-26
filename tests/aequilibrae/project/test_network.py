@@ -15,7 +15,7 @@ class TestNetwork(TestCase):
     def setUp(self) -> None:
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
         self.project = Project(self.file, True)
-
+        self.source = self.file
         self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
         self.conn = sqlite3.connect(self.file2)
         self.conn.enable_load_extension(True)
@@ -34,11 +34,14 @@ class TestNetwork(TestCase):
         self.network = Network(self)
 
     def tearDown(self) -> None:
-        self.project.conn.close()
-        os.unlink(self.file)
+        try:
+            self.project.conn.close()
+            os.unlink(self.file)
 
-        self.conn.close()
-        os.unlink(self.file2)
+            self.conn.close()
+            os.unlink(self.file2)
+        except Exception as e:
+            warn(f'Could not delete. {e.args}')
 
     def test_create_from_osm(self):
         thresh = 0.05
