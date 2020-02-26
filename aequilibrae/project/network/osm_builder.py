@@ -130,7 +130,6 @@ class OSMBuilder(WorkerThread):
         for osm_id, link in self.links.items():
             self.__emit_all(["Value", counter])
             counter += 1
-            self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
             vars["osm_id"] = osm_id
             linknodes = link["nodes"]
             linktags = link["tags"]
@@ -178,6 +177,7 @@ class OSMBuilder(WorkerThread):
                         logger.error("error when inserting link {}. Error {}".format(data, e.args))
                         logger.error(sql)
                     vars["link_id"] += 1
+            self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
 
         return nodes_to_add, node_ids
 
