@@ -309,6 +309,9 @@ class LinearApproximation:
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
+                if self.time_field in c.graph.skim_fields:
+                    idx = c.graph.skim_fields.index(self.time_field)
+                    c.graph.skims[:, idx] = self.congested_time[:]
                 c._aon_results.reset()
             logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
 
