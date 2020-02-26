@@ -4,6 +4,7 @@ import numpy as np
 
 from aequilibrae.distribution import GravityCalibration
 from aequilibrae.matrix import AequilibraeMatrix
+from ...data import siouxfalls_demand, siouxfalls_skims
 
 zones = 100
 
@@ -36,14 +37,18 @@ class TestGravityCalibration(TestCase):
         if distributed_matrix.gap > 0.0001:
             self.fail("Calibration did not converge")
 
-    def test_check_inputs(self):
-        # self.fail()
-        pass
+    def test_calibrate_with_omx(self):
+        imped = AequilibraeMatrix()
+        imped.load(siouxfalls_skims)
+        imped.computational_view(['free_flow_time'])
 
-    def test_apply_gravity(self):
-        # self.fail()
-        pass
+        mat = AequilibraeMatrix()
+        mat.load(siouxfalls_demand)
+        mat.computational_view()
 
-    def test_get_parameters(self):
-        # self.fail()
-        pass
+        args = {"impedance": imped, "matrix": mat, "function": "power", "nan_to_zero": False}
+
+        distributed_matrix = GravityCalibration(**args)
+        distributed_matrix.calibrate()
+        if distributed_matrix.gap > 0.0001:
+            self.fail("Calibration did not converge")

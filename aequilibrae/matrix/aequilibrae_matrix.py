@@ -754,10 +754,12 @@ class AequilibraeMatrix(object):
 
         if self.omx:
             self.view_names = core_list
-            self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
-            for i, core in enumerate(core_list):
-                self.matrix_view[:, :, i] = np.array(self.omx_file[core])
-
+            if len(core_list) == 1:
+                self.matrix_view = np.array(self.omx_file[core_list[0]])
+            else:
+                self.matrix_view = np.empty((self.zones, self.zones, len(core_list)))
+                for i, core in enumerate(core_list):
+                    self.matrix_view[:, :, i] = np.array(self.omx_file[core])
         else:
             # Check if matrices are adjacent
             if len(core_list) > 1:
@@ -807,61 +809,73 @@ class AequilibraeMatrix(object):
         ['bicycle', 'walking']
         """
 
-        if self.omx:
-            raise NotImplementedError("You can import an OMX file to AEM if you'd like")
-
         if output_name is None:
             output_name = self.random_name()
 
-        if cores is None:
-            copyfile(self.file_path, output_name)
-            output = AequilibraeMatrix()
-            output.load(output_name)
-            if self.view_names is not None:
-                output.computational_view(self.view_names)
+        if self.omx:
+            mcores = cores
+            if mcores is None:
+                mcores = self.names
+            temp = AequilibraeMatrix()
 
-            if compress is not None:
-                if compress != self.compressed:
-                    if compress:
-                        output.compress()
-                    else:
-                        output.decompress()
+            fp = self.random_name()
+            temp.create_from_omx(file_path=fp,
+                                 omx_path=self.file_path,
+                                 cores=mcores,
+                                 mappings=self.index_names)
+            output = temp.copy(output_name, cores, names, compress)
+            temp.close()
+            del temp
+            os.unlink(fp)
         else:
-            if compress is None:
-                compress = self.compressed
+            if cores is None:
+                copyfile(self.file_path, output_name)
+                output = AequilibraeMatrix()
+                output.load(output_name)
+                if self.view_names is not None:
+                    output.computational_view(self.view_names)
 
-            if not isinstance(cores, list):
-                raise ValueError("Cores need to be presented as list")
-
-            for i in cores:
-                if i not in self.names:
-                    raise ValueError("Matrix core {} not available on this matrix".format(i))
-
-            if names is None:
-                names = cores
+                if compress is not None:
+                    if compress != self.compressed:
+                        if compress:
+                            output.compress()
+                        else:
+                            output.decompress()
             else:
-                if not isinstance(names, list):
-                    raise ValueError("Names need to be presented as list")
+                if compress is None:
+                    compress = self.compressed
 
-                if len(names) != len(cores):
-                    raise ValueError("Number of cores to cpy and list of names are not compatible")
+                if not isinstance(cores, list):
+                    raise ValueError("Cores need to be presented as list")
 
-            output = AequilibraeMatrix()
-            output.create_empty(
-                file_name=output_name,
-                zones=self.zones,
-                matrix_names=names,
-                index_names=self.index_names,
-                data_type=self.dtype,
-                compressed=bool(compress),
-            )
+                for i in cores:
+                    if i not in self.names:
+                        raise ValueError("Matrix core {} not available on this matrix".format(i))
 
-            output.indices[:] = self.indices[:]
-            for i, c in enumerate(cores):
-                output.matrices[:, :, i] = self.matrices[:, :, self.names.index(c)]
-            self.matrix_hash = output.__builds_hash__()
-            output.matrices.flush()
+                if names is None:
+                    names = cores
+                else:
+                    if not isinstance(names, list):
+                        raise ValueError("Names need to be presented as list")
 
+                    if len(names) != len(cores):
+                        raise ValueError("Number of cores to cpy and list of names are not compatible")
+
+                output = AequilibraeMatrix()
+                output.create_empty(
+                    file_name=output_name,
+                    zones=self.zones,
+                    matrix_names=names,
+                    index_names=self.index_names,
+                    data_type=self.dtype,
+                    compressed=bool(compress),
+                )
+
+                output.indices[:] = self.indices[:]
+                for i, c in enumerate(cores):
+                    output.matrices[:, :, i] = self.matrices[:, :, self.names.index(c)]
+        output.matrix_hash = output.__builds_hash__()
+        output.matrices.flush()
         return output
 
     def rows(self):
