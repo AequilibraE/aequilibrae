@@ -112,6 +112,7 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.set_classes(self.assigclass)
         self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
         self.assignment.set_capacity_field("capacity")

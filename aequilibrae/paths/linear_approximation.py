@@ -1,7 +1,8 @@
+import importlib.util as iutil
 import numpy as np
-from scipy.optimize import root_scalar
 from typing import List, Dict
-
+from warnings import warn
+from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
@@ -10,12 +11,32 @@ from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combi
 from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
 
+try:
+    from scipy.optimize import root_scalar
+
+    recent_scipy = True
+except ImportError as e:
+    from scipy.optimize import root as root_scalar
+
+    recent_scipy = False
+    logger.info(f"Using older version of Scipy. For better performance, use Scipy >= 1.4. {e.args}")
+
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
 
-class LinearApproximation:
+
+class LinearApproximation(WorkerThread):
+    if pyqt:
+        equilibration = SIGNAL(object)
+        assignment = SIGNAL(object)
+
     def __init__(self, assig_spec, algorithm) -> None:
+        WorkerThread.__init__(self, None)
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
@@ -246,19 +267,26 @@ class LinearApproximation:
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
-    def execute(self):
+    def doWork(self):
+        self.execute()
 
+    def execute(self):
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
         logger.info("{} Assignment STATS".format(self.algorithm))
         logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):
+            if pyqt:
+                self.equilibration.emit(['rgap', self.rgap])
+                self.equilibration.emit(['iterations', self.iter])
             flows = []
             aon_flows = []
 
             for c in self.traffic_classes:
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
+                if pyqt:
+                    aon.assignment.connect(self.signal_handler)
                 aon.execute()
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads * c.pce)
@@ -280,9 +308,6 @@ class LinearApproximation:
                     cls_res = c.results
                     linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize,
                                        self.cores)
-                    # TODO: We need to compute the step direction for skims as well.
-                    #       It is probably a matter of transforming the step_direction values from numpy arrays to
-                    #       full AssignmentResults() ones, and cleaning the stuff we don't need
                     if cls_res.num_skims > 0:
                         linear_combination_skims(cls_res.skims.matrix_view,
                                                  stp_dir.skims.matrix_view,
@@ -317,9 +342,11 @@ class LinearApproximation:
 
         if self.rgap > self.rgap_target:
             logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
-        logger.info(
-            "{} Assignment finished. {} iterations and {} final gap".format(self.algorithm, self.iter, self.rgap)
-        )
+        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+        if pyqt:
+            self.equilibration.emit(['rgap', self.rgap])
+            self.equilibration.emit(['iterations', self.iter])
+            self.equilibration.emit(['finished_threaded_procedure'])
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
@@ -334,10 +361,19 @@ class LinearApproximation:
             return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:
-            min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
-            self.stepsize = min_res.root
-            if not min_res.converged:
-                logger.warn("Descent direction stepsize finder is not converged")
+            if recent_scipy:
+                min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
+                self.stepsize = min_res.root
+                if not min_res.converged:
+                    logger.warn("Descent direction stepsize finder is not converged")
+            else:
+                min_res = root_scalar(derivative_of_objective, 1 / self.iter)
+                if not min_res.success:
+                    logger.warn("Descent direction stepsize finder is not converged")
+                self.stepsize = min_res.x[0]
+                if self.stepsize <= 0.0 or self.stepsize >= 1.0:
+                    raise ValueError('wrong root')
+
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
@@ -369,3 +405,7 @@ class LinearApproximation:
         if self.rgap_target >= self.rgap:
             return True
         return False
+
+    def signal_handler(self, val):
+        if pyqt:
+            self.assignment.emit(val)
