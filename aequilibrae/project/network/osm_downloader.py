@@ -45,12 +45,12 @@ class OSMDownloader(WorkerThread):
             "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
-        self.__emit_all(["text", f"Downloading polygon 1 of {len(self.polygons)}"])
         self.__emit_all(["maxValue", len(self.polygons)])
         self.__emit_all(["Value", 0])
 
         for counter, poly in enumerate(self.polygons):
             self.__emit_all(["Value", counter])
+            self.__emit_all(["text", f"Downloading polygon {counter + 1} of {len(self.polygons)}"])
             west, south, east, north = poly
             query_str = query_template.format(
                 north=north,
@@ -65,6 +65,7 @@ class OSMDownloader(WorkerThread):
             if json["elements"]:
                 self.json.append(json)
         self.__emit_all(["Value", len(self.polygons)])
+        self.__emit_all(["FinishedDownloading", 0])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
         """

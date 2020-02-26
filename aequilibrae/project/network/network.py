@@ -268,17 +268,17 @@ class Network(WorkerThread):
 
     def count_links(self) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(*) from links""")
+        c.execute("""select count(link_id) from links""")
         return c.fetchone()[0]
 
     def count_centroids(self) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(*) from nodes where is_centroid=1;""")
+        c.execute("""select count(node_id) from nodes where is_centroid=1;""")
         return c.fetchone()[0]
 
     def count_nodes(self) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(*) from nodes""")
+        c.execute("""select count(node_id) from nodes""")
         return c.fetchone()[0]
 
     def add_triggers(self):
