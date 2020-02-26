@@ -11,7 +11,7 @@ from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combi
 from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
 import scipy
-if int(scipy.__version__.split['.'][1]) >= 13:
+if int(scipy.__version__.split('.')[1]) >= 3:
     from scipy.optimize import root_scalar
     recent_scipy = True
 else:
