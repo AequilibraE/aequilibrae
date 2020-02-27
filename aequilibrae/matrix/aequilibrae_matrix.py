@@ -259,8 +259,7 @@ class AequilibraeMatrix(object):
                 if trial_name not in forbiden_names:
                     return trial_name
 
-        spec = iutil.find_spec("openmatrix")
-        if spec is None:
+        if not has_omx:
             print("Open Matrix is not installed. Cannot continue")
             return
 

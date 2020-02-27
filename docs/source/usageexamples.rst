@@ -1,11 +1,46 @@
 Use examples
 ============
-This page is still under development, so most of the headers are just place-holders for the actual examples
+This page is still under development, so if you have developed interesting use
+cases, please consider contributing them.
 
 .. note::
    The examples provided here are not meant as a through description of
    AequilibraE's capabilities. For that, please look into the API documentation
    or email aequilibrae@googlegroups.com
+
+Sample Data
+-----------
+
+We have compiled two very distinct example datasets imported from the
+`TNTP instances <https://github.com/bstabler/TransportationNetworks/>`_.
+
+* `Sioux Falls <www.aequilibrae.com/data/SiouxFalls.7z>`_
+* `Chicago Regional <www.aequilibrae.com/data/Chicago.7z>`_
+
+While the Sioux Falls network is probably the most traditional example network
+available for evaluating network algorithms, the Chicago Regional model is a
+good example of a real-world sized model, with roughly 1,800 zones.
+
+Each instance contains the following:
+
+* Network in pure GIS format (GeoPackage)
+* Aequilibrae  project already imported
+* Demand matrix in both AEM and OMX formats
+* Demand matrix vectors in AED format
+* Synthetic *future* vectors generated with random growth by zone within [0, 10%]
+* Assignment results
+    - Link flows in AED and CSV formats
+    - Assignment log
+    - Distance and travel time skims
+* Calibrated distribution models on travel time skims
+    - Inverse power
+    - Exponential
+* Synthetic matrices from the application of the distribution models on the original skim matrix
+    - inverse_power_matrix (Inverse power model) in AEM and OMX formats
+    - expo_matrix (exponential model) in AEM and OMX formats
+* Synthetic matrix from the application of IPF for the synthetic vectors and original matrix
+
+* The best-known solutions for link flows.
 
 .. _example_logging:
 
