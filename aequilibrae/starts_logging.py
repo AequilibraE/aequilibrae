@@ -34,6 +34,7 @@ def StartsLogging():
         logger.addHandler(ch)
     return logger
 
+
 def cleaning():
     p = tempfile.gettempdir() + "/aequilibrae_*"
     for f in glob.glob(p):
