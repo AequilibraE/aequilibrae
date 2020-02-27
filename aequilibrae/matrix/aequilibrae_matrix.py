@@ -104,13 +104,13 @@ class AequilibraeMatrix(object):
         self.__version__ = VERSION  # Writes file version
 
     def create_empty(
-        self,
-        file_name: str = None,
-        zones: int = None,
-        matrix_names: List[str] = None,
-        data_type: np.dtype = np.float64,
-        index_names: List[str] = None,
-        compressed: bool = False,
+            self,
+            file_name: str = None,
+            zones: int = None,
+            matrix_names: List[str] = None,
+            data_type: np.dtype = np.float64,
+            index_names: List[str] = None,
+            compressed: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -210,14 +210,25 @@ class AequilibraeMatrix(object):
         if None not in [self.file_path, self.zones]:
             self.__write__()
 
+    def get_matrix(self, core: str, copy=False) -> np.ndarray:
+        if core not in self.names:
+            raise AttributeError('Matrix core does not exist in this matrix')
+        if self.omx:
+            return np.array(self.omx_file[core])
+        else:
+            mat = self.matrix[core]
+            if copy:
+                mat = np.copy(mat)
+            return mat
+
     def create_from_omx(
-        self,
-        file_path: str,
-        omx_path: str,
-        cores: List[str] = None,
-        mappings: List[str] = None,
-        robust: bool = True,
-        compressed: bool = False,
+            self,
+            file_path: str,
+            omx_path: str,
+            cores: List[str] = None,
+            mappings: List[str] = None,
+            robust: bool = True,
+            compressed: bool = False,
     ):
         """
         :param file_path: Path for the output AequilibraEMatrix
@@ -565,10 +576,7 @@ class AequilibraeMatrix(object):
             return self.__dict__[mat_name]
 
         if mat_name in self.names:
-            if self.omx:
-                return np.array(self.omx_file[mat_name])
-            else:
-                return self.matrix[mat_name]
+            return self.get_matrix(mat_name)
 
         raise AttributeError("No such method or matrix core! --> " + str(mat_name))
 
@@ -770,12 +778,12 @@ class AequilibraeMatrix(object):
                         raise ValueError("Matrix cores {} and {} are not adjacent".format(core_list[i - 1], x))
 
             self.view_names = core_list
+            idx1 = self.names.index(core_list[0])
             if len(core_list) == 1:
-                self.matrix_view = self.matrices[:, :, self.names.index(core_list[0])]
+                self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
-                self.matrix_view = self.matrices[
-                    :, :, self.names.index(core_list[0]) : self.names.index(core_list[-1]) + 1
-                ]
+                idx2 = self.names.index(core_list[-1])
+                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
 
     def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None):
         """
