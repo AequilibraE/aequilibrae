@@ -3,6 +3,7 @@ import sys
 import tempfile
 import logging
 from .parameters import Parameters
+import glob
 
 sys.dont_write_bytecode = True
 
@@ -34,4 +35,14 @@ def StartsLogging():
     return logger
 
 
+def cleaning():
+    p = tempfile.gettempdir() + "/aequilibrae_*"
+    for f in glob.glob(p):
+        try:
+            os.unlink(f)
+        except Exception as err:
+            logger.warn(err.__str__())
+
+
 logger = StartsLogging()
+cleaning()

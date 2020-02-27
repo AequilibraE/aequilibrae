@@ -25,6 +25,7 @@ class Network(WorkerThread):
         WorkerThread.__init__(self, None)
 
         self.conn = project.conn  # type: sqlc
+        self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
 
     def _check_if_exists(self):
@@ -43,6 +44,7 @@ class Network(WorkerThread):
         skimmable = ['INT', 'INTEGER', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'BIGINT', 'UNSIGNED BIG INT',
                      'INT2', 'INT8', 'REAL', 'DOUBLE', 'DOUBLE PRECISION', 'FLOAT', 'DECIMAL', 'NUMERIC']
         all_fields = []
+
         for f in field_names:
             if f[1] in ignore_fields:
                 continue
@@ -52,7 +54,17 @@ class Network(WorkerThread):
                     break
 
         all_fields.append('distance')
-        return all_fields
+        real_fields = []
+        for f in all_fields:
+            if f[-2:] == "ab":
+                if f[:-2] + 'ba' in all_fields:
+                    real_fields.append(f[:-3])
+            elif f[-3:] == "_ba":
+                pass
+            else:
+                real_fields.append(f)
+
+        return real_fields
 
     def modes(self):
         curr = self.conn.cursor()
@@ -131,7 +143,7 @@ class Network(WorkerThread):
         self.downloader.doWork()
 
         logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.conn)
+        self.builder = OSMBuilder(self.downloader.json, self.source)
         self.builder.doWork()
 
         if spatial_index:
@@ -256,12 +268,17 @@ class Network(WorkerThread):
 
     def count_links(self) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(*) from links""")
+        c.execute("""select count(link_id) from links""")
+        return c.fetchone()[0]
+
+    def count_centroids(self) -> int:
+        c = self.conn.cursor()
+        c.execute("""select count(node_id) from nodes where is_centroid=1;""")
         return c.fetchone()[0]
 
     def count_nodes(self) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(*) from nodes""")
+        c.execute("""select count(node_id) from nodes""")
         return c.fetchone()[0]
 
     def add_triggers(self):

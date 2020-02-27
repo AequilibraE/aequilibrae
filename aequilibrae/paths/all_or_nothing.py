@@ -59,7 +59,7 @@ class allOrNothing(WorkerThread):
         all_threads = {"count": 0}
         for orig in self.matrix.index:
             i = int(self.graph.nodes_to_indices[orig])
-            if np.nansum(mat[i, :, :]) > 0:
+            if np.nansum(mat[i, :, :]) > 0 or self.results.num_skims > 0:
                 if self.graph.fs[i] == self.graph.fs[i + 1]:
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
@@ -70,7 +70,6 @@ class allOrNothing(WorkerThread):
         self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
 
         if pyqt:
-            self.assignment.emit(["text AoN", "Saving Outputs"])
             self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, O, all_threads):
@@ -86,5 +85,4 @@ class allOrNothing(WorkerThread):
             self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
-            txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-            self.assignment.emit(["text AoN", txt])
+            self.assignment.emit(["text AoN", f'{self.cumulative:,}/{self.matrix.zones:,}'])
