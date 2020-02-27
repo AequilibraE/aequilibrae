@@ -74,11 +74,13 @@ class Ipf:
         if not np.issubdtype(self.matrix.dtype, np.floating):
             raise ValueError("Seed matrix need to be a float type")
 
-        if not np.issubdtype(self.rows.data[self.row_field].dtype, np.floating):
+        row_data = self.rows.data
+        col_data = self.columns.data
+
+        if not np.issubdtype(row_data[self.row_field].dtype, np.floating):
             raise ValueError("production/rows vector must be a float type")
 
-        data = self.columns.data
-        if not np.issubdtype(data[self.column_field].dtype, np.floating):
+        if not np.issubdtype(col_data[self.column_field].dtype, np.floating):
             raise ValueError("Attraction/columns vector must be a float type")
 
         # Check data dimensions
@@ -97,13 +99,13 @@ class Ipf:
 
         if self.error is None:
             # check balancing:
-            sum_rows = np.nansum(self.rows.data[self.row_field])
-            sum_cols = np.nansum(data[self.column_field])
+            sum_rows = np.nansum(row_data[self.row_field])
+            sum_cols = np.nansum(col_data[self.column_field])
             if abs(sum_rows - sum_cols) > self.parameters["balancing tolerance"]:
                 self.error = "Vectors are not balanced"
             else:
                 # guarantees that they are precisely balanced
-                data[self.column_field][:] = data[self.column_field][:] * (sum_rows / sum_cols)
+                col_data[self.column_field][:] = col_data[self.column_field][:] * (sum_rows / sum_cols)
 
         if self.error is not None:
             self.error_free = False
