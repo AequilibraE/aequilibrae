@@ -27,7 +27,7 @@ As an example, one could do programatically change the output folder to
 
   p = Parameters()
   p.parameters['system']['logging_directory'] =  fldr
-  p.writeback()
+  p.write_back()
 
 The other useful resource, especially during model debugging it to also show
 all log messages directly on the screen. Doing that requires a little knowledge

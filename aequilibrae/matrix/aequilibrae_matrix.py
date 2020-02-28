@@ -832,6 +832,8 @@ class AequilibraeMatrix(object):
                                  cores=mcores,
                                  mappings=self.index_names)
             output = temp.copy(output_name, cores, names, compress)
+            if self.view_names is not None:
+                output.computational_view(self.view_names)
             temp.close()
             del temp
             os.unlink(fp)
