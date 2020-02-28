@@ -39,6 +39,10 @@ Each instance contains the following:
     - inverse_power_matrix (Inverse power model) in AEM and OMX formats
     - expo_matrix (exponential model) in AEM and OMX formats
 * Synthetic matrix from the application of IPF for the synthetic vectors and original matrix
+    - in OMX and AEM formats
+* Desire lines layers
+    - Delaunay lines in GeoPackage format
+    - Desire lines in GeoPackage format
 
 * The best-known solutions for link flows.
 
