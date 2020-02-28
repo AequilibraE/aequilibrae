@@ -221,7 +221,7 @@ class Graph(object):
                 else:
                     if centroids.shape[0] != np.unique(centroids).shape[0]:
                         raise ValueError("Centroid IDs are not unique")
-                self.centroids = centroids
+                self.centroids = centroids.astype(np.uint32)
             else:
                 raise ValueError("Centroids need to be an array of integers 64 bits")
         else:
