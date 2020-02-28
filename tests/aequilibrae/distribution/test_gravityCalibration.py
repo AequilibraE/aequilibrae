@@ -52,3 +52,10 @@ class TestGravityCalibration(TestCase):
         distributed_matrix.calibrate()
         if distributed_matrix.gap > 0.0001:
             self.fail("Calibration did not converge")
+
+        args = {"impedance": imped, "matrix": mat, "function": "power", "nan_to_zero": True}
+
+        distributed_matrix = GravityCalibration(**args)
+        distributed_matrix.calibrate()
+        if distributed_matrix.gap > 0.0001:
+            self.fail("Calibration did not converge")
