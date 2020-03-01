@@ -77,7 +77,8 @@ Each instance contains the following folder structure and contents:
 
 7_future_year_assignment
 
-* Traffic assignment:
+* Traffic assignment
+
     - Outputs from traffic assignment to a relative gap of 1e-5 and with
       skimming enabled
     - Link flows in csv and AequilibraE formats
