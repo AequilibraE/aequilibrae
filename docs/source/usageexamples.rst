@@ -7,6 +7,9 @@ This page is still under development, so most of the headers are just place-hold
    AequilibraE's capabilities. For that, please look into the API documentation
    or email aequilibrae@googlegroups.com
 
+For a comprehensive use case for a typical workflow with AequilibraE, access
+
+
 .. _example_logging:
 
 Logging
