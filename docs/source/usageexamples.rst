@@ -8,6 +8,9 @@ cases, please consider contributing them.
    AequilibraE's capabilities. For that, please look into the API documentation
    or email aequilibrae@googlegroups.com
 
+For a comprehensive use case for a typical workflow with AequilibraE, access
+
+
 Sample Data
 -----------
 
@@ -66,7 +69,7 @@ As an example, one could do programatically change the output folder to
 
   p = Parameters()
   p.parameters['system']['logging_directory'] =  fldr
-  p.writeback()
+  p.write_back()
 
 The other useful resource, especially during model debugging it to also show
 all log messages directly on the screen. Doing that requires a little knowledge
