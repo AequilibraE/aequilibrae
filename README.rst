@@ -27,10 +27,9 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
     :alt: PyPi - Windows
 
-.. .. image::
-..    :target:
-..    :alt:
-
+.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Linux%20Python%20Package/badge.svg
+    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Linux%20Python%20Package/badge.svg
+    :alt: PyPi - Linux
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
