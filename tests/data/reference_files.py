@@ -25,3 +25,4 @@ project_file = join(dirname(dirname(abspath(__file__))), "data", "AequilibraE_Pr
 # For Traffic Assignment tests
 siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.sqlite")
 siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.omx")
+siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data", "sfalls_skims.omx")

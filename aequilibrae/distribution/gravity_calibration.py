@@ -95,12 +95,12 @@ class GravityCalibration:
 
             a = 1
             if max_cost > 0:
-                a = (self.impedance.matrix[self.impedance_core][:, :] < max_cost).astype(int)
+                a = (self.impedance.matrix_view[:, :] < max_cost).astype(int)
 
             # weighted average cost
             self.report.append("Iteration: 1")
             cstar = np.nansum(
-                self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :] * a
+                self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :] * a
             ) / np.nansum(self.result_matrix.gravity[:, :] * a)
 
             b0 = 1 / cstar
@@ -225,7 +225,7 @@ class GravityCalibration:
         self.result_matrix = self.gravity.output
 
         return np.nansum(
-            self.impedance.matrix[self.impedance_core][:, :] * self.result_matrix.gravity[:, :]
+            self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]
         ) / np.nansum(self.result_matrix.gravity[:, :])
 
     def get_parameters(self):

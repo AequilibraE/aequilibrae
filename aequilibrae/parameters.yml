@@ -192,6 +192,6 @@ system:
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
   driving side: right
   logging: true
-  logging_directory: D:\release\Sample models\sioux_falls_2020_02_15
+  logging_directory: /temp/
   spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
   temp directory: /temp

@@ -10,16 +10,14 @@ from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
 from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
 from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
-
-try:
+import scipy
+if int(scipy.__version__.split('.')[1]) >= 3:
     from scipy.optimize import root_scalar
-
     recent_scipy = True
-except ImportError as e:
+else:
     from scipy.optimize import root as root_scalar
-
     recent_scipy = False
-    logger.info(f"Using older version of Scipy. For better performance, use Scipy >= 1.4. {e.args}")
+    logger.warn(f"Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
