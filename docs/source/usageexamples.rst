@@ -1,11 +1,94 @@
 Use examples
 ============
-This page is still under development, so most of the headers are just place-holders for the actual examples
+This page is still under development, so if you have developed interesting use
+cases, please consider contributing them.
 
 .. note::
    The examples provided here are not meant as a through description of
    AequilibraE's capabilities. For that, please look into the API documentation
    or email aequilibrae@googlegroups.com
+
+Sample Data
+-----------
+
+We have compiled two very distinct example datasets imported from the
+`TNTP instances <https://github.com/bstabler/TransportationNetworks/>`_.
+
+* `Sioux Falls <www.aequilibrae.com/data/SiouxFalls.7z>`_
+* `Chicago Regional <www.aequilibrae.com/data/Chicago.7z>`_
+
+While the Sioux Falls network is probably the most traditional example network
+available for evaluating network algorithms, the Chicago Regional model is a
+good example of a real-world sized model, with roughly 1,800 zones.
+
+Each instance contains the following folder structure and contents:
+
+0_tntp_data:
+
+* Data imported from https://github.com/bstabler/TransportationNetworks/
+* matrices in openmatrix and AequilibraE formats
+* vectors computed from the matrix in question and in AequilibraE format
+* No alterations made to the data
+
+1_project
+
+* AequilibraE project result of the import of the links and nodes layers
+
+2_skim_results:
+
+* Skim results for distance and free_flow_travel_time computed by minimizing
+  free_flow_travel_time
+* Result matrices in openmatrix and AequilibraE formats
+
+3_desire_lines
+
+* Layers for desire lines and delaunay lines,  each one in a separate
+  geopackage file
+* Desire lines flow map
+* Delaunay Lines flow map
+
+4_assignment_results
+
+* Outputs from traffic assignment to a relative gap of 1e-5 and with skimming
+  enabled
+* Link flows in csv and AequilibraE formats
+* Skim matrices in openmatrix and AequilibraE formats
+* Assignment flow map in png format
+
+5_distribution_results
+
+* Models calibrated for inverse power and negative exponential deterrence
+  functions
+* Convergence logs for the calibration of each model
+* Trip length frequency distribution chart for original matrix
+* Trip length frequency distribution chart for model with negative exponential
+  deterrence function
+* Trip length frequency distribution chart for model with inverse power
+  deterrence function
+* Inputs are the original demand matrix and the skim for TIME (final iteration)
+  from the ASSIGNMENT
+
+6_forecast
+
+* Synthetic future vectors generated with a random growth from 0 to 10% in each
+  cell on top of the original matrix vectors
+* Application of both gravity models calibrated plus IPF to the synthetic
+  future vectors
+
+7_future_year_assignment
+
+* Traffic assignment
+
+    - Outputs from traffic assignment to a relative gap of 1e-5 and with
+      skimming enabled
+    - Link flows in csv and AequilibraE formats
+    - Skim matrices in openmatrix and AequilibraE formats
+* Scenario comparison flow map of absolute differences
+* Composite scenario comparison flow map (gray is flow maintained in both
+  scenarios, red is flow growth and green is flow decline)
+
+The Jupyter notebook used to generate all analytical outputs is available
+on `Github <https://github.com/AequilibraE/aequilibrae/blob/master/docs/source/SiouxFalls.ipynb>`_
 
 .. _example_logging:
 
@@ -67,8 +150,150 @@ you can always revert them to their default values. But remember, **ALL**
 Matrix module
 -------------
 
-* **AequilibraEMatrix**
-* **AequilibraEData**
+Let's see two cases where we work with the matrix module
+
+Extracting vectors
+~~~~~~~~~~~~~~~~~~
+
+Let's extract the vectors for total origins and destinations for the Chicago
+model demand matrix:
+
+::
+
+    from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
+    import numpy as np
+
+    mat = AequilibraeMatrix()
+    mat.load("D:/release/Sample models/Chicago_2020_02_15/demand.omx")
+    m = mat.get_matrix("matrix")
+
+    vectors = "D:/release/Sample models/Chicago_2020_02_15/vectors.aed"
+    args = {
+        "file_path": vectors,
+        "entries": vec_1.shape[0],
+        "field_names": ["origins", "destinations"],
+        "data_types": [np.float64, np.float64],
+    }
+    dataset = AequilibraeData()
+    dataset.create_empty(**args)
+
+    # Transfer the data
+    dataset.index[:] =mat.index[:]
+    dataset.origins[:] = np.sum(m, axis=1)[:]
+    dataset.destinations[:] = np.sum(m, axis=0)[:]
+
+Comprehensive example
+~~~~~~~~~~~~~~~~~~~~~
+
+Lets say we want to Import the freight matrices provided with FAF into AequilibraE's matrix format
+in order to create some Delaunay Lines in QGIS or to perform traffic assignment
+
+Required data
++++++++++++++
+
+* `FAF Matrices <https://faf.ornl.gov/fafweb/Data/FAF4.4_HiLoForecasts.zip>`__
+* `Zones System <http://www.census.gov/econ/cfs/AboutGeographyFiles/CFS_AREA_shapefile_010215.zip>`__
+
+Useful Information
+++++++++++++++++++
+
+* `FAF overview <https://faf.ornl.gov/fafweb/>`__
+* `FAF User Guide <https://faf.ornl.gov/fafweb/data/FAF4%20User%20Guide.pdf>`__
+* `The blog post (with data) <http://www.xl-optim.com/matrix-api-and-multi-class-assignment>`__
+
+The code
+++++++++
+
+We import all libraries we will need, including the AequilibraE
+
+::
+
+    import pandas as pd
+    import numpy as np
+    import os
+    from aequilibrae.matrix import AequilibraeMatrix
+    from scipy.sparse import coo_matrix
+
+Now we set all the paths for files and parameters we need and import the matrices into a Pandas DataFrame
+
+::
+
+    data_folder = 'Y:/ALL DATA/DATA/Pedro/Professional/Data/USA/FAF/4.4'
+    data_file = 'FAF4.4_HiLoForecasts.csv'
+    sctg_names_file = 'sctg_codes.csv'  # Simplified to 50 characters, which is AequilibraE's limit
+    output_folder = data_folder
+
+    matrices = pd.read_csv(os.path.join(data_folder, data_file), low_memory=False)
+
+We import the sctg codes
+
+::
+
+    sctg_names = pd.read_csv(os.path.join(data_folder, sctg_names_file), low_memory=False)
+    sctg_names.set_index('Code', inplace=True)
+    sctg_descr = list(sctg_names['Commodity Description'])
+
+
+We now process the matrices to collect all the data we need, such as:
+
+* List of zones
+* CSTG codes
+* Matrices/scenarios we are importing
+
+::
+
+    all_zones = np.array(sorted(list(set( list(matrices.dms_orig.unique()) + list(matrices.dms_dest.unique())))))
+
+    # Count them and create a 0-based index
+    num_zones = all_zones.shape[0]
+    idx = np.arange(num_zones)
+
+    # Creates the indexing dataframes
+    origs = pd.DataFrame({"from_index": all_zones, "from":idx})
+    dests = pd.DataFrame({"to_index": all_zones, "to":idx})
+
+    # adds the new index columns to the pandas dataframe
+    matrices = matrices.merge(origs, left_on='dms_orig', right_on='from_index', how='left')
+    matrices = matrices.merge(dests, left_on='dms_dest', right_on='to_index', how='left')
+
+    # Lists sctg codes and all the years/scenarios we have matrices for
+    mat_years = [x for x in matrices.columns if 'tons' in x]
+    sctg_codes = matrices.sctg2.unique()
+
+We now import one matrix for each year, saving all the SCTG codes as different matrix cores in our zoning system
+
+::
+
+    # aggregate the matrix according to the relevant criteria
+    agg_matrix = matrices.groupby(['from', 'to', 'sctg2'])[mat_years].sum()
+
+    # returns the indices
+    agg_matrix.reset_index(inplace=True)
+
+
+    for y in mat_years:
+        mat = AequilibraeMatrix()
+
+        # Here it does not make sense to use OMX
+        # If one wants to create an OMX from other data sources, openmatrix is
+        # the library to use
+        kwargs = {'file_name': os.path.join(output_folder, y + '.aem'),
+                  'zones': num_zones,
+                  'matrix_names': sctg_descr}
+
+        mat.create_empty(**kwargs)
+        mat.index[:] = all_zones[:]
+        # for all sctg codes
+        for i in sctg_names.index:
+            prod_name = sctg_names['Commodity Description'][i]
+            mat_filtered_sctg = agg_matrix[agg_matrix.sctg2 == i]
+
+            m = coo_matrix((mat_filtered_sctg[y], (mat_filtered_sctg['from'], mat_filtered_sctg['to'])),
+                                               shape=(num_zones, num_zones)).toarray().astype(np.float64)
+
+            mat.matrix[prod_name][:,:] = m[:,:]
+
+        mat.close()
 
 
 .. _example_usage_project:
@@ -598,115 +823,3 @@ We only have import for now, and it is likely to not work on Windows if you want
 .. ::
 
 ..    some code
-
-Matrices
---------
-Lets say we want to Import the freight matrices provided with FAF into AequilibraE's matrix format
-in order to create some Delaunay Lines in QGIS or to perform traffic assignment
-
-Required data
-~~~~~~~~~~~~~
-
-* `FAF Matrices <https://faf.ornl.gov/fafweb/Data/FAF4.4_HiLoForecasts.zip>`__
-* `Zones System <http://www.census.gov/econ/cfs/AboutGeographyFiles/CFS_AREA_shapefile_010215.zip>`__
-
-Useful Information
-~~~~~~~~~~~~~~~~~~
-
-* `FAF overview <https://faf.ornl.gov/fafweb/>`__
-* `FAF User Guide <https://faf.ornl.gov/fafweb/data/FAF4%20User%20Guide.pdf>`__
-* `The blog post (with data) <http://www.xl-optim.com/matrix-api-and-multi-class-assignment>`__
-
-The code
-~~~~~~~~
-
-We import all libraries we will need, including the AequilibraE
-
-::
-
-    import pandas as pd
-    import numpy as np
-    import os
-    from aequilibrae.matrix import AequilibraeMatrix
-    from scipy.sparse import coo_matrix
-
-Now we set all the paths for files and parameters we need and import the matrices into a Pandas DataFrame
-
-::
-
-    data_folder = 'Y:/ALL DATA/DATA/Pedro/Professional/Data/USA/FAF/4.4'
-    data_file = 'FAF4.4_HiLoForecasts.csv'
-    sctg_names_file = 'sctg_codes.csv'  # Simplified to 50 characters, which is AequilibraE's limit
-    output_folder = data_folder
-
-    matrices = pd.read_csv(os.path.join(data_folder, data_file), low_memory=False)
-
-We import the sctg codes
-
-::
-
-    sctg_names = pd.read_csv(os.path.join(data_folder, sctg_names_file), low_memory=False)
-    sctg_names.set_index('Code', inplace=True)
-    sctg_descr = list(sctg_names['Commodity Description'])
-
-
-We now process the matrices to collect all the data we need, such as:
-
-* List of zones
-* CSTG codes
-* Matrices/scenarios we are importing
-
-::
-
-    all_zones = np.array(sorted(list(set( list(matrices.dms_orig.unique()) + list(matrices.dms_dest.unique())))))
-
-    # Count them and create a 0-based index
-    num_zones = all_zones.shape[0]
-    idx = np.arange(num_zones)
-
-    # Creates the indexing dataframes
-    origs = pd.DataFrame({"from_index": all_zones, "from":idx})
-    dests = pd.DataFrame({"to_index": all_zones, "to":idx})
-
-    # adds the new index columns to the pandas dataframe
-    matrices = matrices.merge(origs, left_on='dms_orig', right_on='from_index', how='left')
-    matrices = matrices.merge(dests, left_on='dms_dest', right_on='to_index', how='left')
-
-    # Lists sctg codes and all the years/scenarios we have matrices for
-    mat_years = [x for x in matrices.columns if 'tons' in x]
-    sctg_codes = matrices.sctg2.unique()
-
-We now import one matrix for each year, saving all the SCTG codes as different matrix cores in our zoning system
-
-::
-
-    # aggregate the matrix according to the relevant criteria
-    agg_matrix = matrices.groupby(['from', 'to', 'sctg2'])[mat_years].sum()
-
-    # returns the indices
-    agg_matrix.reset_index(inplace=True)
-
-
-    for y in mat_years:
-        mat = AequilibraeMatrix()
-
-        # Here it does not make sense to use OMX
-        # If one wants to create an OMX from other data sources, openmatrix is
-        # the library to use
-        kwargs = {'file_name': os.path.join(output_folder, y + '.aem'),
-                  'zones': num_zones,
-                  'matrix_names': sctg_descr}
-
-        mat.create_empty(**kwargs)
-        mat.index[:] = all_zones[:]
-        # for all sctg codes
-        for i in sctg_names.index:
-            prod_name = sctg_names['Commodity Description'][i]
-            mat_filtered_sctg = agg_matrix[agg_matrix.sctg2 == i]
-
-            m = coo_matrix((mat_filtered_sctg[y], (mat_filtered_sctg['from'], mat_filtered_sctg['to'])),
-                                               shape=(num_zones, num_zones)).toarray().astype(np.float64)
-
-            mat.matrix[prod_name][:,:] = m[:,:]
-
-        mat.close()
