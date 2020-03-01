@@ -86,8 +86,6 @@ Each instance contains the following folder structure and contents:
 * Composite scenario comparison flow map (gray is flow maintained in both
   scenarios, red is flow growth and green is flow decline)
 
-https://github.com/AequilibraE/aequilibrae/blob/master/docs/source/SiouxFalls.ipynb
-
 The Jupyter notebook used to generate all analytical outputs is available
 on `Github <https://github.com/AequilibraE/aequilibrae/blob/master/docs/source/SiouxFalls.ipynb>`_
 
