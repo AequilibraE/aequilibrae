@@ -832,9 +832,13 @@ class AequilibraeMatrix(object):
                                  cores=mcores,
                                  mappings=self.index_names)
             output = temp.copy(output_name, cores, names, compress)
+            if names is None:
+                names = mcores
+            if self.view_names is not None:
+                view_names = [names[self.view_names.index(nm)] for nm in self.view_names]
+                output.computational_view(view_names)
             temp.close()
             del temp
-            os.unlink(fp)
         else:
             if cores is None:
                 copyfile(self.file_path, output_name)
@@ -882,6 +886,10 @@ class AequilibraeMatrix(object):
                 output.indices[:] = self.indices[:]
                 for i, c in enumerate(cores):
                     output.matrices[:, :, i] = self.matrices[:, :, self.names.index(c)]
+                if self.view_names is not None:
+                    view_names = [names[self.view_names.index(nm)] for nm in self.view_names]
+                    output.computational_view(view_names)
+
         output.matrix_hash = output.__builds_hash__()
         output.matrices.flush()
         return output
