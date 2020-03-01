@@ -31,8 +31,6 @@ jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
 statsmodels = "*"
 pytest = "*"
-nbsphinx = "*"
-pandoc = "*"
 
 [scripts]
 notebook = "jupyter notebook"
