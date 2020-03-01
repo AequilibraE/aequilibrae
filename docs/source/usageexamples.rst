@@ -31,20 +31,24 @@ Each instance contains the following folder structure and contents:
 * No alterations made to the data
 
 1_project
+
 * AequilibraE project result of the import of the links and nodes layers
 
 2_skim_results:
+
 * Skim results for distance and free_flow_travel_time computed by minimizing
   free_flow_travel_time
 * Result matrices in openmatrix and AequilibraE formats
 
 3_desire_lines
+
 * Layers for desire lines and delaunay lines,  each one in a separate
   geopackage file
 * Desire lines flow map
 * Delaunay Lines flow map
 
 4_assignment_results
+
 * Outputs from traffic assignment to a relative gap of 1e-5 and with skimming
   enabled
 * Link flows in csv and AequilibraE formats
@@ -52,6 +56,7 @@ Each instance contains the following folder structure and contents:
 * Assignment flow map in png format
 
 5_distribution_results
+
 * Models calibrated for inverse power and negative exponential deterrence
   functions
 * Convergence logs for the calibration of each model
@@ -64,12 +69,14 @@ Each instance contains the following folder structure and contents:
   from the ASSIGNMENT
 
 6_forecast
+
 * Synthetic future vectors generated with a random growth from 0 to 10% in each
   cell on top of the original matrix vectors
 * Application of both gravity models calibrated plus IPF to the synthetic
   future vectors
 
 7_future_year_assignment
+
 * Traffic assignment:
     - Outputs from traffic assignment to a relative gap of 1e-5 and with
       skimming enabled
