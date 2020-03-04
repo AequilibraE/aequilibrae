@@ -28,12 +28,22 @@ class Parameters:
     """
 
     def __init__(self):
+        """ Loads parameters from file. The place is always the same. The root of the package"""
         path = os.path.dirname(os.path.realpath(__file__))
         self.file = os.path.join(path, "parameters.yml")
         with open(self.file, "r") as yml:
             self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
 
     def write_back(self):
+        """Writes the parameters back to file"""
         stream = open(self.file, "w")
         yaml.dump(self.parameters, stream, default_flow_style=False)
         stream.close()
+
+    def restore_default(self):
+        """Restores parameters to generic default"""
+        path = os.path.dirname(os.path.realpath(__file__))
+        default_file = os.path.join(path, "parameter_default.yml")
+        with open(default_file, "r") as yml:
+            self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
+        self.write_back()
