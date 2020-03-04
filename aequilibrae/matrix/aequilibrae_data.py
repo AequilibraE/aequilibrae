@@ -12,6 +12,8 @@ data_export_types = ["aed", "csv", "sqlite"]
 
 
 class AequilibraeData(object):
+    """AequilibraE dataset"""
+
     def __init__(self):
         self.data = None
         self.file_path = None
@@ -26,7 +28,7 @@ class AequilibraeData(object):
         """
         Creates a new empty dataset
 
-        :Parameters:
+        Args:
 
             *file_path* (:obj:`str`, Optional): Full path for the output data file. If *memory_false* is 'false' and
             path is missing, then the file is created in the temp folder
@@ -123,7 +125,7 @@ class AequilibraeData(object):
         """
         Loads dataset from file
 
-        :Parameters:
+        Args:
 
             *file_path* (:obj:`str`): Full file path to the AequilibraeData to be loaded
 
@@ -148,7 +150,7 @@ class AequilibraeData(object):
         """
         Exports the dataset to another format. Supports CSV and SQLite
 
-        :Parameters:
+        Args:
 
             *file_name* (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
 

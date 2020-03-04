@@ -9,7 +9,52 @@ from ..matrix import AequilibraeMatrix
 
 
 class Ipf:
-    """Iterative proportional fitting procedure"""
+    """Iterative proportional fitting procedure
+
+        ::
+
+            import pandas as pd
+            from aequilibrae.distribution import Ipf
+            from aequilibrae.matrix import AequilibraeMatrix
+            from aequilibrae.matrix import AequilibraeData
+
+            matrix = AequilibraeMatrix()
+
+            # Here we can create from OMX or load from an AequilibraE matrix.
+            matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
+
+            # The matrix will be operated one (see the note on overwriting), so it does
+            # not make sense load an OMX matrix
+
+
+            source_vectors = pd.read_csv(path/to/CSVs)
+            zones = source_vectors.zone.shape[0]
+
+            args = {"entries": zones, "field_names": ["productions", "attractions"],
+                    "data_types": [np.float64, np.float64], "memory_mode": True}
+
+            vectors = AequilibraEData()
+            vectors.create_empty(**args)
+
+            vectors.productions[:] = source_vectors.productions[:]
+            vectors.attractions[:] = source_vectors.attractions[:]
+
+            # We assume that the indices would be sorted and that they would match the matrix indices
+            vectors.index[:] = source_vectors.zones[:]
+
+            args = {
+                    "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
+                    "column_field": "attractions", "nan_as_zero": False}
+
+            fratar = Ipf(**args)
+
+             fratar.fit()
+
+            # We can get back to our OMX matrix in the end
+            fratar.output.export(path/to_omx/output.omx)
+            fratar.output.export(path/to_aem/output.aem)
+
+"""
 
     def __init__(self, **kwargs):
         """
@@ -36,7 +81,6 @@ class Ipf:
             report (:obj:`list`): Iteration and convergence report
 
             error (:obj:`str`): Error description
-
         """
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 

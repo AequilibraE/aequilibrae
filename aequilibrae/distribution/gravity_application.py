@@ -21,6 +21,80 @@ class GravityApplication:
     Model is an instance of SyntheticGravityModel class
     Impedance is an instance of AequilibraEMatrix
     Row and Column vectors are instances of AequilibraeData
+
+    ::
+
+        import pandas as pd
+        import sqlite3
+
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.matrix import AequilibraeData
+
+        from aequilibrae.distribution import SyntheticGravityModel
+        from aequilibrae.distribution import GravityApplication
+
+        # We define the model we will use
+        model = SyntheticGravityModel()
+
+        # Before adding a parameter to the model, you need to define the model functional form
+        model.function = "GAMMA" # "EXPO" or "POWER"
+
+        # Only the parameter(s) applicable to the chosen functional form will have any effect
+        model.alpha = 0.1
+        model.beta = 0.0001
+
+        # Or you can load the model from a file
+        model.load('path/to/model/file')
+
+        # We load the impedance matrix
+        matrix = AequilibraeMatrix()
+        matrix.load('path/to/impedance_matrix.aem')
+        matrix.computational_view(['distance'])
+
+        # We create the vectors we will use
+        conn = sqlite3.connect('path/to/demographics/database')
+        query = "SELECT zone_id, population, employment FROM demographics;"
+        df = pd.read_sql_query(query,conn)
+
+        index = df.zone_id.values[:]
+        zones = index.shape[0]
+
+        # You create the vectors you would have
+        df = df.assign(production=df.population * 3.0)
+        df = df.assign(attraction=df.employment * 4.0)
+
+        # We create the vector database
+        args = {"entries": zones, "field_names": ["productions", "attractions"],
+            "data_types": [np.float64, np.float64], "memory_mode": True}
+        vectors = AequilibraeData()
+        vectors.create_empty(**args)
+
+        # Assign the data to the vector object
+        vectors.productions[:] = df.production.values[:]
+        vectors.attractions[:] = df.attraction.values[:]
+        vectors.index[:] = zones[:]
+
+        # Balance the vectors
+        vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+
+        # Create the problem object
+        args = {"impedance": matrix,
+                "rows": vectors,
+                "row_field": "productions",
+                "model": model,
+                "columns": vectors,
+                "column_field": "attractions",
+                "output": 'path/to/output/matrix.aem',
+                "nan_as_zero":True
+                }
+        gravity = GravityApplication(**args)
+
+        # Solve and save the outputs
+        gravity.apply()
+        gravity.output.export('path/to/omx_file.omx')
+        with open('path.to/report.txt', 'w') as f:
+            for line in gravity.report:
+                f.write(f'{line}\n')
     """
 
     def __init__(self, **kwargs):
@@ -54,7 +128,6 @@ class GravityApplication:
             report (:obj:`list`): Iteration and convergence report
 
             error (:obj:`str`): Error description
-
         """
 
         self.__required_parameters = ["max trip length"]

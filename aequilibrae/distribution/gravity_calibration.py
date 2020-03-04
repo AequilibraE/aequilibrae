@@ -15,15 +15,44 @@ from ..parameters import Parameters
 
 class GravityCalibration:
     """
-        Applies a traditional synthetic gravity function
+        Calibrate a traditional gravity model
 
-        where function is: 'EXPO' or 'POWER'. 'GAMMA' and 'FRICTION FACTORS' to be implemented at a later time
-        parameters are: 'max trip length'
+        Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
+    ::
+
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.distribution import GravityCalibration
+
+        # We load the impedance matrix
+        matrix = AequilibraeMatrix()
+        matrix.load('path/to/trip_matrix.aem')
+        matrix.computational_view(['total_trips'])
+
+         # We load the impedance matrix
+        impedmatrix = AequilibraeMatrix()
+        impedmatrix.load('path/to/impedance_matrix.aem')
+        impedmatrix.computational_view(['traveltime'])
+
+        # Creates the problem
+        args = {"matrix": matrix,
+                "impedance": impedmatrix,
+                "row_field": "productions",
+                "function": 'expo',
+                "nan_as_zero":True
+                }
+        gravity = GravityCalibration(**args)
+
+        # Solve and save outputs
+        gravity.calibrate()
+        gravity.model.save('path/to/dist_expo_model.mod')
+        with open('path.to/report.txt', 'w') as f:
+            for line in gravity.report:
+                f.write(f'{line}\n')
         """
 
     def __init__(self, **kwargs):
         """
-        Instantiates the Ipf problem
+        Instantiates the Gravity calibration problem
 
         Args:
             matrix (:obj:`AequilibraeMatrix`): Seed/base trip matrix
@@ -37,7 +66,7 @@ class GravityCalibration:
             nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
 
         Results:
-            output (:obj:`SyntheticGravityModel`): Calibrated model
+            model (:obj:`SyntheticGravityModel`): Calibrated model
 
             report (:obj:`list`): Iteration and convergence report
 
