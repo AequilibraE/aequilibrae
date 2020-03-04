@@ -4,23 +4,6 @@ Algorithms to **calibrate** synthetic gravity models with power and exponential 
 The procedures implemented in this code are some of those suggested in
 Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 """
-# -----------------------------------------------------------------------------------------------------------
-# Package:    AequilibraE
-#
-# Name:       Gravity model calibration
-#
-# Original Author:  Pedro Camargo (c@margo.co)
-# Contributors:
-# Last edited by: Pedro Camargo
-#
-# Website:    www.AequilibraE.com
-# Repository:  https://github.com/AequilibraE/AequilibraE
-#
-# Created:    22/10/2016
-# Updated:    02/10/2017
-# Copyright:   (c) AequilibraE authors
-# Licence:     See LICENSE.TXT
-# -----------------------------------------------------------------------------------------------------------
 from time import perf_counter
 
 import numpy as np
@@ -31,7 +14,9 @@ from ..parameters import Parameters
 
 
 class GravityCalibration:
-    """"
+    """
+        Applies a traditional synthetic gravity function
+
         where function is: 'EXPO' or 'POWER'. 'GAMMA' and 'FRICTION FACTORS' to be implemented at a later time
         parameters are: 'max trip length'
         """

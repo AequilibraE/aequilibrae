@@ -1,23 +1,4 @@
-"""
-Iterative Proportional Fitting (Fratar)
-"""
-# -----------------------------------------------------------------------------------------------------------
-# Package:    AequilibraE
-#
-# Original Author:  Pedro Camargo (c@margo.co)
-# Contributors:
-# Last edited by: Pedro Camargo
-#
-# Website:    www.AequilibraE.com
-# Repository:  https://github.com/AequilibraE/AequilibraE
-#
-# Created:    29/09/2016
-# Updated:    11/08/2017
-# Copyright:   (c) AequilibraE authors
-# Licence:     See LICENSE.TXT
-# -----------------------------------------------------------------------------------------------------------
 import os
-import sys
 from time import perf_counter
 
 import numpy as np
@@ -26,10 +7,10 @@ import yaml
 from ..matrix import AequilibraeData
 from ..matrix import AequilibraeMatrix
 
-sys.dont_write_bytecode = True
-
 
 class Ipf:
+    """Iterative proportional fitting procedure"""
+
     def __init__(self, **kwargs):
 
         self.parameters = kwargs.get("parameters", self.get_parameters("ipf"))

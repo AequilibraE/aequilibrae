@@ -1,24 +1,3 @@
-"""
-Algorithms to **apply** synthetic gravity models with power, exponential and gamma functions
-
-The procedures implemented in this code are some of those suggested in
-Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
-"""
-# -----------------------------------------------------------------------------------------------------------
-#  Package:    AequilibraE
-#
-#   Original Author:  Pedro Camargo (c@margo.co)
-#  Contributors:
-#  Last edited by: Pedro Camargo
-#
-#  Website:    www.AequilibraE.com
-#  Repository:  https://github.com/AequilibraE/AequilibraE
-#
-#  Created:    2016-09-30
-#  Updated:    2017-08-11
-#  Copyright:   (c) AequilibraE authors
-#  Licence:     See LICENSE.TXT
-#  -----------------------------------------------------------------------------------------------------------
 from .ipf import Ipf
 from .synthetic_gravity_model import SyntheticGravityModel
 from ..matrix import AequilibraeMatrix, AequilibraeData
@@ -36,7 +15,9 @@ sys.dont_write_bytecode = True
 
 
 class GravityApplication:
-    """"
+    """
+    Applies a synthetic gravity model
+
     Model is an instance of SyntheticGravityModel class
     Impedance is an instance of AequilibraEMatrix
     Row and Column vectors are instances of AequilibraeData

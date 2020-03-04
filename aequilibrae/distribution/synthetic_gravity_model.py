@@ -1,21 +1,3 @@
-"""
-Simple class object to represent synthetic gravity models
-"""
-# -----------------------------------------------------------------------------------------------------------
-#  Package:    AequilibraE
-#
-#  Original Author:  Pedro Camargo (c@margo.co)
-#  Contributors:
-#  Last edited by: Pedro Camargo
-#
-#  Website:    www.AequilibraE.com
-#  Repository:  https://github.com/AequilibraE/AequilibraE
-#
-#  Created:    2017-08-11
-#  Updated:
-#  Copyright:   (c) AequilibraE authors
-#  Licence:     See LICENSE.TXT
-#  -----------------------------------------------------------------------------------------------------------
 import yaml
 
 
@@ -25,6 +7,7 @@ model_type = "SyntheticGravityModel"
 
 
 class SyntheticGravityModel:
+    """Simple class object to represent synthetic gravity models"""
     def __init__(self):
         self.function = None
         self.alpha = None
@@ -64,6 +47,7 @@ class SyntheticGravityModel:
             return self.__dict__[key]
 
     def load(self, file_name):
+        """Loads model from disk. Extension is *.mod"""
         try:
             with open(file_name, "r") as f:
                 model = yaml.safe_load(f)[self.model_type]
@@ -76,6 +60,7 @@ class SyntheticGravityModel:
             raise ValueError("File provided is not a valid Synthetic Gravity Model - {}".format(err.__str__()))
 
     def save(self, file_name):
+        """Saves model to disk in yaml format. Extension is *.mod"""
         file_name = str(file_name)
         if file_name[-4:].upper() != ".MOD":
             file_name += ".mod"

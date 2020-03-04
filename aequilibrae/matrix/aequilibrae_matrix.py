@@ -15,22 +15,6 @@ has_omx = spec is not None
 if has_omx:
     import openmatrix as omx
 
-""""""
-"""-----------------------------------------------------------------------------------------------------------
-Package:    AequilibraE
-Name:       AequilibraE Matrix
-Purpose:    Implements a new class to represent multi-layer matrices
-Original Author:  Pedro Camargo (c@margo.co)
-Contributors: Pedro Camargo
-Last edited by: Pedro Camargo
-Website:    www.AequilibraE.com
-Repository:  https://github.com/AequilibraE/AequilibraE
-Created:    2017-10-02
-Updated:    2018-07-08
-Copyright:   (c) AequilibraE authors
-Licence:     See LICENSE.TXT
------------------------------------------------------------------------------------------------------------"""
-
 # CONSTANTS
 VERSION = 1  # VERSION OF THE MATRIX FORMAT
 INT = 0
