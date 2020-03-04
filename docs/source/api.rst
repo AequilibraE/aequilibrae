@@ -1,5 +1,5 @@
-AequilibraE Classes and Functions
-=================================
+API documentation
+=================
 
 .. automodule:: aequilibrae
    :no-members:

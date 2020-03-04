@@ -4,6 +4,8 @@ import yaml
 
 class Parameters:
     """
+    Global parameters module
+
     Parameters are used in many procedures, and are often defined only in thi parameters.yml file ONLY
     Parameters are organized in the following groups:
 
