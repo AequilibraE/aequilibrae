@@ -30,6 +30,7 @@ Contents
    project_tables
    traffic_assignment
    usageexamples
+   api
    softwaredevelopment
    qgis
 

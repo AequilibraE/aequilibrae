@@ -6,7 +6,7 @@ import zipfile
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project import Project
-from aequilibrae.paths import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import TrafficAssignment, TrafficClass, Graph
 
 from ...data import siouxfalls_project, siouxfalls_demand, data_folder
 

@@ -3,7 +3,7 @@
 # include 'parameters.pxi'
 import numpy as np
 import multiprocessing as mp
-from ...matrix import AequilibraeMatrix
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class SkimResults:

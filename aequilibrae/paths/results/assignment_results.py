@@ -1,10 +1,10 @@
 import multiprocessing as mp
 import numpy as np
 import warnings
-from ...matrix import AequilibraeMatrix, AequilibraeData
-from ..graph import Graph
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.paths.graph import Graph
 from aequilibrae.paths.AoN import sum_axis1
-from aequilibrae import Parameters
+from aequilibrae.parameters import Parameters
 
 """
 TO-DO:
