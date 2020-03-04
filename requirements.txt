@@ -1,4 +1,5 @@
 numpy >= 1.12.0
+scipy
 pyaml
 PyQt5
 cython
