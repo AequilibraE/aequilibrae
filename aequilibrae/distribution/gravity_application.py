@@ -24,11 +24,43 @@ class GravityApplication:
     """
 
     def __init__(self, **kwargs):
+        """
+        Instantiates the Ipf problem
+
+        Args:
+            model (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
+
+            impedance (:obj:`AequilibraeMatrix`): Impedance matrix to be used
+
+            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+
+            row_field (:obj:`str`): Field name that contains the data for the row totals
+
+            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+
+            column_field (:obj:`str`): Field name that contains the data for the column totals
+
+            core_name (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
+
+            output_name (:obj:`str`, optional): Name for the output matrix file. Defaults to temporary file
+
+            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+
+            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+
+        Results:
+            output (:obj:`AequilibraeMatrix`): Result Matrix
+
+            report (:obj:`list`): Iteration and convergence report
+
+            error (:obj:`str`): Error description
+
+        """
 
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
-        self.parameters = kwargs.get("parameters", self.get_parameters())
+        self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.rows = kwargs.get("rows")
         self.row_field = kwargs.get("row_field", None)
@@ -46,7 +78,11 @@ class GravityApplication:
         self.logger = logging.getLogger("aequilibrae")
 
     def apply(self):
-        self.check_data()
+        """Runs the Gravity Application instance as instantiated
+
+        Resulting matrix is the *output* class member
+        """
+        self.__check_data()
         t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
@@ -56,7 +92,7 @@ class GravityApplication:
             self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
         # We apply the function
-        self.apply_function()
+        self.__apply_function()
 
         # We zero those cells that have a trip length above the limit
         if max_cost > 0:
@@ -107,13 +143,13 @@ class GravityApplication:
             except PermissionError as err:
                 self.logger.warning("Could not remove " + err.filename)
 
-    def get_parameters(self):
+    def __get_parameters(self):
         par = Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para
 
-    def check_data(self):
+    def __check_data(self):
         self.report = ["  #####    GRAVITY APPLICATION    #####  ", ""]
 
         if not isinstance(self.model, SyntheticGravityModel):
@@ -164,9 +200,9 @@ class GravityApplication:
             # guarantees that they are precisely balanced
             self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (sum_rows / sum_cols)
 
-        self.check_parameters()
+        self.__check_parameters()
 
-    def check_parameters(self):
+    def __check_parameters(self):
         # Check if parameters are configured properly
         for p in self.__required_parameters:
             if p not in self.parameters:
@@ -175,7 +211,7 @@ class GravityApplication:
                     self.error = self.error + t + ", "
                 break
 
-    def apply_function(self):
+    def __apply_function(self):
         self.core_name = self.output.view_names[0]
         for i in range(self.rows.entries):
             p = self.rows.data[self.row_field][i]

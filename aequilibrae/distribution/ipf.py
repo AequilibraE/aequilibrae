@@ -12,8 +12,33 @@ class Ipf:
     """Iterative proportional fitting procedure"""
 
     def __init__(self, **kwargs):
+        """
+        Instantiates the Ipf problem
 
-        self.parameters = kwargs.get("parameters", self.get_parameters("ipf"))
+        Args:
+            matrix (:obj:`AequilibraeMatrix`): Seed Matrix
+
+            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+
+            row_field (:obj:`str`): Field name that contains the data for the row totals
+
+            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+
+            column_field (:obj:`str`): Field name that contains the data for the column totals
+
+            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+
+            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+
+        Results:
+            output (:obj:`AequilibraeMatrix`): Result Matrix
+
+            report (:obj:`list`): Iteration and convergence report
+
+            error (:obj:`str`): Error description
+
+        """
+        self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
         self.matrix = kwargs.get("matrix", None)
@@ -37,9 +62,9 @@ class Ipf:
         self.report = ["  #####    IPF computation    #####  ", ""]
         self.gap = None
 
-    def check_data(self):
+    def __check_data(self):
         self.error = None
-        self.check_parameters()
+        self.__check_parameters()
 
         # check data types
         if not isinstance(self.rows, AequilibraeData):
@@ -91,7 +116,7 @@ class Ipf:
         if self.error is not None:
             self.error_free = False
 
-    def check_parameters(self):
+    def __check_parameters(self):
         for i in self.__required_parameters:
             if i not in self.parameters:
                 self.error = "Parameters error. It needs to be a dictionary with the following keys: "
@@ -100,8 +125,12 @@ class Ipf:
                 break
 
     def fit(self):
+        """Runs the IPF instance problem to adjust the matrix
+
+        Resulting matrix is the *output* class member
+        """
         t = perf_counter()
-        self.check_data()
+        self.__check_data()
         if self.error_free:
             max_iter = self.parameters["max iterations"]
             conv_criteria = self.parameters["convergence level"]
@@ -137,16 +166,16 @@ class Ipf:
             while self.gap > conv_criteria and iter < max_iter:
                 iter += 1
                 # computes factors for zones
-                marg_rows = self.tot_rows(self.output.matrix_view[:, :])
-                row_factor = self.factor(marg_rows, rows)
+                marg_rows = self.__tot_rows(self.output.matrix_view[:, :])
+                row_factor = self.__factor(marg_rows, rows)
                 # applies factor
                 self.output.matrix_view[:, :] = np.transpose(
                     np.transpose(self.output.matrix_view[:, :]) * np.transpose(row_factor)
                 )[:, :]
 
                 # computes factors for columns
-                marg_cols = self.tot_columns(self.output.matrix_view[:, :])
-                column_factor = self.factor(marg_cols, columns)
+                marg_cols = self.__tot_columns(self.output.matrix_view[:, :])
+                column_factor = self.__factor(marg_cols, columns)
 
                 # applies factor
                 self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
@@ -164,18 +193,18 @@ class Ipf:
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
-    def tot_rows(self, matrix):
+    def __tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)
 
-    def tot_columns(self, matrix):
+    def __tot_columns(self, matrix):
         return np.nansum(matrix, axis=0)
 
-    def factor(self, marginals, targets):
+    def __factor(self, marginals, targets):
         f = np.divide(targets, marginals)  # We compute the factors
         f[f == np.NINF] = 1  # And treat the errors
         return f
 
-    def get_parameters(self, model):
+    def __get_parameters(self, model):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)
