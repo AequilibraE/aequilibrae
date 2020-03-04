@@ -29,7 +29,6 @@ class AequilibraeData(object):
         Creates a new empty dataset
 
         Args:
-
             *file_path* (:obj:`str`, Optional): Full path for the output data file. If *memory_false* is 'false' and
             path is missing, then the file is created in the temp folder
 
@@ -126,7 +125,6 @@ class AequilibraeData(object):
         Loads dataset from file
 
         Args:
-
             *file_path* (:obj:`str`): Full file path to the AequilibraeData to be loaded
 
         ::
@@ -151,7 +149,6 @@ class AequilibraeData(object):
         Exports the dataset to another format. Supports CSV and SQLite
 
         Args:
-
             *file_name* (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
 
             *table_name* (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
