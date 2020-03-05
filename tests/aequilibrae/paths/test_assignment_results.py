@@ -21,7 +21,7 @@ class TestAssignmentResults(TestCase):
             a.set_cores(1.3)
 
         a.set_cores(-2)
-        self.assertEqual(a.cores, min(1, mp.cpu_count() - 2))
+        self.assertEqual(a.cores, max(1, mp.cpu_count() - 2))
 
     #
     # def test_set_critical_links(self):
