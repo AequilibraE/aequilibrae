@@ -27,7 +27,7 @@ class SkimResults:
 
           res = SkimResults()
           res.prepare(car_graph)
-          res.compute_path(17, 13199)
+          res.compute_skims()
 
           res.skims.export('path/to/matrix.aem')
     """

@@ -9,6 +9,57 @@ from aequilibrae import Parameters
 
 
 class TrafficAssignment(object):
+    """Traffic assignment class
+
+    For a comprehensive example on use, see the Use examples page.
+    ::
+
+        from os.path import join
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.paths import TrafficAssignment, TrafficClass
+
+
+        fldr = 'D:/release/Sample models/sioux_falls_2020_02_15'
+        proj_name = 'SiouxFalls.sqlite'
+        dt_fldr = '0_tntp_data'
+        prj_fldr = '1_project'
+
+        demand = AequilibraeMatrix()
+        demand.load(join(fldr, dt_fldr, 'demand.omx'))
+        demand.computational_view(['matrix']) # We will only assign one user class stored as 'matrix' inside the OMX file
+
+        project = Project(join(fldr, prj_fldr, proj_name))
+        project.network.build_graphs()
+
+        graph = project.network.graphs['c'] # we grab the graph for cars
+        graph.set_graph('free_flow_time') # let's say we want to minimize time
+        graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        graph.set_blocked_centroid_flows(True)
+
+        # Creates the assignment class
+        assigclass = TrafficClass(graph, demand)
+
+        assig = TrafficAssignment()
+        # The first thing to do is to add at list of traffic classes to be assigned
+        assig.set_classes([assigclass])
+
+        assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+
+        assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # And its parameters
+
+        assig.set_capacity_field("capacity") # The capacity and free flow travel times as they exist in the graph
+        assig.set_time_field("free_flow_time")
+
+        # And the algorithm we want to use to assign
+        assig.set_algorithm('bfw')
+
+        # since I haven't checked the parameters file, let's make sure convergence criteria is good
+        assig.max_iter = 1000
+        assig.rgap_target = 0.00001
+
+        assig.execute() # we then execute the assignment
+
+    """
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
 
@@ -77,13 +128,32 @@ class TrafficAssignment(object):
         return True, value, ''
 
     def set_vdf(self, vdf_function: str) -> None:
+        """
+        Sets the Volume-delay function to be used
+
+        Args:
+            vdf_function(:obj:`str`:) Name of the VDF to be used
+        """
         self.vdf = vdf_function
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
+        """
+        Sets Traffic classes to be assigned
+
+        Args:
+            classes(:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+        """
+
         self.classes = classes
         self.__collect_data()
 
     def algorithms_available(self) -> list:
+        """
+        Returns all algorithms available for use
+
+        Returns:
+            :obj:`list`: List of string values to be used with **set_algorithm**
+        """
         return self.all_algorithms
 
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
@@ -91,6 +161,9 @@ class TrafficAssignment(object):
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm. e.g. 'frank-wolfe', 'bfw', 'msa'
+
+        Args:
+            algorithm (:obj:`list`): Algorithm to be used
         """
 
         # First we instantiate the arrays we will be using over and over
@@ -126,7 +199,14 @@ class TrafficAssignment(object):
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
-        Sets the parameters for the Volume-delay function. e.g. {'alpha': 0.15, 'beta':4.0}
+        Sets the parameters for the Volume-delay function.
+
+        Parameter values can be scalars (same values for the entire network) or network field names
+        (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
+
+        Args:
+            par (:obj:`dict`): Dictionary with all parameters for the chosen VDF
+
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
             raise Exception('Before setting vdf parameters, you need to set traffic classes and choose a VDF function')
@@ -157,7 +237,13 @@ class TrafficAssignment(object):
         self.__dict__["vdf_parameters"] = pars
 
     def set_cores(self, cores: int) -> None:
-        """Allows one to set the number of cores to be used AFTER traffic classes have been added"""
+        """Allows one to set the number of cores to be used AFTER traffic classes have been added
+
+            Inherited from :obj:`AssignmentResults`
+
+        Args:
+            cores (:obj:`int`): Number of CPU cores to use
+        """
         self.cores = cores
         if self.classes is not None:
             for c in self.classes:
@@ -169,6 +255,9 @@ class TrafficAssignment(object):
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'fftime'
+
+        Args:
+            time_field (:obj:`str`): Field name
         """
         self.time_field = time_field
         self.__collect_data()
@@ -176,15 +265,17 @@ class TrafficAssignment(object):
     def set_capacity_field(self, capacity_field: str) -> None:
         """
         Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
+
+        Args:
+            capacity_field (:obj:`str`): Field name
         """
         self.capacity_field = capacity_field
         self.__collect_data()
 
-    # def load_assignment_spec(self, specs: dict) -> None:
-    #     pass
-
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
+    # def load_assignment_spec(self, specs: dict) -> None:
+    #     pass
     # def get_spec(self) -> dict:
     #     """Gets the entire specification of the assignment"""
     #     return deepcopy(self.__dict__)
@@ -201,4 +292,5 @@ class TrafficAssignment(object):
         return True
 
     def execute(self) -> None:
+        """Processes assignment"""
         self.assignment.execute()
