@@ -109,9 +109,8 @@ Below we have that same workflow as a single script
     from aequilibrae.distribution import GravityCalibration, Ipf, GravityApplication, SyntheticGravityModel
     from aequilibrae import Parameters
     from aequilibrae.project import Project
-    from aequilibrae.paths import PathResults, path_computation
+    from aequilibrae.paths import PathResults, SkimResults
     from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
-    from aequilibrae.paths import NetworkSkimming, SkimResults
     from aequilibrae import logger
     from aequilibrae.paths import TrafficAssignment, TrafficClass
 
@@ -177,7 +176,7 @@ Below we have that same workflow as a single script
     res.prepare(graph)
 
     # compute a path from node 2 to 13
-    path_computation(2, 13, graph, res)
+    res.compute_path(2, 13)
 
     # We can get the sequence of nodes we traverse
     res.path_nodes
@@ -193,7 +192,7 @@ Below we have that same workflow as a single script
 
     # If we want to compute the path for a different destination and same origin, we can just do this
     # It is way faster when you have large networks
-    res.update_trace(graph, 4)
+    res.update_trace(4)
 
     ########## SKIMMING ###################
 
@@ -203,8 +202,7 @@ Below we have that same workflow as a single script
     res.prepare(graph)
 
     # And run the skimming
-    skm = NetworkSkimming(graph, res)
-    skm.execute()
+    res.compute_skims()
 
     # The result is an AequilibraEMatrix object
     skims = res.skims
