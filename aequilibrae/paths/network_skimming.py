@@ -1,24 +1,3 @@
-"""
------------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Network skimming
- Purpose:    Implement skimming algorithms based on Cython's path finding and skimming
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camrgo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2017-07-03
- Updated:    2017-05-07
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
------------------------------------------------------------------------------------------------------------
- """
-
 import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool

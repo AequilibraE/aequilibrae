@@ -10,13 +10,15 @@ class PathResults:
     ::
 
           from aequilibrae.project import Project
-          from aequilibrae.paths import path_computation
           from aequilibrae.paths.results import PathResults
 
           proj = Project('path/to/project.sqlite')
           proj.network.build_graphs()
           # Mode c is car in this project
           car_graph = proj.network.graphs['c']
+
+          # minimize distance
+          car_graph.set_graph('distance')
 
           res = PathResults()
           res.prepare(car_graph)

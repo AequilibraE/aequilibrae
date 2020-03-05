@@ -3,9 +3,9 @@ from tempfile import gettempdir
 from unittest import TestCase
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths import allOrNothing
 from aequilibrae.paths import Graph
-from aequilibrae.paths import AssignmentResults
+from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.all_or_nothing import allOrNothing
 from ...data import test_graph
 
 
