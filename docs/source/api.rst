@@ -7,6 +7,18 @@ API documentation
    :no-inherited-members:
    :no-show-inheritance:
 
+Project Module
+--------------
+
+.. currentmodule:: aequilibrae
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    Project
+    Network
+
 Parameters Module
 -----------------
 
@@ -60,20 +72,6 @@ Paths Module
     VDF
     TrafficClass
     TrafficAssignment
-
-
-Project Module
---------------
-
-.. currentmodule:: aequilibrae
-
-.. autosummary::
-   :nosignatures:
-   :toctree: _generated
-
-    Project
-    Network
-
 
 Transit Module
 --------------
