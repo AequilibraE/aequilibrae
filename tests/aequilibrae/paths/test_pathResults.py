@@ -34,7 +34,7 @@ class TestPathResults(TestCase):
         except Exception as err:
             self.fail("Path result resetting failed - {}".format(err.__str__()))
 
-    def test_update_trace(self):
+    def test_compute_paths(self):
         self.test_prepare()
         try:
             self.r.reset()
@@ -42,6 +42,37 @@ class TestPathResults(TestCase):
             self.fail("Path result resetting failed - {}".format(err.__str__()))
 
         path_computation(origin, dest, self.g, self.r)
+
+        if list(self.r.path) != [53, 52, 13]:
+            self.fail("Path computation failed. Wrong sequence of links")
+
+        if list(self.r.path_nodes) != [5, 168, 166, 27]:
+            self.fail("Path computation failed. Wrong sequence of path nodes")
+
+        if list(self.r.milepost) != [0, 341, 1398, 2162]:
+            self.fail("Path computation failed. Wrong milepost results")
+
+        self.r.compute_path(origin, dest)
+
+        if list(self.r.path) != [53, 52, 13]:
+            self.fail("Path computation failed. Wrong sequence of links")
+
+        if list(self.r.path_nodes) != [5, 168, 166, 27]:
+            self.fail("Path computation failed. Wrong sequence of path nodes")
+
+        if list(self.r.milepost) != [0, 341, 1398, 2162]:
+            self.fail("Path computation failed. Wrong milepost results")
+
+    def test_update_trace(self):
+        self.test_prepare()
+        try:
+            self.r.reset()
+        except Exception as err:
+            self.fail("Path result resetting failed - {}".format(err.__str__()))
+
+        self.r.compute_path(origin, dest - 1)
+
+        self.r.update_trace(dest)
 
         if list(self.r.path) != [53, 52, 13]:
             self.fail("Path computation failed. Wrong sequence of links")

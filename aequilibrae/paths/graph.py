@@ -69,6 +69,12 @@ class Graph(object):
         self.__layer_name__ = None
 
     def default_types(self, tp: str):
+        """
+        Returns the default integer and float types used for computation
+
+        Args:
+            tp (:obj:`str`): data type. 'int' or 'float'
+        """
         if tp == "int":
             return self.__integer_type
         elif tp == "float":
@@ -515,7 +521,7 @@ class Graph(object):
         self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
 
     # We add a new fields that is the same for both directions
-    def add_single_field(self, new_field):
+    def __add_single_field(self, new_field):
         if new_field not in self.required_default_fields:
             self.required_default_fields.append(new_field)
 

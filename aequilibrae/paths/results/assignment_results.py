@@ -15,11 +15,10 @@ TO-DO:
 
 
 class AssignmentResults:
+    """
+    Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
+    """
     def __init__(self):
-        """
-        @type graph: Set of numpy arrays to store Computation results
-        self.critical={required:{"links":[lnk_id1, lnk_id2, ..., lnk_idn], "path file": False}, results:{}}
-        """
         self.link_loads = None  # type: np.array  # The actual results for assignment
         self.total_link_loads = None  # type: np.array  # The result of the assignment for all user classes summed
         self.skims = None  # The array of skims
@@ -28,12 +27,7 @@ class AssignmentResults:
         p = Parameters().parameters['system']['cpus']
         if not isinstance(p, int):
             p = 0
-        if p < 0:
-            self.cores = min(1, mp.cpu_count() - p)
-        elif p == 0:
-            self.cores = mp.cpu_count()
-        else:
-            self.cores = min(p, mp.cpu_count())
+        self.set_cores(p)
 
         self.classes = {"number": 1, "names": ["flow"]}
 
@@ -54,13 +48,15 @@ class AssignmentResults:
         self.direcs = None
 
     # In case we want to do by hand, we can prepare each method individually
-    def prepare(self, graph, matrix):
+    def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """
-        :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
-        :type graph: Graph
-        :param matrix: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
-        :type matrix: AequilibraeMatrix
-        :return:
+        Prepares the object with dimensions corresponding to the assignment matrix and graph objects
+
+        Args:
+            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+
+            *matrix* (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
+             matrix.computational_view(:obj:`list`)
         """
 
         self.__float_type = graph.default_types("float")
@@ -88,10 +84,14 @@ class AssignmentResults:
             self.__redim()
             self.__graph_id__ = graph.__id__
 
-            self.setSavePathFile(False)
-            self.setCriticalLinks(False)
+            # TODO: Enable these methods when the work for select link analysis and saving path files is completed
+            self.__setSavePathFile(False)
+            self.__setCriticalLinks(False)
 
-    def reset(self):
+    def reset(self) -> None:
+        """
+        Resets object to prepared and pre-computation state
+        """
         if self.num_skims > 0:
             self.skims.matrices.fill(0)
         if self.link_loads is not None:
@@ -120,23 +120,42 @@ class AssignmentResults:
 
         self.reset()
 
-    def total_flows(self):
-        """ Totals all link flows for this class into a single link load"""
+    def total_flows(self) -> None:
+        """ Totals all link flows for this class into a single link load
+
+        Results are placed into *total_link_loads* class member
+        """
         sum_axis1(self.total_link_loads, self.link_loads, self.cores)
 
-    def set_cores(self, cores):
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        Args:
+            *cores* (:obj:`int`): Number of cores to be used in computation
+        """
+
         if isinstance(cores, int):
-            if cores > 0:
+            if cores < 0:
+                self.cores = min(1, mp.cpu_count() - cores)
+            if cores == 0:
+                self.cores = mp.cpu_count()
+            elif cores > 0:
+                cores = max(mp.cpu_count(), cores)
                 if self.cores != cores:
                     self.cores = cores
                     if self.link_loads is not None:
                         self.__redim()
-            else:
-                raise ValueError("Number of cores needs to be equal or bigger than one")
         else:
             raise ValueError("Number of cores needs to be an integer")
 
-    def setCriticalLinks(self, save=False, queries={}, crit_res_result=None):
+    def __setCriticalLinks(self, save=False, queries={}, crit_res_result=None):
         a = AequilibraeMatrix()
         if save:
             if crit_res_result is None:
@@ -165,7 +184,7 @@ class AssignmentResults:
             a.matrix_view = a.matrix_view.reshape((self.zones, self.zones, 1))
         self.critical_links = {"save": save, "queries": queries, "results": a}
 
-    def setSavePathFile(self, save=False, path_result=None):
+    def __setSavePathFile(self, save=False, path_result=None):
         # Fields: Origin, Node, Predecessor
         # Number of records: Origins * Nodes
         a = AequilibraeData()
@@ -193,7 +212,14 @@ class AssignmentResults:
 
         self.path_file = {"save": save, "results": a}
 
-    def get_load_results(self):
+    def get_load_results(self) -> AequilibraeData:
+        """
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        Returns:
+            *cores* (:obj:`int`): Number of cores to be used in computation
+        """
         fields = ['link_id']
         for n in self.classes['names']:
             fields.extend([f'{n}_ab', f'{n}_ba', f'{n}_tot'])
@@ -227,18 +253,13 @@ class AssignmentResults:
             res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
         return res
 
-    def save_to_disk(self, file_name=None, output="loads"):
+    def save_to_disk(self, file_name=None, output="loads") -> None:
         """ Function to write to disk all outputs computed during assignment
-    Args:
-        output: 'loads', for writing the link loads
-                'path_file', for writing the path file to a format different than the native binary
 
-        file_name: Name of the file, with extension. Valid extensions are:
-                   1. 'aed', for AequilibraE datasets. (Nearly zero overhead)
-                   2. 'csv', for comma-separated files
-                   3. 'sqlite' for sqlite databases
-    Returns:
-        Nothing"""
+        Args:
+            *file_name* (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
+            *output* (:obj:`str`, optional): Type of output ('loads', 'path_file'). Defaults to 'loads'
+        """
 
         if output == "loads":
             res = self.get_load_results()
