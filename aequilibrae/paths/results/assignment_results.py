@@ -143,7 +143,7 @@ class AssignmentResults:
 
         if isinstance(cores, int):
             if cores < 0:
-                self.cores = min(1, mp.cpu_count() - cores)
+                self.cores = max(1, mp.cpu_count() - cores)
             if cores == 0:
                 self.cores = mp.cpu_count()
             elif cores > 0:
