@@ -14,7 +14,8 @@ from random import random
 class TestNetwork(TestCase):
     def setUp(self) -> None:
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
-        self.project = Project(self.file, True)
+        self.project = Project()
+        self.project.new(self.file)
         self.source = self.file
         self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
         self.conn = sqlite3.connect(self.file2)

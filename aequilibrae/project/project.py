@@ -14,35 +14,49 @@ class Project:
 
         from aequilibrae.project import Project
 
-        existing = Project('path/to/existing/project.sqlite')
+        existing = Project()
+        existing.load('path/to/existing/project.sqlite')
 
-        newfile = Project('path/to/new/project.sqlite', True)
+        newfile = Project()
+        newfile.new('path/to/new/project.sqlite')
         """
 
-    def __init__(self, path_to_file: str, new_project=False):
+    def __init__(self):
+        self.path_to_file: str = None
+        self.source: str = None
+        self.parameters = Parameters().parameters
+        self.conn: sqlite3.Connection = None
+        self.network: Network = None
+
+    def load(self, file_name: str) -> None:
         """
-        Instantiates the class by opening an existing project or creating a new one
+        Loads project from disk
 
         Args:
-            *path_to_file* (:obj:`str`): Full path to the project data file. If project does not exist, new project
-                                        argument needs to be True
-
-            *new_project* (:obj:`bool`, Optional): Flag to create new project. *path_to_file* needs to be set to a
-                                                   non-existing file.
+            *file_name* (:obj:`str`): Full path to the project data file. If does not exist, it will fail
         """
-        self.path_to_file = path_to_file
-        self.parameters = Parameters().parameters
-        if not os.path.isfile(path_to_file):
-            if not new_project:
-                raise FileNotFoundError(
-                    "Model does not exist. Check your path or use the new_project=True flag to create a new project"
-                )
-            else:
-                self.__create_empty_project()
-        else:
-            self.conn = sqlite3.connect(self.path_to_file)
+        self.path_to_file = file_name
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError("Model does not exist. Check your path and try again")
 
+        self.conn = sqlite3.connect(self.path_to_file)
         self.source = self.path_to_file
+        self.conn = spatialite_connection(self.conn)
+        self.network = Network(self)
+
+    def new(self, file_name: str) -> None:
+        """Creates a new project
+
+        Args:
+            *file_name* (:obj:`str`): Full path to the project data file. If file exists, it will fail
+        """
+        self.path_to_file = file_name
+        self.source = self.path_to_file
+        self.parameters = Parameters().parameters
+        if os.path.isfile(file_name):
+            raise FileNotFoundError("File already exist. Choose a different name or remove the existing file")
+        self.__create_empty_project()
+
         self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
 

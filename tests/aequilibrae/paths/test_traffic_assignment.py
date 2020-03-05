@@ -17,7 +17,8 @@ class TestTrafficAssignment(TestCase):
         self.matrix.load(siouxfalls_demand)
         self.matrix.computational_view()
 
-        self.project = Project(siouxfalls_project)
+        self.project = Project()
+        self.project.load(siouxfalls_project)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs['c']  # type: Graph
         self.car_graph.set_graph('free_flow_time')

@@ -149,7 +149,8 @@ Below we have that same workflow as a single script
 
     ########### PROJECT #################
 
-    project = Project(join(fldr, prj_fldr, proj_name))
+    project = Project()
+    project.load(join(fldr, prj_fldr, proj_name))
 
     ########### PATH COMPUTATION #################
 
@@ -682,7 +683,8 @@ folder for analysis at a later time.
       print(city)
       pth = f'd:/net_tests/{city}.sqlite'
 
-      p = Project(pth, True)
+      p = Project()
+      p.new(pth)
       p.network.create_from_osm(place_name=city)
       p.conn.close()
       del p
@@ -693,7 +695,8 @@ If one wants to load a project and check some of its properties, it is easy:
 
   >>> from aequilibrae.project import Project
 
-  >>> p = Project('path/to_project')
+  >>> p = Project()
+  >>> p.load('path/to_project')
 
   # for the modes available in the model
   >>> p.network.modes()
@@ -822,7 +825,8 @@ A simple example of assignment
 
     assig = TrafficAssignment()
 
-    proj = Project('path/to/folder/SiouxFalls.sqlite')
+    proj = Project()
+    proj.load('path/to/folder/SiouxFalls.sqlite')
     proj.network.build_graphs()
     # Mode c is car
     car_graph = proj.network.graphs['c']

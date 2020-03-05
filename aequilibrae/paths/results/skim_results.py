@@ -14,7 +14,8 @@ class SkimResults:
           from aequilibrae.project import Project
           from aequilibrae.paths.results import SkimResults
 
-          proj = Project('path/to/project.sqlite')
+          proj = Project()
+          proj.load('path/to/project.sqlite')
           proj.network.build_graphs()
           # Mode c is car in this project
           car_graph = proj.network.graphs['c']

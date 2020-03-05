@@ -179,7 +179,8 @@ you can import the network without creating indices, as shown below.
 
   from aequilibrae.project import Project
 
-  p = Project('path/to/project/file.sqlite', True)
+  p = Project()
+  p.new('path/to/project/file.sqlite')
   p.network.create_from_osm(place_name='my favorite place')
   p.conn.close()
 
@@ -201,7 +202,8 @@ with the option for creating such indices.
 
   from aequilibrae.project import Project
 
-  p = Project('path/to/project/file.sqlite', True)
+  p = Project()
+  p.new('path/to/project/file.sqlite')
   p.network.create_from_osm(place_name='my favorite place', spatial_index=True)
   p.conn.close()
 

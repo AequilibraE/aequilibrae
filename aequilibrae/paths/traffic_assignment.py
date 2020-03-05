@@ -28,7 +28,8 @@ class TrafficAssignment(object):
         demand.load(join(fldr, dt_fldr, 'demand.omx'))
         demand.computational_view(['matrix']) # We will only assign one user class stored as 'matrix' inside the OMX file
 
-        project = Project(join(fldr, prj_fldr, proj_name))
+        project = Project()
+        project.load(join(fldr, prj_fldr, proj_name))
         project.network.build_graphs()
 
         graph = project.network.graphs['c'] # we grab the graph for cars
