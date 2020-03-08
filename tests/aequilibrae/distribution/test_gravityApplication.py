@@ -1,6 +1,5 @@
 from unittest import TestCase
-from aequilibrae.matrix import AequilibraeData
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
 from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 import numpy as np
 import tempfile

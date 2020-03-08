@@ -214,11 +214,10 @@ class AssignmentResults:
 
     def get_load_results(self) -> AequilibraeData:
         """
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
+        Translates the assignment results from the graph format into the network format
 
         Returns:
-            *cores* (:obj:`int`): Number of cores to be used in computation
+            dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
         fields = ['link_id']
         for n in self.classes['names']:
