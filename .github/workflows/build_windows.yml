@@ -1,8 +1,9 @@
 name: Upload Windows Python Package
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request]
+#on:
+#  release:
+#    types: [prereleased, published]
 
 jobs:
   deploy:
@@ -21,7 +22,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
-        pip install numpy cython pyaml pyqt5 pyshp
+        pip install numpy cython pyaml pyqt5 pyshp scipy
         choco install visualstudio2019community
         choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
 
@@ -33,6 +34,10 @@ jobs:
         cd ..
 
     - name: Build
-      run: |
-          python setup.py sdist bdist_wheel
-          twine upload dist/*.whl
+      run: python setup.py sdist bdist_wheel
+
+#    - name: Publish
+#      env:
+#        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+#        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+#      run: twine upload dist/*.whl
