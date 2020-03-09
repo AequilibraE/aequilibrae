@@ -3,8 +3,13 @@ import numpy as np
 import warnings
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.AoN import sum_axis1
 from aequilibrae.parameters import Parameters
+from aequilibrae import logger
+
+try:
+    from aequilibrae.paths.AoN import sum_axis1
+except ImportError as ie:
+    logger.warn(f'Could not import procedures from the binary. {ie.args}')
 
 """
 TO-DO:
@@ -18,6 +23,7 @@ class AssignmentResults:
     """
     Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
     """
+
     def __init__(self):
         self.link_loads = None  # type: np.array  # The actual results for assignment
         self.total_link_loads = None  # type: np.array  # The result of the assignment for all user classes summed

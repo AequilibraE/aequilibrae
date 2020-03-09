@@ -6,16 +6,24 @@ from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
-from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
-from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 from aequilibrae import logger
+
+try:
+    from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
+    from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+    from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
+except ImportError as ie:
+    logger.warn(f'Could not import procedures from the binary. {ie.args}')
+
 import scipy
+
 if int(scipy.__version__.split('.')[1]) >= 3:
     from scipy.optimize import root_scalar
+
     recent_scipy = True
 else:
     from scipy.optimize import root as root_scalar
+
     recent_scipy = False
     logger.warn(f"Using older version of Scipy. For better performance, use Scipy >= 1.4")
 

@@ -1,11 +1,15 @@
 import sys
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
-
-from .AoN import skimming_single_origin
 from .multi_threaded_skimming import MultiThreadedNetworkSkimming
 from ..utils import WorkerThread
 import importlib.util as iutil
+from aequilibrae import logger
+
+try:
+    from aequilibrae.paths.AoN import skimming_single_origin
+except ImportError as ie:
+    logger.warn(f'Could not import procedures from the binary. {ie.args}')
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
