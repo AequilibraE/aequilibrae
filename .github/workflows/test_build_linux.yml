@@ -1,4 +1,4 @@
-name: Upload Linux Python Package
+name: Test building Linux Package
 
 on: [pull_request]
 

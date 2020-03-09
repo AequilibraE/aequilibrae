@@ -25,13 +25,6 @@ jobs:
         choco install visualstudio2019community
         choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
 
-    - name: Compile library
-      run: |
-        cd aequilibrae/paths
-        python setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
-
     - name: Build
       run: python setup.py sdist bdist_wheel
 

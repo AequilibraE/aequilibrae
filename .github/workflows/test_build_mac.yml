@@ -1,4 +1,4 @@
-name: Upload MacOS Python Package
+name: Test building MacOS Package
 
 on:  [pull_request]
 
