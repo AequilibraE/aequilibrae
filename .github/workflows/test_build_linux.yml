@@ -1,8 +1,6 @@
 name: Upload Linux Python Package
 
-on:
-  release:
-    types: [prereleased, published]
+on: [pull_request]
 
 jobs:
   deploy:
@@ -25,10 +23,3 @@ jobs:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38'
         build-requirements: 'setuptools numpy cython pyaml pyqt5 requests scipy'
         pip-wheel-args: '--no-deps'
-
-    - name: Publish wheels to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload wheelhouse/*-manylinux2014_x86_64.whl

@@ -1,13 +1,10 @@
-name: Upload MacOS Python Package
+name: Upload Windows Python Package
 
-on:
-  release:
-    types: [prereleased, published]
-
+on:  [pull_request]
 
 jobs:
   deploy:
-    runs-on:  macos-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         python-version: [ '3.6', '3.7', '3.8' ]
@@ -23,14 +20,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
         pip install numpy cython pyaml pyqt5 pyshp scipy
+        choco install visualstudio2019community
+        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
+
+    - name: Compile library
+      run: |
+        cd aequilibrae/paths
+        python setup_Assignment.py build_ext --inplace
+        cd ..
+        cd ..
 
     - name: Build
-      run: |
-        python setup.py sdist bdist_wheel
-
-    - name: Publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*.whl
+      run: python setup.py sdist bdist_wheel

@@ -1,8 +1,6 @@
 name: Upload MacOS Python Package
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request]
 
 
 jobs:
@@ -27,10 +25,3 @@ jobs:
     - name: Build
       run: |
         python setup.py sdist bdist_wheel
-
-    - name: Publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*.whl

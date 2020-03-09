@@ -1,9 +1,8 @@
 name: Upload Windows Python Package
 
-on:  [pull_request]
-#on:
-#  release:
-#    types: [prereleased, published]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   deploy:
@@ -36,8 +35,8 @@ jobs:
     - name: Build
       run: python setup.py sdist bdist_wheel
 
-#    - name: Publish
-#      env:
-#        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-#        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-#      run: twine upload dist/*.whl
+    - name: Publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload dist/*.whl
