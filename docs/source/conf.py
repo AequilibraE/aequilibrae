@@ -26,7 +26,6 @@ except ImportError as e:
 
     warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
 
-
 #
 
 # -- Project information -----------------------------------------------------
@@ -39,7 +38,6 @@ author = "Pedro Camargo"
 version = release_version
 # The full version, including alpha/beta/rc tags
 release = "30/07/2018"
-
 
 # -- General configuration ---------------------------------------------------
 
@@ -56,6 +54,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx_autodoc_annotation",
+    'sphinx.ext.autosummary',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -85,7 +84,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
 
-
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -94,7 +92,6 @@ pygments_style = "sphinx"
 # html_theme = "pyramid"
 html_theme = "neo_rtd_theme"
 html_theme_path = [sphinx_theme.get_html_theme_path(html_theme)]
-
 
 # html_theme_options = {
 #     "body_max_width": '70%',
@@ -121,15 +118,31 @@ latex_elements = {}
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
-
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 1)]
 
-
 # -- Options for Texinfo output ----------------------------------------------
+
+autodoc_default_options = {
+    'members': 'var1, var2',
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'private-members': False,
+    'undoc-members': True,
+    'exclude-members': '__weakref__',
+    'inherited-members': False,
+    'show-inheritance': False,
+    'autodoc_inherit_docstrings': False
+}
+
+autodoc_member_order = 'groupwise'
+
+autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
+
+autosummary_generate = True
 
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,

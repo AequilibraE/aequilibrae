@@ -5,7 +5,8 @@
 #
 # class TestAequilibraEProject(TestCase):
 #     def load_model(self):
-#         self.model = AequilibraEProject(project_file)
+#         self.model = AequilibraEProject()
+#         self.model.load(project_file)
 #         self.model.load_model(project_file)
 #
 #     # def test_load_model(self):

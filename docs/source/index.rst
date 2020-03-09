@@ -30,13 +30,19 @@ Contents
    project_tables
    traffic_assignment
    usageexamples
+   api
    softwaredevelopment
    qgis
 
 
-Indices and tables
-==================
+Older versions
+==============
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+AequilibraE has been evolving quite fast, so we recommend you upgrading to a
+newer version as soon as you can.  In the meantime, you can find the
+documentation for older versions below.
+
+* `0.5.3 <https://aequilibrae.com/python/V.0.5.3/>`_
+* `0.6.0 <https://aequilibrae.com/python/V.0.6.0/>`_
+* `0.6.1 <https://aequilibrae.com/python/V.0.6.1/>`_
+* `0.6.2 <https://aequilibrae.com/python/V.0.6.2/>`_

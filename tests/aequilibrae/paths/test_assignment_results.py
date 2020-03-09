@@ -1,5 +1,6 @@
 from unittest import TestCase
 from aequilibrae.paths.results import AssignmentResults
+import multiprocessing as mp
 
 
 class TestAssignmentResults(TestCase):
@@ -19,8 +20,8 @@ class TestAssignmentResults(TestCase):
         with self.assertRaises(ValueError):
             a.set_cores(1.3)
 
-        with self.assertRaises(ValueError):
-            a.set_cores(-2)
+        a.set_cores(-2)
+        self.assertEqual(a.cores, max(1, mp.cpu_count() - 2))
 
     #
     # def test_set_critical_links(self):

@@ -3,6 +3,7 @@ import pickle
 import uuid
 from datetime import datetime
 from warnings import warn
+from typing import List
 
 import numpy as np
 
@@ -20,7 +21,7 @@ class Graph(object):
         self.__float_type = np.float64
 
         self.required_default_fields = []
-        self.reset_single_fields()
+        self.__reset_single_fields()
         self.other_fields = ""
         self.mode = ''
         self.date = str(datetime.now())
@@ -68,6 +69,12 @@ class Graph(object):
         self.__layer_name__ = None
 
     def default_types(self, tp: str):
+        """
+        Returns the default integer and float types used for computation
+
+        Args:
+            tp (:obj:`str`): data type. 'int' or 'float'
+        """
         if tp == "int":
             return self.__integer_type
         elif tp == "float":
@@ -75,7 +82,6 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
-    # Create a graph from a shapefile. To be upgraded to ANY geographic file in the future
     def create_from_geography(
             self,
             geo_file: str,
@@ -88,15 +94,25 @@ class Graph(object):
             bnode="B_NODE",
     ) -> None:
         """
-        :param geo_file: Path to the geographic file to be used. File is usually the output of the network preparation
-                         tool from the AequilibraE plugin for QGIS
-        :param id_field: Name of the field that has link IDs (must be unique)
-        :param dir_field: Name of the field that has the link directions of flow ([-1, 0, 1])
-        :param cost_field: Name of the field that has the cost data (field to minimized in shortest para)
-        :param centroids: Numpy Array with a list of centroids included in this graph
-        :param skim_fields: List with the name of fields to be skimmed
-        :param anode: Name of the field with information of A_Node of links (if different than *A_NODE*)
-        :param bnode: Name of the field with information of B_Node of links (if different than *B_NODE*)
+        Creates a graph from a Shapefile. (Deprecated)
+
+        Args:
+            geo_file (:obj:`str`): Path to the geographic file to be used. File is usually the output of the network
+                                   preparation tool from the AequilibraE plugin for QGIS
+
+            id_field (:obj:`str`): Name of the field that has link IDs (must be unique)
+
+            dir_field (:obj:`str`): Name of the field that has the link directions of flow ([-1, 0, 1])
+
+            cost_field (:obj:`str`): Name of the field that has the cost data (field to minimized in shortest path)
+
+            centroids (:obj:`np.ndarray`): Numpy Array with a list of centroids included in this graph
+
+            skim_fields (:obj:`list`): List with the name of fields to be skimmed
+
+            anode (:obj:`str`): Name of the field with information of A_Node of links (if different than *A_NODE*)
+
+            bnode (:obj:`str`): Name of the field with information of B_Node of links (if different than *B_NODE*)
         """
 
         import shapefile
@@ -210,7 +226,10 @@ class Graph(object):
 
     def prepare_graph(self, centroids: np.ndarray) -> None:
         """
-        :param centroids: Array with centroid IDs. Mandatory type Int64, unique and positive
+        Prepares the graph for a computation for a certain set of centroids
+
+        Args:
+            centroids (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
         """
 
         # Creates the centroids
@@ -226,7 +245,7 @@ class Graph(object):
                 raise ValueError("Centroids need to be an array of integers 64 bits")
         else:
             raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
-        self.build_derived_properties()
+        self.__build_derived_properties()
 
         if not self.network_ok:
             raise ValueError("Network not yet properly loaded")
@@ -330,7 +349,7 @@ class Graph(object):
                     if np.any(np.isnan(self.graph[i])):
                         warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
 
-    def __build_dtype(self, all_titles):
+    def __build_dtype(self, all_titles) -> list:
         dtype = [
             ("link_id", self.__integer_type),
             ("a_node", self.__integer_type),
@@ -352,9 +371,13 @@ class Graph(object):
                     dtype.append((i, self.network[i].dtype))
         return dtype
 
-    # We set which are the fields that are going to be minimized in this file
-    # TODO: Change the call for all the uses on this function
     def set_graph(self, cost_field) -> None:
+        """
+        Sets the field to be used for path computation
+
+        Args:
+            cost_field (:obj:`str`): Field name. Must be numeric
+        """
         if cost_field in self.graph.dtype.names:
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:
@@ -365,10 +388,15 @@ class Graph(object):
         else:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.dtype.names))
 
-        self.build_derived_properties()
+        self.__build_derived_properties()
 
     def set_skimming(self, skim_fields: list) -> None:
+        """
+        Sets the list of skims to be computed
 
+        Args:
+            skim_fields (:obj:`list`): Fields must be numeric
+        """
         if not skim_fields:
             self.skim_fields = []
             self.skims = None
@@ -396,7 +424,15 @@ class Graph(object):
                 self.skims[:, i] = self.graph[j]
         self.skim_fields = skim_fields
 
-    def set_blocked_centroid_flows(self, block_centroid_flows):
+    def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
+        """
+        Chooses whether we want to block paths to go through centroids or not.
+
+        Default value is True
+
+        Args:
+            block_centroid_flows (:obj:`bool`): Blocking or not
+        """
         if isinstance(block_centroid_flows, bool):
             if self.num_zones > 0:
                 self.block_centroid_flows = block_centroid_flows
@@ -407,7 +443,13 @@ class Graph(object):
             raise TypeError("Blocking flows through centroids needs to be boolean")
 
     # Procedure to pickle graph and save to disk
-    def save_to_disk(self, filename):
+    def save_to_disk(self, filename: str) -> None:
+        """
+        Saves graph to disk
+
+        Args:
+            filename (:obj:`str`): Path to file. Usual file extension is *aeg*
+        """
         mygraph = {}
         mygraph["description"] = self.description
         mygraph["num_links"] = self.num_links
@@ -436,7 +478,13 @@ class Graph(object):
         with open(filename, "wb") as f:
             pickle.dump(mygraph, f)
 
-    def load_from_disk(self, filename):
+    def load_from_disk(self, filename: str) -> None:
+        """
+        Loads graph from disk
+
+        Args:
+            filename (:obj:`str`): Path to file
+        """
         with open(filename, "rb") as f:
             mygraph = pickle.load(f)
             self.description = mygraph["description"]
@@ -462,22 +510,28 @@ class Graph(object):
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
             self.mode = mygraph["mode"]
-        self.build_derived_properties()
+        self.__build_derived_properties()
 
-    def build_derived_properties(self):
+    def __build_derived_properties(self):
         if self.centroids is not None:
             self.num_zones = self.centroids.shape[0]
 
     # We return the list of the fields that are the same for both directions to their initial states
-    def reset_single_fields(self):
+    def __reset_single_fields(self):
         self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
 
     # We add a new fields that is the same for both directions
-    def add_single_field(self, new_field):
+    def __add_single_field(self, new_field):
         if new_field not in self.required_default_fields:
             self.required_default_fields.append(new_field)
 
-    def available_skims(self):
+    def available_skims(self) -> List[str]:
+        """
+        Returns graph fields that are available to be set as skims
+
+        Returns:
+            *list* (:obj:`str`): Field names
+        """
         graph_fields = list(self.graph.dtype.names)
         return [x for x in graph_fields if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 

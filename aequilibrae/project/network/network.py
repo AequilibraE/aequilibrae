@@ -13,17 +13,22 @@ from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 
-from ...utils import WorkerThread
 
-
-class Network(WorkerThread):
+class Network():
+    """
+    Network class. Member of an AequilibraE Project
+    """
     req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
     req_node_flds = ["node_id", "is_centroid"]
     protected_fields = ['ogc_fid', 'geometry']
 
     def __init__(self, project):
-        WorkerThread.__init__(self, None)
+        """
+        Instantiates the network with the project it is member of
 
+        Args:
+            *project* (:obj:`Project`): Project
+        """
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
@@ -36,6 +41,12 @@ class Network(WorkerThread):
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
+        """
+        Returns a list of all fields that can be skimmed
+
+        Returns:
+            :obj:`list`: List of all fields that can be skimmed
+        """
         curr = self.conn.cursor()
         curr.execute('PRAGMA table_info(links);')
         field_names = curr.fetchall()
@@ -67,6 +78,12 @@ class Network(WorkerThread):
         return real_fields
 
     def modes(self):
+        """
+        Returns a list of all the modes in this model
+
+        Returns:
+            :obj:`list`: List of all modes
+        """
         curr = self.conn.cursor()
         curr.execute("""select mode_id from modes""")
         return [x[0] for x in curr.fetchall()]
@@ -81,6 +98,24 @@ class Network(WorkerThread):
             modes=["car", "transit", "bicycle", "walk"],
             spatial_index=False,
     ) -> None:
+        """
+        Downloads the network from Open-Street Maps
+
+        Args:
+            *west* (:obj:`float`, Optional): West most coordinate of the download bounding box
+
+            *south* (:obj:`float`, Optional): South most coordinate of the download bounding box
+
+            *east* (:obj:`float`, Optional): East most coordinate of the download bounding box
+
+            *place_name* (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
+            required
+
+            *modes* (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
+            file
+
+            *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
+        """
 
         if self._check_if_exists():
             raise FileExistsError("You can only import an OSM network into a brand new model file")
@@ -154,6 +189,7 @@ class Network(WorkerThread):
         logger.info("Network built successfully")
 
     def create_empty_tables(self) -> None:
+        """Creates empty network tables for future filling"""
         curr = self.conn.cursor()
         # Create the links table
         p = Parameters()
@@ -212,6 +248,7 @@ class Network(WorkerThread):
         self.conn.commit()
 
     def build_graphs(self) -> None:
+        """Builds graphs for all modes currently available in the model"""
         curr = self.conn.cursor()
         curr.execute('PRAGMA table_info(links);')
         field_names = curr.fetchall()
@@ -259,6 +296,12 @@ class Network(WorkerThread):
             self.graphs[m] = g
 
     def set_time_field(self, time_field: str) -> None:
+        """
+        Set the time field for all graphs built in the model
+
+        Args:
+            *time_field* (:obj:`str`): Network field with travel time information
+        """
         for m, g in self.graphs.items():  # type: str, Graph
             if time_field not in list(g.graph.dtype.names):
                 raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
@@ -267,21 +310,40 @@ class Network(WorkerThread):
             self.graphs[m] = g
 
     def count_links(self) -> int:
+        """
+        Returns the number of links in the model
+
+        Returns:
+            :obj:`int`: Number of links
+        """
         c = self.conn.cursor()
         c.execute("""select count(link_id) from links""")
         return c.fetchone()[0]
 
     def count_centroids(self) -> int:
+        """
+        Returns the number of centroids in the model
+
+        Returns:
+            :obj:`int`: Number of centroids
+        """
         c = self.conn.cursor()
         c.execute("""select count(node_id) from nodes where is_centroid=1;""")
         return c.fetchone()[0]
 
     def count_nodes(self) -> int:
+        """
+        Returns the number of nodes in the model
+
+        Returns:
+            :obj:`int`: Number of nodes
+        """
         c = self.conn.cursor()
         c.execute("""select count(node_id) from nodes""")
         return c.fetchone()[0]
 
     def add_triggers(self):
+        """Adds consistency triggers to the project"""
         self.__add_network_triggers()
         self.__add_mode_triggers()
 
@@ -314,6 +376,10 @@ class Network(WorkerThread):
         self.conn.commit()
 
     def add_spatial_index(self) -> None:
+        """Adds spatial indices to links and nodes table
+
+        Requires an Sqlite3 distribution with RTree (not the Python standard).
+        Use with caution"""
         curr = self.conn.cursor()
         curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
         curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")

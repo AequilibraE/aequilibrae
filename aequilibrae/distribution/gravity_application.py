@@ -1,24 +1,3 @@
-"""
-Algorithms to **apply** synthetic gravity models with power, exponential and gamma functions
-
-The procedures implemented in this code are some of those suggested in
-Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
-"""
-# -----------------------------------------------------------------------------------------------------------
-#  Package:    AequilibraE
-#
-#   Original Author:  Pedro Camargo (c@margo.co)
-#  Contributors:
-#  Last edited by: Pedro Camargo
-#
-#  Website:    www.AequilibraE.com
-#  Repository:  https://github.com/AequilibraE/AequilibraE
-#
-#  Created:    2016-09-30
-#  Updated:    2017-08-11
-#  Copyright:   (c) AequilibraE authors
-#  Licence:     See LICENSE.TXT
-#  -----------------------------------------------------------------------------------------------------------
 from .ipf import Ipf
 from .synthetic_gravity_model import SyntheticGravityModel
 from ..matrix import AequilibraeMatrix, AequilibraeData
@@ -36,18 +15,125 @@ sys.dont_write_bytecode = True
 
 
 class GravityApplication:
-    """"
+    """
+    Applies a synthetic gravity model
+
     Model is an instance of SyntheticGravityModel class
     Impedance is an instance of AequilibraEMatrix
     Row and Column vectors are instances of AequilibraeData
+
+    ::
+
+        import pandas as pd
+        import sqlite3
+
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.matrix import AequilibraeData
+
+        from aequilibrae.distribution import SyntheticGravityModel
+        from aequilibrae.distribution import GravityApplication
+
+        # We define the model we will use
+        model = SyntheticGravityModel()
+
+        # Before adding a parameter to the model, you need to define the model functional form
+        model.function = "GAMMA" # "EXPO" or "POWER"
+
+        # Only the parameter(s) applicable to the chosen functional form will have any effect
+        model.alpha = 0.1
+        model.beta = 0.0001
+
+        # Or you can load the model from a file
+        model.load('path/to/model/file')
+
+        # We load the impedance matrix
+        matrix = AequilibraeMatrix()
+        matrix.load('path/to/impedance_matrix.aem')
+        matrix.computational_view(['distance'])
+
+        # We create the vectors we will use
+        conn = sqlite3.connect('path/to/demographics/database')
+        query = "SELECT zone_id, population, employment FROM demographics;"
+        df = pd.read_sql_query(query,conn)
+
+        index = df.zone_id.values[:]
+        zones = index.shape[0]
+
+        # You create the vectors you would have
+        df = df.assign(production=df.population * 3.0)
+        df = df.assign(attraction=df.employment * 4.0)
+
+        # We create the vector database
+        args = {"entries": zones, "field_names": ["productions", "attractions"],
+            "data_types": [np.float64, np.float64], "memory_mode": True}
+        vectors = AequilibraeData()
+        vectors.create_empty(**args)
+
+        # Assign the data to the vector object
+        vectors.productions[:] = df.production.values[:]
+        vectors.attractions[:] = df.attraction.values[:]
+        vectors.index[:] = zones[:]
+
+        # Balance the vectors
+        vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+
+        # Create the problem object
+        args = {"impedance": matrix,
+                "rows": vectors,
+                "row_field": "productions",
+                "model": model,
+                "columns": vectors,
+                "column_field": "attractions",
+                "output": 'path/to/output/matrix.aem',
+                "nan_as_zero":True
+                }
+        gravity = GravityApplication(**args)
+
+        # Solve and save the outputs
+        gravity.apply()
+        gravity.output.export('path/to/omx_file.omx')
+        with open('path.to/report.txt', 'w') as f:
+            for line in gravity.report:
+                f.write(f'{line}\n')
     """
 
     def __init__(self, **kwargs):
+        """
+        Instantiates the Ipf problem
+
+        Args:
+            model (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
+
+            impedance (:obj:`AequilibraeMatrix`): Impedance matrix to be used
+
+            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+
+            row_field (:obj:`str`): Field name that contains the data for the row totals
+
+            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+
+            column_field (:obj:`str`): Field name that contains the data for the column totals
+
+            core_name (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
+
+            output_name (:obj:`str`, optional): Name for the output matrix file. Defaults to temporary file
+
+            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+
+            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+
+        Results:
+            output (:obj:`AequilibraeMatrix`): Result Matrix
+
+            report (:obj:`list`): Iteration and convergence report
+
+            error (:obj:`str`): Error description
+        """
 
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
-        self.parameters = kwargs.get("parameters", self.get_parameters())
+        self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.rows = kwargs.get("rows")
         self.row_field = kwargs.get("row_field", None)
@@ -65,7 +151,11 @@ class GravityApplication:
         self.logger = logging.getLogger("aequilibrae")
 
     def apply(self):
-        self.check_data()
+        """Runs the Gravity Application instance as instantiated
+
+        Resulting matrix is the *output* class member
+        """
+        self.__check_data()
         t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
@@ -75,7 +165,7 @@ class GravityApplication:
             self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
         # We apply the function
-        self.apply_function()
+        self.__apply_function()
 
         # We zero those cells that have a trip length above the limit
         if max_cost > 0:
@@ -126,13 +216,13 @@ class GravityApplication:
             except PermissionError as err:
                 self.logger.warning("Could not remove " + err.filename)
 
-    def get_parameters(self):
+    def __get_parameters(self):
         par = Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para
 
-    def check_data(self):
+    def __check_data(self):
         self.report = ["  #####    GRAVITY APPLICATION    #####  ", ""]
 
         if not isinstance(self.model, SyntheticGravityModel):
@@ -183,9 +273,9 @@ class GravityApplication:
             # guarantees that they are precisely balanced
             self.columns.data[self.column_field][:] = self.columns.data[self.column_field][:] * (sum_rows / sum_cols)
 
-        self.check_parameters()
+        self.__check_parameters()
 
-    def check_parameters(self):
+    def __check_parameters(self):
         # Check if parameters are configured properly
         for p in self.__required_parameters:
             if p not in self.parameters:
@@ -194,7 +284,7 @@ class GravityApplication:
                     self.error = self.error + t + ", "
                 break
 
-    def apply_function(self):
+    def __apply_function(self):
         self.core_name = self.output.view_names[0]
         for i in range(self.rows.entries):
             p = self.rows.data[self.row_field][i]

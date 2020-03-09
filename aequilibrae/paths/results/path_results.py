@@ -1,13 +1,40 @@
 import numpy as np
-from ..graph import Graph
-from ..AoN import update_path_trace
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.AoN import update_path_trace, path_computation
 
 
 class PathResults:
-    def __init__(self):
-        """
-        @type graph: Set of numpy arrays to store Computation results
-        """
+    """
+    Path computation result holder
+
+    ::
+
+          from aequilibrae.project import Project
+          from aequilibrae.paths.results import PathResults
+
+          proj = Project()
+          proj.load('path/to/project.sqlite')
+          proj.network.build_graphs()
+          # Mode c is car in this project
+          car_graph = proj.network.graphs['c']
+
+          # minimize distance
+          car_graph.set_graph('distance')
+
+          res = PathResults()
+          res.prepare(car_graph)
+          res.compute_path(17, 13199)
+
+          # res.milepost, res.path_nodes, res.path, res.skims contain all results
+
+          # Update all the outputs mentioned above for destination 1265. Same origin: 17
+          res.update_trace(1265)
+
+          # clears all computation results
+          res.reset()
+    """
+
+    def __init__(self) -> None:
         self.predecessors = None
         self.connectors = None
         self.skims = None
@@ -17,7 +44,7 @@ class PathResults:
         self.reached_first = None
         self.origin = None
         self.destination = None
-
+        self.graph: Graph = None
         self.links = -1
         self.nodes = -1
         self.zones = -1
@@ -26,7 +53,25 @@ class PathResults:
         self.__float_type = None
         self.__graph_id__ = None
 
-    def prepare(self, graph):
+    def compute_path(self, origin: int, destination: int) -> None:
+        """
+        Computes the path between two nodes in the network
+
+        Args:
+            *origin* (:obj:`int`): Origin for the path
+
+            *destination* (:obj:`int`): Destination for the path
+        """
+
+        path_computation(origin, destination, self.graph, self)
+
+    def prepare(self, graph: Graph) -> None:
+        """
+        Prepares the object with dimensions corresponding to the graph object
+
+        Args:
+            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+        """
         self.__integer_type = graph.default_types("int")
         self.__float_type = graph.default_types("float")
         self.nodes = graph.num_nodes + 1
@@ -39,8 +84,12 @@ class PathResults:
         self.reached_first = np.zeros(self.nodes, dtype=self.__integer_type)
         self.skims = np.zeros((self.nodes, self.num_skims), self.__float_type)
         self.__graph_id__ = graph.__id__
+        self.graph = graph
 
-    def reset(self):
+    def reset(self) -> None:
+        """
+        Resets object to prepared and pre-computation state
+        """
         if self.predecessors is not None:
             self.predecessors.fill(-1)
             self.connectors.fill(-1)
@@ -50,26 +99,21 @@ class PathResults:
             self.milepost = None
 
         else:
-            raise ValueError(
-                "Exception: Path results object was not yet prepared/initialized"
-            )
+            raise ValueError("Exception: Path results object was not yet prepared/initialized")
 
-    def update_trace(self, graph, destination):
-        # type: (Graph, int) -> (None)
+    def update_trace(self, destination: int) -> None:
+        """
+        Updates the path's nodes, links, skims and mileposts
+
+        It does not re-compute the path tree, so it saves most of the computation time
+
+        Args:
+            *destination* (:obj:`int`): ID of the node we are computing the path too
+        """
         if not isinstance(destination, int):
             raise TypeError("destination needs to be an integer")
 
-        if not isinstance(graph, Graph):
-            raise TypeError("graph needs to be an AequilibraE Graph")
+        if destination >= self.graph.nodes_to_indices.shape[0]:
+            raise ValueError("destination out of the range of node numbers in the graph")
 
-        if destination >= graph.nodes_to_indices.shape[0]:
-            raise ValueError(
-                "destination out of the range of node numbers in the graph"
-            )
-
-        if self.__graph_id__ != graph.__id__:
-            raise ValueError(
-                "Results object not prepared. Use --> results.prepare(graph)"
-            )
-
-        update_path_trace(self, destination, graph)
+        update_path_trace(self, destination, self.graph)

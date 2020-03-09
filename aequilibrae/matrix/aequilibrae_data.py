@@ -6,35 +6,14 @@ import uuid
 import numpy as np
 from numpy.lib.format import open_memmap
 
-""""""
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       AequilibraE Database
- Purpose:    Implements a class to represent flat databases with an unique id field.
-             It is really just a wrapper around numpy recarray memmap
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camargo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    2017-10-02
- Updated:
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
-
 MEMORY = 1
 DISK = 0
 data_export_types = ["aed", "csv", "sqlite"]
 
 
 class AequilibraeData(object):
+    """AequilibraE dataset"""
+
     def __init__(self):
         self.data = None
         self.file_path = None
@@ -47,14 +26,35 @@ class AequilibraeData(object):
 
     def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False):
         """
-        :param file_path: Optional. Full path for the output data file. If *memory_false* is 'false' and path is missing,
-        then the file is created in the temp folder
-        :param entries: Number of records in the dataset. Default is 1
-        :param field_names: List of field names for this dataset. If no list is provided, the field 'data' will be created
-        :param data_types: List of data types for the dataset. Types need to be NumPy data types (e.g. np.int16,
-        np.float64). If no list of types are provided, type will be *np.float64*
-        :param memory_mode: If true, dataset will be kept in memory. If false, the dataset will  be a memory-mapped numpy array
-        :return: # nothing. Associates a dataset with the AequilibraeData object
+        Creates a new empty dataset
+
+        Args:
+            *file_path* (:obj:`str`, Optional): Full path for the output data file. If *memory_false* is 'false' and
+            path is missing, then the file is created in the temp folder
+
+            *entries* (:obj:`int`, Optional): Number of records in the dataset. Default is 1
+
+            *field_names* (:obj:`list`, Optional): List of field names for this dataset. If no list is provided, the
+            field 'data' will be created
+
+            *data_types* (:obj:`np.dtype`, Optional): List of data types for the dataset. Types need to be NumPy data
+            types (e.g. np.int16, np.float64). If no list of types are provided, type will be *np.float64*
+
+            *memory_mode* (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
+            be a memory-mapped numpy array
+
+        ::
+
+            vectors = "D:/release/Sample models/Chicago_2020_02_15/vectors.aed"
+            args = {
+                 "file_path": vectors,
+                 "entries": vec_1.shape[0],
+                 "field_names": ["origins", "destinations"],
+                 "data_types": [np.float64, np.float64],
+             }
+            dataset = AequilibraeData()
+            dataset.create_empty(**args)
+
         """
 
         if file_path is not None or memory_mode:
@@ -122,8 +122,15 @@ class AequilibraeData(object):
 
     def load(self, file_path):
         """
-        :param file_path: Full file path to the AequilibraeData to be loaded
-        :return: Loads the dataset into the AequilibraeData instance
+        Loads dataset from file
+
+        Args:
+            *file_path* (:obj:`str`): Full file path to the AequilibraeData to be loaded
+
+        ::
+
+            dataset = AequilibraeData()
+            dataset.load("D:/datasets/vectors.aed")
         """
         f = open(file_path)
         self.file_path = os.path.realpath(f.name)
@@ -139,9 +146,18 @@ class AequilibraeData(object):
 
     def export(self, file_name, table_name="aequilibrae_table"):
         """
-        :param file_name: File name with PATH and extension (csv, or sqlite3, sqlite or db)
-        :param table_name: It only applies if you are saving to an SQLite table. Otherwise ignored
-        :return:
+        Exports the dataset to another format. Supports CSV and SQLite
+
+        Args:
+            *file_name* (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
+
+            *table_name* (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
+
+        ::
+
+            dataset = AequilibraeData()
+            dataset.load("D:/datasets/vectors.aed")
+            dataset.export("D:/datasets/vectors.csv")
         """
 
         file_type = os.path.splitext(file_name)[1]
@@ -191,4 +207,12 @@ class AequilibraeData(object):
 
     @staticmethod
     def random_name():
-        return os.path.join(tempfile.gettempdir(), "Aequilibrae_data_" + str(uuid.uuid4()) + ".aed")
+        """
+        Returns a random name for a dataset with root in the temp directory of the user
+
+        ::
+
+            name = AequilibraeData().random_name()
+          '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
+        """
+        return os.path.join(tempfile.gettempdir(), f"Aequilibrae_data_{uuid.uuid4()}.aed")

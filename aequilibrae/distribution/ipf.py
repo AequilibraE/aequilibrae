@@ -1,23 +1,4 @@
-"""
-Iterative Proportional Fitting (Fratar)
-"""
-# -----------------------------------------------------------------------------------------------------------
-# Package:    AequilibraE
-#
-# Original Author:  Pedro Camargo (c@margo.co)
-# Contributors:
-# Last edited by: Pedro Camargo
-#
-# Website:    www.AequilibraE.com
-# Repository:  https://github.com/AequilibraE/AequilibraE
-#
-# Created:    29/09/2016
-# Updated:    11/08/2017
-# Copyright:   (c) AequilibraE authors
-# Licence:     See LICENSE.TXT
-# -----------------------------------------------------------------------------------------------------------
 import os
-import sys
 from time import perf_counter
 
 import numpy as np
@@ -26,13 +7,82 @@ import yaml
 from ..matrix import AequilibraeData
 from ..matrix import AequilibraeMatrix
 
-sys.dont_write_bytecode = True
-
 
 class Ipf:
-    def __init__(self, **kwargs):
+    """Iterative proportional fitting procedure
 
-        self.parameters = kwargs.get("parameters", self.get_parameters("ipf"))
+        ::
+
+            import pandas as pd
+            from aequilibrae.distribution import Ipf
+            from aequilibrae.matrix import AequilibraeMatrix
+            from aequilibrae.matrix import AequilibraeData
+
+            matrix = AequilibraeMatrix()
+
+            # Here we can create from OMX or load from an AequilibraE matrix.
+            matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
+
+            # The matrix will be operated one (see the note on overwriting), so it does
+            # not make sense load an OMX matrix
+
+
+            source_vectors = pd.read_csv(path/to/CSVs)
+            zones = source_vectors.zone.shape[0]
+
+            args = {"entries": zones, "field_names": ["productions", "attractions"],
+                    "data_types": [np.float64, np.float64], "memory_mode": True}
+
+            vectors = AequilibraEData()
+            vectors.create_empty(**args)
+
+            vectors.productions[:] = source_vectors.productions[:]
+            vectors.attractions[:] = source_vectors.attractions[:]
+
+            # We assume that the indices would be sorted and that they would match the matrix indices
+            vectors.index[:] = source_vectors.zones[:]
+
+            args = {
+                    "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
+                    "column_field": "attractions", "nan_as_zero": False}
+
+            fratar = Ipf(**args)
+
+             fratar.fit()
+
+            # We can get back to our OMX matrix in the end
+            fratar.output.export(path/to_omx/output.omx)
+            fratar.output.export(path/to_aem/output.aem)
+
+"""
+
+    def __init__(self, **kwargs):
+        """
+        Instantiates the Ipf problem
+
+        Args:
+            matrix (:obj:`AequilibraeMatrix`): Seed Matrix
+
+            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+
+            row_field (:obj:`str`): Field name that contains the data for the row totals
+
+            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+
+            column_field (:obj:`str`): Field name that contains the data for the column totals
+
+            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+
+            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+
+        Results:
+            output (:obj:`AequilibraeMatrix`): Result Matrix
+
+            report (:obj:`list`): Iteration and convergence report
+
+            error (:obj:`str`): Error description
+        """
+        self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
         self.matrix = kwargs.get("matrix", None)
@@ -56,9 +106,9 @@ class Ipf:
         self.report = ["  #####    IPF computation    #####  ", ""]
         self.gap = None
 
-    def check_data(self):
+    def __check_data(self):
         self.error = None
-        self.check_parameters()
+        self.__check_parameters()
 
         # check data types
         if not isinstance(self.rows, AequilibraeData):
@@ -110,7 +160,7 @@ class Ipf:
         if self.error is not None:
             self.error_free = False
 
-    def check_parameters(self):
+    def __check_parameters(self):
         for i in self.__required_parameters:
             if i not in self.parameters:
                 self.error = "Parameters error. It needs to be a dictionary with the following keys: "
@@ -119,8 +169,12 @@ class Ipf:
                 break
 
     def fit(self):
+        """Runs the IPF instance problem to adjust the matrix
+
+        Resulting matrix is the *output* class member
+        """
         t = perf_counter()
-        self.check_data()
+        self.__check_data()
         if self.error_free:
             max_iter = self.parameters["max iterations"]
             conv_criteria = self.parameters["convergence level"]
@@ -156,16 +210,16 @@ class Ipf:
             while self.gap > conv_criteria and iter < max_iter:
                 iter += 1
                 # computes factors for zones
-                marg_rows = self.tot_rows(self.output.matrix_view[:, :])
-                row_factor = self.factor(marg_rows, rows)
+                marg_rows = self.__tot_rows(self.output.matrix_view[:, :])
+                row_factor = self.__factor(marg_rows, rows)
                 # applies factor
                 self.output.matrix_view[:, :] = np.transpose(
                     np.transpose(self.output.matrix_view[:, :]) * np.transpose(row_factor)
                 )[:, :]
 
                 # computes factors for columns
-                marg_cols = self.tot_columns(self.output.matrix_view[:, :])
-                column_factor = self.factor(marg_cols, columns)
+                marg_cols = self.__tot_columns(self.output.matrix_view[:, :])
+                column_factor = self.__factor(marg_cols, columns)
 
                 # applies factor
                 self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
@@ -183,18 +237,18 @@ class Ipf:
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
-    def tot_rows(self, matrix):
+    def __tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)
 
-    def tot_columns(self, matrix):
+    def __tot_columns(self, matrix):
         return np.nansum(matrix, axis=0)
 
-    def factor(self, marginals, targets):
+    def __factor(self, marginals, targets):
         f = np.divide(targets, marginals)  # We compute the factors
         f[f == np.NINF] = 1  # And treat the errors
         return f
 
-    def get_parameters(self, model):
+    def __get_parameters(self, model):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)

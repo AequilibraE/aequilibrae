@@ -4,23 +4,6 @@ Algorithms to **calibrate** synthetic gravity models with power and exponential 
 The procedures implemented in this code are some of those suggested in
 Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 """
-# -----------------------------------------------------------------------------------------------------------
-# Package:    AequilibraE
-#
-# Name:       Gravity model calibration
-#
-# Original Author:  Pedro Camargo (c@margo.co)
-# Contributors:
-# Last edited by: Pedro Camargo
-#
-# Website:    www.AequilibraE.com
-# Repository:  https://github.com/AequilibraE/AequilibraE
-#
-# Created:    22/10/2016
-# Updated:    02/10/2017
-# Copyright:   (c) AequilibraE authors
-# Licence:     See LICENSE.TXT
-# -----------------------------------------------------------------------------------------------------------
 from time import perf_counter
 
 import numpy as np
@@ -31,15 +14,68 @@ from ..parameters import Parameters
 
 
 class GravityCalibration:
-    """"
-        where function is: 'EXPO' or 'POWER'. 'GAMMA' and 'FRICTION FACTORS' to be implemented at a later time
-        parameters are: 'max trip length'
+    """
+        Calibrate a traditional gravity model
+
+        Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
+    ::
+
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.distribution import GravityCalibration
+
+        # We load the impedance matrix
+        matrix = AequilibraeMatrix()
+        matrix.load('path/to/trip_matrix.aem')
+        matrix.computational_view(['total_trips'])
+
+         # We load the impedance matrix
+        impedmatrix = AequilibraeMatrix()
+        impedmatrix.load('path/to/impedance_matrix.aem')
+        impedmatrix.computational_view(['traveltime'])
+
+        # Creates the problem
+        args = {"matrix": matrix,
+                "impedance": impedmatrix,
+                "row_field": "productions",
+                "function": 'expo',
+                "nan_as_zero":True
+                }
+        gravity = GravityCalibration(**args)
+
+        # Solve and save outputs
+        gravity.calibrate()
+        gravity.model.save('path/to/dist_expo_model.mod')
+        with open('path.to/report.txt', 'w') as f:
+            for line in gravity.report:
+                f.write(f'{line}\n')
         """
 
     def __init__(self, **kwargs):
+        """
+        Instantiates the Gravity calibration problem
+
+        Args:
+            matrix (:obj:`AequilibraeMatrix`): Seed/base trip matrix
+
+            impedance (:obj:`AequilibraeMatrix`): Impedance matrix to be used
+
+            function (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
+
+            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+
+            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+
+        Results:
+            model (:obj:`SyntheticGravityModel`): Calibrated model
+
+            report (:obj:`list`): Iteration and convergence report
+
+            error (:obj:`str`): Error description
+
+        """
 
         self.__required_parameters = ["max trip length", "max iterations", "max error"]
-        self.parameters = kwargs.get("parameters", self.get_parameters())
+        self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
         self.matrix = kwargs.get("matrix")
@@ -74,7 +110,7 @@ class GravityCalibration:
         else:
             self.model.function = deterrence_function
 
-    def assemble_model(self, b1):
+    def __assemble_model(self, b1):
         # NEED TO SET PARAMETERS #
         if self.model.function == "EXPO":
             self.model.beta = float(b1)
@@ -82,6 +118,10 @@ class GravityCalibration:
             self.model.alpha = float(b1)
 
     def calibrate(self):
+        """Calibrate the model
+
+        Resulting model is in *output* class member
+        """
         t = perf_counter()
         # initialize auxiliary variables
         max_cost = self.parameters["max trip length"]
@@ -89,7 +129,7 @@ class GravityCalibration:
         self.max_error = self.parameters["max error"]
 
         # Check the inputs
-        self.check_inputs()
+        self.__check_inputs()
         if self.model.function in ["EXPO", "POWER"]:
             # filtering for all costs over limit
 
@@ -105,8 +145,8 @@ class GravityCalibration:
 
             b0 = 1 / cstar
 
-            self.assemble_model(b0)
-            c0 = self.apply_gravity()
+            self.__assemble_model(b0)
+            c0 = self.__apply_gravity()
             for i in self.gravity.report:
                 self.report.append("       " + i)
             self.report.append("")
@@ -116,9 +156,9 @@ class GravityCalibration:
             bm = b0 * c0 / cstar
 
             self.report.append("Iteration: 2")
-            self.assemble_model(bm)
+            self.__assemble_model(bm)
 
-            cm = self.apply_gravity()
+            cm = self.__apply_gravity()
             for i in self.gravity.report:
                 self.report.append("       " + i)
             self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
@@ -134,8 +174,8 @@ class GravityCalibration:
             bm1 = aux
             cm1 = cm
 
-            self.assemble_model(bm1)
-            cm = self.apply_gravity()
+            self.__assemble_model(bm1)
+            cm = self.__apply_gravity()
 
             for i in self.gravity.report:
                 self.report.append("       " + i)
@@ -160,7 +200,7 @@ class GravityCalibration:
 
         self.report.append("Running time: " + t)
 
-    def check_inputs(self):
+    def __check_inputs(self):
         if not isinstance(self.impedance, AequilibraeMatrix):
             raise TypeError("Impedance matrix needs to be an instance of AequilibraEMatrix")
 
@@ -186,7 +226,7 @@ class GravityCalibration:
                 raise ValueError(title + "has negative values")
 
         # Augment parameters if we happen to have only passed one
-        default_parameters = self.get_parameters()
+        default_parameters = self.__get_parameters()
         for para in self.__required_parameters:
             if para not in self.parameters:
                 self.parameters[para] = default_parameters[para]
@@ -208,7 +248,7 @@ class GravityCalibration:
 
         self.impedance_core = self.impedance.view_names[0]
 
-    def apply_gravity(self):
+    def __apply_gravity(self):
         args = {
             "impedance": self.impedance,
             "rows": self.rows,
@@ -228,7 +268,7 @@ class GravityCalibration:
             self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]
         ) / np.nansum(self.result_matrix.gravity[:, :])
 
-    def get_parameters(self):
+    def __get_parameters(self):
         par = Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])

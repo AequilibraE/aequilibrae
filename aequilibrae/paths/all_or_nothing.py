@@ -7,8 +7,6 @@ import numpy as np
 from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
-from .results import AssignmentResults
-from .graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 
 spec = iutil.find_spec("PyQt5")
@@ -16,12 +14,18 @@ pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
+if False:
+    from .results import AssignmentResults
+    from .graph import Graph
+
 
 class allOrNothing(WorkerThread):
     if pyqt:
         assignment = SIGNAL(object)
 
-    def __init__(self, matrix: AequilibraeMatrix, graph: Graph, results: AssignmentResults):
+    def __init__(self, matrix, graph, results):
+        # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
+
         WorkerThread.__init__(self, None)
 
         self.matrix = matrix
