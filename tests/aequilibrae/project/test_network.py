@@ -15,10 +15,6 @@ from aequilibrae.project.spatialite_connection import spatialite_connection
 
 class TestNetwork(TestCase):
     def setUp(self) -> None:
-        spatialite_folder = dirname(dirname(dirname(dirname(os.path.abspath(__file__)))))
-        spatialite_folder = join(spatialite_folder, 'aequilibrae/project')
-        os.environ['PATH'] = f'{spatialite_folder};' + os.environ['PATH']
-
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
         self.project = Project()
         self.project.new(self.file)
