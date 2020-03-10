@@ -3,28 +3,28 @@ import os
 import random
 import openmatrix as omx
 from unittest import TestCase
-import tempfile
-
+from os.path import dirname, join
 import numpy as np
-
+import uuid
 from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example, no_index_omx, siouxfalls_skims
 
 zones = 50
-name_test = tempfile.mkstemp()
-copy_matrix_name = tempfile.mkstemp()
-csv_export_name = copy_matrix_name + ".csv"
-omx_export_name = copy_matrix_name + ".omx"
-
 
 class TestAequilibraeMatrix(TestCase):
     matrix = None
 
     def setUp(self) -> None:
+        temp_folder = dirname(dirname(dirname(os.path.abspath(__file__))))
+        self.name_test = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
+        self.copy_matrix_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
+        self.csv_export_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.csv"
+        self.omx_export_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.omx"
+
         if self.matrix is not None:
             return
         args = {
-            "file_name": name_test,
+            "file_name": self.name_test,
             "zones": zones,
             "matrix_names": ["mat", "seed", "dist"],
             "index_names": ["my indices"],
@@ -44,8 +44,11 @@ class TestAequilibraeMatrix(TestCase):
 
     def tearDown(self) -> None:
         try:
-            os.remove(name_test) if os.path.exists(name_test) else None
-            self.matrix = None
+            del self.matrix
+            os.remove(self.name_test) if os.path.exists(self.name_test) else None
+            os.remove(self.csv_export_name) if os.path.exists(self.csv_export_name) else None
+            os.remove(self.copy_matrix_name) if os.path.exists(self.copy_matrix_name) else None
+            os.remove(self.omx_export_name) if os.path.exists(self.omx_export_name) else None
         except Exception as e:
             print(f'Could not delete.  {e.args}')
 
@@ -56,7 +59,8 @@ class TestAequilibraeMatrix(TestCase):
             self.new_matrix.load(no_index_omx)
 
         self.new_matrix = AequilibraeMatrix()
-        self.new_matrix.load(name_test)
+        self.new_matrix.load(self.name_test)
+        del self.new_matrix
 
     def test_computational_view(self):
         self.new_matrix.computational_view(["mat", "seed"])
@@ -73,6 +77,7 @@ class TestAequilibraeMatrix(TestCase):
         self.new_matrix.setDescription(
             "Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         )
+        del self.new_matrix
 
     def test_computational_view_with_omx(self):
         self.new_matrix = AequilibraeMatrix()
@@ -96,23 +101,26 @@ class TestAequilibraeMatrix(TestCase):
         self.assertEqual(m1, total_m1)
 
         omx_file.close()
+        del omx_file
 
     def test_copy(self):
         # test in-memory matrix_procedures copy
 
-        matrix_copy = self.new_matrix.copy(copy_matrix_name, cores=["mat"])
+        matrix_copy = self.new_matrix.copy(self.copy_matrix_name, cores=["mat"])
 
         if not np.array_equal(matrix_copy.mat, self.new_matrix.mat):
             self.fail("Matrix copy was not perfect")
         matrix_copy.close()
+        del matrix_copy
 
     def test_export_to_csv(self):
-        self.new_matrix.export(csv_export_name)
+        self.new_matrix.export(self.csv_export_name)
+        del self.new_matrix
 
     def test_export_to_omx(self):
-        self.new_matrix.export(omx_export_name)
+        self.new_matrix.export(self.omx_export_name)
 
-        omxfile = omx.open_file(omx_export_name, "r")
+        omxfile = omx.open_file(self.omx_export_name, "r")
 
         # Check if matrices values are compatible
         for m in self.new_matrix.names:
@@ -122,6 +130,7 @@ class TestAequilibraeMatrix(TestCase):
             self.assertEqual(
                 sm, sm2, "Matrix {} was exported with the wrong value".format(m)
             )
+        del omxfile
 
     def test_nan_to_num(self):
         m = self.new_matrix.mat.sum() - self.new_matrix.mat[1, 1]
@@ -133,6 +142,7 @@ class TestAequilibraeMatrix(TestCase):
 
         if abs(m - self.new_matrix.mat.sum()) > 0.000000000001:
             self.fail("Total for mat matrix not maintained")
+        del self.new_matrix
 
     def test_copy_from_omx(self):
         temp_file = AequilibraeMatrix().random_name()
@@ -151,6 +161,8 @@ class TestAequilibraeMatrix(TestCase):
         if np.any(a.index[:] != np.array(list(omxfile.mapping("taz").keys()))):
             self.fail("Index was not created properly")
         a.close()
+        del a
+        del omxfile
 
     def test_copy_from_omx_long_name(self):
 
@@ -159,6 +171,7 @@ class TestAequilibraeMatrix(TestCase):
 
         with self.assertRaises(ValueError):
             a.create_from_omx(temp_file, omx_example, robust=False)
+        del a
 
     def test_copy_omx_wrong_content(self):
         # Check if we get a result if we try to copy non-existing cores
@@ -170,6 +183,7 @@ class TestAequilibraeMatrix(TestCase):
 
         with self.assertRaises(ValueError):
             a.create_from_omx(temp_file, omx_example, mappings=["wrong index"])
+        del a
 
     def test_get_matrix(self):
         self.test_load()
@@ -183,5 +197,7 @@ class TestAequilibraeMatrix(TestCase):
         self.assertEqual(q.shape[0], 24)
 
         a = AequilibraeMatrix()
-        a.load(name_test)
+        a.load(self.name_test)
         print(np.array_equal(a.get_matrix("seed"), a.matrix["seed"]))
+
+        del a

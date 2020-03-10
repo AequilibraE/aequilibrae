@@ -1,12 +1,11 @@
 import os
 import tempfile
 from unittest import TestCase
-import tempfile
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeData
 
-file_path = tempfile.mkstemp()
+file_path = AequilibraeData().random_name()
 args = {
     "file_path": file_path,
     "entries": 100,
