@@ -25,8 +25,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools
         pip install numpy cython pyaml pyqt5 pyshp scipy pytest requests openmatrix
-#        choco install visualstudio2019community
-#        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
 
     - name: Download spatialite
       run: |

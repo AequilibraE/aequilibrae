@@ -22,8 +22,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
         pip install numpy cython pyaml pyqt5 pyshp scipy
-        choco install visualstudio2019community
-        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
 
     - name: Build
       run: python setup.py sdist bdist_wheel
