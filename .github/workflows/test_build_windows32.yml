@@ -21,7 +21,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools
         pip install -r requirements.txt
-        pip install pytest
+        pip install wheel
+
+
+    - name: Compile library
+      run: |
+        cd aequilibrae/paths
+        python setup_Assignment.py build_ext --inplace
+        cd ..
+        cd ..
 
     - name: Build
       run: python setup.py sdist bdist_wheel
