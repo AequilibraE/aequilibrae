@@ -11,6 +11,7 @@ from ...data import omx_example, no_index_omx, siouxfalls_skims
 
 zones = 50
 
+
 class TestAequilibraeMatrix(TestCase):
     matrix = None
 
