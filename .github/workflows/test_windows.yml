@@ -39,6 +39,6 @@ jobs:
         cd ..
         cd ..
 
-    - name: Test with coverage report
+    - name: Runs test
       run: |
         python -m pytest

@@ -3,6 +3,7 @@ import os
 import random
 import openmatrix as omx
 from unittest import TestCase
+import tempfile
 
 import numpy as np
 
@@ -10,8 +11,8 @@ from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example, no_index_omx, siouxfalls_skims
 
 zones = 50
-name_test = AequilibraeMatrix().random_name()
-copy_matrix_name = AequilibraeMatrix().random_name()
+name_test = tempfile.mkstemp()
+copy_matrix_name = tempfile.mkstemp()
 csv_export_name = copy_matrix_name + ".csv"
 omx_export_name = copy_matrix_name + ".omx"
 
