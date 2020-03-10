@@ -21,13 +21,13 @@ jobs:
         architecture: x64
         path: "./tests/mod_spatialite-NG-win-amd64"
 
-#    - name: Install dependencies
-#      run: |
-#        python -m pip install --upgrade pip
-#        pip install setuptools
-#        pip install numpy cython pyaml pyqt5 pyshp scipy pytest
-#        choco install visualstudio2019community
-#        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools
+        pip install numpy cython pyaml pyqt5 pyshp scipy pytest
+        choco install visualstudio2019community
+        choco install -y microsoft-build-tools visualcppbuildtools --version 14.0.25420.1
 
     - name: Download spatialite
       run: |
@@ -35,13 +35,13 @@ jobs:
         python setup_windows_spatialite.py
         cd ..
 
-#    - name: Compile library
-#      run: |
-#        cd aequilibrae/paths
-#        python setup_Assignment.py build_ext --inplace
-#        cd ..
-#        cd ..
-#
-#    - name: Test with coverage report
-#      run: |
-#        python -m pytest
+    - name: Compile library
+      run: |
+        cd aequilibrae/paths
+        python setup_Assignment.py build_ext --inplace
+        cd ..
+        cd ..
+
+    - name: Test with coverage report
+      run: |
+        python -m pytest
