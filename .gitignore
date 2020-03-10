@@ -65,5 +65,9 @@ docs/source/_generated/*
 
 
 #Virtual environment
-
 .venv/
+
+# Test files
+.tests/*.aem
+.tests/*.csv
+.tests/*.omx
