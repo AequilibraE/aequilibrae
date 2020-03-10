@@ -68,6 +68,6 @@ docs/source/_generated/*
 .venv/
 
 # Test files
-.tests/*.aem
-.tests/*.csv
-.tests/*.omx
+tests/*.aem
+tests/*.csv
+tests/*.omx
