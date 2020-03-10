@@ -19,7 +19,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-        path: "./tests/mod_spatialite-NG-win-amd64"
 
     - name: Install dependencies
       run: |
