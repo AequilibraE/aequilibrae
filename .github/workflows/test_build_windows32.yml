@@ -1,8 +1,6 @@
-name: Upload Windows Python Package
+name: Test building Windows 32 bits Package
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request]
 
 jobs:
   deploy:
@@ -11,19 +9,20 @@ jobs:
       matrix:
         python-version: [ '3.6', '3.7', '3.8' ]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v1
     - name: Set Python environment
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: x86
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install setuptools
         pip install -r requirements.txt
-        pip install wheel twine
+        pip install wheel
+
 
     - name: Compile library
       run: |
@@ -34,9 +33,3 @@ jobs:
 
     - name: Build
       run: python setup.py sdist bdist_wheel
-
-    - name: Publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: twine upload dist/*.whl

@@ -1,7 +1,6 @@
 import os
 import tempfile
 from unittest import TestCase
-
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeData

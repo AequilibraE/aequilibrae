@@ -7,31 +7,25 @@ from functools import reduce
 from aequilibrae.project import Project
 from aequilibrae.project.network.network import Network
 from aequilibrae.parameters import Parameters
+from os.path import join, dirname
 from warnings import warn
 from random import random
+from aequilibrae.project.spatialite_connection import spatialite_connection
 
 
 class TestNetwork(TestCase):
     def setUp(self) -> None:
+        spatialite_folder = dirname(dirname(dirname(dirname(os.path.abspath(__file__)))))
+        spatialite_folder = join(spatialite_folder, 'aequilibrae/project')
+        os.environ['PATH'] = f'{spatialite_folder};' + os.environ['PATH']
+
         self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
         self.project = Project()
         self.project.new(self.file)
         self.source = self.file
         self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
         self.conn = sqlite3.connect(self.file2)
-        self.conn.enable_load_extension(True)
-        plat = platform.platform()
-        pth = os.getcwd()
-        if "WINDOWS" in plat.upper():
-            par = Parameters()
-            spatialite_path = par.parameters["system"]["spatialite_path"]
-            if os.path.isfile(os.path.join(spatialite_path, "mod_spatialite.dll")):
-                os.chdir(spatialite_path)
-        try:
-            self.conn.load_extension("mod_spatialite")
-        except Exception as e:
-            warn(f"AequilibraE might not work as intended without spatialite. {e.args}")
-        os.chdir(pth)
+        self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
 
     def tearDown(self) -> None:

@@ -1,11 +1,9 @@
-name: Upload Windows Python Package
+name: Tests on Windows
 
-on:
-  release:
-    types: [prereleased, published]
+on: [pull_request]
 
 jobs:
-  deploy:
+  testing:
     runs-on: windows-latest
     strategy:
       matrix:
@@ -23,7 +21,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools
         pip install -r requirements.txt
-        pip install wheel twine
+        pip install pytest
+
+    - name: Download spatialite
+      run: |
+        cd tests
+        python setup_windows_spatialite.py
+        cd ..
 
     - name: Compile library
       run: |
@@ -32,11 +36,6 @@ jobs:
         cd ..
         cd ..
 
-    - name: Build
-      run: python setup.py sdist bdist_wheel
-
-    - name: Publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: twine upload dist/*.whl
+    - name: Runs test
+      run: |
+        python -m pytest
