@@ -30,10 +30,10 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
+        python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
 
     - name: Test with coverage report
       run: |
-        python3 -m pytest
+        python -m pytest
