@@ -1,6 +1,8 @@
-name: Test building Windows Package
+name: Upload Windows Python Package
 
-on:  [pull_request]
+on:
+  release:
+    types: [prereleased, published]
 
 jobs:
   deploy:
@@ -14,7 +16,7 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: x86
 
     - name: Install dependencies
       run: |
@@ -25,3 +27,9 @@ jobs:
 
     - name: Build
       run: python setup.py sdist bdist_wheel
+
+    - name: Publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload dist/*.whl
