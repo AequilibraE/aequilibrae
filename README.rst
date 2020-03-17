@@ -122,7 +122,7 @@ A few distinct improvements deserve to be highlighted.
 
 * The separation of the GUI and the Python library in `two repositories <http://www.xl-optim.com/separating-the-women-from-the-girls/>`_
 * Introduction of Unit Tests and automatic testing using `Travis <https://travis-ci.org/AequilibraE/aequilibrae>`_
-* Welcome of new collaborators: Jamie Cook, Andrew O'Brien and Yu-Chu Huang
+* Welcome of new collaborators: Jamie Cook, Andrew O'Brien, Yu-Chu Huang & Jan Zill
 * Introduction of style-checking with Flake8 and Black
 * Development of proper documentation (undergoing) and a recommended development virtual environment
 
