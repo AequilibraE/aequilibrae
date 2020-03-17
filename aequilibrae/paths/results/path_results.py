@@ -1,6 +1,11 @@
 import numpy as np
 from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.AoN import update_path_trace, path_computation
+from aequilibrae import logger
+
+try:
+    from aequilibrae.paths.AoN import update_path_trace, path_computation
+except ImportError as ie:
+    logger.warn(f'Could not import procedures from the binary. {ie.args}')
 
 
 class PathResults:

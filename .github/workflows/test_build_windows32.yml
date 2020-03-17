@@ -1,4 +1,4 @@
-name: Test building Windows Package
+name: Test building Windows 32 bits Package
 
 on:  [pull_request]
 
@@ -14,7 +14,7 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: x86
 
     - name: Install dependencies
       run: |
@@ -22,6 +22,7 @@ jobs:
         pip install setuptools
         pip install -r requirements.txt
         pip install wheel
+
 
     - name: Compile library
       run: |

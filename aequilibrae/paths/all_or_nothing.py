@@ -1,13 +1,17 @@
 import importlib.util as iutil
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
-
 import numpy as np
 
-from .AoN import one_to_all
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae import logger
+
+try:
+    from aequilibrae.paths.AoN import one_to_all
+except ImportError as ie:
+    logger.warn(f'Could not import procedures from the binary. {ie.args}')
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None

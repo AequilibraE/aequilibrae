@@ -1,9 +1,9 @@
-name: Test building Windows Package
+name: Tests on Windows
 
-on:  [pull_request]
+on: [pull_request]
 
 jobs:
-  deploy:
+  testing:
     runs-on: windows-latest
     strategy:
       matrix:
@@ -21,7 +21,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools
         pip install -r requirements.txt
-        pip install wheel
+        pip install pytest
+
+    - name: Download spatialite
+      run: |
+        cd tests
+        python setup_windows_spatialite.py
+        cd ..
 
     - name: Compile library
       run: |
@@ -30,5 +36,6 @@ jobs:
         cd ..
         cd ..
 
-    - name: Build
-      run: python setup.py sdist bdist_wheel
+    - name: Runs test
+      run: |
+        python -m pytest
