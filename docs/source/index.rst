@@ -47,3 +47,12 @@ documentation for older versions below.
 * `0.6.0 <https://aequilibrae.com/python/V.0.6.0/>`_
 * `0.6.1 <https://aequilibrae.com/python/V.0.6.1/>`_
 * `0.6.2 <https://aequilibrae.com/python/V.0.6.2/>`_
+
+
+Supporting AequilibraE
+======================
+
+AequilibraE is developed by a small but dedicated team of professionals without
+any funding or profiting from this work, so if your organization is making use
+of AequilibraE, please consider funding some of the sew developments or
+maintenance of the project.

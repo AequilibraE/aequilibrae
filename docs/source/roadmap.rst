@@ -35,3 +35,10 @@ identified and that we intend to dedicate some time to in the future.
 
     * Inclusion of TSP and more general vehicle routing problems (resource
       constraints, pick-up and delivery, etc.)
+
+If there is any other feature you would like to suggest, please record a new
+issue on `GitHub <https://github.com/AequilibraE/aequilibrae/issues>`_, or drop
+us a line.
+
+If your organization is making use of AequilibraE, please consider funding some
+of the sew developments or maintenance of the project.
