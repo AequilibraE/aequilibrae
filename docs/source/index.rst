@@ -32,6 +32,7 @@ Contents
    usageexamples
    api
    softwaredevelopment
+   roadmap
    qgis
 
 
