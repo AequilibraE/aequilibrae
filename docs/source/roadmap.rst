@@ -1,17 +1,23 @@
 Roadmap
 =======
 
-As AequilibraE is project with an incredibly small team and no source of
+As AequilibraE is a project with an incredibly small team and no source of
 funding, it is not feasible to determine a precise schedule for the development
 of new features or even a proper roadmap of specific developments.
 
 However, there are a number of enhancements to the software that we have already
 identified and that we intend to dedicate some time to in the future.
 
+* Network data model
+    * Introduce centroid connector data type to replace inference that all links
+      connected to centroids are connectors
+
 * Traffic assignment
 
-    * Re-development of the path-finding algorithm to allow for turn penalties/bans
-    * Implementation of network simplification to improve performance of path-finding
+    * Re-development of the path-finding algorithm to allow for turn
+      penalties/bans
+    * Implementation of network simplification to improve performance of
+      path-finding
 
 * Public Transport
 
@@ -41,4 +47,4 @@ issue on `GitHub <https://github.com/AequilibraE/aequilibrae/issues>`_, or drop
 us a line.
 
 If your organization is making use of AequilibraE, please consider funding some
-of the sew developments or maintenance of the project.
+of the new developments or maintenance of the project.
