@@ -9,6 +9,7 @@ However, there are a number of enhancements to the software that we have already
 identified and that we intend to dedicate some time to in the future.
 
 * Network data model
+
     * Introduce centroid connector data type to replace inference that all links
       connected to centroids are connectors
 
