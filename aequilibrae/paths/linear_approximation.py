@@ -13,7 +13,7 @@ try:
     from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 except ImportError as ie:
-    logger.warn(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f'Could not import procedures from the binary. {ie.args}')
 
 import scipy
 
@@ -25,7 +25,7 @@ else:
     from scipy.optimize import root as root_scalar
 
     recent_scipy = False
-    logger.warn(f"Using older version of Scipy. For better performance, use Scipy >= 1.4")
+    logger.warning(f"Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
@@ -371,11 +371,11 @@ class LinearApproximation(WorkerThread):
                 min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
                 self.stepsize = min_res.root
                 if not min_res.converged:
-                    logger.warn("Descent direction stepsize finder is not converged")
+                    logger.warning("Descent direction stepsize finder is not converged")
             else:
                 min_res = root_scalar(derivative_of_objective, 1 / self.iter)
                 if not min_res.success:
-                    logger.warn("Descent direction stepsize finder is not converged")
+                    logger.warning("Descent direction stepsize finder is not converged")
                 self.stepsize = min_res.x[0]
                 if self.stepsize <= 0.0 or self.stepsize >= 1.0:
                     raise ValueError('wrong root')
@@ -389,7 +389,7 @@ class LinearApproximation(WorkerThread):
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe":
                     heuristic_stepsize_at_zero = 1.0 / self.iter
-                    logger.warn("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                    logger.warning("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                     self.stepsize = heuristic_stepsize_at_zero
                 else:
                     # for cf/bfw: don't add a bad step, just reset the stepdirection calculation to start with fw again
