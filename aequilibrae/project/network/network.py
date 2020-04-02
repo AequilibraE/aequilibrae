@@ -144,7 +144,7 @@ class Network():
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
                 warn(msg)
-                logger.warn(msg)
+                logger.warning(msg)
                 return
             for i in report:
                 if "PLACE FOUND" in i:

@@ -41,7 +41,7 @@ def cleaning():
         try:
             os.unlink(f)
         except Exception as err:
-            logger.warn(err.__str__())
+            logger.warning(err.__str__())
 
 
 logger = StartsLogging()

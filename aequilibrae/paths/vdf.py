@@ -3,7 +3,7 @@ from aequilibrae import logger
 try:
     from aequilibrae.paths.AoN import bpr, delta_bpr
 except ImportError as ie:
-    logger.warn(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f'Could not import procedures from the binary. {ie.args}')
 
 all_vdf_functions = ['bpr']
 

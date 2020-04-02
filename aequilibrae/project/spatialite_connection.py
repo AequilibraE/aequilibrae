@@ -12,5 +12,5 @@ def spatialite_connection(conn):
     try:
         conn.load_extension("mod_spatialite")
     except Exception as e:
-        logger.warn(f"AequilibraE might not work as intended without spatialite. {e.args}")
+        logger.warning(f"AequilibraE might not work as intended without spatialite. {e.args}")
     return conn
