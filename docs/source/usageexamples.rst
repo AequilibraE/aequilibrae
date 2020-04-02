@@ -14,8 +14,8 @@ Sample Data
 We have compiled two very distinct example datasets imported from the
 `TNTP instances <https://github.com/bstabler/TransportationNetworks/>`_.
 
-* `Sioux Falls <https://www.aequilibrae.com/data/SiouxFalls.7z>`_
-* `Chicago Regional <https://www.aequilibrae.com/data/Chicago.7z>`_
+* `Sioux Falls <http://www.aequilibrae.com/data/SiouxFalls.7z>`_
+* `Chicago Regional <http://www.aequilibrae.com/data/Chicago.7z>`_
 
 While the Sioux Falls network is probably the most traditional example network
 available for evaluating network algorithms, the Chicago Regional model is a
