@@ -47,6 +47,15 @@ class LinearApproximation(WorkerThread):
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
+        self.iteration_issue = []
+        self.convergence_report = {'iteration': [],
+                                   'rgap': [],
+                                   'alpha': [],
+                                   'warnings': []}
+        if algorithm == 'bfw':
+            self.convergence_report['beta0'] = []
+            self.convergence_report['beta1'] = []
+            self.convergence_report['beta2'] = []
 
         self.assig = assig_spec  # type: TrafficAssignment
 
@@ -182,7 +191,6 @@ class LinearApproximation(WorkerThread):
             mu = 0.0
         else:
             mu = -mu_numerator / mu_denominator
-            # logger.info("mu before max = {}".format(mu))
             mu = max(0.0, mu)
 
         nu_nom = np.sum(nu_nom * self.vdf_der)
@@ -191,7 +199,6 @@ class LinearApproximation(WorkerThread):
             nu = 0.0
         else:
             nu = -(nu_nom / nu_denom) + mu * self.stepsize / (1.0 - self.stepsize)
-            # logger.info("nu before max = {}".format(nu))
             nu = max(0.0, nu)
 
         self.betas[0] = 1.0 / (1.0 + nu + mu)
@@ -228,7 +235,6 @@ class LinearApproximation(WorkerThread):
         elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
-            # logger.info("CFW step, conjugate stepsize = {}".format(self.conjugate_stepsize))
             for c in self.traffic_classes:
                 stp_dr = self.step_direction[c.mode]
                 pre_previous = self.pre_previous_step_direction[c.mode]
@@ -280,9 +286,10 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
-        logger.info("{} Assignment STATS".format(self.algorithm))
+        logger.info(f"{self.algorithm} Assignment STATS")
         logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):
+            self.iteration_issue = []
             if pyqt:
                 self.equilibration.emit(['rgap', self.rgap])
                 self.equilibration.emit(['iterations', self.iter])
@@ -326,13 +333,27 @@ class LinearApproximation(WorkerThread):
             self.fw_total_flow = np.sum(flows, axis=0)
 
             # Check convergence
-            # This needs ot be done with the current costs, and not the future ones
+            # This needs to be done with the current costs, and not the future ones
+            converged = False
             if self.iter > 1:
-                if self.check_convergence():
-                    if self.steps_below >= self.steps_below_needed_to_terminate:
-                        break
-                    else:
-                        self.steps_below += 1
+                converged = self.check_convergence()
+
+            self.convergence_report['iteration'].append(self.iter)
+            self.convergence_report['rgap'].append(self.rgap)
+            self.convergence_report['warnings'].append('; '.join(self.iteration_issue))
+            self.convergence_report['alpha'].append(self.stepsize)
+
+            if self.algorithm == 'bfw':
+                self.convergence_report['beta0'].append(self.betas[0])
+                self.convergence_report['beta1'].append(self.betas[1])
+                self.convergence_report['beta2'].append(self.betas[2])
+
+            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
+            if converged:
+                if self.steps_below >= self.steps_below_needed_to_terminate:
+                    break
+                else:
+                    self.steps_below += 1
 
             self.vdf.apply_vdf(
                 self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
@@ -344,10 +365,9 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
                 c._aon_results.reset()
-            logger.info("{},{},{}".format(self.iter, self.rgap, self.stepsize))
 
         if self.rgap > self.rgap_target:
-            logger.error("Desired RGap of {} was NOT reached".format(self.rgap_target))
+            logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         if pyqt:
             self.equilibration.emit(['rgap', self.rgap])
@@ -386,18 +406,19 @@ class LinearApproximation(WorkerThread):
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
+            if self.algorithm == 'bfw':
+                self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.stepsize == 0.0:
-                    heuristic_stepsize_at_zero = 1.0 / self.iter
-                    logger.warning("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
-                    self.stepsize = heuristic_stepsize_at_zero
+                    msa_step = 1.0 / self.iter
+                    self.iteration_issue.append('Found bad FW directions. Performing MSA iteration')
+                    logger.warning(f"# Alert: Adding {msa_step} to stepsize to make it non-zero")
+                    self.stepsize = msa_step
                 else:
-                    # for cf/bfw: don't add a bad step, just reset the stepdirection calculation to start with fw again
-                    # TODO: test which works better, msa stepsize or not adding anything
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
-
+                    self.iteration_issue.append('Found bad conjugate direction step. Performing FW search')
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
                     self.calculate_stepsize()
