@@ -546,21 +546,14 @@ class Graph(object):
             if field not in has_fields:
                 raise ValueError(f'could not find field {field} in the network array')
 
-                # checking data types
-        must_types = [self.__integer_type, self.__integer_type, self.__integer_type, np.int8]
-        for field, ytype in zip(must_fields, must_types):
-            if self.network[field].dtype != ytype:
-                raise TypeError(f'Field {field} in the network array has the wrong type. It should be {ytype}')
-
-
         # Uniqueness of the id
         link_ids = self.network["link_id"].astype(np.int)
         if link_ids.shape[0] != np.unique(link_ids).shape[0]:
-            self.status = '"link_id" field not unique'
+            raise ValueError('"link_id" field not unique')
 
             # Direction values
         if np.max(self.network["direction"]) > 1 or np.min(self.network["direction"]) < -1:
-            self.status = '"direction" field not limited to (-1,0,1) values'
+            raise ValueError('"direction" field not limited to (-1,0,1) values')
 
     # Needed for when we load the graph directly
     def __graph_error_checking__(self):
