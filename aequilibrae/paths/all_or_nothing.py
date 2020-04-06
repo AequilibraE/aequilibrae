@@ -11,7 +11,7 @@ from aequilibrae import logger
 try:
     from aequilibrae.paths.AoN import one_to_all
 except ImportError as ie:
-    logger.warn(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f'Could not import procedures from the binary. {ie.args}')
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
