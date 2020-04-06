@@ -397,6 +397,10 @@ class LinearApproximation(WorkerThread):
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
+
+                    # By doing it recursively, we avoid doing the same AoN again
+                    self.__calculate_step_direction()
+                    self.calculate_stepsize()
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
