@@ -387,7 +387,7 @@ class LinearApproximation(WorkerThread):
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                if self.algorithm == "frank-wolfe":
+                if self.algorithm == "frank-wolfe" or self.stepsize == 0.0:
                     heuristic_stepsize_at_zero = 1.0 / self.iter
                     logger.warn("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                     self.stepsize = heuristic_stepsize_at_zero

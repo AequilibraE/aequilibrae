@@ -231,6 +231,7 @@ class Graph(object):
         Args:
             centroids (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
         """
+        self.__network_error_checking__()
 
         # Creates the centroids
         if centroids is not None and isinstance(centroids, np.ndarray):
@@ -543,14 +544,14 @@ class Graph(object):
         must_fields = ["link_id", "a_node", "b_node", "direction"]
         for field in must_fields:
             if field not in has_fields:
-                self.status = 'could not find field "%s" in the network array' % field
+                raise ValueError(f'could not find field {field} in the network array')
 
                 # checking data types
         must_types = [self.__integer_type, self.__integer_type, self.__integer_type, np.int8]
         for field, ytype in zip(must_fields, must_types):
             if self.network[field].dtype != ytype:
-                self.status = ('Field "%s" in the network array has the wrong type. '
-                               'Please refer to the documentation' % field)
+                raise TypeError(f'Field {field} in the network array has the wrong type. It should be {ytype}')
+
 
         # Uniqueness of the id
         link_ids = self.network["link_id"].astype(np.int)
