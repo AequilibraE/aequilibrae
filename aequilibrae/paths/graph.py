@@ -228,6 +228,13 @@ class Graph(object):
         """
         Prepares the graph for a computation for a certain set of centroids
 
+        Under the hood, if sets all centroids to have IDs from 1 through **n**,
+        which should correspond to the index of the matrix being assigned.
+
+        This is what enables having any node IDs as centroids, and it relies on
+        the inference that all links connected to these nodes are centroid
+        connectors.
+
         Args:
             centroids (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
         """
