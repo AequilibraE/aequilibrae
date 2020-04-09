@@ -396,8 +396,6 @@ class LinearApproximation(WorkerThread):
                         "# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                     self.stepsize = heuristic_stepsize_at_zero
                 else:
-                    # for cf/bfw: don't add a bad step, just reset the stepdirection calculation to start with fw again
-                    # TODO: test which works better, msa stepsize or not adding anything
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
