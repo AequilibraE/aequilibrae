@@ -414,8 +414,7 @@ class LinearApproximation(WorkerThread):
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     msa_step = 1.0 / self.iter
-                    logger.warning(
-                        "# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                    logger.warning(f"# Alert: Adding {msa_step} to stepsize to make it non-zero")
                     self.stepsize = msa_step
                 else:
                     self.stepsize = 0.0
