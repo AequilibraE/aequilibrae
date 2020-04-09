@@ -242,6 +242,11 @@ Below we have that same workflow as a single script
 
     assig.execute()  # we then execute the assignment
 
+    # Convergence report is easy to see
+    import pandas as pd
+    convergence_report = pd.DataFrame(assig.assignment.convergence_report)
+    convergence_report.head()
+
     # The link flows are easy to export.
     # we do so for csv and AequilibraEData
     assigclass.results.save_to_disk(join(fldr, assg_fldr, 'link_flows_c.csv'), output="loads")

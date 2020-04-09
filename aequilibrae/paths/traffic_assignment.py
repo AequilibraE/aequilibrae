@@ -60,6 +60,17 @@ class TrafficAssignment(object):
 
         assig.execute() # we then execute the assignment
 
+        # Convergence report is here
+        import pandas as pd
+        convergence_report = pd.DataFrame(assig.assignment.convergence_report)
+        convergence_report.head()
+
+        # Link flow results are here
+        results = assigclass.results
+
+        # skims are here
+        avg_skims = assigclass.results.skims # blended ones
+        last_skims = assigclass._aon_results.skims # those for the last iteration
     """
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
