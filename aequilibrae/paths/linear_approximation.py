@@ -94,6 +94,7 @@ class LinearApproximation(WorkerThread):
         # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
         # the step direction conjugate to the previous direction.
         self.do_fw_step = False
+        self.conjugate_failed = False
         self.do_conjugate_step = False
 
         # BFW specific stuff
@@ -400,6 +401,8 @@ class LinearApproximation(WorkerThread):
                 if self.stepsize <= 0.0 or self.stepsize >= 1.0:
                     raise ValueError('wrong root')
 
+            self.conjugate_failed = False
+
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
@@ -409,19 +412,21 @@ class LinearApproximation(WorkerThread):
             if self.algorithm == 'bfw':
                 self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                if self.algorithm == "frank-wolfe" or self.stepsize == 0.0:
+                if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     msa_step = 1.0 / self.iter
-                    self.iteration_issue.append('Found bad FW directions. Performing MSA iteration')
-                    logger.warning(f"# Alert: Adding {msa_step} to stepsize to make it non-zero")
+                    logger.warning(
+                        "# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                     self.stepsize = msa_step
                 else:
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
+                    self.conjugate_failed = True
                     self.iteration_issue.append('Found bad conjugate direction step. Performing FW search')
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
                     self.calculate_stepsize()
+
             else:
                 # Do we want to keep some of the old solution, or just throw away everything?
                 self.stepsize = 1.0
