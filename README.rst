@@ -64,7 +64,7 @@ is developed independently, although in parallel, and more details can be found 
 <https://github.com/AequilibraE/AequilibraE-GUI>`_.
 
 
-Development road map
+Development roadmap
 ********************
 
 Available in the documentation
