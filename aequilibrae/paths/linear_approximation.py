@@ -85,6 +85,7 @@ class LinearApproximation(WorkerThread):
         # if FW stepsize is zero, we set it to the corresponding MSA stepsize and then need to not make
         # the step direction conjugate to the previous direction.
         self.do_fw_step = False
+        self.conjugate_failed = False
         self.do_conjugate_step = False
 
         # BFW specific stuff
@@ -380,6 +381,8 @@ class LinearApproximation(WorkerThread):
                 if self.stepsize <= 0.0 or self.stepsize >= 1.0:
                     raise ValueError('wrong root')
 
+            self.conjugate_failed = False
+
         except ValueError:
             # We can have iterations where the objective function is not *strictly* convex, but the scipy method cannot deal
             # with this. Stepsize is then either given by 1 or 0, depending on where the objective function is smaller.
@@ -387,9 +390,10 @@ class LinearApproximation(WorkerThread):
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
-                if self.algorithm == "frank-wolfe" or self.stepsize == 0.0:
+                if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     heuristic_stepsize_at_zero = 1.0 / self.iter
-                    logger.warning("# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
+                    logger.warning(
+                        "# Alert: Adding {} to stepsize to make it non-zero".format(heuristic_stepsize_at_zero))
                     self.stepsize = heuristic_stepsize_at_zero
                 else:
                     # for cf/bfw: don't add a bad step, just reset the stepdirection calculation to start with fw again
@@ -397,6 +401,7 @@ class LinearApproximation(WorkerThread):
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
+                    self.conjugate_failed = True
 
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
