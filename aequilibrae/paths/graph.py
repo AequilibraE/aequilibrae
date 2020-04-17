@@ -243,7 +243,7 @@ class Graph(object):
         # Creates the centroids
         if centroids is not None and isinstance(centroids, np.ndarray):
             if np.issubdtype(centroids.dtype, np.integer):
-                if centroids.shape[0]> 0:
+                if centroids.shape[0] > 0:
                     if centroids.min() <= 0:
                         raise ValueError("Centroid IDs need to be positive")
                     else:
@@ -528,6 +528,7 @@ class Graph(object):
                 self.num_zones = self.centroids.shape
             else:
                 self.num_zones = 0
+
     # We return the list of the fields that are the same for both directions to their initial states
     def __reset_single_fields(self):
         self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
