@@ -77,6 +77,10 @@ class PathResults:
         Args:
             *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
         """
+
+        if not graph.cost_field:
+            raise Exception('Cost field needs to be set for cost computation. use graph.set_graph("your_cost_field")')
+
         self.__integer_type = graph.default_types("int")
         self.__float_type = graph.default_types("float")
         self.nodes = graph.num_nodes + 1
