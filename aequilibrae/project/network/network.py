@@ -276,7 +276,7 @@ class Network():
             warn(f'Fields were removed form Graph for being non-numeric: {",".join(removed_fields)}')
 
         curr.execute('select node_id from nodes where is_centroid=1;')
-        centroids = np.array([i[0] for i in curr.fetchall()])
+        centroids = np.array([i[0] for i in curr.fetchall()], np.int32)
 
         modes = curr.execute('select mode_id from modes;').fetchall()
         modes = [m[0] for m in modes]
