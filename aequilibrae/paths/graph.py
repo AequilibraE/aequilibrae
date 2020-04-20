@@ -217,7 +217,7 @@ class Graph(object):
             self.type_loaded = "SHAPEFILE"
             self.status = "OK"
             self.network_ok = True
-            self.prepare_graph(centroids)
+            self.prepare_graph(centroids.astype(np.int64))
             self.__source__ = geo_file
             self.__field_name__ = None
             self.__layer_name__ = None
@@ -243,12 +243,13 @@ class Graph(object):
         # Creates the centroids
         if centroids is not None and isinstance(centroids, np.ndarray):
             if np.issubdtype(centroids.dtype, np.integer):
-                if centroids.min() <= 0:
-                    raise ValueError("Centroid IDs need to be positive")
-                else:
-                    if centroids.shape[0] != np.unique(centroids).shape[0]:
-                        raise ValueError("Centroid IDs are not unique")
-                self.centroids = centroids.astype(np.uint32)
+                if centroids.shape[0] > 0:
+                    if centroids.min() <= 0:
+                        raise ValueError("Centroid IDs need to be positive")
+                    else:
+                        if centroids.shape[0] != np.unique(centroids).shape[0]:
+                            raise ValueError("Centroid IDs are not unique")
+                self.centroids = np.array(list(centroids), np.uint32)
             else:
                 raise ValueError("Centroids need to be an array of integers 64 bits")
         else:
@@ -281,8 +282,9 @@ class Graph(object):
                     self.__integer_type
                 )
                 # We put the centroids as the first N elements of this array
-                for i in self.centroids:
-                    self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes == i))
+                if self.num_zones:
+                    for i in self.centroids:
+                        self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes == i))
 
                 self.all_nodes = np.hstack((centroids, self.all_nodes)).astype(self.__integer_type)
                 self.num_nodes = self.all_nodes.shape[0]
@@ -442,11 +444,11 @@ class Graph(object):
             block_centroid_flows (:obj:`bool`): Blocking or not
         """
         if isinstance(block_centroid_flows, bool):
-            if self.num_zones > 0:
+            if self.num_zones == 0:
+                warn('No centroids in the model. Nothing to block')
+            else:
                 self.block_centroid_flows = block_centroid_flows
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-            else:
-                raise ValueError("You can only block flows through centroids after setting the centroids")
         else:
             raise TypeError("Blocking flows through centroids needs to be boolean")
 
@@ -522,7 +524,10 @@ class Graph(object):
 
     def __build_derived_properties(self):
         if self.centroids is not None:
-            self.num_zones = self.centroids.shape[0]
+            if self.centroids.shape:
+                self.num_zones = self.centroids.shape[0]
+            else:
+                self.num_zones = 0
 
     # We return the list of the fields that are the same for both directions to their initial states
     def __reset_single_fields(self):
