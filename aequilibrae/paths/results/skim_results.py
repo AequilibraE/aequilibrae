@@ -55,6 +55,9 @@ class SkimResults:
             *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
         """
 
+        if not graph.cost_field:
+            raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
+
         self.nodes = graph.num_nodes + 1
         self.zones = graph.num_zones
         self.links = graph.num_links + 1
