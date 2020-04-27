@@ -359,15 +359,24 @@ class Graph(object):
                     if np.any(np.isnan(self.graph[i])):
                         warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
 
-    def excludes_links(self, links: list) -> None:
+    def exclude_links(self, links: list) -> None:
         """
         Excludes a list of links from a graph by setting their B node equal to their A node
 
         Args:
             links (:obj:`list`): List of link IDs to be excluded from the graph
         """
-
         net = self.network
+
+        # We check is the list makes sense in order to warn the user
+        larray = np.array(links, np.int64)
+        # We find out if any of these links are not even part of the network
+        mask = np.in1d(larray, net['link_id'])
+        missing = list(larray[~mask])
+        if missing:
+            warn('At least one link does not exist in the network and therefore cannot be excluded')
+            warn(f'links: {",".join(missing)}')
+
         mask = np.in1d(net['link_id'], links)
         # Makes all unwanted links to
         net['b_node'][mask] = net['a_node'][mask]

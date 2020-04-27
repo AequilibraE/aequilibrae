@@ -110,7 +110,7 @@ class TestGraph(TestCase):
         g = p.network.graphs['c']  # type: Graph
 
         # excludes a link before any setting or preparation
-        g.excludes_links([12])
+        g.exclude_links([12])
 
         g.set_graph('distance')
         r1 = PathResults()
@@ -119,8 +119,10 @@ class TestGraph(TestCase):
         self.assertEqual(list(r1.path), [2, 6, 10, 34])
 
         # We exclude one link that we know was part of the last shortest path
-        g.excludes_links([10])
+        g.exclude_links([10])
         r2 = PathResults()
         r2.prepare(g)
         r2.compute_path(1, 14)
         self.assertEqual(list(r2.path), [2, 7, 36, 34])
+
+        p.conn.close()
