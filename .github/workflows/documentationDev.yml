@@ -46,3 +46,6 @@ jobs:
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
         DEST_DIR: 'python/dev/'      # optional: defaults to entire repository
+
+    - name: Check history of versions
+      run: python docs/website/check_documentation_versions.py

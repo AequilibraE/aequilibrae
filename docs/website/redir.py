@@ -23,12 +23,3 @@ with open(os.path.join(npth, "docs/website/index.html"), mode="w") as f:
 docs = npth + "/docs/build/html"
 docs_dest = npth + f"/docs/build/htmlv/{version}"
 shutil.copytree(docs, docs_dest)
-
-
-# We check if the reference to all existing versions were added by checking
-# that the current version is referenced
-with open(os.path.join(npth, "docs/source/index.rst"), mode="r") as f:
-    txt = f.read()
-
-assert(release_version in txt)
-
