@@ -820,7 +820,7 @@ You can save the results to your place of choice in AequilibraE format or export
 Traffic assignment
 ~~~~~~~~~~~~~~~~~~
 
-A simple example of assignment
+A comprehensive example of assignment
 
 ::
 
@@ -836,6 +836,12 @@ A simple example of assignment
     # Mode c is car
     car_graph = proj.network.graphs['c']
 
+    # If, for any reason, you would like to remove a set of links from the
+    # graph based solely on the modes assigned to links in the project file
+    # This will alter the Graph ID, but everything else (cost field, set of
+    # centroids and configuration for blocking flows through centroid connectors
+    #  remains unaltered
+    car_graph.excludes_links([123, 451, 1, 569, 345])
 
     mat = AequilibraeMatrix()
     mat.load('path/to/folder/demand.omx')
