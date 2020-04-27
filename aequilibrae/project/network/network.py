@@ -248,7 +248,11 @@ class Network():
         self.conn.commit()
 
     def build_graphs(self) -> None:
-        """Builds graphs for all modes currently available in the model"""
+        """Builds graphs for all modes currently available in the model
+
+        When called, it overwrites all graphs previously created and stored in the networks'
+        dictionary of graphs
+        """
         curr = self.conn.cursor()
         curr.execute('PRAGMA table_info(links);')
         field_names = curr.fetchall()

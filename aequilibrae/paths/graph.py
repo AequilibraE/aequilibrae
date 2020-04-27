@@ -374,6 +374,8 @@ class Graph(object):
 
         self.network = net
         self.prepare_graph(self.centroids)
+        self.set_blocked_centroid_flows(self.block_centroid_flows)
+        self.__id__ = uuid.uuid4().hex
 
     def __build_dtype(self, all_titles) -> list:
         dtype = [
