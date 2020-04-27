@@ -359,6 +359,22 @@ class Graph(object):
                     if np.any(np.isnan(self.graph[i])):
                         warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
 
+    def excludes_links(self, links: list) -> None:
+        """
+        Excludes a list of links from a graph by setting their B node equal to their A node
+
+        Args:
+            links (:obj:`list`): List of link IDs to be excluded from the graph
+        """
+
+        net = self.network
+        mask = np.in1d(net['link_id'], links)
+        # Makes all unwanted links to
+        net['b_node'][mask] = net['a_node'][mask]
+
+        self.network = net
+        self.prepare_graph(self.centroids)
+
     def __build_dtype(self, all_titles) -> list:
         dtype = [
             ("link_id", self.__integer_type),

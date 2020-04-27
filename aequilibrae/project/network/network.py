@@ -261,7 +261,6 @@ class Network():
         for l in raw_links:
             lk = list(map(lambda x: np.nan if x is None else x, l))
             links.append(lk)
-        # links =
 
         data = np.core.records.fromrecords(links, names=all_fields)
 
