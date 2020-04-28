@@ -841,7 +841,7 @@ A comprehensive example of assignment
     # This will alter the Graph ID, but everything else (cost field, set of
     # centroids and configuration for blocking flows through centroid connectors
     #  remains unaltered
-    car_graph.excludes_links([123, 451, 1, 569, 345])
+    car_graph.exclude_links([123, 451, 1, 569, 345])
 
     mat = AequilibraeMatrix()
     mat.load('path/to/folder/demand.omx')
