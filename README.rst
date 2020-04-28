@@ -12,10 +12,6 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
     :alt: Linting
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
-    :alt: Linux Unit tests
-
 .. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
     :alt: Windows Unit tests
