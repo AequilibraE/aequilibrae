@@ -1,4 +1,4 @@
-name: Tests Python 3.7
+name: Tests Linux
 
 on: [pull_request]
 #on:
@@ -10,29 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [ '3.6', '3.7', '3.8' ]
     steps:
     - uses: actions/checkout@v2
-#    - name: Set up Python
-#      uses: actions/setup-python@v1
-#      with:
-#        python-version: ${{ matrix.python-version }}
+    - name: Set Python environment
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         sudo apt-get install libsqlite3-mod-spatialite
         sudo apt-get install -y libspatialite-dev
         pip3 install setuptools --upgrade
-        pip3 install numpy
-        pip3 install pyaml
-        pip3 install cython
-        pip3 install scipy
-        pip3 install openmatrix
-        pip3 install pyshp
-        pip3 install requests
+        pip install -r requirements.txt
         pip3 install pytest
         pip3 install spatialite
         pip3 install pytest
-        pip3 install pytest-cov
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Compile library
@@ -42,6 +35,6 @@ jobs:
         cd ..
         cd ..
 
-    - name: Test with coverage report
+    - name: Test
       run: |
         python3 -m pytest

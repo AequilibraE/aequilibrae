@@ -11,10 +11,10 @@ class Test(TestCase):
             thresh = 1.01
 
         if random() < thresh:
-            place, report = placegetter("China")
+            place, report = placegetter("Vatican City")
             place = [round(x, 1) for x in place]
-            if place != [73.5, 4.0, 134.8, 53.6]:
-                self.fail("Returned the wrong boundingbox for China")
+            if place != [12.4, 41.9, 12.5, 41.9]:
+                self.fail("Returned the wrong boundingbox for Vatican City")
 
             place, report = placegetter("Just a random place with no bear in reality")
             if place is not None:

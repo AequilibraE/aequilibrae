@@ -248,7 +248,11 @@ class Network():
         self.conn.commit()
 
     def build_graphs(self) -> None:
-        """Builds graphs for all modes currently available in the model"""
+        """Builds graphs for all modes currently available in the model
+
+        When called, it overwrites all graphs previously created and stored in the networks'
+        dictionary of graphs
+        """
         curr = self.conn.cursor()
         curr.execute('PRAGMA table_info(links);')
         field_names = curr.fetchall()
@@ -261,7 +265,6 @@ class Network():
         for l in raw_links:
             lk = list(map(lambda x: np.nan if x is None else x, l))
             links.append(lk)
-        # links =
 
         data = np.core.records.fromrecords(links, names=all_fields)
 
@@ -276,7 +279,7 @@ class Network():
             warn(f'Fields were removed form Graph for being non-numeric: {",".join(removed_fields)}')
 
         curr.execute('select node_id from nodes where is_centroid=1;')
-        centroids = np.array([i[0] for i in curr.fetchall()])
+        centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
 
         modes = curr.execute('select mode_id from modes;').fetchall()
         modes = [m[0] for m in modes]

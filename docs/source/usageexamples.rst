@@ -242,6 +242,11 @@ Below we have that same workflow as a single script
 
     assig.execute()  # we then execute the assignment
 
+    # Convergence report is easy to see
+    import pandas as pd
+    convergence_report = pd.DataFrame(assig.assignment.convergence_report)
+    convergence_report.head()
+
     # The link flows are easy to export.
     # we do so for csv and AequilibraEData
     assigclass.results.save_to_disk(join(fldr, assg_fldr, 'link_flows_c.csv'), output="loads")
@@ -815,7 +820,7 @@ You can save the results to your place of choice in AequilibraE format or export
 Traffic assignment
 ~~~~~~~~~~~~~~~~~~
 
-A simple example of assignment
+A comprehensive example of assignment
 
 ::
 
@@ -831,6 +836,12 @@ A simple example of assignment
     # Mode c is car
     car_graph = proj.network.graphs['c']
 
+    # If, for any reason, you would like to remove a set of links from the
+    # graph based solely on the modes assigned to links in the project file
+    # This will alter the Graph ID, but everything else (cost field, set of
+    # centroids and configuration for blocking flows through centroid connectors
+    #  remains unaltered
+    car_graph.excludes_links([123, 451, 1, 569, 345])
 
     mat = AequilibraeMatrix()
     mat.load('path/to/folder/demand.omx')

@@ -12,10 +12,6 @@ AequilibraE
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
     :alt: Linting
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20Python%203.7/badge.svg
-    :alt: Linux Unit tests
-
 .. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
     :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
     :alt: Windows Unit tests
@@ -36,7 +32,7 @@ AequilibraE
     :alt: PyPi - Linux
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
-resources not easily available from other open-source packages in the Python (NumPy, really) ecosystem.
+resources not available from other open-source packages in the Python (NumPy, really) ecosystem.
 
 Comprehensive documentation
 ###########################
@@ -48,7 +44,7 @@ What is available
 
 * Importing networks from OSM
 * Synthetic gravity/IPF
-* Traffic assignment
+* Traffic assignment (All-or Nothing, MSA, Frank-Wolfe, Conjugate Frank-Wolfe & Biconjugate-FrankWolfe)
 * Network Skimming & node-to-node path computation
 * Fast Matrix format based on NumPy
 * GTFS Import
@@ -64,13 +60,10 @@ is developed independently, although in parallel, and more details can be found 
 <https://github.com/AequilibraE/AequilibraE-GUI>`_.
 
 
-What is not available yet
-*************************
+Development roadmap
+********************
 
-* GTFS exporters
-* Traffic assignment
-* Thorough documentation
-* AEQ Project
+Available in the documentation
 
 
 What is not planned to be available any time soon
@@ -88,6 +81,7 @@ of this are:
 
 History
 #######
+
 Before there was AequilibraE, there was a need for something like AequilibraE out there.
 
 The very early days
@@ -133,10 +127,8 @@ A few distinct improvements deserve to be highlighted.
 Other relevant Repositories
 ###########################
 
-External hyperlinks, like `Python <http://www.python.org/>`_.
-
 The other most important repository associated with this project is the one for the `QGIS GUI
 <https://github.com/AequilibraE/AequilibraE-GUI>`_  That is where everything started.
 
 The other important repository is the one with the `examples of usage <https://github.com/AequilibraE/examples_api>`_ of
-this code. That repository will problay be replaced with proper documentation for this project, but one thing at a time.
+this code. That repository will probably be replaced with proper documentation for this project, but one thing at a time.

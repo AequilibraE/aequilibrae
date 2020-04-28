@@ -79,6 +79,7 @@ class AssignmentResults:
         if graph is None:
             raise ("Please provide a graph")
         else:
+
             self.nodes = graph.num_nodes
             self.zones = graph.num_zones
             self.centroids = graph.centroids
