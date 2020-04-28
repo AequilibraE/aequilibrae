@@ -102,7 +102,7 @@ class TestGraph(TestCase):
         if self.graph.available_skims() != ["distance"]:
             self.fail("Skim availability with problems")
 
-    def test_excludes_links(self):
+    def test_exclude_links(self):
         p = Project()
         p.load(siouxfalls_project)
         p.network.build_graphs()
