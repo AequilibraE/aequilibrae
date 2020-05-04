@@ -15,4 +15,5 @@ except ImportError as e:
 with open(os.path.join(npth, "docs/source/index.rst"), mode="r") as f:
     txt = f.read()
 
-assert (release_version in txt)
+assert (f'`{release_version}' in txt)
+assert (f'V.{release_version}' in txt)
