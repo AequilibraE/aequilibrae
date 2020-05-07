@@ -11,6 +11,7 @@ from os.path import join, dirname
 from warnings import warn
 from random import random
 from aequilibrae.project.spatialite_connection import spatialite_connection
+from ...data import siouxfalls_project
 
 
 class TestNetwork(TestCase):
@@ -23,6 +24,9 @@ class TestNetwork(TestCase):
         self.conn = sqlite3.connect(self.file2)
         self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
+
+        self.siouxfalls = Project()
+        self.siouxfalls.load(siouxfalls_project)
 
     def tearDown(self) -> None:
         try:
@@ -93,8 +97,17 @@ class TestNetwork(TestCase):
             if f not in nfields:
                 self.fail(f"Field {f} not added to nodes table")
 
-    # def test_count_links(self):
-    #     self.fail()
-    #
-    # def test_count_nodes(self):
-    #     self.fail()
+    def test_count_centroids(self):
+        items = self.siouxfalls.network.count_centroids()
+        if items != 24:
+            self.fail('Wrong number of centroids found')
+
+    def test_count_links(self):
+        items = self.siouxfalls.network.count_links()
+        if items != 76:
+            self.fail('Wrong number of links found')
+
+    def test_count_nodes(self):
+        items = self.siouxfalls.network.count_nodes()
+        if items != 24:
+            self.fail('Wrong number of nodes found')

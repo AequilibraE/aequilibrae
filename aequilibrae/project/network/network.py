@@ -319,9 +319,7 @@ class Network():
         Returns:
             :obj:`int`: Number of links
         """
-        c = self.conn.cursor()
-        c.execute("""select count(link_id) from links""")
-        return c.fetchone()[0]
+        return self.__count_items('link_id', 'links', 'link_id>=0')
 
     def count_centroids(self) -> int:
         """
@@ -330,9 +328,7 @@ class Network():
         Returns:
             :obj:`int`: Number of centroids
         """
-        c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes where is_centroid=1;""")
-        return c.fetchone()[0]
+        return self.__count_items('node_id', 'nodes', 'is_centroid=1')
 
     def count_nodes(self) -> int:
         """
@@ -341,14 +337,17 @@ class Network():
         Returns:
             :obj:`int`: Number of nodes
         """
-        c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes""")
-        return c.fetchone()[0]
+        return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
     def add_triggers(self):
         """Adds consistency triggers to the project"""
         self.__add_network_triggers()
         self.__add_mode_triggers()
+
+    def __count_items(self, field:str, table:str, condition:str)-> int:
+        c = self.conn.cursor()
+        c.execute(f"""select count({field}) from {table} where {condition};""")
+        return c.fetchone()[0]
 
     def __add_network_triggers(self) -> None:
         logger.info("Adding network triggers")
