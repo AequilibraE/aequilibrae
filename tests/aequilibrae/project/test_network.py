@@ -66,7 +66,7 @@ class TestNetwork(TestCase):
             print('Skipped check to not load OSM servers')
 
     def test_create_empty_tables(self):
-        self.network.create_empty_tables()
+        self.network.initialize()
         p = Parameters().parameters["network"]
 
         curr = self.conn.cursor()

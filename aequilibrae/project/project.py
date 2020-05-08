@@ -59,7 +59,6 @@ class Project:
 
         self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
-        self.network.add_triggers()
 
     def __create_empty_project(self):
         shutil.copyfile(spatialite_database, self.path_to_file)

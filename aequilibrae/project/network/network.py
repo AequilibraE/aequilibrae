@@ -88,6 +88,13 @@ class Network():
         curr.execute("""select mode_id from modes""")
         return [x[0] for x in curr.fetchall()]
 
+    def initialize(self) -> None:
+        """
+        Create empty layers for links and nodes, ready for manual or programmatic manipulation
+        """
+        self.__create_empty_tables()
+        self.__add_triggers()
+
     def create_from_osm(
             self,
             west: float = None,
@@ -120,7 +127,7 @@ class Network():
         if self._check_if_exists():
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        self.create_empty_tables()
+        self.__create_empty_tables()
 
         curr = self.conn.cursor()
         curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
@@ -185,10 +192,10 @@ class Network():
             logger.info("Adding spatial indices")
             self.add_spatial_index()
 
-        self.add_triggers()
+        self.__add_triggers()
         logger.info("Network built successfully")
 
-    def create_empty_tables(self) -> None:
+    def __create_empty_tables(self) -> None:
         """Creates empty network tables for future filling"""
         curr = self.conn.cursor()
         # Create the links table
@@ -341,7 +348,7 @@ class Network():
         """
         return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
-    def add_triggers(self):
+    def __add_triggers(self):
         """Adds consistency triggers to the project"""
         self.__add_network_triggers()
         self.__add_mode_triggers()
