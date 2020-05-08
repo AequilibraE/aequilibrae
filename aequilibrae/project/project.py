@@ -59,11 +59,17 @@ class Project:
 
         self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
+        self.network.add_triggers()
 
     def __create_empty_project(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
         self.conn = sqlite3.connect(self.path_to_file)
+
+        cursor = self.conn.cursor()
+        cursor.execute('PRAGMA foreign_keys = ON;')
+        self.conn.commit()
         self.__create_modes_table()
+        self.__create_link_type_table()
 
     def __create_modes_table(self):
 
@@ -82,4 +88,52 @@ class Project:
             par = ",".join(par)
             sql = f"INSERT INTO 'modes' (mode_name, mode_id, description) VALUES({par})"
             cursor.execute(sql)
+        self.conn.commit()
+
+    def __create_link_type_table(self):
+
+        create_query = """CREATE TABLE 'link_types' (link_type VARCHAR PRIMARY KEY UNIQUE NOT NULL,
+                                                     link_type_id VARCHAR UNIQUE NOT NULL,
+                                                     description VARCHAR,
+                                                     lanes NUMERIC,
+                                                     lane_capacity NUMERIC,
+                                                     alpha NUMERIC,
+                                                     beta NUMERIC,
+                                                     gamma NUMERIC,
+                                                     delta NUMERIC,
+                                                     epsilon NUMERIC,
+                                                     zeta NUMERIC,
+                                                     iota NUMERIC,
+                                                     sigma NUMERIC,
+                                                     phi NUMERIC,
+                                                     tau NUMERIC);"""
+
+        cursor = self.conn.cursor()
+        cursor.execute(create_query)
+
+        link_types = self.parameters["network"]["links"]["link_types"]
+        sql = "INSERT INTO 'link_types' (link_type, link_type_id, description, lanes, lane_capacity) VALUES(?, ?, ?, ?, ?)"
+        for lt in link_types:
+            nm = list(lt.keys())[0]
+            args = (nm, lt[nm]["link_type_id"], lt[nm]["description"], lt[nm]["lanes"], lt[nm]["lane_capacity"])
+
+            cursor.execute(sql, args)
+
+        create_query = """CREATE TABLE 'link_type_attributes' (link_type_attribute VARCHAR UNIQUE NOT NULL,
+                                                               description VARCHAR);"""
+        cursor.execute(create_query)
+
+        fields = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'and', 'tau']
+        fields = [[x, 'Available for user convenience'] for x in fields]
+        fields.insert(0, ['link_type', 'Link type name. E.g. arterial, or connector'])
+        fields.insert(0, ['link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
+        fields.insert(0, ['description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
+        fields.insert(0, ['lanes', 'Default number of lanes in each direction. E.g. 2'])
+        fields.insert(0, ['lane_capacity', 'Default vehicle capacity per lane. E.g.  900'])
+
+        for f, d in fields:
+            sql = f"INSERT INTO 'link_type_attributes' (link_type_attribute, description) VALUES('{f}', '{d}')"
+
+            cursor.execute(sql)
+
         self.conn.commit()

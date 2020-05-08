@@ -56,6 +56,17 @@ network:
           osm_behaviour: copy
           osm_source: maxspeed
           type: numeric
+    link_types:
+      - centroid_connector:
+          description: VIRTUAL centroid connectors only
+          link_type_id: z
+          lanes: 10
+          lane_capacity: 10000
+      - default:
+          description: Default link type. Due to lack of information
+          link_type_id: y
+          lanes: 2
+          lane_capacity: 900
   modes:
   - car:
       description: All motorized vehicles

@@ -203,8 +203,10 @@ class Network():
                           direction INTEGER NOT NULL DEFAULT 0,
                           distance NUMERIC,
                           modes TEXT NOT NULL,
-                          link_type TEXT NOT NULL DEFAULT 'link type not defined'
-                          {});"""
+                          link_type TEXT NOT NULL DEFAULT 'default',
+                          {}
+                          FOREIGN KEY (link_type)
+                                REFERENCES link_types (link_type));"""
 
         flds = fields["one-way"]
 
@@ -224,7 +226,7 @@ class Network():
         link_fields = owlf + twlf
 
         if link_fields:
-            sql = sql.format("," + ",".join(link_fields))
+            sql = sql.format(",".join(link_fields) + ",")
         else:
             sql = sql.format("")
 
@@ -343,8 +345,22 @@ class Network():
         """Adds consistency triggers to the project"""
         self.__add_network_triggers()
         self.__add_mode_triggers()
+        self.__add_link_type_triggers()
 
-    def __count_items(self, field:str, table:str, condition:str)-> int:
+    def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
+        """
+               Adds a centroid and centroid connectors for the desired modes to the network file
+
+               Args:
+                   *node_id* (:obj:`int`): ID for the centroid to be included in the network
+
+                   *coords* (:obj:`List`): XY Coordinates for centroid -> [LONGITUDE, LATITUDE]
+
+                   *modes* (:obj:`str`): Modes for which centroids connectors should be added
+               """
+        pass
+
+    def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()
         c.execute(f"""select count({field}) from {table} where {condition};""")
         return c.fetchone()[0]
@@ -359,6 +375,12 @@ class Network():
         logger.info("Adding mode table triggers")
         pth = os.path.dirname(os.path.realpath(__file__))
         qry_file = os.path.join(pth, "database_triggers", "modes_table_triggers.sql")
+        self.__add_trigger_from_file(qry_file)
+
+    def __add_link_type_triggers(self) -> None:
+        logger.info("Adding link type table triggers")
+        pth = os.path.dirname(os.path.realpath(__file__))
+        qry_file = os.path.join(pth, "database_triggers", "link_type_table_triggers.sql")
         self.__add_trigger_from_file(qry_file)
 
     def __add_trigger_from_file(self, qry_file: str):
