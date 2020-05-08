@@ -123,7 +123,7 @@ class Project:
                                                                description VARCHAR);"""
         cursor.execute(create_query)
 
-        fields = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'and', 'tau']
+        fields = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'tau']
         fields = [[x, 'Available for user convenience'] for x in fields]
         fields.insert(0, ['link_type', 'Link type name. E.g. arterial, or connector'])
         fields.insert(0, ['link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
