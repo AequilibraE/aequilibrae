@@ -22,13 +22,7 @@ class Network():
     req_node_flds = ["node_id", "is_centroid"]
     protected_fields = ['ogc_fid', 'geometry']
 
-    def __init__(self, project):
-        """
-        Instantiates the network with the project it is member of
-
-        Args:
-            *project* (:obj:`Project`): Project
-        """
+    def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
@@ -241,7 +235,9 @@ class Network():
 
         sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
                                  node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
+                                 is_centroid INTEGER NOT NULL DEFAULT 0, 
+                                 modes VARCHAR,
+                                 link_types VARCHAR {});"""
 
         flds = p.parameters["network"]["nodes"]["fields"]
         ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in self.req_node_flds]
@@ -348,12 +344,6 @@ class Network():
         """
         return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
-    def __add_triggers(self):
-        """Adds consistency triggers to the project"""
-        self.__add_network_triggers()
-        self.__add_mode_triggers()
-        self.__add_link_type_triggers()
-
     def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
         """
                Adds a centroid and centroid connectors for the desired modes to the network file
@@ -367,6 +357,22 @@ class Network():
                """
         pass
 
+    def add_spatial_index(self) -> None:
+        """Adds spatial indices to links and nodes table
+
+        Requires an Sqlite3 distribution with RTree (not the Python standard).
+        Use with caution"""
+        curr = self.conn.cursor()
+        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
+        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
+        self.conn.commit()
+
+    def __add_triggers(self):
+        """Adds consistency triggers to the project"""
+        self.__add_network_triggers()
+        self.__add_mode_triggers()
+        self.__add_link_type_triggers()
+
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()
         c.execute(f"""select count({field}) from {table} where {condition};""")
@@ -374,23 +380,18 @@ class Network():
 
     def __add_network_triggers(self) -> None:
         logger.info("Adding network triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "network_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
+        self.__add_trigger_from_file("network_triggers.sql")
 
     def __add_mode_triggers(self) -> None:
         logger.info("Adding mode table triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "modes_table_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
+        self.__add_trigger_from_file("modes_table_triggers.sql")
 
     def __add_link_type_triggers(self) -> None:
         logger.info("Adding link type table triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "link_type_table_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
+        self.__add_trigger_from_file("link_type_table_triggers.sql")
 
     def __add_trigger_from_file(self, qry_file: str):
+        qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "database_triggers", qry_file)
         curr = self.conn.cursor()
         sql_file = open(qry_file, "r")
         query_list = sql_file.read()
@@ -404,14 +405,4 @@ class Network():
                 msg = f"Error creating trigger: {e.args}"
                 logger.error(msg)
                 logger.info(cmd)
-        self.conn.commit()
-
-    def add_spatial_index(self) -> None:
-        """Adds spatial indices to links and nodes table
-
-        Requires an Sqlite3 distribution with RTree (not the Python standard).
-        Use with caution"""
-        curr = self.conn.cursor()
-        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
-        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()

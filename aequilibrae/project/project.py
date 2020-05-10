@@ -60,6 +60,10 @@ class Project:
         self.conn = spatialite_connection(self.conn)
         self.network = Network(self)
 
+    def close(self) -> None:
+        """Safely closes the project"""
+        self.conn.close()
+
     def __create_empty_project(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
         self.conn = sqlite3.connect(self.path_to_file)
