@@ -149,13 +149,15 @@ class Project:
         fields = []
         fields.append(['link_types', 'link_type', 'Link type name. E.g. arterial, or connector'])
         fields.append(['link_types', 'link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
-        fields.append(['link_types', 'description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
+        fields.append(['link_types', 'description',
+                       'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
         fields.append(['link_types', 'lanes', 'Default number of lanes in each direction. E.g. 2'])
         fields.append(['link_types', 'lane_capacity', 'Default vehicle capacity per lane. E.g.  900'])
 
         fields.append(['modes', 'mode_name', 'Link type name. E.g. arterial, or connector'])
         fields.append(['modes', 'mode_id', 'Single letter identifying the mode. E.g. a, for arterial'])
-        fields.append(['modes', 'description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
+        fields.append(
+            ['modes', 'description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
 
         extra_keys = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'tau']
         extra_keys = [[x, 'Available for user convenience'] for x in extra_keys]
