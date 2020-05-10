@@ -6,6 +6,8 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.reference_files import spatialite_database
 from .spatialite_connection import spatialite_connection
 
+meta_table = 'attributes_documentation'
+
 
 class Project:
     """AequilibraE project class
@@ -71,14 +73,33 @@ class Project:
         cursor = self.conn.cursor()
         cursor.execute('PRAGMA foreign_keys = ON;')
         self.conn.commit()
+        self.__create_meta_table()
         self.__create_modes_table()
         self.__create_link_type_table()
+
+    def __create_meta_table(self):
+        cursor = self.conn.cursor()
+        create_query = f"""CREATE TABLE '{meta_table}' (name_table  VARCHAR UNIQUE NOT NULL,
+                                                        link_type_attribute VARCHAR UNIQUE NOT NULL,
+                                                        description VARCHAR);"""
+        cursor.execute(create_query)
+        self.conn.commit()
 
     def __create_modes_table(self):
 
         create_query = """CREATE TABLE 'modes' (mode_name VARCHAR UNIQUE NOT NULL,
                                                 mode_id VARCHAR PRIMARY KEY UNIQUE NOT NULL,
-                                                description VARCHAR);"""
+                                                description VARCHAR,
+                                                alpha NUMERIC,
+                                                beta NUMERIC,
+                                                gamma NUMERIC,
+                                                delta NUMERIC,
+                                                epsilon NUMERIC,
+                                                zeta NUMERIC,
+                                                iota NUMERIC,
+                                                sigma NUMERIC,
+                                                phi NUMERIC,
+                                                tau NUMERIC);"""
         cursor = self.conn.cursor()
         cursor.execute(create_query)
         modes = self.parameters["network"]["modes"]
@@ -122,21 +143,30 @@ class Project:
 
             cursor.execute(sql, args)
 
-        create_query = """CREATE TABLE 'link_type_attributes' (link_type_attribute VARCHAR UNIQUE NOT NULL,
-                                                               description VARCHAR);"""
-        cursor.execute(create_query)
+        self.conn.commit()
 
-        fields = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'tau']
-        fields = [[x, 'Available for user convenience'] for x in fields]
-        fields.insert(0, ['link_type', 'Link type name. E.g. arterial, or connector'])
-        fields.insert(0, ['link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
-        fields.insert(0, ['description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
-        fields.insert(0, ['lanes', 'Default number of lanes in each direction. E.g. 2'])
-        fields.insert(0, ['lane_capacity', 'Default vehicle capacity per lane. E.g.  900'])
+    def __add_meta_extra_attributes(self):
+        fields = []
+        fields.append(['link_types', 'link_type', 'Link type name. E.g. arterial, or connector'])
+        fields.append(['link_types', 'link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
+        fields.append(['link_types', 'description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
+        fields.append(['link_types', 'lanes', 'Default number of lanes in each direction. E.g. 2'])
+        fields.append(['link_types', 'lane_capacity', 'Default vehicle capacity per lane. E.g.  900'])
 
-        for f, d in fields:
-            sql = f"INSERT INTO 'link_type_attributes' (link_type_attribute, description) VALUES('{f}', '{d}')"
+        fields.append(['modes', 'mode_name', 'Link type name. E.g. arterial, or connector'])
+        fields.append(['modes', 'mode_id', 'Single letter identifying the mode. E.g. a, for arterial'])
+        fields.append(['modes', 'description', 'Description of the same. E.g. Arterials are streets like AequilibraE Avenue'])
 
+        extra_keys = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'iota', 'sigma', 'phi', 'tau']
+        extra_keys = [[x, 'Available for user convenience'] for x in extra_keys]
+
+        cursor = self.conn.cursor()
+        for table_name, f, d in fields:
+            sql = f"INSERT INTO '{meta_table}' (name_table, attribute, description) VALUES('{table_name}','{f}', '{d}')"
             cursor.execute(sql)
 
+        for table_name in ['link_types', 'modes']:
+            for f, d in extra_keys:
+                sql = f"INSERT INTO '{meta_table}' (name_table, attribute, description) VALUES('{table_name}','{f}', '{d}')"
+                cursor.execute(sql)
         self.conn.commit()

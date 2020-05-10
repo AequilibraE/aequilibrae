@@ -235,7 +235,7 @@ class Network():
 
         sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
                                  node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0, 
+                                 is_centroid INTEGER NOT NULL DEFAULT 0,
                                  modes VARCHAR,
                                  link_types VARCHAR {});"""
 
