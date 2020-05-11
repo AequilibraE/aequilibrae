@@ -193,7 +193,7 @@ def add_mode_triggers(conn) -> None:
     add_trigger_from_file(conn, "modes_table_triggers.sql")
 
 
-def add_link_type_triggers(nn) -> None:
+def add_link_type_triggers(conn) -> None:
     logger.info("Adding link type table triggers")
     add_trigger_from_file(conn, "link_type_table_triggers.sql")
 
