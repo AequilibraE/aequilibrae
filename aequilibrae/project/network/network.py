@@ -12,26 +12,21 @@ from aequilibrae.project.network.haversine import haversine
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
+from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 
 
 class Network():
     """
     Network class. Member of an AequilibraE Project
     """
-    req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
-    req_node_flds = ["node_id", "is_centroid"]
-    protected_fields = ['ogc_fid', 'geometry']
+    req_link_flds = req_link_flds
+    req_node_flds = req_node_flds
+    protected_fields = protected_fields
 
     def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
-
-    def _check_if_exists(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
-        tbls = curr.fetchone()[0]
-        return tbls > 0
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
@@ -82,13 +77,6 @@ class Network():
         curr.execute("""select mode_id from modes""")
         return [x[0] for x in curr.fetchall()]
 
-    def initialize(self) -> None:
-        """
-        Create empty layers for links and nodes, ready for manual or programmatic manipulation
-        """
-        self.__create_empty_tables()
-        self.__add_triggers()
-
     def create_from_osm(
             self,
             west: float = None,
@@ -118,10 +106,8 @@ class Network():
             *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
         """
 
-        if self._check_if_exists():
+        if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
-
-        self.__create_empty_tables()
 
         curr = self.conn.cursor()
         curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
@@ -186,71 +172,7 @@ class Network():
             logger.info("Adding spatial indices")
             self.add_spatial_index()
 
-        self.__add_triggers()
         logger.info("Network built successfully")
-
-    def __create_empty_tables(self) -> None:
-        """Creates empty network tables for future filling"""
-        curr = self.conn.cursor()
-        # Create the links table
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-
-        sql = """CREATE TABLE 'links' (
-                          ogc_fid INTEGER PRIMARY KEY,
-                          link_id INTEGER UNIQUE,
-                          a_node INTEGER,
-                          b_node INTEGER,
-                          direction INTEGER NOT NULL DEFAULT 0,
-                          distance NUMERIC,
-                          modes TEXT NOT NULL,
-                          link_type TEXT NOT NULL DEFAULT 'default',
-                          {}
-                          FOREIGN KEY (link_type)
-                                REFERENCES link_types (link_type));"""
-
-        flds = fields["one-way"]
-
-        # returns first key in the dictionary
-        def fkey(f):
-            return list(f.keys())[0]
-
-        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).lower() not in self.req_link_flds]
-
-        flds = fields["two-way"]
-        twlf = []
-        for f in flds:
-            nm = fkey(f)
-            tp = f[nm]["type"]
-            twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
-
-        link_fields = owlf + twlf
-
-        if link_fields:
-            sql = sql.format(",".join(link_fields) + ",")
-        else:
-            sql = sql.format("")
-
-        curr.execute(sql)
-
-        sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
-                                 node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0,
-                                 modes VARCHAR,
-                                 link_types VARCHAR {});"""
-
-        flds = p.parameters["network"]["nodes"]["fields"]
-        ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in self.req_node_flds]
-
-        if ndflds:
-            sql = sql.format("," + ",".join(ndflds))
-        else:
-            sql = sql.format("")
-        curr.execute(sql)
-
-        curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
-        curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
-        self.conn.commit()
 
     def build_graphs(self) -> None:
         """Builds graphs for all modes currently available in the model
@@ -367,42 +289,7 @@ class Network():
         curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()
 
-    def __add_triggers(self):
-        """Adds consistency triggers to the project"""
-        self.__add_network_triggers()
-        self.__add_mode_triggers()
-        self.__add_link_type_triggers()
-
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()
         c.execute(f"""select count({field}) from {table} where {condition};""")
         return c.fetchone()[0]
-
-    def __add_network_triggers(self) -> None:
-        logger.info("Adding network triggers")
-        self.__add_trigger_from_file("network_triggers.sql")
-
-    def __add_mode_triggers(self) -> None:
-        logger.info("Adding mode table triggers")
-        self.__add_trigger_from_file("modes_table_triggers.sql")
-
-    def __add_link_type_triggers(self) -> None:
-        logger.info("Adding link type table triggers")
-        self.__add_trigger_from_file("link_type_table_triggers.sql")
-
-    def __add_trigger_from_file(self, qry_file: str):
-        qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "database_triggers", qry_file)
-        curr = self.conn.cursor()
-        sql_file = open(qry_file, "r")
-        query_list = sql_file.read()
-        sql_file.close()
-
-        # Run one query/command at a time
-        for cmd in query_list.split("#"):
-            try:
-                curr.execute(cmd)
-            except Exception as e:
-                msg = f"Error creating trigger: {e.args}"
-                logger.error(msg)
-                logger.info(cmd)
-        self.conn.commit()

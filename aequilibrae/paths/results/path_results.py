@@ -18,7 +18,7 @@ class PathResults:
           from aequilibrae.paths.results import PathResults
 
           proj = Project()
-          proj.load('path/to/project.sqlite')
+          proj.load('path/to/project/folder')
           proj.network.build_graphs()
           # Mode c is car in this project
           car_graph = proj.network.graphs['c']

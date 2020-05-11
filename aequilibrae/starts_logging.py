@@ -11,8 +11,12 @@ sys.dont_write_bytecode = True
 # TODO: Add tests for logging
 def StartsLogging():
     # CREATE THE LOGGER
-    temp_folder = Parameters().parameters["system"]["logging_directory"]
-    do_log = Parameters().parameters["system"]["logging"]
+    p = Parameters()
+    par = p.parameters
+    if p.parameters is None:
+        par = p._default
+    temp_folder = par["system"]["logging_directory"]
+    do_log = par["system"]["logging"]
     if not os.path.isdir(temp_folder):
         temp_folder = tempfile.gettempdir()
 

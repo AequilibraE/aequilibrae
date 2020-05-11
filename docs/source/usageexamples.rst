@@ -123,7 +123,6 @@ Below we have that same workflow as a single script
 
     # remove the comments for the lines below to run the Chicago model example instead
     # fldr = 'D:/release/Sample models/Chicago_2020_02_15'
-    # proj_name = 'chicagomodel.sqlite'
 
     dt_fldr = '0_tntp_data'
     prj_fldr = '1_project'
@@ -150,7 +149,7 @@ Below we have that same workflow as a single script
     ########### PROJECT #################
 
     project = Project()
-    project.load(join(fldr, prj_fldr, proj_name))
+    project.load(join(fldr, prj_fldr))
 
     ########### PATH COMPUTATION #################
 

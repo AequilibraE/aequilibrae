@@ -23,6 +23,6 @@ no_index_omx = join(dirname(dirname(abspath(__file__))), "data/no_index.omx")
 project_file = join(dirname(dirname(abspath(__file__))), "data", "AequilibraE_Project.sqlite")
 
 # For Traffic Assignment tests
-siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.sqlite")
-siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data", "SiouxFalls.omx")
-siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data", "sfalls_skims.omx")
+siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project")
+siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "SiouxFalls.omx")
+siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "sfalls_skims.omx")

@@ -10,7 +10,7 @@ development, and are always required unless explicitly mentioned otherwise.
 .. _tables_section6.1:
 
 Modes table
-~~~~~~~~~~
+~~~~~~~~~~~
 
 The **modes** table exists to list all the modes available in the model's network,
 and its main role is to support the creation of graphs directly from the SQLite
@@ -235,3 +235,32 @@ In counterpoint, only the second behaviour mentioned above on
 link_type is not still in use by the network. Therefore only one new trigger is
 required.
 
+Parameters metadata table
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Documentation is paramount for any successful modeling project. For this reason,
+AequilibraE has a database table dedicated to the documentation of each field in
+each of the other tables in the project. This table, called
+**attributes_documentation** can be accessed directly through SQL, but it is
+envisaged that its editing and consultation would happen through the Python API
+itself.
+
+Extra user data fields
+----------------------
+The AequilibraE standard configuration is not particularly minimalist, but it is
+reasonable to expect that users would require further data fields in one or more
+of the data tables that are part of the AequilibraE project. For this reason, and
+to incentivate the creation of a consistent culture around the handling of model
+data in aequilibrae, we have added 10 additional data fields to each table which
+are not used by AequilibraE's standard configuration, all of which are named as
+Greek letters. They are the following:
+
+- 'alpha'
+- 'beta'
+- 'gamma'
+- 'delta'
+- 'epsilon'
+- 'zeta'
+- 'iota'
+- 'sigma'
+- 'phi'
+- 'tau'

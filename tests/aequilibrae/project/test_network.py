@@ -2,8 +2,8 @@ from unittest import TestCase
 import sqlite3
 from tempfile import gettempdir
 import os
+import uuid
 import platform
-from functools import reduce
 from aequilibrae.project import Project
 from aequilibrae.project.network.network import Network
 from aequilibrae.parameters import Parameters
@@ -16,14 +16,17 @@ from ...data import siouxfalls_project
 
 class TestNetwork(TestCase):
     def setUp(self) -> None:
-        self.file = os.path.join(gettempdir(), "aequilibrae_project_test.sqlite")
+        self.proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
         self.project = Project()
-        self.project.new(self.file)
-        self.source = self.file
-        self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
-        self.conn = sqlite3.connect(self.file2)
-        self.conn = spatialite_connection(self.conn)
-        self.network = Network(self)
+        self.project.new(self.proj_path)
+        # self.file = self.project.path_to_file
+        # self.source = self.project.path_to_file
+        #
+        # self.proj_path2 = os.path.join(gettempdir(), uuid.uuid4().hex)
+        # self.file2 = os.path.join(gettempdir(), "aequilibrae_project_test2.sqlite")
+        # self.conn = sqlite3.connect(self.file2)
+        # self.conn = spatialite_connection(self.conn)
+        # self.network = Network(self)
 
         self.siouxfalls = Project()
         self.siouxfalls.load(siouxfalls_project)
@@ -64,38 +67,6 @@ class TestNetwork(TestCase):
                 self.fail("We imported more links than nodes. Something wrong here")
         else:
             print('Skipped check to not load OSM servers')
-
-    def test_create_empty_tables(self):
-        self.network.initialize()
-        p = Parameters().parameters["network"]
-
-        curr = self.conn.cursor()
-        curr.execute("""PRAGMA table_info(links);""")
-        fields = curr.fetchall()
-        fields = [x[1] for x in fields]
-
-        oneway = reduce(lambda a, b: dict(a, **b), p["links"]["fields"]["one-way"])
-        owf = list(oneway.keys())
-        twoway = reduce(lambda a, b: dict(a, **b), p["links"]["fields"]["two-way"])
-        twf = []
-        for k in list(twoway.keys()):
-            twf.extend([f"{k}_ab", f"{k}_ba"])
-
-        for f in owf + twf:
-            if f not in fields:
-                self.fail(f"Field {f} not added to links table")
-
-        curr = self.conn.cursor()
-        curr.execute("""PRAGMA table_info(nodes);""")
-        nfields = curr.fetchall()
-        nfields = [x[1] for x in nfields]
-
-        flds = reduce(lambda a, b: dict(a, **b), p["nodes"]["fields"])
-        flds = list(flds.keys())
-
-        for f in flds:
-            if f not in nfields:
-                self.fail(f"Field {f} not added to nodes table")
 
     def test_count_centroids(self):
         items = self.siouxfalls.network.count_centroids()
