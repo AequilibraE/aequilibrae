@@ -3,6 +3,7 @@ import yaml
 from warnings import warn
 from copy import deepcopy
 
+
 class Parameters:
     """
     Global parameters module
@@ -48,7 +49,6 @@ class Parameters:
         else:
             warn('No pre-existing parameter file exists for this project. Will use default')
             self.parameters = deepcopy(self._default)
-
 
     def write_back(self):
         """Writes the parameters back to file"""

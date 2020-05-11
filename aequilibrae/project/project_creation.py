@@ -193,14 +193,14 @@ def add_mode_triggers(conn) -> None:
     add_trigger_from_file(conn, "modes_table_triggers.sql")
 
 
-def add_link_type_triggers(conn) -> None:
+def add_link_type_triggers(nn) -> None:
     logger.info("Adding link type table triggers")
     add_trigger_from_file(conn, "link_type_table_triggers.sql")
 
 
-def add_trigger_from_file(conn, qry_file: str)->None:
+def add_trigger_from_file(conn, qry_file: str) -> None:
     qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "database_triggers", qry_file)
-    curr = self.conn.cursor()
+    curr = conn.cursor()
     sql_file = open(qry_file, "r")
     query_list = sql_file.read()
     sql_file.close()
@@ -213,4 +213,4 @@ def add_trigger_from_file(conn, qry_file: str)->None:
             msg = f"Error creating trigger: {e.args}"
             logger.error(msg)
             logger.info(cmd)
-    self.conn.commit()
+    conn.commit()
