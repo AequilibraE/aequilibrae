@@ -18,7 +18,7 @@ class TestTrafficAssignment(TestCase):
         self.matrix.computational_view()
 
         self.project = Project()
-        self.project.load(siouxfalls_project)
+        self.project.open(siouxfalls_project)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs['c']  # type: Graph
         self.car_graph.set_graph('free_flow_time')
@@ -29,7 +29,7 @@ class TestTrafficAssignment(TestCase):
 
     def tearDown(self) -> None:
         self.matrix.close()
-        self.project.conn.close()
+        self.project.close()
 
     def test_set_vdf(self):
         with self.assertRaises(ValueError):
