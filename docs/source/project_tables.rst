@@ -142,37 +142,17 @@ removed from the model without breaking it.
 
 .. _tables_section6.2.4:
 
-Adding new link_types
----------------------
+Adding new link_types to an existing project
+--------------------------------------------
 
 To manually add link types, the user can add further link types to the
 parameters file, as shown below.
 
-.. image:: images/parameters_link_types.png
-    :width: 1122
-    :align: center
-    :alt: Link type specification
 
-To add new link types programatically, one can do the following
 
-::
-
-  from aequilibrae import Parameters
-  par = Parameters()
-
-  new_type = {'collector': {'description': 'Regular collector street',
-                            'link_type_id': 'c',
-                            'lanes': 1,
-                            'lane_capacity': 600}}
-
-  par.parameters["network"]["links"]["link_types"].append(new_type)
-  par.write_back()
-
-.. note::
-   AequilibraE will not block you from adding new link types to the
-   parameters file if those parameters are wrong. It is your responsibility
-   to ensure that completeness, uniqueness and formatting requirements are
-   followed.
+Adding new link_types to a project
+----------------------------------
+**STILL NEED TO BUILD THE API FOR SUCH**
 
 .. _tables_section6.2.5:
 
@@ -193,6 +173,9 @@ that link type exists in the links_table.
 
 This condition is ensured by specific trigger checking whether the new link_type 
 exists in the link table. If if it does not, the transaction will fail.
+
+We also need to update the **modes** field the nodes connected to the link with
+a new string of all the different link type IDs connected to them.
 
 .. _tables_section6.2.5.2:
 
@@ -245,7 +228,7 @@ envisaged that its editing and consultation would happen through the Python API
 itself.
 
 Extra user data fields
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 The AequilibraE standard configuration is not particularly minimalist, but it is
 reasonable to expect that users would require further data fields in one or more
 of the data tables that are part of the AequilibraE project. For this reason, and

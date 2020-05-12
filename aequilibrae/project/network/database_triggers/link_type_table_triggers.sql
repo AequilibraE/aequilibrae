@@ -1,4 +1,5 @@
 -- Guarantees that the link_type records have a single letter for link_type_id
+
 CREATE TRIGGER link_type_single_letter_update BEFORE UPDATE OF link_type_id ON "link_types"
 WHEN
 length(new.link_type_id)!= 1
@@ -7,6 +8,8 @@ BEGIN
 END;
 
 #
+-- Guarantees that the link_type_id field is exactly 1 character long
+
 CREATE TRIGGER link_type_single_letter_insert BEFORE INSERT ON "link_types"
 WHEN
 length(new.link_type_id)!= 1
@@ -17,6 +20,7 @@ END;
 #
 
 -- Prevents a link_type record to be changed when it is in use for any link
+
 CREATE TRIGGER link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "link_types"
 WHEN
 (Select count(*) from links where old.link_type = link_type)>0
@@ -37,7 +41,7 @@ END;
 
 #
 -- Ensures an ALTERED link does not reference a non existing link_type
-CREATE TRIGGER link_type_on_links_update BEFORE UPDATE OF 'link_type' ON "links"
+CREATE TRIGGER link_type_on_links_update BEFORE UPDATE OF 'link_type' ON links
 WHEN
 (select count(*) from link_types where new.link_type = link_type)<1
 BEGIN
@@ -46,7 +50,7 @@ END;
 
 #
 -- Ensures an added link does not reference a non existing mode
-CREATE TRIGGER link_type_on_links_insert BEFORE INSERT ON "links"
+CREATE TRIGGER link_type_on_links_insert BEFORE INSERT ON links
 WHEN
 (select count(*) from link_types where new.link_type = link_type)<1
 BEGIN

@@ -202,7 +202,6 @@ def add_link_type_triggers(conn) -> None:
 
 def add_trigger_from_file(conn, qry_file: str) -> None:
     qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "network/database_triggers", qry_file)
-    print(qry_file)
     curr = conn.cursor()
     sql_file = open(qry_file, "r")
     query_list = sql_file.read()
