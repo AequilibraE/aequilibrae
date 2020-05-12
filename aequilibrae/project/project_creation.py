@@ -13,12 +13,14 @@ def initialize_tables(conn) -> None:
     create_modes_table(conn, parameters)
     create_link_type_table(conn, parameters)
     create_network_tables(conn, parameters)
+    populate_meta_extra_attributes(conn)
+    add_triggers(conn)
 
 
 def create_meta_table(conn) -> None:
     cursor = conn.cursor()
-    create_query = f"""CREATE TABLE '{meta_table}' (name_table  VARCHAR UNIQUE NOT NULL,
-                                                    link_type_attribute VARCHAR UNIQUE NOT NULL,
+    create_query = f"""CREATE TABLE '{meta_table}' (name_table  VARCHAR NOT NULL,
+                                                    attribute VARCHAR NOT NULL,
                                                     description VARCHAR);"""
     cursor.execute(create_query)
     conn.commit()
@@ -84,7 +86,7 @@ def create_link_type_table(conn, parameters) -> None:
     conn.commit()
 
 
-def add_meta_extra_attributes(conn) -> None:
+def populate_meta_extra_attributes(conn) -> None:
     fields = []
     fields.append(['link_types', 'link_type', 'Link type name. E.g. arterial, or connector'])
     fields.append(['link_types', 'link_type_id', 'Single letter identifying the mode. E.g. a, for arterial'])
@@ -199,7 +201,8 @@ def add_link_type_triggers(conn) -> None:
 
 
 def add_trigger_from_file(conn, qry_file: str) -> None:
-    qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "database_triggers", qry_file)
+    qry_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "network/database_triggers", qry_file)
+    print(qry_file)
     curr = conn.cursor()
     sql_file = open(qry_file, "r")
     query_list = sql_file.read()
