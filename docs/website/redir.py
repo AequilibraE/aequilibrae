@@ -12,13 +12,7 @@ except ImportError as e:
 
     warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
 
-with open(os.path.join(npth, "docs/website/index.html"), mode="r") as f:
-    txt = f.read()
-
 version = f"V.{release_version}"
-txt = txt.replace("VERSION", version)
-with open(os.path.join(npth, "docs/website/index.html"), mode="w") as f:
-    f.write(txt)
 
 docs = npth + "/docs/build/html"
 docs_dest = npth + f"/docs/build/htmlv/{version}"
