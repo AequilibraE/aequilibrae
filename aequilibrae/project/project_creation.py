@@ -129,10 +129,8 @@ def create_network_tables(conn, parameters) -> None:
                       direction INTEGER NOT NULL DEFAULT 0,
                       distance NUMERIC,
                       modes TEXT NOT NULL,
-                      link_type TEXT NOT NULL DEFAULT 'default',
-                      {}
-                      FOREIGN KEY (link_type)
-                            REFERENCES link_types (link_type));"""
+                      link_type TEXT REFERENCES link_types(link_type) ON UPDATE RESTRICT ON DELETE RESTRICT,
+                      {});"""
 
     flds = fields["one-way"]
 
@@ -152,7 +150,7 @@ def create_network_tables(conn, parameters) -> None:
     link_fields = owlf + twlf
 
     if link_fields:
-        sql = sql.format(",".join(link_fields) + ",")
+        sql = sql.format(",".join(link_fields))
     else:
         sql = sql.format("")
 
