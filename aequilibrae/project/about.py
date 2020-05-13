@@ -2,14 +2,15 @@ import sqlite3
 from copy import deepcopy
 from aequilibrae.project.project_creation import create_about_table
 
+
 class About:
     """Provides an interface for querying and editing the **about** table of an AequilibraE project"""
+
     def __init__(self, conn: sqlite3.Connection):
         self.__characteristics = []
         self.__conn = conn
         if self.__has_about():
             self.__load()
-
 
     def create(self):
         """Creates the 'about' table for project files that did not previously contain it"""
