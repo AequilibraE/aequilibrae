@@ -22,8 +22,8 @@ class TestProject(TestCase):
         rmtree(self.temp_proj_folder)
 
     def test_link_type_triggers(self):
-        root = os.path.dirname(os.path.realpath(__file__)).replace('tests','')
-        qry_file = os.path.join(root,"network/database_triggers/link_type_table_triggers.sql")
+        root = os.path.dirname(os.path.realpath(__file__)).replace('tests', '')
+        qry_file = os.path.join(root, "network/database_triggers/link_type_table_triggers.sql")
         with open(qry_file, "r") as sql_file:
             query_list = sql_file.read()
             query_list = [cmd for cmd in query_list.split("#")]
@@ -99,8 +99,8 @@ class TestProject(TestCase):
                     self.fail('Missing test for triggers in link_types table')
 
     def test_mode_triggers(self):
-        root = os.path.dirname(os.path.realpath(__file__)).replace('tests','')
-        qry_file = os.path.join(root,"network/database_triggers/modes_table_triggers.sql")
+        root = os.path.dirname(os.path.realpath(__file__)).replace('tests', '')
+        qry_file = os.path.join(root, "network/database_triggers/modes_table_triggers.sql")
         with open(qry_file, "r") as sql_file:
             query_list = sql_file.read()
             query_list = [cmd for cmd in query_list.split("#")]
