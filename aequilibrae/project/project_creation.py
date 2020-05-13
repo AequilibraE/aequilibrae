@@ -242,3 +242,4 @@ def create_about_table(conn) -> None:
 
     cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
     cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
+    conn.commit()
