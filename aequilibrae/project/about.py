@@ -1,5 +1,6 @@
 import sqlite3
-from copy import deepcopy
+import string
+from warnings import warn
 from aequilibrae.project.project_creation import create_about_table
 
 
@@ -14,9 +15,12 @@ class About:
 
     def create(self):
         """Creates the 'about' table for project files that did not previously contain it"""
+
         if not self.__has_about():
             create_about_table(self.__conn)
             self.__load()
+        else:
+            warn('About table already exists', Warning)
 
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
@@ -33,14 +37,19 @@ class About:
                 p.about.my_super_relevant_field = 'super relevant information'
                 p.about.write_back()
         """
+        passed = True
+        for x in info_field:
+            if x not in string.ascii_lowercase + '_':
+                passed = False
 
-        if info_field[0].isalpha() and ' ' not in info_field:
+        if passed:
             sql = "INSERT INTO 'about' (infoname) VALUES(?)"
             curr = self.__conn.cursor()
-            curr.execute(sql, info_field)
+            curr.execute(sql, [info_field])
             self.__conn.commit()
+            self.__characteristics.append(info_field)
         else:
-            raise ValueError(f'{info_field} is not valid as a metadata field.')
+            raise ValueError(f'{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _')
 
     def write_back(self):
         """Saves the information parameters back to the project database

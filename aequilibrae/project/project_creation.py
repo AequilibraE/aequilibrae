@@ -234,7 +234,7 @@ def create_about_table(conn) -> None:
               'scenario_name',
               'scenario_description',
               'model_version',
-              'project_ID',
+              'project_id',
               'aequilibrae_version']
 
     for lt in fields:
