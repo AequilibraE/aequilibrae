@@ -111,6 +111,19 @@ where nodes.node_id=old.b_node;
 end;
 
 #
+-- Keeps the list of modes at a node up-to-date when we change the links' mode
+create trigger modes_on_nodes_table_update_links_modes after update of modes on links
+begin
+
+-- We update the modes for the node ID that just received a new link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
+, mode_id) > 0)
+where nodes.node_id=new.b_node;
+end;
+
+#
 -- Keeps the list of modes for both nodes when we insert a link
 create trigger modes_on_nodes_table_insert_link after insert on links
 begin
