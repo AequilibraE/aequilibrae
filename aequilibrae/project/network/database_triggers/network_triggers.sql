@@ -348,3 +348,38 @@ WHEN new.is_centroid != 0 AND new.is_centroid != 1
 BEGIN
   SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
 END;
+
+#
+-- prevents the user from manually changing a_node to an arbitrary number
+CREATE TRIGGER links_table_protects_a_node BEFORE UPDATE OF a_node ON links
+WHEN
+    -- detect that the node in the link's location does not have that node_id I am setting
+    (SELECT count(*)
+    FROM nodes
+    WHERE node_id == new.a_node
+    AND geometry = StartPoint(new.geometry) AND
+    ROWID IN (
+      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
+      search_frame = new.geometry)) == 0
+
+BEGIN
+	SELECT raise(ABORT, 'This change to the a_node field is wrong.');
+END;
+
+#
+
+-- prevents the user from manually changing b_node to an arbitrary number
+CREATE TRIGGER links_table_protects_b_node BEFORE UPDATE OF b_node ON links
+WHEN
+    -- detect that the node in the link's location does not have that node_id I am setting
+    (SELECT count(*)
+    FROM nodes
+    WHERE node_id == new.b_node
+    AND geometry = EndPoint(new.geometry) AND
+    ROWID IN (
+      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
+      search_frame = new.geometry)) == 0
+
+BEGIN
+	SELECT raise(ABORT, 'This change to the b_node field is wrong.');
+END;
