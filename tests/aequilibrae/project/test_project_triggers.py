@@ -228,7 +228,6 @@ class TestProject(TestCase):
                 i = self.curr.fetchone()[0]
                 self.assertEqual(i, 'ctw')
 
-
             elif 'modes_on_nodes_table_update_links_modes' in cmd:
                 sql = "UPDATE 'links' SET modes= 'x' where a_node=24"
                 self.curr.execute(sql)
@@ -258,7 +257,6 @@ class TestProject(TestCase):
                 i = self.curr.fetchone()[0]
                 self.assertIn('r', i)
                 self.assertIn('y', i)
-
 
             elif 'modes_on_links_insert' in cmd:
                 warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS: modes_on_links_insert ')
