@@ -126,6 +126,19 @@ CREATE TRIGGER new_link AFTER INSERT ON links
         link_id=(SELECT MAX(link_id)+1 FROM links)
     WHERE rowid=NEW.rowid and new.link_id is NULL;
 
+    -- We update the modes for the node ID that just received a new link starting in it
+    update nodes
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+    select GROUP_CONCAT(modes, '') from links where (links.a_node = new.a_node) or (links.b_node = new.a_node))
+    , mode_id) > 0)
+    where nodes.node_id=new.a_node;
+
+    -- We update the modes for the node ID that just received a new link ending in it
+    update nodes
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+    select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
+    , mode_id) > 0)
+    where nodes.node_id=new.b_node;
   END;
 #
 CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
@@ -174,9 +187,9 @@ CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
   END;
 #
 
--- delete lonely node AFTER link deleted
 CREATE TRIGGER deleted_link AFTER delete ON links
   BEGIN
+-- delete lonely node AFTER link deleted
     DELETE FROM nodes
     WHERE node_id NOT IN (
       SELECT a_node
@@ -184,6 +197,20 @@ CREATE TRIGGER deleted_link AFTER delete ON links
       union all
       SELECT b_node
       FROM links);
+
+     -- We update the modes for the node ID that just lost a link starting in it
+    update nodes
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+    select GROUP_CONCAT(modes, '') from links where (links.a_node = old.a_node) or (links.b_node = old.a_node))
+    , mode_id) > 0)
+    where nodes.node_id=old.a_node;
+
+    -- We update the modes for the node ID that just lost a link ending in it
+    update nodes
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+    select GROUP_CONCAT(modes, '') from links where (links.a_node = old.b_node) or (links.b_node = old.b_node))
+    , mode_id) > 0)
+    where nodes.node_id=old.b_node;
     END;
 #
 -- when moving OR creating a link, don't allow it to duplicate an existing link.
