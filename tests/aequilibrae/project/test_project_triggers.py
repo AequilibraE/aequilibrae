@@ -17,6 +17,13 @@ class TestProject(TestCase):
         self.proj.open(self.temp_proj_folder)
         self.curr = self.proj.conn.cursor()
 
+        # Modes to add
+        sql = 'INSERT INTO modes (mode_name, mode_id) VALUES (?, ?);'
+        for mid in ['p', 'l', 'g', 'x', 'y', 'd', 'k', 'a', 'r', 'n', 'm']:
+            self.curr.execute(sql, [f'mode_{mid}', mid])
+
+        self.proj.conn.commit()
+
     def tearDown(self) -> None:
         self.proj.close()
         rmtree(self.temp_proj_folder)
@@ -158,14 +165,14 @@ class TestProject(TestCase):
                 reboot_cursor()
 
             elif 'modes_on_links_update' in cmd:
-                sql = "UPDATE 'links' SET modes= 'qwerty' where modes='c'"
+                sql = "UPDATE 'links' SET modes= 'qwerty' where link_id=55"
                 self.curr.execute(sql)
 
                 self.curr.execute(cmd)
                 reboot_cursor()
 
                 with self.assertRaises(sqlite3.IntegrityError):
-                    sql = "UPDATE 'links' SET modes= 'azerty' where modes='t'"
+                    sql = "UPDATE 'links' SET modes= 'azerty' where link_id=56"
                     self.curr.execute(sql)
                 reboot_cursor()
 
@@ -181,11 +188,86 @@ class TestProject(TestCase):
                     self.curr.execute(sql)
                 reboot_cursor()
 
+            elif 'modes_on_nodes_table_update_a_node' in cmd:
+                sql = "UPDATE 'links' SET a_node= 1 where a_node=3"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=1"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertEqual(i, 'ct')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                sql = "UPDATE 'links' SET a_node= 2 where a_node=4"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=2"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertEqual(i, 'ctw')
+
+            elif 'modes_on_nodes_table_update_b_node' in cmd:
+                sql = "UPDATE 'links' SET b_node= 1 where b_node=3"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=1"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertEqual(i, 'ct')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                sql = "UPDATE 'links' SET b_node= 2 where b_node=4"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=2"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertEqual(i, 'ctw')
+
+
+            elif 'modes_on_nodes_table_update_links_modes' in cmd:
+                sql = "UPDATE 'links' SET modes= 'x' where a_node=24"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=24"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertEqual(i, 'c')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                sql = "UPDATE 'links' SET 'modes'= 'y' where a_node=24"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=24"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertIn('c', i)
+                self.assertIn('y', i)
+
+                sql = "UPDATE 'links' SET 'modes'= 'r' where b_node=24"
+                self.curr.execute(sql)
+
+                sql = "SELECT modes from nodes where node_id=24"
+                self.curr.execute(sql)
+                i = self.curr.fetchone()[0]
+                self.assertIn('r', i)
+                self.assertIn('y', i)
+
+
             elif 'modes_on_links_insert' in cmd:
                 warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS: modes_on_links_insert ')
 
             elif 'modes_length_on_links_insert' in cmd:
                 warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS: modes_length_on_links_insert')
+
             else:
                 if 'TRIGGER' in cmd.upper():
-                    self.fail('Missing test for triggers in modes table')
+                    i = cmd.upper().find('TRIGGER')
+                    e = cmd.upper().find('BEGIN')
+                    self.fail(f'Missing test for triggers in modes table --> {cmd[i:e]}')
