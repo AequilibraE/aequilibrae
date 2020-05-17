@@ -74,6 +74,13 @@ Project database
    project_docs/link_types
    project_docs/parameters_metadata
 
+Parameters file
+----------------
+.. toctree::
+   :maxdepth: 1
+
+   parameter_file
+
 Extra user data fields
 ~~~~~~~~~~~~~~~~~~~~~~
 The AequilibraE standard configuration is not particularly minimalist, but it is
