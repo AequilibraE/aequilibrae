@@ -18,6 +18,18 @@ Project Module
 
     Project
     Network
+    About
+
+Project Module
+--------------
+
+.. currentmodule:: Project
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    About
 
 Parameters Module
 -----------------

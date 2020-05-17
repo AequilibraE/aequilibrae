@@ -26,8 +26,6 @@ Contents
    gettingstarted
    parameter_file
    project
-   network
-   project_tables
    traffic_assignment
    usageexamples
    api

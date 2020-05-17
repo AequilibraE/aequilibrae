@@ -198,7 +198,7 @@ layers to the canvas, and selecting properties and clicking on *create spatial*
 *index* for each layer at a time. This action automatically saves the spatial
 indices to the sqlite database.
 
-.. image:: images/qgis_creating_spatial_indices.png
+.. image:: ../images/qgis_creating_spatial_indices.png
     :width: 1383
     :align: center
     :alt: Adding Spatial indices with QGIS
@@ -364,14 +364,13 @@ geographic nature and 3 of data-only nature.
 
 Deleting a link
 ^^^^^^^^^^^^^^^
-A link cannot be deleted if there are other elements associated with it. These
-elements are:
 
-* Transit routes
-* turn penalties
-
-In case a link is deleted, it is necessary to check for orfan nodes, and deal
+In case a link is deleted, it is necessary to check for orphan nodes, and deal
 with them as prescribed in :ref:`net_section.1.1.2`
+
+For all of the link extremities which are not automatically removed as
+prescribed above, the information on modes in the nodes layer are also updated.
+
 
 .. _net_section.1.2.2:
 
@@ -389,8 +388,11 @@ the new node created.
 
 - **The link extremity is moved from one node to another**
 
-The information of node ID (A or B node, depending on the extremety) needs to be
+The information of node ID (A or B node, depending on the extremity) needs to be
 updated according to the ID for the node the link now terminates in.
+
+In both of the cases above, the information on modes on both the original
+extremity and the new extremity nodes are also updated.
 
 .. _net_section.1.2.3:
 
@@ -455,6 +457,23 @@ Editing of the modes field will only be allowed to contain a string of mode_ids
 that exist in the *modes* table, and an error will be thrown if the user
 attempts to leave the field empty or to insert a non-existing mode_id.
 
+a_node and b_node
+^^^^^^^^^^^^^^^^^
+The user should not change the a_node and b_node fields, as they are controlled
+by the triggers that govern the consistency between links and nodes. To ensure
+that such consistency is maintained, a set of triggers exist to check if the new
+a_node and b_node of a link correspond to the correct nodes.
+
+
+Projection
+----------
+
+Although GIS technology allows for a number of different projections to be used
+in pretty much any platform, we have decided to have all AequilibraE's project
+using a single projection, WGS84 - CRS 4326.
+
+This should not affect users too much, as GIS platforms allow for on-the-fly
+reprojection for mapping purposes.
 
 
 # 4	References
