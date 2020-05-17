@@ -57,9 +57,9 @@ END;
 CREATE TRIGGER modes_length_on_links_update BEFORE UPDATE OF 'modes' ON "links"
 WHEN
 length(new.modes)<1
-BEGIN
-    SELECT RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
-END;
+begin
+    select RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
+end;
 
 #
 -- Ensures an added link has at least one mode added to it
@@ -69,3 +69,83 @@ length(new.modes)<1
 BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
 END;
+
+#
+-- Keeps the list of modes at a node up-to-date when we change the links' a_node
+create trigger modes_on_nodes_table_update_a_node after update of a_node on links
+begin
+
+-- We update the modes for the node ID that just received a new link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = new.a_node) or (links.b_node = new.a_node))
+, mode_id) > 0)
+where nodes.node_id=new.a_node;
+
+-- We update the modes for the node ID that just LOST a link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = old.a_node) or (links.b_node = old.a_node))
+, mode_id) > 0)
+where nodes.node_id=old.a_node;
+end;
+
+#
+-- Keeps the list of modes at a node up-to-date when we change the links' b_node
+create trigger modes_on_nodes_table_update_b_node after update of b_node on links
+begin
+
+-- We update the modes for the node ID that just received a new link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
+, mode_id) > 0)
+where nodes.node_id=new.b_node;
+
+-- We update the modes for the node ID that just LOST a link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = old.b_node) or (links.b_node = old.b_node))
+, mode_id) > 0)
+where nodes.node_id=old.b_node;
+end;
+
+#
+-- Keeps the list of modes for both nodes when we insert a link
+create trigger modes_on_nodes_table_insert_link after insert on links
+begin
+
+-- We update the modes for the node ID that just received a new link starting in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = new.a_node) or (links.b_node = new.a_node))
+, mode_id) > 0)
+where nodes.node_id=new.a_node;
+
+-- We update the modes for the node ID that just received a new link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
+, mode_id) > 0)
+where nodes.node_id=new.b_node;
+end;
+
+#
+-- Keeps the list of modes for both nodes when we delete a link
+create trigger modes_on_nodes_table_delete_link after delete on links
+begin
+
+-- We update the modes for the node ID that just lost a link starting in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = old.a_node) or (links.b_node = old.a_node))
+, mode_id) > 0)
+where nodes.node_id=old.a_node;
+
+-- We update the modes for the node ID that just lost a link ending in it
+update nodes
+set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
+select GROUP_CONCAT(modes, '') from links where (links.a_node = old.b_node) or (links.b_node = old.b_node))
+, mode_id) > 0)
+where nodes.node_id=old.b_node;
+end;
