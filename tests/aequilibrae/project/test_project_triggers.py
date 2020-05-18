@@ -55,8 +55,8 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
+                sql = "UPDATE 'link_types' SET link_type_id= 'ww' where link_type_id='w'"
                 with self.assertRaises(sqlite3.IntegrityError):
-                    sql = "UPDATE 'link_types' SET link_type_id= 'ww' where link_type_id='w'"
                     self.curr.execute(sql)
                 reboot_cursor()
 
@@ -78,8 +78,8 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
+                sql = "UPDATE 'link_types' SET link_type= 'QQQ' where link_type='test2'"
                 with self.assertRaises(sqlite3.IntegrityError):
-                    sql = "UPDATE 'link_types' SET link_type= 'QQQ' where link_type='test2'"
                     self.curr.execute(sql)
                 reboot_cursor()
 
@@ -90,8 +90,8 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
+                sql = "DELETE FROM 'link_types' where link_type='test4'"
                 with self.assertRaises(sqlite3.IntegrityError):
-                    sql = "DELETE FROM 'link_types' where link_type='test4'"
                     self.curr.execute(sql)
                 reboot_cursor()
 
@@ -102,13 +102,39 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
+                sql = "UPDATE 'links' SET link_type= 'not_valid_type' where link_type='test4'"
                 with self.assertRaises(sqlite3.IntegrityError):
-                    sql = "UPDATE 'links' SET link_type= 'not_valid_type' where link_type='test4'"
                     self.curr.execute(sql)
                 reboot_cursor()
 
             elif 'link_type_on_links_insert' in cmd:
-                warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS. NEED SPATIALITE FOR THAT')
+                if self.rtree:
+                    self.curr.execute('pragma table_info(links)')
+                    f = self.curr.fetchall()
+                    fields = {x[1]: x[0] for x in f}
+
+                    sql = 'select * from links where link_id=70'
+                    self.curr.execute(sql)
+                    a = [x for x in self.curr.fetchone()]
+                    a[fields['link_type']] = 'something indeed silly123'
+                    a[fields['link_id']] = 456789
+                    a[fields['a_node']] = 777
+                    a[fields['b_node']] = 999
+                    a[0] = 456789
+
+                    idx = ','.join(['?'] * len(a))
+                    self.curr.execute(f'insert into links values ({idx})', a)
+                    self.curr.execute('delete from links where link_id=456789')
+
+                    self.curr.execute(cmd)
+                    reboot_cursor()
+
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        self.curr.execute(f'insert into links values ({idx})', a)
+
+                    self.curr.execute('select link_type from link_types;')
+                    a[fields['link_type']] = self.curr.fetchone()[0]
+                    self.curr.execute(f'insert into links values ({idx})', a)
             else:
                 if 'TRIGGER' in cmd.upper():
                     self.fail('Missing test for triggers in link_types table')
