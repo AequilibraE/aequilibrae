@@ -232,10 +232,12 @@ def create_about_table(conn) -> None:
               'author',
               'license',
               'scenario_name',
+              'year',
               'scenario_description',
               'model_version',
               'project_id',
-              'aequilibrae_version']
+              'aequilibrae_version',
+              'projection']
 
     for lt in fields:
         cursor.execute(sql, [lt])
