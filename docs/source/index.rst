@@ -26,7 +26,6 @@ Contents
    gettingstarted
    project
    traffic_assignment
-   usageexamples
    api
    softwaredevelopment
    roadmap

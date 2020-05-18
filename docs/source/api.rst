@@ -17,19 +17,18 @@ Project Module
    :toctree: _generated
 
     Project
-    Network
-    About
 
-Project Module
---------------
+Project components
+++++++++++++++++++
 
-.. currentmodule:: Project
+.. currentmodule:: aequilibrae.project
 
 .. autosummary::
    :nosignatures:
    :toctree: _generated
 
     About
+    Network
 
 Parameters Module
 -----------------
@@ -96,3 +95,11 @@ Transit Module
 
     GTFS
     create_gtfsdb
+
+Use examples
+------------
+
+.. toctree::
+   :maxdepth: 1
+
+   usageexamples
