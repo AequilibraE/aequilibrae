@@ -50,7 +50,6 @@ class TestNetwork(TestCase):
             if osmids >= lks:
                 self.fail("OSM links not broken down properly")
 
-
             curr.execute("""select count(*) from nodes""")
             nds = curr.fetchone()[0]
 
