@@ -24,6 +24,14 @@ class TestProject(TestCase):
 
         self.proj.conn.commit()
 
+        curr = self.proj.conn.cursor()
+        self.rtree = True
+        try:
+            curr.execute("SELECT rtreecheck('idx_nodes_geometry');")
+        except Exception as e:
+            self.rtree = False
+            warn(f'RTREE not available --> {e.args}')
+
     def tearDown(self) -> None:
         self.proj.close()
         rmtree(self.temp_proj_folder)
@@ -267,52 +275,54 @@ class TestProject(TestCase):
                 self.assertIn('y', i)
 
             elif 'modes_on_links_insert' in cmd:
-                self.curr.execute('pragma table_info(links)')
-                f = self.curr.fetchall()
-                fields = {x[1]: x[0] for x in f}
+                if self.rtree:
+                    self.curr.execute('pragma table_info(links)')
+                    f = self.curr.fetchall()
+                    fields = {x[1]: x[0] for x in f}
 
-                sql = 'select * from links where link_id=10'
-                self.curr.execute(sql)
-                a = [x for x in self.curr.fetchone()]
-                a[fields['modes']] = 'as12'
-                a[fields['link_id']] = 1234
-                a[fields['a_node']] = 999
-                a[fields['b_node']] = 888
-                a[0] = 1234
+                    sql = 'select * from links where link_id=10'
+                    self.curr.execute(sql)
+                    a = [x for x in self.curr.fetchone()]
+                    a[fields['modes']] = 'as12'
+                    a[fields['link_id']] = 1234
+                    a[fields['a_node']] = 999
+                    a[fields['b_node']] = 888
+                    a[0] = 1234
 
-                idx = ','.join(['?'] * len(a))
-                self.curr.execute(f'insert into links values ({idx})', a)
-                self.curr.execute('delete from links where link_id=1234')
-
-                self.curr.execute(cmd)
-                reboot_cursor()
-
-                with self.assertRaises(sqlite3.IntegrityError):
+                    idx = ','.join(['?'] * len(a))
                     self.curr.execute(f'insert into links values ({idx})', a)
+                    self.curr.execute('delete from links where link_id=1234')
+
+                    self.curr.execute(cmd)
+                    reboot_cursor()
+
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        self.curr.execute(f'insert into links values ({idx})', a)
 
             elif 'modes_length_on_links_insert' in cmd:
-                self.curr.execute('pragma table_info(links)')
-                f = self.curr.fetchall()
-                fields = {x[1]: x[0] for x in f}
+                if self.rtree:
+                    self.curr.execute('pragma table_info(links)')
+                    f = self.curr.fetchall()
+                    fields = {x[1]: x[0] for x in f}
 
-                sql = 'select * from links where link_id=70'
-                self.curr.execute(sql)
-                a = [x for x in self.curr.fetchone()]
-                a[fields['modes']] = ''
-                a[fields['link_id']] = 4321
-                a[fields['a_node']] = 888
-                a[fields['b_node']] = 999
-                a[0] = 4321
+                    sql = 'select * from links where link_id=70'
+                    self.curr.execute(sql)
+                    a = [x for x in self.curr.fetchone()]
+                    a[fields['modes']] = ''
+                    a[fields['link_id']] = 4321
+                    a[fields['a_node']] = 888
+                    a[fields['b_node']] = 999
+                    a[0] = 4321
 
-                idx = ','.join(['?'] * len(a))
-                self.curr.execute(f'insert into links values ({idx})', a)
-                self.curr.execute('delete from links where link_id=4321')
-
-                self.curr.execute(cmd)
-                reboot_cursor()
-
-                with self.assertRaises(sqlite3.IntegrityError):
+                    idx = ','.join(['?'] * len(a))
                     self.curr.execute(f'insert into links values ({idx})', a)
+                    self.curr.execute('delete from links where link_id=4321')
+
+                    self.curr.execute(cmd)
+                    reboot_cursor()
+
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        self.curr.execute(f'insert into links values ({idx})', a)
 
             else:
                 if 'TRIGGER' in cmd.upper():
