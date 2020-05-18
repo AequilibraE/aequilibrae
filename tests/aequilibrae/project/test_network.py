@@ -38,16 +38,21 @@ class TestNetwork(TestCase):
             curr = self.project.conn.cursor()
 
             curr.execute("""select count(*) from links""")
-            lks = curr.fetchone()
+            lks = curr.fetchone()[0]
 
             curr.execute("""select count(distinct osm_id) from links""")
-            osmids = curr.fetchone()
+            osmids = curr.fetchone()[0]
+
+            if osmids == 0:
+                warn('COULD NOT RETRIEVE DATA FROM OSM')
+                return
 
             if osmids >= lks:
                 self.fail("OSM links not broken down properly")
 
+
             curr.execute("""select count(*) from nodes""")
-            nds = curr.fetchone()
+            nds = curr.fetchone()[0]
 
             if lks > nds:
                 self.fail("We imported more links than nodes. Something wrong here")
