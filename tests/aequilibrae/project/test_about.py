@@ -39,8 +39,9 @@ class TestAbout(TestCase):
         all_added = set()
         for t in range(30):
             k = self.randomword(random.randint(1, 15))
-            all_added.add(k)
-            self.proj.about.add_info_field(k)
+            if k not in all_added:
+                all_added.add(k)
+                self.proj.about.add_info_field(k)
 
         curr = self.proj.conn.cursor()
         curr.execute("select infoname from 'about'")
