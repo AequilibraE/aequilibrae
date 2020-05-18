@@ -200,13 +200,21 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
-                sql = "UPDATE 'links' SET a_node= 2 where a_node=4"
+                k = ''
+                for n in [2, 5]:
+                    for f in ['a_node', 'b_node']:
+                        self.curr.execute(f"SELECT modes from links where {f}={n}")
+                        k += self.curr.fetchone()[0]
+
+                existing = set(k)
+
+                sql = "UPDATE 'links' SET a_node= 2 where a_node=5"
                 self.curr.execute(sql)
 
                 sql = "SELECT modes from nodes where node_id=2"
                 self.curr.execute(sql)
-                i = self.curr.fetchone()[0]
-                self.assertEqual(i, 'ctw')
+                i = set(self.curr.fetchone()[0])
+                self.assertEqual(i, existing)
 
             elif 'modes_on_nodes_table_update_b_node' in cmd:
                 sql = "UPDATE 'links' SET b_node= 1 where b_node=3"
@@ -259,10 +267,52 @@ class TestProject(TestCase):
                 self.assertIn('y', i)
 
             elif 'modes_on_links_insert' in cmd:
-                warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS: modes_on_links_insert ')
+                self.curr.execute('pragma table_info(links)')
+                f = self.curr.fetchall()
+                fields = {x[1]: x[0] for x in f}
+
+                sql = 'select * from links where link_id=10'
+                self.curr.execute(sql)
+                a = [x for x in self.curr.fetchone()]
+                a[fields['modes']] = 'as12'
+                a[fields['link_id']] = 1234
+                a[fields['a_node']] = 999
+                a[fields['b_node']] = 888
+                a[0] = 1234
+
+                idx = ','.join(['?'] * len(a))
+                self.curr.execute(f'insert into links values ({idx})', a)
+                self.curr.execute('delete from links where link_id=1234')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                with self.assertRaises(sqlite3.IntegrityError):
+                    self.curr.execute(f'insert into links values ({idx})', a)
 
             elif 'modes_length_on_links_insert' in cmd:
-                warn('CANNOT TEST TRIGGER FOR WHEN INSERTING LINKS: modes_length_on_links_insert')
+                self.curr.execute('pragma table_info(links)')
+                f = self.curr.fetchall()
+                fields = {x[1]: x[0] for x in f}
+
+                sql = 'select * from links where link_id=70'
+                self.curr.execute(sql)
+                a = [x for x in self.curr.fetchone()]
+                a[fields['modes']] = ''
+                a[fields['link_id']] = 4321
+                a[fields['a_node']] = 888
+                a[fields['b_node']] = 999
+                a[0] = 4321
+
+                idx = ','.join(['?'] * len(a))
+                self.curr.execute(f'insert into links values ({idx})', a)
+                self.curr.execute('delete from links where link_id=4321')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                with self.assertRaises(sqlite3.IntegrityError):
+                    self.curr.execute(f'insert into links values ({idx})', a)
 
             else:
                 if 'TRIGGER' in cmd.upper():
