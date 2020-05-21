@@ -121,16 +121,16 @@ def create_network_tables(conn, parameters) -> None:
     # Create the links table
     fields = parameters["network"]["links"]["fields"]
 
-    sql = """CREATE TABLE 'links' (
-                      ogc_fid INTEGER PRIMARY KEY,
-                      link_id INTEGER UNIQUE,
-                      a_node INTEGER,
-                      b_node INTEGER,
-                      direction INTEGER NOT NULL DEFAULT 0,
-                      distance NUMERIC,
-                      modes TEXT NOT NULL,
-                      link_type TEXT REFERENCES link_types(link_type) ON UPDATE RESTRICT ON DELETE RESTRICT,
-                      {});"""
+    lnk_tbl_sql = """CREATE TABLE 'links' (ogc_fid   INTEGER PRIMARY KEY,
+                                           link_id   INTEGER UNIQUE,
+                                           a_node    INTEGER,
+                                           b_node    INTEGER,
+                                           direction INTEGER NOT NULL DEFAULT 0,
+                                           distance  NUMERIC,
+                                           modes     TEXT    NOT NULL,
+                                           link_type TEXT REFERENCES link_types(link_type) 
+                                           ON UPDATE RESTRICT ON DELETE RESTRICT,{});
+                                           """
 
     flds = fields["one-way"]
 
@@ -138,38 +138,40 @@ def create_network_tables(conn, parameters) -> None:
     def fkey(f):
         return list(f.keys())[0]
 
-    owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).lower() not in req_link_flds]
+    one_way_lnk_flds = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if
+                        fkey(f).lower() not in req_link_flds]
 
     flds = fields["two-way"]
-    twlf = []
+    two_way_lnk_flds = []
     for f in flds:
         nm = fkey(f)
         tp = f[nm]["type"]
-        twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
+        two_way_lnk_flds.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
 
-    link_fields = owlf + twlf
+    link_fields = one_way_lnk_flds + two_way_lnk_flds
 
-    if link_fields:
-        sql = sql.format(",".join(link_fields))
-    else:
-        sql = sql.format("")
+    link_field_definitions = ",".join(link_fields) + ","
+    lnk_tbl_sql = lnk_tbl_sql.format(link_field_definitions)
 
-    curr.execute(sql)
+    curr.execute(lnk_tbl_sql)
 
-    sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
-                             node_id INTEGER UNIQUE NOT NULL,
-                             is_centroid INTEGER NOT NULL DEFAULT 0,
-                             modes VARCHAR,
-                             link_types VARCHAR {});"""
+    node_tbl_sql = """CREATE TABLE 'nodes' (ogc_fid     INTEGER PRIMARY KEY,
+                                            node_id     INTEGER UNIQUE NOT NULL,
+                                            is_centroid INTEGER        NOT NULL DEFAULT 0,
+                                            modes       VARCHAR,
+                                            link_types  VARCHAR {});"""
 
     flds = parameters["network"]["nodes"]["fields"]
     ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in req_node_flds]
 
-    if ndflds:
-        sql = sql.format("," + ",".join(ndflds))
-    else:
-        sql = sql.format("")
-    curr.execute(sql)
+    node_field_definitions = ",".join(ndflds) + ","
+    node_tbl_sql = lnk_tbl_sql.format(node_field_definitions)
+
+    # if ndflds:
+    #     node_tbl_sql = node_tbl_sql.format("," + ",".join(ndflds))
+    # else:
+    #     node_tbl_sql = node_tbl_sql.format("")
+    curr.execute(node_tbl_sql)
 
     curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
     curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
