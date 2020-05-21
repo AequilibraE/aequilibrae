@@ -128,7 +128,7 @@ def create_network_tables(conn, parameters) -> None:
                                            direction INTEGER NOT NULL DEFAULT 0,
                                            distance  NUMERIC,
                                            modes     TEXT    NOT NULL,
-                                           link_type TEXT REFERENCES link_types(link_type) 
+                                           link_type TEXT REFERENCES link_types(link_type)
                                            ON UPDATE RESTRICT ON DELETE RESTRICT {});
                                            """
 
