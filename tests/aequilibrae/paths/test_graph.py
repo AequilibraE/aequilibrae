@@ -104,7 +104,7 @@ class TestGraph(TestCase):
 
     def test_exclude_links(self):
         p = Project()
-        p.load(siouxfalls_project)
+        p.open(siouxfalls_project)
         p.network.build_graphs()
 
         g = p.network.graphs['c']  # type: Graph
@@ -125,4 +125,4 @@ class TestGraph(TestCase):
         r2.compute_path(1, 14)
         self.assertEqual(list(r2.path), [2, 7, 36, 34])
 
-        p.conn.close()
+        p.close()

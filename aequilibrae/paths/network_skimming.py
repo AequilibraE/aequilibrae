@@ -68,16 +68,16 @@ class NetworkSkimming(WorkerThread):
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
 
-    def func_skim_thread(self, O, all_threads):
+    def func_skim_thread(self, orig, all_threads):
         if threading.get_ident() in all_threads:
             th = all_threads[threading.get_ident()]
         else:
             all_threads[threading.get_ident()] = all_threads["count"]
             th = all_threads["count"]
             all_threads["count"] += 1
-        x = skimming_single_origin(O, self.graph, self.results, self.aux_res, th)
+        x = skimming_single_origin(orig, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
-        if x != O:
+        if x != orig:
             self.report.append(x)
         if pyqt:
             self.skimming.emit(["zones finalized", self.cumulative])

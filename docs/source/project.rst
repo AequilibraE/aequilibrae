@@ -15,7 +15,7 @@ variety of data types and uses.
 
 The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
 with all the GIS capability supported by
-`SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. Their
+`SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. The
 impressive performance, portability, self containment and open-source character
 of these two pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
@@ -26,6 +26,22 @@ package, please refer to :ref:`dependencies`.
    This portion of AequilibraE is under intense development, and important
    changes to the project structure and the API should be expected until at
    least version 0.7. Versions 0.8 and beyond should see a much more stable API
+
+Project structure
+-----------------
+Since version 0.7, the AequilibraE project consists of a main folder, where a
+series of files and sub folders exist. The files are the following:
+
+- **project_database.sqlite** - Main project file, containing network and data
+  tables for the project
+
+- **parameters.yml** - Contains parameters for all parameterized AequilibraE
+  procedures
+
+- **matrices** (*folder*) - Contains all matrices to be used within a project
+
+- **scenarios** (*folder*) - Contains copies of each *project_database.sqlite*
+  at the time a certain scenario was saved (upcoming in version 0.8)
 
 Data consistency
 ----------------
@@ -47,20 +63,8 @@ API.
 All consistency triggers/procedures will be discussed in parallel with the
 features they implement.
 
-Project organization
---------------------
-Along with the Sqlite file that is the base for the AequilibraE project, other
-data such as documentation and binary matrices (OMX or AEM) do not fit nicely
-into a database structure, and therefore are stored in the file system in
-parallel with the Sqlite Project in a folder with the same name.
-
-For now, AequilibraE only supports one network per project file, as everything
-related to network names is hard-coded, and the work of re-factoring it would
-be substantial. However, there is nothing in the SQLite architecture that
-prevents housing an arbitrarily large number of networks within the same file.
-
-Project file components
------------------------
+Project database components
+---------------------------
 
 A number of elements are already default in the AequilibraE project, while
 others are still being developed. The components that are currently part of
@@ -117,6 +121,8 @@ The tables that are currently part of the AequilibraE project are the following:
 * links
 * nodes
 * modes
+* link_types
+* attributes_documentation
 
 .. vector_index
 .. vector_data

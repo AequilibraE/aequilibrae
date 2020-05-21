@@ -34,10 +34,22 @@ jobs:
         cd docs
         make html
 
-    - name: change documentation address
+    - name: Upload to S3
+      uses: jakejarvis/s3-sync-action@master
+      with:
+        args: --acl public-read --follow-symlinks --delete
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
+        DEST_DIR: 'python/latest/'      # optional: defaults to entire repository
+
+    - name: Create Documentation history folder
       run: python docs/website/redir.py
 
-    - name: Upload documentation address
+    - name: Upload documentation to history folder
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks --exclude '*.py'

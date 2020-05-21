@@ -17,7 +17,7 @@ pkgs = [pkg for pkg in find_packages()]
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite"],
     "aequilibrae.paths": ["parameters.pxi"],
-    "aequilibrae": ["parameter_default.yml", "parameters.yml"],
+    "aequilibrae": ["parameters.yml"],
 }
 loose_modules = ["__version__", "parameters"]
 

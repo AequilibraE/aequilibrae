@@ -111,9 +111,14 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 Nodes
 ~~~~~
 
-The nodes table only has two mandatory fields as of now: *node_id*, which can be
-directly linked to *a_node* and *b_node* in the links table, and *is_centroid*,
-which is a 1/0 value identifying nodes as centroids or not.
+The nodes table only has four mandatory fields as of now: *node_id*, which are
+directly linked to *a_node* and *b_node* in the links table through a series of
+database triggers, *is_centroid*, which is a binary 1/0 value identifying nodes
+as centroids (1) or not (0).
+
+The fields for **mode** and **link_types** are linked to the **modes** and
+**link_type** fields from the links layer through a series of triggers, and
+cannot be safely edited by the user (nor there is reason for such).
 
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
@@ -121,6 +126,10 @@ which is a 1/0 value identifying nodes as centroids or not.
 | node_id     | Unique identifier. Tied to the link table's a_node & b_node           | Integer (32/64 bits)    |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 | is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| modes       | Concatenation of all mode_ids of all links connected to the node      | String                  |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| link_types  | Concatenation of all link_type_ids of all links connected to the node | String                  |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
 **The optional fields may include, but are not limited to the following:**
@@ -180,7 +189,7 @@ you can import the network without creating indices, as shown below.
   from aequilibrae.project import Project
 
   p = Project()
-  p.new('path/to/project/file.sqlite')
+  p.new('path/to/project/new/folder')
   p.network.create_from_osm(place_name='my favorite place')
   p.conn.close()
 
@@ -203,7 +212,7 @@ with the option for creating such indices.
   from aequilibrae.project import Project
 
   p = Project()
-  p.new('path/to/project/file.sqlite')
+  p.new('path/to/project/new/folder/')
   p.network.create_from_osm(place_name='my favorite place', spatial_index=True)
   p.conn.close()
 

@@ -12,32 +12,21 @@ from aequilibrae.project.network.haversine import haversine
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
+from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 
 
 class Network():
     """
     Network class. Member of an AequilibraE Project
     """
-    req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
-    req_node_flds = ["node_id", "is_centroid"]
-    protected_fields = ['ogc_fid', 'geometry']
+    req_link_flds = req_link_flds
+    req_node_flds = req_node_flds
+    protected_fields = protected_fields
 
-    def __init__(self, project):
-        """
-        Instantiates the network with the project it is member of
-
-        Args:
-            *project* (:obj:`Project`): Project
-        """
+    def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
-
-    def _check_if_exists(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
-        tbls = curr.fetchone()[0]
-        return tbls > 0
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
@@ -117,10 +106,8 @@ class Network():
             *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
         """
 
-        if self._check_if_exists():
+        if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
-
-        self.create_empty_tables()
 
         curr = self.conn.cursor()
         curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
@@ -185,67 +172,7 @@ class Network():
             logger.info("Adding spatial indices")
             self.add_spatial_index()
 
-        self.add_triggers()
         logger.info("Network built successfully")
-
-    def create_empty_tables(self) -> None:
-        """Creates empty network tables for future filling"""
-        curr = self.conn.cursor()
-        # Create the links table
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-
-        sql = """CREATE TABLE 'links' (
-                          ogc_fid INTEGER PRIMARY KEY,
-                          link_id INTEGER UNIQUE,
-                          a_node INTEGER,
-                          b_node INTEGER,
-                          direction INTEGER NOT NULL DEFAULT 0,
-                          distance NUMERIC,
-                          modes TEXT NOT NULL,
-                          link_type TEXT NOT NULL DEFAULT 'link type not defined'
-                          {});"""
-
-        flds = fields["one-way"]
-
-        # returns first key in the dictionary
-        def fkey(f):
-            return list(f.keys())[0]
-
-        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).lower() not in self.req_link_flds]
-
-        flds = fields["two-way"]
-        twlf = []
-        for f in flds:
-            nm = fkey(f)
-            tp = f[nm]["type"]
-            twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
-
-        link_fields = owlf + twlf
-
-        if link_fields:
-            sql = sql.format("," + ",".join(link_fields))
-        else:
-            sql = sql.format("")
-
-        curr.execute(sql)
-
-        sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
-                                 node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
-
-        flds = p.parameters["network"]["nodes"]["fields"]
-        ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in self.req_node_flds]
-
-        if ndflds:
-            sql = sql.format("," + ",".join(ndflds))
-        else:
-            sql = sql.format("")
-        curr.execute(sql)
-
-        curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
-        curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
-        self.conn.commit()
 
     def build_graphs(self) -> None:
         """Builds graphs for all modes currently available in the model
@@ -262,8 +189,8 @@ class Network():
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
-        for l in raw_links:
-            lk = list(map(lambda x: np.nan if x is None else x, l))
+        for lnk in raw_links:
+            lk = list(map(lambda x: np.nan if x is None else x, lnk))
             links.append(lk)
 
         data = np.core.records.fromrecords(links, names=all_fields)
@@ -319,9 +246,7 @@ class Network():
         Returns:
             :obj:`int`: Number of links
         """
-        c = self.conn.cursor()
-        c.execute("""select count(link_id) from links""")
-        return c.fetchone()[0]
+        return self.__count_items('link_id', 'links', 'link_id>=0')
 
     def count_centroids(self) -> int:
         """
@@ -330,9 +255,7 @@ class Network():
         Returns:
             :obj:`int`: Number of centroids
         """
-        c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes where is_centroid=1;""")
-        return c.fetchone()[0]
+        return self.__count_items('node_id', 'nodes', 'is_centroid=1')
 
     def count_nodes(self) -> int:
         """
@@ -341,42 +264,20 @@ class Network():
         Returns:
             :obj:`int`: Number of nodes
         """
-        c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes""")
-        return c.fetchone()[0]
+        return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
-    def add_triggers(self):
-        """Adds consistency triggers to the project"""
-        self.__add_network_triggers()
-        self.__add_mode_triggers()
+    def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
+        """
+               Adds a centroid and centroid connectors for the desired modes to the network file
 
-    def __add_network_triggers(self) -> None:
-        logger.info("Adding network triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "network_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
+               Args:
+                   *node_id* (:obj:`int`): ID for the centroid to be included in the network
 
-    def __add_mode_triggers(self) -> None:
-        logger.info("Adding mode table triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "modes_table_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
+                   *coords* (:obj:`List`): XY Coordinates for centroid -> [LONGITUDE, LATITUDE]
 
-    def __add_trigger_from_file(self, qry_file: str):
-        curr = self.conn.cursor()
-        sql_file = open(qry_file, "r")
-        query_list = sql_file.read()
-        sql_file.close()
-
-        # Run one query/command at a time
-        for cmd in query_list.split("#"):
-            try:
-                curr.execute(cmd)
-            except Exception as e:
-                msg = f"Error creating trigger: {e.args}"
-                logger.error(msg)
-                logger.info(cmd)
-        self.conn.commit()
+                   *modes* (:obj:`str`): Modes for which centroids connectors should be added
+               """
+        pass
 
     def add_spatial_index(self) -> None:
         """Adds spatial indices to links and nodes table
@@ -387,3 +288,8 @@ class Network():
         curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
         curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
         self.conn.commit()
+
+    def __count_items(self, field: str, table: str, condition: str) -> int:
+        c = self.conn.cursor()
+        c.execute(f"""select count({field}) from {table} where {condition};""")
+        return c.fetchone()[0]
