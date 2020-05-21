@@ -129,7 +129,7 @@ def create_network_tables(conn, parameters) -> None:
                                            distance  NUMERIC,
                                            modes     TEXT    NOT NULL,
                                            link_type TEXT REFERENCES link_types(link_type) 
-                                           ON UPDATE RESTRICT ON DELETE RESTRICT,{});
+                                           ON UPDATE RESTRICT ON DELETE RESTRICT {});
                                            """
 
     flds = fields["one-way"]
@@ -150,7 +150,8 @@ def create_network_tables(conn, parameters) -> None:
 
     link_fields = one_way_lnk_flds + two_way_lnk_flds
 
-    link_field_definitions = ",".join(link_fields) + ","
+    link_fields.insert(0, '')
+    link_field_definitions = ",".join(link_fields)
     lnk_tbl_sql = lnk_tbl_sql.format(link_field_definitions)
 
     curr.execute(lnk_tbl_sql)
@@ -163,9 +164,9 @@ def create_network_tables(conn, parameters) -> None:
 
     flds = parameters["network"]["nodes"]["fields"]
     ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in req_node_flds]
-
-    node_field_definitions = ",".join(ndflds) + ","
-    node_tbl_sql = lnk_tbl_sql.format(node_field_definitions)
+    ndflds.insert(0, '')
+    node_field_definitions = ",".join(ndflds)
+    node_tbl_sql = node_tbl_sql.format(node_field_definitions)
 
     # if ndflds:
     #     node_tbl_sql = node_tbl_sql.format("," + ",".join(ndflds))
