@@ -173,8 +173,8 @@ Next, build the documentation in html format with the following commands run fro
 Releases
 ~~~~~~~~~
 
-AequilibraE releases are manually (and not often) uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`__  (pypi).
+AequilibraE releases are automatically  uploaded to the `Python Package Index
+<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (6 to 12 times per year).
 
 
 Finally
