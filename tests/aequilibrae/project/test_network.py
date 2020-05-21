@@ -58,15 +58,12 @@ class TestNetwork(TestCase):
 
     def test_count_centroids(self):
         items = self.siouxfalls.network.count_centroids()
-        if items != 24:
-            self.fail('Wrong number of centroids found')
+        self.assert_equal(24, items, 'Wrong number of centroids found')
 
     def test_count_links(self):
         items = self.siouxfalls.network.count_links()
-        if items != 76:
-            self.fail('Wrong number of links found')
+        self.assert_equal(76, items, 'Wrong number of links found')
 
     def test_count_nodes(self):
         items = self.siouxfalls.network.count_nodes()
-        if items != 24:
-            self.fail('Wrong number of nodes found')
+        self.assert_equal(24, items, 'Wrong number of nodes found')
