@@ -63,7 +63,7 @@ class Modes:
         if mode.mode_id in self.__all_modes:
             raise ValueError("Mode already exists in the model")
 
-        self.curr.execute(f"insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
+        self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
         self.conn.commit()
         logger.info(f'mode {mode.mode_name}({mode.mode_id}) was added to the project')
 

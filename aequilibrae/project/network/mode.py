@@ -17,7 +17,7 @@ class Mode:
         conn = database_connection()
         curr = conn.cursor()
 
-        curr.execute(f'pragma table_info(modes)')
+        curr.execute('pragma table_info(modes)')
         table_struct = curr.fetchall()
         self.__fields = [x[1] for x in table_struct]
         self.__original__ = {}
@@ -62,7 +62,7 @@ class Mode:
         if curr.fetchone()[0] == 0:
             raise ValueError("Mode does not exist in the model. You need to explicitly add it")
 
-        curr.execute(f'pragma table_info(modes)')
+        curr.execute('pragma table_info(modes)')
         table_struct = [x[1] for x in curr.fetchall()]
 
         for key, value in self.__dict__.items():
