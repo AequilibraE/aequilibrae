@@ -30,6 +30,29 @@ Project components
     About
     Network
 
+Network data tables
+~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: aequilibrae.project.network
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    Modes
+
+Network items
+~~~~~~~~~~~~~
+
+.. currentmodule:: aequilibrae.project.network
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+
+    Mode
+
 Parameters Module
 -----------------
 

@@ -167,7 +167,7 @@ CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
         nodes.node_id = new.b_node))
     WHERE links.ROWID = new.ROWID;
     UPDATE links
-    SET distance = 0
+    SET distance = GeodesicLength(new.geometry)
     WHERE links.ROWID = new.ROWID;
 
     -- now delete nodes which no-longer have attached links

@@ -9,6 +9,7 @@ from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
+from aequilibrae.project.network.modes import Modes
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
@@ -27,6 +28,7 @@ class Network():
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
+        self.modes = Modes(self)
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):

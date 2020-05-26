@@ -30,19 +30,20 @@ def create_meta_table(conn) -> None:
 
 
 def create_modes_table(conn, parameters) -> None:
-    create_query = """CREATE TABLE 'modes' (mode_name VARCHAR UNIQUE NOT NULL,
-                                            mode_id VARCHAR PRIMARY KEY UNIQUE NOT NULL,
+    create_query = """CREATE TABLE 'modes' (mode_name   VARCHAR                UNIQUE NOT NULL,
+                                            mode_id     VARCHAR PRIMARY KEY    UNIQUE NOT NULL,
                                             description VARCHAR,
-                                            alpha NUMERIC,
-                                            beta NUMERIC,
-                                            gamma NUMERIC,
-                                            delta NUMERIC,
-                                            epsilon NUMERIC,
-                                            zeta NUMERIC,
-                                            iota NUMERIC,
-                                            sigma NUMERIC,
-                                            phi NUMERIC,
-                                            tau NUMERIC);"""
+                                            pce         NUMERIC                NOT NULL DEFAULT 0,
+                                            alpha       NUMERIC,
+                                            beta        NUMERIC,
+                                            gamma       NUMERIC,
+                                            delta       NUMERIC,
+                                            epsilon     NUMERIC,
+                                            zeta        NUMERIC,
+                                            iota        NUMERIC,
+                                            sigma       NUMERIC,
+                                            phi         NUMERIC,
+                                            tau         NUMERIC);"""
     cursor = conn.cursor()
     cursor.execute(create_query)
     modes = parameters["network"]["modes"]

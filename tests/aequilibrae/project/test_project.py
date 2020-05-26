@@ -2,6 +2,7 @@ from unittest import TestCase
 import tempfile
 import os
 from aequilibrae.project import Project
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 import uuid
 from functools import reduce
@@ -63,3 +64,11 @@ class TestProject(TestCase):
         for f in flds:
             if f not in nfields:
                 self.fail(f"Field {f} not added to nodes table")
+
+    def test_close(self):
+
+        _ = database_connection()
+
+        self.proj.close()
+        with self.assertRaises(FileExistsError):
+            _ = database_connection()
