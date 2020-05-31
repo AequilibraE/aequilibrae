@@ -31,7 +31,9 @@ if 'WINDOWS' in platform.platform().upper():
     start_dir = 'C:/hostedtoolcache/windows/Python/'
     pattern = "sqlite3.dll"
     for dir, _, _ in walk(start_dir):
-        print(glob(join(dir, pattern)))
+        q = glob(join(dir, pattern))
+        if len(q)> 0:
+            print(q)
 
         # We now set sqlite. Only needed in thge windows server in Github
     plats = {'x86': 'https://sqlite.org/2020/sqlite-dll-win32-x86-3320100.zip',
