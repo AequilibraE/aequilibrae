@@ -34,7 +34,7 @@ Whenever we change the modes allowed on a link, we need to check for two
 conditions:
 
 * At least one mode is allowed on that link
-* All links allowed on that link exist in the modes table
+* All modes allowed on that link exist in the modes table
 
 For each condition, a specific trigger was built, and if any of the checks
 fails, the transaction will fail.
@@ -49,9 +49,8 @@ Directly changing the modes field in the nodes table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A trigger guarantees that the value being inserted in the field is according to
-the values found in the associated links' modes field.
-THIS TRIGGER IS STILL MISSING
-
+the values found in the associated links' modes field. If the user attempts to
+overwrite this value, it will automatically be set back to the appropriate value.
 
 .. _tables_section6.1.1.2:
 
