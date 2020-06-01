@@ -356,7 +356,6 @@ class TestProject(TestCase):
                 dt = self.curr.fetchall()
 
                 x = choice(dt)
-                print(x)
 
                 self.curr.execute(f'update nodes set modes="abcdefgq" where node_id={x[0]}')
                 self.curr.execute(f'select node_id, modes from nodes where node_id={x[0]}')
@@ -368,19 +367,21 @@ class TestProject(TestCase):
                 reboot_cursor()
 
                 y = choice(dt)
+                while y == x:
+                    y = choice(dt)
 
                 # We try to force the change to make sure it was correctly filled to begin with
                 self.curr.execute(f'update nodes set modes="hgfedcba" where node_id={y[0]}')
 
-                while y == x:
-                    y = choice(dt)
+                self.curr.execute(f'select node_id, modes from nodes where node_id={y[0]}')
+                k = self.curr.fetchone()
 
                 self.curr.execute(f'update nodes set modes="abcdefgq" where node_id={y[0]}')
 
                 self.curr.execute(f'select node_id, modes from nodes where node_id={y[0]}')
                 z = self.curr.fetchone()
 
-                self.assertEqual(z, y, 'Failed to preserve the information on modes for the nodes')
+                self.assertEqual(z, k, 'Failed to preserve the information on modes for the nodes')
 
             else:
                 if 'TRIGGER' in cmd.upper():
