@@ -28,11 +28,12 @@ with open(file, "w") as stream:
 
 if 'WINDOWS' in platform.platform().upper():
     from glob import glob
+
     start_dir = 'C:/hostedtoolcache/windows/Python/'
     pattern = "sqlite3.dll"
     for dir, _, _ in walk(start_dir):
         q = glob(join(dir, pattern))
-        if len(q)> 0:
+        if len(q) > 0:
             print(q)
 
         # We now set sqlite. Only needed in thge windows server in Github

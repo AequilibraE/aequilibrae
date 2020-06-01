@@ -1,3 +1,4 @@
+from typing import Dict
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
@@ -45,7 +46,7 @@ class Modes:
         # We then explicitly add it to the network
         modes.add(new_mode)
 
-        # we can even keep editing and save it
+        # we can even keep editing and save it directly once we have added it to the project
         new_mode.description = 'this is my new description'
         new_mode.save()
     """
@@ -70,7 +71,7 @@ class Modes:
         mode.save()
 
     def drop(self, mode_id: str) -> None:
-        """Remove the mode with **mode_id** from the project"""
+        """Removes the mode with **mode_id** from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
             self.conn.commit()
@@ -86,7 +87,7 @@ class Modes:
             raise ValueError(f'Mode {mode_id} does not exist in the model')
         return Mode(mode_id)
 
-    def all_modes(self) -> dict:
+    def all_modes(self) -> Dict[Mode]:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
         self.__update_list_of_modes()
         return {x: Mode(x) for x in self.__all_modes}
