@@ -378,7 +378,6 @@ class TestProject(TestCase):
 
                 self.assertEqual(z, y, 'Failed to preserve the information on modes for the nodes')
 
-
             else:
                 if 'TRIGGER' in cmd.upper():
                     i = cmd.upper().find('TRIGGER')
