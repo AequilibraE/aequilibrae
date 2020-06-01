@@ -367,10 +367,11 @@ class TestProject(TestCase):
                 self.curr.execute(cmd)
                 reboot_cursor()
 
+                y = choice(dt)
+
                 # We try to force the change to make sure it was correctly filled to begin with
                 self.curr.execute(f'update nodes set modes="hgfedcba" where node_id={y[0]}')
 
-                y = choice(dt)
                 while y == x:
                     y = choice(dt)
 
