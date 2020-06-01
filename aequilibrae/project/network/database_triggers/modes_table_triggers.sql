@@ -131,9 +131,8 @@ where nodes.node_id=new.a_node;
 
 end;
 
-
 #
--- Keeps the list of modes at a node up-to-date when we change the links' mode
+-- Keeps the list of modes at a node up-to-date when we try to manually change the modes field in the nodes table
 create trigger modes_on_nodes_table_update_nodes_modes after update of modes on nodes
 begin
 

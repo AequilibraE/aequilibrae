@@ -1,6 +1,7 @@
 from unittest import TestCase
 import tempfile
 import os
+from random import choice
 from warnings import warn
 from shutil import copytree, rmtree
 from aequilibrae.project import Project
@@ -349,6 +350,34 @@ class TestProject(TestCase):
 
                     with self.assertRaises(sqlite3.IntegrityError):
                         self.curr.execute(f'insert into links values ({idx})', a)
+
+            elif 'modes_on_nodes_table_update_nodes_modes' in cmd:
+                self.curr.execute('select node_id, modes from nodes where length(modes)>0')
+                dt = self.curr.fetchall()
+
+                x = choice(dt)
+                print(x)
+
+                self.curr.execute(f'update nodes set modes="abcdefgq" where node_id={x[0]}')
+                self.curr.execute(f'select node_id, modes from nodes where node_id={x[0]}')
+                z = self.curr.fetchone()
+                if z == x:
+                    self.fail('Modes field on nodes layer is being preserved by unknown mechanism')
+
+                self.curr.execute(cmd)
+                reboot_cursor()
+
+                y = choice(dt)
+                while y == x:
+                    y = choice(dt)
+
+                self.curr.execute(f'update nodes set modes="abcdefgq" where node_id={y[0]}')
+
+                self.curr.execute(f'select node_id, modes from nodes where node_id={y[0]}')
+                z = self.curr.fetchone()
+
+                self.assertEqual(z, y, 'Failed to preserve the information on modes for the nodes')
+
 
             else:
                 if 'TRIGGER' in cmd.upper():
