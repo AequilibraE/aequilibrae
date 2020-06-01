@@ -285,6 +285,9 @@ traffic and transit assignments, this behavior would not be considered valid.
 All other edits that result in the creation of un-connected nodes or that result
  in such case should result in an error that prevents such operation
 
+Behavior regarding the fields regarding modes and link types is discussed in
+their respective table descriptions
+
 .. _net_section.1.1.2:
 
 Deleting a node
@@ -306,6 +309,9 @@ A node can only be eliminated as a consequence of all links that terminated/
 originated at it being eliminated. If the user tries to delete a node, the
 network should return an error and not perform such operation.
 
+Behavior regarding the fields regarding modes and link types is discussed in
+their respective table descriptions
+
 .. _net_section.1.1.3:
 
 Moving a node
@@ -325,6 +331,9 @@ All the links that connected to the node on the bottom have their extremities
 switched to the node on top
 The node on the bottom gets eliminated as a consequence of the behavior listed
 on :ref:`net_section.1.1.2`
+
+Behavior regarding the fields regarding modes and link types is discussed in
+their respective table descriptions
 
 .. _net_section.1.1.4:
 
@@ -368,8 +377,8 @@ Deleting a link
 In case a link is deleted, it is necessary to check for orphan nodes, and deal
 with them as prescribed in :ref:`net_section.1.1.2`
 
-For all of the link extremities which are not automatically removed as
-prescribed above, the information on modes in the nodes layer are also updated.
+Behavior regarding the fields regarding modes and link types is discussed in
+their respective table descriptions.
 
 
 .. _net_section.1.2.2:
@@ -391,8 +400,8 @@ the new node created.
 The information of node ID (A or B node, depending on the extremity) needs to be
 updated according to the ID for the node the link now terminates in.
 
-In both of the cases above, the information on modes on both the original
-extremity and the new extremity nodes are also updated.
+Behavior regarding the fields regarding modes and link types is discussed in
+their respective table descriptions.
 
 .. _net_section.1.2.3:
 
@@ -451,18 +460,22 @@ an SQL exception.
 
 .. _net_section.1.3.3:
 
-*modes* field
-^^^^^^^^^^^^^
-Editing of the modes field will only be allowed to contain a string of mode_ids
-that exist in the *modes* table, and an error will be thrown if the user
-attempts to leave the field empty or to insert a non-existing mode_id.
+*modes* field (Links and Nodes layers)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A serious of triggers are associated with the modes field, and they are all
+described in the :ref:`tables_modes`.
+
+*link_type* field (Links layer) & *link_types* field (Nodes layer)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A serious of triggers are associated with the modes field, and they are all
+described in the :ref:`tables_link_types`.
 
 a_node and b_node
 ^^^^^^^^^^^^^^^^^
 The user should not change the a_node and b_node fields, as they are controlled
-by the triggers that govern the consistency between links and nodes. To ensure
-that such consistency is maintained, a set of triggers exist to check if the new
-a_node and b_node of a link correspond to the correct nodes.
+by the triggers that govern the consistency between links and nodes. It is not
+possible to enforce that users do not change these two fields, as it is not
+possible to choose the trigger application sequence in SQLite
 
 
 Projection
