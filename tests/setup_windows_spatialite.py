@@ -27,16 +27,7 @@ with open(file, "w") as stream:
     yaml.dump(parameters, stream, default_flow_style=False)
 
 if 'WINDOWS' in platform.platform().upper():
-    from glob import glob
-
-    start_dir = 'C:/hostedtoolcache/windows/Python/'
-    pattern = "sqlite3.dll"
-    for dir, _, _ in walk(start_dir):
-        q = glob(join(dir, pattern))
-        if len(q) > 0:
-            print(q)
-
-        # We now set sqlite. Only needed in thge windows server in Github
+    # We now set sqlite. Only needed in thge windows server in Github
     plats = {'x86': 'https://sqlite.org/2020/sqlite-dll-win32-x86-3320100.zip',
              'x64': 'https://sqlite.org/2020/sqlite-dll-win64-x64-3320100.zip'}
 
@@ -55,3 +46,4 @@ if 'WINDOWS' in platform.platform().upper():
                 zipfile.ZipFile(zip_path64).extractall(d)
             else:
                 zipfile.ZipFile(zip_path86).extractall(d)
+            print(f'Replaces {d}')
