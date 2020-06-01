@@ -22,11 +22,19 @@ class TestAbout(TestCase):
         self.proj.close()
         rmtree(self.temp_proj_folder)
 
-    def test_create(self):
+    def test_create_and_list(self):
         self.proj.about.create()
 
         with self.assertWarns(expected_warning=Warning):
             self.proj.about.create()
+
+        list = self.proj.about.list_fields()
+        expected = ['model_name', 'region', 'description', 'author', 'license', 'scenario_name', 'year',
+                    'scenario_description', 'model_version', 'project_id', 'aequilibrae_version', 'projection']
+
+        failed = [x for x in list if x not in expected] + [x for x in expected if x not in list]
+        if failed:
+            self.fail('About table does not have all expected fields')
 
     # idea from https://stackoverflow.com/a/2030081/1480643
     def randomword(self, length):

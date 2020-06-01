@@ -5,7 +5,15 @@ from aequilibrae.project.project_creation import create_about_table
 
 
 class About:
-    """Provides an interface for querying and editing the **about** table of an AequilibraE project"""
+    """Provides an interface for querying and editing the **about** table of an AequilibraE project
+        ::
+
+            p = Project()
+            p.open('my/project/folder')
+            about = p.about
+
+
+    """
 
     def __init__(self, conn: sqlite3.Connection):
         self.__characteristics = []
@@ -21,6 +29,10 @@ class About:
             self.__load()
         else:
             warn('About table already exists', Warning)
+
+    def list_fields(self) -> list:
+        """Returns a list of all characteristics the about table holds"""
+        return [x for x in self.__characteristics]
 
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
