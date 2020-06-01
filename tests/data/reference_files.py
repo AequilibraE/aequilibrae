@@ -26,3 +26,6 @@ project_file = join(dirname(dirname(abspath(__file__))), "data", "AequilibraE_Pr
 siouxfalls_project = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project")
 siouxfalls_demand = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "SiouxFalls.omx")
 siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_project/matrices", "sfalls_skims.omx")
+
+#
+no_triggers_project = join(dirname(dirname(abspath(__file__))), "data/no_triggers_project")
