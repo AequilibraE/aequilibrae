@@ -87,7 +87,7 @@ class Modes:
             raise ValueError(f'Mode {mode_id} does not exist in the model')
         return Mode(mode_id)
 
-    def all_modes(self) -> Dict[Mode]:
+    def all_modes(self) -> dict:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
         self.__update_list_of_modes()
         return {x: Mode(x) for x in self.__all_modes}
