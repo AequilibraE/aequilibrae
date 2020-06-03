@@ -1,7 +1,10 @@
+from os.path import join, dirname, realpath
 import sqlite3
 import string
 from warnings import warn
-from aequilibrae.project.project_creation import create_about_table
+import uuid
+from aequilibrae.project.project_creation import run_queries_from_sql_file
+from aequilibrae.paths import release_version
 
 
 class About:
@@ -25,10 +28,20 @@ class About:
         """Creates the 'about' table for project files that did not previously contain it"""
 
         if not self.__has_about():
-            create_about_table(self.__conn)
+            qry_file = join(dirname(realpath(__file__)), 'database_specification', 'tables', 'about.sql')
+            run_queries_from_sql_file(self.__conn, qry_file)
+
+        cursor = self.__conn.cursor()
+        cursor.execute('select infovalue from about where infoname="aequilibrae_version"')
+
+        if cursor.fetchone()[0] is None:
+            cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
+            cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
+            self.__conn.commit()
+
             self.__load()
         else:
-            warn('About table already exists', Warning)
+            warn('About table already exists. Nothing was done', Warning)
 
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""

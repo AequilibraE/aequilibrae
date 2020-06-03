@@ -58,7 +58,6 @@ To manually add link types, the user can add further link types to the
 parameters file, as shown below.
 
 
-
 Adding new link_types to a project
 ----------------------------------
 **STILL NEED TO BUILD THE API FOR SUCH**
@@ -71,6 +70,16 @@ As it happens with the links and nodes tables,
 (:ref:`network_triggers_behaviour`), the link_types table is kept consistent
 with the links table through the use of database triggers
 
+
+.. _tables_section6.2.5.0:
+
+Changes to reserved link_types
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For both link types mentioned about (**y** & **z**), changes to the *link_type*
+and *link_type_id* fields, as well as the removal of any of these records are
+blocked by database triggers, as to ensure that there is always one generic
+physical link type and one virtual link type present in the model.
 
 .. _tables_section6.2.5.1:
 
@@ -126,3 +135,4 @@ In counterpoint, only the second behaviour mentioned above on
 :ref:`tables_section6.2.5.3` applies in this case, the verification that the old
 link_type is not still in use by the network. Therefore only one new trigger is
 required.
+

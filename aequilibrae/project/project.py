@@ -79,6 +79,7 @@ class Project:
 
         self.__create_empty_project()
         self.__load_objects()
+        self.about.create()
         logger.info(f'Created project on {self.project_base_path}')
 
     def close(self) -> None:
