@@ -40,7 +40,7 @@ class TestProject(TestCase):
         fields = [x[1] for x in fields]
 
         if 'distance' not in fields:
-            self.fail(f"Table LINKS was not created correctly")
+            self.fail("Table LINKS was not created correctly")
 
         curr = self.proj.conn.cursor()
         curr.execute("""PRAGMA table_info(nodes);""")
