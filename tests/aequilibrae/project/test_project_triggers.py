@@ -147,7 +147,6 @@ class TestProject(TestCase):
                 with self.assertRaises(sqlite3.IntegrityError):
                     self.curr.execute('delete from link_types where link_type_id="y"')
 
-
             elif 'link_type_id_keep_if_protected_type' in cmd:
                 self.curr.execute(cmd)
                 reboot_cursor()
@@ -157,7 +156,6 @@ class TestProject(TestCase):
 
                 with self.assertRaises(sqlite3.IntegrityError):
                     self.curr.execute('update link_types set link_type_id="x" where link_type_id="z"')
-
 
             elif 'link_type_keep_if_protected_type' in cmd:
                 self.curr.execute(cmd)
