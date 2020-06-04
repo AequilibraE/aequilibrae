@@ -11,7 +11,7 @@ Network
   `Andrew <https://au.linkedin.com/in/andrew-o-brien-5a8bb486>`_.
 
 The objectives of developing a network format for AequilibraE are to provide the
-users a seamless integration between network data and  transportation modeling
+users a seamless integration between network data and transportation modeling
 algorithms and to allow users to easily edit such networks in any GIS platform
 they'd like, while ensuring consistency between network components, namely links
 and nodes.
@@ -20,7 +20,7 @@ As mentioned in other sections of this documentation, the AequilibraE
 network file is composed by a links and a nodes layer that are kept
 consistent with each other through the use of database triggers, and
 the network can therefore be edited in any GIS platform or
-programatically in any fashion, while these triggers will ensure that
+programatically in any fashion, as these triggers will ensure that
 the two layers are kept compatible with each other by either making
 other changes to the layers or preventing the changes.
 
@@ -32,8 +32,8 @@ platforms, we have detailed the behaviour for all different network changes in
 This implementation choice is not, however, free of caveats. Due to
 technological limitations of SQLite, some of the desired behaviors identified in
 :ref:`net_section.1` cannot be implemented, but such caveats do not impact the
-usefulness of this implementation or its robustness in face proper use of the
-tool.
+usefulness of this implementation or its robustness in face of minimally careful
+use of the tool.
 
 .. note::
    AequilibraE does not currently support turn penalties and/or bans. Their
@@ -50,12 +50,14 @@ Links
 ~~~~~
 
 Network links are defined by geographic elements of type LineString (No
-MultiLineString allowed) and a series of mandatory fields, as well a series of
+MultiLineString allowed) and a series of required fields, as well a series of
 other optional fields that might be required for documentation and display
 purposes (e.g. street names) or by specific applications (e.g. parameters for
 Volume-Delay functions, hazardous vehicles restrictions, etc.).
 
-**The mandatory fields are the following**
+Below we present the
+
+**The mandatory fields are the following. REMOVING ANY OF THESE FIELDS WILL CORRUPT YOUR NETWORK**
 
 +-------------+-----------------------------------------------------------------------+-------------------------+
 |  Field name |                           Field Description                           |        Data Type        |
@@ -76,37 +78,28 @@ Volume-Delay functions, hazardous vehicles restrictions, etc.).
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
 
-**The optional fields may include, but are not limited to the following:**
+**The following fields are generated when a new AequilibraE model is created,**
+**but may be removed without compromising the network's consistency.**
 
-+-----------------------+------------------------------------------------------------------+----------------+
-| Field name            | Field description                                                | Data type      |
-+=======================+==================================================================+================+
-| Street name           | Cadastre name of the street                                      | String         |
-+-----------------------+------------------------------------------------------------------+----------------+
-| capacity_ab           | Modeling capacity of the link for the direction A --> B          | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| capacity_ba           | Modeling capacity of the link for the direction B --> A          | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| speed_ab              | Modeling (Free flow) speed for the link in the A --> B direction | Float 32 Bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| speed_ab              | Modeling (Free flow) speed for the link in the B --> A direction | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| volume delay function | Type of volume delay function to be used on that link            | String         |
-+-----------------------+------------------------------------------------------------------+----------------+
-| alfa_ab               | Alfa parameter for the BPR for the A->B direction of link        | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| alfa_ba               | Alfa parameter for the BPR for the B->A direction of link        | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| beta_ab               | Beta parameter for the BPR for the A->B direction of link        | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| beta_ba               | Beta parameter for the BPR for the B->A direction of link        | Float 32 bits  |
-+-----------------------+------------------------------------------------------------------+----------------+
-| lanes_ba              | Number of lanes of the link for the direction A->B               | Integer 8 bits |
-+-----------------------+------------------------------------------------------------------+----------------+
-| lanes_ba              | Number of lanes of the link for the direction B->A               | Integer 8 bits |
-+-----------------------+------------------------------------------------------------------+----------------+
-| ...                   | ...                                                              | ...            |
-+-----------------------+------------------------------------------------------------------+----------------+
++-------------+-----------------------------------------------------------------------+-------------------------+
+|  Field name |                           Field Description                           |        Data Type        |
++=============+=======================================================================+=========================+
+| name        | Cadastre name of the street                                           | String                  |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| capacity_ab | Modeling capacity of the link for the direction A --> B               | Float 32 bits           |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| capacity_ba | Modeling capacity of the link for the direction B --> A               | Float 32 bits           |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| speed_ab    | Modeling (Free flow) speed for the link in the A --> B direction      | Float 32 Bits           |
++-------------+-----------------------------------------------------------------------+-------------------------+
+| speed_ab    | Modeling (Free flow) speed for the link in the B --> A direction      | Float 32 bits           |
++-------------+-----------------------------------------------------------------------+-------------------------+
+
+The user is free to add a virtually unlimited number of fields to the network.
+Although we recommend adding fields using the Python API, adding fields
+directly to the database should not create any issues, but one should observe
+the convention that direction-specific information should be added in the
+form of two fields with the suffixes *_ab* & *_ba*.
 
 Nodes
 ~~~~~
@@ -116,8 +109,8 @@ directly linked to *a_node* and *b_node* in the links table through a series of
 database triggers, *is_centroid*, which is a binary 1/0 value identifying nodes
 as centroids (1) or not (0).
 
-The fields for **mode** and **link_types** are linked to the **modes** and
-**link_type** fields from the links layer through a series of triggers, and
+The fields for *modes* and *link_types* are linked to the *modes* and
+*link_type* fields from the links layer through a series of triggers, and
 cannot be safely edited by the user (nor there is reason for such).
 
 +-------------+-----------------------------------------------------------------------+-------------------------+
@@ -132,18 +125,13 @@ cannot be safely edited by the user (nor there is reason for such).
 | link_types  | Concatenation of all link_type_ids of all links connected to the node | String                  |
 +-------------+-----------------------------------------------------------------------+-------------------------+
 
-**The optional fields may include, but are not limited to the following:**
+As it is the case for the lin k layer, the user is welcome to add new fields
+directly to the database, but we recommend using the API.
 
-+-------------+-----------------------------------------------------------------------+-------------------------+
-|  Field name |                           Field Description                           |        Data Type        |
-+=============+=======================================================================+=========================+
-| taz         | Zone in which the zone is located                                     | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| ...         | ...                                                                   | ...                     |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-
-It is good practice when working with the sqlite to keep all field names without
-spaces and all lowercase.
+.. note::
+    It is good practice when working with the sqlite to keep all field names without
+    spaces and all lowercase. **SPACES AND NUMBERS IN THE FIELD NAMES ARE NOT**
+    **SUPPORTED**
 
 Future components
 ~~~~~~~~~~~~~~~~~
@@ -219,6 +207,10 @@ with the option for creating such indices.
 If you want to learn a little more about this topic, you can access this
 `blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
 or the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
+
+If you want to take a stab at solving your SQLite/SpatiaLite problem
+permanently, take a look at this
+`OTHER BLOG POST <https://www.xl-optim.com/spatialite-and-python-in-2020/>`_.
 
 Please also note that the network consistency triggers will NOT work before
 spatial indices have been created and/or if the editing is being done on a

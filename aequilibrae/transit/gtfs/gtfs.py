@@ -1,6 +1,4 @@
 import os
-import copy
-import csv
 import numpy as np
 
 from .agency import Agency
