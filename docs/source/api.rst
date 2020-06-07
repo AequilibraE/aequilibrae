@@ -40,6 +40,7 @@ Network data tables
    :toctree: _generated
 
     Modes
+    LinkTypes
 
 Network items
 ~~~~~~~~~~~~~
@@ -52,6 +53,7 @@ Network items
 
 
     Mode
+    LinkType
 
 Parameters Module
 -----------------

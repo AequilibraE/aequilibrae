@@ -1,4 +1,3 @@
-from typing import Dict
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
