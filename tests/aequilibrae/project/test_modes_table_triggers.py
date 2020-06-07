@@ -51,8 +51,8 @@ class TestProject(TestCase):
         raise FileNotFoundError('QUERY DOES NOT EXIST')
 
     def test_all_tests_considered(self):
-        tests_added =list(self.__dir__())
-        tests_added = [x[5:] for x in tests_added if x[:5]=='test_']
+        tests_added = list(self.__dir__())
+        tests_added = [x[5:] for x in tests_added if x[:5] == 'test_']
 
         for trigger in self.queries:
             if 'TRIGGER' in trigger.upper():

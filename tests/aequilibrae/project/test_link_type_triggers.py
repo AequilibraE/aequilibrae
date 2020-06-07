@@ -26,6 +26,12 @@ class TestProject(TestCase):
 
         self.proj.conn.commit()
 
+        root = os.path.dirname(os.path.realpath(__file__)).replace('tests', '')
+        qry_file = os.path.join(root, "database_specification/triggers/link_type_table_triggers.sql")
+        with open(qry_file, "r") as sql_file:
+            self.queries = sql_file.read()
+        self.queries = [cmd for cmd in self.queries.split("#")]
+
         curr = self.proj.conn.cursor()
         self.rtree = True
         try:
@@ -38,136 +44,136 @@ class TestProject(TestCase):
         self.proj.close()
         rmtree(self.temp_proj_folder)
 
-    def test_link_type_triggers(self):
-        root = os.path.dirname(os.path.realpath(__file__)).replace('tests', '')
-        qry_file = os.path.join(root, "database_specification/triggers/link_type_table_triggers.sql")
-        with open(qry_file, "r") as sql_file:
-            query_list = sql_file.read()
-            query_list = [cmd for cmd in query_list.split("#")]
+    def __get_query(self, qry: str) -> str:
+        for query in self.queries:
+            if qry in query:
+                return query
+        raise FileNotFoundError('QUERY DOES NOT EXIST')
 
-            def reboot_cursor():
-                self.proj.conn.commit()
-                self.curr = self.proj.conn.cursor()
+    def test_all_tests_considered(self):
+        tests_added = list(self.__dir__())
+        tests_added = [x[5:] for x in tests_added if x[:5] == 'test_']
 
-        for cmd in query_list:
-            if 'link_type_single_letter_update' in cmd:
-                sql = "UPDATE 'link_types' SET link_type_id= 'ttt' where link_type_id='t'"
-                self.curr.execute(sql)
+        for trigger in self.queries:
+            if 'TRIGGER' in trigger.upper():
+                found = [x for x in tests_added if x in trigger]
+                if not found:
+                    self.fail(f'Trigger not tested. {trigger}')
 
-                self.curr.execute(cmd)
-                reboot_cursor()
+    def test_link_type_single_letter_update(self):
+        cmd = self.__get_query('link_type_single_letter_update')
+        sql = "UPDATE 'link_types' SET link_type_id= 'ttt' where link_type_id='t'"
+        self.curr.execute(sql)
 
-                sql = "UPDATE 'link_types' SET link_type_id= 'ww' where link_type_id='w'"
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute(sql)
-                reboot_cursor()
+        self.curr.execute(cmd)
 
-            elif 'link_type_single_letter_insert' in cmd:
-                sql = "INSERT INTO 'link_types' (link_type, link_type_id) VALUES(?, ?)"
-                self.curr.execute(sql, ['test1a', 'more_than_one'])
+        sql = "UPDATE 'link_types' SET link_type_id= 'ww' where link_type_id='w'"
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute(sql)
 
-                self.curr.execute(cmd)
-                reboot_cursor()
+    def test_link_type_single_letter_insert(self):
+        cmd = self.__get_query('link_type_single_letter_insert')
+        sql = "INSERT INTO 'link_types' (link_type, link_type_id) VALUES(?, ?)"
+        self.curr.execute(sql, ['test1a', 'more_than_one'])
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute(sql, ['test1b', 'mm'])
-                reboot_cursor()
+        self.curr.execute(cmd)
 
-            elif 'link_type_keep_if_in_use_updating' in cmd:
-                sql = "UPDATE 'link_types' SET link_type= 'ttt' where link_type='test'"
-                self.curr.execute(sql)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute(sql, ['test1b', 'mm'])
 
-                self.curr.execute(cmd)
-                reboot_cursor()
+    def test_link_type_keep_if_in_use_updating(self):
+        cmd = self.__get_query('link_type_keep_if_in_use_updating')
 
-                sql = "UPDATE 'link_types' SET link_type= 'QQQ' where link_type='test2'"
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute(sql)
-                reboot_cursor()
+        sql = "UPDATE 'link_types' SET link_type= 'ttt' where link_type='test'"
+        self.curr.execute(sql)
 
-            elif 'link_type_keep_if_in_use_deleting' in cmd:
-                sql = "DELETE FROM 'link_types' where link_type='test3'"
-                self.curr.execute(sql)
+        self.curr.execute(cmd)
 
-                self.curr.execute(cmd)
-                reboot_cursor()
+        sql = "UPDATE 'link_types' SET link_type= 'QQQ' where link_type='test2'"
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute(sql)
 
-                sql = "DELETE FROM 'link_types' where link_type='test4'"
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute(sql)
-                reboot_cursor()
+    def test_link_type_keep_if_in_use_deleting(self):
+        cmd = self.__get_query('link_type_keep_if_in_use_deleting')
 
-            elif 'link_type_on_links_update' in cmd:
-                sql = "UPDATE 'links' SET link_type= 'rrr' where link_type='test3'"
-                self.curr.execute(sql)
+        sql = "DELETE FROM 'link_types' where link_type='test3'"
+        self.curr.execute(sql)
 
-                self.curr.execute(cmd)
-                reboot_cursor()
+        self.curr.execute(cmd)
 
-                sql = "UPDATE 'links' SET link_type= 'not_valid_type' where link_type='test4'"
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute(sql)
-                reboot_cursor()
+        sql = "DELETE FROM 'link_types' where link_type='test4'"
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute(sql)
 
-            elif 'link_type_on_links_insert' in cmd:
-                if self.rtree:
-                    self.curr.execute('pragma table_info(links)')
-                    f = self.curr.fetchall()
-                    fields = {x[1]: x[0] for x in f}
+    def test_link_type_on_links_update(self):
+        cmd = self.__get_query('link_type_on_links_update')
 
-                    sql = 'select * from links where link_id=70'
-                    self.curr.execute(sql)
-                    a = [x for x in self.curr.fetchone()]
-                    a[fields['link_type']] = 'something indeed silly123'
-                    a[fields['link_id']] = 456789
-                    a[fields['a_node']] = 777
-                    a[fields['b_node']] = 999
-                    a[0] = 456789
+        sql = "UPDATE 'links' SET link_type= 'rrr' where link_type='test3'"
+        self.curr.execute(sql)
 
-                    idx = ','.join(['?'] * len(a))
-                    self.curr.execute(f'insert into links values ({idx})', a)
-                    self.curr.execute('delete from links where link_id=456789')
+        self.curr.execute(cmd)
 
-                    self.curr.execute(cmd)
-                    reboot_cursor()
+        sql = "UPDATE 'links' SET link_type= 'not_valid_type' where link_type='test4'"
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute(sql)
 
-                    with self.assertRaises(sqlite3.IntegrityError):
-                        self.curr.execute(f'insert into links values ({idx})', a)
+    def test_link_type_on_links_insert(self):
+        cmd = self.__get_query('link_type_on_links_insert')
 
-                    self.curr.execute('select link_type from link_types;')
-                    a[fields['link_type']] = self.curr.fetchone()[0]
-                    self.curr.execute(f'insert into links values ({idx})', a)
+        if self.rtree:
+            self.curr.execute('pragma table_info(links)')
+            f = self.curr.fetchall()
+            fields = {x[1]: x[0] for x in f}
 
-            elif 'link_type_on_links_delete_protected_link_type' in cmd:
-                self.curr.execute(cmd)
-                reboot_cursor()
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('delete from link_types where link_type_id="z"')
+            sql = 'select * from links where link_id=70'
+            self.curr.execute(sql)
+            a = [x for x in self.curr.fetchone()]
+            a[fields['link_type']] = 'something indeed silly123'
+            a[fields['link_id']] = 456789
+            a[fields['a_node']] = 777
+            a[fields['b_node']] = 999
+            a[0] = 456789
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('delete from link_types where link_type_id="y"')
+            idx = ','.join(['?'] * len(a))
+            self.curr.execute(f'insert into links values ({idx})', a)
+            self.curr.execute('delete from links where link_id=456789')
 
-            elif 'link_type_id_keep_if_protected_type' in cmd:
-                self.curr.execute(cmd)
-                reboot_cursor()
+            self.curr.execute(cmd)
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('update link_types set link_type_id="x" where link_type_id="y"')
+            with self.assertRaises(sqlite3.IntegrityError):
+                self.curr.execute(f'insert into links values ({idx})', a)
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('update link_types set link_type_id="x" where link_type_id="z"')
+            self.curr.execute('select link_type from link_types;')
+            a[fields['link_type']] = self.curr.fetchone()[0]
+            self.curr.execute(f'insert into links values ({idx})', a)
 
-            elif 'link_type_keep_if_protected_type' in cmd:
-                self.curr.execute(cmd)
-                reboot_cursor()
+    def test_link_type_on_links_delete_protected_link_type(self):
+        cmd = self.__get_query('link_type_on_links_delete_protected_link_type')
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('update link_types set link_type="xsdfg" where link_type_id="z"')
+        self.curr.execute(cmd)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('delete from link_types where link_type_id="z"')
 
-                with self.assertRaises(sqlite3.IntegrityError):
-                    self.curr.execute('update link_types set link_type="xsdfg" where link_type_id="y"')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('delete from link_types where link_type_id="y"')
 
-            else:
-                if 'TRIGGER' in cmd.upper():
-                    logger.warning(cmd)
-                    self.fail(f'Missing test for triggers in link_types table. {cmd}')
+    def test_link_type_id_keep_if_protected_type(self):
+        cmd = self.__get_query('link_type_id_keep_if_protected_type')
+
+        self.curr.execute(cmd)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('update link_types set link_type_id="x" where link_type_id="y"')
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('update link_types set link_type_id="x" where link_type_id="z"')
+
+    def test_link_type_keep_if_protected_type(self):
+        cmd = self.__get_query('link_type_keep_if_protected_type')
+        self.curr.execute(cmd)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('update link_types set link_type="xsdfg" where link_type_id="z"')
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.curr.execute('update link_types set link_type="xsdfg" where link_type_id="y"')
