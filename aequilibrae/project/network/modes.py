@@ -69,8 +69,8 @@ class Modes:
         self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
         self.conn.commit()
         logger.info(f'mode {mode.mode_name}({mode.mode_id}) was added to the project')
-
         mode.save()
+        self.__update_list_of_modes()
 
     def drop(self, mode_id: str) -> None:
         """Removes the mode with **mode_id** from the project"""
@@ -81,6 +81,7 @@ class Modes:
             logger.error(f'Failed to remove mode {mode_id}. {e.args}')
             raise e
         logger.warning(f'Mode {mode_id} was successfully removed from the database')
+        self.__update_list_of_modes()
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""

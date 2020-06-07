@@ -73,6 +73,7 @@ class LinkTypes:
         logger.info(f'Link Type {link_type.link_type}({link_type.link_type_id}) was added to the project')
 
         link_type.save()
+        self.__update_list_of_link_types()
 
     def drop(self, link_type_id: str) -> None:
         """Removes the link_type with **link_type_id** from the project"""
@@ -83,6 +84,7 @@ class LinkTypes:
             logger.error(f'Failed to remove link_type {link_type_id}. {e.args}')
             raise e
         logger.warning(f'Link type {link_type_id} was successfully removed from the project database')
+        self.__update_list_of_link_types()
 
     def get(self, link_type_id: str) -> LinkType:
         """Get a link_type from the network by its **link_type_id**"""
