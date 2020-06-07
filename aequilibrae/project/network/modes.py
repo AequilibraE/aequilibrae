@@ -22,12 +22,15 @@ class Modes:
         all_modes = modes.all_modes()
 
         #And do a bulk change and save it
-        for mode_id to mode_obj in all_modes.items():
+        for mode_id, mode_obj in all_modes.items():
             mode_obj.beta = 1
             mode_obj.save()
 
         # or just get one mode in specific
         car_mode = modes.get('c')
+
+        # or just get this same mode by name
+        car_mode = modes.get_by_name('c')
 
         # We can change the description of the mode
         car_mode.description = 'personal autos only'
@@ -86,6 +89,15 @@ class Modes:
         if mode_id not in self.__all_modes:
             raise ValueError(f'Mode {mode_id} does not exist in the model')
         return Mode(mode_id)
+
+    def get_by_name(self, mode: str) -> Mode:
+        """Get a mode from the network by its **mode_name**"""
+        self.__update_list_of_modes()
+        self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
+        found = self.curr.fetchone()
+        if len(found) == 0:
+            raise ValueError(f'Mode {mode} does not exist in the model')
+        return Mode(found[0])
 
     def all_modes(self) -> dict:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
