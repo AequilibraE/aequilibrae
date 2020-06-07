@@ -177,3 +177,62 @@ class TestProject(TestCase):
 
         with self.assertRaises(sqlite3.IntegrityError):
             self.curr.execute('update link_types set link_type="xsdfg" where link_type_id="y"')
+
+    def test_link_type_on_nodes_table_update_nodes_link_type(self):
+        cmd = self.__get_query('link_type_on_nodes_table_update_nodes_link_type')
+        self.curr.execute(cmd)
+
+        self.curr.execute('update nodes set link_types="qwerrreyrtuyiuio" where node_id=1')
+
+        self.curr.execute('select link_types from nodes where node_id=1')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'etuw', 'link_types was allowed to be corrupted in the nodes table')
+
+    def test_link_type_on_nodes_table_update_links_link_type(self):
+        cmd = self.__get_query('link_type_on_nodes_table_update_links_link_type')
+        self.curr.execute(cmd)
+
+        self.curr.execute('update links set link_type="test" where link_id=15')
+
+        self.curr.execute('select link_types from nodes where node_id=6')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'rtw', 'link_types on nodes table not updated with new link type in the links')
+
+        self.curr.execute('select link_types from nodes where node_id=5')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'ertw', 'link_types was allowed to be corrupted in the nodes table')
+
+    def test_link_type_on_nodes_table_update_links_a_node(self):
+        cmd = self.__get_query('link_type_on_nodes_table_update_links_a_node')
+        self.curr.execute(cmd)
+
+        self.curr.execute('update links set a_node=1 where link_id=15')
+
+        self.curr.execute('select link_types from nodes where node_id=1')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'etuw', 'link_types on nodes table not updated with new link type in the links')
+
+        self.curr.execute('select link_types from nodes where node_id=6')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'rw', 'link_types was allowed to be corrupted in the nodes table')
+
+    def test_link_type_on_nodes_table_update_links_b_node(self):
+        cmd = self.__get_query('link_type_on_nodes_table_update_links_b_node')
+        self.curr.execute(cmd)
+
+        self.curr.execute('update links set b_node=1 where link_id=15')
+
+        self.curr.execute('select link_types from nodes where node_id=1')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'etuw', 'link_types on nodes table not updated with new link type in the links')
+
+        self.curr.execute('select link_types from nodes where node_id=5')
+        lts = self.curr.fetchone()[0]
+
+        self.assertEqual(lts, 'ertw', 'link_types was allowed to be corrupted in the nodes table')
