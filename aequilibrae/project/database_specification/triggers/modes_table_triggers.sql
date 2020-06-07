@@ -143,3 +143,12 @@ select GROUP_CONCAT(modes, '') from links where (links.a_node = new.node_id) or 
 , mode_id) > 0)
 where nodes.node_id=new.node_id;
 end;
+
+#
+-- We have to have at least one mode in the database
+CREATE TRIGGER mode_keep_at_least_one BEFORE DELETE ON "modes"
+WHEN
+(Select count(*) from modes where mode_id != old.mode_id) =0
+BEGIN
+    SELECT RAISE(ABORT, 'Modes table needs to have at least one mode at any time.');
+END;
