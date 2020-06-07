@@ -370,7 +370,7 @@ Issue 4, PP 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
 
 [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in
 multi-class equilibrium assignment", Transportation Research Part B, Volume 70,
-pg 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
+pg 261-274 `DOI <https://doi.org/10.1016/j.trb.2014.06.011>`_
 
 Handling the network
 --------------------
@@ -502,9 +502,9 @@ Chicago Regional
 
 Network has:
 
-* Links: 2,522
-* Nodes: 1,020
-* Zones: 110
+* Links: 39,018
+* Nodes: 12,982
+* Zones: 1,790
 
 .. image:: images/chicago_regional_msa-500_iter.png
     :width: 590
@@ -545,7 +545,7 @@ applications.
 
 Computational performance
 -------------------------
-Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
+Running on a Thinkpad X1 extreme equipped with a 6 cores 8750H CPU and 32Gb of
 2667Hz RAM, AequilibraE performed 1,000 iterations of Frank-Wolfe assignment
 on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
 takes just under 47 minutes.
