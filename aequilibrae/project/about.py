@@ -68,9 +68,7 @@ class About:
     def __has_about(self):
         curr = self.__conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        if 'about' in [x[0] for x in curr.fetchall()]:
-            return True
-        return False
+return any(['about' in x[0] for x in curr.fetchall()])
 
     def __load(self):
         self.__characteristics = []
