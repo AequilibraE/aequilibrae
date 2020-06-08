@@ -38,9 +38,9 @@ class About:
                 p.about.write_back()
         """
         allowed = string.ascii_lowercase + '_'
-        passed = [x for x in info_field if x not in allowed]
+        has_forbidden = [x for x in info_field if x not in allowed]
 
-        if not passed:
+        if not has_forbidden:
             sql = "INSERT INTO 'about' (infoname) VALUES(?)"
             curr = self.__conn.cursor()
             curr.execute(sql, [info_field])
