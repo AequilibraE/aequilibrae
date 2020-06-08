@@ -37,12 +37,10 @@ class About:
                 p.about.my_super_relevant_field = 'super relevant information'
                 p.about.write_back()
         """
-        passed = True
-        for x in info_field:
-            if x not in string.ascii_lowercase + '_':
-                passed = False
+        allowed = string.ascii_lowercase + '_'
+        passed = [x for x in info_field if x not in allowed]
 
-        if passed:
+        if not passed:
             sql = "INSERT INTO 'about' (infoname) VALUES(?)"
             curr = self.__conn.cursor()
             curr.execute(sql, [info_field])
