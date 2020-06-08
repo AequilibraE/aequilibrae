@@ -40,14 +40,14 @@ class About:
         allowed = string.ascii_lowercase + '_'
         has_forbidden = [x for x in info_field if x not in allowed]
 
-        if not has_forbidden:
-            sql = "INSERT INTO 'about' (infoname) VALUES(?)"
-            curr = self.__conn.cursor()
-            curr.execute(sql, [info_field])
-            self.__conn.commit()
-            self.__characteristics.append(info_field)
-        else:
+        if has_forbidden:
             raise ValueError(f'{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _')
+
+        sql = "INSERT INTO 'about' (infoname) VALUES(?)"
+        curr = self.__conn.cursor()
+        curr.execute(sql, [info_field])
+        self.__conn.commit()
+        self.__characteristics.append(info_field)
 
     def write_back(self):
         """Saves the information parameters back to the project database
