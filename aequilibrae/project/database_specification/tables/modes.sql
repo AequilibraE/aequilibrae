@@ -29,3 +29,5 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','mode_id', 'Single letter identifying the mode. E.g. b, for Bycicle');
 #
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','description', 'Description of the same. E.g. Bycicles used to be human-powered two-wheeled vehicles');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','pce', 'Passenger-Car equivalent for assignment');

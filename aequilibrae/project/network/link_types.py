@@ -58,8 +58,8 @@ class LinkTypes:
         self.__all_types = []
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
-
-        self.__update_list_of_link_types()
+        if self.__has_table():
+            self.__update_list_of_link_types()
 
     def add(self, link_type: LinkType) -> None:
         """ We add a new link type to the project"""
@@ -110,3 +110,8 @@ class LinkTypes:
     def __update_list_of_link_types(self) -> None:
         self.curr.execute("select link_type_id from 'link_types'")
         self.__all_types = [x[0] for x in self.curr.fetchall()]
+
+    def __has_table(self):
+        curr = self.conn.cursor()
+        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        return any(['link_types' in x[0] for x in curr.fetchall()])

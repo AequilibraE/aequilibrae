@@ -107,7 +107,6 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
-        self.about = About(self.conn)
 
     def __create_empty_project(self):
 

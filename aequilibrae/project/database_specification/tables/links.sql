@@ -15,3 +15,28 @@ CREATE TABLE 'links' (ogc_fid      INTEGER PRIMARY KEY,
 
 #
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','a_node', 'origin node for the link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','b_node', 'destination node for the link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','direction', 'Flow direction allowed on the link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','distance', 'length of the link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_ab', 'AB directional speed (if allowed)');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_ba', 'BA directional speed (if allowed)');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_ab', 'AB directional link capacity (if allowed)');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_ba', 'BA directional link capacity (if allowed)');
+

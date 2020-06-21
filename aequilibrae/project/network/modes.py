@@ -57,7 +57,8 @@ class Modes:
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
 
-        self.__update_list_of_modes()
+        if self.__has_mode():
+            self.__update_list_of_modes()
 
     def add(self, mode: Mode) -> None:
         """ We add a mode to the project"""
@@ -113,3 +114,8 @@ class Modes:
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
+
+    def __has_mode(self):
+        curr = self.conn.cursor()
+        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        return any(['modes' in x[0] for x in curr.fetchall()])
