@@ -10,7 +10,6 @@ class Modes:
     ::
 
         from aequilibrae import Project
-        from aequilibrae.project.network import Mode
 
         p = Project()
         p.open('path/to/project/folder')
@@ -41,7 +40,7 @@ class Modes:
         car_mode.save()
 
         # We can also create a completely new mode and add to the model
-        new_mode = Mode('k')
+        new_mode = modes.new('k')
         new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed
         # other fields are not mandatory
 
@@ -103,6 +102,13 @@ class Modes:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
         self.__update_list_of_modes()
         return {x: Mode(x) for x in self.__all_modes}
+
+    def new(self, mode_id: str) -> Mode:
+        """Returns a new mode with *mode_id* that can be added to the model later"""
+        if mode_id in self.__all_modes:
+            raise ValueError("Mode already exists in the model. Creating a new one does not make sense")
+
+        return Mode(mode_id)
 
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")

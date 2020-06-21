@@ -45,6 +45,7 @@ class About:
 
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""
+
         return [x for x in self.__characteristics]
 
     def add_info_field(self, info_field: str) -> None:
@@ -62,19 +63,17 @@ class About:
                 p.about.my_super_relevant_field = 'super relevant information'
                 p.about.write_back()
         """
-        passed = True
-        for x in info_field:
-            if x not in string.ascii_lowercase + '_':
-                passed = False
+        allowed = string.ascii_lowercase + '_'
+        has_forbidden = [x for x in info_field if x not in allowed]
 
-        if passed:
-            sql = "INSERT INTO 'about' (infoname) VALUES(?)"
-            curr = self.__conn.cursor()
-            curr.execute(sql, [info_field])
-            self.__conn.commit()
-            self.__characteristics.append(info_field)
-        else:
+        if has_forbidden:
             raise ValueError(f'{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _')
+
+        sql = "INSERT INTO 'about' (infoname) VALUES(?)"
+        curr = self.__conn.cursor()
+        curr.execute(sql, [info_field])
+        self.__conn.commit()
+        self.__characteristics.append(info_field)
 
     def write_back(self):
         """Saves the information parameters back to the project database
@@ -95,9 +94,7 @@ class About:
     def __has_about(self):
         curr = self.__conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        if 'about' in [x[0] for x in curr.fetchall()]:
-            return True
-        return False
+        return any(['about' in x[0] for x in curr.fetchall()])
 
     def __load(self):
         self.__characteristics = []

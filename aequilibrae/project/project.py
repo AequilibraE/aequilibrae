@@ -107,15 +107,13 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
+        self.about = About(self.conn)
 
     def __create_empty_project(self):
 
         # We create the project folder and create the base file
         os.mkdir(self.project_base_path)
         shutil.copyfile(spatialite_database, self.path_to_file)
-
-        # We create the environment variable with the the location for the project
-        os.environ[environ_var] = self.project_base_path
 
         self.conn = database_connection()
 
