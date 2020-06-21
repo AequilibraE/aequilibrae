@@ -13,21 +13,6 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 If you are looking for the documentation for AequilibraE for QGIS, you can
 see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qgis>`__
 
-Version history
-===============
-
-AequilibraE has been evolving quite fast, so we recommend you upgrading to a
-newer version as soon as you can.  In the meantime, you can find the
-documentation for all versions since 0.5.3.
-
-* `0.5.3 <https://aequilibrae.com/python/V.0.5.3/>`_
-* `0.6.0 <https://aequilibrae.com/python/V.0.6.0/>`_
-* `0.6.1 <https://aequilibrae.com/python/V.0.6.1/>`_
-* `0.6.2 <https://aequilibrae.com/python/V.0.6.2/>`_
-* `0.6.3 <https://aequilibrae.com/python/V.0.6.3/>`_
-* `0.6.4 <https://aequilibrae.com/python/V.0.6.4/>`_
-* `0.7.0 <https://aequilibrae.com/python/V.0.7.0/>`_
-
 Note to users
 =============
 
@@ -45,6 +30,22 @@ there are two alternatives for support:
 
 If you are looking for **paid support or to fund AequilibraE's** development,
 please e-mail the developers at contact@aequilibrae.com.
+
+
+Version history
+===============
+
+AequilibraE has been evolving quite fast, so we recommend you upgrading to a
+newer version as soon as you can.  In the meantime, you can find the
+documentation for all versions since 0.5.3.
+
+* `0.5.3 <https://aequilibrae.com/python/V.0.5.3/>`_
+* `0.6.0 <https://aequilibrae.com/python/V.0.6.0/>`_
+* `0.6.1 <https://aequilibrae.com/python/V.0.6.1/>`_
+* `0.6.2 <https://aequilibrae.com/python/V.0.6.2/>`_
+* `0.6.3 <https://aequilibrae.com/python/V.0.6.3/>`_
+* `0.6.4 <https://aequilibrae.com/python/V.0.6.4/>`_
+* `0.7.0 <https://aequilibrae.com/python/V.0.7.0/>`_
 
 Contents
 ========
