@@ -107,6 +107,8 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
+        self.about = About(self.conn)
+        os.environ[self.environ_var] = self.project_base_path
 
     def __create_empty_project(self):
 

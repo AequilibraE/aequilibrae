@@ -1,7 +1,7 @@
-from os.path import join, dirname, realpath
 import sqlite3
 import string
 from warnings import warn
+from aequilibrae.project.project_creation import create_about_table
 import uuid
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
@@ -28,24 +28,10 @@ class About:
         """Creates the 'about' table for project files that did not previously contain it"""
 
         if not self.__has_about():
-            qry_file = join(dirname(realpath(__file__)), 'database_specification', 'tables', 'about.sql')
-            run_queries_from_sql_file(self.__conn, qry_file)
-
-        cursor = self.__conn.cursor()
-        cursor.execute('select infovalue from about where infoname="aequilibrae_version"')
-
-        if cursor.fetchone()[0] is None:
-            cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
-            cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
-            self.__conn.commit()
-
+            create_about_table(self.__conn)
             self.__load()
         else:
-            warn('About table already exists. Nothing was done', Warning)
-
-    def list_fields(self) -> list:
-        """Returns a list of all characteristics the about table holds"""
-        return [x for x in self.__characteristics]
+            warn('About table already exists', Warning)
 
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
@@ -62,19 +48,17 @@ class About:
                 p.about.my_super_relevant_field = 'super relevant information'
                 p.about.write_back()
         """
-        passed = True
-        for x in info_field:
-            if x not in string.ascii_lowercase + '_':
-                passed = False
+        allowed = string.ascii_lowercase + '_'
+        has_forbidden = [x for x in info_field if x not in allowed]
 
-        if passed:
-            sql = "INSERT INTO 'about' (infoname) VALUES(?)"
-            curr = self.__conn.cursor()
-            curr.execute(sql, [info_field])
-            self.__conn.commit()
-            self.__characteristics.append(info_field)
-        else:
+        if has_forbidden:
             raise ValueError(f'{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _')
+
+        sql = "INSERT INTO 'about' (infoname) VALUES(?)"
+        curr = self.__conn.cursor()
+        curr.execute(sql, [info_field])
+        self.__conn.commit()
+        self.__characteristics.append(info_field)
 
     def write_back(self):
         """Saves the information parameters back to the project database
@@ -95,9 +79,7 @@ class About:
     def __has_about(self):
         curr = self.__conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        if 'about' in [x[0] for x in curr.fetchall()]:
-            return True
-        return False
+        return any(['about' in x[0] for x in curr.fetchall()])
 
     def __load(self):
         self.__characteristics = []
