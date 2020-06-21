@@ -13,24 +13,19 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 If you are looking for the documentation for AequilibraE for QGIS, you can
 see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qgis>`__
 
-Contents
---------
-.. sectnum::
 
-.. toctree::
-   :numbered:
-   :maxdepth: 2
-   :caption: Contents:
+Support
+=======
 
-   overview
-   gettingstarted
-   project
-   traffic_assignment
-   api
-   softwaredevelopment
-   roadmap
-   qgis
+AequilibraE is UNFUNDED, so we appreciate if you do not send questions directly
+to developers the developers.  There are two alternatives for support:
 
+1. Posting your question to `StackOverflow <https:www.stackoverflow.com/>`_
+2. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
+   and sending your question there.
+
+If you are looking for paid support or to fund AequilibraE's development, please
+e-mail the developers at contact@aequilibrae.com
 
 Version history
 ===============
