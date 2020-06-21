@@ -46,3 +46,11 @@ class TestModes(TestCase):
 
         with self.assertRaises(ValueError):
             _ = self.proj.network.modes.get('f')
+
+    def test_new(self):
+        modes = self.proj.network.modes
+        self.assertIsInstance(modes.new('h'), Mode, 'Returned wrong type')
+
+        m = list(modes.all_modes().keys())[0]
+        with self.assertRaises(ValueError):
+            modes.new(m)
