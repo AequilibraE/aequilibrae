@@ -2,6 +2,7 @@ import sqlite3
 import os
 import shutil
 from aequilibrae.project.network import Network
+from aequilibrae.project.about import About
 from aequilibrae.parameters import Parameters
 import warnings
 from aequilibrae import logger
@@ -31,6 +32,7 @@ class Project:
         self.parameters = Parameters().parameters
         self.conn: sqlite3.Connection = None
         self.network: Network = None
+        self.about: About = None
 
     def open(self, project_path: str) -> None:
         """
@@ -99,6 +101,7 @@ class Project:
         self.parameters = Parameters().parameters
 
         self.network = Network(self)
+        self.about = About(self.conn)
         os.environ[self.environ_var] = self.project_base_path
 
     def __create_empty_project(self):

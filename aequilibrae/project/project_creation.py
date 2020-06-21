@@ -1,5 +1,7 @@
 import os
 from aequilibrae import Parameters, logger
+from aequilibrae.paths import release_version
+import uuid
 
 meta_table = 'attributes_documentation'
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
@@ -9,6 +11,7 @@ protected_fields = ['ogc_fid', 'geometry']
 
 def initialize_tables(conn) -> None:
     parameters = Parameters()._default
+    create_about_table(conn)
     create_meta_table(conn)
     create_modes_table(conn, parameters)
     create_link_type_table(conn, parameters)
@@ -216,4 +219,30 @@ def add_trigger_from_file(conn, qry_file: str) -> None:
             msg = f"Error creating trigger: {e.args}"
             logger.error(msg)
             logger.info(cmd)
+    conn.commit()
+
+
+def create_about_table(conn) -> None:
+    create_query = """CREATE TABLE 'about' (infoname VARCHAR UNIQUE NOT NULL,
+                                            infovalue VARCHAR);"""
+    cursor = conn.cursor()
+    cursor.execute(create_query)
+
+    sql = "INSERT INTO 'about' (infoname) VALUES(?)"
+    fields = ['model_name',
+              'region',
+              'description',
+              'author',
+              'license',
+              'scenario_name',
+              'scenario_description',
+              'model_version',
+              'project_id',
+              'aequilibrae_version']
+
+    for lt in fields:
+        cursor.execute(sql, [lt])
+
+    cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
+    cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
     conn.commit()
