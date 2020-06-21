@@ -62,7 +62,6 @@ class TestLinkTypes(TestCase):
         self.assertEqual(ltget.lane_capacity, ltgetbn.lane_capacity, 'Get methods returned different things')
         self.assertEqual(ltget.link_type, 'default', 'Get methods returned different things')
 
-
     def test_all_types(self):
         lt = self.proj.network.link_types
         all_lts = [x for x in lt.all_types().keys()]
