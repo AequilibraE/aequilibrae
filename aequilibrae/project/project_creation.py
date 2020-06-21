@@ -1,22 +1,15 @@
 import os
-from aequilibrae import Parameters, logger
-from aequilibrae.paths import release_version
-import uuid
 from sqlite3 import Connection
 from os.path import join, dirname, realpath
+from aequilibrae import logger
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ['ogc_fid', 'geometry']
 
 
-def initialize_tables(conn) -> None:
-    parameters = Parameters()._default
-    create_about_table(conn)
-    create_meta_table(conn)
-    create_modes_table(conn, parameters)
-    create_link_type_table(conn, parameters)
-    create_network_tables(conn, parameters)
+def initialize_tables(conn: Connection) -> None:
+    create_base_tables(conn)
     populate_meta_extra_attributes(conn)
     add_triggers(conn)
 
@@ -69,29 +62,3 @@ def run_queries_from_sql_file(conn: Connection, qry_file: str) -> None:
             logger.error(msg)
             logger.info(cmd)
             raise e
-
-
-def create_about_table(conn) -> None:
-    create_query = """CREATE TABLE 'about' (infoname VARCHAR UNIQUE NOT NULL,
-                                            infovalue VARCHAR);"""
-    cursor = conn.cursor()
-    cursor.execute(create_query)
-
-    sql = "INSERT INTO 'about' (infoname) VALUES(?)"
-    fields = ['model_name',
-              'region',
-              'description',
-              'author',
-              'license',
-              'scenario_name',
-              'scenario_description',
-              'model_version',
-              'project_id',
-              'aequilibrae_version']
-
-    for lt in fields:
-        cursor.execute(sql, [lt])
-
-    cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
-    cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
-    conn.commit()
