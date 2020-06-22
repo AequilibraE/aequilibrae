@@ -12,14 +12,14 @@ class MetaFields:
     _alowed_characters = allowed_characters
 
     def __init__(self, table_name: str) -> None:
-        self.__table = table_name
+        self._table = table_name
         self._original_values = {}
         self._populate()
         self._check_completeness()
 
     def _populate(self):
         self._original_values.clear()
-        qry = f'Select attribute, description from attributes_documentation where name_table="{self.__table}"'
+        qry = f'Select attribute, description from attributes_documentation where name_table="{self._table}"'
         dt = self.__run_query_fetch_all(qry)
 
         for attr, descr in dt:
@@ -43,11 +43,11 @@ class MetaFields:
         if has_forbidden:
             raise ValueError('attribute_name can only contain letters and "_"')
 
-        qry = f'pragma table_info({self.__table})'
+        qry = f'pragma table_info({self._table})'
         dt = self.__run_query_fetch_all(qry)
         fields = [x[1] for x in dt]
         if field_name not in fields:
-            self.__run_query_commit(f'Alter table {self.__table} add column {field_name} {data_type};')
+            self.__run_query_commit(f'Alter table {self._table} add column {field_name} {data_type};')
         self.__adds_to_attribute_table(field_name, description)
 
     def save(self) -> None:
@@ -57,7 +57,7 @@ class MetaFields:
         for key, val in self._original_values.items():
             new_val = self.__dict__[key]
             if new_val != val:
-                self.__run_query_commit(qry.format(new_val, key, self.__table))
+                self.__run_query_commit(qry.format(new_val, key, self._table))
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -67,7 +67,7 @@ class MetaFields:
         self.__dict__[attribute_name] = attribute_value
         self._original_values[attribute_name] = attribute_value
         qry = 'insert into attributes_documentation VALUES(?,?,?)'
-        vals = (self.__table, attribute_name, attribute_value)
+        vals = (self._table, attribute_name, attribute_value)
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
@@ -88,7 +88,7 @@ class MetaFields:
         conn.close()
 
     def _check_completeness(self) -> None:
-        qry = f'pragma table_info({self.__table})'
+        qry = f'pragma table_info({self._table})'
         dt = self.__run_query_fetch_all(qry)
         fields = [x[1] for x in dt if x[1] != 'ogc_fid']
         for field in fields:
@@ -98,7 +98,7 @@ class MetaFields:
         original_fields = list(self._original_values.keys())
         for field in original_fields:
             if field not in fields:
-                qry = f'DELETE FROM attributes_documentation where attribute="{field}" and name_table="{self.__table}"'
+                qry = f'DELETE FROM attributes_documentation where attribute="{field}" and name_table="{self._table}"'
                 self.__run_query_commit(qry)
                 del self.__dict__[field]
                 del self._original_values[field]

@@ -1,6 +1,7 @@
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae import logger
+from aequilibrae.project.meta_fields import MetaFields
 
 
 class LinkTypes:
@@ -106,6 +107,10 @@ class LinkTypes:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
         self.__update_list_of_link_types()
         return {x: LinkType(x) for x in self.__all_types}
+
+    def fields(self) -> MetaFields:
+        """Returns a handle to edit the Link_Types table fields and their metadata"""
+        return MetaFields('link_types')
 
     def __update_list_of_link_types(self) -> None:
         self.curr.execute("select link_type_id from 'link_types'")

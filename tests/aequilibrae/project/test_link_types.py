@@ -74,3 +74,8 @@ class TestLinkTypes(TestCase):
 
         if diff:
             self.fail('Getting all link_types failed')
+
+    def test_fields(self):
+        fields = self.proj.network.link_types.fields()
+        fields.all_fields()
+        self.assertEqual(fields._table, 'link_types', 'Returned wrong table handler')
