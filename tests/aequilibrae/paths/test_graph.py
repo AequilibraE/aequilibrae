@@ -4,6 +4,7 @@ import tempfile
 import numpy as np
 from aequilibrae.paths import Graph
 from os.path import join
+from uuid import uuid4
 import sys
 from .parameters_test import centroids
 from aequilibrae.project import Project
@@ -14,9 +15,14 @@ from aequilibrae.paths.results import PathResults
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
 from ...data import path_test, test_graph, test_network
+from shutil import copytree, rmtree
 
 
 class TestGraph(TestCase):
+    def setUp(self) -> None:
+        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
+        copytree(siouxfalls_project, self.temp_proj_folder)
+
     def test_create_from_geography(self):
         self.graph = Graph()
         self.graph.create_from_geography(
@@ -104,7 +110,7 @@ class TestGraph(TestCase):
 
     def test_exclude_links(self):
         p = Project()
-        p.open(siouxfalls_project)
+        p.open(self.temp_proj_folder)
         p.network.build_graphs()
 
         g = p.network.graphs['c']  # type: Graph
