@@ -29,6 +29,7 @@ Project components
 
     About
     Network
+    FieldEditor
 
 Network data tables
 ~~~~~~~~~~~~~~~~~~~

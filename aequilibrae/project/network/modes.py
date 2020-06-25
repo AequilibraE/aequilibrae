@@ -1,6 +1,6 @@
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.mode import Mode
-from aequilibrae.project.meta_fields import MetaFields
+from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae import logger
 
 
@@ -84,9 +84,9 @@ class Modes:
         logger.warning(f'Mode {mode_id} was successfully removed from the database')
         self.__update_list_of_modes()
 
-    def fields(self) -> MetaFields:
+    def fields(self) -> FieldEditor:
         """Returns a handle to edit the Modes table fields and their metadata"""
-        return MetaFields('modes')
+        return FieldEditor('modes')
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""

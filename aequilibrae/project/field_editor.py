@@ -5,10 +5,28 @@ from aequilibrae.project.database_connection import database_connection
 allowed_characters = string.ascii_letters + '_'
 
 
-class MetaFields:
+class FieldEditor:
     '''Allows user to edit the description to each field for each table
 
-    The results are kept in the table *attributes_documentation*'''
+    To Add or edit the metadata for the fields of a table, it is
+    necessary to first access the table itself. Example:
+
+    ::
+
+        from aequilibrae import Project
+
+        proj = Project()
+        proj.open('Path/to/project/folder')
+
+        # To edit the fields of the link_types table
+        lt_fields = proj.network.link_types.fields()
+
+        # To edit the fields of the modes table
+        m_fields = proj.network.modes.fields()
+
+
+    Field descriptions are kept in the table *attributes_documentation*
+    '''
     _alowed_characters = allowed_characters
 
     def __init__(self, table_name: str) -> None:
@@ -50,6 +68,9 @@ class MetaFields:
             self.__run_query_commit(f'Alter table {self._table} add column {field_name} {data_type};')
         self.__adds_to_attribute_table(field_name, description)
 
+    def remove(self, field_name: str)->None:
+        pass
+
     def save(self) -> None:
         """Saves any field descriptions which my have been changed to the database"""
 
@@ -62,6 +83,22 @@ class MetaFields:
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
         return list(self._original_values.keys())
+
+    def _check_completeness(self) -> None:
+        qry = f'pragma table_info({self._table})'
+        dt = self.__run_query_fetch_all(qry)
+        fields = [x[1] for x in dt if x[1] != 'ogc_fid']
+        for field in fields:
+            if field not in self._original_values.keys():
+                self.__adds_to_attribute_table(field, 'not provided')
+
+        original_fields = list(self._original_values.keys())
+        for field in original_fields:
+            if field not in fields:
+                qry = f'DELETE FROM attributes_documentation where attribute="{field}" and name_table="{self._table}"'
+                self.__run_query_commit(qry)
+                del self.__dict__[field]
+                del self._original_values[field]
 
     def __adds_to_attribute_table(self, attribute_name, attribute_value):
         self.__dict__[attribute_name] = attribute_value
@@ -86,19 +123,3 @@ class MetaFields:
             conn.execute(qry, values)
         conn.commit()
         conn.close()
-
-    def _check_completeness(self) -> None:
-        qry = f'pragma table_info({self._table})'
-        dt = self.__run_query_fetch_all(qry)
-        fields = [x[1] for x in dt if x[1] != 'ogc_fid']
-        for field in fields:
-            if field not in self._original_values.keys():
-                self.__adds_to_attribute_table(field, 'not provided')
-
-        original_fields = list(self._original_values.keys())
-        for field in original_fields:
-            if field not in fields:
-                qry = f'DELETE FROM attributes_documentation where attribute="{field}" and name_table="{self._table}"'
-                self.__run_query_commit(qry)
-                del self.__dict__[field]
-                del self._original_values[field]
