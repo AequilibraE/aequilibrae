@@ -77,17 +77,19 @@ begin
 
 -- We update the modes for the node ID that just received a new link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = new.a_node) or (links.b_node = new.a_node))
-, mode_id) > 0)
-where nodes.node_id=new.a_node;
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes
+                 where instr((select GROUP_CONCAT(modes, '')
+                 from links
+                 where (links.a_node = new.a_node) or (links.b_node = new.a_node)), mode_id) > 0)
+    where nodes.node_id=new.a_node;
 
 -- We update the modes for the node ID that just LOST a link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = old.a_node) or (links.b_node = old.a_node))
-, mode_id) > 0)
-where nodes.node_id=old.a_node;
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes
+                 where instr((select GROUP_CONCAT(modes, '')
+                 from links
+                 where (links.a_node = old.a_node) or (links.b_node = old.a_node)), mode_id) > 0)
+    where nodes.node_id=old.a_node;
 end;
 
 #
@@ -97,17 +99,20 @@ begin
 
 -- We update the modes for the node ID that just received a new link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
-, mode_id) > 0)
-where nodes.node_id=new.b_node;
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes
+                 where instr((select GROUP_CONCAT(modes, '')
+                 from links
+                 where (links.a_node = new.b_node) or (links.b_node = new.b_node)), mode_id) > 0)
+    where nodes.node_id=new.b_node;
 
 -- We update the modes for the node ID that just LOST a link ending in it
 update nodes
-set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-select GROUP_CONCAT(modes, '') from links where (links.a_node = old.b_node) or (links.b_node = old.b_node))
-, mode_id) > 0)
-where nodes.node_id=old.b_node;
+    set modes = (select GROUP_CONCAT(mode_id, '') from modes
+                where instr((select GROUP_CONCAT(modes, '')
+                             from links
+                             where (links.a_node = old.b_node)
+                             or (links.b_node = old.b_node)), mode_id) > 0)
+    where nodes.node_id=old.b_node;
 end;
 
 #
