@@ -207,9 +207,13 @@ CREATE TRIGGER deleted_link AFTER delete ON links
 
     -- We update the modes for the node ID that just lost a link ending in it
     update nodes
-    set modes = (select GROUP_CONCAT(mode_id, '') from modes where instr((
-    select GROUP_CONCAT(modes, '') from links where (links.a_node = old.b_node) or (links.b_node = old.b_node))
-    , mode_id) > 0)
+set modes = (SELECT GROUP_CONCAT(mode_id, '')
+             FROM modes
+             WHERE instr((SELECT GROUP_CONCAT(modes, '')
+                          FROM links
+                          WHERE (links.a_node = old.b_node) or (links.b_node = old.b_node))
+                         , mode_id) > 0)
+
     where nodes.node_id=old.b_node;
     END;
 #
