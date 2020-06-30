@@ -32,7 +32,7 @@ class TestAbout(TestCase):
         expected = ['model_name', 'region', 'description', 'author', 'license', 'scenario_name', 'year',
                     'scenario_description', 'model_version', 'project_id', 'aequilibrae_version', 'projection']
 
-        failed = [x for x in list if x not in expected] + [x for x in expected if x not in list]
+        failed = set(list).symmetric_difference(set(expected))
         if failed:
             self.fail('About table does not have all expected fields')
 
