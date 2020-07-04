@@ -2,9 +2,8 @@ from unittest import TestCase
 import tempfile
 import os
 from aequilibrae.project import Project
-from aequilibrae import Parameters
+from aequilibrae.project.database_connection import database_connection
 import uuid
-from functools import reduce
 
 
 class TestProject(TestCase):
@@ -34,32 +33,27 @@ class TestProject(TestCase):
             q.open(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
 
     def test_creation(self):
-        p = Parameters().parameters["network"]
 
         curr = self.proj.conn.cursor()
         curr.execute("""PRAGMA table_info(links);""")
         fields = curr.fetchall()
         fields = [x[1] for x in fields]
 
-        oneway = reduce(lambda a, b: dict(a, **b), p["links"]["fields"]["one-way"])
-        owf = list(oneway.keys())
-        twoway = reduce(lambda a, b: dict(a, **b), p["links"]["fields"]["two-way"])
-        twf = []
-        for k in list(twoway.keys()):
-            twf.extend([f"{k}_ab", f"{k}_ba"])
-
-        for f in owf + twf:
-            if f not in fields:
-                self.fail(f"Field {f} not added to links table")
+        if 'distance' not in fields:
+            self.fail("Table LINKS was not created correctly")
 
         curr = self.proj.conn.cursor()
         curr.execute("""PRAGMA table_info(nodes);""")
         nfields = curr.fetchall()
         nfields = [x[1] for x in nfields]
 
-        flds = reduce(lambda a, b: dict(a, **b), p["nodes"]["fields"])
-        flds = list(flds.keys())
+        if 'is_centroid' not in nfields:
+            self.fail('Table NODES was not created correctly')
 
-        for f in flds:
-            if f not in nfields:
-                self.fail(f"Field {f} not added to nodes table")
+    def test_close(self):
+
+        _ = database_connection()
+
+        self.proj.close()
+        with self.assertRaises(FileExistsError):
+            _ = database_connection()

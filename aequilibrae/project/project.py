@@ -1,8 +1,10 @@
 import sqlite3
 import os
 import shutil
+from aequilibrae.starts_logging import StartsLogging
 from aequilibrae.project.network import Network
 from aequilibrae.project.about import About
+from aequilibrae.project.database_connection import database_connection, environ_var
 from aequilibrae.parameters import Parameters
 import warnings
 from aequilibrae import logger
@@ -24,7 +26,6 @@ class Project:
         newfile = Project()
         newfile.new('path/to/new/project/folder')
         """
-    environ_var = 'AEQUILIBRAE_PROJECT_PATH'
 
     def __init__(self):
         self.path_to_file: str = None
@@ -53,8 +54,9 @@ class Project:
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
-        self.conn = sqlite3.connect(self.path_to_file)
-        self.conn = spatialite_connection(self.conn)
+        os.environ[environ_var] = self.project_base_path
+        self.conn = database_connection()
+
         self.__load_objects()
         logger.info(f'Opened project on {self.project_base_path}')
 
@@ -73,18 +75,21 @@ class Project:
 
         if os.path.isdir(project_path):
             raise FileNotFoundError("Location already exists. Choose a different name or remove the existing directory")
+        os.environ[environ_var] = self.project_base_path
+
         self.__create_empty_project()
         self.__load_objects()
+        self.about.create()
         logger.info(f'Created project on {self.project_base_path}')
 
     def close(self) -> None:
         """Safely closes the project"""
-        if self.environ_var in os.environ:
+        if environ_var in os.environ:
             self.conn.close()
-            os.environ.pop(self.environ_var, None)
+            del os.environ[environ_var]
             logger.info(f'Closed project on {self.project_base_path}')
         else:
-            warnings.warn('There is no Aequilibrae project open that you may close')
+            warnings.warn('There is no Aequilibrae project open that you could close')
 
     def load(self, project_path: str) -> None:
         """
@@ -102,22 +107,21 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
-        os.environ[self.environ_var] = self.project_base_path
+        self.about = About(self.conn)
 
     def __create_empty_project(self):
 
         # We create the project folder and create the base file
         os.mkdir(self.project_base_path)
         shutil.copyfile(spatialite_database, self.path_to_file)
-        self.conn = spatialite_connection(sqlite3.connect(self.path_to_file))
 
-        # We create the enviroment variable with the the location for the project
-        os.environ[self.environ_var] = self.project_base_path
+        self.conn = database_connection()
 
         # Write parameters to the project folder
         p = Parameters()
         p.parameters["system"]["logging_directory"] = self.project_base_path
         p.write_back()
+        _ = StartsLogging()
 
         # Create actual tables
         cursor = self.conn.cursor()
@@ -126,6 +130,6 @@ class Project:
         initialize_tables(self.conn)
 
     def __other_project_still_open(self) -> bool:
-        if self.environ_var in os.environ:
+        if environ_var in os.environ:
             return True
         return False

@@ -131,7 +131,7 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'special-members': '__init__',
     'private-members': False,
-    'undoc-members': True,
+    'undoc-members': False,
     'exclude-members': '__weakref__',
     'inherited-members': False,
     'show-inheritance': False,
