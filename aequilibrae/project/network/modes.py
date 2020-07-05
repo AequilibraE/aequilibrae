@@ -1,4 +1,5 @@
 from sqlite3 import IntegrityError, Connection
+from typing import Dict
 from aequilibrae.project.network.mode import Mode
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae import logger
