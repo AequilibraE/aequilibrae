@@ -68,7 +68,7 @@ class FieldEditor:
             self.__run_query_commit(f'Alter table {self._table} add column {field_name} {data_type};')
         self.__adds_to_attribute_table(field_name, description)
 
-    def remove(self, field_name: str)->None:
+    def remove(self, field_name: str) -> None:
         pass
 
     def save(self) -> None:

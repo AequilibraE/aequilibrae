@@ -10,7 +10,7 @@ from aequilibrae import Project
 from ...data import siouxfalls_project
 
 
-class TestMetaFields(TestCase):
+class TestFieldEditor(TestCase):
     my_tables = ['link_types', 'links', 'modes', 'nodes']
 
     def setUp(self) -> None:
