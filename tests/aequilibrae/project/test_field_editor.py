@@ -19,9 +19,9 @@ class TestFieldEditor(TestCase):
         self.proj = Project()
         self.proj.open(self.temp_proj_folder)
 
-    def tearDown(self) -> None:
-        self.proj.close()
-        rmtree(self.temp_proj_folder)
+    # def tearDown(self) -> None:
+    #     self.proj.close()
+    #     rmtree(self.temp_proj_folder)
 
     def randomword(self, length):
         val = ''.join(choice(allowed_characters) for i in range(length))
@@ -74,7 +74,7 @@ class TestFieldEditor(TestCase):
             curr = self.proj.conn.cursor()
 
             # We add a bogus record to the attribute list
-            val = self.randomword(30)
+            val = self.randomword(30).lower()
             qry = 'INSERT INTO "attributes_documentation" VALUES (?,?," ");'
             curr.execute(qry, (table, val))
             self.proj.conn.commit()
@@ -90,9 +90,10 @@ class TestFieldEditor(TestCase):
             self.assertEqual([val2], fields, 'failed to add a new field')
 
             table = FieldEditor(table)
+            self.proj.conn.commit()
             curr = self.proj.conn.cursor()
             curr.execute(f'Select count(*) from "attributes_documentation" where attribute="{val}"')
-            self.assertEqual(curr.fetchone()[0], 0, 'clean the table on loading failed')
+            self.assertEqual(curr.fetchone()[0], 0, f'clean the table on loading failed {val}')
 
             curr.execute(f'Select count(*) from "attributes_documentation" where attribute="{val2}"')
             self.assertEqual(curr.fetchone()[0], 1, 'clean the table on loading failed')

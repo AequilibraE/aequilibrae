@@ -37,7 +37,9 @@ class FieldEditor:
 
     def __init__(self, table_name: str) -> None:
         self._table = table_name.lower()
+        self._table_fields = []
         self._original_values = {}
+        self.__update_table_fields()
         self._populate()
         self._check_completeness()
 
@@ -67,12 +69,16 @@ class FieldEditor:
         if has_forbidden:
             raise ValueError('attribute_name can only contain letters and "_"')
 
-        qry = f'pragma table_info({self._table})'
-        dt = self.__run_query_fetch_all(qry)
-        fields = [x[1] for x in dt]
-        if field_name not in fields:
+        self.__update_table_fields()
+
+        if field_name not in self._table_fields:
             self.__run_query_commit(f'Alter table {self._table} add column {field_name} {data_type};')
         self.__adds_to_attribute_table(field_name, description)
+
+    def __update_table_fields(self):
+        qry = f'pragma table_info({self._table})'
+        dt = self.__run_query_fetch_all(qry)
+        self._table_fields = [x[1] for x in dt if x[1] != 'ogc_fid']
 
     def remove(self, field_name: str) -> None:
         pass
@@ -92,9 +98,7 @@ class FieldEditor:
         return list(self._original_values.keys())
 
     def _check_completeness(self) -> None:
-        qry = f'pragma table_info({self._table})'
-        dt = self.__run_query_fetch_all(qry)
-        raw_fields = [x[1].lower() for x in dt if x[1] != 'ogc_fid']
+        raw_fields = self._table_fields
 
         if self._table == 'links':
             fields = []
