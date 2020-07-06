@@ -12,12 +12,11 @@ class LinkType:
 
         if len(link_type_id) != 1 or link_type_id not in string.ascii_letters:
             raise ValueError('Link Type IDs must be a single ascii character')
+
         conn = database_connection()
         curr = conn.cursor()
 
-        curr.execute('pragma table_info(link_types)')
-        table_struct = curr.fetchall()
-        self.__fields = [x[1] for x in table_struct]
+        self.__fields = [x for x in self.__get_table_struct(curr)]
         self.__original__ = {}
 
         # data for the link_type
@@ -55,13 +54,11 @@ class LinkType:
 
         conn = database_connection()
         curr = conn.cursor()
+        table_struct = self.__get_table_struct(curr)
 
         curr.execute(f'select count(*) from link_types where link_type_id="{self.link_type_id}"')
         if curr.fetchone()[0] == 0:
             raise ValueError("Link type does not exist in the model. You need to explicitly add it")
-
-        curr.execute('pragma table_info(link_types)')
-        table_struct = [x[1] for x in curr.fetchall()]
 
         for key, value in self.__dict__.items():
             if key in table_struct and key != 'link_type_id':
@@ -71,3 +68,8 @@ class LinkType:
                     curr.execute(f"update 'link_types' set '{key}'=? where link_type_id='{self.link_type_id}'", [value])
         conn.commit()
         conn.close()
+
+    def __get_table_struct(self, curr):
+        curr.execute('pragma table_info(link_types)')
+        table_struct = [x[1] for x in curr.fetchall()]
+        return table_struct
