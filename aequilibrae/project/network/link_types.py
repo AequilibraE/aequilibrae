@@ -94,7 +94,7 @@ class LinkTypes:
         return LinkType(link_type_id)
 
     def get_by_name(self, link_type: str) -> LinkType:
-        """Get a mode from the network by its **mode_id**"""
+        """Get a link_type from the network by its **link_type_id**"""
         self.__update_list_of_link_types()
         self.curr.execute(f"select link_type_id from 'link_types' where link_type='{link_type}'")
         found = self.curr.fetchone()
@@ -103,7 +103,7 @@ class LinkTypes:
         return LinkType(found[0])
 
     def all_types(self) -> dict:
-        """Returns a dictionary with all mode objects available in the model. mode_id as key"""
+        """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""
         self.__update_list_of_link_types()
         return {x: LinkType(x) for x in self.__all_types}
 
