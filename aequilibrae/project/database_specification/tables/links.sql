@@ -32,11 +32,7 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 #
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
 #
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_ab', 'AB directional speed (if allowed)');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
 #
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_ba', 'BA directional speed (if allowed)');
-#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_ab', 'AB directional link capacity (if allowed)');
-#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_ba', 'BA directional link capacity (if allowed)');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
 

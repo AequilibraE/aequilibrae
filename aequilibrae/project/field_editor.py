@@ -1,15 +1,22 @@
 import string
 from typing import List
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae import logger
 
 allowed_characters = string.ascii_letters + '_'
 
 
 class FieldEditor:
-    '''Allows user to edit the description to each field for each table
+    '''Allows user to edit the project data tables
 
-    To Add or edit the metadata for the fields of a table, it is
-    necessary to first access the table itself. Example:
+    The field editor is used for two different purposes:
+
+    * Managing data tables (adding and removing fields)
+    * Editing the tables' metadata (description of each field)
+
+    This is a general class used to manage all project's data tables accessible
+    to the user and but it should be accessed directly from within the module
+    corresponding to the data table one wants to edit. Example:
 
     ::
 
@@ -24,13 +31,12 @@ class FieldEditor:
         # To edit the fields of the modes table
         m_fields = proj.network.modes.fields()
 
-
     Field descriptions are kept in the table *attributes_documentation*
     '''
     _alowed_characters = allowed_characters
 
     def __init__(self, table_name: str) -> None:
-        self._table = table_name
+        self._table = table_name.lower()
         self._original_values = {}
         self._populate()
         self._check_completeness()
@@ -41,8 +47,8 @@ class FieldEditor:
         dt = self.__run_query_fetch_all(qry)
 
         for attr, descr in dt:
-            self.__dict__[attr] = descr
-            self._original_values[attr] = descr
+            self.__dict__[attr.lower()] = descr
+            self._original_values[attr.lower()] = descr
 
     def add(self, field_name: str, description: str, data_type="NUMERIC") -> None:
         """Adds new field to the data table
@@ -52,7 +58,7 @@ class FieldEditor:
             *description* (:obj:`str`): Description of the field to be inserted in the metadata
             *data_type* (:obj:`str`, optional): Valid SQLite Data type. Default: "NUMERIC"
         """
-        if field_name in self._original_values.keys():
+        if field_name.lower() in self._original_values.keys():
             raise ValueError('attribute_name already exists')
         if field_name in self.__dict__.keys():
             raise ValueError('attribute_name not allowed')
@@ -79,6 +85,7 @@ class FieldEditor:
             new_val = self.__dict__[key]
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
+                logger.info(f'Metadata for field {key} on table {self._table} was updated to {new_val}')
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -87,7 +94,26 @@ class FieldEditor:
     def _check_completeness(self) -> None:
         qry = f'pragma table_info({self._table})'
         dt = self.__run_query_fetch_all(qry)
-        fields = [x[1] for x in dt if x[1] != 'ogc_fid']
+        raw_fields = [x[1].lower() for x in dt if x[1] != 'ogc_fid']
+
+        if self._table == 'links':
+            fields = []
+            for field in raw_fields:
+                if field[-3:] == '_ab':
+                    if field[:-3] + '_ba' in raw_fields:
+                        fields.append(field[:-2])
+                    else:
+                        fields.append(field)
+                elif field[-3:] == '_ba':
+                    if field[:-3] + '_ab' in raw_fields:
+                        continue
+                    else:
+                        fields.append(field)
+                else:
+                    fields.append(field)
+        else:
+            fields = raw_fields
+
         for field in fields:
             if field not in self._original_values.keys():
                 self.__adds_to_attribute_table(field, 'not provided')

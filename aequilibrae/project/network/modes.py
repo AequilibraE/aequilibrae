@@ -86,7 +86,7 @@ class Modes:
         self.__update_list_of_modes()
 
     def fields(self) -> FieldEditor:
-        """Returns a handle to edit the Modes table fields and their metadata"""
+        """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
         return FieldEditor('modes')
 
     def get(self, mode_id: str) -> Mode:

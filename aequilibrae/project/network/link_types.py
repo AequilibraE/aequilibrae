@@ -109,7 +109,7 @@ class LinkTypes:
         return {x: LinkType(x) for x in self.__all_types}
 
     def fields(self) -> FieldEditor:
-        """Returns a handle to edit the Link_Types table fields and their metadata"""
+        """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
         return FieldEditor('link_types')
 
     def __update_list_of_link_types(self) -> None:
