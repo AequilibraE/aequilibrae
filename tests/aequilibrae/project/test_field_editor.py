@@ -19,9 +19,9 @@ class TestFieldEditor(TestCase):
         self.proj = Project()
         self.proj.open(self.temp_proj_folder)
 
-    # def tearDown(self) -> None:
-    #     self.proj.close()
-    #     rmtree(self.temp_proj_folder)
+    def tearDown(self) -> None:
+        self.proj.close()
+        rmtree(self.temp_proj_folder)
 
     def randomword(self, length):
         val = ''.join(choice(allowed_characters) for i in range(length))
