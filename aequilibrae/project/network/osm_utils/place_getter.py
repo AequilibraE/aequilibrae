@@ -69,6 +69,6 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
         if attempts == max_attempts - 1 and bbox is None:
             report.append("Reached maximum download attempts. Please wait a few minutes and try again")
         else:
-            report.append(f"We got an error for place query.")
+            report.append("We got an error for place query.")
 
         return (bbox, report)

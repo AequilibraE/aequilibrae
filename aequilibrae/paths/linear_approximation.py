@@ -25,7 +25,7 @@ else:
     from scipy.optimize import root as root_scalar
 
     recent_scipy = False
-    logger.warning(f"Using older version of Scipy. For better performance, use Scipy >= 1.4")
+    logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
