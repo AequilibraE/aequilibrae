@@ -20,7 +20,6 @@ include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'parallel_numpy.pyx'
 
-from libc.stdlib cimport abort, malloc, free
 from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
@@ -209,14 +208,14 @@ def path_computation(origin, destination, graph, results):
     origin_index = graph.nodes_to_indices[orig]
     dest_index = graph.nodes_to_indices[dest]
     if results.__graph_id__ != graph.__id__:
-        return "Results object not prepared. Use --> results.prepare(graph)"
+        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
     # Consistency checks
     # if origin >= graph.fs.shape[0]:
     #     raise ValueError ("Node " + str(origin) + " is outside the range of nodes in the graph")
 
     if VERSION_COMPILED != graph.__version__:
-        return 'This graph was created for a different version of AequilibraE. Please re-create it'
+        raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
     #We transform the python variables in Cython variables
     nodes = graph.num_nodes
@@ -286,6 +285,7 @@ def path_computation(origin, destination, graph, results):
 
     if predecessors_view[dest_index] > 0:
         all_connectors = []
+        link_directions = []
         all_nodes = [dest_index]
         mileposts = []
         p = dest_index
@@ -294,11 +294,13 @@ def path_computation(origin, destination, graph, results):
                 p = predecessors_view[p]
                 connector = conn_view[dest_index]
                 all_connectors.append(graph.graph['link_id'][connector])
+                link_directions.append(graph.graph['direction'][connector])
                 mileposts.append(g_view[connector])
                 all_nodes.append(p)
                 dest_index = p
             results.path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
             results.path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
+            results.path_link_directions = np.asarray(link_directions, graph.default_types('int'))[::-1]
             mileposts.append(0)
             results.milepost =  np.cumsum(mileposts[::-1])
 
@@ -328,6 +330,7 @@ def update_path_trace(results, destination, graph):
         results.path_nodes = None
         if results.predecessors[dest_index] > 0:
             all_connectors = []
+            link_directions = []
             all_nodes = [dest_index]
             mileposts = []
             p = dest_index
@@ -336,10 +339,12 @@ def update_path_trace(results, destination, graph):
                     p = results.predecessors[p]
                     connector = results.connectors[dest_index]
                     all_connectors.append(graph.graph['link_id'][connector])
+                    link_directions.append(graph.graph['direction'][connector])
                     mileposts.append(graph.cost[connector])
                     all_nodes.append(p)
                     dest_index = p
                 results.path = np.asarray(all_connectors, graph.default_types('int'))[::-1]
+                results.path_link_directions = np.asarray(link_directions, graph.default_types('int'))[::-1]
                 results.path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
                 mileposts.append(0)
                 results.milepost = np.cumsum(mileposts[::-1])
@@ -359,19 +364,20 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     graph_fs = graph.fs
 
     if result.__graph_id__ != graph.__id__:
-        return "Results object not prepared. Use --> results.prepare(graph)"
+
+        raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
     if orig not in graph.centroids:
-        return "Centroid " + str(orig) + " is outside the range of zones in the graph"
+        raise ValueError("Centroid " + str(orig) + " is outside the range of zones in the graph")
 
     if origin_index > graph.num_nodes:
-        return "Centroid " + str(orig) + " does not exist in the graph"
+        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
     if graph_fs[origin_index] == graph_fs[origin_index + 1]:
-        return "Centroid " + str(orig) + " does not exist in the graph"
+        raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
     if VERSION_COMPILED != graph.__version__:
-        return 'This graph was created for a different version of AequilibraE. Please re-create it'
+        raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
     nodes = graph.num_nodes + 1
     zones = graph.num_zones
