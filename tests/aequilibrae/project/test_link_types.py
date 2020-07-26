@@ -63,13 +63,11 @@ class TestLinkTypes(TestCase):
 
     def test_all_types(self):
         lt = self.proj.network.link_types
-        all_lts = [x for x in lt.all_types().keys()]
+        all_lts = set([x for x in lt.all_types().keys()])
 
         c = self.proj.conn.cursor()
         c.execute('select link_type_id from link_types')
-        reallts = [x[0] for x in c.fetchall()]
+        reallts = set([x[0] for x in c.fetchall()])
 
-        diff = [x for x in reallts if x not in all_lts] + [x for x in all_lts if x not in reallts]
-
-        if diff:
-            self.fail('Getting all link_types failed')
+        diff = all_lts.symmetric_difference(reallts)
+        self.assertEqual(diff, set(), 'Getting all link_types failed')
