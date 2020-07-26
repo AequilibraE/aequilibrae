@@ -6,7 +6,6 @@ import os
 from shutil import copytree, rmtree
 import tempfile
 import uuid
-from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project import Project
 from ...data import no_triggers_project
 

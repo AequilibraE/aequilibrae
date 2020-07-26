@@ -11,7 +11,6 @@ class LinkTypes:
     ::
 
         from aequilibrae import Project
-        from aequilibrae.project.network import LinkType
 
         p = Project()
         p.open('path/to/project/folder')
