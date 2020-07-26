@@ -65,11 +65,16 @@ class LinkTypes:
 
         tl = TableLoader()
         link_types_list = tl.load_table(self.curr, 'link_types')
+        existing_list = [lt['link_type_id'] for lt in link_types_list]
         if link_types_list:
             self.__properties = list(link_types_list[0].keys())
         for lt in link_types_list:
             if lt['link_type_id'] not in self.__items:
                 self.__items[lt['link_type_id']] = LinkType(lt)
+
+        to_del = [key for key in self.__items.keys() if key not in existing_list]
+        for key in to_del:
+            del self.__items[key]
 
     def new(self, link_type_id: str) -> LinkType:
         if link_type_id in self.__items:
