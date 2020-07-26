@@ -5,7 +5,6 @@ import os
 from shutil import copytree, rmtree
 import tempfile
 import uuid
-from aequilibrae.project.network import LinkType
 from aequilibrae.project import Project
 from ...data import no_triggers_project
 
@@ -30,16 +29,16 @@ class TestLinkTypes(TestCase):
         lt = self.proj.network.link_types
         existing = list(lt.all_types().keys())
 
-        newlt = LinkType('G')
+        newlt = lt.new('G')
         newlt.link_type = 'unique_link_type'
-        lt.add(newlt)
+        newlt.save()
 
         nowexisting = list(lt.all_types().keys())
 
         n = [x for x in nowexisting if x not in existing][0]
         self.assertEqual('G', n, 'Failed to add link type')
 
-    def test_drop(self):
+    def test_delete(self):
         lt = self.proj.network.link_types
         existing = list(lt.all_types().keys())
         deleted = random.choice(existing)

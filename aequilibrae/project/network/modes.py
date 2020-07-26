@@ -52,6 +52,7 @@ class Modes:
         new_mode.description = 'this is my new description'
         new_mode.save()
     """
+    __items = {}
 
     def __init__(self, net):
         self.__all_modes = []
@@ -114,3 +115,12 @@ class Modes:
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
+
+    def __copy__(self):
+        raise Exception('Link Types object cannot be copied')
+
+    def __deepcopy__(self, memodict=None):
+        raise Exception('Link Types object cannot be copied')
+
+    def __del__(self):
+        self.__items.clear()
