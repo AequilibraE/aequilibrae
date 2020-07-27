@@ -30,7 +30,11 @@ class PathResults:
           res.prepare(car_graph)
           res.compute_path(17, 13199)
 
-          # res.milepost, res.path_nodes, res.path, res.skims contain all results
+          # res.milepost contains the milepost corresponding to each node along the path
+          # res.path_nodes contains the sequence of nodes that form the path
+          # res.path  contains the sequence of links that form the path
+          # res.path_link_directions contains the link directions corresponding to the above links
+          # res.skims contain all skims requested when preparing the graph
 
           # Update all the outputs mentioned above for destination 1265. Same origin: 17
           res.update_trace(1265)
@@ -45,6 +49,7 @@ class PathResults:
         self.skims = None
         self.path = None
         self.path_nodes = None
+        self.path_link_directions = None
         self.milepost = None
         self.reached_first = None
         self.origin = None
@@ -105,6 +110,7 @@ class PathResults:
             self.skims.fill(np.inf)
             self.path = None
             self.path_nodes = None
+            self.path_link_directions = None
             self.milepost = None
 
         else:

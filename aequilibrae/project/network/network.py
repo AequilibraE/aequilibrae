@@ -10,6 +10,7 @@ from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.modes import Modes
+from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
@@ -23,12 +24,14 @@ class Network():
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
+    link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
         self.modes = Modes(self)
+        self.link_types = LinkTypes(self)
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
@@ -295,3 +298,7 @@ class Network():
         c = self.conn.cursor()
         c.execute(f"""select count({field}) from {table} where {condition};""")
         return c.fetchone()[0]
+
+    def __del__(self):
+        for obj in [self.link_types, self.modes]:
+            del obj

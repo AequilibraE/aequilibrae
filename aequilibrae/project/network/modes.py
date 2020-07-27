@@ -1,5 +1,5 @@
-from typing import Dict
 from sqlite3 import IntegrityError, Connection
+from typing import Dict
 from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
 
@@ -21,12 +21,15 @@ class Modes:
         all_modes = modes.all_modes()
 
         #And do a bulk change and save it
-        for mode_id to mode_obj in all_modes.items():
+        for mode_id, mode_obj in all_modes.items():
             mode_obj.beta = 1
             mode_obj.save()
 
         # or just get one mode in specific
         car_mode = modes.get('c')
+
+        # or just get this same mode by name
+        car_mode = modes.get_by_name('c')
 
         # We can change the description of the mode
         car_mode.description = 'personal autos only'
@@ -49,6 +52,7 @@ class Modes:
         new_mode.description = 'this is my new description'
         new_mode.save()
     """
+    __items = {}
 
     def __init__(self, net):
         self.__all_modes = []
@@ -66,10 +70,10 @@ class Modes:
         self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
         self.conn.commit()
         logger.info(f'mode {mode.mode_name}({mode.mode_id}) was added to the project')
-
         mode.save()
+        self.__update_list_of_modes()
 
-    def drop(self, mode_id: str) -> None:
+    def delete(self, mode_id: str) -> None:
         """Removes the mode with **mode_id** from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
@@ -78,6 +82,7 @@ class Modes:
             logger.error(f'Failed to remove mode {mode_id}. {e.args}')
             raise e
         logger.warning(f'Mode {mode_id} was successfully removed from the database')
+        self.__update_list_of_modes()
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""
@@ -85,6 +90,15 @@ class Modes:
         if mode_id not in self.__all_modes:
             raise ValueError(f'Mode {mode_id} does not exist in the model')
         return Mode(mode_id)
+
+    def get_by_name(self, mode: str) -> Mode:
+        """Get a mode from the network by its **mode_name**"""
+        self.__update_list_of_modes()
+        self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
+        found = self.curr.fetchone()
+        if len(found) == 0:
+            raise ValueError(f'Mode {mode} does not exist in the model')
+        return Mode(found[0])
 
     def all_modes(self) -> dict:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
@@ -101,3 +115,12 @@ class Modes:
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
+
+    def __copy__(self):
+        raise Exception('Modes object cannot be copied')
+
+    def __deepcopy__(self, memodict=None):
+        raise Exception('Modes object cannot be copied')
+
+    def __del__(self):
+        self.__items.clear()

@@ -80,16 +80,16 @@ class allOrNothing(WorkerThread):
         if pyqt:
             self.assignment.emit(["finished_threaded_procedure", None])
 
-    def func_assig_thread(self, orig, all_threads):
+    def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
         th = all_threads.get(thread_id, all_threads["count"])
         if th == all_threads["count"]:
             all_threads[thread_id] = all_threads["count"]
             all_threads["count"] += 1
 
-        x = one_to_all(orig, self.matrix, self.graph, self.results, self.aux_res, th)
+        x = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
-        if x != orig:
+        if x != origin:
             self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
