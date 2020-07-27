@@ -24,6 +24,7 @@ class Network():
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
+    link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
@@ -297,3 +298,7 @@ class Network():
         c = self.conn.cursor()
         c.execute(f"""select count({field}) from {table} where {condition};""")
         return c.fetchone()[0]
+
+    def __del__(self):
+        for obj in [self.link_types, self.modes]:
+            del obj

@@ -34,10 +34,10 @@ class TestModes(TestCase):
         self.assertEqual(self.curr.fetchone()[0], name, 'Could not save the mode properly to the database')
 
     def test_drop(self):
-        self.proj.network.modes.drop('b')
+        self.proj.network.modes.delete('b')
 
         with self.assertRaises(IntegrityError):
-            self.proj.network.modes.drop('c')
+            self.proj.network.modes.delete('c')
 
     def test_get(self):
         c = self.proj.network.modes.get('c')

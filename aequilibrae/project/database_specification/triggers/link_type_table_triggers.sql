@@ -25,7 +25,7 @@ CREATE TRIGGER link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "
 WHEN
     (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
 BEGIN
-    SELECT RAISE(ABORT, 'Link_type is in use ON your network. Cannot change it');
+    SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
 
 #
@@ -34,7 +34,7 @@ CREATE TRIGGER link_type_keep_if_in_use_deleting BEFORE DELETE ON "link_types"
 WHEN
     (SELECT count(*) FROM links WHERE old.link_type = link_type)>0
 BEGIN
-    SELECT RAISE(ABORT, 'Link_type is in use ON your network. Cannot change it');
+    SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
 
 #

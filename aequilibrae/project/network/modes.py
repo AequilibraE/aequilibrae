@@ -53,14 +53,14 @@ class Modes:
         new_mode.description = 'this is my new description'
         new_mode.save()
     """
+    __items = {}
 
     def __init__(self, net):
         self.__all_modes = []
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
 
-        if self.__has_mode():
-            self.__update_list_of_modes()
+        self.__update_list_of_modes()
 
     def add(self, mode: Mode) -> None:
         """ We add a mode to the project"""
@@ -74,7 +74,7 @@ class Modes:
         mode.save()
         self.__update_list_of_modes()
 
-    def drop(self, mode_id: str) -> None:
+    def delete(self, mode_id: str) -> None:
         """Removes the mode with **mode_id** from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
@@ -120,6 +120,15 @@ class Modes:
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
+
+    def __copy__(self):
+        raise Exception('Modes object cannot be copied')
+
+    def __deepcopy__(self, memodict=None):
+        raise Exception('Modes object cannot be copied')
+
+    def __del__(self):
+        self.__items.clear()
 
     def __has_mode(self):
         curr = self.conn.cursor()

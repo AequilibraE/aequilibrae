@@ -86,6 +86,8 @@ class Project:
         """Safely closes the project"""
         if environ_var in os.environ:
             self.conn.close()
+            for obj in [self.parameters, self.network]:
+                del obj
             del os.environ[environ_var]
             logger.info(f'Closed project on {self.project_base_path}')
         else:
