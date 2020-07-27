@@ -117,7 +117,7 @@ class Modes:
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
 
     def __copy__(self):
-        raise Exception('Link Types object cannot be copied')
+        raise Exception('Modes object cannot be copied')
 
     def __deepcopy__(self, memodict=None):
         raise Exception('Modes object cannot be copied')
