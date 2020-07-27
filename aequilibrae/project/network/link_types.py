@@ -87,7 +87,7 @@ class LinkTypes:
         logger.warning('Link type has not yet been saved to the database. Do so explicitly')
         return lt
 
-    def drop(self, link_type_id: str) -> None:
+    def delete(self, link_type_id: str) -> None:
         """Removes the link_type with **link_type_id** from the project"""
         try:
             lt = self.__items[link_type_id]  # type: LinkType

@@ -73,7 +73,7 @@ class Modes:
         mode.save()
         self.__update_list_of_modes()
 
-    def drop(self, mode_id: str) -> None:
+    def delete(self, mode_id: str) -> None:
         """Removes the mode with **mode_id** from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
@@ -120,7 +120,7 @@ class Modes:
         raise Exception('Link Types object cannot be copied')
 
     def __deepcopy__(self, memodict=None):
-        raise Exception('Link Types object cannot be copied')
+        raise Exception('Modes object cannot be copied')
 
     def __del__(self):
         self.__items.clear()

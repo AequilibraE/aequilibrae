@@ -42,7 +42,7 @@ class TestLinkTypes(TestCase):
         lt = self.proj.network.link_types
         existing = list(lt.all_types().keys())
         deleted = random.choice(existing)
-        lt.drop(deleted)
+        lt.delete(deleted)
         remaining = list(lt.all_types().keys())
 
         difference = [x for x in existing if x not in remaining]
