@@ -16,5 +16,6 @@ nominatim_endpoint = "https://nominatim.openstreetmap.org/"
 max_attempts = 5
 
 timeout = 180
-memory = None
+memory = 0
 max_query_area_size = 50 * 1000 * 50 * 1000
+sleeptime = 0
