@@ -21,7 +21,6 @@ class TestModes(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        rmtree(self.temp_proj_folder)
 
     def test_add(self):
         new_mode = Mode('F')

@@ -23,8 +23,6 @@ class TestMode(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        print(self.temp_proj_folder)
-        rmtree(self.temp_proj_folder)
 
     def test_build(self):
         for val in ['1', 'ab', '', None]:

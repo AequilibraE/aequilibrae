@@ -179,18 +179,22 @@ class Network():
 
         logger.info("Network built successfully")
 
-    def build_graphs(self) -> None:
+    def build_graphs(self, fields: list = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
         dictionary of graphs
         """
         curr = self.conn.cursor()
-        curr.execute('PRAGMA table_info(links);')
-        field_names = curr.fetchall()
 
-        ignore_fields = ['ogc_fid', 'geometry']
-        all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        if fields is None:
+            curr.execute('PRAGMA table_info(links);')
+            field_names = curr.fetchall()
+
+            ignore_fields = ['ogc_fid', 'geometry']
+            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        else:
+            all_fields = fields
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []

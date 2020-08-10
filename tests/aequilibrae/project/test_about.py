@@ -20,7 +20,6 @@ class TestAbout(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        rmtree(self.temp_proj_folder)
 
     def test_create_and_list(self):
         self.proj.about.create()
