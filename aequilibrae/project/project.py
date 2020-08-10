@@ -144,14 +144,17 @@ class Project:
         if p.parameters is None:
             par = p._default
         do_log = par["system"]["logging"]
-
-        formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+        for handler in logger.handlers:
+            if handler.name == 'aequilibrae':
+                logger.removeHandler(handler)
         if do_log:
+            formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
             log_file = os.path.join(self.project_base_path, "aequilibrae.log")
             if not os.path.isfile(log_file):
                 a = open(log_file, "w")
                 a.close()
             ch = logging.FileHandler(log_file)
+            ch.name = 'aequilibrae'
             ch.setFormatter(formatter)
             ch.setLevel(logging.DEBUG)
             logger.addHandler(ch)
