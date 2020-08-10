@@ -12,7 +12,7 @@ For the original work, please see https://github.com/gboeing/osmnx
 import time
 import re
 import requests
-from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers
+from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers, sleeptime, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 import importlib.util as iutil
@@ -42,15 +42,19 @@ class OSMDownloader(WorkerThread):
     def doWork(self):
         infrastructure = 'way["highway"]'
         query_template = (
-            "[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
+            "{memory}[out:json][timeout:{timeout}];({infrastructure}{filters}({south:.6f},{west:.6f},"
             "{north:.6f},{east:.6f});>;);out;"
         )
         self.__emit_all(["maxValue", len(self.polygons)])
         self.__emit_all(["Value", 0])
-
+        m = ''
+        if memory > 0:
+            m = f'[maxsize: {memory}]'
         for counter, poly in enumerate(self.polygons):
+            msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
+            logger.debug(msg)
             self.__emit_all(["Value", counter])
-            self.__emit_all(["text", f"Downloading polygon {counter + 1} of {len(self.polygons)}"])
+            self.__emit_all(["text", msg])
             west, south, east, north = poly
             query_str = query_template.format(
                 north=north,
@@ -60,6 +64,7 @@ class OSMDownloader(WorkerThread):
                 infrastructure=infrastructure,
                 filters=self.filter,
                 timeout=timeout,
+                memory=m
             )
             json = self.overpass_request(data={"data": query_str}, timeout=timeout)
             if json["elements"]:
@@ -92,7 +97,7 @@ class OSMDownloader(WorkerThread):
         # define the Overpass API URL, then construct a GET-style URL as a string to
         url = overpass_endpoint.rstrip("/") + "/interpreter"
         if pause_duration is None:
-            time.sleep(5)
+            time.sleep(sleeptime)
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
@@ -117,7 +122,7 @@ class OSMDownloader(WorkerThread):
             if response.status_code in [429, 504]:
                 # pause for error_pause_duration seconds before re-trying request
                 if error_pause_duration is None:
-                    error_pause_duration = 5
+                    error_pause_duration = sleeptime + 1
                 msg = "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
                     domain, response.status_code, error_pause_duration
                 )

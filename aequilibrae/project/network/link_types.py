@@ -79,7 +79,7 @@ class LinkTypes:
 
     def new(self, link_type_id: str) -> LinkType:
         if link_type_id in self.__items:
-            raise ValueError('Link Type ID already exists in the model. It must be unique.')
+            raise ValueError(f'Link Type ID ({link_type_id}) already exists in the model. It must be unique.')
 
         tp = {key: None for key in self.__properties}
         tp['link_type_id'] = link_type_id

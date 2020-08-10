@@ -1,9 +1,9 @@
 CREATE TABLE 'links' (ogc_fid      INTEGER PRIMARY KEY,
                       link_id      INTEGER NOT NULL UNIQUE,
-                      a_node       INTEGER NOT NULL ,
-                      b_node       INTEGER NOT NULL ,
+                      a_node       INTEGER,
+                      b_node       INTEGER,
                       direction    INTEGER NOT NULL DEFAULT 0,
-                      distance     NUMERIC NOT NULL ,
+                      distance     NUMERIC,
                       modes        TEXT    NOT NULL,
                       link_type    TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
                       'name'       NUMERIC,
@@ -15,6 +15,23 @@ CREATE TABLE 'links' (ogc_fid      INTEGER PRIMARY KEY,
 
 #
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
+
+#
+CREATE INDEX idx_link ON links (link_id);
+
+#
+CREATE INDEX idx_link_anode ON links (a_node);
+
+#
+CREATE INDEX idx_link_bnode ON links (b_node);
+
+#
+CREATE INDEX idx_link_modes ON links (modes);
+
+#
+CREATE INDEX idx_link_link_type ON links (link_type);
+
+
 #
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
 #

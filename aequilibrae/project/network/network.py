@@ -110,7 +110,7 @@ class Network():
 
             *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
         """
-
+        self.add_spatial_index()
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
@@ -154,8 +154,8 @@ class Network():
             parts = math.ceil(area / max_query_area_size)
             horizontal = math.ceil(math.sqrt(parts))
             vertical = math.ceil(parts / horizontal)
-            dx = east - west
-            dy = north - south
+            dx = (east - west) / horizontal
+            dy = (north - south) / vertical
             for i in range(horizontal):
                 xmin = max(-180, west + i * dx)
                 xmax = min(180, west + (i + 1) * dx)

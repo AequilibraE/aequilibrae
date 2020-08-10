@@ -11,6 +11,7 @@ from aequilibrae import logger
 from aequilibrae.reference_files import spatialite_database
 from .spatialite_connection import spatialite_connection
 from .project_creation import initialize_tables
+import logging
 
 
 class Project:
@@ -58,6 +59,7 @@ class Project:
         self.conn = database_connection()
 
         self.__load_objects()
+        self.__set_logging_path()
         logger.info(f'Opened project on {self.project_base_path}')
 
     def new(self, project_path: str) -> None:
@@ -80,6 +82,7 @@ class Project:
         self.__create_empty_project()
         self.__load_objects()
         self.about.create()
+        self.__set_logging_path()
         logger.info(f'Created project on {self.project_base_path}')
 
     def close(self) -> None:
@@ -134,3 +137,21 @@ class Project:
         if environ_var in os.environ:
             return True
         return False
+
+    def __set_logging_path(self):
+        p = Parameters()
+        par = p.parameters
+        if p.parameters is None:
+            par = p._default
+        do_log = par["system"]["logging"]
+
+        formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+        if do_log:
+            log_file = os.path.join(self.project_base_path, "aequilibrae.log")
+            if not os.path.isfile(log_file):
+                a = open(log_file, "w")
+                a.close()
+            ch = logging.FileHandler(log_file)
+            ch.setFormatter(formatter)
+            ch.setLevel(logging.DEBUG)
+            logger.addHandler(ch)
