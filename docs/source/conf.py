@@ -53,6 +53,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
+    "sphinx_autodoc_annotation",
     'sphinx.ext.autosummary',
 ]
 
