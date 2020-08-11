@@ -520,7 +520,7 @@ Network has:
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
 
 Convergence Study
----------------
+-----------------
 
 Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago

@@ -1,6 +1,7 @@
 import requests
 
-overpass_endpoint = "http://overpass-api.de/api"
+overpass_endpoint = "http://192.168.9.108:32784/api"
+# overpass_endpoint = "http://overpass-api.de/api"
 
 user_agent = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"
 referer = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"
@@ -13,9 +14,9 @@ http_headers.update(
 
 nominatim_endpoint = "https://nominatim.openstreetmap.org/"
 
-max_attempts = 5
+max_attempts = 50
 
-timeout = 180
+timeout = 540
 memory = 0
-max_query_area_size = 50 * 1000 * 50 * 1000
+max_query_area_size = 200 * 1000 * 200 * 1000
 sleeptime = 0

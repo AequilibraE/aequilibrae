@@ -184,6 +184,19 @@ class Network():
 
         When called, it overwrites all graphs previously created and stored in the networks'
         dictionary of graphs
+
+        Args:
+            *fields* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+                                              database, it may be useful to specify which fields to use
+
+        To use the *fields* parameter, a minimalistic option is the following
+        ::
+
+            p = Project()
+            p.open(nm)
+            fields = ['link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes']
+            p.network.build_graphs(fields)
+
         """
         curr = self.conn.cursor()
 

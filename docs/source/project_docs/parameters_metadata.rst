@@ -1,4 +1,4 @@
-.. _tables_modes:
+.. _parameters_metadata:
 
 =========================
 Parameters metadata table

@@ -1188,6 +1188,7 @@ fancy multithreading implemented in path computation.
 
 .. Transit
 .. -------
+
 We only have import for now, and it is likely to not work on Windows if you want the geometries
 
 .. _example_usage_transit:
