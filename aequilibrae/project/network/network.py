@@ -71,7 +71,7 @@ class Network():
 
         return real_fields
 
-    def modes(self):
+    def list_modes(self):
         """
         Returns a list of all the modes in this model
 
@@ -164,7 +164,6 @@ class Network():
                     ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
-
         logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
         self.downloader.doWork()
