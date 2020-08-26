@@ -6,7 +6,6 @@ from aequilibrae.parameters import Parameters
 from .osm_params import http_headers
 
 
-
 def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     """
     Send a request to the Nominatim API via HTTP GET and return a geometry polygon
