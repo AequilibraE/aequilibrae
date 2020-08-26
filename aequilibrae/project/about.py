@@ -7,6 +7,7 @@ from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
 from aequilibrae.starts_logging import logger
 
+
 class About:
     """Provides an interface for querying and editing the **about** table of an AequilibraE project
         ::

@@ -11,24 +11,25 @@ class Parameters:
     Parameters are used in many procedures, and are often defined only in thi parameters.yml file ONLY
     Parameters are organized in the following groups:
 
-    assignment:
-    distribution:
+    * assignment
+    * distribution
 
-    system:
-    cpus: Maximum threads to be used in any procedure
-    default_directory: If is the directory QGIS file opening/saving dialogs will try to open as standard
-    driving side: For purposes of plotting on QGIS
-    logging: Level of logging to be written to temp/aequilibrae.log: Levels are those from the Python logging library
-                0: 'NOTSET'
-                10: 'DEBUG'
-                20: 'INFO'
-                30: 'WARNING'
-                40: 'ERROR'
-                50: 'CRITICAL'
-            both numeric and text accepted
-    report zeros:
-    temp directory:
+    * system
+        - cpus: Maximum threads to be used in any procedure
 
+        - default_directory: If is the directory QGIS file opening/saving dialogs will try to open as standard
+
+        - driving side: For purposes of plotting on QGIS
+
+        - logging: Level of logging to be written to temp/aequilibrae.log: Levels are those from the Python logging library
+                    - 0: 'NOTSET'
+                    - 10: 'DEBUG'
+                    - 20: 'INFO'
+                    - 30: 'WARNING'
+                    - 40: 'ERROR'
+                    - 50: 'CRITICAL'
+    * report zeros
+    * temp directory
     """
 
     def __init__(self):

@@ -69,7 +69,7 @@ override them during assignment, as detailed in :ref:`convergence_criteria`.
 .. _parameters_distribution:
 
 Distribution
-----------
+------------
 
 The distribution section of the parameter file is also fairly short, as it
 contains only the parameters for number of maximum iterations, convergence level

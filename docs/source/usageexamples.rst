@@ -25,7 +25,7 @@ Each instance contains the following folder structure and contents:
 
 0_tntp_data:
 
-* Data imported from https://github.com/bstabler/TransportationNetworks/
+* Data imported from `TNTP instances <https://github.com/bstabler/TransportationNetworks/>`_.
 * matrices in openmatrix and AequilibraE formats
 * vectors computed from the matrix in question and in AequilibraE format
 * No alterations made to the data
@@ -889,7 +889,7 @@ Assigning traffic on TNTP instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is a set of well known traffic assignment problems used in the literature
-maintained on `GitHub <https://github.com/bstabler/TransportationNetworks/>`_
+maintained on `Ben's GitHub <https://github.com/bstabler/TransportationNetworks/>`_
 that is often used for tests, so we will use one of those problems here.
 
 Let's suppose we want to perform traffic assignment for one of those problems
@@ -965,7 +965,7 @@ Let's suppose one wants to setup a matrix for assignment that has two user
 classes, *red_cars* and *blue cars* for a single traffic class. To do that, one
 needs only to call the *computational_view* method with a list of the two
 matrices of interest.  Both matrices need to be contained in the same file (and
-to be contiguous if an *.aem instead of a *.omx file) however.
+to be contiguous if an * .aem instead of a * .omx file) however.
 
 ::
 
