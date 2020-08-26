@@ -93,23 +93,6 @@ Matrix Module
     AequilibraeMatrix
     AequilibraeData
 
-Paths Module
-------------
-
-.. currentmodule:: aequilibrae
-
-.. autosummary::
-   :nosignatures:
-   :toctree: _generated
-
-    Graph
-    AssignmentResults
-    SkimResults
-    PathResults
-    VDF
-    TrafficClass
-    TrafficAssignment
-
 Transit Module
 --------------
 
