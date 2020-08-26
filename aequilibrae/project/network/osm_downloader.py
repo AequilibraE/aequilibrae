@@ -15,6 +15,7 @@ import requests
 from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers, sleeptime, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
+import gc
 import importlib.util as iutil
 from ...utils import WorkerThread
 
@@ -68,7 +69,9 @@ class OSMDownloader(WorkerThread):
             )
             json = self.overpass_request(data={"data": query_str}, timeout=timeout)
             if json["elements"]:
-                self.json.append(json)
+                self.json.extend(json["elements"])
+            del json
+            gc.collect()
         self.__emit_all(["Value", len(self.polygons)])
         self.__emit_all(["FinishedDownloading", 0])
 

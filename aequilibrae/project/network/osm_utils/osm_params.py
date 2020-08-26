@@ -1,6 +1,6 @@
 import requests
 
-overpass_endpoint = "http://192.168.9.108:32784/api"
+overpass_endpoint = "http://192.168.9.108:32780/api"
 # overpass_endpoint = "http://overpass-api.de/api"
 
 user_agent = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"
@@ -18,5 +18,5 @@ max_attempts = 50
 
 timeout = 540
 memory = 0
-max_query_area_size = 200 * 1000 * 200 * 1000
+max_query_area_size = 50 * 1000 * 50 * 1000
 sleeptime = 0

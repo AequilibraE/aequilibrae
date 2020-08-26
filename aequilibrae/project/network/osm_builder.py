@@ -1,6 +1,6 @@
 import sqlite3
 import string
-import math
+import gc
 from typing import List
 import importlib.util as iutil
 import numpy as np
@@ -58,31 +58,22 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def data_structures(self):
-
-        osmi = []
-        logger.info("Consolidating geo elements")
-        self.__emit_all(["text", "Consolidating geo elements"])
-        self.__emit_all(["maxValue", len(self.osm_items)])
-
-        for i, x in enumerate(self.osm_items):
-            osmi.append(x["elements"])
-            self.__emit_all(["Value", i])
-        self.osm_items = sum(osmi, [])
-
         logger.info("Separating nodes and links")
         self.__emit_all(["text", "Separating nodes and links"])
         self.__emit_all(["maxValue", len(self.osm_items)])
 
         alinks = []
         n = []
-        for i, x in enumerate(self.osm_items):
-            if x["type"] == "way":
-                alinks.append(x)
-            elif x["type"] == "node":
-                n.append(x)
-            self.__emit_all(["Value", i])
+        tot_items = len(self.osm_items)
+        for i in range(tot_items, 0, -1):
+            item = self.osm_items.pop(-1)
+            if item['type'] == "way":
+                alinks.append(item)
+            elif item['type'] == "node":
+                n.append(item)
+            self.__emit_all(["Value", tot_items - i])
+        gc.collect()
 
-        self.osm_items = None
         logger.info("Setting data structures for nodes")
         self.__emit_all(["text", "Setting data structures for nodes"])
         self.__emit_all(["maxValue", len(n)])
@@ -191,7 +182,7 @@ class OSMBuilder(WorkerThread):
                     vars["link_id"] += 1
                 self.conn.commit()
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
-
+            self.links[osm_id] = []
         self.conn.commit()
         self.curr.close()
 
