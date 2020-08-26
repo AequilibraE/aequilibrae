@@ -10,6 +10,8 @@ certain portion of the software.
 
 * :ref:`parameters_assignment`
 
+* :ref:`parameters_osm`
+
 * :ref:`parameters_distribution`
 
 * :ref:`parameters_network`
@@ -30,7 +32,7 @@ below.
 .. image:: images/parameters_system_example.png
     :width: 812
     :align: center
-    :alt: Link examples
+    :alt: System example
 
 The number of CPUs have a special behaviour defined, as follows:
 
@@ -49,6 +51,23 @@ the case of the *driving side* and  *default_directory* parameters.
 the instructions on how to set :ref:`installing_spatialite_on_windows` on
 Windows.
 
+.. _parameters_osm:
+
+Open Streeet Maps
+-----------------
+The OSM section of the parameter file is relevant only when one plans to
+download a substantial amount of data from an Overpass API, in which case it is
+recommended to deploy a local Overpass server.
+
+.. image:: images/parameters_assignment_example.png
+    :width: 840
+    :align: center
+    :alt: OSM example
+
+The user is also welcome to change the maximum area for a single query to the
+Overpass API (m\ :sup:`2`) and the pause duration between successive
+requests *sleeptime*.
+
 .. _parameters_assignment:
 
 Assignment
@@ -60,7 +79,7 @@ of iterations and target Relative Gap.
 .. image:: images/parameters_assignment_example.png
     :width: 487
     :align: center
-    :alt: Link examples
+    :alt: Assignment example
 
 Although these parameters are required to exist in the parameters file, one can
 override them during assignment, as detailed in :ref:`convergence_criteria`.
@@ -79,7 +98,7 @@ synthetic gravity models, as shown below.
 .. image:: images/parameters_distribution_example.png
     :width: 546
     :align: center
-    :alt: Link examples
+    :alt: Distribution example
 
 .. _parameters_network:
 
@@ -112,7 +131,7 @@ to the use of **integer**, **numeric** and **varchar**.
 .. image:: images/parameters_links_example.png
     :width: 704
     :align: center
-    :alt: Link examples
+    :alt: Link example
 
 For the case of all non-mandatory fields, two more parameters are possible: *osm_source* and
 *osm_behaviour*. Those two fields provide the necessary information for importing data from

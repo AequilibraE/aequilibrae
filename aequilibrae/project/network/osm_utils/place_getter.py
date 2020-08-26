@@ -2,7 +2,9 @@ import time
 import re
 from typing import List, Union, Tuple
 import requests
-from .osm_params import nominatim_endpoint, http_headers, max_attempts
+from aequilibrae.parameters import Parameters
+from .osm_params import http_headers
+
 
 
 def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
@@ -17,6 +19,10 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
 
     Adapted from http://www.github.com/gboeing/osmnx
     """
+
+    par = Parameters().parameters['osm']
+    nominatim_endpoint = par['nominatim_endpoint']
+    max_attempts = par['max_attempts']
 
     params = {"q": place, "format": "json"}
 

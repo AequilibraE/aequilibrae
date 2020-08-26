@@ -12,7 +12,7 @@ For the original work, please see https://github.com/gboeing/osmnx
 import time
 import re
 import requests
-from .osm_utils.osm_params import overpass_endpoint, timeout, http_headers, sleeptime, memory
+from .osm_utils.osm_params import http_headers, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 import gc
@@ -39,6 +39,10 @@ class OSMDownloader(WorkerThread):
         self.filter = self.get_osm_filter(modes)
         self.report = []
         self.json = []
+        par = Parameters().parameters['osm']
+        self.overpass_endpoint = par['overpass_endpoint']
+        self.timeout = par['timeout']
+        self.sleeptime = par['sleeptime']
 
     def doWork(self):
         infrastructure = 'way["highway"]'
@@ -64,10 +68,10 @@ class OSMDownloader(WorkerThread):
                 west=west,
                 infrastructure=infrastructure,
                 filters=self.filter,
-                timeout=timeout,
+                timeout=self.timeout,
                 memory=m
             )
-            json = self.overpass_request(data={"data": query_str}, timeout=timeout)
+            json = self.overpass_request(data={"data": query_str}, timeout=self.timeout)
             if json["elements"]:
                 self.json.extend(json["elements"])
             del json
@@ -98,9 +102,9 @@ class OSMDownloader(WorkerThread):
         """
 
         # define the Overpass API URL, then construct a GET-style URL as a string to
-        url = overpass_endpoint.rstrip("/") + "/interpreter"
+        url = self.overpass_endpoint.rstrip("/") + "/interpreter"
         if pause_duration is None:
-            time.sleep(sleeptime)
+            time.sleep(self.sleeptime)
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
@@ -125,7 +129,7 @@ class OSMDownloader(WorkerThread):
             if response.status_code in [429, 504]:
                 # pause for error_pause_duration seconds before re-trying request
                 if error_pause_duration is None:
-                    error_pause_duration = sleeptime + 1
+                    error_pause_duration = self.sleeptime + 1
                 msg = "Server at {} returned status code {} and no JSON data. Re-trying request in {:.2f} seconds.".format(
                     domain, response.status_code, error_pause_duration
                 )

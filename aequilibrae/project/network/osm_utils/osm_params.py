@@ -1,22 +1,14 @@
 import requests
+from aequilibrae.parameters import Parameters
 
-overpass_endpoint = "http://192.168.9.108:32780/api"
-# overpass_endpoint = "http://overpass-api.de/api"
+par = Parameters().parameters['osm']
+accept_language = par['accept_language']
+memory = 0
 
 user_agent = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"
 referer = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"
-accept_language = "en"
 
 http_headers = requests.utils.default_headers()
 http_headers.update(
     {"User-Agent": user_agent, "referer": referer, "Accept-Language": accept_language, "format": "json"}
 )
-
-nominatim_endpoint = "https://nominatim.openstreetmap.org/"
-
-max_attempts = 50
-
-timeout = 540
-memory = 0
-max_query_area_size = 50 * 1000 * 50 * 1000
-sleeptime = 0
