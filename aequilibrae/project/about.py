@@ -95,7 +95,7 @@ class About:
         for k in self.__characteristics:
             v = self.__dict__[k]
             if v != self.__original[k]:
-                curr.execute(f"UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
+                curr.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
                 logger.info(f'Updated {k} on About_Table to {v}')
         self.__conn.commit()
 
