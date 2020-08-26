@@ -131,7 +131,7 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    'members': 'var1, var2',
+    'members': True,
     'member-order': 'bysource',
     'special-members': '__init__',
     'private-members': False,
