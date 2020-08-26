@@ -57,6 +57,9 @@ extensions = [
     'sphinx.ext.autosummary',
 ]
 
+autodoc_mock_imports = ['aequilibrae.paths.basic_path_finding', 'aequilibrae.paths.bpr',
+                        'aequilibrae.paths.setup_Assignment', 'aequilibrae.paths.parallel_numpy']
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
