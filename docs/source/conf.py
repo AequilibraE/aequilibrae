@@ -57,9 +57,6 @@ extensions = [
     'sphinx.ext.autosummary',
 ]
 
-autodoc_mock_imports = ['aequilibrae.paths.basic_path_finding', 'aequilibrae.paths.bpr',
-                        'aequilibrae.paths.setup_Assignment', 'aequilibrae.paths.parallel_numpy']
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
@@ -82,8 +79,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "basic_path_finding", "bpr", "parallel_numpy",
-                    "setup_Assignment"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -131,11 +127,11 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    'members': True,
+    'members': 'var1, var2',
     'member-order': 'bysource',
     'special-members': '__init__',
     'private-members': False,
-    'undoc-members': False,
+    'undoc-members': True,
     'exclude-members': '__weakref__',
     'inherited-members': False,
     'show-inheritance': False,
