@@ -28,7 +28,6 @@ class Project:
         newfile.new('path/to/new/project/folder')
         """
 
-
     def __init__(self):
         self.path_to_file: str = None
         self.source: str = None
