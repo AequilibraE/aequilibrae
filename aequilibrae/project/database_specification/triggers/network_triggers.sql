@@ -190,13 +190,13 @@ CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
 CREATE TRIGGER deleted_link AFTER delete ON links
   BEGIN
 -- delete lonely node AFTER link deleted
-    DELETE FROM nodes
-    WHERE node_id NOT IN (
-      SELECT a_node
-      FROM links
-      union all
-      SELECT b_node
-      FROM links);
+	Delete from Nodes
+    where node_id = old.a_node and
+           (select count(*) from Links where a_node = old.a_node or b_node = old.a_node) < 1;
+
+	Delete from Nodes
+    where node_id = old.b_node and
+           (select count(*) from Links where a_node = old.b_node or b_node = old.b_node) < 1;
 
      -- We update the modes for the node ID that just lost a link starting in it
     update nodes
