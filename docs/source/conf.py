@@ -130,9 +130,9 @@ autodoc_default_options = {
     'members': 'var1, var2',
     'member-order': 'bysource',
     'special-members': '__init__',
-    'private-members': False,
+    'private-members': True,
     'undoc-members': True,
-    # 'exclude-members': '__weakref__',
+    'exclude-members': '__weakref__',
     'inherited-members': False,
     'show-inheritance': False,
     'autodoc_inherit_docstrings': False

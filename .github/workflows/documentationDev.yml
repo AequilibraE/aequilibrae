@@ -27,8 +27,6 @@ jobs:
       run: |
         cd aequilibrae/paths
         python3 setup_Assignment.py build_ext --inplace
-        rm *.pyx
-        rm setup_Assignment.py
         cd ..
         cd ..
 
