@@ -84,7 +84,6 @@ class Zoning:
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
         return any(['zone' in x[0].lower() for x in curr.fetchall()])
 
-
     def __load(self):
         tl = TableLoader()
         zones_list = tl.load_table(self.__curr, 'zones')
