@@ -1,6 +1,5 @@
 import yaml
 
-
 valid_functions = ["EXPO", "GAMMA", "POWER"]
 members = ["function", "alpha", "beta"]
 model_type = "SyntheticGravityModel"
@@ -10,6 +9,7 @@ class SyntheticGravityModel:
     """Simple class object to represent synthetic gravity models
 
     """
+
     def __init__(self):
         self.function = None
         self.alpha = None
