@@ -1,8 +1,11 @@
 from sqlite3 import IntegrityError, Connection
+from os.path import join, dirname, realpath
+from warnings import warn
 from aequilibrae import logger
-from .zone import Zone
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.project_creation import run_queries_from_sql_file
+from .zone import Zone
 
 
 class Zoning:
@@ -34,22 +37,20 @@ class Zoning:
 
     def __init__(self, project):
         self.__all_types = []
-        self.conn = project.conn  # type: Connection
-        self.curr = project.conn.cursor()
+        self.__conn = project.conn  # type: Connection
+        self.__curr = project.conn.cursor()
+        if self.__has_zoning():
+            self.__load()
 
-        tl = TableLoader()
-        zones_list = tl.load_table(self.curr, 'zones')
+    def create(self):
+        """Creates the 'zones' table for project files that did not previously contain it"""
 
-        existing_list = [zn['zone_id'] for zn in zones_list]
-        if zones_list:
-            self.__properties = list(zones_list[0].keys())
-        for zn in zones_list:
-            if zn['zone_id'] not in self.__items:
-                self.__items[zn['zone_id']] = Zone(zn)
-
-        to_del = [key for key in self.__items.keys() if key not in existing_list]
-        for key in to_del:
-            del self.__items[key]
+        if not self.__has_zoning():
+            qry_file = join(realpath(__file__), 'database_specification', 'tables', 'zones.sql')
+            run_queries_from_sql_file(self.__conn, qry_file)
+            self.__load()
+        else:
+            warn('zones table already exists. Nothing was done', Warning)
 
     def get(self, zone_id: str) -> Zone:
         """Get a zone from the model by its **zone_id**"""
@@ -77,3 +78,24 @@ class Zoning:
 
     def __del__(self):
         self.__items.clear()
+
+    def __has_zoning(self):
+        curr = self.__conn.cursor()
+        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        return any(['zone' in x[0].lower() for x in curr.fetchall()])
+
+
+    def __load(self):
+        tl = TableLoader()
+        zones_list = tl.load_table(self.__curr, 'zones')
+
+        existing_list = [zn['zone_id'] for zn in zones_list]
+        if zones_list:
+            self.__properties = list(zones_list[0].keys())
+        for zn in zones_list:
+            if zn['zone_id'] not in self.__items:
+                self.__items[zn['zone_id']] = Zone(zn)
+
+        to_del = [key for key in self.__items.keys() if key not in existing_list]
+        for key in to_del:
+            del self.__items[key]
