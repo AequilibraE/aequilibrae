@@ -147,7 +147,7 @@ Future components
 Importing from Open Street Maps
 -------------------------------
 
-Please review the information :ref:`parameters`
+Please review the information :ref:`parameters_osm`
 
 .. note::
 

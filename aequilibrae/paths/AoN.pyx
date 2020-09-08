@@ -13,6 +13,7 @@
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------"""
 
+# cython: language_level=3
 cimport numpy as np
 
 # include 'parameters.pxi'

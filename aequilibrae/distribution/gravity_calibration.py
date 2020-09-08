@@ -14,7 +14,7 @@ from ..parameters import Parameters
 
 
 class GravityCalibration:
-    """
+    r"""
         Calibrate a traditional gravity model
 
         Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
