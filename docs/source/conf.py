@@ -79,8 +79,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", 'basic_path_finding.*', 'bpr.*', 'parallel_numpy.*',
-                    'setup_Assignment.*']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", '*.pyx']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -133,7 +132,7 @@ autodoc_default_options = {
     'special-members': '__init__',
     'private-members': False,
     'undoc-members': True,
-    'exclude-members': '__weakref__',
+    # 'exclude-members': '__weakref__',
     'inherited-members': False,
     'show-inheritance': False,
     'autodoc_inherit_docstrings': False
