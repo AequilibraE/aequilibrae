@@ -15,7 +15,7 @@ sys.dont_write_bytecode = True
 
 
 class GravityApplication:
-    """
+    r"""
     Applies a synthetic gravity model
 
     Model is an instance of SyntheticGravityModel class
