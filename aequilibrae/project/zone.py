@@ -31,7 +31,7 @@ class Zone(SafeClass):
                 if value != v_old and value is not None:
                     self.__original__[key] = value
                     if key == 'geometry':
-                        sql = f"update 'zones' set geometry=ST_Multi(GeomFromWKB(?, 4326)) where zone_id=?"
+                        sql = "update 'zones' set geometry=ST_Multi(GeomFromWKB(?, 4326)) where zone_id=?"
                         curr.execute(sql, [value.wkb, self.zone_id])
                     else:
                         curr.execute(f"update 'zones' set '{key}'=? where zone_id=?", [value, self.zone_id])

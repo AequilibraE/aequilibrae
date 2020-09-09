@@ -1,3 +1,4 @@
+from tempfile import gettempdir
 import urllib.request
 import platform
 import zipfile
@@ -8,7 +9,7 @@ from os import walk
 
 pth = 'https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip'
 
-outfolder = dirname(os.path.abspath(__file__))
+outfolder = gettempdir()
 
 dest_path = join(outfolder, "mod_spatialite-NG-win-amd64.zip")
 urllib.request.urlretrieve(pth, dest_path)
