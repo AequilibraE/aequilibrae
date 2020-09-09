@@ -17,16 +17,6 @@ urllib.request.urlretrieve(pth, dest_path)
 fldr = join(outfolder, 'temp_data')
 zipfile.ZipFile(dest_path).extractall(fldr)
 
-file = join(dirname(outfolder), "aequilibrae/parameters.yml")
-print(file)
-with open(file, "r") as yml:
-    parameters = yaml.load(yml, Loader=yaml.SafeLoader)
-
-parameters['system']['spatialite_path'] = fldr
-
-with open(file, "w") as stream:
-    yaml.dump(parameters, stream, default_flow_style=False)
-
 if 'WINDOWS' in platform.platform().upper():
     # We now set sqlite. Only needed in thge windows server in Github
     plats = {'x86': 'https://sqlite.org/2020/sqlite-dll-win32-x86-3320100.zip',
