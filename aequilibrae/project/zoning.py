@@ -19,7 +19,7 @@ class Zoning:
         p = Project()
         p.open('path/to/project/folder')
 
-        zones = p.zones
+        zones = p.zoning
 
         # We edit the fields for a particular zone
         zone_downtown = zones.get(1)
@@ -93,8 +93,11 @@ class Zoning:
             self.__properties = list(zones_list[0].keys())
         for zn in zones_list:
             if zn['zone_id'] not in self.__items:
-                self.__items[zn['zone_id']] = Zone(zn)
+                self.__items[zn['zone_id']] = Zone(zn, self)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
             del self.__items[key]
+
+    def _remove_zone(self, zone_id: int):
+        del self.__items[zone_id]

@@ -3,7 +3,7 @@ import os
 import random
 import openmatrix as omx
 from unittest import TestCase
-from os.path import dirname, join
+from tempfile import gettempdir
 import numpy as np
 import uuid
 from aequilibrae.matrix import AequilibraeMatrix
@@ -16,7 +16,7 @@ class TestAequilibraeMatrix(TestCase):
     matrix = None
 
     def setUp(self) -> None:
-        temp_folder = dirname(dirname(dirname(os.path.abspath(__file__))))
+        temp_folder = gettempdir()
         self.name_test = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
         self.copy_matrix_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
         self.csv_export_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.csv"

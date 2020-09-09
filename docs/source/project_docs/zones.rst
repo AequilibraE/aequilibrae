@@ -14,15 +14,14 @@ created with each new model has a very limited number of fields, as follows:
 * employment
 * geometry
 
-As it is the case for the length of links, the field area is automatically
-computed by a database trigger at any change in geometry and the zone_id must be
-unique, but the remaining fields are not restricted in any form.
+As it is to be expected, zone_id must be unique, but the remaining fields are
+not restricted in any form.
 
 The API for manipulation of the zones table and each one of its records is
 consistent with what exists to manipulate the other fields in the database.
 
 As it happens with links and nodes, zones also have geometries associated with
-them, and in this case they are of the type Shapely **MultiPolygon**.
+them, and in this case they are of the type **MultiPolygon**.
 
 An example of manipulating the zones table follows:
 
