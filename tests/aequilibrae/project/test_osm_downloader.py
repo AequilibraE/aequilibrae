@@ -12,6 +12,7 @@ pyqt = spec is not None
 class TestOSMDownloader(TestCase):
     def setUp(self) -> None:
         os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+
     def test_do_work(self):
         thresh = 0.05
         if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
