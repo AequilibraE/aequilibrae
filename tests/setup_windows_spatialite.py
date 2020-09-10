@@ -2,9 +2,7 @@ from tempfile import gettempdir
 import urllib.request
 import platform
 import zipfile
-import os
-import yaml
-from os.path import join, dirname
+from os.path import join
 from os import walk
 
 pth = 'https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip'

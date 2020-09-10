@@ -5,7 +5,6 @@ import numpy as np
 from aequilibrae.paths import Graph
 from os.path import join
 from uuid import uuid4
-import sys
 from .parameters_test import centroids
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
@@ -20,6 +19,7 @@ from shutil import copytree, rmtree
 
 class TestGraph(TestCase):
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
 

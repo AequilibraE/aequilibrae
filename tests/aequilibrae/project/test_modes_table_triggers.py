@@ -13,6 +13,7 @@ from ...data import no_triggers_project
 
 class TestProject(TestCase):
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
         copytree(no_triggers_project, self.temp_proj_folder)
         self.proj = Project()
