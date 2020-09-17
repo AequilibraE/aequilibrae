@@ -127,7 +127,7 @@ class OSMBuilder(WorkerThread):
         for osm_id, link in self.links.items():
             self.__emit_all(["Value", counter])
             counter += 1
-            if divmod(counter, 1000)[1] == 0:
+            if counter % 1000 == 0:
                 logger.info(f'Inserting segments from {counter:,} out of {L:,} OSM link objects')
             vars["osm_id"] = osm_id
             vars['link_type'] = 'default'
