@@ -199,7 +199,7 @@ class OSMBuilder(WorkerThread):
         structure = curr.fetchall()
         has_fields = [x[1].lower() for x in structure]
         fields = [field.lower() for field in self.get_link_fields()] + ['osm_id']
-        for field in [f for f in fields if not f in has_fields]:
+        for field in [f for f in fields if f not in has_fields]:
             ltype = self.get_link_field_type(field).upper()
             curr.execute(f'Alter table Links add column {field} {ltype}')
         self.conn.commit()
