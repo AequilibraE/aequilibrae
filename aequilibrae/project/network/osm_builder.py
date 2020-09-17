@@ -65,6 +65,8 @@ class OSMBuilder(WorkerThread):
         alinks = []
         n = []
         tot_items = len(self.osm_items)
+        # When downloading data for entire countries, memory consumption can be quite intensive
+        # So we get rid of everything we don't need
         for i in range(tot_items, 0, -1):
             item = self.osm_items.pop(-1)
             if item['type'] == "way":
