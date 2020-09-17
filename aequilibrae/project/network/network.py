@@ -227,9 +227,7 @@ class Network():
             field_names = curr.fetchall()
 
             ignore_fields = ['ogc_fid', 'geometry']
-            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
-        else:
-            all_fields = fields
+            fields = [f[1] for f in field_names if f[1] not in ignore_fields]
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
