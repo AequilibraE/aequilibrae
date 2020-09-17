@@ -20,20 +20,20 @@
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
 #
-CREATE INDEX IF NOT EXISTS links_a_node_idx ON links (a_node);
+create INDEX IF NOT EXISTS links_a_node_idx ON links (a_node);
 
 #
-CREATE INDEX IF NOT EXISTS links_b_node_idx ON links (b_node);
+create INDEX IF NOT EXISTS links_b_node_idx ON links (b_node);
 
 #
-CREATE INDEX IF NOT EXISTS links_link_type ON links (link_type);
+create INDEX IF NOT EXISTS links_link_type ON links (link_type);
 
 #
-CREATE INDEX IF NOT EXISTS nodes_node_id ON nodes (node_id);
+create INDEX IF NOT EXISTS nodes_node_id ON nodes (node_id);
 
 #
-CREATE TRIGGER new_link_a_node BEFORE INSERT ON links
-  WHEN
+create trigger new_link_a_node before insert on links
+  when
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
@@ -47,8 +47,8 @@ CREATE TRIGGER new_link_a_node BEFORE INSERT ON links
             StartPoint(new.geometry));
   END;
 #
-CREATE TRIGGER new_link_b_node BEFORE INSERT ON links
-  WHEN
+create trigger new_link_b_node before insert on links
+  when
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
@@ -64,8 +64,8 @@ CREATE TRIGGER new_link_b_node BEFORE INSERT ON links
 #
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
-CREATE TRIGGER update_link_a_node BEFORE UPDATE OF geometry ON links
-  WHEN
+create trigger update_link_a_node before update of geometry on links
+  when
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
@@ -79,8 +79,8 @@ CREATE TRIGGER update_link_a_node BEFORE UPDATE OF geometry ON links
             StartPoint(new.geometry));
   END;
 #
-CREATE TRIGGER update_link_b_node BEFORE UPDATE OF geometry ON links
-  WHEN
+create trigger update_link_b_node before update of geometry on links
+  when
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
@@ -95,36 +95,36 @@ CREATE TRIGGER update_link_b_node BEFORE UPDATE OF geometry ON links
   END;
 #
   
-CREATE TRIGGER new_link AFTER INSERT ON links
-  BEGIN
+create trigger new_link after insert on links
+  begin
     -- Update a/b_node AFTER creating a link.
-    UPDATE links
-    SET a_node = (
-      SELECT node_id
-      FROM nodes
-      WHERE nodes.geometry = StartPoint(new.geometry) AND
-      (nodes.ROWID IN (
-          SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-          search_frame = StartPoint(new.geometry)) OR
+    update links
+    set a_node = (
+      select node_id
+      from nodes
+      where nodes.geometry = StartPoint(new.geometry) and
+      (nodes.rowid in (
+          select rowid from SpatialIndex where f_table_name = 'nodes' and
+          search_frame = StartPoint(new.geometry)) or
         nodes.node_id = new.a_node))
-    WHERE links.ROWID = new.ROWID;
-    UPDATE links
-    SET b_node = (
-      SELECT node_id
-      FROM nodes
-      WHERE nodes.geometry = EndPoint(links.geometry) AND
-      (nodes.ROWID IN (
-          SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-          search_frame = EndPoint(links.geometry)) OR
+    where links.rowid = new.rowid;
+    update links
+    set b_node = (
+      select node_id
+      from nodes
+      where nodes.geometry = EndPoint(links.geometry) and
+      (nodes.rowid in (
+          select rowid from SpatialIndex where f_table_name = 'nodes' and
+          search_frame = EndPoint(links.geometry)) or
         nodes.node_id = new.b_node))
-    WHERE links.ROWID = new.ROWID;
-    UPDATE links
-    SET distance = GeodesicLength(new.geometry)
-    WHERE links.ROWID = new.ROWID;
+    where links.rowid = new.rowid;
+    update links
+    set distance = GeodesicLength(new.geometry)
+    where links.rowid = new.rowid;
 
-    UPDATE links SET
-        link_id=(SELECT MAX(link_id)+1 FROM links)
-    WHERE rowid=NEW.rowid and new.link_id is NULL;
+    update links set
+        link_id=(select max(link_id)+1 from links)
+    where rowid=NEW.rowid and new.link_id is null;
 
     -- We update the modes for the node ID that just received a new link starting in it
     update nodes
@@ -139,64 +139,64 @@ CREATE TRIGGER new_link AFTER INSERT ON links
     select GROUP_CONCAT(modes, '') from links where (links.a_node = new.b_node) or (links.b_node = new.b_node))
     , mode_id) > 0)
     where nodes.node_id=new.b_node;
-  END;
+  end;
 #
-CREATE TRIGGER updated_link_geometry AFTER UPDATE OF geometry ON links
-  BEGIN
+create trigger updated_link_geometry after update of geometry on links
+  begin
   -- Update a/b_node AFTER moving a link.
   -- Note that if this TRIGGER is triggered by a node move, then the SpatialIndex may be out of date.
   -- This is why we also allow current a_node to persist.
-    UPDATE links
-    SET a_node = (
-      SELECT node_id
-      FROM nodes
-      WHERE nodes.geometry = StartPoint(new.geometry) AND
-      (nodes.ROWID IN (
-          SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-          search_frame = StartPoint(new.geometry)) OR
+    update links
+    set a_node = (
+      select node_id
+      from nodes
+      where nodes.geometry = StartPoint(new.geometry) and
+      (nodes.rowid in (
+          select rowid from SpatialIndex where f_table_name = 'nodes' and
+          search_frame = StartPoint(new.geometry)) or
         nodes.node_id = new.a_node))
-    WHERE links.ROWID = new.ROWID;
-    UPDATE links
-    SET b_node = (
-      SELECT node_id
-      FROM nodes
-      WHERE nodes.geometry = EndPoint(links.geometry) AND
-      (nodes.ROWID IN (
-          SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-          search_frame = EndPoint(links.geometry)) OR
+    where links.rowid = new.rowid;
+    update links
+    set b_node = (
+      select node_id
+      from nodes
+      where nodes.geometry = EndPoint(links.geometry) and
+      (nodes.rowid in (
+          select rowid from SpatialIndex where f_table_name = 'nodes' and
+          search_frame = EndPoint(links.geometry)) or
         nodes.node_id = new.b_node))
-    WHERE links.ROWID = new.ROWID;
-    UPDATE links
-    SET distance = GeodesicLength(new.geometry)
-    WHERE links.ROWID = new.ROWID;
+    where links.rowid = new.rowid;
+    update links
+    set distance = GeodesicLength(new.geometry)
+    where links.rowid = new.rowid;
 
     -- now delete nodes which no-longer have attached links
     -- limit search to nodes which were attached to this link.
-    DELETE FROM nodes
-    WHERE (node_id = old.a_node OR node_id = old.b_node)
+    delete from nodes
+    where (node_id = old.a_node or node_id = old.b_node)
     --AND NOT (geometry = EndPoint(new.geometry) OR
     --         geometry = StartPoint(new.geometry))
-    AND node_id not in (    
-      SELECT a_node
-      FROM links
-      WHERE a_node is NOT NULL
+    and node_id not in (
+      select a_node
+      from links
+      where a_node is not null
       union all
-      SELECT b_node
-      FROM links
-      WHERE b_node is NOT NULL);
-  END;
+      select b_node
+      from links
+      where b_node is not null);
+  end;
 #
 
-CREATE TRIGGER deleted_link AFTER delete ON links
-  BEGIN
+create trigger deleted_link after delete on links
+  begin
 -- delete lonely node AFTER link deleted
-	Delete from Nodes
-    where node_id = old.a_node and
-           (select count(*) from Links where a_node = old.a_node or b_node = old.a_node) < 1;
-
-	Delete from Nodes
-    where node_id = old.b_node and
-           (select count(*) from Links where a_node = old.b_node or b_node = old.b_node) < 1;
+    delete from nodes
+    where node_id not in (
+      select a_node
+      from links
+      union all
+      select b_node
+      from links);
 
      -- We update the modes for the node ID that just lost a link starting in it
     update nodes
@@ -210,15 +210,15 @@ CREATE TRIGGER deleted_link AFTER delete ON links
 
     -- We update the modes for the node ID that just lost a link ending in it
     update nodes
-    set modes = (SELECT GROUP_CONCAT(mode_id, '')
-                 FROM modes
-                 WHERE instr((SELECT GROUP_CONCAT(modes, '')
-                              FROM links
-                              WHERE (links.a_node = old.b_node) or (links.b_node = old.b_node))
+    set modes = (select GROUP_CONCAT(mode_id, '')
+                 from modes
+                 where instr((select GROUP_CONCAT(modes, '')
+                              from links
+                              where (links.a_node = old.b_node) or (links.b_node = old.b_node))
                              , mode_id) > 0)
 
     where nodes.node_id=old.b_node;
-    END;
+    end;
 #
 -- when moving OR creating a link, don't allow it to duplicate an existing link.
 -- TODO
@@ -227,23 +227,23 @@ CREATE TRIGGER deleted_link AFTER delete ON links
 --
 
 -- when you move a node, move attached links
-CREATE TRIGGER update_node_geometry AFTER UPDATE OF geometry ON nodes
-  BEGIN
-    UPDATE links
-    SET geometry = SetStartPoint(geometry,new.geometry)
-    WHERE a_node = new.node_id
-    AND StartPoint(geometry) != new.geometry;
-    UPDATE links
-    SET geometry = SetEndPoint(geometry,new.geometry)
-    WHERE b_node = new.node_id
-    AND EndPoint(geometry) != new.geometry;
-  END;
+create trigger update_node_geometry after update of geometry on nodes
+  begin
+    update links
+    set geometry = SetStartPoint(geometry,new.geometry)
+    where a_node = new.node_id
+    and StartPoint(geometry) != new.geometry;
+    update links
+    set geometry = SetEndPoint(geometry,new.geometry)
+    where b_node = new.node_id
+    and EndPoint(geometry) != new.geometry;
+  end;
 #
 -- when you move a node on top of another node, steal all links FROM that node, AND delete it.
 -- be careful of merging the a_nodes of attached links to the new node
 -- this may be better as a TRIGGER on links?
-CREATE TRIGGER cannibalise_node BEFORE UPDATE OF geometry ON nodes
-  WHEN
+create trigger cannibalise_node before update of geometry on nodes
+  when
     -- detect another node in the new location
     (SELECT count(*)
     FROM nodes
@@ -283,8 +283,8 @@ CREATE TRIGGER cannibalise_node BEFORE UPDATE OF geometry ON nodes
   END;
 #
 -- you may NOT CREATE a node on top of another node.
-CREATE TRIGGER no_duplicate_node BEFORE INSERT ON nodes
-  WHEN
+create trigger no_duplicate_node before insert on nodes
+  when
     (SELECT count(*)
     FROM nodes
     WHERE nodes.node_id != new.node_id
@@ -300,8 +300,8 @@ CREATE TRIGGER no_duplicate_node BEFORE INSERT ON nodes
 -- TODO: cannot CREATE node NOT attached.
 
 -- don't delete a node, unless no attached links
-CREATE TRIGGER dont_delete_node BEFORE DELETE ON nodes
-  WHEN (SELECT count(*) FROM links WHERE a_node = old.node_id OR b_node = old.node_id) > 0
+create trigger dont_delete_node before delete on nodes
+  when (SELECT count(*) FROM links WHERE a_node = old.node_id OR b_node = old.node_id) > 0
   BEGIN
     SELECT raise(ABORT, 'Node cannot be deleted, it still has attached links.');
   END;
@@ -311,82 +311,47 @@ CREATE TRIGGER dont_delete_node BEFORE DELETE ON nodes
 -- CREATE BEFORE WHERE spatial index AND PointN()
 
 -- when editing node_id, UPDATE connected links
-CREATE TRIGGER updated_node_id AFTER UPDATE OF node_id ON nodes
-  BEGIN
-    UPDATE links SET a_node = new.node_id
-    WHERE links.a_node = old.node_id;
-    UPDATE links SET b_node = new.node_id
-    WHERE links.b_node = old.node_id;
-  END;
+create trigger updated_node_id after update of node_id on nodes
+  begin
+    update links set a_node = new.node_id
+    where links.a_node = old.node_id;
+    update links set b_node = new.node_id
+    where links.b_node = old.node_id;
+  end;
 #
 
 -- Guarantees that link direction is one of the required values
-CREATE TRIGGER links_direction_update BEFORE UPDATE ON links
-WHEN new.direction != -1 AND new.direction != 0 AND new.direction != 1
-BEGIN
-  SELECT RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
-END;
+create trigger links_direction_update before update on links
+when new.direction != -1 AND new.direction != 0 AND new.direction != 1
+begin
+  select RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
+end;
 
 #
-CREATE TRIGGER links_direction_insert BEFORE INSERT ON links
-WHEN new.direction != -1 AND new.direction != 0 AND new.direction != 1
-BEGIN
-  SELECT RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
-END;
+create trigger links_direction_insert before insert on links
+when new.direction != -1 AND new.direction != 0 AND new.direction != 1
+begin
+  select RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
+end;
 
 #
-CREATE TRIGGER enforces_link_length_update AFTER UPDATE OF distance ON links
-BEGIN
-  UPDATE links SET distance = GeodesicLength(new.geometry)
-  WHERE links.ROWID = new.ROWID;END;
+create trigger enforces_link_length_update after update of distance on links
+begin
+  update links set distance = GeodesicLength(new.geometry)
+  where links.rowid = new.rowid;end;
 
 
 #
 -- Guarantees that link direction is one of the required values
-CREATE TRIGGER nodes_iscentroid_update BEFORE UPDATE ON nodes
-WHEN new.is_centroid != 0 AND new.is_centroid != 1
-BEGIN
-  SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
-END;
+create trigger nodes_iscentroid_update before update on nodes
+when new.is_centroid != 0 AND new.is_centroid != 1
+begin
+  select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+end;
 
 #
-CREATE TRIGGER nodes_iscentroid_insert BEFORE INSERT ON nodes
-WHEN new.is_centroid != 0 AND new.is_centroid != 1
-BEGIN
-  SELECT RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
-END;
-
---#
----- prevents the user from manually changing a_node to an arbitrary number
---CREATE TRIGGER links_table_protects_a_node BEFORE UPDATE OF a_node ON links
---WHEN
---    -- detect that the node in the link's location does not have that node_id I am setting
---    (SELECT count(*)
---    FROM nodes
---    WHERE node_id == new.a_node
---    AND geometry = StartPoint(new.geometry) AND
---    ROWID IN (
---      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
---      search_frame = new.geometry)) == 0
---
---BEGIN
---	SELECT raise(ABORT, 'This change to the a_node field is wrong.');
---END;
---
---#
---
----- prevents the user from manually changing b_node to an arbitrary number
---CREATE TRIGGER links_table_protects_b_node BEFORE UPDATE OF b_node ON links
---WHEN
---    -- detect that the node in the link's location does not have that node_id I am setting
---    (SELECT count(*)
---    FROM nodes
---    WHERE node_id == new.b_node
---    AND geometry = EndPoint(new.geometry) AND
---    ROWID IN (
---      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
---      search_frame = new.geometry)) == 0
---
---BEGIN
---	SELECT raise(ABORT, 'This change to the b_node field is wrong.');
---END;
+create trigger nodes_iscentroid_insert before insert on nodes
+when new.is_centroid != 0 AND new.is_centroid != 1
+begin
+  select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+end;

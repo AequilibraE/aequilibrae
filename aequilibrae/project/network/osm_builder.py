@@ -127,7 +127,7 @@ class OSMBuilder(WorkerThread):
         for osm_id, link in self.links.items():
             self.__emit_all(["Value", counter])
             counter += 1
-            if divmod(counter, 1000)[1] == 0:
+            if counter % 1000 == 0:
                 logger.info(f'Inserting segments from {counter:,} out of {L:,} OSM link objects')
             vars["osm_id"] = osm_id
             vars['link_type'] = 'default'
@@ -199,9 +199,7 @@ class OSMBuilder(WorkerThread):
         structure = curr.fetchall()
         has_fields = [x[1].lower() for x in structure]
         fields = [field.lower() for field in self.get_link_fields()] + ['osm_id']
-        for field in fields:
-            if field in has_fields:
-                continue
+        for field in [f for f in fields if f not in has_fields]:
             ltype = self.get_link_field_type(field).upper()
             curr.execute(f'Alter table Links add column {field} {ltype}')
         self.conn.commit()
