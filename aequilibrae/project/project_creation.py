@@ -47,6 +47,35 @@ def add_triggers(conn: Connection) -> None:
         run_queries_from_sql_file(conn, qry_file)
 
 
+def remove_triggers(conn: Connection) -> None:
+    curr = conn.cursor()
+    spec_folder = join(dirname(realpath(__file__)), "database_specification", 'triggers')
+    with open(join(spec_folder, 'triggers_list.txt'), 'r') as file_list:
+        all_trigger_sets = file_list.readlines()
+
+    for table in all_trigger_sets:
+        qry_file = join(spec_folder, f'{table.rstrip()}.sql')
+
+        with open(qry_file, "r") as sql_file:
+            query_list = sql_file.read()
+
+        # Running one query/command at a time helps debugging in the case a particular command fails
+        for cmd in query_list.split("#"):
+            for qry in cmd.split("\n"):
+                if qry[:2] == '--':
+                    continue
+                if 'CREATE TRIGGER' in qry.upper():
+                    qry = qry.replace('CREATE TRIGGER', '').strip()
+
+                    qry = 'DROP trigger if exists ' + qry.split(' ')[0]
+                    try:
+                        curr.execute(qry)
+                    except Exception as e:
+                        logger.error(f'Failed removing triggers table - > {e.args}')
+                        logger.error(f'Point of failure - > {qry}')
+        conn.commit()
+
+
 def run_queries_from_sql_file(conn: Connection, qry_file: str) -> None:
     curr = conn.cursor()
 

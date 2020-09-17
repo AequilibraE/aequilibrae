@@ -72,7 +72,7 @@ END;
 
 #
 -- Keeps the list of modes at a node up-to-date when we change the links' a_node
-create trigger modes_on_nodes_table_update_a_node after update of a_node on links
+CREATE TRIGGER modes_on_nodes_table_update_a_node after update of a_node on links
 begin
 
 -- We update the modes for the node ID that just received a new link ending in it
@@ -94,7 +94,7 @@ end;
 
 #
 -- Keeps the list of modes at a node up-to-date when we change the links' b_node
-create trigger modes_on_nodes_table_update_b_node after update of b_node on links
+CREATE TRIGGER modes_on_nodes_table_update_b_node after update of b_node on links
 begin
 
 -- We update the modes for the node ID that just received a new link ending in it
@@ -117,7 +117,7 @@ end;
 
 #
 -- Keeps the list of modes at a node up-to-date when we change the links' mode
-create trigger modes_on_nodes_table_update_links_modes after update of modes on links
+CREATE TRIGGER modes_on_nodes_table_update_links_modes after update of modes on links
 begin
 
 -- We update the modes for the node ID that just received a new link ending in it
@@ -138,7 +138,7 @@ end;
 
 #
 -- Keeps the list of modes at a node up-to-date when we try to manually change the modes field in the nodes table
-create trigger modes_on_nodes_table_update_nodes_modes after update of modes on nodes
+CREATE TRIGGER modes_on_nodes_table_update_nodes_modes after update of modes on nodes
 begin
 
 -- We update the modes for the node ID that just received a new link ending in it

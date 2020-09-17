@@ -21,7 +21,6 @@ class TestModes(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        rmtree(self.temp_proj_folder)
 
     def test_add(self):
         new_mode = Mode('F')
@@ -54,3 +53,8 @@ class TestModes(TestCase):
         m = list(modes.all_modes().keys())[0]
         with self.assertRaises(ValueError):
             modes.new(m)
+
+    def test_fields(self):
+        fields = self.proj.network.modes.fields()
+        fields.all_fields()
+        self.assertEqual(fields._table, 'modes', 'Returned wrong table handler')

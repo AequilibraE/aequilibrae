@@ -22,8 +22,6 @@ class TestLinkTypes(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        print(self.temp_proj_folder)
-        rmtree(self.temp_proj_folder)
 
     def test_add(self):
         lt = self.proj.network.link_types

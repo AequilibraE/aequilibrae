@@ -1,13 +1,15 @@
 import yaml
 
-
 valid_functions = ["EXPO", "GAMMA", "POWER"]
 members = ["function", "alpha", "beta"]
 model_type = "SyntheticGravityModel"
 
 
 class SyntheticGravityModel:
-    """Simple class object to represent synthetic gravity models"""
+    """Simple class object to represent synthetic gravity models
+
+    """
+
     def __init__(self):
         self.function = None
         self.alpha = None
@@ -47,7 +49,9 @@ class SyntheticGravityModel:
             return self.__dict__[key]
 
     def load(self, file_name):
-        """Loads model from disk. Extension is *.mod"""
+        """Loads model from disk. Extension is \*.mod
+
+        """
         try:
             with open(file_name, "r") as f:
                 model = yaml.safe_load(f)[self.model_type]
@@ -60,7 +64,9 @@ class SyntheticGravityModel:
             raise ValueError("File provided is not a valid Synthetic Gravity Model - {}".format(err.__str__()))
 
     def save(self, file_name):
-        """Saves model to disk in yaml format. Extension is *.mod"""
+        """Saves model to disk in yaml format. Extension is \*.mod
+
+        """
         file_name = str(file_name)
         if file_name[-4:].upper() != ".MOD":
             file_name += ".mod"

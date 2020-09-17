@@ -7,7 +7,6 @@ import numpy as np
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
-from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
@@ -71,7 +70,7 @@ class Network():
 
         return real_fields
 
-    def modes(self):
+    def list_modes(self):
         """
         Returns a list of all the modes in this model
 
@@ -90,7 +89,6 @@ class Network():
             north: float = None,
             place_name: str = None,
             modes=["car", "transit", "bicycle", "walk"],
-            spatial_index=False,
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -108,9 +106,35 @@ class Network():
             *modes* (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
 
-            *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
+            p = Project()
+            p.new(nm)
+
+        ::
+
+            from aequilibrae import Project, Parameters
+            p = Project()
+            p.new('path/to/project')
+
+            # We now choose a different overpass endpoint (say a deployment in your local network)
+            par = Parameters()
+            par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
+
+            # Because we have our own server, we can set a bigger area for download (in M2)
+            par.parameters['osm']['max_query_area_size'] = 10000000000
+
+            # And have no pause between successive queries
+            par.parameters['osm']['sleeptime'] = 0
+
+            # Save the parameters to disk
+            par.write_back()
+
+            # And do the import
+            p.network.create_from_osm(place_name=my_beautiful_hometown)
+            p.close()
         """
 
+        logger.info("Adding spatial indices")
+        self.add_spatial_index()
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
@@ -147,6 +171,9 @@ class Network():
         width = haversine(east, (north + south) / 2, west, (north + south) / 2)
         area = height * width
 
+        par = Parameters().parameters['osm']
+        max_query_area_size = par['max_query_area_size']
+
         if area < max_query_area_size:
             polygons = [bbox]
         else:
@@ -154,8 +181,8 @@ class Network():
             parts = math.ceil(area / max_query_area_size)
             horizontal = math.ceil(math.sqrt(parts))
             vertical = math.ceil(parts / horizontal)
-            dx = east - west
-            dy = north - south
+            dx = (east - west) / horizontal
+            dy = (north - south) / vertical
             for i in range(horizontal):
                 xmin = max(-180, west + i * dx)
                 xmax = min(180, west + (i + 1) * dx)
@@ -164,7 +191,6 @@ class Network():
                     ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
-
         logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
         self.downloader.doWork()
@@ -173,24 +199,37 @@ class Network():
         self.builder = OSMBuilder(self.downloader.json, self.source)
         self.builder.doWork()
 
-        if spatial_index:
-            logger.info("Adding spatial indices")
-            self.add_spatial_index()
-
         logger.info("Network built successfully")
 
-    def build_graphs(self) -> None:
+    def build_graphs(self, fields: list = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
         dictionary of graphs
+
+        Args:
+            *fields* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+                                              database, it may be useful to specify which fields to use
+
+        To use the *fields* parameter, a minimalistic option is the following
+        ::
+
+            p = Project()
+            p.open(nm)
+            fields = ['link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes']
+            p.network.build_graphs(fields)
+
         """
         curr = self.conn.cursor()
-        curr.execute('PRAGMA table_info(links);')
-        field_names = curr.fetchall()
 
-        ignore_fields = ['ogc_fid', 'geometry']
-        all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        if fields is None:
+            curr.execute('PRAGMA table_info(links);')
+            field_names = curr.fetchall()
+
+            ignore_fields = ['ogc_fid', 'geometry']
+            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        else:
+            all_fields = fields
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []

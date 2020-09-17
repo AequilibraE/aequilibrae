@@ -1,6 +1,7 @@
 from sqlite3 import IntegrityError, Connection
 from typing import Dict
 from aequilibrae.project.network.mode import Mode
+from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae import logger
 
 
@@ -84,6 +85,10 @@ class Modes:
         logger.warning(f'Mode {mode_id} was successfully removed from the database')
         self.__update_list_of_modes()
 
+    def fields(self) -> FieldEditor:
+        """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
+        return FieldEditor('modes')
+
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""
         self.__update_list_of_modes()
@@ -124,3 +129,8 @@ class Modes:
 
     def __del__(self):
         self.__items.clear()
+
+    def __has_mode(self):
+        curr = self.conn.cursor()
+        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        return any(['modes' in x[0] for x in curr.fetchall()])

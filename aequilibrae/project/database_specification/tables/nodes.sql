@@ -6,3 +6,12 @@ CREATE TABLE 'nodes' (ogc_fid     INTEGER PRIMARY KEY,
 
 #
 SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY', 1);
+
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','node_id', 'Unique node ID');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','is_centroid', 'Flag identifying centroids');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','modes', 'Modes connected to the node');
+#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','link_types', 'Link types connected to the node');

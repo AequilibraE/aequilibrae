@@ -147,7 +147,7 @@ Future components
 Importing from Open Street Maps
 -------------------------------
 
-Please review the information :ref:`parameters`
+Please review the information :ref:`parameters_osm`
 
 .. note::
 
@@ -238,7 +238,7 @@ problem:
 
 1. Knowing what to do when a certain edit is attempted by the user
 2. Automatically applying the tests and consistency checks (and changes)
-required on one
+   required on one
 
 .. _net_section.1:
 
@@ -275,7 +275,7 @@ An alternative behavior would be to allow the user to create nodes with no
 attached links. Although this would not result in inconsistent networks for
 traffic and transit assignments, this behavior would not be considered valid.
 All other edits that result in the creation of un-connected nodes or that result
- in such case should result in an error that prevents such operation
+in such case should result in an error that prevents such operation
 
 Behavior regarding the fields regarding modes and link types is discussed in
 their respective table descriptions
@@ -313,12 +313,14 @@ There are two possibilities for moving a node: Moving to an empty space, and
 moving on top of another node.
 
 - **If a node is moved to an empty space**
+
 All links originated/ending at that node will have its shape altered to conform
 to that new node position and keep the network connected. The alteration of the
 link happens only by changing the Latitude and Longitude of the link extremity
 associated with that node.
 
 - **If a node is moved on top of another node**
+
 All the links that connected to the node on the bottom have their extremities
 switched to the node on top
 The node on the bottom gets eliminated as a consequence of the behavior listed
@@ -428,9 +430,8 @@ field, they will most likely corrupt the project.
 .. _net_section.1.3:
 
 Field-specific data consistency
-++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++
  Some data fields are specially
-
 
 .. _net_section.1.3.1:
 

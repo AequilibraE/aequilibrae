@@ -120,7 +120,7 @@ For now the only transit-related capability of AequilibraE is to import GTFS
 into SQLite/Spatialite. The results of this import is NOT integrated with the
 AequilibraE project.
 
-Usage examples can be found on :ref:`example_usage_transit`.
+.. Usage examples can be found on :ref:`example_usage_transit`.
 
 
 .. _overview_matrix:

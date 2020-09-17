@@ -198,6 +198,15 @@ network:
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true
+osm:
+    overpass_endpoint: "http://overpass-api.de/api"
+    nominatim_endpoint: "https://nominatim.openstreetmap.org/"
+    accept_language: "en"
+    max_attempts: 50
+    timeout: 540
+    max_query_area_size: 2500000000
+    sleeptime: 10
+
 system:
   cpus: 0
   default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt

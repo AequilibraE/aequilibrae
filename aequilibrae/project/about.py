@@ -5,6 +5,7 @@ from warnings import warn
 import uuid
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
+from aequilibrae.starts_logging import logger
 
 
 class About:
@@ -15,11 +16,15 @@ class About:
             p.open('my/project/folder')
             about = p.about
 
+            about.description = 'This is the example project. Do not use for forecast'
+            about.write_back()
+
 
     """
 
     def __init__(self, conn: sqlite3.Connection):
         self.__characteristics = []
+        self.__original = {}
         self.__conn = conn
         if self.__has_about():
             self.__load()
@@ -74,6 +79,7 @@ class About:
         curr.execute(sql, [info_field])
         self.__conn.commit()
         self.__characteristics.append(info_field)
+        self.__original[info_field] = None
 
     def write_back(self):
         """Saves the information parameters back to the project database
@@ -88,7 +94,9 @@ class About:
         curr = self.__conn.cursor()
         for k in self.__characteristics:
             v = self.__dict__[k]
-            curr.execute(f"UPDATE 'about' set infovalue = '{v}' where infoname='{k}'")
+            if v != self.__original[k]:
+                curr.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
+                logger.info(f'Updated {k} on About_Table to {v}')
         self.__conn.commit()
 
     def __has_about(self):
@@ -104,3 +112,4 @@ class About:
         for x in curr.fetchall():
             self.__characteristics.append(x[0])
             self.__dict__[x[0]] = x[1]
+            self.__original[x[0]] = x[1]

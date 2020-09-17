@@ -1,6 +1,7 @@
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae import logger
+from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 
 
@@ -43,7 +44,7 @@ class LinkTypes:
         default_link_type.save()
 
         # We can also create a completely new link_type and add to the model
-        new_type = new('a')
+        new_type = all_link_types.new('a')
         new_type.link_type_name = 'Arterial'  # Only ASCII letters and *_* allowed
         # other fields are not mandatory
 
@@ -78,7 +79,7 @@ class LinkTypes:
 
     def new(self, link_type_id: str) -> LinkType:
         if link_type_id in self.__items:
-            raise ValueError('Link Type ID already exists in the model. It must be unique.')
+            raise ValueError(f'Link Type ID ({link_type_id}) already exists in the model. It must be unique.')
 
         tp = {key: None for key in self.__properties}
         tp['link_type_id'] = link_type_id
@@ -110,6 +111,10 @@ class LinkTypes:
         for lt in self.__items.values():
             if lt.link_type.lower() == link_type.lower():
                 return lt
+
+    def fields(self) -> FieldEditor:
+        """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
+        return FieldEditor('link_types')
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""

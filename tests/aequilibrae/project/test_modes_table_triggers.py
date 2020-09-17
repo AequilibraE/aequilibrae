@@ -42,7 +42,6 @@ class TestProject(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        rmtree(self.temp_proj_folder)
 
     def __get_query(self, qry: str) -> str:
         for query in self.queries:

@@ -23,8 +23,6 @@ class TestLinkType(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-        print(self.temp_proj_folder)
-        rmtree(self.temp_proj_folder)
 
     def test_changing_link_type_id(self):
         ltypes = self.proj.network.link_types
