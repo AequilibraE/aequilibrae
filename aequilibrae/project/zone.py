@@ -4,11 +4,13 @@ from aequilibrae.project.database_connection import database_connection
 
 
 class Zone(SafeClass):
+    """Single zone object that can be queried and manipulated in memory"""
     def __init__(self, data_set: dict, zoning):
         super().__init__(data_set)
         self.__zoning = zoning
 
     def delete(self):
+        """Removes the zone from the database"""
         conn = database_connection()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
@@ -17,6 +19,7 @@ class Zone(SafeClass):
         del self
 
     def save(self):
+        """Saves/Updates the zone data to the database"""
         conn = database_connection()
         curr = conn.cursor()
 

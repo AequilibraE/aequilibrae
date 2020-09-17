@@ -30,6 +30,18 @@ Project components
     About
     Network
     FieldEditor
+    Zoning
+
+Project objects
+++++++++++++++++++
+
+.. currentmodule:: aequilibrae.project
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    Zone
 
 Network data tables
 ~~~~~~~~~~~~~~~~~~~
