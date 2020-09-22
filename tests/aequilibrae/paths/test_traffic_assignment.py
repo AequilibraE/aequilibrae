@@ -2,7 +2,7 @@ from unittest import TestCase
 import os
 import string
 import random
-import zipfile
+from tempfile import gettempdir
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project import Project
@@ -13,6 +13,8 @@ from ...data import siouxfalls_project, siouxfalls_demand, data_folder
 
 class TestTrafficAssignment(TestCase):
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+
         self.matrix = AequilibraeMatrix()
         self.matrix.load(siouxfalls_demand)
         self.matrix.computational_view()

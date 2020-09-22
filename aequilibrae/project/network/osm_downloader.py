@@ -107,6 +107,7 @@ class OSMDownloader(WorkerThread):
             time.sleep(self.sleeptime)
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
+        logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
 
         # get the response size and the domain, log result

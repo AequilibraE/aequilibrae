@@ -3,6 +3,7 @@ import os
 import shutil
 from aequilibrae.starts_logging import StartsLogging
 from aequilibrae.project.network import Network
+from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.about import About
 from aequilibrae.project.database_connection import database_connection, environ_var
 from aequilibrae.parameters import Parameters
@@ -34,6 +35,7 @@ class Project:
         self.conn: sqlite3.Connection = None
         self.network: Network = None
         self.about: About = None
+        self.zoning: Zoning = None
         self.logger: logging.Logger = None
 
     def open(self, project_path: str) -> None:
@@ -112,6 +114,7 @@ class Project:
     def __load_objects(self):
         self.network = Network(self)
         self.about = About(self.conn)
+        self.zoning = Zoning(self)
         self.parameters = Parameters().parameters
 
     def __create_empty_project(self):

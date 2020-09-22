@@ -1,30 +1,19 @@
+from tempfile import gettempdir
 import urllib.request
 import platform
 import zipfile
-import os
-import yaml
-from os.path import join, dirname
+from os.path import join
 from os import walk
 
 pth = 'https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip'
 
-outfolder = dirname(os.path.abspath(__file__))
+outfolder = gettempdir()
 
 dest_path = join(outfolder, "mod_spatialite-NG-win-amd64.zip")
 urllib.request.urlretrieve(pth, dest_path)
 
 fldr = join(outfolder, 'temp_data')
 zipfile.ZipFile(dest_path).extractall(fldr)
-
-file = join(dirname(outfolder), "aequilibrae/parameters.yml")
-print(file)
-with open(file, "r") as yml:
-    parameters = yaml.load(yml, Loader=yaml.SafeLoader)
-
-parameters['system']['spatialite_path'] = fldr
-
-with open(file, "w") as stream:
-    yaml.dump(parameters, stream, default_flow_style=False)
 
 if 'WINDOWS' in platform.platform().upper():
     # We now set sqlite. Only needed in thge windows server in Github

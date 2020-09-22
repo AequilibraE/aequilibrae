@@ -3,4 +3,5 @@ about
 link_types
 modes
 nodes
+zones
 links

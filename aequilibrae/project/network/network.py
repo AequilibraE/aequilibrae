@@ -201,7 +201,7 @@ class Network():
 
         logger.info("Network built successfully")
 
-    def build_graphs(self, fields: list = None) -> None:
+    def build_graphs(self, fields: list = None, modes: list = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
@@ -210,14 +210,16 @@ class Network():
         Args:
             *fields* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
                                               database, it may be useful to specify which fields to use
+            *modes* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+                                              database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
         ::
 
             p = Project()
             p.open(nm)
-            fields = ['link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes']
-            p.network.build_graphs(fields)
+            fields = ['distance']
+            p.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
         curr = self.conn.cursor()
@@ -229,7 +231,14 @@ class Network():
             ignore_fields = ['ogc_fid', 'geometry']
             all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
         else:
-            all_fields = fields
+            fields.extend(['link_id', 'a_node', 'b_node', 'direction', 'modes'])
+            all_fields = list(set(fields))
+
+        if modes is None:
+            modes = curr.execute('select mode_id from modes;').fetchall()
+            modes = [m[0] for m in modes]
+        elif isinstance(modes, str):
+            modes = [modes]
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
@@ -251,9 +260,6 @@ class Network():
 
         curr.execute('select node_id from nodes where is_centroid=1;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
-
-        modes = curr.execute('select mode_id from modes;').fetchall()
-        modes = [m[0] for m in modes]
 
         for m in modes:
             w = np.core.defchararray.find(data['modes'], m)

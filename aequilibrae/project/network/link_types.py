@@ -18,8 +18,8 @@ class LinkTypes:
 
         link_types = p.network.link_types
 
-        # We can get a dictionary of all modes in the model
-        all_link_types = modes.all_types()
+        # We can get a dictionary of link types in the model
+        all_link_types = link_types.all_types()
 
         #And do a bulk change and save it
         for link_type_id, link_type_obj in all_link_types.items():
@@ -34,13 +34,13 @@ class LinkTypes:
         # or just get it by name
         default_link_type = link_types.get_by_name('default')
 
-        # We can change the description of the mode
+        # We can change the description of the link types
         default_link_type.description = 'My own new description'
 
         # Let's say we are using alpha to store lane capacity during the night as 90% of the standard
         default_link_type.alpha =0.9 * default_link_type.lane_capacity
 
-        # To save this mode we can simply
+        # To save this link types we can simply
         default_link_type.save()
 
         # We can also create a completely new link_type and add to the model

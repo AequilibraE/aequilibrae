@@ -7,6 +7,9 @@ from aequilibrae.project import Project
 
 
 class TestDatabaseConnection(TestCase):
+    def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+
     def test_database_connection(self):
         # Errors when project does not exist
         with self.assertRaises(FileExistsError):

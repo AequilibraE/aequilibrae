@@ -1,7 +1,7 @@
-import string
+import os
 from uuid import uuid4
 from random import choice
-from shutil import copytree, rmtree
+from shutil import copytree
 from os.path import join
 from tempfile import gettempdir
 from unittest import TestCase
@@ -14,6 +14,7 @@ class TestFieldEditor(TestCase):
     my_tables = ['link_types', 'links', 'modes', 'nodes']
 
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.temp_proj_folder = join(gettempdir(), uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
         self.proj = Project()
@@ -21,7 +22,6 @@ class TestFieldEditor(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
-    #     rmtree(self.temp_proj_folder)
 
     def randomword(self, length):
         val = ''.join(choice(allowed_characters) for i in range(length))

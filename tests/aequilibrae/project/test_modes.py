@@ -13,6 +13,7 @@ from ...data import siouxfalls_project
 
 class TestModes(TestCase):
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
         self.proj = Project()

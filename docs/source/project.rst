@@ -63,6 +63,23 @@ likely be added in upcoming versions.
 All consistency triggers/procedures are discussed in parallel with the
 features they implement.
 
+
+Dealing with Geometries
+-----------------------
+Geometry is a key feature when dealing with transportation infrastructure and
+actual travel. For this reason, all datasets in AequilibraE that correspond to
+elements with physical GIS representation are geo-enabled.
+
+This also means that the AequilibraE API needs to provide an interface to
+manipulate each element's geometry in a convenient way. This is done using the
+wonderful `Shapely <https://shapely.readthedocs.io/>`_, and we urge you to study
+its comprehensive API before attempting to edit a feature's geometry in memory.
+
+As AequilibraE is based on Spatialite, the user is also welcome to use its
+powerful tools to manipulate your model's geometries, although that is not
+recommended, as the "training wheels are off".
+
+
 Project database
 ----------------
 .. toctree::
@@ -72,6 +89,7 @@ Project database
    project_docs/network
    project_docs/modes
    project_docs/link_types
+   project_docs/zones
    project_docs/parameters_metadata
 
 Parameters file
