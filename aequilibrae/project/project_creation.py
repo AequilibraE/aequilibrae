@@ -62,12 +62,15 @@ def remove_triggers(conn: Connection) -> None:
         # Running one query/command at a time helps debugging in the case a particular command fails
         for cmd in query_list.split("#"):
             for qry in cmd.split("\n"):
+                q = qry.upper()
                 if qry[:2] == '--':
                     continue
+                while '  ' in qry:
+                    qry = qry.replace('  ', ' ')
                 if 'CREATE TRIGGER' in qry.upper():
-                    qry = qry.replace('CREATE TRIGGER', '').strip()
+                    qry = qry.upper().replace('CREATE TRIGGER', '').strip()
 
-                    qry = 'DROP trigger if exists ' + qry.split(' ')[0]
+                    qry = 'drop trigger if exists ' + qry.lower().split(' ')[0]
                     try:
                         curr.execute(qry)
                     except Exception as e:
