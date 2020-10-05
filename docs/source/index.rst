@@ -60,6 +60,7 @@ Contents
    gettingstarted
    project
    modeling
+   path_computation_engine
    api
    softwaredevelopment
    roadmap
