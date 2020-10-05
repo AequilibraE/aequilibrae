@@ -1,7 +1,7 @@
 .. _aequilibrae_as_path_engine:
 
-AequilibraE as a path computation engine
-========================================
+Path computation engine
+=======================
 
 Given AequilibraE's incredibly fast path computation capabilities, of of its
 important use cases is the computation of paths in general transportation

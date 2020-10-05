@@ -1,7 +1,7 @@
 .. _modeling_platform:
 
-AequilibraE as a modeling platform
-==================================
+Modeling Platform
+=================
 
 AequilibraE's main objective is to be a fully-fledged modeling platform, and
 therefore most of its features are geared towards that.  In time, this section
