@@ -62,7 +62,9 @@ Basic setup
     graph.set_graph('travel_time')
 
     # And *skim* (compute the corresponding) distance for the resulting paths
-    # Even if you don't want to skim any other field, you need to call this method (with only the minimizing field)
+    # you should do this ONLY if you require skims for any field other than the minimizing field
+    # or for all the nodes in the graph
+    # It can increase computation time in up to 30%
     graph.set_skimming(['distance', 'travel_time'])
 
     # Finally, we get the path result computation object and prepare it to work with our graph
@@ -95,6 +97,12 @@ nodes.
     # You can also know the direction you traversed each link with
     res.path_link_directions # Array of the same size as res.path
 
+    # If you chose to compute skims, you can access them for ALL nodes
+    # Array is indexed on node IDs
+    res.skims
+    # Order of columns is the same as in
+    graph.skim_fields
+    # disconnected and non-existing nodes are set to np.inf
 
 
 
