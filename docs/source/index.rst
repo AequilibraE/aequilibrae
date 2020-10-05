@@ -59,7 +59,7 @@ Contents
    overview
    gettingstarted
    project
-   traffic_assignment
+   modeling
    api
    softwaredevelopment
    roadmap

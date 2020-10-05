@@ -672,10 +672,20 @@ the world with their complete networks downloaded from
 `Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
 folder for analysis at a later time.
 
+There are few important parameters regarding the use of OSM Overpass servers
+that one needs to pay attention to:
+
+* Overpass API endpoint
+* Maximum query area (m\ :sup:`2`)
+* Sleep time (between successive queries when the queried area is too large)
+
+The lines regarding parameters in the code below assume that you have a local
+instance of the Overpass server installed and can overload it with unlimited
+queries in rapid succession.  For more details see :ref:`parameters_osm`.
 
 ::
 
-  from aequilibrae.project import Project
+  from aequilibrae import Project, Parameters
 
   cities = ["Darwin, Australia",
             "Karlsruhe, Germany",
@@ -689,9 +699,19 @@ folder for analysis at a later time.
 
       p = Project()
       p.new(pth)
+
+      # Set parameters for a local private Overpass API server
+      par = Parameters()
+      par.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+      par.parameters['osm']['max_query_area_size'] = 10000000000
+      par.parameters['osm']['sleeptime'] = 0
+      par.write_back()
+
       p.network.create_from_osm(place_name=city)
       p.conn.close()
       del p
+
+
 
 If one wants to load a project and check some of its properties, it is easy:
 
@@ -700,7 +720,7 @@ If one wants to load a project and check some of its properties, it is easy:
   >>> from aequilibrae.project import Project
 
   >>> p = Project()
-  >>> p.load('path/to_project')
+  >>> p.open('path/to_project_folder')
 
   # for the modes available in the model
   >>> p.network.modes()
