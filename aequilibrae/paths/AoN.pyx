@@ -226,7 +226,7 @@ def path_computation(origin, destination, graph, results):
     # initializes predecessors  and link connectors for output
     results.predecessors.fill(-1)
     results.connectors.fill(-1)
-    skims = results.num_skims
+    skims = len(graph.skim_fields)
 
     #In order to release the GIL for this procedure, we create all the
     #memmory views we will need
@@ -239,7 +239,7 @@ def path_computation(origin, destination, graph, results):
 
     cdef long long [:] predecessors_view = results.predecessors
     cdef long long [:] conn_view = results.connectors
-    cdef double [:, :] skim_matrix_view = results.skims
+    cdef double [:, :] skim_matrix_view = results._skimming_array
     cdef long long [:] reached_first_view = results.reached_first
 
     new_b_nodes = graph.b_node.copy()
@@ -265,15 +265,16 @@ def path_computation(origin, destination, graph, results):
                          conn_view,
                          reached_first_view)
 
-        skim_single_path(origin_index,
-                         nodes,
-                         skims,
-                         skim_matrix_view,
-                         predecessors_view,
-                         conn_view,
-                         graph_skim_view,
-                         reached_first_view,
-                         w)
+        if skims > 0:
+            skim_single_path(origin_index,
+                             nodes,
+                             skims,
+                             skim_matrix_view,
+                             predecessors_view,
+                             conn_view,
+                             graph_skim_view,
+                             reached_first_view,
+                             w)
 
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
             b = 1
