@@ -62,7 +62,6 @@ def remove_triggers(conn: Connection) -> None:
         # Running one query/command at a time helps debugging in the case a particular command fails
         for cmd in query_list.split("#"):
             for qry in cmd.split("\n"):
-                q = qry.upper()
                 if qry[:2] == '--':
                     continue
                 while '  ' in qry:
