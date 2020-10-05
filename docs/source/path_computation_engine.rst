@@ -38,36 +38,66 @@ Basic setup
     graph = proj.network.graphs['w']
 
     # And prepare it for computation
-    graph.prepare_graph(np.array(nodes))
-    graph.set_blocked_centroid_flows(False)
-    graph.set_graph('distance')
-    graph.set_skimming(['distance'])
 
-    # We get the path result computation object and create models for me
+    # Being primarily a modeling package, AequilibraE expects that your network
+    # will have centroids (synthetic nodes) and connectors (synthetic links)
+    # and we therefore need to account for it when computing paths
+    # Here we will assume that we do not have centroids in the network, so
+    # we will have to *trick* the Graph object
+
+    # let's get 10 of our nodes (completely arbitrary, do as you please) to
+    # serve as *centroids*
+    # The AequilibraE project file is based on SQLite, so we can just do a query
+    curr = proj.conn.cursor()
+    curr.execute('Select node_id from Nodes WHERE modes like "%c%" limit 100')
+    nodes = list(set([x[0] for x in curr.fetchall()]))
+
+    # Just use the arbitrary node set as centroids
+    graph.prepare_graph(np.array(nodes))
+
+    # Tell AequilibraE that no link is synthetic (no need to block paths going through *"centroids"*).
+    graph.set_blocked_centroid_flows(False)
+
+    # We will minimize travel_time
+    graph.set_graph('travel_time')
+
+    # And *skim* (compute the corresponding) distance for the resulting paths
+    # Even if you don't want to skim any other field, you need to call this method (with only the minimizing field)
+    graph.set_skimming(['distance', 'travel_time'])
+
+    # Finally, we get the path result computation object and prepare it to work with our graph
     res = PathResults()
     res.prepare(g)
 
-    curr = p.conn.cursor()
-    curr.execute('Select a_node, link_id, distance from Links order by distance limit 10')
-    nodes = list(set([x[0] for x in curr.fetchall()]))
+    # We are now ready to compute paths between any two nodes in the network
 
 
-    logger.info('Preparing Graph')
+Simple path computation and finding your way around
+---------------------------------------------------
 
-    logger.info("Let's compute")
+Building on the code above, we can just compute paths between two arbitrary
+nodes.
 
-    t = perf_counter()
-    res.compute_path(nodes[0], nodes[-1])
-    t = perf_counter() - t
-    p.logger.info(f'Computing path took {round(t, 4)}')
+::
 
-    res = SkimResults()
-    res.prepare(g)
-    t = perf_counter()
-    res.compute_skims()
-    t = perf_counter() - t
-    p.logger.info(f'Computing Skim matrix {round(t, 4)}')
-    p.close()
+    res.compute_path(32568, 179)
+
+    # You can consult the origin & destination for the path you computed
+    res.origin
+    res.destination
+
+    # You can also consult the sequence of links traversed from origin to destination
+    res.path
+
+    # And the sequence of nodes visited in that path
+    res.path_nodes
+
+    # You can also know the direction you traversed each link with
+    res.path_link_directions # Array of the same size as res.path
+
+
+
+
 
 
 
