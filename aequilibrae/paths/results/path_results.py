@@ -117,6 +117,8 @@ class PathResults:
             self._skimming_array = np.zeros((1, 2), self.__float_type)
 
         self.__graph_id__ = graph.__id__
+        # We can imagine somebody creating a worst-case scenario network (imagining that turn penalties are considered)
+        # where one needs to traverse all links (or almost all) in both directions.
         self.__graph_sum = 2 * graph.cost.sum()
         self.graph = graph
 
