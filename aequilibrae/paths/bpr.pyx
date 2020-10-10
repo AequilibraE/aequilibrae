@@ -2,7 +2,7 @@ from libc.math cimport pow
 from cython.parallel import prange
 
 def bpr(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
-    cdef int c
+    cdef int c = cores
 
     cdef double [:] congested_view = congested_times
     cdef double [:] link_flows_view = link_flows
@@ -10,12 +10,11 @@ def bpr(congested_times, link_flows, capacity, fftime, alpha, beta, cores):
     cdef double [:] fftime_view = fftime
     cdef double [:] alpha_view = alpha
     cdef double [:] beta_view = beta
-    c = cores
 
     bpr_cython(congested_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
 def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
-    cdef int c
+    cdef int c = cores
 
     cdef double [:] dbpr_view = dbpr
     cdef double [:] link_flows_view = link_flows
@@ -23,7 +22,6 @@ def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
     cdef double [:] fftime_view = fftime
     cdef double [:] alpha_view = alpha
     cdef double [:] beta_view = beta
-    c = cores
 
     dbpr_cython(dbpr_view, link_flows_view, capacity_view, fftime_view, alpha_view, beta_view, c)
 
