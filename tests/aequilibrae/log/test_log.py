@@ -9,6 +9,7 @@ from aequilibrae.project import Project
 
 class TestLog(TestCase):
     def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.proj_dir)
 
