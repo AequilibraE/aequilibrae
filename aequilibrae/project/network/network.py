@@ -242,8 +242,8 @@ class Network():
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
-        for lnk in raw_links:
-            lk = list(map(lambda x: np.nan if x is None else x, lnk))
+        for link in raw_links:
+            lk = list(map(lambda x: np.nan if x is None else x, link))
             links.append(lk)
 
         data = np.core.records.fromrecords(links, names=all_fields)
