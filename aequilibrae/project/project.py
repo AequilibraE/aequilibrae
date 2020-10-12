@@ -7,6 +7,7 @@ from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.about import About
 from aequilibrae.project.database_connection import database_connection, environ_var
 from aequilibrae.parameters import Parameters
+from aequilibrae.log import Log
 import warnings
 from aequilibrae import logger
 from aequilibrae.reference_files import spatialite_database
@@ -110,6 +111,12 @@ class Project:
         """
         warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
         self.open(project_path)
+
+    def log(self) -> Log:
+        """Returns a log object
+
+        allows the user to read the log or clear it"""
+        return Log(self.project_base_path)
 
     def __load_objects(self):
         self.network = Network(self)

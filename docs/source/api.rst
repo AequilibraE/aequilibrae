@@ -31,6 +31,7 @@ Project components
     Network
     FieldEditor
     Zoning
+    Log
 
 Project objects
 ++++++++++++++++++

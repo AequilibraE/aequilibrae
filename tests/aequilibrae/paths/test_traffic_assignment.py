@@ -1,5 +1,7 @@
 from unittest import TestCase
 import os
+from shutil import copytree
+import uuid
 import string
 import random
 from tempfile import gettempdir
@@ -19,8 +21,11 @@ class TestTrafficAssignment(TestCase):
         self.matrix.load(siouxfalls_demand)
         self.matrix.computational_view()
 
+        proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
+        copytree(siouxfalls_project, proj_dir)
+
         self.project = Project()
-        self.project.open(siouxfalls_project)
+        self.project.open(proj_dir)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs['c']  # type: Graph
         self.car_graph.set_graph('free_flow_time')
