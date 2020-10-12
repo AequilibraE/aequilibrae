@@ -8,9 +8,6 @@ therefore most of its features are geared towards that.  In time, this section
 of the documentation will have more detailed documentation, as it is the case
 of Traffic Assignment, linked below.
 
-
-Modeling components
--------------------
 .. toctree::
    :maxdepth: 1
 
