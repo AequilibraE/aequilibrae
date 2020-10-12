@@ -35,4 +35,5 @@ class Log:
 
     def clear(self):
         """Clears the log file. Use it wisely"""
-        _ = open(self.log_file_path, 'w')
+        with open(self.log_file_path, 'w') as _:
+            pass
