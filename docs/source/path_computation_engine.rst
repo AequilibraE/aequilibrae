@@ -3,8 +3,8 @@
 Path computation engine
 =======================
 
-Given AequilibraE's incredibly fast path computation capabilities, of of its
-important use cases is the computation of paths in general transportation
+Given AequilibraE's incredibly fast path computation capabilities, one of its
+important use cases is the computati`on of paths on general transportation
 networks and between any two nodes, regardless of their type (centroid or not).
 
 This use case supports the development of a number of computationally intensive
@@ -17,7 +17,7 @@ fully documented in the :ref:`aequilibrae_api` section of this documentation.
 Below we detail its capability for a number of use-cases outside traditional
 modeling, from a simple path computation to a more sophisticated map-matching
 use.
-
+`
 Basic setup
 
 ::
@@ -74,8 +74,8 @@ Basic setup
     # We are now ready to compute paths between any two nodes in the network
 
 
-Simple path computation and finding your way around
----------------------------------------------------
+path computation and finding your way around
+--------------------------------------------
 
 Building on the code above, we can just compute paths between two arbitrary
 nodes.
@@ -97,16 +97,69 @@ nodes.
     # You can also know the direction you traversed each link with
     res.path_link_directions # Array of the same size as res.path
 
-    # If you chose to compute skims, you can access them for ALL nodes
+    # If you chose to compute skims, you can access them for ALL NODES
     # Array is indexed on node IDs
     res.skims
     # Order of columns is the same as in
     graph.skim_fields
     # disconnected and non-existing nodes are set to np.inf
 
+    # The metric used to compute the path is also summarized for all nodes along the path
+    res.milepost
+    # This is especially useful when you want to interpolate other metrics along the path
+    # This is the case in route-reconstruction when map-matching GPS data
+
+    # The shortest path tree is stored during computation, so recomputing the path from
+    # the same origin but for a different destination is lightning fast
+    res.update_trace(195)
+
+    # Skims obviously won't change, but the OD pair specific data will
+    res.path_nodes
+    res.path
+    res.path_link_directions
+    res.milepost
 
 
+Network skimming
+----------------
+If your objective is just to compute distance/travel_time/your_own_cost matrix
+between a series of nodes, then the process is even simpler
 
+
+::
+
+    from aequilibrae.paths.results import SkimResults
+
+    res.compute_path(32568, 179)
+
+    # You can consult the origin & destination for the path you computed
+    res.origin
+    res.destination
+
+    # You would prepare the graph with "centroids" that correspond to the nodes
+    # you are interested in
+    graph.prepare_graph(np.array(my_nodes_of_interest))
+
+    # And do the steps from the setup phase accordingly
+    graph.set_blocked_centroid_flows(False)
+    graph.set_graph('travel_time')
+    graph.set_skimming(['distance', 'travel_time'])
+
+    # Finally, we get the path result computation object and prepare it to work with our graph
+    skm_res = SkimResults()
+    skm_res.prepare(graph)
+
+    # You can tell AequilibraE to use an specific number of cores
+    skm_res.set_cores(12)
+
+    # And then compute it
+    skm_res.compute_skims()
+
+    skm_res.skims.export('path/to/matrix.omx')
+    # or
+    skm_res.skims.export('path/to/matrix.aem')
+    # or
+    skm_res.skims.export('path/to/matrix.csv')
 
 
 
