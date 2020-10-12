@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from aequilibrae.paths import path_computation, Graph
 from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import binary_version
 from ...data import test_graph
 import numpy as np
 
@@ -20,6 +21,7 @@ class TestPathResults(TestCase):
         # graph
         self.g = Graph()
         self.g.load_from_disk(test_graph)
+        self.g.__version__ = binary_version
         self.g.set_graph(cost_field="distance")
 
         self.r = PathResults()
@@ -82,6 +84,7 @@ class TestPathResults(TestCase):
     def test_compute_with_skimming(self):
         g = Graph()
         g.load_from_disk(test_graph)
+        g.__version__ = binary_version
         g.set_graph(cost_field="distance")
 
         r = PathResults()

@@ -5,6 +5,7 @@ from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths import skimming_single_origin
 from aequilibrae.paths.results import SkimResults
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.paths import binary_version
 
 # Adds the folder with the data to the path and collects the paths to the files
 from ...data import test_graph
@@ -15,6 +16,7 @@ class TestNetwork_skimming(TestCase):
         # graph
         g = Graph()
         g.load_from_disk(test_graph)
+        g.__version__ = binary_version
         g.set_graph(cost_field="distance")
         g.set_skimming("distance")
 

@@ -9,6 +9,7 @@ from .parameters_test import centroids
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
 from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import binary_version
 
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
@@ -45,6 +46,7 @@ class TestGraph(TestCase):
 
         reference_graph = Graph()
         reference_graph.load_from_disk(test_graph)
+        reference_graph.__version__ = binary_version
         if not np.array_equal(self.graph.graph, reference_graph.graph):
             self.fail("Reference graph and newly-prepared graph are not equal")
 
@@ -69,6 +71,7 @@ class TestGraph(TestCase):
         self.test_save_to_disk()
         reference_graph = Graph()
         reference_graph.load_from_disk(test_graph)
+        reference_graph.__version__ = binary_version
 
         new_graph = Graph()
         new_graph.load_from_disk(join(path_test, "aequilibrae_test_graph.aeg"))
