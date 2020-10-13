@@ -249,7 +249,7 @@ class Graph(object):
                     else:
                         if centroids.shape[0] != np.unique(centroids).shape[0]:
                             raise ValueError("Centroid IDs are not unique")
-                self.centroids = np.array(list(centroids), np.uint32)
+                self.centroids = np.sort(np.array(list(centroids), np.uint32))
             else:
                 raise ValueError("Centroids need to be an array of integers 64 bits")
         else:
