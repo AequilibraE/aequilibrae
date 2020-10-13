@@ -1,5 +1,6 @@
 from typing import List
 from warnings import warn
+from uuid import uuid4
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
@@ -91,6 +92,9 @@ class TrafficAssignment(object):
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
         self.__dict__["cores"] = None  # type: int
+
+        self.__dict__["procedure_id"] = uuid4().hex
+        self.__dict__["description"] = ''
 
     def __setattr__(self, instance, value) -> None:
 
@@ -306,3 +310,21 @@ class TrafficAssignment(object):
     def execute(self) -> None:
         """Processes assignment"""
         self.assignment.execute()
+
+    def save_assignment_results(self, table_name: str) -> None:
+        """Saves the assignment results to results_database.sqlite
+
+        Args:
+            table_name (:obj:`str`): Name of the table to hold this assignment result
+        """
+        pass
+
+    def save_skims(self, matrix_name: str, which_ones='final') -> None:
+        """Saves the skims (if any) to the skim folder and registers in the matrix list
+
+        Args:
+            matrix_name (:obj:`str`): Name of the file to hold this matrix
+            which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
+            all iterations} Default is 'final'
+        """
+        pass
