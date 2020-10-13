@@ -68,6 +68,9 @@ The user is also welcome to change the maximum area for a single query to the
 Overpass API (m\ :sup:`2`) and the pause duration between successive
 requests *sleeptime*.
 
+It is also possible to set a custom address for the Nominatim server, but its
+use by AequilibraE is so small that it is likely not necessary to do so.
+
 .. _parameters_assignment:
 
 Assignment
