@@ -2,10 +2,12 @@ from typing import List
 from warnings import warn
 from uuid import uuid4
 import numpy as np
+import pandas as pd
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.matrix import AequilibraeData
 from aequilibrae import Parameters
 
 
@@ -66,8 +68,8 @@ class TrafficAssignment(object):
         convergence_report = pd.DataFrame(assig.assignment.convergence_report)
         convergence_report.head()
 
-        # Link flow results are here
-        results = assigclass.results
+        # Assignment results can be viewed as a Pandas DataFrame
+        results = assig.results()
 
         # skims are here
         avg_skims = assigclass.results.skims # blended ones
@@ -311,13 +313,76 @@ class TrafficAssignment(object):
         """Processes assignment"""
         self.assignment.execute()
 
-    def save_assignment_results(self, table_name: str) -> None:
+    def save_results(self, table_name: str) -> None:
         """Saves the assignment results to results_database.sqlite
 
-        Args:
-            table_name (:obj:`str`): Name of the table to hold this assignment result
+                Args:
+                    table_name (:obj:`str`): Name of the table to hold this assignment result
+                """
+        df = self.results()
+
+    def results(self) -> pd.DataFrame:
+        """Prepares the assignment results as a Pandas DataFrame
+
+        Returns:
+            *DataFrame* (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
         """
-        pass
+
+        assig_results = [cls.results.get_load_results() for cls in self.classes]
+
+        class1 = self.classes[0]
+        res1 = assig_results[0]
+
+        tot_flow = self.assignment.fw_total_flow
+        voc = self.assignment.fw_total_flow / self.capacity
+
+        entries = res1.data.shape[0]
+        fields = ['Congested_Time_AB', 'Congested_Time_BA', 'Congested_Time_Max',
+                  'Delay_factor_AB', 'Delay_factor_BA','Delay_factor_Max',
+                  'VOC_AB', 'VOC_BA', 'VOC_max',
+                  'PCE_AB', 'PCE_BA', 'PCE_tot']
+
+        types = [np.float64] * len(fields)
+        agg = AequilibraeData()
+        agg.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
+        agg.data.fill(np.nan)
+        agg.index[:] = res1.data.index[:]
+
+        link_ids = class1.results.lids
+        ABs = class1.results.direcs > 0
+        BAs = class1.results.direcs < 0
+
+        indexing = np.zeros(int(link_ids.max()) + 1, np.uint64)
+        indexing[agg.index[:]] = np.arange(entries)
+
+        # Indices of links BA and AB
+        ab_ids = indexing[link_ids[ABs]]
+        ba_ids = indexing[link_ids[BAs]]
+
+        agg.data['Congested_Time_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs])
+        agg.data['Congested_Time_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs])
+        agg.data['Congested_Time_Max'][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+
+        agg.data['Delay_factor_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs]/self.free_flow_tt[ABs])
+        agg.data['Delay_factor_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs]/self.free_flow_tt[BAs])
+        agg.data['Delay_factor_Max'][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+
+
+        agg.data['VOC_AB'][ab_ids] = np.nan_to_num(voc[ABs])
+        agg.data['VOC_BA'][ba_ids] = np.nan_to_num(voc[BAs])
+        agg.data['VOC_max'][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+
+        agg.data['PCE_AB'][ab_ids] = np.nan_to_num(tot_flow[ABs])
+        agg.data['PCE_BA'][ba_ids] = np.nan_to_num(tot_flow[BAs])
+        agg.data['PCE_tot'][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+
+        assig_results.append(agg)
+
+        dfs = [pd.DataFrame(aed.data) for aed in assig_results]
+        dfs = [df.rename(columns={'index': 'link_id'}).set_index('link_id') for df in dfs]
+        df = pd.concat(dfs, axis=1)
+
+        return df
 
     def save_skims(self, matrix_name: str, which_ones='final') -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
