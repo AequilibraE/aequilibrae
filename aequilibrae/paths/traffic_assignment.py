@@ -1,8 +1,11 @@
+from os import environ, path
 from typing import List
 from warnings import warn
 from uuid import uuid4
+import sqlite3
 import numpy as np
 import pandas as pd
+from aequilibrae.project.database_connection import environ_var
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
@@ -320,6 +323,8 @@ class TrafficAssignment(object):
                     table_name (:obj:`str`): Name of the table to hold this assignment result
                 """
         df = self.results()
+        conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
+        df.to_sql(table_name, conn)
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -338,7 +343,7 @@ class TrafficAssignment(object):
 
         entries = res1.data.shape[0]
         fields = ['Congested_Time_AB', 'Congested_Time_BA', 'Congested_Time_Max',
-                  'Delay_factor_AB', 'Delay_factor_BA','Delay_factor_Max',
+                  'Delay_factor_AB', 'Delay_factor_BA', 'Delay_factor_Max',
                   'VOC_AB', 'VOC_BA', 'VOC_max',
                   'PCE_AB', 'PCE_BA', 'PCE_tot']
 
@@ -363,10 +368,9 @@ class TrafficAssignment(object):
         agg.data['Congested_Time_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs])
         agg.data['Congested_Time_Max'][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data['Delay_factor_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs]/self.free_flow_tt[ABs])
-        agg.data['Delay_factor_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs]/self.free_flow_tt[BAs])
+        agg.data['Delay_factor_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs] / self.free_flow_tt[ABs])
+        agg.data['Delay_factor_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs] / self.free_flow_tt[BAs])
         agg.data['Delay_factor_Max'][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
-
 
         agg.data['VOC_AB'][ab_ids] = np.nan_to_num(voc[ABs])
         agg.data['VOC_BA'][ba_ids] = np.nan_to_num(voc[BAs])
