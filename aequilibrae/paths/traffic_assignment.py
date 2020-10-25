@@ -72,7 +72,10 @@ class TrafficAssignment(object):
         convergence_report.head()
 
         # Assignment results can be viewed as a Pandas DataFrame
-        results = assig.results()
+        results_df = assig.results()
+
+        # Or save it directly to the results database
+        results = assig.save_results(table_name='example_from_the_documentation')
 
         # skims are here
         avg_skims = assigclass.results.skims # blended ones
@@ -319,9 +322,11 @@ class TrafficAssignment(object):
     def save_results(self, table_name: str) -> None:
         """Saves the assignment results to results_database.sqlite
 
-                Args:
-                    table_name (:obj:`str`): Name of the table to hold this assignment result
-                """
+        Method fails if table exists
+
+        Args:
+            table_name (:obj:`str`): Name of the table to hold this assignment result
+        """
         df = self.results()
         conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
         df.to_sql(table_name, conn)
