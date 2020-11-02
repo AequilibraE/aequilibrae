@@ -4,6 +4,7 @@ from shutil import copytree
 import uuid
 import string
 import random
+from random import choice
 from tempfile import gettempdir
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix
@@ -33,6 +34,8 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment = TrafficAssignment()
         self.assigclass = TrafficClass(self.car_graph, self.matrix)
+
+        self.algorithms = ['msa', 'fw', 'cfw', 'bfw', 'frank-wolfe']
 
     def tearDown(self) -> None:
         self.matrix.close()
@@ -94,7 +97,11 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_time_field("free_flow_time")
 
         self.assignment.max_iter = 10
-        self.assignment.set_algorithm('bfw')
+
+        for algo in self.algorithms:
+            for _ in range(10):
+                algo = ''.join([x.upper() if random.random() < 0.5 else x.lower() for x in algo])
+                self.assignment.set_algorithm(algo)
 
     def test_set_vdf_parameters(self):
         with self.assertRaises(Exception):
@@ -172,3 +179,31 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(fw25, msa25)
         self.assertLess(cfw25, fw25)
         self.assertLess(bfw25, cfw25)
+
+    def test_info(self):
+        iterations = random.randint(1, 10000)
+        rgap = random.random() / 10000
+        algo = choice(self.algorithms)
+
+        self.assignment.set_classes(self.assigclass)
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+
+        self.assignment.max_iter = iterations
+        self.assignment.rgap_target = rgap
+        self.assignment.set_algorithm(algo)
+
+        # TY
+        for _ in range(10):
+            algo = ''.join([x.upper() if random.random() < 0.5 else x.lower() for x in algo])
+
+        dct = self.assignment.info()
+        if algo.lower() == 'fw':
+            algo = 'frank-wolfe'
+        self.assertEqual(dct['Algorithm'], algo.lower(), 'Algorithm not correct in info method')
+
+        self.assertEqual(dct['Maximum iterations'], iterations, 'maximum iterations not correct in info method')

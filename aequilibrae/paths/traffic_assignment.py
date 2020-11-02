@@ -3,6 +3,8 @@ from typing import List
 from warnings import warn
 from uuid import uuid4
 import sqlite3
+from datetime import datetime
+import socket
 import numpy as np
 import pandas as pd
 from aequilibrae.project.database_connection import environ_var
@@ -11,6 +13,7 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.matrix import AequilibraeData
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 
 
@@ -82,7 +85,7 @@ class TrafficAssignment(object):
         last_skims = assigclass._aon_results.skims # those for the last iteration
     """
     bpr_parameters = ["alpha", "beta"]
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
     def __init__(self) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
@@ -103,6 +106,7 @@ class TrafficAssignment(object):
 
         self.__dict__["procedure_id"] = uuid4().hex
         self.__dict__["description"] = ''
+        self.__dict__["procedure_date"] = str(datetime.today())
 
     def __setattr__(self, instance, value) -> None:
 
@@ -168,7 +172,7 @@ class TrafficAssignment(object):
             classes(:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
-        self.classes = classes
+        self.classes = classes  # type: List[TrafficClass]
         self.__collect_data()
 
     def algorithms_available(self) -> list:
@@ -191,15 +195,19 @@ class TrafficAssignment(object):
         """
 
         # First we instantiate the arrays we will be using over and over
-        if algorithm not in self.all_algorithms:
+        if algorithm.lower() not in self.all_algorithms:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algorithm.lower() == "all-or-nothing":
             self.assignment = allOrNothing(self)
+        elif algorithm.lower() == 'fw':
+            self.assignment = LinearApproximation(self, "frank-wolfe")
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
         else:
             raise Exception('Algorithm not listed in the case selection')
+
+        self.__dict__['algorithm'] = algorithm
 
         self.__collect_data()
 
@@ -330,6 +338,16 @@ class TrafficAssignment(object):
         df = self.results()
         conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
         df.to_sql(table_name, conn)
+        conn.close()
+
+        conn = database_connection()
+        report = {'convergence': str(self.assignment.convergence_report),
+                  'setup': str(self.info())}
+        data = [table_name, 'traffic assignment', self.procedure_id, str(report), self.procedure_date, self.description]
+        conn.execute('''Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)''', data)
+        conn.commit()
+        conn.close()
 
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
@@ -393,12 +411,41 @@ class TrafficAssignment(object):
 
         return df
 
+    def info(self) -> dict:
+        """ Returns information for the traffic assignment procedure
+
+        Dictionary contains keys  'Algorithm', 'Classes', 'Computer name', 'Procedure ID',
+        'Maximum iterations' and 'Target RGap'.
+
+        The classes key is also a dictionary with all the user classes per traffic class and their respective
+        matrix totals
+
+        Returns:
+            *info* (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
+        """
+
+        classes = {}
+        for cls in self.classes:
+            if len(cls.matrix.view_names) == 1:
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
+            else:
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for i, nm in
+                                           enumerate(cls.matrix.view_names)}
+
+        info = {'Algorithm': self.algorithm,
+                'Classes': classes,
+                'Computer name': socket.gethostname(),
+                'Maximum iterations': self.assignment.max_iter,
+                'Procedure ID': self.procedure_id,
+                'Target RGap': self.assignment.rgap_target}
+        return info
+
     def save_skims(self, matrix_name: str, which_ones='final') -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         Args:
             matrix_name (:obj:`str`): Name of the file to hold this matrix
             which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
-            all iterations} Default is 'final'
+            all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
         """
         pass
