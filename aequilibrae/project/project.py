@@ -124,6 +124,17 @@ class Project:
         self.zoning = Zoning(self)
         self.parameters = Parameters().parameters
 
+        matrix_folder = os.path.join(self.project_base_path, 'matrices')
+        if not os.path.isdir(matrix_folder):
+            os.mkdir(matrix_folder)
+
+    def check_file_indices(self) -> None:
+        """ Makes results_database.sqlite and the matrices folder compatible with project database
+
+
+        """
+        pass
+
     def __create_empty_project(self):
 
         # We create the project folder and create the base file

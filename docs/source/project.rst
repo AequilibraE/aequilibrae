@@ -36,6 +36,9 @@ series of files and sub folders exist. The files are the following:
 - **project_database.sqlite** - Main project file, containing network and data
   tables for the project
 
+- **results_database.sqlite** - Database containing outputs for all algorithms
+  such as those resulting from traffic assignment
+
 - **parameters.yml** - Contains parameters for all parameterized AequilibraE
   procedures
 
