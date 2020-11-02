@@ -22,7 +22,6 @@ jobs:
         pip3 install cython
         pip3 install scipy
         pip3 install openmatrix
-        pip3 install pyshp
         pip3 install requests
         pip3 install pytest
         pip3 install spatialite

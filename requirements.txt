@@ -4,6 +4,5 @@ pyaml
 PyQt5
 cython
 openmatrix
-pyshp
 requests
 shapely
