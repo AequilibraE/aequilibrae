@@ -63,7 +63,7 @@ class TestTrafficAssignment(TestCase):
 
     def test_algorithms_available(self):
         algs = self.assignment.algorithms_available()
-        real = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw', 'cfw']
+        real = ['all-or-nothing', 'msa', 'frank-wolfe', 'bfw', 'cfw', 'fw']
 
         diff = [x for x in real if x not in algs]
         diff2 = [x for x in algs if x not in real]
