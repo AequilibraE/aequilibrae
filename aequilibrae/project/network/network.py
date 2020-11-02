@@ -133,8 +133,6 @@ class Network():
             p.close()
         """
 
-        logger.info("Adding spatial indices")
-        self.add_spatial_index()
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
@@ -328,16 +326,6 @@ class Network():
                    *modes* (:obj:`str`): Modes for which centroids connectors should be added
                """
         pass
-
-    def add_spatial_index(self) -> None:
-        """Adds spatial indices to links and nodes table
-
-        Requires an Sqlite3 distribution with RTree (not the Python standard).
-        Use with caution"""
-        curr = self.conn.cursor()
-        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
-        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
-        self.conn.commit()
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()

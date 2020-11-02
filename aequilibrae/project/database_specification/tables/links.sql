@@ -20,6 +20,9 @@ select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
 CREATE INDEX idx_link ON links (link_id);
 
 #
+SELECT CreateSpatialIndex( 'links' , 'geometry' );
+
+#
 CREATE INDEX idx_link_anode ON links (a_node);
 
 #
