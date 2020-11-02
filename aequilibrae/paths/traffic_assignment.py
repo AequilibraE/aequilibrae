@@ -205,6 +205,7 @@ class TrafficAssignment(object):
             self.assignment = allOrNothing(self)
         elif algorithm.lower() == 'fw':
             self.assignment = LinearApproximation(self, "frank-wolfe")
+            algorithm = "frank-wolfe"
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
         else:
