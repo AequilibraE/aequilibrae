@@ -163,7 +163,7 @@ class TrafficAssignment(object):
         Sets the Volume-delay function to be used
 
         Args:
-            vdf_function(:obj:`str`:) Name of the VDF to be used
+            vdf_function (:obj:`str`:) Name of the VDF to be used
         """
         self.vdf = vdf_function
 
