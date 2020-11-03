@@ -193,24 +193,29 @@ class TrafficAssignment(object):
         """
         Chooses the assignment algorithm. e.g. 'frank-wolfe', 'bfw', 'msa'
 
+        'fw' is also accepted as an alternative to 'frank-wolfe'
+
         Args:
             algorithm (:obj:`list`): Algorithm to be used
         """
 
         # First we instantiate the arrays we will be using over and over
-        if algorithm.lower() not in self.all_algorithms:
+
+        algo_dict = {i: i for i in self.all_algorithms}
+        algo_dict["fw"] = "frank-wolfe"
+        algo = algo_dict.get(algorithm.lower())
+
+        if algo not in self.all_algorithms:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        if algorithm.lower() == "all-or-nothing":
+        if algo == "all-or-nothing":
             self.assignment = allOrNothing(self)
-        elif algorithm.lower() == 'fw':
-            self.assignment = LinearApproximation(self, "frank-wolfe")
-        elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = LinearApproximation(self, algorithm.lower())
+        elif algo in ["msa", "frank-wolfe", "cfw", "bfw"]:
+            self.assignment = LinearApproximation(self, algo)
         else:
             raise Exception('Algorithm not listed in the case selection')
 
-        self.__dict__['algorithm'] = algorithm
+        self.__dict__['algorithm'] = algo
 
         self.__collect_data()
 

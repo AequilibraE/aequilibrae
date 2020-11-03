@@ -35,7 +35,7 @@ class TestTrafficAssignment(TestCase):
         self.assignment = TrafficAssignment()
         self.assigclass = TrafficClass(self.car_graph, self.matrix)
 
-        self.algorithms = ['msa', 'fw', 'cfw', 'bfw', 'frank-wolfe']
+        self.algorithms = ['msa', 'cfw', 'bfw', 'frank-wolfe']
 
     def tearDown(self) -> None:
         self.matrix.close()
