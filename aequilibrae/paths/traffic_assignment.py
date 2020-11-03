@@ -205,7 +205,7 @@ class TrafficAssignment(object):
         algo_dict["fw"] = "frank-wolfe"
         algo = algo_dict.get(algorithm.lower())
 
-        if algo not in self.all_algorithms:
+        if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algo == "all-or-nothing":

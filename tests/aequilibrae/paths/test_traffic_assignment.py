@@ -103,6 +103,9 @@ class TestTrafficAssignment(TestCase):
                 algo = ''.join([x.upper() if random.random() < 0.5 else x.lower() for x in algo])
                 self.assignment.set_algorithm(algo)
 
+        with self.assertRaises(AttributeError):
+            self.assignment.set_algorithm('not a valid algorithm')
+
     def test_set_vdf_parameters(self):
         with self.assertRaises(Exception):
             self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
