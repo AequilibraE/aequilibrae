@@ -77,7 +77,7 @@ class TrafficAssignment(object):
         # Assignment results can be viewed as a Pandas DataFrame
         results_df = assig.results()
 
-        # information on the assignment setup can be recovered wuth
+        # information on the assignment setup can be recovered with
         info = assig.info()
 
         # Or save it directly to the results database
