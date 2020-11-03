@@ -432,7 +432,7 @@ class TrafficAssignment(object):
             if len(cls.matrix.view_names) == 1:
                 classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
             else:
-                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for i, nm in
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
                                            enumerate(cls.matrix.view_names)}
 
         info = {'Algorithm': self.algorithm,
