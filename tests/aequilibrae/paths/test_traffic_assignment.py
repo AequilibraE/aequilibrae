@@ -35,7 +35,7 @@ class TestTrafficAssignment(TestCase):
         self.assignment = TrafficAssignment()
         self.assigclass = TrafficClass(self.car_graph, self.matrix)
 
-        self.algorithms = ['msa', 'fw', 'cfw', 'bfw', 'frank-wolfe']
+        self.algorithms = ['msa', 'cfw', 'bfw', 'frank-wolfe']
 
     def tearDown(self) -> None:
         self.matrix.close()
@@ -102,6 +102,9 @@ class TestTrafficAssignment(TestCase):
             for _ in range(10):
                 algo = ''.join([x.upper() if random.random() < 0.5 else x.lower() for x in algo])
                 self.assignment.set_algorithm(algo)
+
+        with self.assertRaises(AttributeError):
+            self.assignment.set_algorithm('not a valid algorithm')
 
     def test_set_vdf_parameters(self):
         with self.assertRaises(Exception):
