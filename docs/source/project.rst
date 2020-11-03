@@ -91,6 +91,7 @@ Project database
    project_docs/link_types
    project_docs/zones
    project_docs/parameters_metadata
+   project_docs/results
 
 Parameters file
 ----------------

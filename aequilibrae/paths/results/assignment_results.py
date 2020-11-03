@@ -226,7 +226,7 @@ class AssignmentResults:
         Returns:
             dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
-        fields = ['link_id']
+        fields = []
         for n in self.classes['names']:
             fields.extend([f'{n}_ab', f'{n}_ba', f'{n}_tot'])
         types = [np.float64] * len(fields)
@@ -236,7 +236,6 @@ class AssignmentResults:
         res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
         res.data.fill(np.nan)
         res.index[:] = np.unique(self.lids)[:]
-        res.link_id[:] = res.index[:]
 
         indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
         indexing[res.index[:]] = np.arange(entries)
