@@ -77,7 +77,7 @@ class TrafficAssignment(object):
         # Assignment results can be viewed as a Pandas DataFrame
         results_df = assig.results()
 
-        # information on the assignment setup can be recovered wuth
+        # information on the assignment setup can be recovered with
         info = assig.info()
 
         # Or save it directly to the results database
@@ -433,7 +433,7 @@ class TrafficAssignment(object):
             if len(cls.matrix.view_names) == 1:
                 classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
             else:
-                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for i, nm in
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
                                            enumerate(cls.matrix.view_names)}
 
         info = {'Algorithm': self.algorithm,
