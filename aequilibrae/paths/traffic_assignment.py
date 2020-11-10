@@ -95,7 +95,7 @@ class TrafficAssignment(object):
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = VDF()
-        self.__dict__["classes"] = None  # type: List[TrafficClass]
+        self.__dict__["classes"] = []  # type: List[TrafficClass]
         self.__dict__["algorithm"] = None  # type: str
         self.__dict__["vdf_parameters"] = None  # type: list
         self.__dict__["time_field"] = None  # type: str
@@ -172,10 +172,28 @@ class TrafficAssignment(object):
         Sets Traffic classes to be assigned
 
         Args:
-            classes(:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+            classes (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
+        ids = set([x._id for x in classes])
+        if len(ids) < len(classes):
+            raise Exception('Classes need to be unique. Your list of classes has repeated items')
         self.classes = classes  # type: List[TrafficClass]
+        self.__collect_data()
+
+    def add_class(self, traffic_class: TrafficClass) -> None:
+        """
+        Adds a traffic class to the assignment
+
+        Args:
+            traffic_class (:obj:`TrafficClass`:) Traffic class
+        """
+
+        ids = [x._id for x in self.classes if x._id == traffic_class._id]
+        if len(ids) > 0:
+            raise Exception('Traffic class already in the assignment')
+
+        self.classes.append(traffic_class)
         self.__collect_data()
 
     def algorithms_available(self) -> list:
@@ -220,7 +238,7 @@ class TrafficAssignment(object):
         self.__collect_data()
 
     def __collect_data(self):
-        if not isinstance(self.classes, list):
+        if not self.classes:
             return
 
         c = self.classes[0]
@@ -285,7 +303,7 @@ class TrafficAssignment(object):
             cores (:obj:`int`): Number of CPU cores to use
         """
         self.cores = cores
-        if self.classes is not None:
+        if self.classes:
             for c in self.classes:
                 c.results.set_cores(cores)
                 c._aon_results.set_cores(cores)
@@ -418,6 +436,14 @@ class TrafficAssignment(object):
         df = pd.concat(dfs, axis=1)
 
         return df
+
+    def report(self) -> pd.DataFrame:
+        """Returns the assignment convergence report
+
+         Returns:
+            *DataFrame* (:obj:`pd.DataFrame`): Convergence report
+        """
+        return pd.DataFrame(self.assignment.convergence_report)
 
     def info(self) -> dict:
         """ Returns information for the traffic assignment procedure
