@@ -302,13 +302,13 @@ class TrafficAssignment(object):
         Args:
             cores (:obj:`int`): Number of CPU cores to use
         """
-        if self.classes:
-            self.cores = cores
-            for c in self.classes:
-                c.results.set_cores(cores)
-                c._aon_results.set_cores(cores)
-        else:
+        if not self.classes:
             raise Exception('You need load traffic classes before overwriting the number of cores')
+
+        self.cores = cores
+        for c in self.classes:
+            c.results.set_cores(cores)
+            c._aon_results.set_cores(cores)
 
     def set_time_field(self, time_field: str) -> None:
         """
