@@ -35,12 +35,18 @@ class Matrices:
 
         self.curr.execute('Select name, file_name from matrices;')
 
-        remove = [[nm] for nm, file in self.curr.fetchall() if isfile(os.path.join(self.fldr, file))]
+        remove = [nm for nm, file in self.curr.fetchall() if isfile(os.path.join(self.fldr, file))]
 
         if remove:
             self.__project.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
+
+            remove = [[x] for x in remove]
             self.curr.executemany('DELETE from matrices where name=?;', remove)
             self.conn.commit()
+
+    def update_database(self) -> None:
+        """Adds records to the matrices database for matrix files found on disk"""
+        pass
 
     def list(self) -> pd.DataFrame:
         """
