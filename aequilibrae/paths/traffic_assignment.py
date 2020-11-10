@@ -302,8 +302,8 @@ class TrafficAssignment(object):
         Args:
             cores (:obj:`int`): Number of CPU cores to use
         """
-        self.cores = cores
         if self.classes:
+            self.cores = cores
             for c in self.classes:
                 c.results.set_cores(cores)
                 c._aon_results.set_cores(cores)
