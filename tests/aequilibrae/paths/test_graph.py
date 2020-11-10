@@ -23,35 +23,11 @@ class TestGraph(TestCase):
         os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
-
-    def test_create_from_geography(self):
         self.graph = Graph()
-        self.graph.create_from_geography(
-            test_network,
-            "link_id",
-            "dir",
-            "distance",
-            centroids=centroids,
-            skim_fields=[],
-            anode="A_NODE",
-            bnode="B_NODE",
-        )
-        self.graph.set_graph(cost_field="distance")
-        self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
-        self.graph.set_skimming("distance")
-
-    def test_prepare_graph(self):
-        self.test_create_from_geography()
-        self.graph.prepare_graph(centroids)
-
-        reference_graph = Graph()
-        reference_graph.load_from_disk(test_graph)
-        reference_graph.__version__ = binary_version
-        if not np.array_equal(self.graph.graph, reference_graph.graph):
-            self.fail("Reference graph and newly-prepared graph are not equal")
+        self.graph.load_from_disk(test_graph)
+        self.graph.__version__ = binary_version
 
     def test_set_graph(self):
-        self.test_prepare_graph()
         self.graph.set_graph(cost_field="distance")
         self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
         if self.graph.num_zones != centroids.shape[0]:
@@ -62,7 +38,8 @@ class TestGraph(TestCase):
             self.fail("Number of nodes not properly set - " + str(self.graph.num_nodes))
 
     def test_save_to_disk(self):
-        self.test_create_from_geography()
+        self.graph = Graph()
+        self.graph.load_from_disk(test_graph)
         self.graph.save_to_disk(join(path_test, "aequilibrae_test_graph.aeg"))
         self.graph_id = self.graph.__id__
         self.graph_version = self.graph.__version__
