@@ -36,8 +36,8 @@ class TestMatrices(TestCase):
         matrices.update_database()
 
 
-    def test_list(self):
-        self.fail()
-
-    def test_get_matrix(self):
-        self.fail()
+    # def test_list(self):
+    #     self.fail()
+    #
+    # def test_get_matrix(self):
+    #     self.fail()

@@ -27,7 +27,7 @@ class Matrices:
             if lt['name'] not in self.__items:
                 if isfile(join(self.fldr, lt['file_name'])):
                     lt['folder'] = self.fldr
-                    self.__items[lt['name']] = MatrixRecord(lt)
+                    self.__items[lt['name']] = MatrixRecord(lt, self.__items)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
