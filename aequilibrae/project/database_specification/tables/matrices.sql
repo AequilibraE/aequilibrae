@@ -5,3 +5,7 @@ create TABLE 'matrices' (name          TEXT     NOT NULL  PRIMARY KEY,
                          matrix_type   TEXT     NOT NULL,
                          timestamp     DATETIME DEFAULT current_timestamp,
                          description   TEXT);
+
+
+#
+CREATE INDEX name_matrices ON matrices (name);

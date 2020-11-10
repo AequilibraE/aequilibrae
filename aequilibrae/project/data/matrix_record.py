@@ -1,5 +1,5 @@
 from aequilibrae.project.network.safe_class import SafeClass
 
 
-class MatrixClass(SafeClass):
+class MatrixRecord(SafeClass):
     pass
