@@ -174,6 +174,7 @@ class TrafficAssignment(object):
         Args:
             classes (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
+
         ids = set([x._id for x in classes])
         if len(ids) < len(classes):
             raise Exception('Classes need to be unique. Your list of classes has repeated items')
@@ -237,7 +238,7 @@ class TrafficAssignment(object):
         self.__collect_data()
 
     def __collect_data(self):
-        if not isinstance(self.classes, list):
+        if not self.classes:
             return
 
         c = self.classes[0]
@@ -302,7 +303,7 @@ class TrafficAssignment(object):
             cores (:obj:`int`): Number of CPU cores to use
         """
         self.cores = cores
-        if self.classes is not None:
+        if self.classes:
             for c in self.classes:
                 c.results.set_cores(cores)
                 c._aon_results.set_cores(cores)

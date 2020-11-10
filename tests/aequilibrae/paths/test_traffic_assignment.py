@@ -48,8 +48,12 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_vdf('BPR')
 
     def test_set_classes(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AttributeError):
             self.assignment.set_classes([1, 2])
+
+        with self.assertRaises(Exception):
+            self.assignment.set_classes(self.assigclass)
+
 
         # The traffic assignment class is unprotected.
         # Should we protect it?
@@ -58,7 +62,7 @@ class TestTrafficAssignment(TestCase):
         # with self.assertRaises(ValueError):
         #     self.assignment.set_classes(self.assigclass)
 
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.set_classes([self.assigclass])
         # self.fail()
 
     def test_algorithms_available(self):
@@ -75,7 +79,7 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(Exception):
             self.assignment.set_cores(3)
 
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.add_class(self.assigclass)
         with self.assertRaises(ValueError):
             self.assignment.set_cores('q')
 
@@ -85,7 +89,7 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(AttributeError):
             self.assignment.set_algorithm('not an algo')
 
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.add_class(self.assigclass)
 
         with self.assertRaises(Exception):
             self.assignment.set_algorithm('msa')
@@ -111,7 +115,7 @@ class TestTrafficAssignment(TestCase):
             self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
         self.assignment.set_vdf('bpr')
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.add_class(self.assigclass)
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     def test_set_time_field(self):
@@ -128,7 +132,7 @@ class TestTrafficAssignment(TestCase):
 
     def test_execute(self):
 
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.add_class(self.assigclass)
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
@@ -188,7 +192,7 @@ class TestTrafficAssignment(TestCase):
         rgap = random.random() / 10000
         algo = choice(self.algorithms)
 
-        self.assignment.set_classes(self.assigclass)
+        self.assignment.add_class(self.assigclass)
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
