@@ -67,8 +67,8 @@ class LinkTypes:
         tl = TableLoader()
         link_types_list = tl.load_table(self.curr, 'link_types')
         existing_list = [lt['link_type_id'] for lt in link_types_list]
-        if link_types_list:
-            self.__properties = list(link_types_list[0].keys())
+
+        self.__fields = [x for x in tl.fields]
         for lt in link_types_list:
             if lt['link_type_id'] not in self.__items:
                 self.__items[lt['link_type_id']] = LinkType(lt)
@@ -81,7 +81,7 @@ class LinkTypes:
         if link_type_id in self.__items:
             raise ValueError(f'Link Type ID ({link_type_id}) already exists in the model. It must be unique.')
 
-        tp = {key: None for key in self.__properties}
+        tp = {key: None for key in self.__fields}
         tp['link_type_id'] = link_type_id
         lt = LinkType(tp)
         self.__items[link_type_id] = lt

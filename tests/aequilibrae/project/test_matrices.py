@@ -31,7 +31,10 @@ class TestMatrices(TestCase):
         self.assertEqual(self.curr.fetchone()[0], 1, 'Did not clear the database appropriately')
 
     def test_update_database(self):
-        self.fail()
+        matrices = self.project.matrices
+
+        matrices.update_database()
+
 
     def test_list(self):
         self.fail()
