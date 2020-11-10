@@ -54,14 +54,6 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(Exception):
             self.assignment.set_classes(self.assigclass)
 
-
-        # The traffic assignment class is unprotected.
-        # Should we protect it?
-        # self.assigclass = TrafficClass(self.car_graph, self.matrix)
-        # self.assigclass.graph = 1
-        # with self.assertRaises(ValueError):
-        #     self.assignment.set_classes(self.assigclass)
-
         self.assignment.set_classes([self.assigclass])
         # self.fail()
 
