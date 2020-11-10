@@ -1,10 +1,19 @@
+from os import environ, path
 from typing import List
 from warnings import warn
+from uuid import uuid4
+import sqlite3
+from datetime import datetime
+import socket
 import numpy as np
+import pandas as pd
+from aequilibrae.project.database_connection import environ_var
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.matrix import AequilibraeData
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 
 
@@ -65,22 +74,28 @@ class TrafficAssignment(object):
         convergence_report = pd.DataFrame(assig.assignment.convergence_report)
         convergence_report.head()
 
-        # Link flow results are here
-        results = assigclass.results
+        # Assignment results can be viewed as a Pandas DataFrame
+        results_df = assig.results()
+
+        # information on the assignment setup can be recovered with
+        info = assig.info()
+
+        # Or save it directly to the results database
+        results = assig.save_results(table_name='example_from_the_documentation')
 
         # skims are here
         avg_skims = assigclass.results.skims # blended ones
         last_skims = assigclass._aon_results.skims # those for the last iteration
     """
     bpr_parameters = ["alpha", "beta"]
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
     def __init__(self) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = VDF()
-        self.__dict__["classes"] = None  # type: List[TrafficClass]
+        self.__dict__["classes"] = []  # type: List[TrafficClass]
         self.__dict__["algorithm"] = None  # type: str
         self.__dict__["vdf_parameters"] = None  # type: list
         self.__dict__["time_field"] = None  # type: str
@@ -91,6 +106,10 @@ class TrafficAssignment(object):
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
         self.__dict__["cores"] = None  # type: int
+
+        self.__dict__["procedure_id"] = uuid4().hex
+        self.__dict__["description"] = ''
+        self.__dict__["procedure_date"] = str(datetime.today())
 
     def __setattr__(self, instance, value) -> None:
 
@@ -153,10 +172,28 @@ class TrafficAssignment(object):
         Sets Traffic classes to be assigned
 
         Args:
-            classes(:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+            classes (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
-        self.classes = classes
+        ids = set([x._id for x in classes])
+        if len(ids) < len(classes):
+            raise Exception('Classes need to be unique. Your list of classes has repeated items')
+        self.classes = classes  # type: List[TrafficClass]
+        self.__collect_data()
+
+    def add_class(self, traffic_class: TrafficClass) -> None:
+        """
+        Adds a traffic class to the assignment
+
+        Args:
+            traffic_class (:obj:`TrafficClass`:) Traffic class
+        """
+
+        ids = [x._id for x in self.classes if x._id == traffic_class._id]
+        if len(ids) > 0:
+            raise Exception('Traffic class already in the assignment')
+
+        self.classes.append(traffic_class)
         self.__collect_data()
 
     def algorithms_available(self) -> list:
@@ -174,25 +211,34 @@ class TrafficAssignment(object):
         """
         Chooses the assignment algorithm. e.g. 'frank-wolfe', 'bfw', 'msa'
 
+        'fw' is also accepted as an alternative to 'frank-wolfe'
+
         Args:
             algorithm (:obj:`list`): Algorithm to be used
         """
 
         # First we instantiate the arrays we will be using over and over
-        if algorithm not in self.all_algorithms:
+
+        algo_dict = {i: i for i in self.all_algorithms}
+        algo_dict["fw"] = "frank-wolfe"
+        algo = algo_dict.get(algorithm.lower())
+
+        if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        if algorithm.lower() == "all-or-nothing":
+        if algo == "all-or-nothing":
             self.assignment = allOrNothing(self)
-        elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = LinearApproximation(self, algorithm.lower())
+        elif algo in ["msa", "frank-wolfe", "cfw", "bfw"]:
+            self.assignment = LinearApproximation(self, algo)
         else:
             raise Exception('Algorithm not listed in the case selection')
+
+        self.__dict__['algorithm'] = algo
 
         self.__collect_data()
 
     def __collect_data(self):
-        if not isinstance(self.classes, list):
+        if not self.classes:
             return
 
         c = self.classes[0]
@@ -256,13 +302,13 @@ class TrafficAssignment(object):
         Args:
             cores (:obj:`int`): Number of CPU cores to use
         """
-        self.cores = cores
-        if self.classes is not None:
-            for c in self.classes:
-                c.results.set_cores(cores)
-                c._aon_results.set_cores(cores)
-        else:
+        if not self.classes:
             raise Exception('You need load traffic classes before overwriting the number of cores')
+
+        self.cores = cores
+        for c in self.classes:
+            c.results.set_cores(cores)
+            c._aon_results.set_cores(cores)
 
     def set_time_field(self, time_field: str) -> None:
         """
@@ -306,3 +352,134 @@ class TrafficAssignment(object):
     def execute(self) -> None:
         """Processes assignment"""
         self.assignment.execute()
+
+    def save_results(self, table_name: str) -> None:
+        """Saves the assignment results to results_database.sqlite
+
+        Method fails if table exists
+
+        Args:
+            table_name (:obj:`str`): Name of the table to hold this assignment result
+        """
+        df = self.results()
+        conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
+        df.to_sql(table_name, conn)
+        conn.close()
+
+        conn = database_connection()
+        report = {'convergence': str(self.assignment.convergence_report),
+                  'setup': str(self.info())}
+        data = [table_name, 'traffic assignment', self.procedure_id, str(report), self.procedure_date, self.description]
+        conn.execute('''Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)''', data)
+        conn.commit()
+        conn.close()
+
+    def results(self) -> pd.DataFrame:
+        """Prepares the assignment results as a Pandas DataFrame
+
+        Returns:
+            *DataFrame* (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+        """
+
+        assig_results = [cls.results.get_load_results() for cls in self.classes]
+
+        class1 = self.classes[0]
+        res1 = assig_results[0]
+
+        tot_flow = self.assignment.fw_total_flow
+        voc = self.assignment.fw_total_flow / self.capacity
+
+        entries = res1.data.shape[0]
+        fields = ['Congested_Time_AB', 'Congested_Time_BA', 'Congested_Time_Max',
+                  'Delay_factor_AB', 'Delay_factor_BA', 'Delay_factor_Max',
+                  'VOC_AB', 'VOC_BA', 'VOC_max',
+                  'PCE_AB', 'PCE_BA', 'PCE_tot']
+
+        types = [np.float64] * len(fields)
+        agg = AequilibraeData()
+        agg.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
+        agg.data.fill(np.nan)
+        agg.index[:] = res1.data.index[:]
+
+        link_ids = class1.results.lids
+        ABs = class1.results.direcs > 0
+        BAs = class1.results.direcs < 0
+
+        indexing = np.zeros(int(link_ids.max()) + 1, np.uint64)
+        indexing[agg.index[:]] = np.arange(entries)
+
+        # Indices of links BA and AB
+        ab_ids = indexing[link_ids[ABs]]
+        ba_ids = indexing[link_ids[BAs]]
+
+        agg.data['Congested_Time_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs])
+        agg.data['Congested_Time_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs])
+        agg.data['Congested_Time_Max'][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+
+        agg.data['Delay_factor_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs] / self.free_flow_tt[ABs])
+        agg.data['Delay_factor_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs] / self.free_flow_tt[BAs])
+        agg.data['Delay_factor_Max'][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+
+        agg.data['VOC_AB'][ab_ids] = np.nan_to_num(voc[ABs])
+        agg.data['VOC_BA'][ba_ids] = np.nan_to_num(voc[BAs])
+        agg.data['VOC_max'][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+
+        agg.data['PCE_AB'][ab_ids] = np.nan_to_num(tot_flow[ABs])
+        agg.data['PCE_BA'][ba_ids] = np.nan_to_num(tot_flow[BAs])
+        agg.data['PCE_tot'][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+
+        assig_results.append(agg)
+
+        dfs = [pd.DataFrame(aed.data) for aed in assig_results]
+        dfs = [df.rename(columns={'index': 'link_id'}).set_index('link_id') for df in dfs]
+        df = pd.concat(dfs, axis=1)
+
+        return df
+
+    def report(self) -> pd.DataFrame:
+        """Returns the assignment convergence report
+
+         Returns:
+            *DataFrame* (:obj:`pd.DataFrame`): Convergence report
+        """
+        return pd.DataFrame(self.assignment.convergence_report)
+
+    def info(self) -> dict:
+        """ Returns information for the traffic assignment procedure
+
+        Dictionary contains keys  'Algorithm', 'Classes', 'Computer name', 'Procedure ID',
+        'Maximum iterations' and 'Target RGap'.
+
+        The classes key is also a dictionary with all the user classes per traffic class and their respective
+        matrix totals
+
+        Returns:
+            *info* (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
+        """
+
+        classes = {}
+        for cls in self.classes:
+            if len(cls.matrix.view_names) == 1:
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
+            else:
+                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
+                                           enumerate(cls.matrix.view_names)}
+
+        info = {'Algorithm': self.algorithm,
+                'Classes': classes,
+                'Computer name': socket.gethostname(),
+                'Maximum iterations': self.assignment.max_iter,
+                'Procedure ID': self.procedure_id,
+                'Target RGap': self.assignment.rgap_target}
+        return info
+
+    def save_skims(self, matrix_name: str, which_ones='final') -> None:
+        """Saves the skims (if any) to the skim folder and registers in the matrix list
+
+        Args:
+            matrix_name (:obj:`str`): Name of the file to hold this matrix
+            which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
+            all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
+        """
+        pass

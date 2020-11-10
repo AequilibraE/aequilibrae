@@ -59,7 +59,8 @@ Contents
    overview
    gettingstarted
    project
-   traffic_assignment
+   modeling
+   path_computation_engine
    api
    softwaredevelopment
    roadmap

@@ -43,7 +43,7 @@ class Graph(object):
         self.cost = None  # This array holds the values being used in the shortest path routine
         self.capacity = None  # Array holds the capacity for links
         self.free_flow_time = None  # Array holds the free flow travel time by link
-        self.skims = np.zeros((1, 1), self.__float_type)  # Skimming array that we initialize with something for the
+        self.skims = None
         # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field

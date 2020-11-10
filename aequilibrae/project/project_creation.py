@@ -1,4 +1,4 @@
-import os
+import re
 from sqlite3 import Connection
 from os.path import join, dirname, realpath
 from aequilibrae import logger
@@ -53,6 +53,7 @@ def remove_triggers(conn: Connection) -> None:
     with open(join(spec_folder, 'triggers_list.txt'), 'r') as file_list:
         all_trigger_sets = file_list.readlines()
 
+    create_drop_regex = re.compile(r'create\s+trigger\s+(\w+)', flags=re.I)
     for table in all_trigger_sets:
         qry_file = join(spec_folder, f'{table.rstrip()}.sql')
 
@@ -64,12 +65,13 @@ def remove_triggers(conn: Connection) -> None:
             for qry in cmd.split("\n"):
                 if qry[:2] == '--':
                     continue
-                if 'CREATE TRIGGER' in qry.upper():
-                    qry = qry.replace('CREATE TRIGGER', '').strip()
+                while '  ' in qry:
+                    qry = qry.replace('  ', ' ')
 
-                    qry = 'DROP trigger if exists ' + qry.split(' ')[0]
+                m = re.search(create_drop_regex, qry)
+                if m:
                     try:
-                        curr.execute(qry)
+                        curr.execute(f'drop trigger if exists {m.group(1).lower()}')
                     except Exception as e:
                         logger.error(f'Failed removing triggers table - > {e.args}')
                         logger.error(f'Point of failure - > {qry}')

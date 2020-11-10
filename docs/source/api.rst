@@ -1,3 +1,5 @@
+.. _aequilibrae_api:
+
 API documentation
 =================
 
@@ -31,6 +33,7 @@ Project components
     Network
     FieldEditor
     Zoning
+    Log
 
 Project objects
 ++++++++++++++++++

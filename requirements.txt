@@ -6,3 +6,4 @@ cython
 openmatrix
 requests
 shapely
+pandas

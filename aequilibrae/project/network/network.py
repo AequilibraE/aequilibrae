@@ -133,8 +133,6 @@ class Network():
             p.close()
         """
 
-        logger.info("Adding spatial indices")
-        self.add_spatial_index()
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
@@ -242,8 +240,8 @@ class Network():
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
-        for lnk in raw_links:
-            lk = list(map(lambda x: np.nan if x is None else x, lnk))
+        for link in raw_links:
+            lk = list(map(lambda x: np.nan if x is None else x, link))
             links.append(lk)
 
         data = np.core.records.fromrecords(links, names=all_fields)
@@ -256,9 +254,9 @@ class Network():
             else:
                 removed_fields.append(f)
         if len(removed_fields) > 1:
-            warn(f'Fields were removed form Graph for being non-numeric: {",".join(removed_fields)}')
+            warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
 
-        curr.execute('select node_id from nodes where is_centroid=1;')
+        curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
 
         for m in modes:
@@ -328,16 +326,6 @@ class Network():
                    *modes* (:obj:`str`): Modes for which centroids connectors should be added
                """
         pass
-
-    def add_spatial_index(self) -> None:
-        """Adds spatial indices to links and nodes table
-
-        Requires an Sqlite3 distribution with RTree (not the Python standard).
-        Use with caution"""
-        curr = self.conn.cursor()
-        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
-        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
-        self.conn.commit()
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()
