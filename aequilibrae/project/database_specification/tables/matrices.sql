@@ -1,7 +1,8 @@
-create TABLE 'matrices' (name          TEXT     NOT NULL  PRIMARY KEY,
+create TABLE 'matrices' (name          TEXT     NOT NULL PRIMARY KEY,
                          file_name     TEXT     NOT NULL UNIQUE,
-                         procedure     TEXT     NOT NULL,
-                         procedure_id  TEXT     NOT NULL,
+                         cores         INTEGER  NOT NULL DEFAULT 1,
+                         procedure     TEXT,
+                         procedure_id  TEXT,
                          timestamp     DATETIME DEFAULT current_timestamp,
                          description   TEXT);
 

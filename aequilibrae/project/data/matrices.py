@@ -131,7 +131,13 @@ class Matrices:
         tp = {key: None for key in self.__fields}
         tp['name'] = name
         tp['file_name'] = file_name
-        mr = MatrixRecord(tp)
+        mat = AequilibraeMatrix()
+        mat.load(join(self.fldr, file_name))
+        tp['cores'] = mat.cores
+        mat.close()
+        del mat
+
+        mr = MatrixRecord(tp, self.__items)
         self.__items[name] = mr
         self.__project.logger.warning('Matrix Record has not yet been saved to the database. Do so explicitly')
         return mr

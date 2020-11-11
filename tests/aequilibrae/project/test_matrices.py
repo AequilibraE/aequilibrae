@@ -41,3 +41,13 @@ class TestMatrices(TestCase):
     #
     # def test_get_matrix(self):
     #     self.fail()
+
+
+    # def test_update_cores(self):
+    #     self.fail()
+    #
+    # def test_save(self):
+    #     self.fail()
+    #
+    # def test_delete(self):
+    #     self.fail()
