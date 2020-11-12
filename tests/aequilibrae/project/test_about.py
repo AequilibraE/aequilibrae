@@ -80,9 +80,9 @@ class TestAbout(TestCase):
         self.proj.about.write_back()
 
         self.proj.close()
+        del self.proj
 
-        proj2 = Project()
-        proj2.open(self.temp_proj_folder)
-
-        self.assertEqual(val, proj2.about.good_info_field_perhaps, 'failed to save data to about table')
-        self.assertEqual(val2, proj2.about.description, 'failed to save data to about table')
+        self.proj = Project()
+        self.proj.open(self.temp_proj_folder)
+        self.assertEqual(val, self.proj.about.good_info_field_perhaps, 'failed to save data to about table')
+        self.assertEqual(val2, self.proj.about.description, 'failed to save data to about table')
