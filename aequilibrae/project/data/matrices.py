@@ -26,8 +26,8 @@ class Matrices:
         for lt in matrices_list:
             if lt['name'] not in self.__items:
                 if isfile(join(self.fldr, lt['file_name'])):
-                    lt['folder'] = self.fldr
-                    self.__items[lt['name']] = MatrixRecord(lt, self.__items)
+                    lt['fldr'] = self.fldr
+                    self.__items[lt['name']] = MatrixRecord(lt, self.__items, self.__project.logger)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
@@ -38,7 +38,7 @@ class Matrices:
 
         self.curr.execute('Select name, file_name from matrices;')
 
-        remove = [nm for nm, file in self.curr.fetchall() if isfile(join(self.fldr, file))]
+        remove = [nm for nm, file in self.curr.fetchall() if not isfile(join(self.fldr, file))]
 
         if remove:
             self.__project.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
@@ -62,18 +62,22 @@ class Matrices:
             mat = AequilibraeMatrix()
             mat.load(join(self.fldr, fl))
 
-            name = mat.name
-            if name:
-                if '/' in name:
-                    name = ''
-            if not len(name):
-                name = fl.name.replace(' ', '_')
-                name = name.replace('.', '_')
+            name = None
+            if not mat.omx:
+                name = mat.name
+
+            if not name:
+                name = fl
+
+            name = name.replace('.', '_').replace(' ', '_')
+
             if name in self.__items:
                 i = 0
                 while f'{name}_{i}' in self.__items:
                     i += 1
                 name = f'{name}_{i}'
+            rec = self.create_record(name, fl)
+            rec.save()
 
     def list(self) -> pd.DataFrame:
         """
@@ -106,10 +110,24 @@ class Matrices:
             matrix (:obj:`AequilibraeMatrix`:) Matrix object
 
         """
-        pass
+
+        return self.get_record(matrix_name).get_data()
+
+    def get_record(self, matrix_name: str) -> MatrixRecord:
+        """Returns a model Matrix Record for manipulation in memory"""
+
+        if matrix_name.lower() not in self.__items:
+            raise Exception('There is no matrix record with that name')
+
+        return self.__items[matrix_name.lower()]
+
+    def delete_record(self, matrix_name: str) -> None:
+        """Deletes a Matrix Record from the model and attempts to remove from disk"""
+        mr = self.get_record(matrix_name)
+        mr.delete()
 
     def create_record(self, name: str, file_name: str) -> MatrixRecord:
-        """Adds a new record for a matrix in disk
+        """Creates a new record for a matrix in disk, but does not save it
 
         If the matrix file is not already on disk, it will fail
 
@@ -137,7 +155,12 @@ class Matrices:
         mat.close()
         del mat
 
-        mr = MatrixRecord(tp, self.__items)
+        mr = MatrixRecord(tp, self.__items, self.__project.logger)
+        mr.save()
         self.__items[name] = mr
-        self.__project.logger.warning('Matrix Record has not yet been saved to the database. Do so explicitly')
+        self.__project.logger.warning('Matrix Record has been saved to the database')
         return mr
+
+    def _clear(self):
+        """Eliminates records from memory. For internal use only"""
+        self.__items.clear()
