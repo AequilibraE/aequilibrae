@@ -1,5 +1,7 @@
 from aequilibrae.starts_logging import logger
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.data import Matrices
+from aequilibrae.log import Log
 from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit

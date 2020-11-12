@@ -17,3 +17,4 @@ given current models and available computer hardware.
 
 Finally, AequilibraE is fully compatible with OMX, so you can keep (and generate)
 all your matrices in that format.
+

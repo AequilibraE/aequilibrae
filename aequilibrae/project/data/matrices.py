@@ -8,6 +8,7 @@ from aequilibrae.project.data.matrix_record import MatrixRecord
 
 
 class Matrices:
+    """Gateway into the matrices available/recorded in the model"""
     __items = {}
     __fields = []
 
