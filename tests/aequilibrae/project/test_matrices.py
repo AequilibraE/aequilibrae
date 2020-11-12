@@ -3,7 +3,7 @@ import string
 from unittest import TestCase
 from random import choice, randint
 import os
-from shutil import copytree, copyfile
+from shutil import copytree
 import uuid
 from tempfile import gettempdir
 from ...data import siouxfalls_project
@@ -50,7 +50,6 @@ class TestMatrices(TestCase):
         self.__mat_count(2, 'Did not clear the database appropriately')
 
     def test_update_database(self):
-
         self.__mat_count(3, 'The test data started wrong')
 
         self.matrices.update_database()
@@ -63,9 +62,6 @@ class TestMatrices(TestCase):
         mat = self.matrices.get_matrix('oMx')
         mat.computational_view()
         self.assertEqual(floor(mat.matrix_view.sum()), 20309, 'Matrix loaded incorrectly')
-
-    def test_list(self):
-        self.matrices.list()
 
     def test_get_record(self):
         rec = self.matrices.get_record('omx')
@@ -95,6 +91,13 @@ class TestMatrices(TestCase):
 
         with self.assertRaises(Exception):
             self.matrices.get_record('omx')
+
+    def test_list(self):
+        df = self.matrices.list()
+        self.curr.execute('select count(*) from Matrices')
+        self.assertEqual(df.shape[0], self.curr.fetchone()[0], 'Returned the wrong number of matrices in the database')
+
+        self.assertEqual(df[df.status == 'file missing'].shape[0], 1, 'Wrong # of records for missing matrix files')
 
     def __mat_count(self, should_have: int, error_message: str) -> None:
         self.curr.execute('Select count(*) from Matrices;')
