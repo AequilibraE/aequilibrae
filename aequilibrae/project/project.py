@@ -100,6 +100,8 @@ class Project:
                 del obj
             del os.environ[environ_var]
             self.matrices._clear()
+            del self.network.link_types
+            del self.network.modes
             logger.info(f'Closed project on {self.project_base_path}')
         else:
             warnings.warn('There is no Aequilibrae project open that you could close')

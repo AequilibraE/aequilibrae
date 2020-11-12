@@ -57,7 +57,7 @@ class LinkTypes:
         new_type.save()
 
     """
-    __lt_items = {}
+    __items = {}
 
     def __init__(self, net):
         self.__all_types = []
@@ -70,30 +70,30 @@ class LinkTypes:
 
         self.__fields = [x for x in tl.fields]
         for lt in link_types_list:
-            if lt['link_type_id'] not in self.__lt_items:
-                self.__lt_items[lt['link_type_id']] = LinkType(lt)
+            if lt['link_type_id'] not in self.__items:
+                self.__items[lt['link_type_id']] = LinkType(lt)
 
-        to_del = [key for key in self.__lt_items.keys() if key not in existing_list]
+        to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
-            del self.__lt_items[key]
+            del self.__items[key]
 
     def new(self, link_type_id: str) -> LinkType:
-        if link_type_id in self.__lt_items:
+        if link_type_id in self.__items:
             raise ValueError(f'Link Type ID ({link_type_id}) already exists in the model. It must be unique.')
 
         tp = {key: None for key in self.__fields}
         tp['link_type_id'] = link_type_id
         lt = LinkType(tp)
-        self.__lt_items[link_type_id] = lt
+        self.__items[link_type_id] = lt
         logger.warning('Link type has not yet been saved to the database. Do so explicitly')
         return lt
 
     def delete(self, link_type_id: str) -> None:
         """Removes the link_type with **link_type_id** from the project"""
         try:
-            lt = self.__lt_items[link_type_id]  # type: LinkType
+            lt = self.__items[link_type_id]  # type: LinkType
             lt.delete()
-            del self.__lt_items[link_type_id]
+            del self.__items[link_type_id]
             self.conn.commit()
         except IntegrityError as e:
             logger.error(f'Failed to remove link_type {link_type_id}. {e.args}')
@@ -102,13 +102,13 @@ class LinkTypes:
 
     def get(self, link_type_id: str) -> LinkType:
         """Get a link_type from the network by its **link_type_id**"""
-        if link_type_id not in self.__lt_items:
+        if link_type_id not in self.__items:
             raise ValueError(f'Link type {link_type_id} does not exist in the model')
-        return self.__lt_items[link_type_id]
+        return self.__items[link_type_id]
 
     def get_by_name(self, link_type: str) -> LinkType:
         """Get a link_type from the network by its **link_type** (i.e. name)"""
-        for lt in self.__lt_items.values():
+        for lt in self.__items.values():
             if lt.link_type.lower() == link_type.lower():
                 return lt
 
@@ -118,10 +118,10 @@ class LinkTypes:
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""
-        return self.__lt_items
+        return self.__items
 
     def save(self):
-        for lt in self.__lt_items.values():  # type: LinkType
+        for lt in self.__items.values():  # type: LinkType
             lt.save()
 
     def __copy__(self):
@@ -131,4 +131,4 @@ class LinkTypes:
         raise Exception('Link Types object cannot be copied')
 
     def __del__(self):
-        self.__lt_items.clear()
+        self.__items.clear()
