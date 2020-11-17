@@ -10,6 +10,7 @@ from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.project.network.links import Links
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
@@ -31,6 +32,7 @@ class Network():
         self.graphs = {}  # type: Dict[Graph]
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
+        self.links = Links(self)
 
     # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
