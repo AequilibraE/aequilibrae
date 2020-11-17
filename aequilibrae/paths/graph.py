@@ -355,9 +355,9 @@ class Graph(object):
                 self.fs[self.num_nodes] = self.graph.shape[0]
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-                for i in self.graph.dtype.names:
-                    if np.any(np.isnan(self.graph[i])):
-                        warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
+                nans = [i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))]
+                if nans:
+                    warn(f'Field(s) {", ".join(nans)} has(ve) at least one NaN value. Check your computations')
 
     def exclude_links(self, links: list) -> None:
         """
