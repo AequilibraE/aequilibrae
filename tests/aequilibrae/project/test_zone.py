@@ -1,3 +1,4 @@
+from warnings import warn
 from uuid import uuid4
 from random import randint
 from shutil import copytree, rmtree
@@ -20,14 +21,18 @@ class TestZone(TestCase):
 
     def tearDown(self) -> None:
         self.proj.close()
+        try:
+            rmtree(self.temp_proj_folder)
+        except Exception as e:
+            warn(f'Error: {e.args}')
 
     def test_delete(self):
         zones = self.proj.zoning
-        zone_downtown = zones.get(1)
+        zone_downtown = zones.get(3)
         zone_downtown.delete()
 
         with self.assertRaises(ValueError):
-            zone_downtown = zones.get(1)
+            _ = zones.get(3)
 
     def test_save(self):
         zones = self.proj.zoning
