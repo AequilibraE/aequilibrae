@@ -52,7 +52,7 @@ class MatrixRecord(SafeClass):
         self.__dict__['cores'] = self.__get_cores()
 
     def get_data(self) -> AequilibraeMatrix:
-        """Returns the actual matrix fort computation
+        """Returns the actual matrix for further computation
 
         Returns:
             matrix (:obj:`AequilibraeMatrix`:) Matrix object
