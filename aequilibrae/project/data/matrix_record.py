@@ -7,10 +7,10 @@ from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class MatrixRecord(SafeClass):
-    def __init__(self, data_set: dict, matrix_items: dict, logger: Logger):
+    def __init__(self, data_set: dict, logger: Logger):
         super().__init__(data_set)
-        self.__items = matrix_items
         self.__logger = logger
+        self._exists = True
 
     def save(self):
         """Saves matrix record to the project database"""
@@ -44,8 +44,7 @@ class MatrixRecord(SafeClass):
                 self.__logger.error(f'Could not remove matrix from disk: {e.args}')
 
         conn.close()
-        del self.__items[self.name]
-        del self
+        self._exists = False
 
     def update_cores(self):
         """Updates this matrix record with the matrix core count in disk"""
@@ -64,11 +63,17 @@ class MatrixRecord(SafeClass):
     def __setattr__(self, instance, value) -> None:
         if instance == 'name':
             value = str(value).lower()
-            if value in self.__items:
+            conn = database_connection()
+            curr = conn.cursor()
+            curr.execute('Select count(*) from matrices where LOWER(name)=?', [value])
+            if sum(curr.fetchone()) > 0:
                 raise ValueError('Another matrix with this name already exists')
+            conn.close()
         elif instance == 'file_name':
-            exists = [x for x in self.__items.values() if x.file_name == value]
-            if exists:
+            conn = database_connection()
+            curr = conn.cursor()
+            curr.execute('Select count(*) from matrices where LOWER(file_name)=?', [str(value).lower()])
+            if sum(curr.fetchone()) > 0:
                 raise ValueError('There is another matrix record for this file')
 
         self.__dict__[instance] = value

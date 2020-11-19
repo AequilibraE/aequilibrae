@@ -28,7 +28,7 @@ class Matrices:
             if lt['name'] not in self.__items:
                 if isfile(join(self.fldr, lt['file_name'])):
                     lt['fldr'] = self.fldr
-                    self.__items[lt['name']] = MatrixRecord(lt, self.__items, self.__project.logger)
+                    self.__items[lt['name']] = MatrixRecord(lt, self.__project.logger)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
@@ -120,6 +120,9 @@ class Matrices:
         if matrix_name.lower() not in self.__items:
             raise Exception('There is no matrix record with that name')
 
+        if not self.__items[matrix_name.lower()]._exists:
+            raise Exception('This matrix was deleted during this session')
+
         return self.__items[matrix_name.lower()]
 
     def delete_record(self, matrix_name: str) -> None:
@@ -156,7 +159,7 @@ class Matrices:
         mat.close()
         del mat
 
-        mr = MatrixRecord(tp, self.__items, self.__project.logger)
+        mr = MatrixRecord(tp, self.__project.logger)
         mr.save()
         self.__items[name] = mr
         self.__project.logger.warning('Matrix Record has been saved to the database')
