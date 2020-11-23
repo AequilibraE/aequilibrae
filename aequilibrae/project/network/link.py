@@ -2,11 +2,52 @@ from .safe_class import SafeClass
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.modes import Modes
+from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
 
 
 class Link(SafeClass):
-    """A link object represents a single record in the *links* table"""
+    """A link object represents a single record in the *links* table
+
+    ::
+
+        from aequilibrae import Project
+
+        proj = Project()
+        proj.open('path/to/project/folder')
+
+        all_links = proj.network.links
+
+        # Let's get a mode to work with
+        modes = proj.network.modes
+        car_mode = modes.get('c')
+
+        # We can just get one link in specific
+        link1 = all_links.get(4523)
+        link2 = all_links.get(3254)
+
+        # We can find out which fields exist for the links
+        which_fields_do_we_have = link1.data_fields()
+
+        # And edit each one like this
+        link1.lanes_ab = 3
+        link1.lanes_ba = 2
+
+        # we can drop a mode from the link
+        link1.drop_mode(car_mode)
+        # or link1.drop_mode('c')
+
+        # we can add a mode to the link
+        link2.add_mode(car_mode)
+        # or link2.add_mode('c')
+
+        # Or set all modes at once
+        link2.set_modes('cmtw')
+
+        # We can just save the link
+        link1.save()
+        link2.save()
+        """
 
     def __init__(self, dataset, link_types: LinkTypes, modes: Modes):
         super().__init__(dataset)
@@ -60,7 +101,7 @@ class Link(SafeClass):
                 logger.warn(f'Nothing to update for link {self.link_id}')
                 return
 
-            txts = ','.join(txts) + f' where link_id=?'
+            txts = ','.join(txts) + ' where link_id=?'
             data.append(self.link_id)
             sql = f'Update Links set {txts}'
 
@@ -88,14 +129,17 @@ class Link(SafeClass):
 
         self.__dict__["modes"] = modes
 
-    def add_mode(self, mode_id: str):
+    def add_mode(self, mode_id: [str, Mode]):
         """Adds a new mode to this link
 
         Raises a warning if mode is already allowed on the link, and fails if mode does not exist
 
         Args:
-            *mode_id* (:obj:`str`): Mode_id of the mode to be added to the link
+            *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be added to the link
         """
+
+        if isinstance(mode_id, Mode):
+            mode_id = mode_id.mode_id
 
         if mode_id in self.modes:
             logger.warn('Mode already active for this link')
@@ -106,14 +150,17 @@ class Link(SafeClass):
 
         self.__dict__["modes"] += mode_id
 
-    def drop_mode(self, mode_id: str):
+    def drop_mode(self, mode_id: [str, Mode]):
         """Removes a mode from this link
 
         Raises a warning if mode is already NOT allowed on the link, and fails if mode does not exist
 
         Args:
-            *mode_id* (:obj:`str`): Mode_id of the mode to be removed from the link
+            *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be removed from the link
         """
+
+        if isinstance(mode_id, Mode):
+            mode_id = mode_id.mode_id
 
         if mode_id not in self.modes:
             logger.warn('Mode already inactive for this link')
@@ -127,7 +174,7 @@ class Link(SafeClass):
 
         self.__dict__['modes'] = self.modes.replace(mode_id, '')
 
-    def fields(self) -> list:
+    def data_fields(self) -> list:
         """lists all data fields for the link, as available in the database
 
         Returns:

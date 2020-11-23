@@ -6,6 +6,7 @@ from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.modes import Modes
+from aequilibrae.project.network.mode import Mode
 
 
 class Links:
@@ -16,33 +17,13 @@ class Links:
 
         from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        proj = Project()
+        proj.open('path/to/project/folder')
 
-        all_links = p.network.links
+        all_links = proj.network.links
 
         # We can just get one link in specific
         link = all_links.get(4523)
-
-        # We can find out which fields exist for the links
-        link.fields()
-
-        # And edit each one like this
-        link.lanes_ab = 3
-        link.lanes_ba = 2
-
-
-        # we can drop a mode from the link
-        link.drop_mode('c')
-
-        # we can add a mode to the link
-        link.add_mode('m')
-
-        # Or set all modes at once
-        link.set_modes('cmtw')
-
-        # We can just save the link
-        link.save()
 
         # We can save changes for all links we have edited so far
         all_links.save()
