@@ -17,7 +17,7 @@ CREATE TABLE 'links' (ogc_fid      INTEGER PRIMARY KEY,
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
 
 #
-CREATE INDEX idx_link ON links (link_id);
+CREATE UNIQUE INDEX idx_link ON links (link_id);
 
 #
 SELECT CreateSpatialIndex( 'links' , 'geometry' );
@@ -34,6 +34,8 @@ CREATE INDEX idx_link_modes ON links (modes);
 #
 CREATE INDEX idx_link_link_type ON links (link_type);
 
+#
+CREATE UNIQUE INDEX idx_links_a_node_b_node ON links (a_node, b_node);
 
 #
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_id', 'Unique link ID');
