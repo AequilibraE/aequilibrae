@@ -1,5 +1,6 @@
 from sqlite3 import Connection
 from copy import deepcopy
+import shapely.wkb
 from aequilibrae.project.network.link import Link
 from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
@@ -55,6 +56,8 @@ class Links:
             *link* (:obj:`Link`): Link object for requested link_id
             """
 
+        if link_id in self.__items:
+            return self.__items[link_id]
         data = self.__link_data(link_id)
         if data:
             return self.__create_return_link(data)
@@ -91,7 +94,7 @@ class Links:
         geo = data['geometry']
         data['geometry'] = None
         link = self.__create_return_link(data)
-        link.geometry = geo
+        link.geometry = shapely.wkb.loads(geo)
 
         return link
 
@@ -115,8 +118,14 @@ class Links:
             self.__existence_error(link_id)
 
     def save(self):
-        for lt in self.__items.values():  # type: Link
-            lt.save()
+        for link in self.__items.values():  # type: Link
+            link.save()
+
+    def refresh(self):
+        """Refreshes all the links in memory"""
+        lst = list(self.__items.keys())
+        for k in lst:
+            del self.__items[k]
 
     @staticmethod
     def fields() -> FieldEditor:
@@ -144,7 +153,7 @@ class Links:
         data = self.curr.fetchone()
         if data:
             return {key: val for key, val in zip(self.__fields, data)}
-        return {}
+        raise ValueError('Link_id does not exist on the network')
 
     def __new_link_id(self):
         self.__max_id += 1
