@@ -181,7 +181,7 @@ class Link(SafeClass):
         if instance not in self.__dict__ and instance[:1] != "_":
             raise AttributeError(f'"{instance}" is not a valid attribute for a link')
         if instance == 'modes':
-            self.set_mode(value)
+            self.set_modes(value)
         elif instance == 'link_type':
             raise NotImplementedError('Setting link_type is a little tricky')
         elif instance == 'a_node':
