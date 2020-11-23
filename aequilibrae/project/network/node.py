@@ -77,7 +77,7 @@ class Node(SafeClass):
 
         return list(self.__original__.keys())
 
-    def re_number(self, new_id: int):
+    def renumber(self, new_id: int):
         """Renumbers the node in the network
 
         Raises a warning if another node already exists with this node_id
