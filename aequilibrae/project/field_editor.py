@@ -7,7 +7,7 @@ allowed_characters = string.ascii_letters + '_'
 
 
 class FieldEditor:
-    '''Allows user to edit the project data tables
+    """Allows user to edit the project data tables
 
     The field editor is used for two different purposes:
 
@@ -32,7 +32,7 @@ class FieldEditor:
         m_fields = proj.network.modes.fields()
 
     Field descriptions are kept in the table *attributes_documentation*
-    '''
+    """
     _alowed_characters = allowed_characters
 
     def __init__(self, table_name: str) -> None:
