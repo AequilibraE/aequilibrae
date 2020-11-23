@@ -105,7 +105,7 @@ class FieldEditor:
             for field in raw_fields:
                 if field[-3:] == '_ab':
                     if field[:-3] + '_ba' in raw_fields:
-                        fields.append(field[:-2])
+                        fields.append(field[:-3])
                     else:
                         fields.append(field)
                 elif field[-3:] == '_ba':
