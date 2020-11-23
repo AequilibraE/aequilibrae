@@ -11,6 +11,7 @@ from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
@@ -33,8 +34,8 @@ class Network():
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
         self.links = Links(self)
+        self.nodes = Nodes(self)
 
-    # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
         """
         Returns a list of all fields that can be skimmed
