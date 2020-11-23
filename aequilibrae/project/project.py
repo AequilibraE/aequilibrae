@@ -4,6 +4,7 @@ import shutil
 from aequilibrae.starts_logging import StartsLogging
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
+from aequilibrae.project.data import Matrices
 from aequilibrae.project.about import About
 from aequilibrae.project.database_connection import database_connection, environ_var
 from aequilibrae.parameters import Parameters
@@ -31,6 +32,7 @@ class Project:
 
     def __init__(self):
         self.path_to_file: str = None
+        self.project_base_path = ''
         self.source: str = None
         self.parameters = {}
         self.conn: sqlite3.Connection = None
@@ -97,6 +99,9 @@ class Project:
             for obj in [self.parameters, self.network]:
                 del obj
             del os.environ[environ_var]
+            self.matrices._clear()
+            del self.network.link_types
+            del self.network.modes
             logger.info(f'Closed project on {self.project_base_path}')
         else:
             warnings.warn('There is no Aequilibrae project open that you could close')
@@ -119,10 +124,22 @@ class Project:
         return Log(self.project_base_path)
 
     def __load_objects(self):
+        matrix_folder = os.path.join(self.project_base_path, 'matrices')
+        if not os.path.isdir(matrix_folder):
+            os.mkdir(matrix_folder)
+
         self.network = Network(self)
         self.about = About(self.conn)
         self.zoning = Zoning(self)
+        self.matrices = Matrices(self)
         self.parameters = Parameters().parameters
+
+    def check_file_indices(self) -> None:
+        """ Makes results_database.sqlite and the matrices folder compatible with project database
+
+
+        """
+        pass
 
     def __create_empty_project(self):
 

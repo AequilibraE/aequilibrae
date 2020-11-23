@@ -30,10 +30,11 @@ Project components
    :toctree: _generated
 
     About
-    Network
     FieldEditor
-    Zoning
     Log
+    Matrices
+    Network
+    Zoning
 
 Project objects
 ++++++++++++++++++
