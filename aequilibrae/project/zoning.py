@@ -76,9 +76,6 @@ class Zoning:
     def __deepcopy__(self, memodict=None):
         raise Exception('Zones object cannot be copied')
 
-    def __del__(self):
-        self.__items.clear()
-
     def __has_zoning(self):
         curr = self.__conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
