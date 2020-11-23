@@ -1,13 +1,11 @@
 from .safe_class import SafeClass
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.project.network.link_types import LinkTypes
-from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
 
 
 class Link(SafeClass):
-    """A link object represents a single record in the *links* table
+    """A Link object represents a single record in the *links* table
 
     ::
 
@@ -49,10 +47,8 @@ class Link(SafeClass):
         link2.save()
         """
 
-    def __init__(self, dataset, link_types: LinkTypes, modes: Modes):
+    def __init__(self, dataset):
         super().__init__(dataset)
-        self.__link_types = link_types
-        self.__modes = modes
         self.__fields = list(dataset.keys())
 
         self.__new = dataset['geometry'] is None
@@ -122,14 +118,10 @@ class Link(SafeClass):
             raise ValueError('Modes field needs to be a string')
         if modes == '':
             raise ValueError('Modes field needs to have at least one mode')
-        all_modes = self.__modes.all_modes()
-        missing = [x for x in modes if x not in all_modes]
-        if missing:
-            raise ValueError(f'Mode(s) {",".join(missing)} do not exist in the model')
 
         self.__dict__["modes"] = modes
 
-    def add_mode(self, mode_id: [str, Mode]):
+    def add_mode(self, mode: [str, Mode]):
         """Adds a new mode to this link
 
         Raises a warning if mode is already allowed on the link, and fails if mode does not exist
@@ -137,20 +129,15 @@ class Link(SafeClass):
         Args:
             *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be added to the link
         """
-
-        if isinstance(mode_id, Mode):
-            mode_id = mode_id.mode_id
+        mode_id = self.__validate(mode)
 
         if mode_id in self.modes:
             logger.warn('Mode already active for this link')
             return
 
-        if mode_id not in self.__modes.all_modes():
-            raise ValueError('Mode does not exist in the model')
-
         self.__dict__["modes"] += mode_id
 
-    def drop_mode(self, mode_id: [str, Mode]):
+    def drop_mode(self, mode: [str, Mode]):
         """Removes a mode from this link
 
         Raises a warning if mode is already NOT allowed on the link, and fails if mode does not exist
@@ -159,15 +146,11 @@ class Link(SafeClass):
             *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be removed from the link
         """
 
-        if isinstance(mode_id, Mode):
-            mode_id = mode_id.mode_id
+        mode_id = self.__validate(mode)
 
         if mode_id not in self.modes:
             logger.warn('Mode already inactive for this link')
             return
-
-        if mode_id not in self.__modes.all_modes():
-            raise ValueError('Mode does not exist in the model')
 
         if len(self.modes) == 1:
             raise ValueError('Link needs to have at least one mode')
@@ -183,6 +166,17 @@ class Link(SafeClass):
 
         return list(self.__original__.keys())
 
+    def __validate(self, mode: [str, Mode]) -> str:
+        if isinstance(mode, Mode):
+            mode_id = mode.mode_id
+        elif isinstance(mode, str):
+            if len(mode) > 1:
+                raise ValueError('A mode_id is a single character')
+            mode_id = mode
+        else:
+            raise TypeError('You should provide a mode id (string) or a Mode object')
+        return mode_id
+
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":
             raise AttributeError(f'"{instance}" is not a valid attribute for a link')
@@ -190,6 +184,10 @@ class Link(SafeClass):
             self.set_mode(value)
         elif instance == 'link_type':
             raise NotImplementedError('Setting link_type is a little tricky')
+        elif instance == 'a_node':
+            raise AttributeError('Setting a_node is not allowed')
+        elif instance == 'b_node':
+            raise AttributeError('Setting b_node is not allowed')
         elif instance == 'link_id':
             raise ValueError('Changing a link_id is not supported. Create a new one and delete this')
         else:
