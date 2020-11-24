@@ -1,4 +1,5 @@
-from unittest import TestCase
+from unittest import TestCase, TestLoader
+
 from sqlite3 import IntegrityError
 from copy import copy, deepcopy
 import os
@@ -11,6 +12,8 @@ import shapely.wkb
 from aequilibrae.project import Project
 
 from ...data import siouxfalls_project
+
+TestLoader.sortTestMethodsUsing = None
 
 
 class TestNodes(TestCase):
