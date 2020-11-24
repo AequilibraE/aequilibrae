@@ -122,7 +122,7 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_capacity_field(val)
         self.assertEqual(self.assignment.capacity_field, val)
 
-    def test_execute(self):
+    def test_execute_and_save_results(self):
 
         self.assignment.add_class(self.assigclass)
         self.assignment.set_vdf("BPR")
@@ -152,6 +152,11 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.set_algorithm('frank-wolfe')
         self.assignment.execute()
+
+        self.assignment.save_skims('my_skims', 'all')
+        with self.assertRaises(FileExistsError):
+            self.assignment.save_skims('my_skims', 'all')
+
         fw25 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
@@ -178,6 +183,11 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(fw25, msa25)
         self.assertLess(cfw25, fw25)
         self.assertLess(bfw25, cfw25)
+
+        self.assignment.save_results('save_to_database')
+
+        with self.assertRaises(ValueError):
+            self.assignment.save_results('save_to_database')
 
     def test_info(self):
         iterations = random.randint(1, 10000)
