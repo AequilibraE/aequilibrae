@@ -73,7 +73,8 @@ class Nodes:
 
     def save(self):
         """Saves all nodes that have been retrieved (and edited) so far"""
-        for node in self.__items.values():  # type: Node
+        nodes = [node for node in self.__items.values()]
+        for node in nodes:  # type: Node
             node.save()
 
     @staticmethod
