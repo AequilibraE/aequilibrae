@@ -51,6 +51,8 @@ class TestNodes(TestCase):
     def test_save(self):
         nodes = self.network.nodes
         chosen = [randint(1, 24) for _ in range(5)]
+        while len(chosen) != len(set(chosen)):
+            chosen = [randint(1, 24) for _ in range(5)]
         coords = []
         for nd in chosen:
             node = nodes.get(nd)
