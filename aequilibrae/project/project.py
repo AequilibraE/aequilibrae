@@ -131,7 +131,7 @@ class Project:
         self.network = Network(self)
         self.about = About(self.conn)
         self.zoning = Zoning(self)
-        self.matrices = Matrices(self)
+        self.matrices = Matrices()
         self.parameters = Parameters().parameters
 
     def check_file_indices(self) -> None:

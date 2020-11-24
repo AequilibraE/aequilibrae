@@ -1,10 +1,11 @@
 import os
 from os.path import isfile, join
-from sqlite3 import Connection
 import pandas as pd
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
+from aequilibrae.starts_logging import logger
+from aequilibrae.project.database_connection import database_connection, environ_var
 
 
 class Matrices:
@@ -12,11 +13,10 @@ class Matrices:
     __items = {}
     __fields = []
 
-    def __init__(self, project):
-        self.__project = project
-        self.conn = project.conn  # type: Connection
+    def __init__(self):
+        self.conn = database_connection()
         self.curr = self.conn.cursor()
-        self.fldr = os.path.join(project.project_base_path, 'matrices')
+        self.fldr = os.path.join(os.environ.get(environ_var), 'matrices')
 
         tl = TableLoader()
         matrices_list = tl.load_table(self.curr, 'matrices')
@@ -28,7 +28,7 @@ class Matrices:
             if lt['name'] not in self.__items:
                 if isfile(join(self.fldr, lt['file_name'])):
                     lt['fldr'] = self.fldr
-                    self.__items[lt['name']] = MatrixRecord(lt, self.__project.logger)
+                    self.__items[lt['name']] = MatrixRecord(lt)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
@@ -42,7 +42,7 @@ class Matrices:
         remove = [nm for nm, file in self.curr.fetchall() if not isfile(join(self.fldr, file))]
 
         if remove:
-            self.__project.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
+            logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
 
             remove = [[x] for x in remove]
             self.curr.executemany('DELETE from matrices where name=?;', remove)
@@ -57,7 +57,7 @@ class Matrices:
         new_files = [x for x in new_files if os.path.splitext(x.lower())[1] in ['.omx', '.aem']]
 
         if new_files:
-            self.__project.logger.warning(f'New matrix found on disk. Added to the database: {",".join(new_files)}')
+            logger.warning(f'New matrix found on disk. Added to the database: {",".join(new_files)}')
 
         for fl in new_files:
             mat = AequilibraeMatrix()
@@ -77,7 +77,7 @@ class Matrices:
                 while f'{name}_{i}' in self.__items:
                     i += 1
                 name = f'{name}_{i}'
-            rec = self.create_record(name, fl)
+            rec = self.new_record(name, fl)
             rec.save()
 
     def list(self) -> pd.DataFrame:
@@ -109,7 +109,6 @@ class Matrices:
 
         Returns:
             matrix (:obj:`AequilibraeMatrix`:) Matrix object
-
         """
 
         return self.get_record(matrix_name).get_data()
@@ -125,12 +124,20 @@ class Matrices:
 
         return self.__items[matrix_name.lower()]
 
+    def check_exists(self, name: str) -> bool:
+        """Checks whether a matrix with a given name exists
+
+        Returns:
+            exists (:obj:`bool`:) Does the matrix exist?
+        """
+        return name.lower() in self.__items
+
     def delete_record(self, matrix_name: str) -> None:
         """Deletes a Matrix Record from the model and attempts to remove from disk"""
         mr = self.get_record(matrix_name)
         mr.delete()
 
-    def create_record(self, name: str, file_name: str) -> MatrixRecord:
+    def new_record(self, name: str, file_name: str) -> MatrixRecord:
         """Creates a new record for a matrix in disk, but does not save it
 
         If the matrix file is not already on disk, it will fail
@@ -159,10 +166,10 @@ class Matrices:
         mat.close()
         del mat
 
-        mr = MatrixRecord(tp, self.__project.logger)
+        mr = MatrixRecord(tp)
         mr.save()
-        self.__items[name] = mr
-        self.__project.logger.warning('Matrix Record has been saved to the database')
+        self.__items[name.lower()] = mr
+        logger.warning('Matrix Record has been saved to the database')
         return mr
 
     def _clear(self):
