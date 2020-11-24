@@ -58,11 +58,10 @@ class Node(SafeClass):
             logger.warn(f'Nothing to update for node {self.node_id}')
             return
 
-            txts = ','.join(txts) + ' where node_id=?'
-            data.append(self.node_id)
-            sql = f'Update Nodes set {txts}'
+        txts = ','.join(txts) + ' where node_id=?'
+        data.append(self.node_id)
+        sql = f'Update Nodes set {txts}'
 
-        logger.error(sql)
         curr.execute(sql, data)
         conn.commit()
         conn.close()
@@ -85,6 +84,10 @@ class Node(SafeClass):
         Args:
             *new_id* (:obj:`int`): New node_id
         """
+
+        if new_id == self.node_id:
+            raise ValueError('This is already the node number')
+
         conn = database_connection()
         curr = conn.cursor()
 
