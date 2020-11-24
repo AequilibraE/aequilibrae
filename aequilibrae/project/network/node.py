@@ -9,6 +9,7 @@ class Node(SafeClass):
     ::
 
         from aequilibrae import Project
+        from shapely.geometry import Point
 
         proj = Project()
         proj.open('path/to/project/folder')
@@ -23,6 +24,11 @@ class Node(SafeClass):
 
         # And edit each one like this
         node1.comment = 'This node is important'
+
+        # It success if the node_id already does not exist
+        node1.renumber(998877)
+
+        node.geometry = Point(1,2)
 
         # We can just save the node
         node1.save()

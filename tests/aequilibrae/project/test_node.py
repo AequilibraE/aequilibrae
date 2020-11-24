@@ -67,6 +67,13 @@ class TestNode(TestCase):
         self.assertEqual(geo.x, x, 'Geometry X saved wrong')
         self.assertEqual(geo.y, y, 'Geometry Y saved wrong')
 
+        self.curr.execute('Select asBinary(geometry) from links where a_node=?;', [nd])
+        wkb = self.curr.fetchone()[0]
+
+        geo2 = shapely.wkb.loads(wkb)
+        self.assertEqual(geo2.xy[0][0], x, 'Saving node geometry broke underlying network')
+        self.assertEqual(geo2.xy[1][0], y, 'Saving node geometry broke underlying network')
+
     def test_data_fields(self):
         nodes = self.network.nodes
 
