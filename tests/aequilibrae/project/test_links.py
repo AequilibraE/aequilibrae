@@ -1,4 +1,5 @@
 from unittest import TestCase
+from copy import copy, deepcopy
 import os
 from shutil import copytree, rmtree
 import uuid
@@ -110,3 +111,10 @@ class TestLinks(TestCase):
         links.refresh()
         link1 = links.get(1)
         self.assertEqual(link1.capacity_ba, original_value, 'Did not reset correctly')
+
+    def test_copy(self):
+        nodes = self.network.nodes
+        with self.assertRaises(Exception):
+            _ = copy(nodes)
+        with self.assertRaises(Exception):
+            _ = deepcopy(nodes)

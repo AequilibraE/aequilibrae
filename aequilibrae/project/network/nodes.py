@@ -1,7 +1,6 @@
 from sqlite3 import Connection
 from copy import deepcopy
 from aequilibrae.project.network.node import Node
-from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 
@@ -52,7 +51,17 @@ class Nodes:
             *node* (:obj:`Node`): Node object for requested node_id
             """
 
-        self.curr.execute(f'{self.sql} where link_id=?', [node_id])
+        if node_id in self.__items:
+            node = self.__items[node_id]
+
+            # If this element has not been renumbered, we return it. Otherwise we
+            # store the object under its new number and carry on
+            if node.node_id == node_id:
+                return node
+            else:
+                self.__items[node.node_id] = self.__items.pop(node_id)
+
+        self.curr.execute(f'{self.sql} where node_id=?', [node_id])
         data = self.curr.fetchone()
         if data:
             data = {key: val for key, val in zip(self.__fields, data)}
@@ -63,7 +72,7 @@ class Nodes:
         raise ValueError(f'Node {node_id} does not exist in the model')
 
     def save(self):
-        """Saves all nodes that have been retrieved so far"""
+        """Saves all nodes that have been retrieved (and edited) so far"""
         for node in self.__items.values():  # type: Node
             node.save()
 
