@@ -105,9 +105,8 @@ class Links:
             *link_id* (:obj:`int`): Id of a link to delete"""
         d = 1
         if link_id in self.__items:
-            link = self.__items[link_id]  # type: Link
+            link = self.__items.pop(link_id)  # type: Link
             link.delete()
-            del self.__items[link_id]
         else:
             self.curr.execute('Delete from Links where link_id=?', [link_id])
             d = self.curr.rowcount
