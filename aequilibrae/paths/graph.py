@@ -6,7 +6,7 @@ from warnings import warn
 from typing import List
 
 import numpy as np
-
+from aequilibrae.starts_logging import logger
 from .__version__ import binary_version as VERSION
 
 
@@ -355,9 +355,9 @@ class Graph(object):
                 self.fs[self.num_nodes] = self.graph.shape[0]
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-                nans = [i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))]
+                nans = ",".join([i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))])
                 if nans:
-                    warn(f'Field(s) {", ".join(nans)} has(ve) at least one NaN value. Check your computations')
+                    logger.warn(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
 
     def exclude_links(self, links: list) -> None:
         """

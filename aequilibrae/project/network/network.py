@@ -257,7 +257,7 @@ class Network():
             else:
                 removed_fields.append(f)
         if len(removed_fields) > 1:
-            warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
+            logger.warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
 
         curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
