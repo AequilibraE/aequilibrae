@@ -64,6 +64,7 @@ class TestLinks(TestCase):
         self.assertEqual(new_link.distance, old_link.distance)
         self.assertEqual(new_link.modes, old_link.modes)
         self.assertEqual(new_link.link_type, old_link.link_type)
+        new_link.save()
 
     def test_delete(self):
         links = self.network.links

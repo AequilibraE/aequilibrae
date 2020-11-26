@@ -110,7 +110,7 @@ class Link(SafeClass):
                 continue
             up_keys.append(f'"{key}"')
             data.append(val)
-        markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?)'
+        markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?, 4326)'
         up_keys.append('geometry')
         data.append(self.geometry.wkb)
         sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
