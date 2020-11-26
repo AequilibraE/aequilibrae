@@ -57,7 +57,10 @@ class Links:
             """
 
         if link_id in self.__items:
-            return self.__items[link_id]
+            link = self.__items[link_id]
+            if not link._exists():
+                raise Exception('Link was deleted')
+            return link
         data = self.__link_data(link_id)
         if data:
             return self.__create_return_link(data)
