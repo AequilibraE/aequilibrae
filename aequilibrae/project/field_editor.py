@@ -102,7 +102,7 @@ class FieldEditor:
         raw_fields = self._table_fields
 
         if self._table == 'links':
-            fields = [re.sub("_ab", "", re.sub("_ba", '', f)) for f in raw_fields].unique
+            fields = list({re.sub("_ab", "", re.sub("_ba", '', f)) for f in raw_fields})
         else:
             fields = raw_fields
 
