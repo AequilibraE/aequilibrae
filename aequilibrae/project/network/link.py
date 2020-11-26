@@ -66,46 +66,55 @@ class Link(SafeClass):
         conn = database_connection()
         curr = conn.cursor()
 
-        data = []
         if self.__new:
-            up_keys = []
-            for key, val in self.__dict__.items():
-                if key not in self.__original__ or key == 'geometry':
-                    continue
-                up_keys.append(f'"{key}"')
-                data.append(val)
-            markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?)'
-            up_keys.append('geometry')
-            data.append(self.geometry.wkb)
-            sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
+            data, sql = self.__save_new_link()
         else:
-            if self.link_id != self.__original__['link_id']:
-                raise ValueError('One cannot change the link_id')
-
-            txts = []
-            for key, val in self.__dict__.items():
-                if key not in self.__original__:
-                    continue
-                if val != self.__original__[key]:
-                    if key == 'geometry' and val is not None:
-                        data.append(val.wkb)
-                    else:
-                        data.append(val)
-                    txts.append(f'"{key}"=?')
-
-            if not data:
-                logger.warn(f'Nothing to update for link {self.link_id}')
-                return
-
-            txts = ','.join(txts) + ' where link_id=?'
-            data.append(self.link_id)
-            sql = f'Update Links set {txts}'
+            data, sql = self.__save_existing_link()
 
         logger.error(sql)
         curr.execute(sql, data)
         conn.commit()
         conn.close()
         self.__new = False
+
+    def __save_existing_link(self):
+        data = []
+        if self.link_id != self.__original__['link_id']:
+            raise ValueError('One cannot change the link_id')
+
+        txts = []
+        for key, val in self.__dict__.items():
+            if key not in self.__original__:
+                continue
+            if val != self.__original__[key]:
+                if key == 'geometry' and val is not None:
+                    data.append(val.wkb)
+                else:
+                    data.append(val)
+                txts.append(f'"{key}"=?')
+
+        if not data:
+            logger.warn(f'Nothing to update for link {self.link_id}')
+            return
+
+        txts = ','.join(txts) + ' where link_id=?'
+        data.append(self.link_id)
+        sql = f'Update Links set {txts}'
+        return data, sql
+
+    def __save_new_link(self):
+        data = []
+        up_keys = []
+        for key, val in self.__dict__.items():
+            if key not in self.__original__ or key == 'geometry':
+                continue
+            up_keys.append(f'"{key}"')
+            data.append(val)
+        markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?)'
+        up_keys.append('geometry')
+        data.append(self.geometry.wkb)
+        sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
+        return data, sql
 
     def set_modes(self, modes: str):
         """Sets the modes acceptable for this link
