@@ -2,6 +2,7 @@ import string
 from typing import List
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
+import re
 
 allowed_characters = string.ascii_letters + '_'
 
@@ -101,20 +102,7 @@ class FieldEditor:
         raw_fields = self._table_fields
 
         if self._table == 'links':
-            fields = []
-            for field in raw_fields:
-                if field[-3:] == '_ab':
-                    if field[:-3] + '_ba' in raw_fields:
-                        fields.append(field[:-3])
-                    else:
-                        fields.append(field)
-                elif field[-3:] == '_ba':
-                    if field[:-3] + '_ab' in raw_fields:
-                        continue
-                    else:
-                        fields.append(field)
-                else:
-                    fields.append(field)
+            fields = [re.sub("_ab", "", re.sub("_ba", '', f)) for f in raw_fields].unique
         else:
             fields = raw_fields
 
