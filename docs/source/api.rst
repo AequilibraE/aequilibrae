@@ -47,8 +47,8 @@ Project objects
 
     Zone
 
-Network data tables
-~~~~~~~~~~~~~~~~~~~
+Network data
+~~~~~~~~~~~~
 
 .. currentmodule:: aequilibrae.project.network
 
@@ -58,6 +58,8 @@ Network data tables
 
     Modes
     LinkTypes
+    Links
+    Nodes
 
 Network items
 ~~~~~~~~~~~~~
@@ -71,6 +73,8 @@ Network items
 
     Mode
     LinkType
+    Link
+    Node
 
 Parameters Module
 -----------------

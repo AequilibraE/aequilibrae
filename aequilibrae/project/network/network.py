@@ -10,6 +10,8 @@ from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
@@ -31,8 +33,9 @@ class Network():
         self.graphs = {}  # type: Dict[Graph]
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
+        self.links = Links(self)
+        self.nodes = Nodes(self)
 
-    # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
         """
         Returns a list of all fields that can be skimmed
@@ -254,7 +257,7 @@ class Network():
             else:
                 removed_fields.append(f)
         if len(removed_fields) > 1:
-            warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
+            logger.warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
 
         curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
