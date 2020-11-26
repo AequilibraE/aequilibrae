@@ -86,6 +86,7 @@ class NetworkSkimming(WorkerThread):
             self.skimming.emit(["zones finalized", 0])
 
         self.results.prepare(self.graph)
+        self.aux_res = MultiThreadedNetworkSkimming()
         self.aux_res.prepare(self.graph, self.results)
 
         pool = ThreadPool(self.results.cores)
@@ -100,6 +101,7 @@ class NetworkSkimming(WorkerThread):
                 pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
+        self.aux_res = None
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
