@@ -528,11 +528,11 @@ class TrafficAssignment(object):
         # Assembling a single final skim file can be done like this
         # We will want only the time for the last iteration and the distance averaged out for all iterations
         if mat_format == 'aem':
-            file_name = export_name
+            working_name = export_name
         else:
-            file_name = AequilibraeMatrix().random_name()
+            working_name = AequilibraeMatrix().random_name()
 
-        kwargs = {'file_name': file_name,
+        kwargs = {'file_name': working_name,
                   'zones': self.classes[0].graph.centroids.shape[0],
                   'matrix_names': names}
 
