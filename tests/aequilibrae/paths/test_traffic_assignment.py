@@ -135,6 +135,11 @@ class TestTrafficAssignment(TestCase):
         self.assignment.max_iter = 10
         self.assignment.set_algorithm('msa')
         self.assignment.execute()
+
+        with self.assertRaises(ValueError):
+            # We have no skimming setup
+            self.assignment.save_skims('my_skims', 'all')
+
         msa10 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
@@ -153,10 +158,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm('frank-wolfe')
         self.assignment.execute()
 
-        self.assignment.save_skims('my_skims', 'all')
-        with self.assertRaises(FileExistsError):
-            self.assignment.save_skims('my_skims', 'all')
-
         fw25 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
@@ -170,6 +171,11 @@ class TestTrafficAssignment(TestCase):
         self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, self.assigclass.graph.graph['volume'])[0, 1]
         self.assertLess(0.98, correl)
+
+        # For the last algorithm, we set skimming
+        self.car_graph.set_skimming(["free_flow_time", "distance"])
+        assigclass = TrafficClass(self.car_graph, self.matrix)
+        self.assignment.set_classes([assigclass])
 
         self.assignment.set_algorithm('bfw')
         self.assignment.execute()
@@ -185,6 +191,7 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(bfw25, cfw25)
 
         self.assignment.save_results('save_to_database')
+        self.assignment.save_skims('my_skims', 'all')
 
         with self.assertRaises(ValueError):
             self.assignment.save_results('save_to_database')

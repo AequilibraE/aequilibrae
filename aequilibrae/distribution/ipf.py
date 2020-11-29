@@ -179,7 +179,7 @@ class Ipf:
             max_iter = self.parameters["max iterations"]
             conv_criteria = self.parameters["convergence level"]
 
-            if self.matrix.omx:
+            if self.matrix.is_omx():
                 self.output = AequilibraeMatrix()
                 self.output.create_from_omx(self.output.random_name(), self.matrix.file_path,
                                             cores=self.matrix.view_names)

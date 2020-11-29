@@ -524,7 +524,7 @@ class TrafficAssignment(object):
                     names.append(f'{core}_blended')
 
         if not names:
-            ValueError('No skims to save')
+            raise ValueError('No skims to save')
         # Assembling a single final skim file can be done like this
         # We will want only the time for the last iteration and the distance averaged out for all iterations
         if mat_format == 'aem':

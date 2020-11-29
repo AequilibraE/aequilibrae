@@ -64,7 +64,7 @@ class Matrices:
             mat.load(join(self.fldr, fl))
 
             name = None
-            if not mat.omx:
+            if not mat.is_omx():
                 name = mat.name
 
             if not name:
