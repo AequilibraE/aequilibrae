@@ -20,7 +20,7 @@ class MatrixRecord(SafeClass):
 
         curr.execute('select count(*) from matrices where name=?', [self.name])
         if curr.fetchone()[0] == 0:
-            data = [self.name, self.file_name, self.cores]
+            data = [str(self.name), str(self.file_name), int(self.cores)]
             curr.execute('Insert into matrices (name, file_name, cores) values(?,?,?)', data)
 
         for key, value in self.__dict__.items():
