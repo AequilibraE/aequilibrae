@@ -78,7 +78,7 @@ class AequilibraeMatrix(object):
         self.zones = None
         self.dtype = None
         self.names = None
-        self.name = None
+        self.name = ''
         self.description = None
         self.current_index = None
         self.__omx = False

@@ -65,7 +65,7 @@ class Matrices:
 
             name = None
             if not mat.is_omx():
-                name = mat.name
+                name = str(mat.name)
 
             if not name:
                 name = fl

@@ -2,7 +2,9 @@ from math import floor
 import string
 from unittest import TestCase
 from random import choice, randint
+from shutil import copyfile
 import os
+from os.path import join
 from shutil import copytree
 import uuid
 from tempfile import gettempdir
@@ -55,6 +57,18 @@ class TestMatrices(TestCase):
         self.matrices.update_database()
         self.__mat_count(4, 'Did not add to the database appropriately')
 
+        rec = self.matrices.get_record('omx')
+        existing = join(rec.fldr, rec.file_name)
+        new_name = 'test_name.omx'
+        new_name1 = 'test_name1.omx'
+
+        copyfile(existing, join(rec.fldr, new_name))
+        record = self.matrices.new_record('test_name1.omx', new_name)
+        record.save()
+
+        copyfile(existing, join(rec.fldr, new_name1))
+        self.matrices.update_database()
+
     def test_get_matrix(self):
         with self.assertRaises(Exception):
             _ = self.matrices.get_matrix('omxq')
@@ -102,3 +116,4 @@ class TestMatrices(TestCase):
     def __mat_count(self, should_have: int, error_message: str) -> None:
         self.curr.execute('Select count(*) from Matrices;')
         self.assertEqual(self.curr.fetchone()[0], should_have, error_message)
+
