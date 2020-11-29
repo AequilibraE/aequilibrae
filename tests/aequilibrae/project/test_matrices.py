@@ -116,4 +116,3 @@ class TestMatrices(TestCase):
     def __mat_count(self, should_have: int, error_message: str) -> None:
         self.curr.execute('Select count(*) from Matrices;')
         self.assertEqual(self.curr.fetchone()[0], should_have, error_message)
-
