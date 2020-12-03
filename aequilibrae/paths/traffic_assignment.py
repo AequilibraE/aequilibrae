@@ -480,11 +480,11 @@ class TrafficAssignment(object):
                 'Target RGap': self.assignment.rgap_target}
         return info
 
-    def save_skims(self, name: str, which_ones='final', format='omx') -> None:
+    def save_skims(self, matrix_name: str, which_ones='final', format='omx') -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         Args:
-            name (:obj:`str`): Name of the file to hold this matrix
+            name (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
             which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
@@ -496,7 +496,7 @@ class TrafficAssignment(object):
         if mat_format == 'omx' and not has_omx:
             raise ImportError('OpenMatrix is not available on your system')
 
-        file_name = f'{name}.{mat_format}'
+        file_name = f'{matrix_name}.{mat_format}'
 
         mats = Matrices()
         export_name = path.join(mats.fldr, file_name)
@@ -504,8 +504,8 @@ class TrafficAssignment(object):
         if path.isfile(export_name):
             raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
 
-        if mats.check_exists(name):
-            raise FileExistsError(f'{name} already exists. Choose a different name')
+        if mats.check_exists(matrix_name):
+            raise FileExistsError(f'{matrix_name} already exists. Choose a different name')
 
         avg_skims = self.classes[0].results.skims  # type: AequilibraeMatrix
 
@@ -553,7 +553,7 @@ class TrafficAssignment(object):
             out_skims.export(export_name)
 
         # Now we create the appropriate record
-        record = mats.new_record(name, file_name)
+        record = mats.new_record(matrix_name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = 'Traffic Assignment'
