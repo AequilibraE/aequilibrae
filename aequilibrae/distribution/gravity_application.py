@@ -204,24 +204,17 @@ class GravityApplication:
         self.output = self.__ipf.output
         self.gap = self.__ipf.gap
 
-        _ = self.__ipf.report.pop(0)
-        for q in self.__ipf.report:
-            self.report.append(q)
-
-        self.report.append("")
-        self.report.append("")
-
+        self.report.extend(self.__ipf.report[1:] + ['', ''])
         self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view))))
-        self.report.append(
-            "Intrazonal flow: " + "{:15,.4f}".format(float(np.nansum(np.diagonal(self.output.matrix_view))))
-        )
-        self.report.append("Running time: " + str(round(perf_counter() - t, 3)))
+        intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
+        self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
+        self.report.append(f"Running time: {round(perf_counter() - t, 3)}")
 
         for i in glob.glob(tempfile.gettempdir() + "*.aem"):
             try:
                 os.unlink(i)
             except PermissionError as err:
-                self.logger.warning("Could not remove " + err.filename)
+                self.logger.warning(f"Could not remove {err.filename}")
 
     def save_to_project(self, name: str, file_name: str) -> None:
         """Saves the matrix output to the project file
