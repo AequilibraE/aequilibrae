@@ -6,7 +6,7 @@ from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.project.data import Matrices
 from aequilibrae.project.about import About
-from aequilibrae.project.database_connection import database_connection, environ_var
+from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 from aequilibrae.parameters import Parameters
 from aequilibrae.log import Log
 import warnings
@@ -60,7 +60,7 @@ class Project:
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
-        os.environ[environ_var] = self.project_base_path
+        os.environ[ENVIRON_VAR] = self.project_base_path
         self.conn = database_connection()
 
         self.__load_objects()
@@ -83,7 +83,7 @@ class Project:
 
         if os.path.isdir(project_path):
             raise FileNotFoundError("Location already exists. Choose a different name or remove the existing directory")
-        os.environ[environ_var] = self.project_base_path
+        os.environ[ENVIRON_VAR] = self.project_base_path
 
         self.__create_empty_project()
         self.__load_objects()
@@ -94,11 +94,11 @@ class Project:
 
     def close(self) -> None:
         """Safely closes the project"""
-        if environ_var in os.environ:
+        if ENVIRON_VAR in os.environ:
             self.conn.close()
             for obj in [self.parameters, self.network]:
                 del obj
-            del os.environ[environ_var]
+            del os.environ[ENVIRON_VAR]
             self.matrices._clear()
             del self.network.link_types
             del self.network.modes
@@ -162,7 +162,7 @@ class Project:
         initialize_tables(self.conn)
 
     def __other_project_still_open(self) -> bool:
-        if environ_var in os.environ:
+        if ENVIRON_VAR in os.environ:
             return True
         return False
 
