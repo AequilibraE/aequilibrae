@@ -514,14 +514,12 @@ class TrafficAssignment(object):
 
         names = []
         if which_ones in ['final', 'all']:
-            if last_skims.names:
-                for core in last_skims.names:
-                    names.append(f'{core}_final')
+            for core in last_skims.names:
+                names.append(f'{core}_final')
 
         if which_ones in ['blended', 'all']:
-            if avg_skims.names:
-                for core in avg_skims.names:
-                    names.append(f'{core}_blended')
+            for core in avg_skims.names:
+                names.append(f'{core}_blended')
 
         if not names:
             raise ValueError('No skims to save')
@@ -544,14 +542,12 @@ class TrafficAssignment(object):
         out_skims.description = f'Assignment skim from procedure ID {self.procedure_id}'
 
         if which_ones in ['final', 'all']:
-            if last_skims.names:
-                for core in last_skims.names:
-                    out_skims.matrix[f'{core}_final'][:, :] = last_skims.matrix[core][:, :]
+            for core in last_skims.names:
+                out_skims.matrix[f'{core}_final'][:, :] = last_skims.matrix[core][:, :]
 
         if which_ones in ['blended', 'all']:
-            if avg_skims.names:
-                for core in avg_skims.names:
-                    out_skims.matrix[f'{core}_blended'][:, :] = avg_skims.matrix[core][:, :]
+            for core in avg_skims.names:
+                out_skims.matrix[f'{core}_blended'][:, :] = avg_skims.matrix[core][:, :]
 
         out_skims.matrices.flush()  # Make sure that all data went to the disk
 
