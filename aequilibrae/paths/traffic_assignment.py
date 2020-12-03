@@ -8,7 +8,7 @@ from datetime import datetime
 import socket
 import numpy as np
 import pandas as pd
-from aequilibrae.project.database_connection import environ_var
+from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
@@ -368,7 +368,7 @@ class TrafficAssignment(object):
             table_name (:obj:`str`): Name of the table to hold this assignment result
         """
         df = self.results()
-        conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
+        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], 'results_database.sqlite'))
         df.to_sql(table_name, conn)
         conn.close()
 
@@ -480,11 +480,11 @@ class TrafficAssignment(object):
                 'Target RGap': self.assignment.rgap_target}
         return info
 
-    def save_skims(self, name: str, which_ones='final', format='omx') -> None:
+    def save_skims(self, matrix_name: str, which_ones='final', format='omx') -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         Args:
-            name (:obj:`str`): Name of the file to hold this matrix
+            name (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
             which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
@@ -496,7 +496,7 @@ class TrafficAssignment(object):
         if mat_format == 'omx' and not has_omx:
             raise ImportError('OpenMatrix is not available on your system')
 
-        file_name = f'{name}.{mat_format}'
+        file_name = f'{matrix_name}.{mat_format}'
 
         mats = Matrices()
         export_name = path.join(mats.fldr, file_name)
@@ -504,8 +504,8 @@ class TrafficAssignment(object):
         if path.isfile(export_name):
             raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
 
-        if mats.check_exists(name):
-            raise FileExistsError(f'{name} already exists. Choose a different name')
+        if mats.check_exists(matrix_name):
+            raise FileExistsError(f'{matrix_name} already exists. Choose a different name')
 
         avg_skims = self.classes[0].results.skims  # type: AequilibraeMatrix
 
@@ -514,23 +514,18 @@ class TrafficAssignment(object):
 
         names = []
         if which_ones in ['final', 'all']:
-            if last_skims.names:
-                for core in last_skims.names:
-                    names.append(f'{core}_final')
+            for core in last_skims.names:
+                names.append(f'{core}_final')
 
         if which_ones in ['blended', 'all']:
-            if avg_skims.names:
-                for core in avg_skims.names:
-                    names.append(f'{core}_blended')
+            for core in avg_skims.names:
+                names.append(f'{core}_blended')
 
         if not names:
             raise ValueError('No skims to save')
         # Assembling a single final skim file can be done like this
         # We will want only the time for the last iteration and the distance averaged out for all iterations
-        if mat_format == 'aem':
-            working_name = export_name
-        else:
-            working_name = AequilibraeMatrix().random_name()
+        working_name = export_name if mat_format == 'aem' else AequilibraeMatrix().random_name()
 
         kwargs = {'file_name': working_name,
                   'zones': self.classes[0].graph.centroids.shape[0],
@@ -544,14 +539,12 @@ class TrafficAssignment(object):
         out_skims.description = f'Assignment skim from procedure ID {self.procedure_id}'
 
         if which_ones in ['final', 'all']:
-            if last_skims.names:
-                for core in last_skims.names:
-                    out_skims.matrix[f'{core}_final'][:, :] = last_skims.matrix[core][:, :]
+            for core in last_skims.names:
+                out_skims.matrix[f'{core}_final'][:, :] = last_skims.matrix[core][:, :]
 
         if which_ones in ['blended', 'all']:
-            if avg_skims.names:
-                for core in avg_skims.names:
-                    out_skims.matrix[f'{core}_blended'][:, :] = avg_skims.matrix[core][:, :]
+            for core in avg_skims.names:
+                out_skims.matrix[f'{core}_blended'][:, :] = avg_skims.matrix[core][:, :]
 
         out_skims.matrices.flush()  # Make sure that all data went to the disk
 
@@ -560,7 +553,7 @@ class TrafficAssignment(object):
             out_skims.export(export_name)
 
         # Now we create the appropriate record
-        record = mats.new_record(name, file_name)
+        record = mats.new_record(matrix_name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = 'Traffic Assignment'

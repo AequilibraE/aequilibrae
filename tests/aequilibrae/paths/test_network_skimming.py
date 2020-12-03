@@ -54,7 +54,7 @@ class TestNetwork_skimming(TestCase):
         skm.execute()
 
         tot = np.nanmax(skm.results.skims.distance[:, :])
-        if tot > 10e10:
+        if tot > np.sum(graph.cost):
             self.fail("Skimming was not successful. At least one np.inf returned.")
 
         if skm.report:

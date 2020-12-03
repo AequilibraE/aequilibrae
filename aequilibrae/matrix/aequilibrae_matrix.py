@@ -77,9 +77,9 @@ class AequilibraeMatrix(object):
         self.cores = None
         self.zones = None
         self.dtype = None
-        self.names = None
+        self.names = []  # type: [str]
         self.name = ''
-        self.description = None
+        self.description = ''
         self.current_index = None
         self.__omx = False
         self.omx_file = None  # type: omx.File
@@ -91,7 +91,7 @@ class AequilibraeMatrix(object):
         If working with AEM file, it flushes data to disk.  If working with OMX, requires new names
 
         Args:
-            *names* (:obj:`List[str]`, `Optional`): New names for the matrices. Required if working with OMX files"""
+            *names* (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files"""
 
         if not self.__omx:
             self.matrices.flush()
