@@ -8,7 +8,7 @@ from datetime import datetime
 import socket
 import numpy as np
 import pandas as pd
-from aequilibrae.project.database_connection import environ_var
+from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
@@ -368,7 +368,7 @@ class TrafficAssignment(object):
             table_name (:obj:`str`): Name of the table to hold this assignment result
         """
         df = self.results()
-        conn = sqlite3.connect(path.join(environ[environ_var], 'results_database.sqlite'))
+        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], 'results_database.sqlite'))
         df.to_sql(table_name, conn)
         conn.close()
 
