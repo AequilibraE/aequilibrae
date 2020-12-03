@@ -1,9 +1,9 @@
 from os import unlink
 from os.path import isfile, join
-
+import os
 from aequilibrae.starts_logging import logger
 from aequilibrae.project.network.safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
@@ -11,6 +11,7 @@ class MatrixRecord(SafeClass):
     def __init__(self, data_set: dict):
         super().__init__(data_set)
         self._exists = True
+        self.fldr = join(os.environ.get(ENVIRON_VAR), 'matrices')
 
     def save(self):
         """Saves matrix record to the project database"""

@@ -122,7 +122,7 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_capacity_field(val)
         self.assertEqual(self.assignment.capacity_field, val)
 
-    def test_execute(self):
+    def test_execute_and_save_results(self):
 
         self.assignment.add_class(self.assigclass)
         self.assignment.set_vdf("BPR")
@@ -135,6 +135,11 @@ class TestTrafficAssignment(TestCase):
         self.assignment.max_iter = 10
         self.assignment.set_algorithm('msa')
         self.assignment.execute()
+
+        with self.assertRaises(ValueError):
+            # We have no skimming setup
+            self.assignment.save_skims('my_skims', 'all')
+
         msa10 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
@@ -152,6 +157,7 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.set_algorithm('frank-wolfe')
         self.assignment.execute()
+
         fw25 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
@@ -166,6 +172,11 @@ class TestTrafficAssignment(TestCase):
         correl = np.corrcoef(self.assigclass.results.total_link_loads, self.assigclass.graph.graph['volume'])[0, 1]
         self.assertLess(0.98, correl)
 
+        # For the last algorithm, we set skimming
+        self.car_graph.set_skimming(["free_flow_time", "distance"])
+        assigclass = TrafficClass(self.car_graph, self.matrix)
+        self.assignment.set_classes([assigclass])
+
         self.assignment.set_algorithm('bfw')
         self.assignment.execute()
         bfw25 = self.assignment.assignment.rgap
@@ -178,6 +189,12 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(fw25, msa25)
         self.assertLess(cfw25, fw25)
         self.assertLess(bfw25, cfw25)
+
+        self.assignment.save_results('save_to_database')
+        self.assignment.save_skims('my_skims', 'all')
+
+        with self.assertRaises(ValueError):
+            self.assignment.save_results('save_to_database')
 
     def test_info(self):
         iterations = random.randint(1, 10000)

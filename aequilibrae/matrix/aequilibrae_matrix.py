@@ -5,8 +5,6 @@ import uuid
 from shutil import copyfile
 from typing import List
 import functools
-import logging
-
 import numpy as np
 
 # Checks if we can display OMX
@@ -79,13 +77,44 @@ class AequilibraeMatrix(object):
         self.cores = None
         self.zones = None
         self.dtype = None
-        self.names = None
-        self.name = None
-        self.description = None
+        self.names = []  # type: [str]
+        self.name = ''
+        self.description = ''
         self.current_index = None
-        self.omx = False
+        self.__omx = False
         self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
+
+    def save(self, names=()) -> None:
+        """Saves matrix data back to file.
+
+        If working with AEM file, it flushes data to disk.  If working with OMX, requires new names
+
+        Args:
+            *names* (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files"""
+
+        if not self.__omx:
+            self.matrices.flush()
+            return
+
+        if isinstance(names, str):
+            names = [names]
+
+        if len(names) != len(self.view_names):
+            raise ValueError('Number of names needs to be equal to computational view')
+
+        exists = [n for n in names if n in self.names]
+        if exists:
+            raise ValueError(f'Matrix(ces) "{".".join(exists)}" already exist. Choose (a) new name(s)')
+
+        if len(self.view_names) == 1:
+            self.omx_file[names[0]] = self.matrix_view[:, :]
+        else:
+            for i, name in enumerate(names):
+                self.omx_file[name] = self.matrix_view[:, :, i]
+
+        self.names = self.omx_file.list_matrices()
+        self.computational_view(names)
 
     def create_empty(
             self,
@@ -207,7 +236,7 @@ class AequilibraeMatrix(object):
         """
         if core not in self.names:
             raise AttributeError('Matrix core does not exist in this matrix')
-        if self.omx:
+        if self.__omx:
             return np.array(self.omx_file[core])
         else:
             mat = self.matrix[core]
@@ -268,7 +297,7 @@ class AequilibraeMatrix(object):
             print("Open Matrix is not installed. Cannot continue")
             return
 
-        src = omx.open_file(omx_path, "r")
+        src = omx.open_file(omx_path, "a")
 
         avail_cores = src.list_matrices()
 
@@ -433,7 +462,7 @@ class AequilibraeMatrix(object):
         self.names = self.omx_file.list_matrices()
 
         if len(self.omx_file) == 0:
-            raise LookupError("Matrix file has cores")
+            raise LookupError("Matrix file has no cores")
 
         self.index_names = self.omx_file.list_mappings()
 
@@ -564,7 +593,7 @@ class AequilibraeMatrix(object):
             mat.current_index
           'census'
         """
-        if self.omx:
+        if self.__omx:
             self.index = np.array(list(self.omx_file.mapping(index_to_set).keys()))
             self.current_index = index_to_set
         else:
@@ -605,7 +634,7 @@ class AequilibraeMatrix(object):
         Removes matrix from memory and flushes all data to disk, or closes the OMX file if that is the case
         """
 
-        if self.omx:
+        if self.__omx:
             self.omx_file.close()
         else:
             self.matrices.flush()
@@ -645,7 +674,7 @@ class AequilibraeMatrix(object):
           ['Car trips', 'bike trips']
         """
 
-        if self.omx:
+        if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         fname, file_extension = os.path.splitext(output_name.upper())
@@ -719,11 +748,15 @@ class AequilibraeMatrix(object):
         self.file_path = file_path
 
         if os.path.splitext(file_path)[-1].upper() == ".OMX":
-            self.omx = True
-            self.omx_file = omx.open_file(file_path, "r")
+            self.__omx = True
+            self.omx_file = omx.open_file(file_path, "a")
             self.__load_omx__()
         else:
             self.__load_aem__()
+
+    def is_omx(self):
+        """Returns True if matrix data source is OMX, False otherwise"""
+        return self.__omx
 
     def computational_view(self, core_list: List[str] = None):
         """
@@ -753,6 +786,8 @@ class AequilibraeMatrix(object):
         if core_list is None:
             core_list = self.names
         else:
+            if isinstance(core_list, str):
+                core_list = [core_list]
             if isinstance(core_list, list):
                 for i in core_list:
                     if i not in self.names:
@@ -760,7 +795,7 @@ class AequilibraeMatrix(object):
             else:
                 raise TypeError("Please provide a list of matrices")
 
-        if self.omx:
+        if self.__omx:
             self.view_names = core_list
             if len(core_list) == 1:
                 self.matrix_view = np.array(self.omx_file[core_list[0]])
@@ -818,7 +853,7 @@ class AequilibraeMatrix(object):
         if output_name is None:
             output_name = self.random_name()
 
-        if self.omx:
+        if self.__omx:
             mcores = cores
             if mcores is None:
                 mcores = self.names
@@ -944,7 +979,7 @@ class AequilibraeMatrix(object):
             mat.nan_to_num()
         """
 
-        if self.omx:
+        if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if np.issubdtype(self.dtype, np.floating) and self.matrix_view is not None:
@@ -962,7 +997,7 @@ class AequilibraeMatrix(object):
         return {self.index[i]: i for i in range(self.zones)}
 
     def __define_data_class(self):
-        if self.omx:
+        if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if np.issubdtype(self.dtype, np.floating):
@@ -991,7 +1026,7 @@ class AequilibraeMatrix(object):
             mat.name
           'This is my example'
         """
-        if self.omx:
+        if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if matrix_name is not None:
@@ -1017,7 +1052,7 @@ class AequilibraeMatrix(object):
             mat.description
           'This is some text about this matrix of mine'
         """
-        if self.omx:
+        if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if matrix_description is not None:

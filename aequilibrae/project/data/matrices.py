@@ -5,7 +5,7 @@ from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.starts_logging import logger
-from aequilibrae.project.database_connection import database_connection, environ_var
+from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 
 
 class Matrices:
@@ -16,7 +16,7 @@ class Matrices:
     def __init__(self):
         self.conn = database_connection()
         self.curr = self.conn.cursor()
-        self.fldr = os.path.join(os.environ.get(environ_var), 'matrices')
+        self.fldr = os.path.join(os.environ.get(ENVIRON_VAR), 'matrices')
 
         tl = TableLoader()
         matrices_list = tl.load_table(self.curr, 'matrices')
@@ -64,8 +64,8 @@ class Matrices:
             mat.load(join(self.fldr, fl))
 
             name = None
-            if not mat.omx:
-                name = mat.name
+            if not mat.is_omx():
+                name = str(mat.name)
 
             if not name:
                 name = fl

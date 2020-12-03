@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+from shutil import copyfile
 import openmatrix as omx
 from unittest import TestCase
 from tempfile import gettempdir
@@ -16,6 +17,8 @@ class TestAequilibraeMatrix(TestCase):
     matrix = None
 
     def setUp(self) -> None:
+        self.sf_skims = f"/Aequilibrae_matrix_{uuid.uuid4()}.omx"
+        copyfile(siouxfalls_skims, self.sf_skims)
         temp_folder = gettempdir()
         self.name_test = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
         self.copy_matrix_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
@@ -187,9 +190,8 @@ class TestAequilibraeMatrix(TestCase):
         del a
 
     def test_get_matrix(self):
-        self.test_load()
         a = AequilibraeMatrix()
-        a.load(siouxfalls_skims)
+        a.load(self.sf_skims)
 
         with self.assertRaises(AttributeError):
             a.get_matrix('does not exist')
@@ -202,3 +204,37 @@ class TestAequilibraeMatrix(TestCase):
         print(np.array_equal(a.get_matrix("seed"), a.matrix["seed"]))
 
         del a
+
+    def test_save(self):
+        a = AequilibraeMatrix()
+        a.load(self.sf_skims)
+
+        a.computational_view(['distance'])
+        new_mat = np.random.rand(a.zones, a.zones)
+        a.matrix_view *= new_mat
+
+        res = a.matrix_view.sum()
+
+        a.save('new_name_for_matrix')
+        self.assertEqual(res, a.matrix_view.sum(), 'Saved wrong result')
+
+        a.save(['new_name_for_matrix2'])
+        self.assertEqual(a.view_names[0], 'new_name_for_matrix2', 'Did not update computational view')
+        self.assertEqual(len(a.view_names), 1, 'computational view with the wrong number of matrices')
+
+        a.computational_view(['distance', 'new_name_for_matrix'])
+
+        with self.assertRaises(ValueError):
+            a.save(['just_one_name'])
+
+        a.save(['one_name', 'two_names'])
+
+        with self.assertRaises(ValueError):
+            a.save('distance')
+
+        b = AequilibraeMatrix()
+        b.load(self.name_test)
+        b.computational_view("seed")
+        b.save()
+        b.computational_view(["mat", "seed", "dist"])
+        b.save()
