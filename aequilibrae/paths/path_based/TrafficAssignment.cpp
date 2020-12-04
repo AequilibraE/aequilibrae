@@ -208,6 +208,9 @@ void TrafficAssignment::update_link_flows(unsigned int origin) {
 
 
 /******/
+
+// TODO (change): do not want to update path flows here, do that later with alpha. want to store them here? so
+
 // step 3 to calculate new solution
 void TrafficAssignment::update_path_flows_without_link_flows(unsigned long origin, float *flows) {
     for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {
@@ -215,6 +218,7 @@ void TrafficAssignment::update_path_flows_without_link_flows(unsigned long origi
     }
     update_link_flows_by_origin(origin);
 }
+
 
 void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
     for (unsigned long l_id=0; l_id < links.size(); l_id++) {
