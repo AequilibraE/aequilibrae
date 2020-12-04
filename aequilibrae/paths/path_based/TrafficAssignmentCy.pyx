@@ -35,6 +35,7 @@ cdef extern from "TrafficAssignment.h":
         void update_path_flows_without_link_flows(unsigned long origin, float *flows)
         void update_link_flows_stepsize(unsigned long origin, float stepsize)
         void update_all_link_derivatives()
+        void update_path_flows_stepsize(unsigned int origin, float stepsize)
 
 
 cdef class TrafficAssignmentCy:

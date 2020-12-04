@@ -125,7 +125,6 @@ void TrafficAssignment::set_edges() {
 	for (int i=0; i < this->links.size(); i++) {
 	    from_nodes.push_back(this->links[i].from_node);
 	    to_nodes.push_back(this->links[i].to_node);
-
 	}
 	this->spComputation = new ShortestPathComputation(num_nodes, this->links.size());
     this->spComputation->set_edges(from_nodes.data(), to_nodes.data());
@@ -171,7 +170,8 @@ void TrafficAssignment::perform_initial_solution() {
         std::map<unsigned long,DestinationDescriptor>::iterator it;
         for (it=centroidsDescriptors[i].destinationDescriptors.begin(); it!=centroidsDescriptors[i].destinationDescriptors.end(); it++)
         {
-            centroidsDescriptors[i].path_flows[it->second.path_indices[0]]=it->second.demand;
+            centroidsDescriptors[i].path_flows[it->second.path_indices[0]] = it->second.demand;
+            //centroidsDescriptors[i].path_flows_current_iter[it->second.path_indices[0]] = 0.0; // Done in compute_shortest_path on first pass
         }
     }
     for (unsigned int i=0; i< centroidsDescriptors.size(); i++) {
@@ -214,7 +214,8 @@ void TrafficAssignment::update_link_flows(unsigned int origin) {
 // step 3 to calculate new solution
 void TrafficAssignment::update_path_flows_without_link_flows(unsigned long origin, float *flows) {
     for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {
-        centroidsDescriptors[origin].path_flows[j] = flows[j];
+        //centroidsDescriptors[origin].path_flows[j] = flows[j];
+        centroidsDescriptors[origin].path_flows_current_iter[j] = flows[j];
     }
     update_link_flows_by_origin(origin);
 }
@@ -224,7 +225,7 @@ void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
     for (unsigned long l_id=0; l_id < links.size(); l_id++) {
         float flow=0;
         for (unsigned int j=0; j< centroidsDescriptors[origin].path_link_incidence[l_id].size();j++) {
-            flow += centroidsDescriptors[origin].path_flows[centroidsDescriptors[origin].path_link_incidence[l_id][j]];
+            flow += centroidsDescriptors[origin].path_flows_current_iter[centroidsDescriptors[origin].path_link_incidence[l_id][j]];
         }
         float previous_flow = link_flows_origin[origin*n_links+l_id];
         //float diff = flow-previous_flow;
@@ -246,6 +247,16 @@ void TrafficAssignment::update_link_flows_stepsize(unsigned int origin, float st
 void TrafficAssignment::update_all_link_derivatives() {
     for (unsigned long l_id=0; l_id < links.size();l_id++) {
         update_link_derivatives(l_id);
+    }
+}
+
+
+void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize) {
+
+    for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {
+        centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
+         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
+        centroidsDescriptors[origin].path_flows_current_iter[j] = 0.0;
     }
 }
 
@@ -322,6 +333,7 @@ void TrafficAssignment::compute_path_link_sequence(int origin, int destination) 
         }
         centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.push_back(n_paths);
         centroidsDescriptors[origin].path_flows.push_back(0.0);
+        centroidsDescriptors[origin].path_flows_current_iter.push_back(0.0);
         centroidsDescriptors[origin].num_paths += 1;
    }
 }

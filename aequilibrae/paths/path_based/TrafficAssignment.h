@@ -48,6 +48,7 @@ struct Centroid {
 	std::map<int, std::vector<unsigned int> > path_link_incidence;
 	int *paths;
 	std::vector<float> path_flows;
+	std::vector<float> path_flows_current_iter;
 };
 
 
@@ -89,6 +90,7 @@ public:
 	void update_link_flows(unsigned int from_node);
 	void update_link_flows_stepsize(unsigned int from_node, float alpha);
 	void update_link_flows_by_origin(unsigned int from_node);
+    void update_path_flows_stepsize(unsigned int origin, float stepsize);
 
 	void insert_od(unsigned long from, unsigned long to, float demand);
 
