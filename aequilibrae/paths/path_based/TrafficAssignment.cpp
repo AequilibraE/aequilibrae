@@ -239,7 +239,7 @@ void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
 // non-parallel step:
 void TrafficAssignment::update_link_flows_stepsize(unsigned int origin, float stepsize) {
     for (unsigned long l_id=0; l_id < links.size();l_id++) {
-        link_flows[l_id] += link_flows_origin_current_iter_diff[origin*n_links+l_id];
+        link_flows[l_id] += stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id];
         //update_link_derivatives(l_id);NO, do this once at the end
     }
 }

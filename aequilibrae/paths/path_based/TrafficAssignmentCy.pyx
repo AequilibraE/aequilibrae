@@ -128,6 +128,7 @@ cdef class TrafficAssignmentCy:
 
 
     #####
+
     def update_path_flows_without_link_flows(self, origin, flows):
         cdef array.array path_flows = array.array('f', flows)
         self.thisptr.update_path_flows_without_link_flows(origin, path_flows.data.as_floats)
@@ -137,6 +138,9 @@ cdef class TrafficAssignmentCy:
 
     def update_all_link_derivatives(self):
         self.thisptr.update_all_link_derivatives()
+
+    def update_path_flows_stepsize(self, unsigned int origin, float stepsize):
+        self.thisptr.update_path_flows_stepsize(origin, stepsize)
 
     ######
 
