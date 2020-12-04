@@ -69,6 +69,7 @@ public:
     float *alphas_2;
 
     float *link_flows_origin;
+    float *link_flows_origin_current_iter_diff;
 
     unsigned int n_cent;
     unsigned int n_links;
@@ -86,6 +87,8 @@ public:
 	void perform_initial_solution();
 
 	void update_link_flows(unsigned int from_node);
+	void update_link_flows_stepsize(unsigned int from_node, float alpha);
+	void update_link_flows_by_origin(unsigned int from_node);
 
 	void insert_od(unsigned long from, unsigned long to, float demand);
 
@@ -97,6 +100,7 @@ public:
 	unsigned int get_total_paths(unsigned long origin, unsigned long destination);
 
 	void update_path_flows(unsigned long centroid, float *flows);
+	void update_path_flows_without_link_flows(unsigned long centroid, float *flows);
 
 	void compute_path_link_sequence(int origin, int destination);
 
@@ -105,6 +109,7 @@ public:
 	void get_odpath_times(unsigned long origin, unsigned long destination, float *path_times,  float *path_flows);
 
 	void update_link_derivatives(int link_id);
+	void update_all_link_derivatives();
 
     float get_objective_function();
 

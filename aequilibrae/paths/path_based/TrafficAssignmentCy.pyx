@@ -32,9 +32,9 @@ cdef extern from "TrafficAssignment.h":
         void update_path_flows(unsigned long origin, float *flows)
         void get_odpath_times(int origin, int destination, float *buffer, float *path_times)
 
-
-
-
+        void update_path_flows_without_link_flows(unsigned long origin, float *flows)
+        void update_link_flows_stepsize(unsigned long origin, float stepsize)
+        void update_all_link_derivatives()
 
 
 cdef class TrafficAssignmentCy:
@@ -123,6 +123,23 @@ cdef class TrafficAssignmentCy:
     def update_path_flows(self, origin, flows):
         cdef array.array path_flows= array.array('f', flows)
         self.thisptr.update_path_flows(origin, path_flows.data.as_floats)
+
+
+
+    #####
+    def update_path_flows_without_link_flows(self, origin, flows):
+        cdef array.array path_flows = array.array('f', flows)
+        self.thisptr.update_path_flows_without_link_flows(origin, path_flows.data.as_floats)
+
+    def update_link_flows_stepsize(self, origin, stepsize):
+        self.thisptr.update_link_flows_stepsize(origin, stepsize)
+
+    def update_all_link_derivatives(self):
+        self.thisptr.update_all_link_derivatives()
+
+    ######
+
+
 
 
     def get_path_times(self, origin, destination):
