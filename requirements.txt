@@ -6,3 +6,4 @@ cython
 openmatrix
 pyshp
 requests
+cvxopt

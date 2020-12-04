@@ -3,6 +3,7 @@ from warnings import warn
 import numpy as np
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
+from aequilibrae.paths.path_based_assignment import PathBasedAssignment
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae import Parameters
@@ -72,8 +73,9 @@ class TrafficAssignment(object):
         avg_skims = assigclass.results.skims # blended ones
         last_skims = assigclass._aon_results.skims # those for the last iteration
     """
+
     bpr_parameters = ["alpha", "beta"]
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw", "bush-based"]
 
     def __init__(self) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
@@ -85,7 +87,7 @@ class TrafficAssignment(object):
         self.__dict__["vdf_parameters"] = None  # type: list
         self.__dict__["time_field"] = None  # type: str
         self.__dict__["capacity_field"] = None  # type: str
-        self.__dict__["assignment"] = None  # type: LinearApproximation
+        self.__dict__["assignment"] = None  # type: LinearApproximation or PathBasedAssignment
         self.__dict__["capacity"] = None  # type: np.ndarray
         self.__dict__["free_flow_tt"] = None  # type: np.ndarray
         self.__dict__["total_flow"] = None  # type: np.ndarray
@@ -103,12 +105,12 @@ class TrafficAssignment(object):
     def __check_attributes(self, instance, value):
         if instance == "rgap_target":
             if not isinstance(value, float):
-                return False, value, 'Relative gap needs to be a float'
+                return False, value, "Relative gap needs to be a float"
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.rgap_target = value
         elif instance == "max_iter":
             if not isinstance(value, int):
-                return False, value, 'Number of iterations needs to be an integer'
+                return False, value, "Number of iterations needs to be an integer"
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
@@ -132,12 +134,12 @@ class TrafficAssignment(object):
         elif instance in ["time_field", "capacity_field"]:
             if not isinstance(value, str):
                 return False, value, f"Value for {instance} is not string"
-        elif instance == 'cores':
+        elif instance == "cores":
             if not isinstance(value, int):
                 return False, value, f"Value for {instance} is not integer"
         if instance not in self.__dict__:
             return False, value, f"trafficAssignment class does not have property {instance}"
-        return True, value, ''
+        return True, value, ""
 
     def set_vdf(self, vdf_function: str) -> None:
         """
@@ -186,8 +188,10 @@ class TrafficAssignment(object):
             self.assignment = allOrNothing(self)
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
+        elif algorithm.lower() == "bush-based":
+            self.assignment = PathBasedAssignment(self)
         else:
-            raise Exception('Algorithm not listed in the case selection')
+            raise Exception("Algorithm not listed in the case selection")
 
         self.__collect_data()
 
@@ -221,13 +225,13 @@ class TrafficAssignment(object):
 
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise Exception('Before setting vdf parameters, you need to set traffic classes and choose a VDF function')
-        self.__dict__['vdf_parameters'] = par
+            raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
+        self.__dict__["vdf_parameters"] = par
         pars = []
         if self.vdf.function in ["BPR"]:
-            for p1 in ['alpha', 'beta']:
+            for p1 in ["alpha", "beta"]:
                 if p1 not in par:
-                    raise ValueError(f'{p1} should exist in the set of parameters provided')
+                    raise ValueError(f"{p1} should exist in the set of parameters provided")
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
                     array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
@@ -237,14 +241,14 @@ class TrafficAssignment(object):
                 pars.append(array)
 
                 if np.any(np.isnan(array)):
-                    warn(f'At least one {p1} is NaN. Results will make no sense')
+                    warn(f"At least one {p1} is NaN. Results will make no sense")
 
-                if p1 == 'alpha':
+                if p1 == "alpha":
                     if array.min() < 0:
-                        warn(f'At least one {p1} is smaller than zero. Results will make no sense')
+                        warn(f"At least one {p1} is smaller than zero. Results will make no sense")
                 else:
                     if array.min() < 1:
-                        warn(f'At least one {p1} is smaller than one. Results will make no sense')
+                        warn(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
 
@@ -262,7 +266,7 @@ class TrafficAssignment(object):
                 c.results.set_cores(cores)
                 c._aon_results.set_cores(cores)
         else:
-            raise Exception('You need load traffic classes before overwriting the number of cores')
+            raise Exception("You need load traffic classes before overwriting the number of cores")
 
     def set_time_field(self, time_field: str) -> None:
         """
