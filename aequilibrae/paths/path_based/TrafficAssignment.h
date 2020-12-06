@@ -88,7 +88,7 @@ public:
 	void perform_initial_solution();
 
 	void update_link_flows(unsigned int from_node);
-	void update_link_flows_stepsize(unsigned int from_node, float alpha);
+	void update_link_flows_stepsize(double stepsize);
 	void update_link_flows_by_origin(unsigned int from_node);
     void update_path_flows_stepsize(unsigned int origin, float stepsize, float *flows);
 
@@ -113,7 +113,6 @@ public:
 	void get_odpath_times(unsigned long origin, unsigned long destination, float *path_times,  float *path_flows);
 
 	void update_link_derivatives(int link_id);
-	void update_all_link_derivatives();
 
     float get_objective_function();
 

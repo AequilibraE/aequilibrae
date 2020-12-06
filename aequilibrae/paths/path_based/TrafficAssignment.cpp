@@ -230,8 +230,6 @@ void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
         float previous_flow = link_flows_origin[origin*n_links+l_id];
         link_flows_origin_current_iter_diff[origin*n_links+l_id] = flow - previous_flow;
         link_flows_origin[origin*n_links+l_id] = flow; //update to current solution
-
-        // Do we bend link_flows_origin? Don't think so.
     }
 }
 
@@ -254,15 +252,15 @@ float TrafficAssignment::objective_derivative_stepsize(double stepsize) {
 
 
 // non-parallel step:
-void TrafficAssignment::update_link_flows_stepsize(unsigned int origin, float stepsize) {
+void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
     for (unsigned long l_id=0; l_id < links.size();l_id++) {
-        link_flows[l_id] += (stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id]);
-    }
-}
+        double sum_over_origins = 0.0;
+        for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
+            sum_over_origins += link_flows_origin_current_iter_diff[origin*n_links+l_id];
+        }
+        link_flows[l_id] += stepsize * sum_over_origins;//link_flows_origin_current_iter_diff[origin*n_links+l_id]);
 
-void TrafficAssignment::update_all_link_derivatives() {
-    for (unsigned long l_id=0; l_id < links.size();l_id++) {
-        update_link_derivatives(l_id);
+        update_link_derivatives(l_id); // also updates costs
     }
 }
 
@@ -274,26 +272,20 @@ void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float st
     }
 }
 
-
-
-
-
 /******/
 
 
 
 void TrafficAssignment::update_link_derivatives(int link_id) {
     float flow = link_flows[link_id];
-    Link l=links[link_id];
-
-    weights[link_id] = l.t0*(1+l.alfa*pow((flow/l.capacity),l.beta));
-    float p= pow(flow,l.beta-1);
-    float den=pow(l.capacity, l.beta);
-    float dtime = p*l.alfa*l.t0*l.beta/den;
-
-    alphas_1[link_id]=dtime/2.0;
+    Link l = links[link_id];
+    weights[link_id] = l.t0 * (1.0 + l.alfa * pow(flow / l.capacity, l.beta));
+    float p = pow(flow , l.beta - 1.0);
+    float den = pow(l.capacity, l.beta);
+    float dtime = p * l.alfa * l.t0 * l.beta / den;
+    alphas_1[link_id] = dtime / 2.0;
     //alphas_2[link_id]=weights[link_id]-flow*alphas_1[link_id];
-    alphas_2[link_id]=weights[link_id]-flow*dtime;
+    alphas_2[link_id] = weights[link_id] - flow * dtime;
 }
 
 
