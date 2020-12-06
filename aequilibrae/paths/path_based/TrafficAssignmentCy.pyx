@@ -23,7 +23,7 @@ cdef extern from "TrafficAssignment.h":
         void add_link(int link_id, float t0, float alfa, int beta, float capacity, unsigned long from_node,unsigned long to_node)
         void set_edges()
         float get_objective_function()
-        float get_value_for_given_stepsize(double stepsize)
+        float objective_derivative_stepsize(double stepsize)
         void get_subproblem_data(unsigned long origin, float *Q, float *c, float *A, float *b, float *G, float *h)
         unsigned int get_total_paths(int origin)
         unsigned int get_total_paths(int origin, int destination)
@@ -144,8 +144,8 @@ cdef class TrafficAssignmentCy:
         cdef array.array path_flows = array.array('f', flows)
         self.thisptr.update_path_flows_stepsize(origin, stepsize, path_flows.data.as_floats)
 
-    def get_value_for_given_stepsize(self, double stepsize):
-        return self.thisptr.get_value_for_given_stepsize(stepsize)
+    def objective_derivative_stepsize(self, double stepsize):
+        return self.thisptr.objective_derivative_stepsize(stepsize)
 
 
     ######

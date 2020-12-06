@@ -103,7 +103,7 @@ public:
 
 	void update_path_flows(unsigned long centroid, float *flows);
 	void update_path_flows_without_link_flows(unsigned long centroid, float *flows);
-	float get_value_for_given_stepsize(double stepsize);
+	float objective_derivative_stepsize(double stepsize);
 
 
 	void compute_path_link_sequence(int origin, int destination);

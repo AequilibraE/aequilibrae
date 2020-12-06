@@ -236,7 +236,7 @@ void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
 }
 
 
-float TrafficAssignment::get_value_for_given_stepsize(double stepsize) {
+float TrafficAssignment::objective_derivative_stepsize(double stepsize) {
     float link_cost = 0;
     for (unsigned int link_id=0; link_id < n_links; link_id++) {
         Link l=links[link_id];
