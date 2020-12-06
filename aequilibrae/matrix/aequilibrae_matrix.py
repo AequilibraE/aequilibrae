@@ -74,7 +74,7 @@ class AequilibraeMatrix(object):
         self.indices = None
         self.matrix = None
         self.matrices = None
-        self.cores = None
+        self.cores = 0
         self.zones = None
         self.dtype = None
         self.names = []  # type: [str]

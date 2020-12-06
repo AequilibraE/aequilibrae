@@ -1,11 +1,16 @@
 import os
 from time import perf_counter
-
+from uuid import uuid4
+from datetime import datetime
+import importlib.util as iutil
 import numpy as np
 import yaml
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.project.data import Matrices
+from aequilibrae.project.data.matrix_record import MatrixRecord
 
-from ..matrix import AequilibraeData
-from ..matrix import AequilibraeMatrix
+spec = iutil.find_spec("openmatrix")
+has_omx = spec is not None
 
 
 class Ipf:
@@ -99,12 +104,14 @@ class Ipf:
         self.columns = kwargs.get("columns", None)
         self.column_field = kwargs.get("column_field", None)
 
-        self.output = None
+        self.output = AequilibraeMatrix()
         self.error = None
         self.__required_parameters = ["convergence level", "max iterations", "balancing tolerance"]
         self.error_free = True
         self.report = ["  #####    IPF computation    #####  ", ""]
         self.gap = None
+        self.procedure_date = ''
+        self.procedure_id = ''
 
     def __check_data(self):
         self.error = None
@@ -166,13 +173,16 @@ class Ipf:
                 self.error = "Parameters error. It needs to be a dictionary with the following keys: "
                 for t in self.__required_parameters:
                     self.error = self.error + t + ", "
-                break
+        if self.error:
+            raise ValueError(self.error)
 
     def fit(self):
         """Runs the IPF instance problem to adjust the matrix
 
         Resulting matrix is the *output* class member
         """
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
         t = perf_counter()
         self.__check_data()
         if self.error_free:
@@ -236,6 +246,22 @@ class Ipf:
 
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
+
+    def save_to_project(self, name: str, file_name: str) -> MatrixRecord:
+        """Saves the matrix output to the project file
+
+        Args:
+            name (:obj:`str`): Name of the desired matrix record
+            file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+        """
+
+        mats = Matrices()
+        record = mats.new_record(name, file_name, self.output)
+        record.procedure_id = self.procedure_id
+        record.timestamp = self.procedure_date
+        record.procedure = 'Iterative Proportional fitting'
+        record.save()
+        return record
 
     def __tot_rows(self, matrix):
         return np.nansum(matrix, axis=1)

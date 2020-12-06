@@ -117,26 +117,9 @@ class NetworkSkimming(WorkerThread):
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
         """
 
-        mat_format = format.lower()
-        if mat_format not in ['omx', 'aem']:
-            raise ValueError('Matrix needs to be either OMX or native AequilibraE')
-        if mat_format == 'omx' and not has_omx:
-            raise ImportError('OpenMatrix is not available on your system')
-
-        file_name = f'{name}.{mat_format}'
-
+        file_name = f'{name}.{format.lower()}'
         mats = Matrices()
-        export_name = join(mats.fldr, file_name)
-
-        if isfile(export_name):
-            raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
-
-        if mats.check_exists(name):
-            raise FileExistsError(f'{name} already exists. Choose a different name')
-
-        self.results.skims.export(export_name)
-
-        record = mats.new_record(name, file_name)
+        record = mats.new_record(name, file_name, self.results.skims)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = 'Network skimming'
