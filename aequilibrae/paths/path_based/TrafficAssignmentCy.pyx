@@ -33,9 +33,9 @@ cdef extern from "TrafficAssignment.h":
         void update_path_flows(unsigned long origin, float *flows)
         void get_odpath_times(int origin, int destination, float *buffer, float *path_times)
 
-        void update_path_flows_without_link_flows(unsigned long origin, float *flows)
+        void update_current_iteration_flows_by_origin(unsigned long origin, float *flows)
         void update_link_flows_stepsize(double stepsize)
-        void update_path_flows_stepsize(unsigned int origin, float stepsize, float *flows)
+        void update_path_flows_stepsize(unsigned int origin, float stepsize)
 
 
 cdef class TrafficAssignmentCy:
@@ -129,16 +129,15 @@ cdef class TrafficAssignmentCy:
 
     #####
 
-    def update_path_flows_without_link_flows(self, origin, flows):
+    def update_current_iteration_flows_by_origin(self, origin, flows):
         cdef array.array path_flows = array.array('f', flows)
-        self.thisptr.update_path_flows_without_link_flows(origin, path_flows.data.as_floats)
+        self.thisptr.update_current_iteration_flows_by_origin(origin, path_flows.data.as_floats)
 
     def update_link_flows_stepsize(self, stepsize):
         self.thisptr.update_link_flows_stepsize(stepsize)
 
-    def update_path_flows_stepsize(self, unsigned int origin, float stepsize, flows):
-        cdef array.array path_flows = array.array('f', flows)
-        self.thisptr.update_path_flows_stepsize(origin, stepsize, path_flows.data.as_floats)
+    def update_path_flows_stepsize(self, unsigned int origin, float stepsize):
+        self.thisptr.update_path_flows_stepsize(origin, stepsize)
 
     def objective_derivative_stepsize(self, double stepsize):
         return self.thisptr.objective_derivative_stepsize(stepsize)

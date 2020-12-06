@@ -90,7 +90,7 @@ public:
 	void update_link_flows(unsigned int from_node);
 	void update_link_flows_stepsize(double stepsize);
 	void update_link_flows_by_origin(unsigned int from_node);
-    void update_path_flows_stepsize(unsigned int origin, float stepsize, float *flows);
+    void update_path_flows_stepsize(unsigned int origin, float stepsize);
 
 	void insert_od(unsigned long from, unsigned long to, float demand);
 
@@ -102,7 +102,7 @@ public:
 	unsigned int get_total_paths(unsigned long origin, unsigned long destination);
 
 	void update_path_flows(unsigned long centroid, float *flows);
-	void update_path_flows_without_link_flows(unsigned long centroid, float *flows);
+	void update_current_iteration_flows_by_origin(unsigned long centroid, float *flows);
 	float objective_derivative_stepsize(double stepsize);
 
 

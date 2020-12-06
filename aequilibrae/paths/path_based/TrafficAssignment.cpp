@@ -209,10 +209,7 @@ void TrafficAssignment::update_link_flows(unsigned int origin) {
 
 /******/
 
-// TODO (change): do not want to update path flows here, do that later with alpha.
-
-// step 3 to calculate new solution
-void TrafficAssignment::update_path_flows_without_link_flows(unsigned long origin, float *flows) {
+void TrafficAssignment::update_current_iteration_flows_by_origin(unsigned long origin, float *flows) {
     for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
         //centroidsDescriptors[origin].path_flows[j] = flows[j];
         centroidsDescriptors[origin].path_flows_current_iter[j] = flows[j];
@@ -265,10 +262,10 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
 }
 
 
-void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize, float *flows) {
+void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize) {
     for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
         centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
-         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];//flows[j];// new flows by definition
+         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
     }
 }
 
