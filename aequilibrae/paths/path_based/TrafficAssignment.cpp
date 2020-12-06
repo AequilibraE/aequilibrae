@@ -253,6 +253,8 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
         double sum_over_origins = 0.0;
         for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
             sum_over_origins += link_flows_origin_current_iter_diff[origin*n_links+l_id];
+            // YES OR NO? NO!
+            //link_flows_origin[origin*n_links+l_id] += stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id];
         }
         link_flows[l_id] += stepsize * sum_over_origins;
         update_link_derivatives(l_id); // also updates costs
@@ -263,7 +265,7 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
 void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, double stepsize) {
     for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size(); j++) {
         centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
-         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
+            stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
     }
 }
 
@@ -377,7 +379,7 @@ void TrafficAssignment::get_objective_data(unsigned int origin, float *Q, float 
                 index=num_paths*(*it_a)+(*it_b);
                 Q[index] += 2*alphas_1[it_links->first];
             }
-            c[*it_a] += 2*alphas_1[it_links->first]*(link_flows[it_links->first]-link_flows_origin[origin*n_links+it_links->first]);
+            c[*it_a] += 2*alphas_1[it_links->first]*(link_flows[it_links->first]-link_flows_origin[origin*n_links+it_links->first]); // q in note, not c
             c[*it_a] += alphas_2[it_links->first];
         }
     }
