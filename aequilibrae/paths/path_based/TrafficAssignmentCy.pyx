@@ -35,7 +35,7 @@ cdef extern from "TrafficAssignment.h":
 
         void update_current_iteration_flows_by_origin(unsigned long origin, float *flows)
         void update_link_flows_stepsize(double stepsize)
-        void update_path_flows_stepsize(unsigned int origin, float stepsize)
+        void update_path_flows_stepsize(unsigned int origin, double stepsize)
 
 
 cdef class TrafficAssignmentCy:
@@ -126,28 +126,6 @@ cdef class TrafficAssignmentCy:
         self.thisptr.update_path_flows(origin, path_flows.data.as_floats)
 
 
-
-    #####
-
-    def update_current_iteration_flows_by_origin(self, origin, flows):
-        cdef array.array path_flows = array.array('f', flows)
-        self.thisptr.update_current_iteration_flows_by_origin(origin, path_flows.data.as_floats)
-
-    def update_link_flows_stepsize(self, stepsize):
-        self.thisptr.update_link_flows_stepsize(stepsize)
-
-    def update_path_flows_stepsize(self, unsigned int origin, float stepsize):
-        self.thisptr.update_path_flows_stepsize(origin, stepsize)
-
-    def objective_derivative_stepsize(self, double stepsize):
-        return self.thisptr.objective_derivative_stepsize(stepsize)
-
-
-    ######
-
-
-
-
     def get_path_times(self, origin, destination):
         num_paths = self.thisptr.get_total_paths(origin, destination)
 
@@ -157,4 +135,22 @@ cdef class TrafficAssignmentCy:
         self.thisptr.get_odpath_times(origin, destination, path_times.data.as_floats, path_flows.data.as_floats)
         return path_times, path_flows
 
+
+
+    ### new for parallel implementation
+
+    def update_current_iteration_flows_by_origin(self, origin, flows):
+        cdef array.array path_flows = array.array('f', flows)
+        self.thisptr.update_current_iteration_flows_by_origin(origin, path_flows.data.as_floats)
+
+    def update_link_flows_stepsize(self, stepsize):
+        self.thisptr.update_link_flows_stepsize(stepsize)
+
+    def update_path_flows_stepsize(self, origin, stepsize):
+        self.thisptr.update_path_flows_stepsize(origin, stepsize)
+
+    def objective_derivative_stepsize(self, stepsize):
+        """Calculate the derivative of the objective function with respect to the stepsize given the
+        update scheme described in the notes"""
+        return self.thisptr.objective_derivative_stepsize(stepsize)
 

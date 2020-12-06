@@ -262,7 +262,7 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
 }
 
 
-void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize) {
+void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, double stepsize) {
     for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
         centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
          stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
