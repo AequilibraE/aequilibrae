@@ -104,7 +104,7 @@ class Ipf:
         self.columns = kwargs.get("columns", None)
         self.column_field = kwargs.get("column_field", None)
 
-        self.output = None
+        self.output = AequilibraeMatrix()
         self.error = None
         self.__required_parameters = ["convergence level", "max iterations", "balancing tolerance"]
         self.error_free = True
@@ -255,25 +255,8 @@ class Ipf:
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
 
-        mat_format = file_name.split('.')[-1].lower()
-        if mat_format not in ['omx', 'aem']:
-            raise ValueError('Matrix needs to be either OMX or native AequilibraE')
-        if mat_format == 'omx' and not has_omx:
-            raise ImportError('OpenMatrix is not available on your system')
-
         mats = Matrices()
-        export_name = os.path.join(mats.fldr, file_name)
-
-        if os.path.isfile(export_name):
-            raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
-
-        if mats.check_exists(name):
-            raise FileExistsError(f'{name} already exists. Choose a different name')
-
-        self.output.export(output_name=export_name)
-
-        # Now we create the appropriate record
-        record = mats.new_record(name, file_name)
+        record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = 'Iterative Proportional fitting'

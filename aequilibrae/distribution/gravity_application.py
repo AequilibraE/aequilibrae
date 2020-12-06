@@ -11,6 +11,7 @@ import importlib.util as iutil
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.project.data import Matrices
 from aequilibrae import Parameters
 
 sys.dont_write_bytecode = True
@@ -224,9 +225,12 @@ class GravityApplication:
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
 
-        record = self.__ipf.save_to_project(name, file_name)
-        record.procedure = 'Synthetic trip distribution'
-        record.description = f'Synthetic trip distribution. {self.model.function}'
+        mats = Matrices()
+        record = mats.new_record(name, file_name, self.output)
+        record.procedure_id = self.procedure_id
+        record.timestamp = self.procedure_date
+        record.procedure = 'Synthetic gravity trip distribution'
+        record.description = f'Synthetic gravity trip distribution. {self.model.function}'
         record.save()
 
     def __get_parameters(self):

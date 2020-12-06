@@ -137,7 +137,7 @@ class Matrices:
         mr = self.get_record(matrix_name)
         mr.delete()
 
-    def new_record(self, name: str, file_name: str) -> MatrixRecord:
+    def new_record(self, name: str, file_name: str, matrix=AequilibraeMatrix()) -> MatrixRecord:
         """Creates a new record for a matrix in disk, but does not save it
 
         If the matrix file is not already on disk, it will fail
@@ -157,15 +157,29 @@ class Matrices:
             if mat.file_name == file_name:
                 raise ValueError(f'There is already a matrix record for file name ({file_name}). It must be unique.')
 
+        if matrix.cores > 0:
+            if isfile(join(self.fldr, file_name)):
+                raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
+
+            mat_format = file_name.split('.')[-1].lower()
+            if mat_format not in ['omx', 'aem']:
+                raise ValueError('Matrix needs to be either OMX or native AequilibraE')
+
+            matrix.export(join(self.fldr, file_name))
+            cores = matrix.cores
+        else:
+            if not isfile(join(self.fldr, file_name)):
+                raise FileExistsError(f'{file_name} does not exist. Cannot create this matrix record')
+            mat = AequilibraeMatrix()
+            mat.load(join(self.fldr, file_name))
+            cores = mat.cores
+            mat.close()
+            del mat
+
         tp = {key: None for key in self.__fields}
         tp['name'] = name
         tp['file_name'] = file_name
-        mat = AequilibraeMatrix()
-        mat.load(join(self.fldr, file_name))
-        tp['cores'] = mat.cores
-        mat.close()
-        del mat
-
+        tp['cores'] = cores
         mr = MatrixRecord(tp)
         mr.save()
         self.__items[name.lower()] = mr
