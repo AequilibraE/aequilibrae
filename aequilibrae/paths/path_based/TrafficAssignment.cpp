@@ -209,11 +209,11 @@ void TrafficAssignment::update_link_flows(unsigned int origin) {
 
 /******/
 
-// TODO (change): do not want to update path flows here, do that later with alpha. want to store them here? so
+// TODO (change): do not want to update path flows here, do that later with alpha.
 
 // step 3 to calculate new solution
 void TrafficAssignment::update_path_flows_without_link_flows(unsigned long origin, float *flows) {
-    for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {
+    for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
         //centroidsDescriptors[origin].path_flows[j] = flows[j];
         centroidsDescriptors[origin].path_flows_current_iter[j] = flows[j];
     }
@@ -228,19 +228,35 @@ void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
             flow += centroidsDescriptors[origin].path_flows_current_iter[centroidsDescriptors[origin].path_link_incidence[l_id][j]];
         }
         float previous_flow = link_flows_origin[origin*n_links+l_id];
-        //float diff = flow-previous_flow;
-        //link_flows[l_id]+=diff;
-        //update_link_derivatives(l_id);
         link_flows_origin_current_iter_diff[origin*n_links+l_id] = flow - previous_flow;
         link_flows_origin[origin*n_links+l_id] = flow; //update to current solution
+
+        // Do we bend link_flows_origin? Don't think so.
     }
 }
+
+
+float TrafficAssignment::get_value_for_given_stepsize(double stepsize) {
+    float link_cost = 0;
+    for (unsigned int link_id=0; link_id < n_links; link_id++) {
+        Link l=links[link_id];
+        float c_flow = link_flows[link_id];
+        // now add up solutions per origin
+        double sum_over_origins = 0.0;
+        for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
+            sum_over_origins += link_flows_origin_current_iter_diff[origin*n_links+link_id];
+        }
+        float updated_link_flow = c_flow + stepsize * sum_over_origins;
+        link_cost += l.t0 * (1.0 + (l.alfa * pow(updated_link_flow / l.capacity, l.beta))) * sum_over_origins;
+    }
+    return link_cost;
+}
+
 
 // non-parallel step:
 void TrafficAssignment::update_link_flows_stepsize(unsigned int origin, float stepsize) {
     for (unsigned long l_id=0; l_id < links.size();l_id++) {
-        link_flows[l_id] += stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id];
-        //update_link_derivatives(l_id);NO, do this once at the end
+        link_flows[l_id] += (stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id]);
     }
 }
 
@@ -251,19 +267,18 @@ void TrafficAssignment::update_all_link_derivatives() {
 }
 
 
-void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize) {
-
-    for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {
+void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, float stepsize, float *flows) {
+    for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
         centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
-         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
-        centroidsDescriptors[origin].path_flows_current_iter[j] = 0.0;
+         stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];//flows[j];// new flows by definition
     }
 }
 
+
+
+
+
 /******/
-
-
-
 
 
 
