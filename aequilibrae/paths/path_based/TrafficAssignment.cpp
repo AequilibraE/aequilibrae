@@ -207,11 +207,10 @@ void TrafficAssignment::update_link_flows(unsigned int origin) {
 
 
 
-/******/
+/*** new things for parallel implementation ***/
 
 void TrafficAssignment::update_current_iteration_flows_by_origin(unsigned long origin, float *flows) {
     for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
-        //centroidsDescriptors[origin].path_flows[j] = flows[j];
         centroidsDescriptors[origin].path_flows_current_iter[j] = flows[j];
     }
     update_link_flows_by_origin(origin);
@@ -255,21 +254,20 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
         for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
             sum_over_origins += link_flows_origin_current_iter_diff[origin*n_links+l_id];
         }
-        link_flows[l_id] += stepsize * sum_over_origins;//link_flows_origin_current_iter_diff[origin*n_links+l_id]);
-
+        link_flows[l_id] += stepsize * sum_over_origins;
         update_link_derivatives(l_id); // also updates costs
     }
 }
 
 
 void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, double stepsize) {
-    for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size();j++) {
+    for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size(); j++) {
         centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
          stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
     }
 }
 
-/******/
+/*** end new things for parallel implementation ***/
 
 
 
