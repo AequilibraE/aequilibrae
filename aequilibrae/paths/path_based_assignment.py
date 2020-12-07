@@ -161,8 +161,8 @@ class PathBasedAssignment(WorkerThread):
         self.execute()
 
     def execute(self):
-        for c in self.traffic_classes:
-            c.graph.set_graph(self.time_field)
+        # for c in self.traffic_classes:
+        #     c.graph.set_graph(self.time_field)
 
         logger.info(f"{self.algorithm} Assignment STATS")
         # logger.info("Iteration, RelativeGap, stepsize")
@@ -217,22 +217,13 @@ class PathBasedAssignment(WorkerThread):
                 self.t_assignment.update_path_flows(origin, solution)
 
             this_cost = self.t_assignment.get_objective_function()
+            self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+            converged = self.check_convergence()
 
             logger.info(f"Iteration {self.iter}, computed gap: {self.rgap}, computed objective: {this_cost}")
-
-            # Check convergence
-            # This needs to be done with the current costs, and not the future ones
-            converged = False
-            if self.iter > 1:
-                converged = self.check_convergence()
-
-            self.convergence_report["iteration"].append(self.iter)
-            self.convergence_report["rgap"].append(self.rgap)
-            self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
-            self.convergence_report["alpha"].append(self.stepsize)
-            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
-
-            self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+            # self.convergence_report["iteration"].append(self.iter)
+            # self.convergence_report["rgap"].append(self.rgap)
+            # self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
 
             if converged:
                 break
