@@ -169,6 +169,41 @@ class PathBasedAssignment(WorkerThread):
         for origin in range(len(self.origins)):
             self.t_assignment.update_link_flows(origin)
 
+        # c++ data structures and aequilibrae data structures are not integrated yet
+        self.update_time_field_for_path_computation()
+
+    def shortest_path_temp_wrapper(self, origin):
+        c = self.traffic_classes[0]
+        matrix = c.matrix
+        graph = c.graph
+        results = c._aon_results
+        aux_res = MultiThreadedAoN()
+        aux_res.prepare(graph, results)
+        matrix.matrix_view = c.matrix.matrix_view.reshape((graph.num_zones, graph.num_zones, results.classes["number"]))
+        th = 0  # th is thread id
+        origin_aeq = origin + 1  # sort out this mess
+        _ = one_to_all(origin_aeq, matrix, graph, results, aux_res, th)
+
+        # set precedence to aux_res.predecessors[:,0]
+        prec = aux_res.predecessors[:, 0]
+        self.t_assignment.set_precedence(prec)
+        self.t_assignment.compute_path_link_sequence_external_precedence(origin)
+
+        # c++ data structures and aequilibrae data structures are not integrated yet
+        self.update_time_field_for_path_computation()
+
+    def update_time_field_for_path_computation(self):
+        # self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+        self.total_flow = self.t_assignment.get_link_flows()
+        self.congested_time = self.t_assignment.get_congested_times()
+        self.vdf.apply_vdf(self.total_flow, self.congested_time, self.capacity, self.free_flow_tt, *self.vdf_parameters)
+        c = self.traffic_classes[0]
+        c.graph.cost = self.congested_time
+        if self.time_field in c.graph.skim_fields:
+            idx = c.graph.skim_fields.index(self.time_field)
+            c.graph.skims[:, idx] = self.congested_time[:]
+        # c._aon_results.reset() # not used atm, we do not assign link flows along shortest paths
+
     def doWork(self):
         self.execute()
 
@@ -194,8 +229,6 @@ class PathBasedAssignment(WorkerThread):
                 destinations_per_origin[o] = 0
             destinations_per_origin[o] += 1
 
-        # Ini solution, iter 0
-
         self.initial_iteration()
         # self.t_assignment.perform_initial_solution()
 
@@ -219,7 +252,10 @@ class PathBasedAssignment(WorkerThread):
 
             origins = destinations_per_origin.keys()
             for origin in origins:
-                self.t_assignment.compute_shortest_paths(origin)
+
+                # self.t_assignment.compute_shortest_paths(origin)
+                self.shortest_path_temp_wrapper(origin)
+
                 t_paths = self.t_assignment.get_total_paths(origin)
                 Q, q, A, b, G, h = self.t_assignment.get_problem_data(origin, destinations_per_origin[origin])
                 Am = cvxopt.matrix(A.tolist(), (t_paths, destinations_per_origin[origin]), "d")
@@ -242,16 +278,6 @@ class PathBasedAssignment(WorkerThread):
 
             if converged:
                 break
-
-            # self.vdf.apply_vdf(
-            #     self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
-            # )
-            # for c in self.traffic_classes:
-            #     c.graph.cost = self.congested_time
-            #     if self.time_field in c.graph.skim_fields:
-            #         idx = c.graph.skim_fields.index(self.time_field)
-            #         c.graph.skims[:, idx] = self.congested_time[:]
-            #     c._aon_results.reset()
 
         if self.rgap > self.rgap_target:
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

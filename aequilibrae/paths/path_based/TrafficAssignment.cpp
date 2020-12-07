@@ -375,6 +375,18 @@ void TrafficAssignment::get_link_flows(float *ptr_flows) {
 }
 
 
+void TrafficAssignment::get_congested_times(float *travel_time) {
+    float *time = new float[n_links];
+    memset(time, 0, sizeof(float)*n_links);
+    for (unsigned int link_id=0; link_id < n_links; link_id++) {
+        Link l=links[link_id];
+        float c_flow = link_flows[link_id];
+        time[link_id] = l.t0 * (1.0 + l.alfa * pow(c_flow / l.capacity, l.beta));
+    }
+    memcpy(travel_time, time, n_links*sizeof(float));
+}
+
+
 float TrafficAssignment::get_objective_function() {
     float total_cost = 0;
     for (unsigned int link_id=0; link_id < n_links; link_id++) {
