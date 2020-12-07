@@ -4,8 +4,7 @@ on: [pull_request]
 
 jobs:
   testing:
-    needs: linting
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: [ '3.6', '3.7', '3.8' ]
