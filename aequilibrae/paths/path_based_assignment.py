@@ -141,7 +141,7 @@ class PathBasedAssignment(WorkerThread):
         # ods
         num_zones = self.traffic_classes[0].matrix.zones
         mat_ = self.traffic_classes[0].matrix.get_matrix("matrix")
-        self.ods = {(o, d): mat_[o, d] for o in range(0, num_zones) for d in range(0, num_zones)}
+        self.ods = {(o, d): mat_[o, d] for o in range(0, num_zones) for d in range(0, num_zones) if mat_[o, d] > 0.0}
 
         # from OpenBenchmark:
         destinations = []
