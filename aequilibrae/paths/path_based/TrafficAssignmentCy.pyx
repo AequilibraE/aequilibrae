@@ -37,6 +37,8 @@ cdef extern from "TrafficAssignment.h":
         void update_link_flows_stepsize(double stepsize)
         void update_path_flows_stepsize(unsigned int origin, double stepsize)
         void get_precedence(int *prec)
+        void set_precedence(int *prec)
+        void compute_path_link_sequence_external_precedence(int origin)
 
 
 cdef class TrafficAssignmentCy:
@@ -64,7 +66,6 @@ cdef class TrafficAssignmentCy:
         self.thisptr.set_edges()
 
 
-
     def __dealloc__(self):
         del self.thisptr
 
@@ -76,8 +77,17 @@ cdef class TrafficAssignmentCy:
     def compute_shortest_paths(self, origin):
         self.thisptr.compute_shortest_paths(origin)
 
+
+    def set_precedence(self, precedence):
+        cdef array.array prec = array.array('i', precedence)
+        self.thisptr.set_precedence(prec.data.as_ints)
+
+    def compute_path_link_sequence_external_precedence(self, origin):
+        self.thisptr.compute_path_link_sequence_external_precedence(origin)
+
     def perform_initial_solution(self):
         self.thisptr.perform_initial_solution()
+
 
     def get_link_flows(self):
         zeros = [0.0 for i in range(len(self.links))]
@@ -86,11 +96,13 @@ cdef class TrafficAssignmentCy:
         self.thisptr.get_link_flows(link_f.data.as_floats)
         return link_f
 
+
     def get_precedence(self):
         zeros = [0 for i in range(self.num_nodes)]
         cdef array.array prec = array.array('i', zeros)
         self.thisptr.get_precedence(prec.data.as_ints)
         return prec
+
 
     def get_objective_function(self):
         return self.thisptr.get_objective_function()

@@ -301,6 +301,18 @@ void TrafficAssignment::get_precedence(int *prec){
     memcpy(prec, precedence, num_nodes*sizeof(int));
 }
 
+void TrafficAssignment::set_precedence(int *prec){
+    memcpy(precedence, prec, num_nodes*sizeof(int));
+}
+
+void TrafficAssignment::compute_path_link_sequence_external_precedence(int from_node) {
+    std::map<unsigned long,DestinationDescriptor>::iterator it;
+    for (it=centroidsDescriptors[from_node].destinationDescriptors.begin(); it!=centroidsDescriptors[from_node].destinationDescriptors.end(); it++)
+    {
+        compute_path_link_sequence(from_node, it->second.destination);
+    }
+}
+
 
 
 void TrafficAssignment::compute_path_link_sequence(int origin, int destination) {
