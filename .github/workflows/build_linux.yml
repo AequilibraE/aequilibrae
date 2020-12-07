@@ -1,8 +1,6 @@
-name: Upload Linux Python Package
+name: Build and upload Linux Python Package
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request, release]
 
 jobs:
   deploy:
@@ -27,6 +25,7 @@ jobs:
         pip-wheel-args: '--no-deps'
 
     - name: Publish wheels to PyPI
+      if: ${{ github.event_name == 'release'}}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
