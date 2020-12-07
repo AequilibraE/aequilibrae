@@ -189,7 +189,7 @@ class TrafficAssignment(object):
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
         elif algorithm.lower() == "bush-based":
-            self.assignment = PathBasedAssignment(self)
+            self.assignment = PathBasedAssignment(self, algorithm.lower())
         else:
             raise Exception("Algorithm not listed in the case selection")
 

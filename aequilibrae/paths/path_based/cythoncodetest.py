@@ -35,50 +35,6 @@ class OpenBenchmark:
 
         return links, nodes, ods, destinations, origins
 
-    def get_data_structure_with_by_directional_links(self):
-        links, nodes, ods, destination, origins = self.build_datastructure()
-        nodes = {}
-
-        for link in links:
-            a = link.node_id_from
-            b = link.node_id_to
-
-            if a < b:
-                pair = (a, b)
-            else:
-                pair = (b, a)
-
-            if pair not in nodes:
-                nodes[pair] = []
-
-            nodes[pair].append(link)
-
-        bi_directional_links = []
-        for pair in nodes:
-            if len(nodes[pair]) == 1:
-                bi_directional_links.append(nodes[pair][0])
-            else:
-                if nodes[pair][0].node_id_from < nodes[pair][0].node_id_to:
-                    lab = nodes[pair][0]
-                    lba = nodes[pair][1]
-                else:
-                    lba = nodes[pair][1]
-                    lab = nodes[pair][0]
-
-                lab.direction = 0
-                lab.t0_ba = lba.t0
-                lab.capacity_ba = lba.capacity
-                bi_directional_links.append(lab)
-
-        return bi_directional_links, nodes, ods, destination, origins
-
-    def compute_objective_function(self, flow_file):
-        flows = self.open_flow_file(flow_file)
-        cost = 0
-        for i, link in enumerate(self.links):
-            cost += link.get_cost(flows[i])
-        return cost
-
     def open_link_file(self):
         f = open(os.path.join(self.folder, self.link_file))
         lines = f.readlines()
@@ -162,28 +118,3 @@ class OpenBenchmark:
                     except:  # noqa: E722
                         continue
         return ods
-
-    def open_flow_file(self, filename):
-        f = open(self.folder + filename)
-        lines = f.readlines()
-        f.close()
-
-        links_info = []
-        flows = []
-
-        header_found = False
-        for line in lines:
-            if not header_found and line.startswith("~"):
-                header_found = True
-            elif header_found:
-                links_info.append(line)
-
-        for line in links_info:
-            data = line.split("\t")
-            flow = float(data[4])
-            flows.append(flow)
-        return flows
-
-
-def convert_to_sparse(cvx_opt_matrix):
-    pass
