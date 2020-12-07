@@ -12,6 +12,7 @@ import pandas as pd
 from aequilibrae.paths.path_based.node import Node
 from aequilibrae.paths.path_based.link import Link
 import cvxopt
+import array
 
 # temp for one to all shortest path hack
 from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
@@ -190,8 +191,10 @@ class PathBasedAssignment(WorkerThread):
         self.t_assignment.compute_path_link_sequence_external_precedence(origin)
 
     def update_time_field_for_path_computation(self):
-        self.total_flow = self.t_assignment.get_link_flows()
-        # self.congested_time = self.t_assignment.get_congested_times()
+        total_flow_ = self.t_assignment.get_link_flows()
+        # let's just hack it, most data structures will be integrated anyways
+        self.total_flow = array.array("d", total_flow_)
+        self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
 
         self.vdf.apply_vdf(self.congested_time, self.total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters)
         c = self.traffic_classes[0]
@@ -201,12 +204,17 @@ class PathBasedAssignment(WorkerThread):
             c.graph.skims[:, idx] = self.congested_time[:]
         c._aon_results.reset()  # not used atm, we do not assign link flows along shortest paths
 
+        c.results.link_loads = self.total_flow
+
     def doWork(self):
         self.execute()
 
     def execute(self):
-        # for c in self.traffic_classes:
-        #     c.graph.set_graph(self.time_field)
+
+        use_boost = False
+
+        for c in self.traffic_classes:
+            c.graph.set_graph(self.time_field)
 
         logger.info(f"{self.algorithm} Assignment STATS")
         # logger.info("Iteration, RelativeGap, stepsize")
@@ -226,8 +234,10 @@ class PathBasedAssignment(WorkerThread):
                 destinations_per_origin[o] = 0
             destinations_per_origin[o] += 1
 
-        self.initial_iteration()
-        # self.t_assignment.perform_initial_solution()
+        if use_boost:
+            self.t_assignment.perform_initial_solution()
+        else:
+            self.initial_iteration()
 
         logger.info(f" 0th iteration done, cost = {self.t_assignment.get_objective_function()}")
 
@@ -240,8 +250,10 @@ class PathBasedAssignment(WorkerThread):
             origins = destinations_per_origin.keys()
             for origin in origins:
 
-                # self.t_assignment.compute_shortest_paths(origin)
-                self.shortest_path_temp_wrapper(origin)
+                if use_boost:
+                    self.t_assignment.compute_shortest_paths(origin)
+                else:
+                    self.shortest_path_temp_wrapper(origin)
 
                 t_paths = self.t_assignment.get_total_paths(origin)
                 Q, q, A, b, G, h = self.t_assignment.get_problem_data(origin, destinations_per_origin[origin])
@@ -254,11 +266,15 @@ class PathBasedAssignment(WorkerThread):
                 solution = cvxopt.solvers.qp(Qm.trans(), qm, Gm.trans(), hm, Am.trans(), bm)["x"]
                 self.t_assignment.update_path_flows(origin, solution)
 
-                # c++ data structures and aequilibrae data structures are not integrated yet
-                self.update_time_field_for_path_computation()
+                if not use_boost:
+                    # c++ data structures and aequilibrae data structures are not integrated yet
+                    self.update_time_field_for_path_computation()
 
             this_cost = self.t_assignment.get_objective_function()
-            self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+
+            if use_boost:
+                self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+
             converged = self.check_convergence()
 
             logger.info(f"Iteration {self.iter}, computed gap: {self.rgap}, computed objective: {this_cost}")
