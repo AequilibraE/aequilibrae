@@ -1,4 +1,4 @@
-name: Tests on Windows
+name: Tests on Windows with linting
 
 on: [pull_request]
 
@@ -8,6 +8,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.6', '3.7', '3.8' ]
+        architecture: [ 'x86', 'x64' ]
       max-parallel: 1
     steps:
     - uses: actions/checkout@v2
@@ -15,7 +16,7 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: ${{ matrix.architecture }}
 
     - name: Install dependencies
       run: |
@@ -23,6 +24,11 @@ jobs:
         pip install setuptools wheel
         pip install -r requirements.txt
         pip install pytest
+
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        flake8
 
     - name: Download spatialite
       run: |
@@ -37,6 +43,18 @@ jobs:
         cd ..
         cd ..
 
-    - name: Runs test
+    - name: Generate coverage report
+      if: ${{ matrix.python-version == '3.7' && matrix.architecture == 'x64'}}
       run: |
-        python -m pytest
+        python3 -m pytest --cov=./ --cov-report=xml
+
+    - name: Upload coverage to Codecov
+      if: ${{ matrix.python-version == '3.7' && matrix.architecture == 'x64'}}
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        yml: ./codecov.yml
+        fail_ci_if_error: true
