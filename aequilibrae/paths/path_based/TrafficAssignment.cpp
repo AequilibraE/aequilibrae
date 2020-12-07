@@ -296,6 +296,13 @@ void TrafficAssignment::compute_shortest_paths(int from_node) {
 }
 
 
+// temp for shortest path replacement
+void TrafficAssignment::get_precedence(int *prec){
+    memcpy(prec, precedence, num_nodes*sizeof(int));
+}
+
+
+
 void TrafficAssignment::compute_path_link_sequence(int origin, int destination) {
     unsigned int num_links_path=0;
     int l_id;

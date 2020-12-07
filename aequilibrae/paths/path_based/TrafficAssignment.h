@@ -109,6 +109,8 @@ public:
 	void compute_path_link_sequence(int origin, int destination);
 
 	void get_link_flows(float *ptr_flows);
+	// test for shortest path replacement:
+	void get_precedence(int *prec);
 
 	void get_odpath_times(unsigned long origin, unsigned long destination, float *path_times,  float *path_flows);
 

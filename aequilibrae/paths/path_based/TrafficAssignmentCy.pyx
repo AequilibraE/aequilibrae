@@ -36,6 +36,7 @@ cdef extern from "TrafficAssignment.h":
         void update_current_iteration_flows_by_origin(unsigned long origin, float *flows)
         void update_link_flows_stepsize(double stepsize)
         void update_path_flows_stepsize(unsigned int origin, double stepsize)
+        void get_precedence(int *prec)
 
 
 cdef class TrafficAssignmentCy:
@@ -84,6 +85,12 @@ cdef class TrafficAssignmentCy:
 
         self.thisptr.get_link_flows(link_f.data.as_floats)
         return link_f
+
+    def get_precedence(self):
+        zeros = [0 for i in range(self.num_nodes)]
+        cdef array.array prec = array.array('i', zeros)
+        self.thisptr.get_precedence(prec.data.as_ints)
+        return prec
 
     def get_objective_function(self):
         return self.thisptr.get_objective_function()
