@@ -3,25 +3,18 @@ import sys
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt  # noqa: E402
 
 aequ_dir = "/mnt/c/Users/jan.zill/code/aequilibrae"
-sys.path.append(aequ_dir)
-
+if aequ_dir not in sys.path:
+    sys.path.append(aequ_dir)
 from aequilibrae.paths import TrafficAssignment  # noqa: E402
 from aequilibrae.paths import Graph  # noqa: E402
 from aequilibrae.paths.traffic_class import TrafficClass  # noqa: E402
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-
-from aequilibrae import logger  # noqa: E402
-import logging  # noqa: E402
-
-# We redirect the logging output to the terminal
-# stdout_handler = logging.StreamHandler(sys.stdout)
-# logger.addHandler(stdout_handler)
 
 
-def get_assignment_solution(tntp_dir, scenario, link_file, method="bfw", block_centroids=True, rgap=1e-5):
+def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids=True, rgap=1e-5):
     net = pd.read_csv(os.path.join(tntp_dir, scenario, link_file), skiprows=7, sep="\t")
     net = net.reset_index().rename(columns={"index": "link_id"})
 
@@ -79,13 +72,18 @@ def get_assignment_solution(tntp_dir, scenario, link_file, method="bfw", block_c
     assig.set_time_field("time")
     assig.set_algorithm(method)
     assig.rgap_target = rgap
+    return assig
+
+
+def get_assignment_solution(tntp_dir, scenario, link_file, method="bfw", block_centroids=True, rgap=1e-5):
+    assig = set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids, rgap)
 
     # Execute the assignment
     assig.execute()
 
     # the results are within each traffic class only one, in this case
     # assigclass.results.link_loads
-    solution = pd.DataFrame(assigclass.graph.network)
-    solution["flow"] = assigclass.results.link_loads
+    solution = pd.DataFrame(assig.classes[0].graph.network)
+    solution["flow"] = assig.classes[0].results.link_loads
 
     return solution
