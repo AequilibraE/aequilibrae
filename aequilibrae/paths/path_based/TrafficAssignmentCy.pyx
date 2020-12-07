@@ -40,6 +40,7 @@ cdef extern from "TrafficAssignment.h":
         void set_precedence(int *prec)
         void compute_path_link_sequence_external_precedence(int origin)
         void set_initial_path_flows(unsigned int origin)
+        void update_link_flows(unsigned int from_node)
 
 
 cdef class TrafficAssignmentCy:
@@ -146,6 +147,9 @@ cdef class TrafficAssignmentCy:
     def update_path_flows(self, origin, flows):
         cdef array.array path_flows= array.array('f', flows)
         self.thisptr.update_path_flows(origin, path_flows.data.as_floats)
+
+    def update_link_flows(self, from_node):
+        self.thisptr.update_link_flows(from_node)
 
 
     def get_path_times(self, origin, destination):
