@@ -202,7 +202,7 @@ class PathBasedAssignment(WorkerThread):
         if self.time_field in c.graph.skim_fields:
             idx = c.graph.skim_fields.index(self.time_field)
             c.graph.skims[:, idx] = self.congested_time[:]
-        # c._aon_results.reset() # not used atm, we do not assign link flows along shortest paths
+        c._aon_results.reset()  # not used atm, we do not assign link flows along shortest paths
 
     def doWork(self):
         self.execute()
@@ -239,16 +239,6 @@ class PathBasedAssignment(WorkerThread):
             if pyqt:
                 self.equilibration.emit(["rgap", self.rgap])
                 self.equilibration.emit(["iterations", self.iter])
-            # flows = []
-            # aon_flows = []
-            # for c in self.traffic_classes:
-            # aon = allOrNothing(c.matrix, c.graph, c._aon_results)
-            # if pyqt:
-            #    aon.assignment.connect(self.signal_handler)
-            # aon.execute()
-            # c._aon_results.total_flows()
-            # aon_flows.append(c._aon_results.total_link_loads * c.pce)
-            # self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             origins = destinations_per_origin.keys()
             for origin in origins:

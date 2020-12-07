@@ -96,13 +96,15 @@ cdef class TrafficAssignmentCy:
 
     def get_link_flows(self):
         zeros = [0.0 for i in range(len(self.links))]
-        cdef array.array link_f= array.array('f', zeros)
+        # need double here for integration with aequilibrae
+        cdef array.array link_f= array.array('d', zeros)
         self.thisptr.get_link_flows(link_f.data.as_floats)
         return link_f
 
     def get_congested_times(self):
         zeros = [0.0 for i in range(len(self.links))]
-        cdef array.array link_times = array.array('f', zeros)
+        # need double here for integration with aequilibrae
+        cdef array.array link_times = array.array('d', zeros)
         self.thisptr.get_congested_times(link_times.data.as_floats)
         return link_times
 
