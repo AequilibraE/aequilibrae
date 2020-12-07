@@ -15,14 +15,16 @@ from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData  # noqa: E402
 
 
 def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids=True, rgap=1e-5):
+
     net = pd.read_csv(os.path.join(tntp_dir, scenario, link_file), skiprows=7, sep="\t")
     net = net.reset_index().rename(columns={"index": "link_id"})
+    net.columns = net.columns.str.strip()
 
     if scenario == "Anaheim":
         cols_ = ["link_id", "Tail", "Head", "Free Flow Time (min)", "Capacity (veh/h)", "B", "Power"]
         col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
     elif scenario == "Berlin-Center":
-        cols_ = ["link_id", "Init node ", "Term node ", "Free Flow Time ", "Capacity ", "B ", "Power "]
+        cols_ = ["link_id", "Init node", "Term node", "Free Flow Time", "Capacity", "B", "Power"]
         col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
     else:
         raise ValueError(f"Scenario {scenario} needs network column name check")
