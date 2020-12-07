@@ -21,13 +21,13 @@ import logging  # noqa: E402
 # logger.addHandler(stdout_handler)
 
 
-def get_gradient_descent_solution(tntp_dir, scenario, link_file, method="bfw", block_centroids=True, rgap=1e-5):
+def get_assignment_solution(tntp_dir, scenario, link_file, method="bfw", block_centroids=True, rgap=1e-5):
     net = pd.read_csv(os.path.join(tntp_dir, scenario, link_file), skiprows=7, sep="\t")
     net = net.reset_index().rename(columns={"index": "link_id"})
 
     if scenario == "Anaheim":
-        cols_ = ["link_id", "Tail", "Head", "Free Flow Time (min)", "Capacity (veh/h)"]
-        col_names = ["link_id", "a_node", "b_node", "time", "capacity"]
+        cols_ = ["link_id", "Tail", "Head", "Free Flow Time (min)", "Capacity (veh/h)", "B", "Power"]
+        col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
     elif scenario == "Berlin-Center":
         cols_ = ["link_id", "Init node ", "Term node ", "Free Flow Time ", "Capacity ", "B ", "Power "]
         col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
@@ -70,18 +70,14 @@ def get_gradient_descent_solution(tntp_dir, scenario, link_file, method="bfw", b
 
     # configures it properly
     assig.set_vdf("BPR")
-    if scenario == "Anaheim":
-        assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    elif scenario == "Berlin-Center":
-        assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
-    else:
-        raise ValueError(f"Scenario {scenario} needs BPR params")
+    #     if scenario == "Anaheim":
+    #         assig.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    #     elif scenario == "Berlin-Center":
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
 
     assig.set_capacity_field("capacity")
     assig.set_time_field("time")
-    # could be assig.set_algorithm('frank-wolfe')
-    assig.set_algorithm("bfw")
-
+    assig.set_algorithm(method)
     assig.rgap_target = rgap
 
     # Execute the assignment
