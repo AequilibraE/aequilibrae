@@ -113,6 +113,7 @@ public:
 	void get_precedence(int *prec);
 	void set_precedence(int *prec);
 	void compute_path_link_sequence_external_precedence(int from_node);
+	void set_initial_path_flows(unsigned int origin);
 
 	void get_odpath_times(unsigned long origin, unsigned long destination, float *path_times,  float *path_flows);
 

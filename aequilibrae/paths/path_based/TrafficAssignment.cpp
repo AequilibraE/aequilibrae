@@ -179,6 +179,14 @@ void TrafficAssignment::perform_initial_solution() {
     }
 }
 
+void TrafficAssignment::set_initial_path_flows(unsigned int origin) {
+    std::map<unsigned long,DestinationDescriptor>::iterator it;
+    for (it=centroidsDescriptors[origin].destinationDescriptors.begin(); it!=centroidsDescriptors[origin].destinationDescriptors.end(); it++)
+    {
+        centroidsDescriptors[origin].path_flows[it->second.path_indices[0]] = it->second.demand;
+    }
+}
+
 
 void TrafficAssignment::update_path_flows(unsigned long origin, float *flows) {
     for (unsigned int j=0; j< centroidsDescriptors[origin].path_flows.size();j++) {

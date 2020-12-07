@@ -5,7 +5,6 @@ from warnings import warn
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae import logger
 
 from aequilibrae.paths.path_based import TrafficAssignmentCy
@@ -14,6 +13,10 @@ from aequilibrae.paths.path_based.node import Node
 from aequilibrae.paths.path_based.link import Link
 import cvxopt
 
+# temp for one to all shortest path hack
+from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
+from aequilibrae.paths.AoN import one_to_all
+
 
 # try:
 #     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
@@ -21,18 +24,6 @@ import cvxopt
 #     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 # except ImportError as ie:
 #     logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
-# import scipy
-#
-# if int(scipy.__version__.split(".")[1]) >= 3:
-#     from scipy.optimize import root_scalar
-#
-#     recent_scipy = True
-# else:
-#     from scipy.optimize import root as root_scalar
-#
-#     recent_scipy = False
-#     logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
@@ -151,11 +142,32 @@ class PathBasedAssignment(WorkerThread):
                 destinations.append(destination)
             if origin not in origins:
                 origins.append(origin)
-
         self.destinations = destinations
         self.origins = origins
 
-    #        return links, nodes, ods, destinations, origins
+    def initial_iteration(self):
+        c = self.traffic_classes[0]
+        matrix = c.matrix
+        graph = c.graph
+        results = c._aon_results
+        for origin in range(len(self.origins)):
+            aux_res = MultiThreadedAoN()
+            aux_res.prepare(graph, results)
+            matrix.matrix_view = c.matrix.matrix_view.reshape(
+                (graph.num_zones, graph.num_zones, results.classes["number"])
+            )
+            th = 0  # th is thread id
+            origin_aeq = origin + 1  # sort out this mess
+            _ = one_to_all(origin_aeq, matrix, graph, results, aux_res, th)
+
+            # set precedence to aux_res.predecessors[:,0]
+            prec = aux_res.predecessors[:, 0]
+            self.t_assignment.set_precedence(prec)
+            self.t_assignment.compute_path_link_sequence_external_precedence(origin)
+            self.t_assignment.set_initial_path_flows(origin)
+
+        for origin in range(len(self.origins)):
+            self.t_assignment.update_link_flows(origin)
 
     def doWork(self):
         self.execute()
@@ -183,7 +195,10 @@ class PathBasedAssignment(WorkerThread):
             destinations_per_origin[o] += 1
 
         # Ini solution, iter 0
-        self.t_assignment.perform_initial_solution()
+
+        self.initial_iteration()
+        # self.t_assignment.perform_initial_solution()
+
         logger.info(f" 0th iteration done, cost = {self.t_assignment.get_objective_function()}")
 
         for self.iter in range(1, self.max_iter + 1):
