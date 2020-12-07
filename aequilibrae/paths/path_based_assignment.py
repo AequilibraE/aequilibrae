@@ -189,14 +189,11 @@ class PathBasedAssignment(WorkerThread):
         self.t_assignment.set_precedence(prec)
         self.t_assignment.compute_path_link_sequence_external_precedence(origin)
 
-        # c++ data structures and aequilibrae data structures are not integrated yet
-        self.update_time_field_for_path_computation()
-
     def update_time_field_for_path_computation(self):
-        # self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
         self.total_flow = self.t_assignment.get_link_flows()
-        self.congested_time = self.t_assignment.get_congested_times()
-        self.vdf.apply_vdf(self.total_flow, self.congested_time, self.capacity, self.free_flow_tt, *self.vdf_parameters)
+        # self.congested_time = self.t_assignment.get_congested_times()
+
+        self.vdf.apply_vdf(self.congested_time, self.total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters)
         c = self.traffic_classes[0]
         c.graph.cost = self.congested_time
         if self.time_field in c.graph.skim_fields:
@@ -256,6 +253,9 @@ class PathBasedAssignment(WorkerThread):
                 hm = cvxopt.matrix(h.tolist(), (t_paths, 1), "d")
                 solution = cvxopt.solvers.qp(Qm.trans(), qm, Gm.trans(), hm, Am.trans(), bm)["x"]
                 self.t_assignment.update_path_flows(origin, solution)
+
+                # c++ data structures and aequilibrae data structures are not integrated yet
+                self.update_time_field_for_path_computation()
 
             this_cost = self.t_assignment.get_objective_function()
             self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
