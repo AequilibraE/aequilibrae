@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
+      max-parallel: 1
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.7
@@ -34,6 +34,7 @@ jobs:
         make html
 
   upload_dev:
+    runs-on: ubuntu-latest
     needs: build
     if: ${{ github.event_name == 'pull_request'}}
     steps:
@@ -52,6 +53,7 @@ jobs:
       - name: Check history of versions
         run: python docs/website/check_documentation_versions.py
   upload_final:
+    runs-on: ubuntu-latest
     needs: build
     if: ${{ github.event_name == 'release'}}
     steps:
