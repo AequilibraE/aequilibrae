@@ -17,30 +17,20 @@ jobs:
         sudo apt-get install libsqlite3-mod-spatialite
         sudo apt-get install -y libspatialite-dev
         pip3 install setuptools --upgrade
-        pip3 install numpy
-        pip3 install pyaml
-        pip3 install cython
-        pip3 install scipy
-        pip3 install openmatrix
-        pip3 install pyshp
-        pip3 install requests
-        pip3 install pytest
+        pip3 install -r requirements.txt
         pip3 install spatialite
         pip3 install pytest
         pip3 install pytest-cov
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
     - name: Compile library
       run: |
         cd aequilibrae/paths
         python3 setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
-
     - name: Generate coverage report
       run: |
         python3 -m pytest --cov=./ --cov-report=xml
-
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
