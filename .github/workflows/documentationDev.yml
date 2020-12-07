@@ -51,7 +51,6 @@ jobs:
 
       - name: Check history of versions
         run: python docs/website/check_documentation_versions.py
-
   upload_final:
     needs: build
     if: ${{ github.event_name == 'release'}}
