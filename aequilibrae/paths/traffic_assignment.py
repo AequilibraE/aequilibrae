@@ -106,12 +106,12 @@ class TrafficAssignment(object):
         if instance == "rgap_target":
             if not isinstance(value, float):
                 return False, value, "Relative gap needs to be a float"
-            if isinstance(self.assignment, LinearApproximation):
+            if isinstance(self.assignment, LinearApproximation) or isinstance(self.assignment, PathBasedAssignment):
                 self.assignment.rgap_target = value
         elif instance == "max_iter":
             if not isinstance(value, int):
                 return False, value, "Number of iterations needs to be an integer"
-            if isinstance(self.assignment, LinearApproximation):
+            if isinstance(self.assignment, LinearApproximation) or isinstance(self.assignment, PathBasedAssignment):
                 self.assignment.max_iter = value
         elif instance == "vdf":
             v = value.lower()

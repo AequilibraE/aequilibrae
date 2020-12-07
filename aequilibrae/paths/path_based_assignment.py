@@ -295,6 +295,7 @@ class PathBasedAssignment(WorkerThread):
 
     def check_convergence(self):
         """Calculate relative gap and return True if it is smaller than desired precision"""
+
         num = 0.0
         dem = 0.0
         for (origin, destination) in self.ods:

@@ -14,7 +14,7 @@ from aequilibrae.paths.traffic_class import TrafficClass  # noqa: E402
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData  # noqa: E402
 
 
-def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids=True, rgap=1e-5):
+def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids, rgap):
 
     net = pd.read_csv(os.path.join(tntp_dir, scenario, link_file), skiprows=7, sep="\t")
     net = net.reset_index().rename(columns={"index": "link_id"})
