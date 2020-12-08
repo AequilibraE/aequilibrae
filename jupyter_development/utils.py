@@ -57,7 +57,7 @@ def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids, rg
     g.set_blocked_centroid_flows(block_centroids)
 
     # # Creates the assignment class
-    assigclass = TrafficClass(g, mat)
+    assigclass = [TrafficClass(g, mat)]
 
     # Instantiates the traffic assignment problem
     assig = TrafficAssignment()

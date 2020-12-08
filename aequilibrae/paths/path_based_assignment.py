@@ -54,6 +54,7 @@ class PathBasedAssignment(WorkerThread):
         WorkerThread.__init__(self, None)
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
+        self.cores = assig_spec.cores
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
         self.iteration_issue = []
@@ -206,7 +207,9 @@ class PathBasedAssignment(WorkerThread):
         self.total_flow = array.array("d", total_flow_)
         self.traffic_classes[0].results.link_loads = self.total_flow
 
-        self.vdf.apply_vdf(self.congested_time, self.total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters)
+        self.vdf.apply_vdf(
+            self.congested_time, self.total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+        )
         c = self.traffic_classes[0]
         c.graph.cost = self.congested_time
         if self.time_field in c.graph.skim_fields:
