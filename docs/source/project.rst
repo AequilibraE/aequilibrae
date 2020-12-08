@@ -4,7 +4,7 @@ The AequilibraE project
 =======================
 
 Similarly to commercial packages, AequilibraE is moving towards having the
-majority of a model residing inside a single file. This change is motivated
+majority of a model's components residing inside a single file. This change is motivated
 by the fact that it is easier to develop and maintain documentation for models
 if they are kept in a format that favors data integrity and that supports a
 variety of data types and uses.
@@ -15,7 +15,7 @@ variety of data types and uses.
 
 The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
 with all the GIS capability supported by
-`SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. Their
+`SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. The
 impressive performance, portability, self containment and open-source character
 of these two pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
@@ -25,7 +25,27 @@ package, please refer to :ref:`dependencies`.
 .. note::
    This portion of AequilibraE is under intense development, and important
    changes to the project structure and the API should be expected until at
-   least version 0.7. Versions 0.8 and beyond should see a much more stable API
+   least version 0.7.X. Versions 0.8 and beyond should see a much more stable
+   API, with new capabilities being incorporated in each release.
+
+Project structure
+-----------------
+Since version 0.7, the AequilibraE project consists of a main folder, where a
+series of files and sub folders exist. The files are the following:
+
+- **project_database.sqlite** - Main project file, containing network and data
+  tables for the project
+
+- **results_database.sqlite** - Database containing outputs for all algorithms
+  such as those resulting from traffic assignment
+
+- **parameters.yml** - Contains parameters for all parameterized AequilibraE
+  procedures
+
+- **matrices** (*folder*) - Contains all matrices to be used within a project
+
+- **scenarios** (*folder*) - Contains copies of each *project_database.sqlite*
+  at the time a certain scenario was saved (upcoming in version 0.8)
 
 Data consistency
 ----------------
@@ -39,95 +59,68 @@ consistency, which has been introduced in the AequilibraE framework with
 implemented link-node consistency infrastructure in the form of spatialite
 triggers.
 
-Further data consistency, especially for tabular data, is also necessary,
-however, and it is being slowly introduced in the AequilibraE project in the
-form of database triggers and user-triggered consistency checks through the
-API.
+Further data consistency, especially for tabular data, is also necessary. This
+need has been largely addressed in version 0.7, but more triggers will most
+likely be added in upcoming versions.
 
-All consistency triggers/procedures will be discussed in parallel with the
+All consistency triggers/procedures are discussed in parallel with the
 features they implement.
 
-Project organization
---------------------
-Along with the Sqlite file that is the base for the AequilibraE project, other
-data such as documentation and binary matrices (OMX or AEM) do not fit nicely
-into a database structure, and therefore are stored in the file system in
-parallel with the Sqlite Project in a folder with the same name.
 
-For now, AequilibraE only supports one network per project file, as everything
-related to network names is hard-coded, and the work of re-factoring it would
-be substantial. However, there is nothing in the SQLite architecture that
-prevents housing an arbitrarily large number of networks within the same file.
-
-Project file components
+Dealing with Geometries
 -----------------------
+Geometry is a key feature when dealing with transportation infrastructure and
+actual travel. For this reason, all datasets in AequilibraE that correspond to
+elements with physical GIS representation are geo-enabled.
 
-A number of elements are already default in the AequilibraE project, while
-others are still being developed. The components that are currently part of
-the AequilibraE project are:
+This also means that the AequilibraE API needs to provide an interface to
+manipulate each element's geometry in a convenient way. This is done using the
+wonderful `Shapely <https://shapely.readthedocs.io/>`_, and we urge you to study
+its comprehensive API before attempting to edit a feature's geometry in memory.
 
-.. index:: transponet
-
-Projection
-----------
-
-Although GIS technology allows for a number of different projections to be used
-in pretty much any platform, we have decided to have all AequilibraE's project
-using a single projection, WGS84 - CRS 4326.
-
-This should not affect users too much, as GIS platforms allow for on-the-fly
-reprojection for mapping purposes.
+As AequilibraE is based on Spatialite, the user is also welcome to use its
+powerful tools to manipulate your model's geometries, although that is not
+recommended, as the "training wheels are off".
 
 
-Network
-~~~~~~~
+Project database
+----------------
+.. toctree::
+   :maxdepth: 1
 
-Given the complexity of the Network tables, a dedicated documentation page has
-been created to discuss their implementation in :ref:`network`.
+   project_docs/about
+   project_docs/network
+   project_docs/modes
+   project_docs/link_types
+   project_docs/matrices
+   project_docs/zones
+   project_docs/parameters_metadata
+   project_docs/results
 
-.. TODO: Remove section if features not present by version 0.8
-.. Supporting layers
-.. ~~~~~~~~~~~~~~~~~
-.. As any SQLite file, the AequilibraE project is capable of supporting any number
-.. of layers inside the project, and therefore the user is welcome to load any needed
-.. layers in the database.
-.. However, special support for a few commonly used layers is expected to come to
-.. AequilibraE, particularly those related to zoning systems, census/demographic
-.. databases and Delaunay networks.
-.. Zone layer
-.. ++++++++++
-.. Just for displaying purposes. No math involves this layer
-.. Matrix Index
-.. ~~~~~~~~~~~~
+Parameters file
+----------------
+.. toctree::
+   :maxdepth: 1
 
+   parameter_file
 
-Configuration tables
-~~~~~~~~~~~~~~~~~~~~
+Extra user data fields
+~~~~~~~~~~~~~~~~~~~~~~
+The AequilibraE standard configuration is not particularly minimalist, but it is
+reasonable to expect that users would require further data fields in one or more
+of the data tables that are part of the AequilibraE project. For this reason, and
+to incentivate the creation of a consistent culture around the handling of model
+data in aequilibrae, we have added 10 additional data fields to each table which
+are not used by AequilibraE's standard configuration, all of which are named as
+Greek letters. They are the following:
 
-Many tables with information on the models (demographics, modes, metadata, etc.)
-are expected to exist, so a dedicated page on them is advisable, even though the
-content of such a page is not yet too extensive.  :ref:`project_tables`.
-
-
-Summary of all tables in the project database
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The tables that are currently part of the AequilibraE project are the following:
-
-* links
-* nodes
-* modes
-
-.. vector_index
-.. vector_data
-.. matrix_index
-.. scenario_index
-
-Project API
------------
-
-The project API is still not particularly powerful, and most of the procedures
-that exist within AequilibraE are not integrated with the project format.
-However, as each feature is made compatible with AequilibraE Project, the
-examples provided will be updated. For now, all the examples can be found under
-:ref:`example_usage_project`.
+- 'alpha'
+- 'beta'
+- 'gamma'
+- 'delta'
+- 'epsilon'
+- 'zeta'
+- 'iota'
+- 'sigma'
+- 'phi'
+- 'tau'

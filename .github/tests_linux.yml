@@ -24,7 +24,7 @@ jobs:
         pip3 install setuptools --upgrade
         pip install -r requirements.txt
         pip3 install pytest
-        pip3 install spatialite
+        pip3 install spatialite pysqlite3-binary
         pip3 install pytest
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 

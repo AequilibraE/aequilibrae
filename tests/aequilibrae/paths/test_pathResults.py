@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from aequilibrae.paths import path_computation, Graph
 from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import binary_version
 from ...data import test_graph
 import numpy as np
 
@@ -20,6 +21,7 @@ class TestPathResults(TestCase):
         # graph
         self.g = Graph()
         self.g.load_from_disk(test_graph)
+        self.g.__version__ = binary_version
         self.g.set_graph(cost_field="distance")
 
         self.r = PathResults()
@@ -40,8 +42,9 @@ class TestPathResults(TestCase):
         self.assertEqual(self.r.predecessors.min(), -1, 'Fail to reset the Path computation object')
         self.assertEqual(self.r.connectors.max(), -1, 'Fail to reset the Path computation object')
         self.assertEqual(self.r.connectors.min(), -1, 'Fail to reset the Path computation object')
-        self.assertEqual(self.r.skims.max(), np.inf, 'Fail to reset the Path computation object')
-        self.assertEqual(self.r.skims.min(), np.inf, 'Fail to reset the Path computation object')
+        if self.r.skims is not None:
+            self.assertEqual(self.r.skims.max(), np.inf, 'Fail to reset the Path computation object')
+            self.assertEqual(self.r.skims.min(), np.inf, 'Fail to reset the Path computation object')
 
         new_r = PathResults()
         with self.assertRaises(ValueError):
@@ -77,6 +80,18 @@ class TestPathResults(TestCase):
         self.r.compute_path(dest, origin)
         if list(self.r.path_link_directions) != [1, 1, 1]:
             self.fail("Path computation failed. Wrong link directions")
+
+    def test_compute_with_skimming(self):
+        g = Graph()
+        g.load_from_disk(test_graph)
+        g.__version__ = binary_version
+        g.set_graph(cost_field="distance")
+
+        r = PathResults()
+        g.set_skimming("distance")
+        r.prepare(g)
+        r.compute_path(origin, dest)
+        self.assertEqual(r.milepost[-1], r.skims[dest], 'Skims computed wrong when computing path')
 
     def test_update_trace(self):
         self.r.compute_path(origin, dest - 1)

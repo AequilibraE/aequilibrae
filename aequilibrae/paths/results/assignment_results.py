@@ -27,7 +27,7 @@ class AssignmentResults:
     def __init__(self):
         self.link_loads = None  # type: np.array  # The actual results for assignment
         self.total_link_loads = None  # type: np.array  # The result of the assignment for all user classes summed
-        self.skims = None  # The array of skims
+        self.skims = AequilibraeMatrix()  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
         p = Parameters().parameters['system']['cpus']
@@ -226,7 +226,7 @@ class AssignmentResults:
         Returns:
             dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
-        fields = ['link_id']
+        fields = []
         for n in self.classes['names']:
             fields.extend([f'{n}_ab', f'{n}_ba', f'{n}_tot'])
         types = [np.float64] * len(fields)
@@ -236,7 +236,6 @@ class AssignmentResults:
         res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
         res.data.fill(np.nan)
         res.index[:] = np.unique(self.lids)[:]
-        res.link_id[:] = res.index[:]
 
         indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
         indexing[res.index[:]] = np.arange(entries)

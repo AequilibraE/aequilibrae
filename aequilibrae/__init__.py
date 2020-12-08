@@ -1,5 +1,7 @@
 from aequilibrae.starts_logging import logger
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.data import Matrices
+from aequilibrae.log import Log
 from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
@@ -24,7 +26,6 @@ if compiled:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
     from aequilibrae.paths.graph import Graph
     from aequilibrae.project import Project
-    from aequilibrae.project.network import Network
     from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
     from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
     from aequilibrae.paths import release_version as __version__

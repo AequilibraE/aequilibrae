@@ -6,7 +6,7 @@ from warnings import warn
 from typing import List
 
 import numpy as np
-
+from aequilibrae.starts_logging import logger
 from .__version__ import binary_version as VERSION
 
 
@@ -43,7 +43,7 @@ class Graph(object):
         self.cost = None  # This array holds the values being used in the shortest path routine
         self.capacity = None  # Array holds the capacity for links
         self.free_flow_time = None  # Array holds the free flow travel time by link
-        self.skims = np.zeros((1, 1), self.__float_type)  # Skimming array that we initialize with something for the
+        self.skims = None
         # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
@@ -355,9 +355,9 @@ class Graph(object):
                 self.fs[self.num_nodes] = self.graph.shape[0]
                 self.ids = self.graph["id"]
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-                for i in self.graph.dtype.names:
-                    if np.any(np.isnan(self.graph[i])):
-                        warn(f'Field {i} has at least one NaN value.  Your computation may be compromised')
+                nans = ",".join([i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))])
+                if nans:
+                    logger.warn(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
 
     def exclude_links(self, links: list) -> None:
         """

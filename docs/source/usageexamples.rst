@@ -25,7 +25,7 @@ Each instance contains the following folder structure and contents:
 
 0_tntp_data:
 
-* Data imported from https://github.com/bstabler/TransportationNetworks/
+* Data imported from `TNTP instances <https://github.com/bstabler/TransportationNetworks/>`_.
 * matrices in openmatrix and AequilibraE formats
 * vectors computed from the matrix in question and in AequilibraE format
 * No alterations made to the data
@@ -123,7 +123,6 @@ Below we have that same workflow as a single script
 
     # remove the comments for the lines below to run the Chicago model example instead
     # fldr = 'D:/release/Sample models/Chicago_2020_02_15'
-    # proj_name = 'chicagomodel.sqlite'
 
     dt_fldr = '0_tntp_data'
     prj_fldr = '1_project'
@@ -150,7 +149,7 @@ Below we have that same workflow as a single script
     ########### PROJECT #################
 
     project = Project()
-    project.load(join(fldr, prj_fldr, proj_name))
+    project.load(join(fldr, prj_fldr))
 
     ########### PATH COMPUTATION #################
 
@@ -673,10 +672,20 @@ the world with their complete networks downloaded from
 `Open Street Maps <http://www.openstreetmap.org>`_ and place them on a local
 folder for analysis at a later time.
 
+There are few important parameters regarding the use of OSM Overpass servers
+that one needs to pay attention to:
+
+* Overpass API endpoint
+* Maximum query area (m\ :sup:`2`)
+* Sleep time (between successive queries when the queried area is too large)
+
+The lines regarding parameters in the code below assume that you have a local
+instance of the Overpass server installed and can overload it with unlimited
+queries in rapid succession.  For more details see :ref:`parameters_osm`.
 
 ::
 
-  from aequilibrae.project import Project
+  from aequilibrae import Project, Parameters
 
   cities = ["Darwin, Australia",
             "Karlsruhe, Germany",
@@ -690,9 +699,19 @@ folder for analysis at a later time.
 
       p = Project()
       p.new(pth)
+
+      # Set parameters for a local private Overpass API server
+      par = Parameters()
+      par.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+      par.parameters['osm']['max_query_area_size'] = 10000000000
+      par.parameters['osm']['sleeptime'] = 0
+      par.write_back()
+
       p.network.create_from_osm(place_name=city)
       p.conn.close()
       del p
+
+
 
 If one wants to load a project and check some of its properties, it is easy:
 
@@ -701,7 +720,7 @@ If one wants to load a project and check some of its properties, it is easy:
   >>> from aequilibrae.project import Project
 
   >>> p = Project()
-  >>> p.load('path/to_project')
+  >>> p.open('path/to_project_folder')
 
   # for the modes available in the model
   >>> p.network.modes()
@@ -890,7 +909,7 @@ Assigning traffic on TNTP instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is a set of well known traffic assignment problems used in the literature
-maintained on `GitHub <https://github.com/bstabler/TransportationNetworks/>`_
+maintained on `Ben's GitHub <https://github.com/bstabler/TransportationNetworks/>`_
 that is often used for tests, so we will use one of those problems here.
 
 Let's suppose we want to perform traffic assignment for one of those problems
@@ -966,7 +985,7 @@ Let's suppose one wants to setup a matrix for assignment that has two user
 classes, *red_cars* and *blue cars* for a single traffic class. To do that, one
 needs only to call the *computational_view* method with a list of the two
 matrices of interest.  Both matrices need to be contained in the same file (and
-to be contiguous if an *.aem instead of a *.omx file) however.
+to be contiguous if an * .aem instead of a * .omx file) however.
 
 ::
 
@@ -1189,6 +1208,7 @@ fancy multithreading implemented in path computation.
 
 .. Transit
 .. -------
+
 We only have import for now, and it is likely to not work on Windows if you want the geometries
 
 .. _example_usage_transit:

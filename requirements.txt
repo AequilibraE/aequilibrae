@@ -6,4 +6,6 @@ cython
 openmatrix
 pyshp
 requests
+shapely
+pandas == 1.0.1
 cvxopt
