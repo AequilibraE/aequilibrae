@@ -206,7 +206,7 @@ class PathBasedAssignment(WorkerThread):
         total_flow_ = self.t_assignment.get_link_flows()
         # let's just hack it, most data structures will be integrated anyways
         self.total_flow = array.array("d", total_flow_)
-        self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+        self.traffic_classes[0].results.link_loads = self.total_flow
 
         self.vdf.apply_vdf(self.congested_time, self.total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters)
         c = self.traffic_classes[0]
@@ -215,7 +215,6 @@ class PathBasedAssignment(WorkerThread):
             idx = c.graph.skim_fields.index(self.time_field)
             c.graph.skims[:, idx] = self.congested_time[:]
         c._aon_results.reset()  # not used atm, we do not assign link flows along shortest paths
-
         c.results.link_loads = self.total_flow
 
     def doWork(self):
@@ -309,9 +308,9 @@ class PathBasedAssignment(WorkerThread):
                 # c++ data structures and aequilibrae data structures are not integrated yet
                 self.update_time_field_for_path_computation()
 
-            # now this can be parallel again
-            for origin in origins:
-                self.t_assignment.update_path_flows_stepsize(origin, self.stepsize)
+            # now this can be parallel again, loop over origins in c++
+            # for origin in origins:
+            self.t_assignment.update_path_flows_stepsize(self.stepsize)
 
             this_cost = self.t_assignment.get_objective_function()
 

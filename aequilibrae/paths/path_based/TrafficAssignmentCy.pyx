@@ -36,7 +36,7 @@ cdef extern from "TrafficAssignment.h":
 
         void update_current_iteration_flows_by_origin(unsigned long origin, float *flows)
         void update_link_flows_stepsize(double stepsize)
-        void update_path_flows_stepsize(unsigned int origin, double stepsize)
+        void update_path_flows_stepsize(double stepsize)
         # void get_precedence(int *prec)
         void set_precedence(int *prec)
         void compute_path_link_sequence_external_precedence(int origin)
@@ -181,8 +181,8 @@ cdef class TrafficAssignmentCy:
     def update_link_flows_stepsize(self, stepsize):
         self.thisptr.update_link_flows_stepsize(stepsize)
 
-    def update_path_flows_stepsize(self, origin, stepsize):
-        self.thisptr.update_path_flows_stepsize(origin, stepsize)
+    def update_path_flows_stepsize(self, stepsize):
+        self.thisptr.update_path_flows_stepsize(stepsize)
 
     def objective_derivative_stepsize(self, stepsize):
         """Calculate the derivative of the objective function with respect to the stepsize given the

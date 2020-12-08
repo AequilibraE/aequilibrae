@@ -226,6 +226,7 @@ void TrafficAssignment::update_current_iteration_flows_by_origin(unsigned long o
 }
 
 
+// TODO: the name is not an accurate description, change it
 void TrafficAssignment::update_link_flows_by_origin(unsigned int origin) {
     for (unsigned long l_id=0; l_id < links.size(); l_id++) {
         float flow=0;
@@ -262,8 +263,10 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
         double sum_over_origins = 0.0;
         for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
             sum_over_origins += link_flows_origin_current_iter_diff[origin*n_links+l_id];
-            // YES OR NO? NO!
-            //link_flows_origin[origin*n_links+l_id] += stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id];
+
+            // TODO: YES OR NO? -> link_flows_by_origin are sum over path flows, so maybe update these that way?, see next function
+            link_flows_origin[origin*n_links+l_id] += stepsize * link_flows_origin_current_iter_diff[origin*n_links+l_id];
+            //
         }
         link_flows[l_id] += stepsize * sum_over_origins;
         update_link_derivatives(l_id); // also updates costs
@@ -271,10 +274,31 @@ void TrafficAssignment::update_link_flows_stepsize(double stepsize) {
 }
 
 
-void TrafficAssignment::update_path_flows_stepsize(unsigned int origin, double stepsize) {
-    for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size(); j++) {
-        centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
-            stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
+void TrafficAssignment::update_path_flows_stepsize(double stepsize) {
+    for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
+        for (unsigned int j=0; j < centroidsDescriptors[origin].path_flows_current_iter.size(); j++) {
+            centroidsDescriptors[origin].path_flows[j] = (1.0 - stepsize) * centroidsDescriptors[origin].path_flows[j] +
+                stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
+        }
+    }
+    // TODO: Yes or no? update link flows by origin
+    // update_link_flows_by_origin_for_all();
+}
+
+
+// now this does what the name says, but see l.229
+void TrafficAssignment::update_link_flows_by_origin_for_all() {
+
+    for (unsigned int origin = 0; origin < n_cent; origin++) { // see constructor, centroids have 0-based continuous indeces
+        for (unsigned long l_id=0; l_id < links.size(); l_id++) {
+            double flow = 0.0;
+            for (unsigned int j=0; j< centroidsDescriptors[origin].path_link_incidence[l_id].size();j++) {
+                flow += centroidsDescriptors[origin].path_flows[centroidsDescriptors[origin].path_link_incidence[l_id][j]];
+            }
+            //float previous_flow = link_flows_origin[origin*n_links+l_id];
+            //link_flows_origin_current_iter_diff[origin*n_links+l_id] = flow - previous_flow;
+            link_flows_origin[origin*n_links+l_id] = static_cast<float> (flow); //update to current solution
+        }
     }
 }
 
