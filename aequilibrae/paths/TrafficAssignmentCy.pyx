@@ -1,6 +1,5 @@
 # distutils: language=c++
 # distutils: sources = TrafficAssignment.cpp
-#ShortestPathComputation.cpp
 
 from cpython cimport array
 #import array

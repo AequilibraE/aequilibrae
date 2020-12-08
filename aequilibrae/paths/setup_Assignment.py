@@ -43,8 +43,8 @@ if "WINDOWS" in platform.platform().upper():
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=['/openmp'],
-            extra_link_args=['/openmp'],
+            extra_compile_args=["/openmp"],
+            extra_link_args=["/openmp"],
             include_dirs=[np.get_include()],
         )
     ]
@@ -53,10 +53,20 @@ else:
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=['-fopenmp'],
-            extra_link_args=['-fopenmp'],
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
             include_dirs=[np.get_include()],
         )
     ]
 
-setup(name='AoN', ext_modules=cythonize(ext_modules), )
+ext_bushbased = [
+    Extension(
+        "TrafficAssignmentCy",
+        sources=["TrafficAssignmentCy.pyx", "TrafficAssignment.cpp"],
+        language="c++",
+        extra_compile_args=["-ffast-math", "-O3"],
+    )
+]
+
+setup(name="AoN", ext_modules=cythonize(ext_modules))
+setup(name="TrafficAssignmentCy", ext_modules=cythonize(ext_bushbased))

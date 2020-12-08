@@ -2,21 +2,26 @@ import importlib.util as iutil
 import numpy as np
 from typing import List, Dict
 from warnings import warn
+import cvxopt
+import array
+
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae import logger
+import pandas as pd  # temporary for data structures
+from aequilibrae.paths.link import Link, Node
 
-from aequilibrae.paths.path_based import TrafficAssignmentCy
-import pandas as pd
-from aequilibrae.paths.path_based.node import Node
-from aequilibrae.paths.path_based.link import Link
-import cvxopt
-import array
 
-# temp for one to all shortest path hack
-from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
-from aequilibrae.paths.AoN import one_to_all
+try:
+    from aequilibrae.paths import TrafficAssignmentCy
+
+    # temp for one to all shortest path hack
+    from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
+    from aequilibrae.paths.AoN import one_to_all
+except ImportError as ie:
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+
 
 import scipy
 
@@ -30,13 +35,6 @@ else:
     recent_scipy = False
     logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
-
-# try:
-#     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
-#     from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
-#     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
-# except ImportError as ie:
-#     logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
