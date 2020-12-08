@@ -1,5 +1,0 @@
-Workflows
-=========
-
-Downloading example files
-
