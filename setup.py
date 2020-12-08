@@ -13,8 +13,9 @@ whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
 ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include()])
 
 whole_path2 = os.path.join(here, "aequilibrae/paths/path_based", "TrafficAssignmentCy.pyx")
-ext_module2 = Extension("aequilibrae.paths.path_based.TrafficAssignmentCy", [whole_path],
-                        include_dirs=[np.get_include()])
+whole_path3 = os.path.join(here, "aequilibrae/paths/path_based", "TrafficAssignment.cpp")
+ext_module2 = Extension("aequilibrae.paths.path_based.TrafficAssignmentCy", [whole_path2, whole_path3],
+                        language="c++", extra_compile_args=["-ffast-math"])
 
 pkgs = [pkg for pkg in find_packages()]
 
