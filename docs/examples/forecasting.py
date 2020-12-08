@@ -199,6 +199,7 @@ demand.computational_view(['matrix'])
 from math import log10, floor
 import matplotlib.pyplot as plt
 
+
 def plot_tlfd(demand, skim, name):
     b = floor(log10(skim.shape[0]) * 10)
     n, bins, patches = plt.hist(np.nan_to_num(skim.flatten(), 0), bins=b, weights=np.nan_to_num(demand.flatten()),
@@ -222,7 +223,7 @@ for function in ['power', 'expo']:
     model.save(join(fldr, f'{function}_model.mod'))
 
     # We save a trip length frequency distribution image
-    plot_tlfd(gc.result_matrix.matrix_view, imped.matrix_view, join(fldr,  f'{function}_tfld.png'))
+    plot_tlfd(gc.result_matrix.matrix_view, imped.matrix_view, join(fldr, f'{function}_tfld.png'))
 
     # We can save the result of applying the model as well
     # we can also save the calibration report
@@ -282,7 +283,7 @@ imped.computational_view(['final_time_with_intrazonals'])
 
 for function in ['power', 'expo']:
     model = SyntheticGravityModel()
-    model.load(join(fldr,  f'{function}_model.mod'))
+    model.load(join(fldr, f'{function}_model.mod'))
 
     outmatrix = join(proj_matrices.fldr, f'demand_{function}_model.aem')
     apply = GravityApplication()
