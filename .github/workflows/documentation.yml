@@ -23,7 +23,10 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
+        python setup_Assignment.py build_ext --inplace
+        cd path_based
+        python setup_path_based.py build_ext --inplace
+        cd ..
         cd ..
         cd ..
 
