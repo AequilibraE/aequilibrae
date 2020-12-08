@@ -62,6 +62,7 @@ Contents
    modeling
    path_computation_engine
    api
+   workflows
    softwaredevelopment
    roadmap
    qgis

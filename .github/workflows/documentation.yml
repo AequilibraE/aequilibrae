@@ -19,6 +19,7 @@ jobs:
         pip install wheel
         pip install -r requirements.txt
         pip install -r docs/requirements-docs.txt
+        python -m pip install sphinx-gallery --user
 
     - name: Compile library
       run: |
