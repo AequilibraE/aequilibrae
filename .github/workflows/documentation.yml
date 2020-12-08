@@ -26,7 +26,6 @@ jobs:
         python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
-        cd ..
 
     - name: Build documentation
       run: |
