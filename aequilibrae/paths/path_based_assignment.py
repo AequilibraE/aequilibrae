@@ -222,7 +222,10 @@ class PathBasedAssignment(WorkerThread):
         self.execute()
 
     def execute(self):
-        do_parallel = True
+        do_parallel = False
+        if "parallel" in self.algorithm:
+            do_parallel = True
+
         if do_parallel:
             self.execute_parallel()
         else:
@@ -306,9 +309,8 @@ class PathBasedAssignment(WorkerThread):
                 # c++ data structures and aequilibrae data structures are not integrated yet
                 self.update_time_field_for_path_computation()
 
-            # now this can be parallel again. Q: Path flows are not used for anything here, are they?
+            # now this can be parallel again
             for origin in origins:
-                # update path flows: new_path_flows = (1-stepsize) * old_path_flow + stepsize * new_path_flow
                 self.t_assignment.update_path_flows_stepsize(origin, self.stepsize)
 
             this_cost = self.t_assignment.get_objective_function()

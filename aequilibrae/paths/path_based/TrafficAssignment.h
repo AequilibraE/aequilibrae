@@ -9,7 +9,7 @@
 #define TRAFFICASSIGNMENT_H_
 #include <vector>
 #include <map>
-#include "ShortestPathComputation.h"
+//#include "ShortestPathComputation.h"
 
 #define PATHS_PER_OD 10
 
@@ -23,7 +23,6 @@ struct Link {
 	int from_node;
 	int to_node;
 };
-
 
 
 struct Path{
@@ -52,7 +51,6 @@ struct Centroid {
 };
 
 
-
 class TrafficAssignment {
 public:
 	std::vector<Link> links;
@@ -61,6 +59,9 @@ public:
 	int num_nodes;
 
     int *precedence;
+    // for parallel shortest path:
+    //std::map<int, std::vector<int>> precedence_by_origin;
+
     int *buffer_path;
 
     float *weights;
@@ -83,9 +84,9 @@ public:
 	void add_link(int link_id, float t0, float alfa, int beta, float capacity, int from_node,
 	              int to_node);
 
-	void set_edges();
-
-	void perform_initial_solution();
+	//void set_edges();
+	//void perform_initial_solution();
+	//void compute_shortest_paths(int from_node);
 
 	void update_link_flows(unsigned int from_node);
 	void update_link_flows_stepsize(double stepsize);
@@ -93,8 +94,6 @@ public:
     void update_path_flows_stepsize(unsigned int origin, double stepsize);
 
 	void insert_od(unsigned long from, unsigned long to, float demand);
-
-	void compute_shortest_paths(int from_node);
 
 	void get_subproblem_data(unsigned int origin, float *Q, float *c, float *A, float *b, float *G, float *h);
 
@@ -110,7 +109,7 @@ public:
 
 	void get_link_flows(float *ptr_flows);
 	// test for shortest path replacement:
-	void get_precedence(int *prec);
+	//void get_precedence(int *prec);
 	void set_precedence(int *prec);
 	void compute_path_link_sequence_external_precedence(int from_node);
 	void set_initial_path_flows(unsigned int origin);

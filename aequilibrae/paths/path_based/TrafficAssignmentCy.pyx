@@ -1,5 +1,6 @@
 # distutils: language=c++
-# distutils: sources = TrafficAssignment.cpp ShortestPathComputation.cpp
+# distutils: sources = TrafficAssignment.cpp
+#ShortestPathComputation.cpp
 
 from cpython cimport array
 #import array
@@ -21,14 +22,14 @@ cdef extern from "TrafficAssignment.h":
         TrafficAssignment(unsigned long num_links, unsigned long num_nodes, unsigned long num_centroids) except +
         void insert_od(unsigned long fromnode, unsigned long tonode, float demand)
         void add_link(int link_id, float t0, float alfa, int beta, float capacity, unsigned long from_node,unsigned long to_node)
-        void set_edges()
+        # void set_edges()
         float get_objective_function()
         float objective_derivative_stepsize(double stepsize)
         void get_subproblem_data(unsigned long origin, float *Q, float *c, float *A, float *b, float *G, float *h)
         unsigned int get_total_paths(int origin)
         unsigned int get_total_paths(int origin, int destination)
         void compute_shortest_paths(int origin)
-        void perform_initial_solution()
+        # void perform_initial_solution()
         void get_link_flows(float *ptr_flows)
         void update_path_flows(unsigned long origin, float *flows)
         void get_odpath_times(int origin, int destination, float *buffer, float *path_times)
@@ -36,7 +37,7 @@ cdef extern from "TrafficAssignment.h":
         void update_current_iteration_flows_by_origin(unsigned long origin, float *flows)
         void update_link_flows_stepsize(double stepsize)
         void update_path_flows_stepsize(unsigned int origin, double stepsize)
-        void get_precedence(int *prec)
+        # void get_precedence(int *prec)
         void set_precedence(int *prec)
         void compute_path_link_sequence_external_precedence(int origin)
         void set_initial_path_flows(unsigned int origin)
@@ -66,7 +67,7 @@ cdef class TrafficAssignmentCy:
             self.thisptr.add_link(link.link_id, link.t0, link.alfa, link.beta, link.capacity, link.node_id_from,
                             link.node_id_to)
 
-        self.thisptr.set_edges()
+        # self.thisptr.set_edges()
 
 
     def __dealloc__(self):
@@ -88,8 +89,8 @@ cdef class TrafficAssignmentCy:
     def compute_path_link_sequence_external_precedence(self, origin):
         self.thisptr.compute_path_link_sequence_external_precedence(origin)
 
-    def perform_initial_solution(self):
-        self.thisptr.perform_initial_solution()
+#    def perform_initial_solution(self):
+#        self.thisptr.perform_initial_solution()
 
     def set_initial_path_flows(self, origin):
         self.thisptr.set_initial_path_flows(origin)
@@ -109,11 +110,11 @@ cdef class TrafficAssignmentCy:
         return link_times
 
 
-    def get_precedence(self):
-        zeros = [0 for i in range(self.num_nodes)]
-        cdef array.array prec = array.array('i', zeros)
-        self.thisptr.get_precedence(prec.data.as_ints)
-        return prec
+#    def get_precedence(self):
+#        zeros = [0 for i in range(self.num_nodes)]
+#        cdef array.array prec = array.array('i', zeros)
+#        self.thisptr.get_precedence(prec.data.as_ints)
+#        return prec
 
 
     def get_objective_function(self):

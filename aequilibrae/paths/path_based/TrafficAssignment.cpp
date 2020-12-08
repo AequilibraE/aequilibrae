@@ -5,7 +5,7 @@
  *      Author: fas
  */
 
-#include "TrafficAssignment.h"
+//#include "TrafficAssignment.h"
 #include <memory.h>
 #include <math.h>
 
@@ -118,17 +118,18 @@ void TrafficAssignment::insert_od(unsigned long from, unsigned long to, float de
 	centroidsDescriptors[from].destinationDescriptors[to] = dest;
 }
 
-void TrafficAssignment::set_edges() {
-	std::vector<int> from_nodes;
-	std::vector<int> to_nodes;
 
-	for (int i=0; i < this->links.size(); i++) {
-	    from_nodes.push_back(this->links[i].from_node);
-	    to_nodes.push_back(this->links[i].to_node);
-	}
-	this->spComputation = new ShortestPathComputation(num_nodes, this->links.size());
-    this->spComputation->set_edges(from_nodes.data(), to_nodes.data());
-}
+//void TrafficAssignment::set_edges() {
+//	std::vector<int> from_nodes;
+//	std::vector<int> to_nodes;
+//
+//	for (int i=0; i < this->links.size(); i++) {
+//	    from_nodes.push_back(this->links[i].from_node);
+//	    to_nodes.push_back(this->links[i].to_node);
+//	}
+//	this->spComputation = new ShortestPathComputation(num_nodes, this->links.size());
+//    this->spComputation->set_edges(from_nodes.data(), to_nodes.data());
+//}
 
 
 void TrafficAssignment::add_link(int link_id, float t0, float alfa, int beta,
@@ -164,20 +165,20 @@ unsigned int TrafficAssignment::get_total_paths(unsigned long origin, unsigned l
 }
 
 
-void TrafficAssignment::perform_initial_solution() {
-    for (unsigned int i=0; i< centroidsDescriptors.size(); i++) {
-        compute_shortest_paths(i);
-        std::map<unsigned long,DestinationDescriptor>::iterator it;
-        for (it=centroidsDescriptors[i].destinationDescriptors.begin(); it!=centroidsDescriptors[i].destinationDescriptors.end(); it++)
-        {
-            centroidsDescriptors[i].path_flows[it->second.path_indices[0]] = it->second.demand;
-            //centroidsDescriptors[i].path_flows_current_iter[it->second.path_indices[0]] = 0.0; // Done in compute_shortest_path on first pass
-        }
-    }
-    for (unsigned int i=0; i< centroidsDescriptors.size(); i++) {
-        update_link_flows(i);
-    }
-}
+//void TrafficAssignment::perform_initial_solution() {
+//    for (unsigned int i=0; i< centroidsDescriptors.size(); i++) {
+//        compute_shortest_paths(i);
+//        std::map<unsigned long,DestinationDescriptor>::iterator it;
+//        for (it=centroidsDescriptors[i].destinationDescriptors.begin(); it!=centroidsDescriptors[i].destinationDescriptors.end(); it++)
+//        {
+//            centroidsDescriptors[i].path_flows[it->second.path_indices[0]] = it->second.demand;
+//            //centroidsDescriptors[i].path_flows_current_iter[it->second.path_indices[0]] = 0.0; // Done in compute_shortest_path on first pass
+//        }
+//    }
+//    for (unsigned int i=0; i< centroidsDescriptors.size(); i++) {
+//        update_link_flows(i);
+//    }
+//}
 
 void TrafficAssignment::set_initial_path_flows(unsigned int origin) {
     std::map<unsigned long,DestinationDescriptor>::iterator it;
@@ -294,20 +295,20 @@ void TrafficAssignment::update_link_derivatives(int link_id) {
 }
 
 
-void TrafficAssignment::compute_shortest_paths(int from_node) {
-    this->spComputation->compute_shortest_paths(weights, from_node, precedence, costs);
-    std::map<unsigned long,DestinationDescriptor>::iterator it;
-    for (it=centroidsDescriptors[from_node].destinationDescriptors.begin(); it!=centroidsDescriptors[from_node].destinationDescriptors.end(); it++)
-    {
-        compute_path_link_sequence(from_node, it->second.destination);
-    }
-}
+//void TrafficAssignment::compute_shortest_paths(int from_node) {
+//    this->spComputation->compute_shortest_paths(weights, from_node, precedence, costs);
+//    std::map<unsigned long,DestinationDescriptor>::iterator it;
+//    for (it=centroidsDescriptors[from_node].destinationDescriptors.begin(); it!=centroidsDescriptors[from_node].destinationDescriptors.end(); it++)
+//    {
+//        compute_path_link_sequence(from_node, it->second.destination);
+//    }
+//}
 
 
 // temp for shortest path replacement
-void TrafficAssignment::get_precedence(int *prec){
-    memcpy(prec, precedence, num_nodes*sizeof(int));
-}
+//void TrafficAssignment::get_precedence(int *prec){
+//    memcpy(prec, precedence, num_nodes*sizeof(int));
+//}
 
 void TrafficAssignment::set_precedence(int *prec){
     memcpy(precedence, prec, num_nodes*sizeof(int));
@@ -320,7 +321,6 @@ void TrafficAssignment::compute_path_link_sequence_external_precedence(int from_
         compute_path_link_sequence(from_node, it->second.destination);
     }
 }
-
 
 
 void TrafficAssignment::compute_path_link_sequence(int origin, int destination) {

@@ -75,7 +75,7 @@ class TrafficAssignment(object):
     """
 
     bpr_parameters = ["alpha", "beta"]
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw", "bush-based"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw", "bush-based", "bush-based-parallel"]
 
     def __init__(self) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
@@ -188,7 +188,7 @@ class TrafficAssignment(object):
             self.assignment = allOrNothing(self)
         elif algorithm.lower() in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algorithm.lower())
-        elif algorithm.lower() == "bush-based":
+        elif algorithm.lower() in ["bush-based", "bush-based-parallel"]:
             self.assignment = PathBasedAssignment(self, algorithm.lower())
         else:
             raise Exception("Algorithm not listed in the case selection")
