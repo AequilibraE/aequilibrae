@@ -18,13 +18,17 @@ class PathResults:
           from aequilibrae.paths.results import PathResults
 
           proj = Project()
-          proj.load('path/to/project.sqlite')
+          proj.load('path/to/project/folder')
           proj.network.build_graphs()
           # Mode c is car in this project
           car_graph = proj.network.graphs['c']
 
           # minimize distance
           car_graph.set_graph('distance')
+
+          # If you want to compute skims
+          # It does increase path computation time substantially
+          car_graph.set_skimming(['distance', 'travel_time'])
 
           res = PathResults()
           res.prepare(car_graph)
@@ -47,6 +51,7 @@ class PathResults:
         self.predecessors = None
         self.connectors = None
         self.skims = None
+        self._skimming_array = None
         self.path = None
         self.path_nodes = None
         self.path_link_directions = None
@@ -62,6 +67,7 @@ class PathResults:
         self.__integer_type = None
         self.__float_type = None
         self.__graph_id__ = None
+        self.__graph_sum = None
 
     def compute_path(self, origin: int, destination: int) -> None:
         """
@@ -73,7 +79,14 @@ class PathResults:
             *destination* (:obj:`int`): Destination for the path
         """
 
+        if self.graph is None:
+            raise Exception('You need to set graph skimming before you compute a path')
+
         path_computation(origin, destination, self.graph, self)
+        if self.graph.skim_fields:
+            self.skims.fill(np.inf)
+            self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
+            self.skims[self.skims > self.__graph_sum] = np.inf
 
     def prepare(self, graph: Graph) -> None:
         """
@@ -91,13 +104,22 @@ class PathResults:
         self.nodes = graph.num_nodes + 1
         self.zones = graph.centroids + 1
         self.links = graph.num_links + 1
-        self.num_skims = graph.skims.shape[1]
+        self.num_skims = len(graph.skim_fields)
 
         self.predecessors = np.zeros(self.nodes, dtype=self.__integer_type)
         self.connectors = np.zeros(self.nodes, dtype=self.__integer_type)
         self.reached_first = np.zeros(self.nodes, dtype=self.__integer_type)
-        self.skims = np.zeros((self.nodes, self.num_skims), self.__float_type)
+        if self.num_skims:
+            self.skims = np.empty((graph.all_nodes[-1] + 1, self.num_skims), self.__float_type)
+            self.skims.fill(np.inf)
+            self._skimming_array = np.zeros((self.nodes, self.num_skims), self.__float_type)
+        else:
+            self._skimming_array = np.zeros((1, 2), self.__float_type)
+
         self.__graph_id__ = graph.__id__
+        # We can imagine somebody creating a worst-case scenario network (imagining that turn penalties are considered)
+        # where one needs to traverse all links (or almost all) in both directions.
+        self.__graph_sum = 2 * graph.cost.sum()
         self.graph = graph
 
     def reset(self) -> None:
@@ -107,7 +129,9 @@ class PathResults:
         if self.predecessors is not None:
             self.predecessors.fill(-1)
             self.connectors.fill(-1)
-            self.skims.fill(np.inf)
+            if self.skims is not None:
+                self.skims.fill(np.inf)
+            self._skimming_array.fill(np.inf)
             self.path = None
             self.path_nodes = None
             self.path_link_directions = None

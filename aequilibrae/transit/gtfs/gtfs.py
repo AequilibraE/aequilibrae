@@ -1,8 +1,5 @@
 import os
-import copy
-import csv
 import numpy as np
-
 from .agency import Agency
 from .calendar_dates import CalendarDates
 from .stop import Stop
@@ -14,11 +11,8 @@ class GTFS:
     """
      Reader for GTFS (from https://developers.google.com/transit/gtfs/reference/)
 
-     .
+     Provides a memory container for GTFS that can be:
 
-     Objective
-     _________
-     To provide a memory container for GTFS that can be:
         * Passed to transit assignment algorithms in memory
         * Edited and saved back to disk
         * Displayed in a GIS environment

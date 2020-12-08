@@ -1,12 +1,14 @@
-import math
+import sqlite3
+import string
+import gc
 from typing import List
+import importlib.util as iutil
 import numpy as np
+from aequilibrae.project.network.link_types import LinkTypes
 from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
 from ...utils import WorkerThread
-import importlib.util as iutil
-import sqlite3
 from ..spatialite_connection import spatialite_connection
 
 spec = iutil.find_spec("PyQt5")
@@ -30,10 +32,14 @@ class OSMBuilder(WorkerThread):
         self.path = path
         self.conn = None
         self.node_start = node_start
+        self.__link_types = None  # type: LinkTypes
         self.report = []
+        self.__model_link_types = []
+        self.__model_link_type_ids = []
+        self.__link_type_quick_reference = {}
         self.nodes = {}
         self.links = {}
-        self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText("{}", 4326))"""
+        self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
 
     def __emit_all(self, *args):
         if pyqt:
@@ -46,37 +52,30 @@ class OSMBuilder(WorkerThread):
             conn = sqlite3.connect(self.path)
             self.conn = spatialite_connection(conn)
         self.curr = self.conn.cursor()
-
+        self.__worksetup()
         node_count = self.data_structures()
-        nodes_to_add, node_ids = self.importing_links(node_count)
-        self.import_nodes(nodes_to_add, node_ids)
+        self.importing_links(node_count)
+        self.__emit_all(["finished_threaded_procedure", 0])
 
     def data_structures(self):
-
-        osmi = []
-        logger.info("Consolidating geo elements")
-        self.__emit_all(["text", "Consolidating geo elements"])
-        self.__emit_all(["maxValue", len(self.osm_items)])
-
-        for i, x in enumerate(self.osm_items):
-            osmi.append(x["elements"])
-            self.__emit_all(["Value", i])
-        self.osm_items = sum(osmi, [])
-
         logger.info("Separating nodes and links")
         self.__emit_all(["text", "Separating nodes and links"])
         self.__emit_all(["maxValue", len(self.osm_items)])
 
         alinks = []
         n = []
-        for i, x in enumerate(self.osm_items):
-            if x["type"] == "way":
-                alinks.append(x)
-            elif x["type"] == "node":
-                n.append(x)
-            self.__emit_all(["Value", i])
+        tot_items = len(self.osm_items)
+        # When downloading data for entire countries, memory consumption can be quite intensive
+        # So we get rid of everything we don't need
+        for i in range(tot_items, 0, -1):
+            item = self.osm_items.pop(-1)
+            if item['type'] == "way":
+                alinks.append(item)
+            elif item['type'] == "node":
+                n.append(item)
+            self.__emit_all(["Value", tot_items - i])
+        gc.collect()
 
-        self.osm_items = None
         logger.info("Setting data structures for nodes")
         self.__emit_all(["text", "Setting data structures for nodes"])
         self.__emit_all(["maxValue", len(n)])
@@ -115,22 +114,25 @@ class OSMBuilder(WorkerThread):
         vars["link_id"] = 1
         table = "links"
         fields = self.get_link_fields()
+        self.__update_table_structure()
         field_names = ",".join(fields)
-        fn = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
 
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
         L = len(list(self.links.keys()))
         self.__emit_all(["maxValue", L])
 
-        nodes_to_add = set()
         counter = 0
         mode_codes, not_found_tags = self.modes_per_link_type()
+        owf, twf = self.field_osm_source()
 
         for osm_id, link in self.links.items():
             self.__emit_all(["Value", counter])
             counter += 1
+            if counter % 1000 == 0:
+                logger.info(f'Inserting segments from {counter:,} out of {L:,} OSM link objects')
             vars["osm_id"] = osm_id
+            vars['link_type'] = 'default'
             linknodes = link["nodes"]
             linktags = link["tags"]
 
@@ -144,76 +146,65 @@ class OSMBuilder(WorkerThread):
             intersections = np.where(nodedegree > 1)[0]
             segments = intersections.shape[0] - 1
 
-            owf, twf = self.field_osm_source()
-
             # Attributes that are common to all individual links/segments
             vars["direction"] = (linktags.get("oneway") == "yes") * 1
 
             for k, v in owf.items():
-                attr_value = linktags.get(v)
-                if isinstance(attr_value, str):
-                    attr_value = attr_value.replace('"', "'")
-                    attr_value = '"{}"'.format(attr_value)
-
-                vars[k] = attr_value
+                vars[k] = linktags.get(v)
 
             for k, v in twf.items():
                 val = linktags.get(v["osm_source"])
-                for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
-                    vars["{}_{}".format(k, d1)] = self.__get_link_property(d2, val, linktags, v)
+                if vars["direction"] == 0:
+                    for d1, d2 in [("ab", "forward"), ("ba", "backward")]:
+                        vars[f"{k}_{d1}"] = self.__get_link_property(d2, val, linktags, v)
+                elif vars["direction"] == -1:
+                    vars[f"{k}_ba"] = linktags.get(f"{v['osm_source']}:{'backward'}", val)
+                elif vars["direction"] == 1:
+                    vars[f"{k}_ab"] = linktags.get(f"{v['osm_source']}:{'forward'}", val)
 
             vars["modes"] = mode_codes.get(linktags.get("highway"), not_found_tags)
 
+            vars['link_type'] = self.__link_type_quick_reference.get(vars['link_type'].lower(),
+                                                                     self.__repair_link_type(vars['link_type']))
+
             if len(vars["modes"]) > 0:
                 for i in range(segments):
-                    geometry, attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
-                    sql = self.insert_qry.format(table, fn, attributes, geometry)
-                    sql = sql.replace("None", "null")
+                    attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
+                    sql = self.insert_qry.format(table, field_names, ','.join(['?'] * (len(attributes) - 1)))
                     try:
-                        self.curr.execute(sql)
-                        nodes_to_add.update([linknodes[intersections[i]], linknodes[intersections[i + 1]]])
+                        self.curr.execute(sql, attributes)
+                        self.curr.execute('Select a_node, b_node from links where link_id=?', [vars["link_id"]])
+                        a, b = self.curr.fetchone()
+                        self.curr.executemany('update nodes set osm_id=? where node_id=?',
+                                              [[linknodes[intersections[i]], a], [linknodes[intersections[i + 1]], b]])
                     except Exception as e:
                         data = list(vars.values())
                         logger.error("error when inserting link {}. Error {}".format(data, e.args))
                         logger.error(sql)
                     vars["link_id"] += 1
+                self.conn.commit()
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
-
-        return nodes_to_add, node_ids
-
-    def import_nodes(self, nodes_to_add, node_ids):
-        table = "nodes"
-        fields = self.get_node_fields()
-        field_names = ",".join(fields)
-        field_names = ",".join(['"{}"'.format(x) for x in field_names.split(",")])
-
-        logger.info("Adding network nodes")
-        self.__emit_all(["text", "Adding network nodes"])
-        self.__emit_all(["maxValue", len(nodes_to_add)])
-
-        vars = {}
-        for counter, osm_id in enumerate(nodes_to_add):
-            self.__emit_all(["Value", counter])
-            vars["node_id"] = node_ids[osm_id]
-            vars["osm_id"] = osm_id
-            vars["is_centroid"] = 0
-            geometry = "POINT({} {})".format(self.nodes[osm_id]["lon"], self.nodes[osm_id]["lat"])
-
-            attributes = [vars.get(x) for x in fields]
-            attributes = ", ".join([str(x) for x in attributes])
-            sql = self.insert_qry.format(table, field_names, attributes, geometry)
-            sql = sql.replace("None", "null")
-
-            try:
-                self.curr.execute(sql)
-            except Exception as e:
-                data = list(vars.values())
-                logger.error("error when inserting NODE {}. Error {}".format(data, e.args))
-                logger.error(sql)
-
+            self.links[osm_id] = []
         self.conn.commit()
         self.curr.close()
-        self.__emit_all(["finished_threaded_procedure", 0])
+
+    def __worksetup(self):
+        self.__link_types = LinkTypes(self)
+        lts = self.__link_types.all_types()
+        for lt_id, lt in lts.items():
+            self.__model_link_types.append(lt.link_type)
+            self.__model_link_type_ids.append(lt_id)
+
+    def __update_table_structure(self):
+        curr = self.conn.cursor()
+        curr.execute('pragma table_info(Links)')
+        structure = curr.fetchall()
+        has_fields = [x[1].lower() for x in structure]
+        fields = [field.lower() for field in self.get_link_fields()] + ['osm_id']
+        for field in [f for f in fields if f not in has_fields]:
+            ltype = self.get_link_field_type(field).upper()
+            curr.execute(f'Alter table Links add column {field} {ltype}')
+        self.conn.commit()
 
     def __build_link_data(self, vars, intersections, i, linknodes, node_ids, fields):
         ii = intersections[i]
@@ -230,34 +221,64 @@ class OSMBuilder(WorkerThread):
             node_ids[linknodes[jj]] = vars["b_node"]
             self.node_start += 1
 
-        vars["distance"] = sum(
-            [
-                haversine(
-                    self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"]
-                )
-                for x, y in zip(all_nodes[1:], all_nodes[:-1])
-            ]
-        )
+        vars["distance"] = sum([haversine(self.nodes[x]["lon"], self.nodes[x]["lat"],
+                                          self.nodes[y]["lon"], self.nodes[y]["lat"])
+                                for x, y in zip(all_nodes[1:], all_nodes[:-1])])
 
         geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
         geometry = "LINESTRING ({})".format(", ".join(geometry))
 
         attributes = [vars.get(x) for x in fields]
+        attributes.append(geometry)
+        return attributes
 
-        attributes = ", ".join([str(x) for x in attributes])
+    def __repair_link_type(self, link_type: str) -> str:
+        original_link_type = link_type
+        link_type = ''.join([x for x in link_type if x in string.ascii_letters + '_']).lower()
 
-        return geometry, attributes
+        split = link_type.split('_')
+        for i, piece in enumerate(split[1:]):
+            if piece in ['link', 'segment', 'stretch']:
+                link_type = '_'.join(split[0:i + 1])
+
+        if len(link_type) == 0:
+            link_type = 'empty'
+
+        if len(self.__model_link_type_ids) >= 51 and link_type not in self.__model_link_types:
+            link_type = 'aggregate_link_type'
+
+        if link_type in self.__model_link_types:
+            lt = self.__link_types.get_by_name(link_type)
+            if original_link_type not in lt.description:
+                lt.description += f', {original_link_type}'
+                lt.save()
+            self.__link_type_quick_reference[original_link_type.lower()] = link_type
+            return link_type
+
+        letter = link_type[0]
+        if letter in self.__model_link_type_ids:
+            letter = letter.upper()
+            if letter in self.__model_link_type_ids:
+                for letter in string.ascii_letters:
+                    if letter not in self.__model_link_type_ids:
+                        break
+        lt = self.__link_types.new(letter)
+        lt.link_type = link_type
+        lt.description = f"Link types from Open Street Maps: {original_link_type}"
+        lt.save()
+        self.__model_link_types.append(link_type)
+        self.__model_link_type_ids.append(letter)
+        self.__link_type_quick_reference[original_link_type.lower()] = link_type
+        return link_type
 
     def __get_link_property(self, d2, val, linktags, v):
-        vald = linktags.get("{}:{}".format(v["osm_source"], d2), val)
-        if vald is not None:
-            if vald.isdigit():
-                if vald == val and v["osm_behaviour"] == "divide":
-                    vald = float(val) / 2
-            else:
-                if isinstance(vald, str):
-                    vald = vald.replace('"', "'")
-                    vald = '"{}"'.format(vald)
+        vald = linktags.get(f"{v['osm_source']}:{d2}", val)
+        if vald is None:
+            return vald
+
+        if vald.isdigit():
+            if vald == val and v["osm_behaviour"] == "divide":
+                vald = float(val) / 2
         return vald
 
     @staticmethod
@@ -278,6 +299,22 @@ class OSMBuilder(WorkerThread):
         twf2 = ["{}_ba".format(list(x.keys())[0]) for x in fields["two-way"]]
 
         return owf + twf1 + twf2 + ["osm_id"]
+
+    @staticmethod
+    def get_link_field_type(field_name):
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        if field_name[-3:].lower() in ['_ab', '_ba']:
+            field_name = field_name[:-3]
+            for tp in fields["two-way"]:
+                if field_name in tp:
+                    return tp[field_name]['type']
+        else:
+
+            for tp in fields["one-way"]:
+                if field_name in tp:
+                    return tp[field_name]['type']
 
     @staticmethod
     def field_osm_source():
@@ -318,9 +355,9 @@ class OSMBuilder(WorkerThread):
             if val["unknown_tags"]:
                 notfound += md
 
-        type_list = {k: '"{}"'.format("".join(set(v))) for k, v in type_list.items()}
+        type_list = {k: "".join(set(v)) for k, v in type_list.items()}
 
-        return type_list, '"{}"'.format(notfound)
+        return type_list, '{}'.format(notfound)
 
     @staticmethod
     def get_node_fields():

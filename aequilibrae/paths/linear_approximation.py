@@ -134,7 +134,7 @@ class LinearApproximation(WorkerThread):
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
@@ -163,7 +163,7 @@ class LinearApproximation(WorkerThread):
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
@@ -357,8 +357,8 @@ class LinearApproximation(WorkerThread):
                     self.steps_below += 1
 
             self.vdf.apply_vdf(
-                self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters
-            )
+                self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters,
+                self.cores)
 
             for c in self.traffic_classes:
                 c.graph.cost = self.congested_time
@@ -384,7 +384,8 @@ class LinearApproximation(WorkerThread):
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
 
-            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters)
+            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters,
+                               self.cores)
             return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:

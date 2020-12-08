@@ -25,7 +25,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.5, 3.6 and 3.7, but we recommend using Python 3.6 for development.
+AequilibraE is currently tested for Python 3.6, 3.7 and 3.8, but we recommend using Python 3.7 for development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
@@ -43,14 +43,14 @@ Windows
 Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated
 command prompt.
 
-Python 3.6 needs to be installed, and the following instructions assume you are using `Chocolatey
+Python 3.7 needs to be installed, and the following instructions assume you are using `Chocolatey
 <https://chocolatey.org/>`_ as a package manager.
 ::
 
-    cinst python3 --version 3.6.8
+    cinst python3 --version 3.7
     cinst python
 
-    set PATH=C:\Python36;%PATH%
+    set PATH=C:\Python37;%PATH%
     python -m pip install pipenv
     virtualenv .venv #Only if you want to save the virtual environment in the same folder
     python -m pipenv install --dev
@@ -173,8 +173,8 @@ Next, build the documentation in html format with the following commands run fro
 Releases
 ~~~~~~~~~
 
-AequilibraE releases are manually (and not often) uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`__  (pypi).
+AequilibraE releases are automatically  uploaded to the `Python Package Index
+<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (6 to 12 times per year).
 
 
 Finally

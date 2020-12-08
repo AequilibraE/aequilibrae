@@ -2,6 +2,7 @@ import unittest
 from aequilibrae.paths import Graph
 from aequilibrae.paths.results import SkimResults
 from aequilibrae.paths import skimming_single_origin
+from aequilibrae.paths import binary_version
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 import numpy as np
 
@@ -14,6 +15,7 @@ class TestSkimming_single_origin(unittest.TestCase):
 
         g = Graph()
         g.load_from_disk(test_graph)
+        g.__version__ = binary_version
         g.set_graph(cost_field="distance")
         g.set_skimming("distance")
 

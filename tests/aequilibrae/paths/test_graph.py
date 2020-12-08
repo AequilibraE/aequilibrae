@@ -4,19 +4,26 @@ import tempfile
 import numpy as np
 from aequilibrae.paths import Graph
 from os.path import join
-import sys
+from uuid import uuid4
 from .parameters_test import centroids
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
 from aequilibrae.paths.results import PathResults
+from aequilibrae.paths import binary_version
 
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
 from ...data import path_test, test_graph, test_network
+from shutil import copytree, rmtree
 
 
 class TestGraph(TestCase):
+    def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
+        copytree(siouxfalls_project, self.temp_proj_folder)
+
     def test_create_from_geography(self):
         self.graph = Graph()
         self.graph.create_from_geography(
@@ -39,6 +46,7 @@ class TestGraph(TestCase):
 
         reference_graph = Graph()
         reference_graph.load_from_disk(test_graph)
+        reference_graph.__version__ = binary_version
         if not np.array_equal(self.graph.graph, reference_graph.graph):
             self.fail("Reference graph and newly-prepared graph are not equal")
 
@@ -63,6 +71,7 @@ class TestGraph(TestCase):
         self.test_save_to_disk()
         reference_graph = Graph()
         reference_graph.load_from_disk(test_graph)
+        reference_graph.__version__ = binary_version
 
         new_graph = Graph()
         new_graph.load_from_disk(join(path_test, "aequilibrae_test_graph.aeg"))
@@ -104,7 +113,7 @@ class TestGraph(TestCase):
 
     def test_exclude_links(self):
         p = Project()
-        p.load(siouxfalls_project)
+        p.open(self.temp_proj_folder)
         p.network.build_graphs()
 
         g = p.network.graphs['c']  # type: Graph
@@ -125,4 +134,4 @@ class TestGraph(TestCase):
         r2.compute_path(1, 14)
         self.assertEqual(list(r2.path), [2, 7, 36, 34])
 
-        p.conn.close()
+        p.close()

@@ -7,39 +7,35 @@ import numpy as np
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
-from aequilibrae.project.network.osm_utils.osm_params import max_query_area_size
 from aequilibrae.project.network.haversine import haversine
+from aequilibrae.project.network.modes import Modes
+from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.paths import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import logger
+from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 
 
 class Network():
     """
     Network class. Member of an AequilibraE Project
     """
-    req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
-    req_node_flds = ["node_id", "is_centroid"]
-    protected_fields = ['ogc_fid', 'geometry']
+    req_link_flds = req_link_flds
+    req_node_flds = req_node_flds
+    protected_fields = protected_fields
+    link_types: LinkTypes = None
 
-    def __init__(self, project):
-        """
-        Instantiates the network with the project it is member of
-
-        Args:
-            *project* (:obj:`Project`): Project
-        """
+    def __init__(self, project) -> None:
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
+        self.modes = Modes(self)
+        self.link_types = LinkTypes(self)
+        self.links = Links(self)
+        self.nodes = Nodes(self)
 
-    def _check_if_exists(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='links';")
-        tbls = curr.fetchone()[0]
-        return tbls > 0
-
-    # TODO: DOCUMENT THESE FUNCTIONS
     def skimmable_fields(self):
         """
         Returns a list of all fields that can be skimmed
@@ -77,7 +73,7 @@ class Network():
 
         return real_fields
 
-    def modes(self):
+    def list_modes(self):
         """
         Returns a list of all the modes in this model
 
@@ -96,7 +92,6 @@ class Network():
             north: float = None,
             place_name: str = None,
             modes=["car", "transit", "bicycle", "walk"],
-            spatial_index=False,
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -114,13 +109,35 @@ class Network():
             *modes* (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
 
-            *spatial_index* (:obj:`bool`, Optional): Creates spatial index. Defaults to zero. REQUIRES SQLITE WITH RTREE
+            p = Project()
+            p.new(nm)
+
+        ::
+
+            from aequilibrae import Project, Parameters
+            p = Project()
+            p.new('path/to/project')
+
+            # We now choose a different overpass endpoint (say a deployment in your local network)
+            par = Parameters()
+            par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
+
+            # Because we have our own server, we can set a bigger area for download (in M2)
+            par.parameters['osm']['max_query_area_size'] = 10000000000
+
+            # And have no pause between successive queries
+            par.parameters['osm']['sleeptime'] = 0
+
+            # Save the parameters to disk
+            par.write_back()
+
+            # And do the import
+            p.network.create_from_osm(place_name=my_beautiful_hometown)
+            p.close()
         """
 
-        if self._check_if_exists():
+        if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
-
-        self.create_empty_tables()
 
         curr = self.conn.cursor()
         curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
@@ -155,6 +172,9 @@ class Network():
         width = haversine(east, (north + south) / 2, west, (north + south) / 2)
         area = height * width
 
+        par = Parameters().parameters['osm']
+        max_query_area_size = par['max_query_area_size']
+
         if area < max_query_area_size:
             polygons = [bbox]
         else:
@@ -162,8 +182,8 @@ class Network():
             parts = math.ceil(area / max_query_area_size)
             horizontal = math.ceil(math.sqrt(parts))
             vertical = math.ceil(parts / horizontal)
-            dx = east - west
-            dy = north - south
+            dx = (east - west) / horizontal
+            dy = (north - south) / vertical
             for i in range(horizontal):
                 xmin = max(-180, west + i * dx)
                 xmax = min(180, west + (i + 1) * dx)
@@ -172,7 +192,6 @@ class Network():
                     ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
-
         logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
         self.downloader.doWork()
@@ -181,84 +200,46 @@ class Network():
         self.builder = OSMBuilder(self.downloader.json, self.source)
         self.builder.doWork()
 
-        if spatial_index:
-            logger.info("Adding spatial indices")
-            self.add_spatial_index()
-
-        self.add_triggers()
         logger.info("Network built successfully")
 
-    def create_empty_tables(self) -> None:
-        """Creates empty network tables for future filling"""
-        curr = self.conn.cursor()
-        # Create the links table
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-
-        sql = """CREATE TABLE 'links' (
-                          ogc_fid INTEGER PRIMARY KEY,
-                          link_id INTEGER UNIQUE,
-                          a_node INTEGER,
-                          b_node INTEGER,
-                          direction INTEGER NOT NULL DEFAULT 0,
-                          distance NUMERIC,
-                          modes TEXT NOT NULL,
-                          link_type TEXT NOT NULL DEFAULT 'link type not defined'
-                          {});"""
-
-        flds = fields["one-way"]
-
-        # returns first key in the dictionary
-        def fkey(f):
-            return list(f.keys())[0]
-
-        owlf = ["{} {}".format(fkey(f), f[fkey(f)]["type"]) for f in flds if fkey(f).lower() not in self.req_link_flds]
-
-        flds = fields["two-way"]
-        twlf = []
-        for f in flds:
-            nm = fkey(f)
-            tp = f[nm]["type"]
-            twlf.extend([f"{nm}_ab {tp}", f"{nm}_ba {tp}"])
-
-        link_fields = owlf + twlf
-
-        if link_fields:
-            sql = sql.format("," + ",".join(link_fields))
-        else:
-            sql = sql.format("")
-
-        curr.execute(sql)
-
-        sql = """CREATE TABLE 'nodes' (ogc_fid INTEGER PRIMARY KEY,
-                                 node_id INTEGER UNIQUE NOT NULL,
-                                 is_centroid INTEGER NOT NULL DEFAULT 0 {});"""
-
-        flds = p.parameters["network"]["nodes"]["fields"]
-        ndflds = [f"{fkey(f)} {f[fkey(f)]['type']}" for f in flds if fkey(f).lower() not in self.req_node_flds]
-
-        if ndflds:
-            sql = sql.format("," + ",".join(ndflds))
-        else:
-            sql = sql.format("")
-        curr.execute(sql)
-
-        curr.execute("""SELECT AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY' )""")
-        curr.execute("""SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY' )""")
-        self.conn.commit()
-
-    def build_graphs(self) -> None:
+    def build_graphs(self, fields: list = None, modes: list = None) -> None:
         """Builds graphs for all modes currently available in the model
 
         When called, it overwrites all graphs previously created and stored in the networks'
         dictionary of graphs
+
+        Args:
+            *fields* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+                                              database, it may be useful to specify which fields to use
+            *modes* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+                                              database, it may be useful to generate only those we need
+
+        To use the *fields* parameter, a minimalistic option is the following
+        ::
+
+            p = Project()
+            p.open(nm)
+            fields = ['distance']
+            p.network.build_graphs(fields, modes = ['c', 'w'])
+
         """
         curr = self.conn.cursor()
-        curr.execute('PRAGMA table_info(links);')
-        field_names = curr.fetchall()
 
-        ignore_fields = ['ogc_fid', 'geometry']
-        all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        if fields is None:
+            curr.execute('PRAGMA table_info(links);')
+            field_names = curr.fetchall()
+
+            ignore_fields = ['ogc_fid', 'geometry']
+            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+        else:
+            fields.extend(['link_id', 'a_node', 'b_node', 'direction', 'modes'])
+            all_fields = list(set(fields))
+
+        if modes is None:
+            modes = curr.execute('select mode_id from modes;').fetchall()
+            modes = [m[0] for m in modes]
+        elif isinstance(modes, str):
+            modes = [modes]
 
         raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
         links = []
@@ -276,13 +257,10 @@ class Network():
             else:
                 removed_fields.append(f)
         if len(removed_fields) > 1:
-            warn(f'Fields were removed form Graph for being non-numeric: {",".join(removed_fields)}')
+            logger.warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
 
-        curr.execute('select node_id from nodes where is_centroid=1;')
+        curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
-
-        modes = curr.execute('select mode_id from modes;').fetchall()
-        modes = [m[0] for m in modes]
 
         for m in modes:
             w = np.core.defchararray.find(data['modes'], m)
@@ -319,9 +297,7 @@ class Network():
         Returns:
             :obj:`int`: Number of links
         """
-        c = self.conn.cursor()
-        c.execute("""select count(link_id) from links""")
-        return c.fetchone()[0]
+        return self.__count_items('link_id', 'links', 'link_id>=0')
 
     def count_centroids(self) -> int:
         """
@@ -330,9 +306,7 @@ class Network():
         Returns:
             :obj:`int`: Number of centroids
         """
-        c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes where is_centroid=1;""")
-        return c.fetchone()[0]
+        return self.__count_items('node_id', 'nodes', 'is_centroid=1')
 
     def count_nodes(self) -> int:
         """
@@ -341,49 +315,22 @@ class Network():
         Returns:
             :obj:`int`: Number of nodes
         """
+        return self.__count_items('node_id', 'nodes', 'node_id>=0')
+
+    def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
+        """
+               Adds a centroid and centroid connectors for the desired modes to the network file
+
+               Args:
+                   *node_id* (:obj:`int`): ID for the centroid to be included in the network
+
+                   *coords* (:obj:`List`): XY Coordinates for centroid -> [LONGITUDE, LATITUDE]
+
+                   *modes* (:obj:`str`): Modes for which centroids connectors should be added
+               """
+        pass
+
+    def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()
-        c.execute("""select count(node_id) from nodes""")
+        c.execute(f"""select count({field}) from {table} where {condition};""")
         return c.fetchone()[0]
-
-    def add_triggers(self):
-        """Adds consistency triggers to the project"""
-        self.__add_network_triggers()
-        self.__add_mode_triggers()
-
-    def __add_network_triggers(self) -> None:
-        logger.info("Adding network triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "network_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
-
-    def __add_mode_triggers(self) -> None:
-        logger.info("Adding mode table triggers")
-        pth = os.path.dirname(os.path.realpath(__file__))
-        qry_file = os.path.join(pth, "database_triggers", "modes_table_triggers.sql")
-        self.__add_trigger_from_file(qry_file)
-
-    def __add_trigger_from_file(self, qry_file: str):
-        curr = self.conn.cursor()
-        sql_file = open(qry_file, "r")
-        query_list = sql_file.read()
-        sql_file.close()
-
-        # Run one query/command at a time
-        for cmd in query_list.split("#"):
-            try:
-                curr.execute(cmd)
-            except Exception as e:
-                msg = f"Error creating trigger: {e.args}"
-                logger.error(msg)
-                logger.info(cmd)
-        self.conn.commit()
-
-    def add_spatial_index(self) -> None:
-        """Adds spatial indices to links and nodes table
-
-        Requires an Sqlite3 distribution with RTree (not the Python standard).
-        Use with caution"""
-        curr = self.conn.cursor()
-        curr.execute("""SELECT CreateSpatialIndex( 'links' , 'geometry' );""")
-        curr.execute("""SELECT CreateSpatialIndex( 'nodes' , 'geometry' );""")
-        self.conn.commit()

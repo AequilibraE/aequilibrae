@@ -12,11 +12,13 @@ class VDF:
     """Volume-Delay function
 
     ::
+
         from aequilibrae.paths import VDF
 
         vdf = VDF()
         vdf.functions_available()
       ['bpr']
+
     """
 
     def __init__(self):
@@ -37,5 +39,6 @@ class VDF:
             raise AttributeError('This class only allows you to set the VDF to use')
 
     def functions_available(self) -> list:
-        """returns a list of all functions available"""
+        """returns a list of all functions available
+        """
         return all_vdf_functions

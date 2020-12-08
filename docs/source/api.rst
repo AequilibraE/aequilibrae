@@ -1,3 +1,5 @@
+.. _aequilibrae_api:
+
 API documentation
 =================
 
@@ -17,7 +19,62 @@ Project Module
    :toctree: _generated
 
     Project
+
+Project components
+++++++++++++++++++
+
+.. currentmodule:: aequilibrae.project
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    About
+    FieldEditor
+    Log
+    Matrices
     Network
+    Zoning
+
+Project objects
+++++++++++++++++++
+
+.. currentmodule:: aequilibrae.project
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    Zone
+
+Network data
+~~~~~~~~~~~~
+
+.. currentmodule:: aequilibrae.project.network
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+    Modes
+    LinkTypes
+    Links
+    Nodes
+
+Network items
+~~~~~~~~~~~~~
+
+.. currentmodule:: aequilibrae.project.network
+
+.. autosummary::
+   :nosignatures:
+   :toctree: _generated
+
+
+    Mode
+    LinkType
+    Link
+    Node
 
 Parameters Module
 -----------------
@@ -84,3 +141,11 @@ Transit Module
 
     GTFS
     create_gtfsdb
+
+Use examples
+------------
+
+.. toctree::
+   :maxdepth: 1
+
+   usageexamples

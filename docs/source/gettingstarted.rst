@@ -57,11 +57,8 @@ Spatialite does not have great support on Python for Windows. For this reason,
 it is necessary to download Spatialite for Windows and inform AequilibraE of its
 location.
 
-One can download the
-`64Bit <http://www.gaia-gis.it/gaia-sins/windows-bin-NEXTGEN-amd64/mod_spatialite-NG-win-amd64.7z>`_
-version of SpatiaLite or navigate to the SpatiaLite
-`website <https://www.gaia-gis.it/gaia-sins/>`_ to download the appropriate
-version.
+One can download the appropriate version of the latest SpatiaLite release
+directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ .
 
 After unpacking the zip file into its own folder (say D:/spatialite), one can
 update the AequilibraE parameter file with the location of spatialite by using
