@@ -62,7 +62,7 @@ Contents
    modeling
    path_computation_engine
    api
-   workflows
+   _generated/auto_examples/index
    softwaredevelopment
    roadmap
    qgis
