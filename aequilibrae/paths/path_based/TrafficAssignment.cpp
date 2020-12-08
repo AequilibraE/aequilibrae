@@ -281,7 +281,7 @@ void TrafficAssignment::update_path_flows_stepsize(double stepsize) {
                 stepsize * centroidsDescriptors[origin].path_flows_current_iter[j];
         }
     }
-    // TODO: Yes or no? update link flows by origin
+    // TODO: Yes or no? update link flows by origin. See also previous function.
     // update_link_flows_by_origin_for_all();
 }
 

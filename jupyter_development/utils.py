@@ -23,7 +23,7 @@ def set_up_assignment(tntp_dir, scenario, link_file, method, block_centroids, rg
     if scenario == "Anaheim":
         cols_ = ["link_id", "Tail", "Head", "Free Flow Time (min)", "Capacity (veh/h)", "B", "Power"]
         col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
-    elif scenario == "Berlin-Center":
+    elif scenario in ["Berlin-Center", "Barcelona"]:
         cols_ = ["link_id", "Init node", "Term node", "Free Flow Time", "Capacity", "B", "Power"]
         col_names = ["link_id", "a_node", "b_node", "time", "capacity", "alpha", "beta"]
     else:
