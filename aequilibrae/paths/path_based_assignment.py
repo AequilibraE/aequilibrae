@@ -18,6 +18,18 @@ import array
 from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
 from aequilibrae.paths.AoN import one_to_all
 
+import scipy
+
+if int(scipy.__version__.split(".")[1]) >= 3:
+    from scipy.optimize import root_scalar
+
+    recent_scipy = True
+else:
+    from scipy.optimize import root as root_scalar
+
+    recent_scipy = False
+    logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
+
 
 # try:
 #     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims
@@ -210,13 +222,127 @@ class PathBasedAssignment(WorkerThread):
         self.execute()
 
     def execute(self):
+        do_parallel = True
+        if do_parallel:
+            self.execute_parallel()
+        else:
+            self.execute_sequential()
 
+    def execute_parallel(self):
         use_boost = False
 
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
-        logger.info(f"{self.algorithm} Assignment STATS")
+        logger.info(f"{self.algorithm} parallel Assignment STATS")
+
+        self.initialise_data_structures()
+        num_links = len(self.links)
+        num_nodes = len(self.nodes)
+        num_centroids = len(self.origins)
+        logger.info(f" Initialised data structures, num nodes = {num_nodes}, num links = {num_links}")
+
+        self.t_assignment = TrafficAssignmentCy.TrafficAssignmentCy(self.links, num_links, num_nodes, num_centroids)
+        destinations_per_origin = {}
+        for (o, d) in self.ods:
+            self.t_assignment.insert_od(o, d, self.ods[o, d])
+            if o not in destinations_per_origin:
+                destinations_per_origin[o] = 0
+            destinations_per_origin[o] += 1
+
+        if use_boost:
+            self.t_assignment.perform_initial_solution()
+        else:
+            self.initial_iteration()
+
+        logger.info(f" 0th iteration done, cost = {self.t_assignment.get_objective_function()}")
+
+        for self.iter in range(1, self.max_iter + 1):
+            self.iteration_issue = []
+            if pyqt:
+                self.equilibration.emit(["rgap", self.rgap])
+                self.equilibration.emit(["iterations", self.iter])
+
+            origins = destinations_per_origin.keys()
+
+            for origin in origins:
+                if use_boost:
+                    self.t_assignment.compute_shortest_paths(origin)
+                else:
+                    self.shortest_path_temp_wrapper(origin)
+
+                t_paths = self.t_assignment.get_total_paths(origin)
+                Q, q, A, b, G, h = self.t_assignment.get_problem_data(origin, destinations_per_origin[origin])
+                Am = cvxopt.matrix(A.tolist(), (t_paths, destinations_per_origin[origin]), "d")
+                bm = cvxopt.matrix(b.tolist(), (destinations_per_origin[origin], 1), "d")
+                Qm = cvxopt.matrix(Q.tolist(), (t_paths, t_paths), "d")
+                qm = cvxopt.matrix(q.tolist(), (t_paths, 1), "d")
+                Gm = cvxopt.matrix(G.tolist(), (t_paths, t_paths), "d")
+                hm = cvxopt.matrix(h.tolist(), (t_paths, 1), "d")
+                solution = cvxopt.solvers.qp(Qm.trans(), qm, Gm.trans(), hm, Am.trans(), bm)["x"]
+
+                self.t_assignment.update_current_iteration_flows_by_origin(origin, solution)
+
+            # not parallel:
+            try:
+                min_res = root_scalar(lambda x: self.t_assignment.objective_derivative_stepsize(x), bracket=[0, 1])
+                self.stepsize = min_res.root
+            except ValueError:
+                left_ = self.t_assignment.objective_derivative_stepsize(0)
+                right_ = self.t_assignment.objective_derivative_stepsize(1)
+                logger.warning(
+                    f"Error finding stepsize: left derivative is {left_:.0f}, right derivative is {right_:.0f}"
+                )
+                # TODO: need to decide what to do here
+                if left_ < right_:
+                    self.stepsize = 0.01
+                else:
+                    self.stepsize = 0.99
+
+            # update solution
+            self.t_assignment.update_link_flows_stepsize(self.stepsize)
+
+            if not use_boost:
+                # c++ data structures and aequilibrae data structures are not integrated yet
+                self.update_time_field_for_path_computation()
+
+            # now this can be parallel again. Q: Path flows are not used for anything here, are they?
+            for origin in origins:
+                # update path flows: new_path_flows = (1-stepsize) * old_path_flow + stepsize * new_path_flow
+                self.t_assignment.update_path_flows_stepsize(origin, self.stepsize)
+
+            this_cost = self.t_assignment.get_objective_function()
+
+            if use_boost:
+                self.traffic_classes[0].results.link_loads = self.t_assignment.get_link_flows()
+
+            converged = self.check_convergence()
+
+            logger.info(
+                f"Iteration {self.iter}, computed gap: {self.rgap}, computed objective: {this_cost}, stepsize: {self.stepsize}"
+            )
+            # self.convergence_report["iteration"].append(self.iter)
+            # self.convergence_report["rgap"].append(self.rgap)
+            # self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
+
+            if converged:
+                break
+
+        if self.rgap > self.rgap_target:
+            logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
+        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+        if pyqt:
+            self.equilibration.emit(["rgap", self.rgap])
+            self.equilibration.emit(["iterations", self.iter])
+            self.equilibration.emit(["finished_threaded_procedure"])
+
+    def execute_sequential(self):
+        use_boost = False
+
+        for c in self.traffic_classes:
+            c.graph.set_graph(self.time_field)
+
+        logger.info(f"{self.algorithm} sequential Assignment STATS")
         # logger.info("Iteration, RelativeGap, stepsize")
 
         # links, nodes, ods, destinations, origins =
