@@ -5,7 +5,7 @@
  *      Author: fas
  */
 
-//#include "TrafficAssignment.h"
+#include "TrafficAssignment.h"
 #include <memory.h>
 #include <math.h>
 

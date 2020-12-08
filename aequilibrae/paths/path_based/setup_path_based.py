@@ -36,7 +36,7 @@ ext_4 = Extension(
     # our Cython source
     sources=[
         "TrafficAssignmentCy.pyx",
-        "ShortestPathComputation.cpp",
+        # "ShortestPathComputation.cpp",
         "TrafficAssignment.cpp",
     ],  # additional source file(s)
     language="c++",  # generate C++ code,

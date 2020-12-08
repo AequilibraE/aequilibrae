@@ -9,6 +9,7 @@
 #define TRAFFICASSIGNMENT_H_
 #include <vector>
 #include <map>
+#include <iostream>
 //#include "ShortestPathComputation.h"
 
 #define PATHS_PER_OD 10
@@ -75,7 +76,7 @@ public:
 
     unsigned int n_cent;
     unsigned int n_links;
-	ShortestPathComputation *spComputation;
+	//ShortestPathComputation *spComputation;
 
 
 

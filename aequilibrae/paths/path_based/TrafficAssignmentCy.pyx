@@ -28,7 +28,7 @@ cdef extern from "TrafficAssignment.h":
         void get_subproblem_data(unsigned long origin, float *Q, float *c, float *A, float *b, float *G, float *h)
         unsigned int get_total_paths(int origin)
         unsigned int get_total_paths(int origin, int destination)
-        void compute_shortest_paths(int origin)
+        # void compute_shortest_paths(int origin)
         # void perform_initial_solution()
         void get_link_flows(float *ptr_flows)
         void update_path_flows(unsigned long origin, float *flows)
@@ -78,8 +78,8 @@ cdef class TrafficAssignmentCy:
         self.thisptr.insert_od(origin, destination, flow)
 
 
-    def compute_shortest_paths(self, origin):
-        self.thisptr.compute_shortest_paths(origin)
+#    def compute_shortest_paths(self, origin):
+#        self.thisptr.compute_shortest_paths(origin)
 
 
     def set_precedence(self, precedence):
