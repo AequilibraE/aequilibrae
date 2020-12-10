@@ -9,3 +9,4 @@ sphinx_theme
 sphinx_autodoc_annotation
 nbsphinx
 pillow
+matplotlib
