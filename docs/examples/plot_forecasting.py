@@ -33,7 +33,6 @@ logger.addHandler(stdout_handler)
 
 # %%
 
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # %%
@@ -96,10 +95,6 @@ assig.max_iter = 1000
 assig.rgap_target = 0.001
 
 assig.execute()  # we then execute the assignment
-
-# %% md
-
-### Outputs
 
 # %%
 
@@ -194,24 +189,6 @@ imped.view_names
 # We set the matrices for being used in computation
 demand.computational_view(['matrix'])
 
-# %%
-
-from math import log10, floor
-import matplotlib.pyplot as plt
-
-
-def plot_tlfd(demand, skim, name):
-    b = floor(log10(skim.shape[0]) * 10)
-    n, bins, patches = plt.hist(np.nan_to_num(skim.flatten(), 0), bins=b, weights=np.nan_to_num(demand.flatten()),
-                                density=False, facecolor='g', alpha=0.75)
-
-    plt.xlabel('Trip length')
-    plt.ylabel('Probability')
-    plt.title('Trip-length frequency distribution')
-    plt.savefig(name, format="png")
-    plt.clf()
-    plt.show()
-
 
 # %%
 
@@ -222,19 +199,12 @@ for function in ['power', 'expo']:
     # we save the model
     model.save(join(fldr, f'{function}_model.mod'))
 
-    # We save a trip length frequency distribution image
-    plot_tlfd(gc.result_matrix.matrix_view, imped.matrix_view, join(fldr, f'{function}_tfld.png'))
-
     # We can save the result of applying the model as well
     # we can also save the calibration report
     with open(join(fldr, f'{function}_convergence.log'), 'w') as otp:
         for r in gc.report:
             otp.write(r + '\n')
 
-# %%
-
-# We save a trip length frequency distribution image
-plot_tlfd(demand.matrix_view, imped.matrix_view, join(fldr, 'demand_tfld.png'))
 
 # %% md
 
@@ -244,8 +214,8 @@ plot_tlfd(demand.matrix_view, imped.matrix_view, join(fldr, 'demand_tfld.png'))
 
 # %%
 
-from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel, Ipf
-from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
+from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel
+from aequilibrae.matrix import AequilibraeData
 import numpy as np
 
 # %%
@@ -378,7 +348,7 @@ assig.set_algorithm('bfw')
 
 # since I haven't checked the parameters file, let's make sure convergence criteria is good
 assig.max_iter = 1000
-assig.rgap_target = 0.001
+assig.rgap_target = 0.0001
 
 assig.execute()  # we then execute the assignment
 
@@ -391,9 +361,23 @@ assig.save_results('future_year_assignment')
 assig.save_skims('future_year_assignment_skims', which_ones='all', format='omx')
 
 # %% md
+# We can also plot convergence
+import matplotlib.pyplot as plt
 
-## Close the project
+df = assig.report()
+x = df.iteration.values
+y = df.rgap.values
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+
+plt.plot(x, y,'k--')
+plt.yscale('log')
+plt.grid(True,which="both")
+plt.xlabel(r"Iterations")
+plt.ylabel(r"Relative Gap")
+plt.show()
 
 # %%
-
+# Close the project
 project.close()

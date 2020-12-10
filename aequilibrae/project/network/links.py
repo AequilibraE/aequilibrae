@@ -55,7 +55,7 @@ class Links:
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
             """
-
+        link_id = int(link_id)
         if link_id in self.__items:
             link = self.__items[link_id]
             if not link._exists():
@@ -89,7 +89,7 @@ class Links:
             *link* (:obj:`Link`): Link object for requested link_id
             """
 
-        data = self.__link_data(link_id)
+        data = self.__link_data(int(link_id))
         data['link_id'] = self.__new_link_id()
 
         # The geometry wrangling is just a workaround to signalize that the link is new
@@ -107,6 +107,7 @@ class Links:
         Args:
             *link_id* (:obj:`int`): Id of a link to delete"""
         d = 1
+        link_id = int(link_id)
         if link_id in self.__items:
             link = self.__items.pop(link_id)  # type: Link
             link.delete()

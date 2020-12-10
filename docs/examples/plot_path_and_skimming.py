@@ -12,7 +12,6 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 
-
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -61,8 +60,8 @@ graph.set_blocked_centroid_flows(False)
 res = PathResults()
 res.prepare(graph)
 
-# compute a path from node 2 to 13
-res.compute_path(2, 13)
+# compute a path from node 8 to 13
+res.compute_path(8, 4)
 
 # %%
 
@@ -83,11 +82,31 @@ res.milepost
 
 # If we want to compute the path for a different destination and same origin, we can just do this
 # It is way faster when you have large networks
-res.update_trace(4)
+res.update_trace(13)
 
 # %%
 
 res.path_nodes
+
+# %%
+# If you want to show the path in Python
+# We do NOT recommend this, though....  It is very slow for real networks
+import matplotlib.pyplot as plt
+from shapely.ops import linemerge
+
+links = project.network.links
+
+# We plot the entire network
+curr = project.conn.cursor()
+curr.execute('Select link_id from links;')
+
+for lid in curr.fetchall():
+    geo = links.get(lid[0]).geometry
+    plt.plot(*geo.xy, color='red')
+
+path_geometry = linemerge(links.get(lid).geometry for lid in res.path)
+plt.plot(*path_geometry.xy, color='blue', linestyle='dashed', linewidth=2)
+plt.show()
 
 # %% md
 
@@ -100,6 +119,7 @@ from aequilibrae.paths import NetworkSkimming
 # %%
 # But let's say we only want a skim matrix for nodes 1, 3, 6 & 8
 import numpy as np
+
 graph.prepare_graph(np.array([1, 3, 6, 8]))
 # %%
 
@@ -132,5 +152,4 @@ mat_record.description = 'minimized FF travel time while also skimming distance 
 mat_record.save()
 
 # %%
-
 project.close()

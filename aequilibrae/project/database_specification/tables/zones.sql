@@ -7,7 +7,8 @@ CREATE TABLE 'zones' (ogc_fid    INTEGER PRIMARY KEY,
 
 #
 SELECT AddGeometryColumn( 'zones', 'geometry', 4326, 'MULTIPOLYGON', 'XY', 1);
-
+#
+CREATE UNIQUE INDEX idx_zone ON zones (zone_id);
 #
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('zones','zone_id', 'Unique node ID');
 #

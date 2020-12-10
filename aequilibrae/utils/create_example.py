@@ -10,7 +10,7 @@ def create_example(path: str) -> Project:
         raise FileExistsError('Cannot overwrite an existing directory')
 
     os.mkdir(path)
-    zipfile.ZipFile(join(dirname(__file__), 'sioux_falls.zip')).extractall(path)
+    zipfile.ZipFile(join(dirname(__file__), '../reference_files/sioux_falls.zip')).extractall(path)
     proj = Project()
     proj.open(path)
     return proj
