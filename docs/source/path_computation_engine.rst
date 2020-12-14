@@ -4,7 +4,7 @@ Path computation engine
 =======================
 
 Given AequilibraE's incredibly fast path computation capabilities, one of its
-important use cases is the computati`on of paths on general transportation
+important use cases is the computation of paths on general transportation
 networks and between any two nodes, regardless of their type (centroid or not).
 
 This use case supports the development of a number of computationally intensive

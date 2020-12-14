@@ -51,6 +51,10 @@ Spatialite
 Although the presence of Spatialite is rather obiquitous in the GIS ecosystem,
 it has to be installed separately from Python or AequilibraE.
 
+This `blog post<https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
+comprehensive explanation of what is the setup you need to get Spatialite working,
+but below there is something you can start with.
+
 Windows
 ^^^^^^^
 Spatialite does not have great support on Python for Windows. For this reason,
