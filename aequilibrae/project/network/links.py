@@ -1,10 +1,12 @@
 from sqlite3 import Connection
 from copy import deepcopy
 import shapely.wkb
+import pandas as pd
 from aequilibrae.project.network.link import Link
 from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.data_loader import DataLoader
 
 
 class Links:
@@ -123,6 +125,16 @@ class Links:
     def save(self):
         for link in self.__items.values():  # type: Link
             link.save()
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """ Returns all links data as a Pandas dataFrame
+
+        Returns:
+            *table* (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
+        """
+        dl = DataLoader(self.conn, 'links')
+        return dl.load_table()
 
     def refresh(self):
         """Refreshes all the links in memory"""
