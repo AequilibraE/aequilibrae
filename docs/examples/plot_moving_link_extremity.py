@@ -61,9 +61,8 @@ for nid in curr.fetchall():
 
 plt.show()
 
-# Now look at the network how it used to bne
+# Now look at the network how it used to be
 
 
 # %%
-
 project.close()

@@ -65,6 +65,12 @@ sphinx_gallery_conf = {
     'gallery_dirs': '_generated/auto_examples',  # path to where to save gallery generated output
 }
 
+nbsphinx_thumbnails = {
+    '../examples/plot_logging_to_terminal': '../examples/plot_logging_to_terminal_image.png',
+    '../examples/plot_display': '../examples/plot_display_image.png',
+    '../examples/plot_from_osm': '../examples/nauru.png',
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 

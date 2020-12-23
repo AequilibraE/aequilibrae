@@ -10,3 +10,4 @@ sphinx_autodoc_annotation
 nbsphinx
 pillow
 matplotlib
+folium
