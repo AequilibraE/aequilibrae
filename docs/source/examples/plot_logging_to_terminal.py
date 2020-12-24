@@ -29,3 +29,13 @@ logger.addHandler(stdout_handler)
 
 # %%
 project.close()
+
+# %%
+# **Want to see what you will get?**
+
+# %%
+from PIL import Image
+import matplotlib.pyplot as plt
+
+img = Image.open('plot_logging_to_terminal_image.png')
+plt.imshow(img)

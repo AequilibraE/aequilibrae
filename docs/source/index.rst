@@ -33,7 +33,7 @@ Contents
    modeling
    path_computation_engine
    api
-   _generated/auto_examples/index
+   _auto_examples/index
    softwaredevelopment
    roadmap
    qgis

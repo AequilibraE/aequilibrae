@@ -60,3 +60,12 @@ map_osm
 
 # %%
 project.close()
+
+# %%
+# **Don't know Nauru? Here is a map**
+
+# %%
+from PIL import Image
+import matplotlib.pyplot as plt
+img = Image.open('nauru.png')
+plt.imshow(img)

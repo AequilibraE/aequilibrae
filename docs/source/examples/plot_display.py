@@ -9,6 +9,16 @@ each mode in the network, a layer for all links and a layer for all nodes
 """
 
 # %%
+# **What we want is a map that looks a little like this**
+
+# %%
+from PIL import Image
+import matplotlib.pyplot as plt
+img = Image.open('plot_network_image.png')
+plt.imshow(img)
+
+
+# %%
 ## Imports
 from uuid import uuid4
 from tempfile import gettempdir
