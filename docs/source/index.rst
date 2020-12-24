@@ -16,7 +16,7 @@ see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qg
 Examples
 ========
 
-Skip the *blah-blah-blah* and go straight to the point: :ref:`sphx_glr__generated_auto_examples`
+Skip the *blah-blah-blah* and go straight to the point: :ref:`sphx_glr__auto_examples`
 
 Contents
 ========
