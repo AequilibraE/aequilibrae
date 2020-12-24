@@ -62,6 +62,7 @@ aequilibrae/paths/*.html
 aequilibrae/paths/build/*
 docs/build/*
 docs/source/_generated/*
+docs/source/_auto_examples/*
 
 
 #Virtual environment
