@@ -42,6 +42,7 @@ class About:
         if cursor.fetchone()[0] is None:
             cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
             cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
+            cursor.execute(f"UPDATE 'about' set infovalue='right' where infoname='driving_side'")
             self.__conn.commit()
 
             self.__load()
