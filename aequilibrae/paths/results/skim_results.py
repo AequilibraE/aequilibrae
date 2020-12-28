@@ -2,7 +2,6 @@ import numpy as np
 import multiprocessing as mp
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.network_skimming import NetworkSkimming
 
 
 class SkimResults:
@@ -114,12 +113,4 @@ class SkimResults:
             self.milepost = None
 
         else:
-            raise ValueError(
-                "Exception: Path results object was not yet prepared/initialized"
-            )
-
-    def compute_skims(self) -> None:
-        """Computes the skims as set"""
-
-        ns = NetworkSkimming(self.graph, self)
-        ns.execute()
+            raise ValueError("Exception: Path results object was not yet prepared/initialized")

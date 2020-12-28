@@ -1,9 +1,14 @@
 import sys
+from os.path import join, isfile
 import threading
-from multiprocessing.dummy import Pool as ThreadPool
-from .multi_threaded_skimming import MultiThreadedNetworkSkimming
-from ..utils import WorkerThread
 import importlib.util as iutil
+from uuid import uuid4
+from multiprocessing.dummy import Pool as ThreadPool
+from datetime import datetime
+from aequilibrae.project.data import Matrices
+from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
+from aequilibrae.paths.results.skim_results import SkimResults
+from aequilibrae.utils import WorkerThread
 from aequilibrae import logger
 
 try:
@@ -16,39 +21,72 @@ pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
+spec = iutil.find_spec("openmatrix")
+has_omx = spec is not None
+
 sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
+    """
+
+    ::
+
+        from aequilibrae.paths.network_skimming import NetworkSkimming
+        from aequilibrae.project import Project
+
+        project = Project()
+        project.open(self.proj_dir)
+        network = self.project.network
+
+        network.build_graphs()
+        graph = network.graphs['c']
+        graph.set_graph(cost_field="distance")
+        graph.set_skimming("distance")
+
+        skm = NetworkSkimming(graph)
+        skm.execute()
+
+        # The skim report (if any error generated) is available here
+        skm.report
+
+        # To access the skim matrix directly from its temporary file
+        matrix = skm.results.skims
+
+        # Or you can save the results to disk
+        skm.save_to_project('skimming result')
+
+        # Or specify the AequilibraE's matrix file format
+        skm.save_to_project('skimming result', 'aem')
+
+        project.close()
+    """
+
     if pyqt:
         skimming = pyqtSignal(object)
 
-    def __init__(self, graph, results, origins=None):
+    def __init__(self, graph, origins=None):
         WorkerThread.__init__(self, None)
 
         self.origins = origins
         self.graph = graph
-        self.results = results
+        self.results = SkimResults()
         self.aux_res = MultiThreadedNetworkSkimming()
         self.report = []
+        self.procedure_id = ''
+        self.procedure_date = ''
         self.cumulative = 0
-
-        if results.__graph_id__ != graph.__id__:
-            raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
-
-        if results.__graph_id__ is None:
-            raise ValueError("The results object was not prepared. Use results.prepare(graph)")
-
-        elif results.__graph_id__ != graph.__id__:
-            raise ValueError("The results object was prepared for a different graph")
 
     def doWork(self):
         self.execute()
 
     def execute(self):
+        """Runs the skimming process as specified in the graph"""
         if pyqt:
             self.skimming.emit(["zones finalized", 0])
 
+        self.results.prepare(self.graph)
+        self.aux_res = MultiThreadedNetworkSkimming()
         self.aux_res.prepare(self.graph, self.results)
 
         pool = ThreadPool(self.results.cores)
@@ -60,15 +98,34 @@ class NetworkSkimming(WorkerThread):
             elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
                 self.report.append("Centroid " + str(orig) + " does not exist in the graph")
             else:
-                pool.apply_async(self.func_skim_thread, args=(orig, all_threads))
+                pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
+        self.aux_res = None
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
 
         if pyqt:
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
 
-    def func_skim_thread(self, origin, all_threads):
+    def save_to_project(self, name: str, format='omx') -> None:
+        """Saves skim results to the project folder and creates record in the database
+
+        Args:
+            *name* (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
+            *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
+        """
+
+        file_name = f'{name}.{format.lower()}'
+        mats = Matrices()
+        record = mats.new_record(name, file_name, self.results.skims)
+        record.procedure_id = self.procedure_id
+        record.timestamp = self.procedure_date
+        record.procedure = 'Network skimming'
+        record.save()
+
+    def __func_skim_thread(self, origin, all_threads):
         if threading.get_ident() in all_threads:
             th = all_threads[threading.get_ident()]
         else:

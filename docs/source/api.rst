@@ -30,10 +30,11 @@ Project components
    :toctree: _generated
 
     About
-    Network
     FieldEditor
-    Zoning
     Log
+    Matrices
+    Network
+    Zoning
 
 Project objects
 ++++++++++++++++++
@@ -46,8 +47,8 @@ Project objects
 
     Zone
 
-Network data tables
-~~~~~~~~~~~~~~~~~~~
+Network data
+~~~~~~~~~~~~
 
 .. currentmodule:: aequilibrae.project.network
 
@@ -57,6 +58,8 @@ Network data tables
 
     Modes
     LinkTypes
+    Links
+    Nodes
 
 Network items
 ~~~~~~~~~~~~~
@@ -70,6 +73,8 @@ Network items
 
     Mode
     LinkType
+    Link
+    Node
 
 Parameters Module
 -----------------

@@ -27,7 +27,7 @@ class AssignmentResults:
     def __init__(self):
         self.link_loads = None  # type: np.array  # The actual results for assignment
         self.total_link_loads = None  # type: np.array  # The result of the assignment for all user classes summed
-        self.skims = None  # The array of skims
+        self.skims = AequilibraeMatrix()  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = None  # number of skims that will be computed. Depends on the setting of the graph provided
         p = Parameters().parameters['system']['cpus']

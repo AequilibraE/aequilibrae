@@ -6,4 +6,4 @@ cython
 openmatrix
 requests
 shapely
-pandas
+pandas == 1.0.1

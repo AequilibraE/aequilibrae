@@ -59,7 +59,6 @@ class Modes:
         self.__all_modes = []
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
-
         self.__update_list_of_modes()
 
     def add(self, mode: Mode) -> None:

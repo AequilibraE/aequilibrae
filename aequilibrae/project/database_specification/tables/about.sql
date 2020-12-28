@@ -1,6 +1,6 @@
-CREATE TABLE 'about' (infoname  TEXT UNIQUE NOT NULL,
-                      infovalue TEXT
-                     );
+CREATE TABLE  if not exists about (infoname  TEXT UNIQUE NOT NULL,
+                                   infovalue TEXT
+                                  );
 #
 INSERT INTO 'about' (infoname) VALUES('model_name');
 

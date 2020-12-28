@@ -2,12 +2,13 @@ import string
 from typing import List
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
+import re
 
 allowed_characters = string.ascii_letters + '_'
 
 
 class FieldEditor:
-    '''Allows user to edit the project data tables
+    """Allows user to edit the project data tables
 
     The field editor is used for two different purposes:
 
@@ -32,7 +33,7 @@ class FieldEditor:
         m_fields = proj.network.modes.fields()
 
     Field descriptions are kept in the table *attributes_documentation*
-    '''
+    """
     _alowed_characters = allowed_characters
 
     def __init__(self, table_name: str) -> None:
@@ -101,20 +102,7 @@ class FieldEditor:
         raw_fields = self._table_fields
 
         if self._table == 'links':
-            fields = []
-            for field in raw_fields:
-                if field[-3:] == '_ab':
-                    if field[:-3] + '_ba' in raw_fields:
-                        fields.append(field[:-2])
-                    else:
-                        fields.append(field)
-                elif field[-3:] == '_ba':
-                    if field[:-3] + '_ab' in raw_fields:
-                        continue
-                    else:
-                        fields.append(field)
-                else:
-                    fields.append(field)
+            fields = list({re.sub("_ab", "", re.sub("_ba", '', f)) for f in raw_fields})
         else:
             fields = raw_fields
 

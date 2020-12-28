@@ -1,8 +1,6 @@
-name: Upload Windows Python Package
+name: Build and upload Windows Python Package
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request, release]
 
 jobs:
   deploy:
@@ -10,13 +8,14 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.6', '3.7', '3.8', '3.9' ]
+        architecture: ['x86', 'x64']
     steps:
     - uses: actions/checkout@v2
     - name: Set Python environment
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: x64
+        architecture: ${{ matrix.architecture }}
 
     - name: Install dependencies
       run: |
@@ -36,6 +35,7 @@ jobs:
       run: python setup.py sdist bdist_wheel
 
     - name: Publish
+      if: ${{ github.event_name == 'release'}}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
