@@ -3,6 +3,7 @@ import shapely.wkb
 
 class SafeClass:
     _srid = 4326
+
     def __init__(self, data_set: dict) -> None:
         self.__original__ = {}
         for k, v in data_set.items():

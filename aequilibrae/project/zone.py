@@ -93,7 +93,7 @@ class Zone(SafeClass):
             lt = ''.join([x[0] for x in curr.fetchall()])
             lt = f'*[{lt}]*'
 
-        sql = '''select node_id, ST_asBinary(geometry), modes, link_types from nodes where ST_Within(geometry, GeomFromWKB(?, ?)) and 
+        sql = '''select node_id, ST_asBinary(geometry), modes, link_types from nodes where ST_Within(geometry, GeomFromWKB(?, ?)) and
                         (nodes.rowid in (select rowid from SpatialIndex where f_table_name = 'nodes' and
                         search_frame = GeomFromWKB(?, ?)))
                 and link_types glob ? and instr(modes, ?)>0'''
