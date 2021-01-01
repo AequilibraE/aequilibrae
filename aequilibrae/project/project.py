@@ -38,7 +38,6 @@ class Project:
         self.conn: sqlite3.Connection = None
         self.network: Network = None
         self.about: About = None
-        self.zoning: Zoning = None
         self.logger: logging.Logger = None
 
     def open(self, project_path: str) -> None:
@@ -130,7 +129,6 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
-        self.zoning = Zoning(self)
         self.matrices = Matrices()
         self.parameters = Parameters().parameters
 
@@ -138,6 +136,10 @@ class Project:
         """ Makes results_database.sqlite and the matrices folder compatible with project database
         """
         raise NotImplementedError
+
+    @property
+    def zoning(self):
+        return Zoning(self.network)
 
     def __create_empty_project(self):
 

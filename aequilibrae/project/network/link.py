@@ -46,14 +46,12 @@ class Link(SafeClass):
         link1.save()
         link2.save()
         """
-
     def __init__(self, dataset):
         super().__init__(dataset)
         self.__fields = list(dataset.keys())
 
         self.__new = dataset['geometry'] is None
         self.__stil_exists = True
-        self.__srid = 4326
 
     def delete(self):
         """Deletes link from database"""
@@ -168,7 +166,7 @@ class Link(SafeClass):
                 continue
             if val != self.__original__[key]:
                 if key == 'geometry' and val is not None:
-                    data.extend([val.wkb, self.__srid])
+                    data.extend([val.wkb, self._srid])
                     txts.append('geometry=GeomFromWKB(?, ?)')
                 else:
                     data.append(val)
@@ -193,7 +191,7 @@ class Link(SafeClass):
             data.append(val)
         markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?, ?)'
         up_keys.append('geometry')
-        data.extend([self.geometry.wkb, self.__srid])
+        data.extend([self.geometry.wkb, self._srid])
         sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
         return data, sql
 
@@ -202,8 +200,6 @@ class Link(SafeClass):
             raise AttributeError(f'"{instance}" is not a valid attribute for a link')
         if instance == 'modes':
             self.set_modes(value)
-        elif instance == 'link_type':
-            raise NotImplementedError('Setting link_type is a little tricky')
         elif instance == 'a_node':
             raise AttributeError('Setting a_node is not allowed')
         elif instance == 'b_node':

@@ -1,4 +1,4 @@
-from sqlite3 import Connection
+import os
 from copy import deepcopy
 import shapely.wkb
 import pandas as pd
@@ -7,6 +7,7 @@ from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.data_loader import DataLoader
+from aequilibrae.project.database_connection import database_connection
 
 
 class Links:
@@ -34,10 +35,10 @@ class Links:
     #: Query sql for retrieving links
     sql = ''
 
-    def __init__(self, net):
+    def __init__(self):
         self.__all_links = []
-        self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
+        self.conn = database_connection()
+        self.curr = self.conn.cursor()
         self.curr.execute('select max(link_id) from Links')
         self.__max_id = self.curr.fetchone()[0]
         tl = TableLoader()
@@ -77,7 +78,8 @@ class Links:
 
         data = {key: None for key in self.__fields}
         data['link_id'] = self.__new_link_id()
-        return self.__create_return_link(data)
+        return Link(data)
+        # return self.__create_return_link(data)
 
     def copy_link(self, link_id: int) -> Link:
         """Creates a copy of a link with a new id

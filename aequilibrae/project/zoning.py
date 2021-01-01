@@ -9,6 +9,8 @@ from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from .zone import Zone
+from aequilibrae import logger
+from aequilibrae.project.database_connection import database_connection
 
 
 class Zoning:
@@ -38,10 +40,11 @@ class Zoning:
     """
     __items = {}
 
-    def __init__(self, project):
+    def __init__(self, network):
+        self.network = network
         self.__all_types = []
-        self.__conn = project.conn  # type: Connection
-        self.__curr = project.conn.cursor()
+        self.conn = database_connection()
+        self.__curr = self.conn.cursor()
         self.__fields = []
         if self.__has_zoning():
             self.__load()
@@ -58,6 +61,8 @@ class Zoning:
 
         data = {key: None for key in self.__fields}
         data['zone_id'] = zone_id
+
+        logger.info(f'Zone with id {zone_id} was created')
         return self.__create_return_zone(data)
 
     def create_zoning_layer(self):
@@ -65,7 +70,7 @@ class Zoning:
 
         if not self.__has_zoning():
             qry_file = join(realpath(__file__), 'database_specification', 'tables', 'zones.sql')
-            run_queries_from_sql_file(self.__conn, qry_file)
+            run_queries_from_sql_file(self.conn, qry_file)
             self.__load()
         else:
             warn('zones table already exists. Nothing was done', Warning)
@@ -115,7 +120,7 @@ class Zoning:
         raise Exception('Zones object cannot be copied')
 
     def __has_zoning(self):
-        curr = self.__conn.cursor()
+        curr = self.conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
         return any(['zone' in x[0].lower() for x in curr.fetchall()])
 

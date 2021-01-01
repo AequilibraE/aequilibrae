@@ -91,6 +91,7 @@ class Node(SafeClass):
             *new_id* (:obj:`int`): New node_id
         """
 
+        new_id = int(new_id)
         if new_id == self.node_id:
             raise ValueError('This is already the node number')
 
@@ -103,6 +104,7 @@ class Node(SafeClass):
         curr.execute('Update Links set b_node=? where b_node=?', [new_id, self.node_id])
         curr.execute('COMMIT;')
         conn.close()
+        logger.info(f'Node {self.node_id} was renumbered to {new_id}')
         self.__dict__['node_id'] = new_id
         self.__original__['node_id'] = new_id
 

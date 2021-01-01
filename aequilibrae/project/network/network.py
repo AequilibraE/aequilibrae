@@ -1,11 +1,10 @@
 import math
-import os
 from warnings import warn
 from sqlite3 import Connection as sqlc
-from typing import List, Dict
+from typing import Dict
 import numpy as np
 import shapely.wkb
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon
 from shapely.ops import unary_union
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
@@ -36,8 +35,8 @@ class Network():
         self.graphs = {}  # type: Dict[Graph]
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
-        self.links = Links(self)
-        self.nodes = Nodes(self)
+        self.links = Links()
+        self.nodes = Nodes()
 
     def skimmable_fields(self):
         """
@@ -317,22 +316,6 @@ class Network():
             :obj:`int`: Number of nodes
         """
         return self.__count_items('node_id', 'nodes', 'node_id>=0')
-
-    def add_centroid(self, zone_id: int, point: Point, modes: str) -> None:
-        """Adds a centroid and centroid connectors for the desired modes to the network file
-
-           Centroid connectors are added to the closest nodes until all modes requested have been
-           connected. If connecting a node does not increase connectivity, such connector is not added
-
-               Args:
-                   *zone_id* (:obj:`int`): ID for the zone centroid to be included in the network
-
-                   *point* (:obj:`Point`): Shapely Point corresponding to the
-
-                   *modes* (:obj:`str`): Modes for which centroids connectors should be added
-               """
-
-        raise NotImplementedError
 
     def extent(self):
         """Queries the extent of the network included in the model

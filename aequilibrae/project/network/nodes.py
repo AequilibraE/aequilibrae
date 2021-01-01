@@ -5,6 +5,7 @@ from aequilibrae.project.network.node import Node
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.data_loader import DataLoader
+from aequilibrae.project.database_connection import database_connection
 
 
 class Nodes:
@@ -31,10 +32,10 @@ class Nodes:
     #: Query sql for retrieving nodes
     sql = ''
 
-    def __init__(self, net):
+    def __init__(self):
         self.__all_nodes = []
-        self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
+        self.conn = database_connection()
+        self.curr = self.conn.cursor()
         tl = TableLoader()
         tl.load_structure(self.curr, 'nodes')
         self.sql = tl.sql
