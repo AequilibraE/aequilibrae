@@ -4,6 +4,9 @@ from warnings import warn
 from sqlite3 import Connection as sqlc
 from typing import List, Dict
 import numpy as np
+import shapely.wkb
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
@@ -329,6 +332,28 @@ class Network():
                    *modes* (:obj:`str`): Modes for which centroids connectors should be added
                """
         pass
+
+    def extent(self):
+        """Queries the extent of the network included in the model
+
+        Returns:
+            *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
+        """
+        curr = self.conn.cursor()
+        curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
+        poly = shapely.wkb.loads(curr.fetchone()[0])
+        return poly
+
+    def convex_hull(self) -> Polygon:
+        """ Queries the model for the convex hull of the entire network
+
+        Returns:
+            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
+        """
+        curr = self.conn.cursor()
+        curr.execute('Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;')
+        links = [shapely.wkb.loads(x[0]) for x in curr.fetchall()]
+        return unary_union(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()

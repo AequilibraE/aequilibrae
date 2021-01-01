@@ -1,7 +1,9 @@
-from sqlite3 import IntegrityError, Connection
-from os.path import join, dirname, realpath
+from sqlite3 import Connection
+from os.path import join, realpath
 from warnings import warn
-from aequilibrae import logger
+import shapely.wkb
+from shapely.ops import unary_union
+from shapely.geometry import Polygon
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.project_creation import run_queries_from_sql_file
@@ -51,6 +53,26 @@ class Zoning:
             self.__load()
         else:
             warn('zones table already exists. Nothing was done', Warning)
+
+    def extent(self) -> Polygon:
+        """Queries the extent of the zoning system included in the model
+
+        Returns:
+            *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the zoning system.
+        """
+        self.__curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
+        poly = shapely.wkb.loads(self.__curr.fetchone()[0])
+        return poly
+
+    def coverage(self) -> Polygon:
+        """ Returns a single polygon for the entire zoning coverage
+
+        Returns:
+            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
+        """
+        self.__curr.execute('Select ST_asBinary("geometry") from zones;')
+        polygons = [shapely.wkb.loads(x[0]) for x in self.__curr.fetchall()]
+        return unary_union(polygons)
 
     def get(self, zone_id: str) -> Zone:
         """Get a zone from the model by its **zone_id**"""
