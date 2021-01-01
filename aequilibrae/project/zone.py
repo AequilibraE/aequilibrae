@@ -5,9 +5,10 @@ from aequilibrae.project.database_connection import database_connection
 
 class Zone(SafeClass):
     """Single zone object that can be queried and manipulated in memory"""
-    def __init__(self, data_set: dict, zoning):
-        super().__init__(data_set)
+    def __init__(self, dataset: dict, zoning):
+        super().__init__(dataset)
         self.__zoning = zoning
+        self.__new = dataset['geometry'] is None
 
     def delete(self):
         """Removes the zone from the database"""
@@ -20,6 +21,10 @@ class Zone(SafeClass):
 
     def save(self):
         """Saves/Updates the zone data to the database"""
+
+        if self.zone_id != self.__original__['zone_id']:
+            raise ValueError('One cannot change the zone_id')
+
         conn = database_connection()
         curr = conn.cursor()
 

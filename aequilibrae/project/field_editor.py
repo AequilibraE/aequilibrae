@@ -82,7 +82,7 @@ class FieldEditor:
         self._table_fields = [x[1] for x in dt if x[1] != 'ogc_fid']
 
     def remove(self, field_name: str) -> None:
-        pass
+        raise NotImplementedError
 
     def save(self) -> None:
         """Saves any field descriptions which my have been changed to the database"""

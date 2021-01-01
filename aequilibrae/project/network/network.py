@@ -5,7 +5,7 @@ from sqlite3 import Connection as sqlc
 from typing import List, Dict
 import numpy as np
 import shapely.wkb
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from shapely.ops import unary_union
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
@@ -69,9 +69,7 @@ class Network():
             if f[-2:] == "ab":
                 if f[:-2] + 'ba' in all_fields:
                     real_fields.append(f[:-3])
-            elif f[-3:] == "_ba":
-                pass
-            else:
+            elif f[-3:] != "_ba":
                 real_fields.append(f)
 
         return real_fields
@@ -320,18 +318,21 @@ class Network():
         """
         return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
-    def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
-        """
-               Adds a centroid and centroid connectors for the desired modes to the network file
+    def add_centroid(self, zone_id: int, point: Point, modes: str) -> None:
+        """Adds a centroid and centroid connectors for the desired modes to the network file
+
+           Centroid connectors are added to the closest nodes until all modes requested have been
+           connected. If connecting a node does not increase connectivity, such connector is not added
 
                Args:
-                   *node_id* (:obj:`int`): ID for the centroid to be included in the network
+                   *zone_id* (:obj:`int`): ID for the zone centroid to be included in the network
 
-                   *coords* (:obj:`List`): XY Coordinates for centroid -> [LONGITUDE, LATITUDE]
+                   *point* (:obj:`Point`): Shapely Point corresponding to the
 
                    *modes* (:obj:`str`): Modes for which centroids connectors should be added
                """
-        pass
+
+        raise NotImplementedError
 
     def extent(self):
         """Queries the extent of the network included in the model

@@ -136,10 +136,8 @@ class Project:
 
     def check_file_indices(self) -> None:
         """ Makes results_database.sqlite and the matrices folder compatible with project database
-
-
         """
-        pass
+        raise NotImplementedError
 
     def __create_empty_project(self):
 

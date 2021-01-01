@@ -1,3 +1,4 @@
+from copy import deepcopy
 from sqlite3 import Connection
 from os.path import join, realpath
 from warnings import warn
@@ -41,10 +42,25 @@ class Zoning:
         self.__all_types = []
         self.__conn = project.conn  # type: Connection
         self.__curr = project.conn.cursor()
+        self.__fields = []
         if self.__has_zoning():
             self.__load()
 
-    def create(self):
+    def new(self, zone_id: int) -> Zone:
+        """Creates a new zone
+
+        Returns:
+            *zone* (:obj:`Zone`): A new link object populated only with link_id (not saved in the model yet)
+            """
+
+        if zone_id in self.__items:
+            raise Exception(f'Zone ID {zone_id} already exists')
+
+        data = {key: None for key in self.__fields}
+        data['zone_id'] = zone_id
+        return self.__create_return_zone(data)
+
+    def create_zoning_layer(self):
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
@@ -106,6 +122,7 @@ class Zoning:
     def __load(self):
         tl = TableLoader()
         zones_list = tl.load_table(self.__curr, 'zones')
+        self.__fields = deepcopy(tl.fields)
 
         existing_list = [zn['zone_id'] for zn in zones_list]
         if zones_list:
@@ -120,3 +137,8 @@ class Zoning:
 
     def _remove_zone(self, zone_id: int):
         del self.__items[zone_id]
+
+    def __create_return_zone(self, data):
+        zone = Zone(data, self)
+        self.__items[zone.zone_id] = zone
+        return zone
