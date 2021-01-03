@@ -61,7 +61,7 @@ def remove_triggers(conn: Connection) -> None:
             query_list = sql_file.read()
 
         # Running one query/command at a time helps debugging in the case a particular command fails
-        for cmd in query_list.split("#"):
+        for cmd in query_list.split("--#"):
             for qry in cmd.split("\n"):
                 if qry[:2] == '--':
                     continue
@@ -85,7 +85,7 @@ def run_queries_from_sql_file(conn: Connection, qry_file: str) -> None:
         query_list = sql_file.read()
 
     # Running one query/command at a time helps debugging in the case a particular command fails
-    for cmd in query_list.split("#"):
+    for cmd in query_list.split("--#"):
         try:
             curr.execute(cmd)
         except Exception as e:
