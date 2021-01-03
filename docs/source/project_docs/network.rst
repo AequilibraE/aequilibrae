@@ -264,10 +264,11 @@ conceivable are also explored.
 Creating a node
 ^^^^^^^^^^^^^^^
 
-There are only two situations when a node is to be created:
+There are only three situations when a node is to be created:
 - Placement of a link extremity (new or moved) at a position where no node
 already exists
 - Spliting a link in the middle
+- Creation of a centroid for later connection to the network
 
 In both cases a unique node ID needs to be generated for the new node, and all
 other node fields should be empty
