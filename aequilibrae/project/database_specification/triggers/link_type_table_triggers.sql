@@ -7,7 +7,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type_id need to be a single letter');
 END;
 
-#
+--#
 -- Guarantees that the link_type_id field is exactly 1 character long
 
 CREATE TRIGGER link_type_single_letter_insert BEFORE INSERT ON "link_types"
@@ -17,7 +17,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type_id need to be a single letter');
 END;
 
-#
+--#
 
 -- Prevents a link_type record to be changed when it is in use for any link
 
@@ -28,7 +28,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
 
-#
+--#
 -- Prevents a link_type record to be removed when it is in use for any link
 CREATE TRIGGER link_type_keep_if_in_use_deleting BEFORE DELETE ON "link_types"
 WHEN
@@ -37,7 +37,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type is in use on your network. Cannot change it');
 END;
 
-#
+--#
 -- Ensures an ALTERED link does not reference a non existing link_type
 CREATE TRIGGER link_type_on_links_update BEFORE UPDATE OF 'link_type' ON links
 WHEN
@@ -46,7 +46,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type need to exist in the link_types table in order to be used');
 END;
 
-#
+--#
 -- Ensures an added link does not reference a non existing mode
 CREATE TRIGGER link_type_on_links_insert BEFORE INSERT ON links
 WHEN
@@ -55,7 +55,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Link_type need to exist in the link_types table in order to be used');
 END;
 
-#
+--#
 -- Ensures that we do not delete a protected link type
 CREATE TRIGGER link_type_on_links_delete_protected_link_type BEFORE DELETE ON link_types
 WHEN
@@ -64,7 +64,7 @@ BEGIN
     SELECT RAISE(ABORT, 'We cannot delete this link type');
 END;
 
-#
+--#
 -- Ensures that we do not alter a protected link type
 CREATE TRIGGER link_type_keep_if_protected_type BEFORE UPDATE OF link_type ON "link_types"
 WHEN
@@ -73,7 +73,7 @@ BEGIN
     SELECT RAISE(ABORT, 'We cannot delete this link type');
 END;
 
-#
+--#
 -- Keeps the two protected items unchanged in the database
 CREATE TRIGGER link_type_id_keep_if_protected_type BEFORE UPDATE OF link_type_id ON "link_types"
 WHEN
@@ -82,7 +82,7 @@ BEGIN
     SELECT RAISE(ABORT, 'We cannot alter this link type');
 END;
 
-#
+--#
 -- Keeps the list of link_types at a node up-to-date when we try to manually change it in the modes table
 CREATE TRIGGER link_type_on_nodes_table_update_nodes_link_type AFTER UPDATE of link_types ON nodes
 BEGIN
@@ -96,7 +96,7 @@ BEGIN
           WHERE nodes.node_id=new.node_id;
 END;
 
-#
+--#
 -- Keeps the list of link_types at a node up-to-date when we change link type for a link
 CREATE TRIGGER link_type_on_nodes_table_update_links_link_type AFTER UPDATE of link_type ON links
 BEGIN
@@ -122,7 +122,7 @@ BEGIN
 END;
 
 
-#
+--#
 -- Keeps the list of link_types at a node up-to-date when we change the a_node for a link
 CREATE TRIGGER link_type_on_nodes_table_update_links_a_node AFTER UPDATE of a_node ON links
 BEGIN
@@ -147,7 +147,7 @@ BEGIN
         WHERE nodes.node_id=old.a_node;
 END;
 
-#
+--#
 -- Keeps the list of link_types at a node up-to-date when we change the b_node for a link
 CREATE TRIGGER link_type_on_nodes_table_update_links_b_node AFTER UPDATE of b_node ON links
 BEGIN
