@@ -53,7 +53,7 @@ class Link(SafeClass):
 
         self.__new = dataset['geometry'] is None
         self.__stil_exists = True
-        self.__srid = 4326
+        self._table = 'links'
 
     def delete(self):
         """Deletes link from database"""
@@ -69,7 +69,7 @@ class Link(SafeClass):
         curr = conn.cursor()
 
         if self.__new:
-            data, sql = self.__save_new_link()
+            data, sql = self._save_new_with_geometry()
         else:
             data, sql = self.__save_existing_link()
 
@@ -168,7 +168,7 @@ class Link(SafeClass):
                 continue
             if val != self.__original__[key]:
                 if key == 'geometry' and val is not None:
-                    data.extend([val.wkb, self.__srid])
+                    data.extend([val.wkb, self.__srid__])
                     txts.append('geometry=GeomFromWKB(?, ?)')
                 else:
                     data.append(val)
@@ -183,27 +183,11 @@ class Link(SafeClass):
         sql = f'Update Links set {txts}'
         return data, sql
 
-    def __save_new_link(self):
-        data = []
-        up_keys = []
-        for key, val in self.__dict__.items():
-            if key not in self.__original__ or key == 'geometry':
-                continue
-            up_keys.append(f'"{key}"')
-            data.append(val)
-        markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?, ?)'
-        up_keys.append('geometry')
-        data.extend([self.geometry.wkb, self.__srid])
-        sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
-        return data, sql
-
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":
             raise AttributeError(f'"{instance}" is not a valid attribute for a link')
         if instance == 'modes':
             self.set_modes(value)
-        elif instance == 'link_type':
-            raise NotImplementedError('Setting link_type is a little tricky')
         elif instance == 'a_node':
             raise AttributeError('Setting a_node is not allowed')
         elif instance == 'b_node':
