@@ -3,8 +3,8 @@ import sqlite3
 from tempfile import gettempdir
 import os
 import uuid
-import platform
 from shutil import copytree
+from shapely.geometry import Point
 from aequilibrae.project import Project
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from ...data import siouxfalls_project
@@ -40,3 +40,19 @@ class TestNetworkTriggers(TestCase):
         # Since node 1 is no longer a centroid, we should have only 23 nodes in the network
         items = self.siouxfalls.network.count_nodes()
         self.assertEqual(23, items, 'Wrong number of nodes found')
+
+    def test_add_empty_node(self):
+        self.assertEqual(24, self.siouxfalls.network.count_nodes(), 'Wrong number of nodes found')
+
+        sql = 'INSERT into nodes (node_id, is_centroid, modes, link_types, geometry) VALUES(?,?,?,?,GeomFromWKB(?, 4326));'
+
+        data = [1000, 0, 'c', 'y', Point(0, 0).wkb]
+        curr = self.siouxfalls.conn.cursor()
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            curr.execute(sql, data)
+
+        data[1] = 1
+        curr.execute(sql, data)
+        self.siouxfalls.conn.commit()
+        self.assertEqual(25, self.siouxfalls.network.count_nodes(), 'Failed to add node')

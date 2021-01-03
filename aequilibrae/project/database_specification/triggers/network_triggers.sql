@@ -223,7 +223,13 @@ create trigger deleted_link after delete on links
     end;
 --#
 -- when moving OR creating a link, don't allow it to duplicate an existing link.
--- TODO
+-- don't delete a node, unless no attached links
+create trigger dont_create_empty_node before insert on nodes
+  when (SELECT count(*) FROM links WHERE a_node = new.node_id OR b_node = new.node_id) = 0  and new.is_centroid=0
+  BEGIN
+    SELECT raise(ABORT, 'A regular node with no links attached cannot be added');
+  END;
+--#
 
 -- Triggered by change of nodes
 --
