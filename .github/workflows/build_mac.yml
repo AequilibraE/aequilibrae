@@ -1,9 +1,6 @@
-name: Upload MacOS Python Package
+name: Build and upload MacOS Python Package
 
-on:
-  release:
-    types: [prereleased, published]
-
+on:  [pull_request, release]
 
 jobs:
   deploy:
@@ -22,15 +19,23 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
-        pip install numpy cython pyaml pyqt5 pyshp scipy
+        pip install -r requirements.txt
 
     - name: Build
       run: |
         python setup.py sdist bdist_wheel
 
     - name: Publish
+      if: ${{ github.event_name == 'release'}}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         twine upload dist/*.whl
+
+    - name: Publish tar files
+      if: ${{ github.event_name == 'release'}}
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload dist/*.gz

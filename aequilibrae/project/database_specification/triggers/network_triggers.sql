@@ -19,19 +19,19 @@
 
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
-#
+--#
 create INDEX IF NOT EXISTS links_a_node_idx ON links (a_node);
 
-#
+--#
 create INDEX IF NOT EXISTS links_b_node_idx ON links (b_node);
 
-#
+--#
 create INDEX IF NOT EXISTS links_link_type ON links (link_type);
 
-#
+--#
 create INDEX IF NOT EXISTS nodes_node_id ON nodes (node_id);
 
-#
+--#
 create trigger new_link_a_node before insert on links
   when
     (SELECT count(*)
@@ -46,7 +46,7 @@ create trigger new_link_a_node before insert on links
     VALUES ((SELECT coalesce(max(node_id) + 1,1) from nodes),
             StartPoint(new.geometry));
   END;
-#
+--#
 create trigger new_link_b_node before insert on links
   when
     (SELECT count(*)
@@ -61,7 +61,7 @@ create trigger new_link_b_node before insert on links
     VALUES ((SELECT coalesce(max(node_id) + 1,1) from nodes),
             EndPoint(new.geometry));
   END;
-#
+--#
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
 create trigger update_link_a_node before update of geometry on links
@@ -78,7 +78,7 @@ create trigger update_link_a_node before update of geometry on links
     VALUES ((SELECT coalesce(max(node_id) + 1,1) from nodes),
             StartPoint(new.geometry));
   END;
-#
+--#
 create trigger update_link_b_node before update of geometry on links
   when
     (SELECT count(*)
@@ -93,7 +93,7 @@ create trigger update_link_b_node before update of geometry on links
     VALUES ((SELECT coalesce(max(node_id) + 1,1) from nodes),
             EndPoint(new.geometry));
   END;
-#
+--#
   
 create trigger new_link after insert on links
   begin
@@ -140,7 +140,7 @@ create trigger new_link after insert on links
     , mode_id) > 0)
     where nodes.node_id=new.b_node;
   end;
-#
+--#
 create trigger updated_link_geometry after update of geometry on links
   begin
   -- Update a/b_node AFTER moving a link.
@@ -185,7 +185,7 @@ create trigger updated_link_geometry after update of geometry on links
       from links
       where b_node is not null);
   end;
-#
+--#
 
 create trigger deleted_link after delete on links
   begin
@@ -219,7 +219,7 @@ create trigger deleted_link after delete on links
 
     where nodes.node_id=old.b_node;
     end;
-#
+--#
 -- when moving OR creating a link, don't allow it to duplicate an existing link.
 -- TODO
 
@@ -238,7 +238,7 @@ create trigger update_node_geometry after update of geometry on nodes
     where b_node = new.node_id
     and EndPoint(geometry) != new.geometry;
   end;
-#
+--#
 -- when you move a node on top of another node, steal all links FROM that node, AND delete it.
 -- be careful of merging the a_nodes of attached links to the new node
 -- this may be better as a TRIGGER on links?
@@ -281,7 +281,7 @@ create trigger cannibalise_node before update of geometry on nodes
       SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
       search_frame = new.geometry);
   END;
-#
+--#
 -- you may NOT CREATE a node on top of another node.
 create trigger no_duplicate_node before insert on nodes
   when
@@ -296,7 +296,7 @@ create trigger no_duplicate_node before insert on nodes
     -- todo: change this to perform a cannibalisation instead.
     SELECT raise(ABORT, 'Cannot create on-top of other node');
   END;
-#
+--#
 -- TODO: cannot CREATE node NOT attached.
 
 -- don't delete a node, unless no attached links
@@ -305,7 +305,7 @@ create trigger dont_delete_node before delete on nodes
   BEGIN
     SELECT raise(ABORT, 'Node cannot be deleted, it still has attached links.');
   END;
-#
+--#
 -- don't CREATE a node, unless on a link endpoint
 -- TODO
 -- CREATE BEFORE WHERE spatial index AND PointN()
@@ -318,7 +318,7 @@ create trigger updated_node_id after update of node_id on nodes
     update links set b_node = new.node_id
     where links.b_node = old.node_id;
   end;
-#
+--#
 
 -- Guarantees that link direction is one of the required values
 create trigger links_direction_update before update on links
@@ -327,21 +327,21 @@ begin
   select RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
 end;
 
-#
+--#
 create trigger links_direction_insert before insert on links
 when new.direction != -1 AND new.direction != 0 AND new.direction != 1
 begin
   select RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
 end;
 
-#
+--#
 create trigger enforces_link_length_update after update of distance on links
 begin
   update links set distance = GeodesicLength(new.geometry)
   where links.rowid = new.rowid;end;
 
 
-#
+--#
 -- Guarantees that link direction is one of the required values
 create trigger nodes_iscentroid_update before update on nodes
 when new.is_centroid != 0 AND new.is_centroid != 1
@@ -349,7 +349,7 @@ begin
   select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
 end;
 
-#
+--#
 create trigger nodes_iscentroid_insert before insert on nodes
 when new.is_centroid != 0 AND new.is_centroid != 1
 begin
