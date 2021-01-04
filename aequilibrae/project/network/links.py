@@ -77,6 +77,8 @@ class Links:
                 """
 
         data = {key: None for key in self.__fields}
+        data['direction'] = 0
+        data['link_type'] = 'default'
         data['link_id'] = self.__new_link_id()
         return Link(data)
         # return self.__create_return_link(data)

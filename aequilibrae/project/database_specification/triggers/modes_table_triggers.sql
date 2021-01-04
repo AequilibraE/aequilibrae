@@ -6,7 +6,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to be a single letter');
 END;
 
-#
+--#
 CREATE TRIGGER mode_single_letter_insert BEFORE INSERT ON "modes"
 WHEN
 length(new.mode_id)!= 1
@@ -14,7 +14,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to be a single letter');
 END;
 
-#
+--#
 
 -- Prevents a mode record to be changed when it is in use for any link
 CREATE TRIGGER mode_keep_if_in_use_updating BEFORE UPDATE OF mode_id ON "modes"
@@ -25,7 +25,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
 
-#
+--#
 -- Prevents a mode record to be removed when it is in use for any link
 CREATE TRIGGER mode_keep_if_in_use_deleting BEFORE DELETE ON "modes"
 WHEN
@@ -34,7 +34,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode in use on your network. Cannot change it');
 END;
 
-#
+--#
 -- Ensures an ALTERED link does not reference a non existing mode
 CREATE TRIGGER modes_on_links_update BEFORE UPDATE OF 'modes' ON "links"
 WHEN
@@ -43,7 +43,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
 END;
 
-#
+--#
 -- Ensures an added link does not reference a non existing mode
 CREATE TRIGGER modes_on_links_insert BEFORE INSERT ON "links"
 WHEN
@@ -52,7 +52,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
 END;
 
-#
+--#
 -- Ensures an ALTERED link has at least one mode added to it
 CREATE TRIGGER modes_length_on_links_update BEFORE UPDATE OF 'modes' ON "links"
 WHEN
@@ -61,7 +61,7 @@ begin
     select RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
 end;
 
-#
+--#
 -- Ensures an added link has at least one mode added to it
 CREATE TRIGGER modes_length_on_links_insert BEFORE INSERT ON "links"
 WHEN
@@ -70,7 +70,7 @@ BEGIN
     SELECT RAISE(ABORT, 'Mode codes need to exist in the modes table in order to be used');
 END;
 
-#
+--#
 -- Keeps the list of modes at a node up-to-date when we change the links' a_node
 CREATE TRIGGER modes_on_nodes_table_update_a_node after update of a_node on links
 begin
@@ -92,7 +92,7 @@ update nodes
     where nodes.node_id=old.a_node;
 end;
 
-#
+--#
 -- Keeps the list of modes at a node up-to-date when we change the links' b_node
 CREATE TRIGGER modes_on_nodes_table_update_b_node after update of b_node on links
 begin
@@ -115,7 +115,7 @@ update nodes
     where nodes.node_id=old.b_node;
 end;
 
-#
+--#
 -- Keeps the list of modes at a node up-to-date when we change the links' mode
 CREATE TRIGGER modes_on_nodes_table_update_links_modes after update of modes on links
 begin
@@ -136,7 +136,7 @@ where nodes.node_id=new.a_node;
 
 end;
 
-#
+--#
 -- Keeps the list of modes at a node up-to-date when we try to manually change the modes field in the nodes table
 CREATE TRIGGER modes_on_nodes_table_update_nodes_modes after update of modes on nodes
 begin
@@ -149,7 +149,7 @@ select GROUP_CONCAT(modes, '') from links where (links.a_node = new.node_id) or 
 where nodes.node_id=new.node_id;
 end;
 
-#
+--#
 -- We have to have at least one mode in the database
 CREATE TRIGGER mode_keep_at_least_one BEFORE DELETE ON "modes"
 WHEN

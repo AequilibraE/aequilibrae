@@ -90,6 +90,24 @@ class Nodes:
         dl = DataLoader(self.conn, 'nodes')
         return dl.load_table()
 
+    def new_centroid(self, node_id: int) -> Node:
+        """Creates a new centroid with a given ID
+
+        Args:
+            *node_id* (:obj:`int`): Id of the centroid to be created
+        """
+
+        self.curr.execute('select count(*) from nodes where node_id=?', [node_id])
+        if self.curr.fetchone()[0] > 0:
+            raise Exception('Node_id already exists. Failed to create it')
+
+        data = {key: None for key in self.__fields}
+        data['node_id'] = node_id
+        data['is_centroid'] = 1
+        node = Node(data)
+        self.__items[node_id] = node
+        return node
+
     @staticmethod
     def fields() -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Links table fields and their metadata

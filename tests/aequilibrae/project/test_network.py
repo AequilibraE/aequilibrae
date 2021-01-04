@@ -3,6 +3,7 @@ import sqlite3
 from tempfile import gettempdir
 import os
 import uuid
+from shutil import copytree
 import platform
 from aequilibrae.project import Project
 from aequilibrae.project.network.network import Network
@@ -18,9 +19,9 @@ class TestNetwork(TestCase):
     def setUp(self) -> None:
         os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
         self.proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
-
+        copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
-        self.siouxfalls.open(siouxfalls_project)
+        self.siouxfalls.open(self.proj_path)
 
     def tearDown(self) -> None:
         self.siouxfalls.close()
@@ -57,13 +58,21 @@ class TestNetwork(TestCase):
             if lks > nds:
                 self.fail("We imported more links than nodes. Something wrong here")
             self.project.close()
-            self.siouxfalls.open(siouxfalls_project)
+            self.siouxfalls.open(self.proj_path)
         else:
             print('Skipped check to not load OSM servers')
 
     def test_count_centroids(self):
         items = self.siouxfalls.network.count_centroids()
         self.assertEqual(24, items, 'Wrong number of centroids found')
+
+        nodes = self.siouxfalls.network.nodes
+        node = nodes.get(1)
+        node.is_centroid = 0
+        node.save()
+
+        items = self.siouxfalls.network.count_centroids()
+        self.assertEqual(23, items, 'Wrong number of centroids found')
 
     def test_count_links(self):
         items = self.siouxfalls.network.count_links()

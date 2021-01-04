@@ -52,6 +52,7 @@ class Link(SafeClass):
 
         self.__new = dataset['geometry'] is None
         self.__stil_exists = True
+        self._table = 'links'
 
     def delete(self):
         """Deletes link from database"""
@@ -67,7 +68,7 @@ class Link(SafeClass):
         curr = conn.cursor()
 
         if self.__new:
-            data, sql = self.__save_new_link()
+            data, sql = self._save_new_with_geometry()
         else:
             data, sql = self.__save_existing_link()
 
@@ -166,7 +167,7 @@ class Link(SafeClass):
                 continue
             if val != self.__original__[key]:
                 if key == 'geometry' and val is not None:
-                    data.extend([val.wkb, self._srid])
+                    data.extend([val.wkb, self.__srid__])
                     txts.append('geometry=GeomFromWKB(?, ?)')
                 else:
                     data.append(val)
@@ -179,20 +180,6 @@ class Link(SafeClass):
         txts = ','.join(txts) + ' where link_id=?'
         data.append(self.link_id)
         sql = f'Update Links set {txts}'
-        return data, sql
-
-    def __save_new_link(self):
-        data = []
-        up_keys = []
-        for key, val in self.__dict__.items():
-            if key not in self.__original__ or key == 'geometry':
-                continue
-            up_keys.append(f'"{key}"')
-            data.append(val)
-        markers = ','.join(['?'] * len(up_keys)) + ',GeomFromWKB(?, ?)'
-        up_keys.append('geometry')
-        data.extend([self.geometry.wkb, self._srid])
-        sql = f'Insert into links ({",".join(up_keys)}) values({markers})'
         return data, sql
 
     def __setattr__(self, instance, value) -> None:

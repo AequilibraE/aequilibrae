@@ -36,37 +36,22 @@ class Node(SafeClass):
 
     def __init__(self, dataset):
         super().__init__(dataset)
+        self.__new = dataset['geometry'] is None
         self.__fields = list(dataset.keys())
+        self._table = 'nodes'
 
     def save(self):
         """Saves node to database"""
         conn = database_connection()
         curr = conn.cursor()
 
-        data = []
-
         if self.node_id != self.__original__['node_id']:
             raise ValueError('One cannot change the node_id')
 
-        txts = []
-        for key, val in self.__dict__.items():
-            if key not in self.__original__:
-                continue
-            if val != self.__original__[key]:
-                if key == 'geometry' and val is not None:
-                    data.append(val.wkb)
-                    txts.append('geometry=GeomFromWKB(?, 4326)')
-                else:
-                    data.append(val)
-                    txts.append(f'"{key}"=?')
-
-        if not data:
-            logger.warn(f'Nothing to update for node {self.node_id}')
-            return
-
-        txts = ','.join(txts) + ' where node_id=?'
-        data.append(self.node_id)
-        sql = f'Update Nodes set {txts}'
+        if self.__new:
+            data, sql = self._save_new_with_geometry()
+        else:
+            data, sql = self.__save_existing_node()
 
         curr.execute(sql, data)
         conn.commit()
@@ -107,6 +92,29 @@ class Node(SafeClass):
         logger.info(f'Node {self.node_id} was renumbered to {new_id}')
         self.__dict__['node_id'] = new_id
         self.__original__['node_id'] = new_id
+
+    def __save_existing_node(self):
+        data = []
+        txts = []
+        for key, val in self.__dict__.items():
+            if key not in self.__original__:
+                continue
+            if val != self.__original__[key]:
+                if key == 'geometry' and val is not None:
+                    data.append(val.wkb)
+                    txts.append(f'geometry=GeomFromWKB(?, {self.__srid__})')
+                else:
+                    data.append(val)
+                    txts.append(f'"{key}"=?')
+
+        if not data:
+            logger.warn(f'Nothing to update for node {self.node_id}')
+            return
+
+        txts = ','.join(txts) + ' where node_id=?'
+        data.append(self.node_id)
+        sql = f'Update Nodes set {txts}'
+        return data, sql
 
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":
