@@ -4,10 +4,10 @@ from tempfile import gettempdir
 import os
 import uuid
 from shutil import copytree
-from shapely.geometry import Point
 from aequilibrae.project import Project
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from ...data import siouxfalls_project
+from shapely.geometry import LineString, Point
 
 
 class TestNetworkTriggers(TestCase):
@@ -41,18 +41,12 @@ class TestNetworkTriggers(TestCase):
         items = self.siouxfalls.network.count_nodes()
         self.assertEqual(23, items, 'Wrong number of nodes found')
 
-    def test_add_empty_node(self):
-        self.assertEqual(24, self.siouxfalls.network.count_nodes(), 'Wrong number of nodes found')
-
-        sql = 'INSERT into nodes (node_id, is_centroid, modes, link_types, geometry) VALUES(?,?,?,?,GeomFromWKB(?, 4326));'
-
-        data = [1000, 0, 'c', 'y', Point(0, 0).wkb]
+    def test_add_regular_link(self):
+        # Add a regular link to see if it fails when creating it
+        # It happened at some point
         curr = self.siouxfalls.conn.cursor()
+        data = [123456, 'c', 'default', LineString([Point(0, 0), Point(1, 1)]).wkb]
 
-        with self.assertRaises(sqlite3.IntegrityError):
-            curr.execute(sql, data)
-
-        data[1] = 1
+        sql = 'insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));'
         curr.execute(sql, data)
         self.siouxfalls.conn.commit()
-        self.assertEqual(25, self.siouxfalls.network.count_nodes(), 'Failed to add node')

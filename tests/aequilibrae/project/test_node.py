@@ -25,8 +25,8 @@ class TestNode(TestCase):
         self.curr = self.project.conn.cursor()
 
     def tearDown(self) -> None:
+        self.curr.close()
         self.project.close()
-        del self.curr
         try:
             rmtree(self.proj_dir)
         except Exception as e:

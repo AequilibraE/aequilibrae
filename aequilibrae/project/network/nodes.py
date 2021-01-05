@@ -109,6 +109,16 @@ class Nodes:
         self.__items[node_id] = node
         return node
 
+    @property
+    def data(self) -> pd.DataFrame:
+        """ Returns all nodes data as a Pandas dataFrame
+
+        Returns:
+            *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry
+        """
+        dl = DataLoader(self.conn, 'nodes')
+        return dl.load_table()
+
     @staticmethod
     def fields() -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Links table fields and their metadata
