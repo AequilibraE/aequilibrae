@@ -128,10 +128,6 @@ class TestZone(TestCase):
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
-        # There are no centroid connectors like this
-        with self.assertRaises(Exception):
-            zone1.connect_mode('c', link_types='z')
-
         zone1.connect_mode('c')
 
         curr.execute('Select count(*) from links where a_node=?', [1])

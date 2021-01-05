@@ -81,16 +81,6 @@ class Nodes:
         for node in nodes:  # type: Node
             node.save()
 
-    @property
-    def data(self) -> pd.DataFrame:
-        """ Returns all nodes data as a Pandas dataFrame
-
-        Returns:
-            *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry
-        """
-        dl = DataLoader(self.conn, 'nodes')
-        return dl.load_table()
-
     def new_centroid(self, node_id: int) -> Node:
         """Creates a new centroid with a given ID
 
