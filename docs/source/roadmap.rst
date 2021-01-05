@@ -19,6 +19,8 @@ identified and that we intend to dedicate some time to in the future.
       penalties/bans
     * Implementation of network simplification to improve performance of
       path-finding
+    * New origin-based traffic assignment to achieve ultra-converged
+      assignment
 
 * Public Transport
 
@@ -36,7 +38,6 @@ identified and that we intend to dedicate some time to in the future.
       table)
     * Inclusion of new table for vectors based on node IDs (plus metadata table)
     * Inclusion of new table for vectors based on link IDs (plus metadata table)
-    * New matrix registry and matrix folder alongside project
 
 * QGIS
 
