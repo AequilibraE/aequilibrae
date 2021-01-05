@@ -150,7 +150,6 @@ class TestZone(TestCase):
         self.__change_project()
         curr = self.proj.conn.cursor()
         zones = self.proj.zoning
-        network = self.proj.network
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
