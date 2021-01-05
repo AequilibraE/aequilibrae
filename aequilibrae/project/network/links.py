@@ -30,22 +30,23 @@ class Links:
         all_links.save()
     """
     __items = {}
-    __max_id = 0
+    __all_links = []
+    __fields = []
+    __max_id = -1
 
     #: Query sql for retrieving links
     sql = ''
 
     def __init__(self):
-        self.__all_links = []
         self.conn = database_connection()
         self.curr = self.conn.cursor()
-        self.curr.execute('select max(link_id) from Links')
-        self.__max_id = self.curr.fetchone()[0]
-        tl = TableLoader()
-        tl.load_structure(self.curr, 'links')
-        self.sql = tl.sql
-
-        self.__fields = deepcopy(tl.fields)
+        if self.sql == '':
+            self.curr.execute('select max(link_id) from Links')
+            self.__max_id = self.curr.fetchone()[0]
+            tl = TableLoader()
+            tl.load_structure(self.curr, 'links')
+            self.sql = tl.sql
+            self.__fields = deepcopy(tl.fields)
 
     def get(self, link_id: int) -> Link:
         """Get a link from the network by its **link_id**

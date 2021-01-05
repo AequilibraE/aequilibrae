@@ -28,6 +28,7 @@ class Nodes:
         all_nodes.save()
     """
     __items = {}
+    __fields = []
 
     #: Query sql for retrieving nodes
     sql = ''
@@ -36,11 +37,11 @@ class Nodes:
         self.__all_nodes = []
         self.conn = database_connection()
         self.curr = self.conn.cursor()
-        tl = TableLoader()
-        tl.load_structure(self.curr, 'nodes')
-        self.sql = tl.sql
-
-        self.__fields = deepcopy(tl.fields)
+        if self.sql == '':
+            tl = TableLoader()
+            tl.load_structure(self.curr, 'nodes')
+            self.sql = tl.sql
+            self.__fields = deepcopy(tl.fields)
 
     def get(self, node_id: int) -> Node:
         """Get a node from the network by its **node_id**

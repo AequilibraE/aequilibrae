@@ -1,5 +1,8 @@
+from warnings import warn
+from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from aequilibrae.project.database_connection import database_connection
+from .connector_creation import connector_creation
 from aequilibrae import logger
 
 
@@ -108,13 +111,37 @@ class Node(SafeClass):
                     txts.append(f'"{key}"=?')
 
         if not data:
-            logger.warn(f'Nothing to update for node {self.node_id}')
+            logger.warning(f'Nothing to update for node {self.node_id}')
             return
 
         txts = ','.join(txts) + ' where node_id=?'
         data.append(self.node_id)
         sql = f'Update Nodes set {txts}'
         return data, sql
+
+    def connect_mode(self, area: Polygon, mode_id: str, link_types='', connectors=1):
+        """Adds centroid connectors for the desired mode to the network file
+
+           Centroid connectors are created by clustering all nodes inside the zone that
+           satisfy the mode and link_types criteria in as many clusters as requested connectors.
+           Same algorithm as applied when
+
+               Args:
+
+                   *area* (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
+
+                   *mode_id* (:obj:`str`): Mode ID we are trying to connect
+
+                   *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
+                   eg: yCdR. Defaults to ALL link types
+
+                   *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+               """
+        if self.is_centroid != 1 or self.__original__['is_centroid'] != 1:
+            warn('Connecting a mode only makes sense for centroids and not for regular nodes')
+            return
+
+        connector_creation(area, self.node_id, self.__srid__, mode_id, link_types, connectors)
 
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":
