@@ -7,5 +7,5 @@ create TABLE if not exists matrices (name          TEXT     NOT NULL PRIMARY KEY
                                      description   TEXT);
 
 
-#
+--#
 CREATE INDEX name_matrices ON matrices (name);

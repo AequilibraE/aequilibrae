@@ -1,8 +1,10 @@
 from sqlite3 import Connection
 from copy import deepcopy
+import pandas as pd
 from aequilibrae.project.network.node import Node
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.data_loader import DataLoader
 
 
 class Nodes:
@@ -76,6 +78,16 @@ class Nodes:
         nodes = [node for node in self.__items.values()]
         for node in nodes:  # type: Node
             node.save()
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """ Returns all nodes data as a Pandas dataFrame
+
+        Returns:
+            *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry
+        """
+        dl = DataLoader(self.conn, 'nodes')
+        return dl.load_table()
 
     @staticmethod
     def fields() -> FieldEditor:
