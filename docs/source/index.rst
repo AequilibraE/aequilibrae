@@ -13,6 +13,32 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 If you are looking for the documentation for AequilibraE for QGIS, you can
 see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qgis>`__
 
+Examples
+========
+
+Skip the *blah-blah-blah* and go straight to the point: :ref:`sphx_glr__auto_examples`
+
+Contents
+========
+.. sectnum::
+
+.. toctree::
+   :numbered:
+   :maxdepth: 1
+   :caption: Contents:
+
+   overview
+   gettingstarted
+   project
+   modeling
+   path_computation_engine
+   api
+   _auto_examples/index
+   softwaredevelopment
+   roadmap
+   qgis
+
+
 Note to users
 =============
 
@@ -28,7 +54,8 @@ there are two alternatives for support:
 2. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
    and sending your question there.
 
-If you are looking for **paid support or to fund AequilibraE's** development,
+Aequilibrae **does not have paid support** but if you are looking to hire its developers
+for specific projects or to **fund AequilibraE's** development,
 please e-mail the developers at contact@aequilibrae.com.
 
 
@@ -46,22 +73,3 @@ documentation for all versions since 0.5.3.
 * `0.6.3 <https://aequilibrae.com/python/V.0.6.3/>`_
 * `0.6.4 <https://aequilibrae.com/python/V.0.6.4/>`_
 * `0.7.0 <https://aequilibrae.com/python/V.0.7.0/>`_
-
-Contents
-========
-.. sectnum::
-
-.. toctree::
-   :numbered:
-   :maxdepth: 1
-   :caption: Contents:
-
-   overview
-   gettingstarted
-   project
-   modeling
-   path_computation_engine
-   api
-   softwaredevelopment
-   roadmap
-   qgis
