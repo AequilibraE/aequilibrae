@@ -6,8 +6,8 @@ from scipy.spatial.distance import cdist
 import shapely.wkb
 from shapely.geometry import LineString
 from aequilibrae.project.database_connection import database_connection
-import aequilibrae.project.network.nodes as nod
-from aequilibrae.project.network.links import Links
+from .nodes import Nodes
+from .links import Links
 from aequilibrae import logger
 
 
@@ -23,7 +23,7 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types=''
         warn('This centroid does not exist. Please create it first')
         return
 
-    proj_nodes = nod.Nodes()
+    proj_nodes = Nodes()
     node = proj_nodes.get(zone_id)
     curr.execute('select count(*) from links where a_node=? and instr(modes,?) > 0', [zone_id, mode_id])
     if curr.fetchone()[0] > 0:
