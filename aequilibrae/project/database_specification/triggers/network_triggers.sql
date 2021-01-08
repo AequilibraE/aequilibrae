@@ -346,13 +346,20 @@ begin
   update links set distance = GeodesicLength(new.geometry)
   where links.rowid = new.rowid;end;
 
-
 --#
 -- Guarantees that link direction is one of the required values
 create trigger nodes_iscentroid_update before update on nodes
 when new.is_centroid != 0 AND new.is_centroid != 1
 begin
   select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+end;
+
+--#
+-- Deletes an empty node when marked no longer as a centroid
+create trigger nodes_iscentroid_change_update after update of is_centroid on nodes
+when new.is_centroid = 0 AND (SELECT count(*) FROM links WHERE a_node = new.node_id OR b_node = new.node_id) = 0
+begin
+  delete from nodes where node_id=new.node_id;
 end;
 
 --#
