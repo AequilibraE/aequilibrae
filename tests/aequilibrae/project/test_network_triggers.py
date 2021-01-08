@@ -68,5 +68,3 @@ class TestNetworkTriggers(TestCase):
         curr.execute('Update nodes set is_centroid=0 where node_id=?', data[:1])
         self.siouxfalls.conn.commit()
         self.assertEqual(nodes, network.count_nodes(), 'Failed to delete node when changing centroid flag')
-
-
