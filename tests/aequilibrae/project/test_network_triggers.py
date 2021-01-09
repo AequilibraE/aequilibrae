@@ -50,3 +50,21 @@ class TestNetworkTriggers(TestCase):
         sql = 'insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));'
         curr.execute(sql, data)
         self.siouxfalls.conn.commit()
+
+    def test_add_regular_node_change_centroid_id(self):
+        # Add a regular link to see if it fails when creating it
+        # It happened at some point
+        curr = self.siouxfalls.conn.cursor()
+        network = self.siouxfalls.network
+        nodes = network.count_nodes()
+
+        data = [987654, 1, Point(0, 0).wkb]
+
+        sql = 'insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));'
+        curr.execute(sql, data)
+        self.siouxfalls.conn.commit()
+        self.assertEqual(nodes + 1, network.count_nodes(), 'Failed to insert node')
+
+        curr.execute('Update nodes set is_centroid=0 where node_id=?', data[:1])
+        self.siouxfalls.conn.commit()
+        self.assertEqual(nodes, network.count_nodes(), 'Failed to delete node when changing centroid flag')
