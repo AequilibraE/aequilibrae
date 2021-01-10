@@ -4,7 +4,7 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
 import re
 
-allowed_characters = string.ascii_letters + '_'
+ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
 class FieldEditor:
@@ -34,7 +34,8 @@ class FieldEditor:
 
     Field descriptions are kept in the table *attributes_documentation*
     """
-    _alowed_characters = allowed_characters
+
+    _alowed_characters = ALLOWED_CHARACTERS
 
     def __init__(self, table_name: str) -> None:
         self._table = table_name.lower()
@@ -62,24 +63,27 @@ class FieldEditor:
             *data_type* (:obj:`str`, optional): Valid SQLite Data type. Default: "NUMERIC"
         """
         if field_name.lower() in self._original_values.keys():
-            raise ValueError('attribute_name already exists')
+            raise ValueError("attribute_name already exists")
         if field_name in self.__dict__.keys():
-            raise ValueError('attribute_name not allowed')
+            raise ValueError("attribute_name not allowed")
 
         has_forbidden = [letter for letter in field_name if letter not in self._alowed_characters]
         if has_forbidden:
-            raise ValueError('attribute_name can only contain letters and "_"')
+            raise ValueError('attribute_name can only contain letters, numbers and "_"')
+
+        if field_name[0] in "0123456789":
+            raise ValueError("attribute_name cannot begin with a digit")
 
         self.__update_table_fields()
 
         if field_name not in self._table_fields:
-            self.__run_query_commit(f'Alter table {self._table} add column {field_name} {data_type};')
+            self.__run_query_commit(f"Alter table {self._table} add column {field_name} {data_type};")
         self.__adds_to_attribute_table(field_name, description)
 
     def __update_table_fields(self):
-        qry = f'pragma table_info({self._table})'
+        qry = f"pragma table_info({self._table})"
         dt = self.__run_query_fetch_all(qry)
-        self._table_fields = [x[1] for x in dt if x[1] != 'ogc_fid']
+        self._table_fields = [x[1] for x in dt if x[1] != "ogc_fid"]
 
     def remove(self, field_name: str) -> None:
         raise NotImplementedError
@@ -92,7 +96,7 @@ class FieldEditor:
             new_val = self.__dict__[key]
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
-                logger.info(f'Metadata for field {key} on table {self._table} was updated to {new_val}')
+                logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -101,14 +105,14 @@ class FieldEditor:
     def _check_completeness(self) -> None:
         raw_fields = self._table_fields
 
-        if self._table == 'links':
-            fields = list({re.sub("_ab", "", re.sub("_ba", '', f)) for f in raw_fields})
+        if self._table == "links":
+            fields = list({re.sub("_ab", "", re.sub("_ba", "", f)) for f in raw_fields})
         else:
             fields = raw_fields
 
         for field in fields:
             if field not in self._original_values.keys():
-                self.__adds_to_attribute_table(field, 'not provided')
+                self.__adds_to_attribute_table(field, "not provided")
 
         original_fields = list(self._original_values.keys())
         for field in original_fields:
@@ -121,7 +125,7 @@ class FieldEditor:
     def __adds_to_attribute_table(self, attribute_name, attribute_value):
         self.__dict__[attribute_name] = attribute_value
         self._original_values[attribute_name] = attribute_value
-        qry = 'insert into attributes_documentation VALUES(?,?,?)'
+        qry = "insert into attributes_documentation VALUES(?,?,?)"
         vals = (self._table, attribute_name, attribute_value)
         self.__run_query_commit(qry, vals)
 
