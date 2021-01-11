@@ -47,7 +47,7 @@ struct Centroid {
 	std::map<unsigned long, DestinationDescriptor> destinationDescriptors;
 	std::vector<unsigned long> destinations;
 	std::map<int, std::vector<unsigned int> > path_link_incidence;
-	std::vector<std::vector<int>> paths;
+	std::vector<std::vector<int> > paths;
 	//int *paths;
 	std::vector<float> path_flows;
 	std::vector<float> path_flows_current_iter;
