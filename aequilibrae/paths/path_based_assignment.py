@@ -21,7 +21,6 @@ try:
 except ImportError as ie:
     logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-
 import scipy
 
 if int(scipy.__version__.split(".")[1]) >= 3:
@@ -33,7 +32,6 @@ else:
 
     recent_scipy = False
     logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
-
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
