@@ -124,6 +124,7 @@ void TrafficAssignment::insert_od(unsigned long from, unsigned long to, float de
 	dest.destination = to;
 	dest.demand = demand;
 	centroidsDescriptors[from].destinationDescriptors[to] = dest;
+	centroidsDescriptors[from].destinations.push_back(to);
 }
 
 
@@ -517,4 +518,56 @@ void TrafficAssignment::get_odpath_times(unsigned long origin, unsigned long des
 
 
     }
+}
+
+float TrafficAssignment::compute_gap()
+{
+    std::vector<long double> path_times;
+    std::vector<long double> path_flows;
+    path_times.reserve(10);
+    path_flows.reserve(10);
+
+    long double numerator = 0;
+    long double denominator = 0;
+
+    for (unsigned int origin=0; origin< centroidsDescriptors.size(); origin++)
+    {
+
+        for (int d=0; d<centroidsDescriptors[origin].destinations.size(); d++)
+        {
+            int destination = centroidsDescriptors[origin].destinations[d];
+            path_times.clear();
+            path_flows.clear();
+            for(int p=0; p<centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();
+                p++)
+            {
+                long double path_time=0;
+                int path_id = centroidsDescriptors[origin].destinationDescriptors[destination].path_indices[p];
+                for (int k=0; k<centroidsDescriptors[origin].paths[path_id].size(); k++)
+                {
+
+                    Link l = links[centroidsDescriptors[origin].paths[path_id][k]];
+
+                    path_time += weights[l.link_id];
+
+                }
+                path_times.push_back(path_time);
+                //path_times[computed] = path_time;
+                path_flows.push_back(centroidsDescriptors[origin].path_flows[path_id]);
+
+
+            }
+
+            std::vector<long double>::iterator shortest_time = std::min_element(path_times.begin(), path_times.end());
+            long double t = *shortest_time;
+            for (int u=0; u<path_times.size();u++)
+            {
+                numerator += path_flows[u]*(path_times[u]-t);
+                denominator += path_flows[u]*path_times[u];
+            }
+
+        }
+    }
+
+    return numerator/denominator;
 }

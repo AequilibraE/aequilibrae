@@ -10,9 +10,9 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <algorithm>
 //#include "ShortestPathComputation.h"
 
-//#define PATHS_PER_OD 10
 
 struct Link {
 	unsigned long link_id;
@@ -45,6 +45,7 @@ struct Centroid {
 	unsigned int num_paths;
 	std::map<unsigned int, unsigned int> crcs;
 	std::map<unsigned long, DestinationDescriptor> destinationDescriptors;
+	std::vector<unsigned long> destinations;
 	std::map<int, std::vector<unsigned int> > path_link_incidence;
 	std::vector<std::vector<int>> paths;
 	//int *paths;
@@ -72,11 +73,11 @@ public:
     std::vector<float> alphas_1;
     std::vector<float> alphas_2;
     std::vector<float> link_flows_out_of_partition;
-    std::vector<std::vector<float>> link_flows_origin;
+    std::vector<std::vector<float> > link_flows_origin;
 
     //float *link_flows_origin;
     //float *link_flows_origin_current_iter_diff;
-    std::vector<std::vector<float>> link_flows_origin_current_iter_diff;
+    std::vector<std::vector<float> > link_flows_origin_current_iter_diff;
 
     unsigned int n_cent;
     unsigned int n_links;
@@ -110,6 +111,7 @@ public:
 	void update_current_iteration_flows_by_origin(unsigned long centroid, float *flows);
 	float objective_derivative_stepsize(double stepsize);
 
+    float compute_gap();
 
 	void compute_path_link_sequence(int origin, int destination);
 
