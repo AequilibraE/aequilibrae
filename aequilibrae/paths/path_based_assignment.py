@@ -11,7 +11,6 @@ from aequilibrae.paths.results import AssignmentResults
 from aequilibrae import logger
 import pandas as pd  # temporary for data structures
 from aequilibrae.paths.link import Link, Node
-#t
 
 try:
     from aequilibrae.paths import TrafficAssignmentCy
