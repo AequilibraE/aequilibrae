@@ -63,6 +63,7 @@ unsigned int crctab[] = { 0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x1304
         0xb1f740b4 };
 
 
+//inserting a comment here just to commit something
 TrafficAssignment::TrafficAssignment(int num_links, int num_nodes,
 				int num_centroids) {
     this->weights = new float[num_links];
