@@ -12,7 +12,7 @@
 #include <iostream>
 //#include "ShortestPathComputation.h"
 
-#define PATHS_PER_OD 10
+//#define PATHS_PER_OD 10
 
 struct Link {
 	unsigned long link_id;
@@ -46,7 +46,8 @@ struct Centroid {
 	std::map<unsigned int, unsigned int> crcs;
 	std::map<unsigned long, DestinationDescriptor> destinationDescriptors;
 	std::map<int, std::vector<unsigned int> > path_link_incidence;
-	int *paths;
+	std::vector<std::vector<int>> paths;
+	//int *paths;
 	std::vector<float> path_flows;
 	std::vector<float> path_flows_current_iter;
 };
@@ -65,14 +66,17 @@ public:
 
     int *buffer_path;
 
-    float *weights;
-    float *costs;
-    float *link_flows;
-    float *alphas_1;
-    float *alphas_2;
+    std::vector<float> weights;
+    std::vector<float> costs;
+    std::vector<float> link_flows;
+    std::vector<float> alphas_1;
+    std::vector<float> alphas_2;
+    std::vector<float> link_flows_out_of_partition;
+    std::vector<std::vector<float>> link_flows_origin;
 
-    float *link_flows_origin;
-    float *link_flows_origin_current_iter_diff;
+    //float *link_flows_origin;
+    //float *link_flows_origin_current_iter_diff;
+    std::vector<std::vector<float>> link_flows_origin_current_iter_diff;
 
     unsigned int n_cent;
     unsigned int n_links;
