@@ -92,3 +92,19 @@ class TestNodes(TestCase):
             _ = copy(nodes)
         with self.assertRaises(Exception):
             _ = deepcopy(nodes)
+
+    def test_new_centroid(self):
+        nodes = self.network.nodes
+
+        with self.assertRaises(Exception):
+            node = nodes.new_centroid(1)
+
+        tot_prev_centr = self.network.count_centroids()
+        tot_prev_nodes = self.network.count_nodes()
+        node = nodes.new_centroid(100)
+        self.assertEqual(1, node.is_centroid, 'Creating new centroid returned wrong is_centroid value')
+        node.geometry = Point(1, 1)
+        node.save()
+
+        self.assertEqual(tot_prev_centr + 1, self.network.count_centroids(), 'Failed to add centroids')
+        self.assertEqual(tot_prev_nodes + 1, self.network.count_nodes(), 'Failed to add centroids')

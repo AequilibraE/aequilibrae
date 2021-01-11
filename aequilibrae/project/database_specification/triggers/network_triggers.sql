@@ -192,10 +192,12 @@ create trigger deleted_link after delete on links
 -- delete lonely node AFTER link deleted
 	Delete from Nodes
     where node_id = old.a_node and
+           is_centroid != 1 and
            (select count(*) from Links where a_node = old.a_node or b_node = old.a_node) < 1;
 
 	Delete from Nodes
     where node_id = old.b_node and
+           is_centroid != 1 and
            (select count(*) from Links where a_node = old.b_node or b_node = old.b_node) < 1;
 
      -- We update the modes for the node ID that just lost a link starting in it
@@ -220,12 +222,6 @@ create trigger deleted_link after delete on links
     where nodes.node_id=old.b_node;
     end;
 --#
--- when moving OR creating a link, don't allow it to duplicate an existing link.
--- TODO
-
--- Triggered by change of nodes
---
-
 -- when you move a node, move attached links
 create trigger update_node_geometry after update of geometry on nodes
   begin
@@ -242,7 +238,23 @@ create trigger update_node_geometry after update of geometry on nodes
 -- when you move a node on top of another node, steal all links FROM that node, AND delete it.
 -- be careful of merging the a_nodes of attached links to the new node
 -- this may be better as a TRIGGER on links?
-create trigger cannibalise_node before update of geometry on nodes
+create trigger cannibalize_node_abort_when_centroid before update of geometry on nodes
+  when
+    -- detect another node in the new location
+    (SELECT count(*)
+    FROM nodes
+    WHERE node_id != new.node_id
+    AND geometry = new.geometry AND
+    (is_centroid=1 OR new.is_centroid=1) AND
+    ROWID IN (
+      SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
+      search_frame = new.geometry)) > 0
+  BEGIN
+       SELECT RAISE(ABORT,'Cannot cannibalize centroids');
+  END;
+
+--#
+create trigger cannibalize_node before update of geometry on nodes
   when
     -- detect another node in the new location
     (SELECT count(*)
@@ -297,8 +309,6 @@ create trigger no_duplicate_node before insert on nodes
     SELECT raise(ABORT, 'Cannot create on-top of other node');
   END;
 --#
--- TODO: cannot CREATE node NOT attached.
-
 -- don't delete a node, unless no attached links
 create trigger dont_delete_node before delete on nodes
   when (SELECT count(*) FROM links WHERE a_node = old.node_id OR b_node = old.node_id) > 0
@@ -306,10 +316,6 @@ create trigger dont_delete_node before delete on nodes
     SELECT raise(ABORT, 'Node cannot be deleted, it still has attached links.');
   END;
 --#
--- don't CREATE a node, unless on a link endpoint
--- TODO
--- CREATE BEFORE WHERE spatial index AND PointN()
-
 -- when editing node_id, UPDATE connected links
 create trigger updated_node_id after update of node_id on nodes
   begin
@@ -340,13 +346,20 @@ begin
   update links set distance = GeodesicLength(new.geometry)
   where links.rowid = new.rowid;end;
 
-
 --#
 -- Guarantees that link direction is one of the required values
 create trigger nodes_iscentroid_update before update on nodes
 when new.is_centroid != 0 AND new.is_centroid != 1
 begin
   select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
+end;
+
+--#
+-- Deletes an empty node when marked no longer as a centroid
+create trigger nodes_iscentroid_change_update after update of is_centroid on nodes
+when new.is_centroid = 0 AND (SELECT count(*) FROM links WHERE a_node = new.node_id OR b_node = new.node_id) = 0
+begin
+  delete from nodes where node_id=new.node_id;
 end;
 
 --#

@@ -14,6 +14,9 @@ SELECT CreateSpatialIndex( 'nodes' , 'geometry' );
 CREATE INDEX idx_node ON nodes (node_id);
 
 --#
+CREATE INDEX idx_node_is_centroid ON nodes (is_centroid);
+
+--#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','node_id', 'Unique node ID');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','is_centroid', 'Flag identifying centroids');

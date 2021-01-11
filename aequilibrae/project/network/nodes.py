@@ -79,6 +79,24 @@ class Nodes:
         for node in nodes:  # type: Node
             node.save()
 
+    def new_centroid(self, node_id: int) -> Node:
+        """Creates a new centroid with a given ID
+
+        Args:
+            *node_id* (:obj:`int`): Id of the centroid to be created
+        """
+
+        self.curr.execute('select count(*) from nodes where node_id=?', [node_id])
+        if self.curr.fetchone()[0] > 0:
+            raise Exception('Node_id already exists. Failed to create it')
+
+        data = {key: None for key in self.__fields}
+        data['node_id'] = node_id
+        data['is_centroid'] = 1
+        node = Node(data)
+        self.__items[node_id] = node
+        return node
+
     @property
     def data(self) -> pd.DataFrame:
         """ Returns all nodes data as a Pandas dataFrame
