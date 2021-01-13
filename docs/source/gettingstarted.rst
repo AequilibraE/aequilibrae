@@ -52,7 +52,7 @@ Spatialite
 Although the presence of Spatialite is rather obiquitous in the GIS ecosystem,
 it has to be installed separately from Python or AequilibraE.
 
-This `blog post<https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
+This `blog post <https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
 comprehensive explanation of what is the setup you need to get Spatialite working,
 but below there is something you can start with.
 
@@ -63,13 +63,18 @@ it is necessary to download Spatialite for Windows and inform AequilibraE of its
 location.
 
 One can download the appropriate version of the latest SpatiaLite release
-directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ .
+directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ , or the
+cached versions on AequilibraE's website for
+`64-Bit Python <https://www.aequilibrae.com/binaries/spatialite/spatialite-loadable-modules-5.0.0-win-amd64.7z>`_
+or
+`32-Bit Python <https://www.aequilibrae.com/binaries/spatialite/spatialite-loadable-modules-5.0.0-win-x86.7z>`_
 
 After unpacking the zip file into its own folder (say D:/spatialite), one can
 start their Python session by creating a *temporary* environment variable with said
 location, as follows:
 
 ::
+
   import os
   from aequilibrae.utils.create_example import create_example
 
