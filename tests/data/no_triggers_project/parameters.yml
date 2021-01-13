@@ -200,9 +200,9 @@ network:
         unknown_tags: true
 system:
   cpus: 0
-  default_directory: C:\Users\pedro.camargo\Documents\sourcecode\drt
+  default_directory: C:\
   driving side: right
   logging: true
   logging_directory: D:/no_triggers_project
-  spatialite_path: C:\Users\pedro\Documents\mod_spatialite-NG-win-amd64
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp

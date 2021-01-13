@@ -46,7 +46,6 @@ class Link(SafeClass):
         link1.save()
         link2.save()
         """
-
     def __init__(self, dataset):
         super().__init__(dataset)
         self.__fields = list(dataset.keys())

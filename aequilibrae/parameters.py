@@ -48,8 +48,9 @@ class Parameters:
             with open(self.file, "r") as yml:
                 self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
         else:
-            warn('No pre-existing parameter file exists for this project. Will use default')
             self.parameters = deepcopy(self._default)
+            if proj_path:
+                warn('No pre-existing parameter file exists for this project. Will use default')
 
     def write_back(self):
         """Writes the parameters back to file"""

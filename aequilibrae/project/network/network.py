@@ -1,9 +1,11 @@
 import math
-import os
 from warnings import warn
 from sqlite3 import Connection as sqlc
-from typing import List, Dict
+from typing import Dict
 import numpy as np
+import shapely.wkb
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
@@ -33,8 +35,8 @@ class Network():
         self.graphs = {}  # type: Dict[Graph]
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
-        self.links = Links(self)
-        self.nodes = Nodes(self)
+        self.links = Links()
+        self.nodes = Nodes()
 
     def skimmable_fields(self):
         """
@@ -66,9 +68,7 @@ class Network():
             if f[-2:] == "ab":
                 if f[:-2] + 'ba' in all_fields:
                     real_fields.append(f[:-3])
-            elif f[-3:] == "_ba":
-                pass
-            else:
+            elif f[-3:] != "_ba":
                 real_fields.append(f)
 
         return real_fields
@@ -257,7 +257,7 @@ class Network():
             else:
                 removed_fields.append(f)
         if len(removed_fields) > 1:
-            logger.warn(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
+            logger.warning(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
 
         curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
@@ -317,18 +317,27 @@ class Network():
         """
         return self.__count_items('node_id', 'nodes', 'node_id>=0')
 
-    def add_centroid(self, node_id: int, coords: List[float], modes: str) -> None:
+    def extent(self):
+        """Queries the extent of the network included in the model
+
+        Returns:
+            *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-               Adds a centroid and centroid connectors for the desired modes to the network file
+        curr = self.conn.cursor()
+        curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
+        poly = shapely.wkb.loads(curr.fetchone()[0])
+        return poly
 
-               Args:
-                   *node_id* (:obj:`int`): ID for the centroid to be included in the network
+    def convex_hull(self) -> Polygon:
+        """ Queries the model for the convex hull of the entire network
 
-                   *coords* (:obj:`List`): XY Coordinates for centroid -> [LONGITUDE, LATITUDE]
-
-                   *modes* (:obj:`str`): Modes for which centroids connectors should be added
-               """
-        pass
+        Returns:
+            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
+        """
+        curr = self.conn.cursor()
+        curr.execute('Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;')
+        links = [shapely.wkb.loads(x[0]) for x in curr.fetchall()]
+        return unary_union(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.cursor()

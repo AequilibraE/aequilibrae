@@ -322,14 +322,11 @@ class Graph(object):
                             self.graph[i[0:-3]][a1:a2] = poss[i]
                             self.graph[i[0:-3]][a2:a3] = zers[i[0:-3] + "_ba"]
                             self.graph[i[0:-3]][a3:a4] = zers[i]
-                        elif i[-3:] == "_ba":
-                            pass
-                        else:
-                            if i in all_titles:
-                                self.graph[i][0:a1] = negs[i]
-                                self.graph[i][a1:a2] = poss[i]
-                                self.graph[i][a2:a3] = zers[i]
-                                self.graph[i][a3:a4] = zers[i]
+                        elif i[-3:] != "_ba" and i in all_titles:
+                            self.graph[i][0:a1] = negs[i]
+                            self.graph[i][a1:a2] = poss[i]
+                            self.graph[i][a2:a3] = zers[i]
+                            self.graph[i][a3:a4] = zers[i]
 
                 ind = np.lexsort((self.graph["b_node"], self.graph["a_node"]))
                 self.graph = self.graph[ind]
@@ -357,7 +354,7 @@ class Graph(object):
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
                 nans = ",".join([i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))])
                 if nans:
-                    logger.warn(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
+                    logger.warning(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
 
     def exclude_links(self, links: list) -> None:
         """

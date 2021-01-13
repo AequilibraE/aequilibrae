@@ -272,4 +272,4 @@ class AssignmentResults:
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
-            pass
+            raise NotImplementedError
