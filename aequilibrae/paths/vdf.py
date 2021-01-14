@@ -1,11 +1,11 @@
 from aequilibrae import logger
 
 try:
-    from aequilibrae.paths.AoN import bpr, delta_bpr
+    from aequilibrae.paths.AoN import bpr, delta_bpr, conical, delta_conical
 except ImportError as ie:
-    logger.warning(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-all_vdf_functions = ['bpr']
+all_vdf_functions = ["bpr", "conical"]
 
 
 class VDF:
@@ -17,7 +17,7 @@ class VDF:
 
         vdf = VDF()
         vdf.functions_available()
-      ['bpr']
+      ['bpr', 'conical']
 
     """
 
@@ -33,10 +33,13 @@ class VDF:
             if value == "BPR":
                 self.__dict__["apply_vdf"] = bpr
                 self.__dict__["apply_derivative"] = delta_bpr
+            if value == "CONICAL":
+                self.__dict__["apply_vdf"] = conical
+                self.__dict__["apply_derivative"] = delta_conical
             else:
-                raise ValueError('VDF function not available')
+                raise ValueError("VDF function not available")
         else:
-            raise AttributeError('This class only allows you to set the VDF to use')
+            raise AttributeError("This class only allows you to set the VDF to use")
 
     def functions_available(self) -> list:
         """returns a list of all functions available
