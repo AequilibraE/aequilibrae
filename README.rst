@@ -110,7 +110,7 @@ The first reasonable version
 The first important thing I noticed after releasing AequilibraE was that the code was written in procedural style, even
 though it would make a lot more sense doing it in a Object-Oriented fashion, which let me down the path of creating the
 objects (graph, assignment results, matrix) that the software still relies on and were the foundation blocks of the
-proper API that is in the making. That `version was release almost 3 years ago
+proper API that is in the making. That `version was release over 4 years ago
 <http://www.xl-optim.com/new-version-of-aequilibrae/>`_.
 
 Evolving into proper software
