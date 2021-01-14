@@ -42,6 +42,7 @@ cdef extern from "TrafficAssignment.h":
         void set_initial_path_flows(unsigned int origin)
         void update_link_flows(unsigned int from_node)
         void get_congested_times(float *travel_time)
+        float compute_gap()
 
 
 cdef class TrafficAssignmentCy:
@@ -169,7 +170,8 @@ cdef class TrafficAssignmentCy:
         self.thisptr.get_odpath_times(origin, destination, path_times.data.as_floats, path_flows.data.as_floats)
         return path_times, path_flows
 
-
+    def compute_gap(self):
+        return self.thisptr.compute_gap()
 
     ### new for parallel implementation
 
@@ -187,4 +189,6 @@ cdef class TrafficAssignmentCy:
         """Calculate the derivative of the objective function with respect to the stepsize given the
         update scheme described in the notes"""
         return self.thisptr.objective_derivative_stepsize(stepsize)
+
+
 

@@ -421,14 +421,8 @@ class PathBasedAssignment(WorkerThread):
     def check_convergence(self):
         """Calculate relative gap and return True if it is smaller than desired precision"""
 
-        num = 0.0
-        dem = 0.0
-        for (origin, destination) in self.ods:
-            p_times, p_flows = self.t_assignment.get_path_times(origin, destination)
-            num += sum(p_flows) * min(p_times)
-            for ind in range(len(p_times)):
-                dem += p_times[ind] * p_flows[ind]
-        self.rgap = 1 - num / dem
+        self.rgap = self.t_assignment.compute_gap()
+
         if self.rgap_target >= self.rgap:
             return True
         return False
