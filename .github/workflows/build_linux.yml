@@ -30,4 +30,11 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        twine upload wheelhouse/*-manylinux2014_x86_64.whl
+        twine upload ./*-manylinux2014_x86_64.whl
+
+    - name: Publish wheels to TEST PyPI
+      if: ${{ github.event_name == 'pull_request'}}
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload --repository testpypi ./*-manylinux2014_x86_64.whl

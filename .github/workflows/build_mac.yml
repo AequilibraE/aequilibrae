@@ -34,8 +34,22 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ github.event_name == 'release'}}
+      if: ${{ github.event_name == 'release' && matrix.python-version == '3.8' }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: twine upload dist/*.gz
+
+    - name: Publish wheels to TEST PyPI
+      if: ${{ github.event_name == 'pull_request'}}
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload --repository testpypi dist/*.whl
+
+    - name: Publish tar files to TEST PyPI
+      if: ${{ github.event_name == 'release' && matrix.python-version == '3.8' }}
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload --repository testpypi dist/*.gz
