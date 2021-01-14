@@ -13,11 +13,11 @@ try:
     from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
 except ImportError as ie:
-    logger.warning(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 import scipy
 
-if int(scipy.__version__.split('.')[1]) >= 3:
+if int(scipy.__version__.split(".")[1]) >= 3:
     from scipy.optimize import root_scalar
 
     recent_scipy = True
@@ -48,14 +48,11 @@ class LinearApproximation(WorkerThread):
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
         self.iteration_issue = []
-        self.convergence_report = {'iteration': [],
-                                   'rgap': [],
-                                   'alpha': [],
-                                   'warnings': []}
-        if algorithm == 'bfw':
-            self.convergence_report['beta0'] = []
-            self.convergence_report['beta1'] = []
-            self.convergence_report['beta2'] = []
+        self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
+        if algorithm == "bfw":
+            self.convergence_report["beta0"] = []
+            self.convergence_report["beta1"] = []
+            self.convergence_report["beta2"] = []
 
         self.assig = assig_spec  # type: TrafficAssignment
 
@@ -66,9 +63,11 @@ class LinearApproximation(WorkerThread):
             assig_spec.time_field,
             assig_spec.vdf_parameters,
         ]:
-            all_par = 'Traffic classes, VDF, VDF_parameters, capacity field & time_field'
-            raise Exception("Parameter missing. Setting the algorithm is the last thing to do "
-                            f"when assigning. Check if you have all of these: {all_par}")
+            all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
+            raise Exception(
+                "Parameter missing. Setting the algorithm is the last thing to do "
+                f"when assigning. Check if you have all of these: {all_par}"
+            )
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
         self.num_classes = len(assig_spec.classes)
@@ -117,7 +116,7 @@ class LinearApproximation(WorkerThread):
             r.prepare(c.graph, c.matrix)
             self.step_direction[c.mode] = r
 
-        if self.algorithm in ['cfw', 'bfw']:
+        if self.algorithm in ["cfw", "bfw"]:
 
             for c in self.traffic_classes:
                 r = AssignmentResults()
@@ -174,15 +173,21 @@ class LinearApproximation(WorkerThread):
         nu_nom = 0.0
         nu_denom = 0.0
         for c in self.traffic_classes:
-            x_ = np.sum((self.step_direction[c.mode].link_loads[:, :] * self.stepsize
-                         + self.previous_step_direction[c.mode].link_loads[:, :] * (1.0 - self.stepsize)
-                         - c.results.link_loads[:, :]), axis=1)
+            x_ = np.sum(
+                (
+                    self.step_direction[c.mode].link_loads[:, :] * self.stepsize
+                    + self.previous_step_direction[c.mode].link_loads[:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
+                ),
+                axis=1,
+            )
 
             y_ = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_ = np.sum(self.step_direction[c.mode].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             mu_numerator += x_ * y_
             mu_denominator += x_ * np.sum(
-                self.previous_step_direction[c.mode].link_loads - self.step_direction[c.mode].link_loads[:, :], axis=1)
+                self.previous_step_direction[c.mode].link_loads - self.step_direction[c.mode].link_loads[:, :], axis=1
+            )
             nu_nom += z_ * y_
             nu_denom += z_ * z_
 
@@ -213,11 +218,11 @@ class LinearApproximation(WorkerThread):
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if (
-                (self.iter == 2)
-                or (self.stepsize == 1.0)
-                or (self.do_fw_step)
-                or (self.algorithm == "frank-wolfe")
-                or (self.algorithm == "msa")
+            (self.iter == 2)
+            or (self.stepsize == 1.0)
+            or (self.do_fw_step)
+            or (self.algorithm == "frank-wolfe")
+            or (self.algorithm == "msa")
         ):
             # logger.info("FW step")
             self.do_fw_step = False
@@ -243,12 +248,18 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(pre_previous.skims.matrix_view, stp_dr.skims.matrix_view, self.cores)
 
-                linear_combination(stp_dr.link_loads, stp_dr.link_loads,
-                                   c._aon_results.link_loads, self.conjugate_stepsize, self.cores)
+                linear_combination(
+                    stp_dr.link_loads, stp_dr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
+                )
 
                 if c.results.num_skims > 0:
-                    linear_combination_skims(stp_dr.skims.matrix_view, stp_dr.skims.matrix_view,
-                                             c._aon_results.skims.matrix_view, self.conjugate_stepsize, self.cores)
+                    linear_combination_skims(
+                        stp_dr.skims.matrix_view,
+                        stp_dr.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        self.conjugate_stepsize,
+                        self.cores,
+                    )
 
                 sd_flows.append(np.sum(stp_dr.link_loads, axis=1) * c.pce)
         # biconjugate
@@ -264,13 +275,24 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
 
-                triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
-                                          prev_stp_dir.link_loads, self.betas, self.cores)
+                triple_linear_combination(
+                    stp_dir.link_loads,
+                    c._aon_results.link_loads,
+                    stp_dir.link_loads,
+                    prev_stp_dir.link_loads,
+                    self.betas,
+                    self.cores,
+                )
 
                 if c.results.num_skims > 0:
-                    triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
-                                                    stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
-                                                    self.betas, self.cores)
+                    triple_linear_combination_skims(
+                        stp_dir.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        stp_dir.skims.matrix_view,
+                        prev_stp_dir.skims.matrix_view,
+                        self.betas,
+                        self.cores,
+                    )
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1) * c.pce)
 
@@ -284,16 +306,25 @@ class LinearApproximation(WorkerThread):
         self.execute()
 
     def execute(self):
+        generalized_costs = 0
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
+            generalized_costs += c.__fixed_cost_parameter__
 
         logger.info(f"{self.algorithm} Assignment STATS")
         logger.info("Iteration, RelativeGap, stepsize")
+
+        if generalized_costs > 0:
+            for c in self.traffic_classes:
+                tpar = c.__time_parameter__
+                cpar = c.__fixed_cost_parameter__
+                c.graph.cost = tpar * c.graph.graph[self.time_field] + cpar * c.graph.graph[c.__fixed_cost_field__]
+
         for self.iter in range(1, self.max_iter + 1):
             self.iteration_issue = []
             if pyqt:
-                self.equilibration.emit(['rgap', self.rgap])
-                self.equilibration.emit(['iterations', self.iter])
+                self.equilibration.emit(["rgap", self.rgap])
+                self.equilibration.emit(["iterations", self.iter])
             flows = []
             aon_flows = []
 
@@ -320,14 +351,17 @@ class LinearApproximation(WorkerThread):
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c.mode]
                     cls_res = c.results
-                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize,
-                                       self.cores)
+                    linear_combination(
+                        cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
+                    )
                     if cls_res.num_skims > 0:
-                        linear_combination_skims(cls_res.skims.matrix_view,
-                                                 stp_dir.skims.matrix_view,
-                                                 cls_res.skims.matrix_view,
-                                                 self.stepsize,
-                                                 self.cores)
+                        linear_combination_skims(
+                            cls_res.skims.matrix_view,
+                            stp_dir.skims.matrix_view,
+                            cls_res.skims.matrix_view,
+                            self.stepsize,
+                            self.cores,
+                        )
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads * c.pce)
 
@@ -339,15 +373,15 @@ class LinearApproximation(WorkerThread):
             if self.iter > 1:
                 converged = self.check_convergence()
 
-            self.convergence_report['iteration'].append(self.iter)
-            self.convergence_report['rgap'].append(self.rgap)
-            self.convergence_report['warnings'].append('; '.join(self.iteration_issue))
-            self.convergence_report['alpha'].append(self.stepsize)
+            self.convergence_report["iteration"].append(self.iter)
+            self.convergence_report["rgap"].append(self.rgap)
+            self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
+            self.convergence_report["alpha"].append(self.stepsize)
 
-            if self.algorithm == 'bfw':
-                self.convergence_report['beta0'].append(self.betas[0])
-                self.convergence_report['beta1'].append(self.betas[1])
-                self.convergence_report['beta2'].append(self.betas[2])
+            if self.algorithm == "bfw":
+                self.convergence_report["beta0"].append(self.betas[0])
+                self.convergence_report["beta1"].append(self.betas[1])
+                self.convergence_report["beta2"].append(self.betas[2])
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
@@ -357,11 +391,21 @@ class LinearApproximation(WorkerThread):
                     self.steps_below += 1
 
             self.vdf.apply_vdf(
-                self.congested_time, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters,
-                self.cores)
+                self.congested_time,
+                self.fw_total_flow,
+                self.capacity,
+                self.free_flow_tt,
+                *self.vdf_parameters,
+                self.cores,
+            )
 
             for c in self.traffic_classes:
-                c.graph.cost = self.congested_time
+                if generalized_costs > 0:
+                    tpar = c.__time_parameter__
+                    cpar = c.__fixed_cost_parameter__
+                    c.graph.cost = tpar * c.graph.graph[self.time_field] + cpar * c.graph.graph[c.__fixed_cost_field__]
+                else:
+                    c.graph.cost = self.congested_time
                 if self.time_field in c.graph.skim_fields:
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
@@ -371,9 +415,9 @@ class LinearApproximation(WorkerThread):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         if pyqt:
-            self.equilibration.emit(['rgap', self.rgap])
-            self.equilibration.emit(['iterations', self.iter])
-            self.equilibration.emit(['finished_threaded_procedure'])
+            self.equilibration.emit(["rgap", self.rgap])
+            self.equilibration.emit(["iterations", self.iter])
+            self.equilibration.emit(["finished_threaded_procedure"])
 
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
@@ -384,8 +428,9 @@ class LinearApproximation(WorkerThread):
         def derivative_of_objective(stepsize):
             x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
 
-            self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters,
-                               self.cores)
+            self.vdf.apply_vdf(
+                self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+            )
             return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
 
         try:
@@ -400,7 +445,7 @@ class LinearApproximation(WorkerThread):
                     logger.warning("Descent direction stepsize finder is not converged")
                 self.stepsize = min_res.x[0]
                 if self.stepsize <= 0.0 or self.stepsize >= 1.0:
-                    raise ValueError('wrong root')
+                    raise ValueError("wrong root")
 
             self.conjugate_failed = False
 
@@ -410,7 +455,7 @@ class LinearApproximation(WorkerThread):
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
-            if self.algorithm == 'bfw':
+            if self.algorithm == "bfw":
                 self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
@@ -422,7 +467,7 @@ class LinearApproximation(WorkerThread):
                     # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
                     self.conjugate_failed = True
-                    self.iteration_issue.append('Found bad conjugate direction step. Performing FW search')
+                    self.iteration_issue.append("Found bad conjugate direction step. Performing FW search")
                     # By doing it recursively, we avoid doing the same AoN again
                     self.__calculate_step_direction()
                     self.calculate_stepsize()

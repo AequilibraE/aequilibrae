@@ -18,6 +18,7 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data import Matrices
+from aequilibrae import logger
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -93,6 +94,7 @@ class TrafficAssignment(object):
         avg_skims = assigclass.results.skims # blended ones
         last_skims = assigclass._aon_results.skims # those for the last iteration
     """
+
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
@@ -114,7 +116,7 @@ class TrafficAssignment(object):
         self.__dict__["cores"] = None  # type: int
 
         self.__dict__["procedure_id"] = uuid4().hex
-        self.__dict__["description"] = ''
+        self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
 
     def __setattr__(self, instance, value) -> None:
@@ -128,12 +130,12 @@ class TrafficAssignment(object):
     def __check_attributes(self, instance, value):
         if instance == "rgap_target":
             if not isinstance(value, float):
-                return False, value, 'Relative gap needs to be a float'
+                return False, value, "Relative gap needs to be a float"
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.rgap_target = value
         elif instance == "max_iter":
             if not isinstance(value, int):
-                return False, value, 'Number of iterations needs to be an integer'
+                return False, value, "Number of iterations needs to be an integer"
             if isinstance(self.assignment, LinearApproximation):
                 self.assignment.max_iter = value
         elif instance == "vdf":
@@ -157,12 +159,12 @@ class TrafficAssignment(object):
         elif instance in ["time_field", "capacity_field"]:
             if not isinstance(value, str):
                 return False, value, f"Value for {instance} is not string"
-        elif instance == 'cores':
+        elif instance == "cores":
             if not isinstance(value, int):
                 return False, value, f"Value for {instance} is not integer"
         if instance not in self.__dict__:
             return False, value, f"trafficAssignment class does not have property {instance}"
-        return True, value, ''
+        return True, value, ""
 
     def set_vdf(self, vdf_function: str) -> None:
         """
@@ -183,7 +185,7 @@ class TrafficAssignment(object):
 
         ids = set([x._id for x in classes])
         if len(ids) < len(classes):
-            raise Exception('Classes need to be unique. Your list of classes has repeated items')
+            raise Exception("Classes need to be unique. Your list of classes has repeated items")
         self.classes = classes  # type: List[TrafficClass]
         self.__collect_data()
 
@@ -197,7 +199,7 @@ class TrafficAssignment(object):
 
         ids = [x._id for x in self.classes if x._id == traffic_class._id]
         if len(ids) > 0:
-            raise Exception('Traffic class already in the assignment')
+            raise Exception("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
         self.__collect_data()
@@ -237,9 +239,9 @@ class TrafficAssignment(object):
         elif algo in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algo)
         else:
-            raise Exception('Algorithm not listed in the case selection')
+            raise Exception("Algorithm not listed in the case selection")
 
-        self.__dict__['algorithm'] = algo
+        self.__dict__["algorithm"] = algo
 
         self.__collect_data()
 
@@ -273,13 +275,13 @@ class TrafficAssignment(object):
 
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise Exception('Before setting vdf parameters, you need to set traffic classes and choose a VDF function')
-        self.__dict__['vdf_parameters'] = par
+            raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
+        self.__dict__["vdf_parameters"] = par
         pars = []
         if self.vdf.function in ["BPR"]:
-            for p1 in ['alpha', 'beta']:
+            for p1 in ["alpha", "beta"]:
                 if p1 not in par:
-                    raise ValueError(f'{p1} should exist in the set of parameters provided')
+                    raise ValueError(f"{p1} should exist in the set of parameters provided")
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
                     array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
@@ -289,14 +291,14 @@ class TrafficAssignment(object):
                 pars.append(array)
 
                 if np.any(np.isnan(array)):
-                    warn(f'At least one {p1} is NaN. Results will make no sense')
+                    warn(f"At least one {p1} is NaN. Results will make no sense")
 
-                if p1 == 'alpha':
+                if p1 == "alpha":
                     if array.min() < 0:
-                        warn(f'At least one {p1} is smaller than zero. Results will make no sense')
+                        warn(f"At least one {p1} is smaller than zero. Results will make no sense")
                 else:
                     if array.min() < 1:
-                        warn(f'At least one {p1} is smaller than one. Results will make no sense')
+                        warn(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
 
@@ -309,7 +311,7 @@ class TrafficAssignment(object):
             cores (:obj:`int`): Number of CPU cores to use
         """
         if not self.classes:
-            raise Exception('You need load traffic classes before overwriting the number of cores')
+            raise Exception("You need load traffic classes before overwriting the number of cores")
 
         self.cores = cores
         for c in self.classes:
@@ -357,6 +359,9 @@ class TrafficAssignment(object):
 
     def execute(self) -> None:
         """Processes assignment"""
+        if sum([c.__fixed_cost_parameter__ for c in self.classes]) > 0:
+            logger.info("Assigning with generalized cost function")
+
         self.assignment.execute()
 
     def save_results(self, table_name: str) -> None:
@@ -368,16 +373,18 @@ class TrafficAssignment(object):
             table_name (:obj:`str`): Name of the table to hold this assignment result
         """
         df = self.results()
-        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], 'results_database.sqlite'))
+        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
 
         conn = database_connection()
-        report = {'convergence': str(self.assignment.convergence_report),
-                  'setup': str(self.info())}
-        data = [table_name, 'traffic assignment', self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute('''Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)''', data)
+        report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
+        data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
         conn.commit()
         conn.close()
 
@@ -397,10 +404,20 @@ class TrafficAssignment(object):
         voc = self.assignment.fw_total_flow / self.capacity
 
         entries = res1.data.shape[0]
-        fields = ['Congested_Time_AB', 'Congested_Time_BA', 'Congested_Time_Max',
-                  'Delay_factor_AB', 'Delay_factor_BA', 'Delay_factor_Max',
-                  'VOC_AB', 'VOC_BA', 'VOC_max',
-                  'PCE_AB', 'PCE_BA', 'PCE_tot']
+        fields = [
+            "Congested_Time_AB",
+            "Congested_Time_BA",
+            "Congested_Time_Max",
+            "Delay_factor_AB",
+            "Delay_factor_BA",
+            "Delay_factor_Max",
+            "VOC_AB",
+            "VOC_BA",
+            "VOC_max",
+            "PCE_AB",
+            "PCE_BA",
+            "PCE_tot",
+        ]
 
         types = [np.float64] * len(fields)
         agg = AequilibraeData()
@@ -419,26 +436,26 @@ class TrafficAssignment(object):
         ab_ids = indexing[link_ids[ABs]]
         ba_ids = indexing[link_ids[BAs]]
 
-        agg.data['Congested_Time_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs])
-        agg.data['Congested_Time_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs])
-        agg.data['Congested_Time_Max'][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
+        agg.data["Congested_Time_AB"][ab_ids] = np.nan_to_num(self.congested_time[ABs])
+        agg.data["Congested_Time_BA"][ba_ids] = np.nan_to_num(self.congested_time[BAs])
+        agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data['Delay_factor_AB'][ab_ids] = np.nan_to_num(self.congested_time[ABs] / self.free_flow_tt[ABs])
-        agg.data['Delay_factor_BA'][ba_ids] = np.nan_to_num(self.congested_time[BAs] / self.free_flow_tt[BAs])
-        agg.data['Delay_factor_Max'][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
+        agg.data["Delay_factor_AB"][ab_ids] = np.nan_to_num(self.congested_time[ABs] / self.free_flow_tt[ABs])
+        agg.data["Delay_factor_BA"][ba_ids] = np.nan_to_num(self.congested_time[BAs] / self.free_flow_tt[BAs])
+        agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
 
-        agg.data['VOC_AB'][ab_ids] = np.nan_to_num(voc[ABs])
-        agg.data['VOC_BA'][ba_ids] = np.nan_to_num(voc[BAs])
-        agg.data['VOC_max'][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
+        agg.data["VOC_AB"][ab_ids] = np.nan_to_num(voc[ABs])
+        agg.data["VOC_BA"][ba_ids] = np.nan_to_num(voc[BAs])
+        agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
 
-        agg.data['PCE_AB'][ab_ids] = np.nan_to_num(tot_flow[ABs])
-        agg.data['PCE_BA'][ba_ids] = np.nan_to_num(tot_flow[BAs])
-        agg.data['PCE_tot'][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
+        agg.data["PCE_AB"][ab_ids] = np.nan_to_num(tot_flow[ABs])
+        agg.data["PCE_BA"][ba_ids] = np.nan_to_num(tot_flow[BAs])
+        agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
 
         assig_results.append(agg)
 
         dfs = [pd.DataFrame(aed.data) for aed in assig_results]
-        dfs = [df.rename(columns={'index': 'link_id'}).set_index('link_id') for df in dfs]
+        dfs = [df.rename(columns={"index": "link_id"}).set_index("link_id") for df in dfs]
         df = pd.concat(dfs, axis=1)
 
         return df
@@ -469,18 +486,21 @@ class TrafficAssignment(object):
             if len(cls.matrix.view_names) == 1:
                 classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
             else:
-                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
-                                           enumerate(cls.matrix.view_names)}
+                classes[cls.graph.mode] = {
+                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
+                }
 
-        info = {'Algorithm': self.algorithm,
-                'Classes': classes,
-                'Computer name': socket.gethostname(),
-                'Maximum iterations': self.assignment.max_iter,
-                'Procedure ID': self.procedure_id,
-                'Target RGap': self.assignment.rgap_target}
+        info = {
+            "Algorithm": self.algorithm,
+            "Classes": classes,
+            "Computer name": socket.gethostname(),
+            "Maximum iterations": self.assignment.max_iter,
+            "Procedure ID": self.procedure_id,
+            "Target RGap": self.assignment.rgap_target,
+        }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones='final', format='omx') -> None:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx") -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         Args:
@@ -491,21 +511,21 @@ class TrafficAssignment(object):
         """
 
         mat_format = format.lower()
-        if mat_format not in ['omx', 'aem']:
-            raise ValueError('Matrix needs to be either OMX or native AequilibraE')
-        if mat_format == 'omx' and not has_omx:
-            raise ImportError('OpenMatrix is not available on your system')
+        if mat_format not in ["omx", "aem"]:
+            raise ValueError("Matrix needs to be either OMX or native AequilibraE")
+        if mat_format == "omx" and not has_omx:
+            raise ImportError("OpenMatrix is not available on your system")
 
-        file_name = f'{matrix_name}.{mat_format}'
+        file_name = f"{matrix_name}.{mat_format}"
 
         mats = Matrices()
         export_name = path.join(mats.fldr, file_name)
 
         if path.isfile(export_name):
-            raise FileExistsError(f'{file_name} already exists. Choose a different name or matrix format')
+            raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
         if mats.check_exists(matrix_name):
-            raise FileExistsError(f'{matrix_name} already exists. Choose a different name')
+            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
         avg_skims = self.classes[0].results.skims  # type: AequilibraeMatrix
 
@@ -513,49 +533,47 @@ class TrafficAssignment(object):
         last_skims = self.classes[0]._aon_results.skims  # type: AequilibraeMatrix
 
         names = []
-        if which_ones in ['final', 'all']:
+        if which_ones in ["final", "all"]:
             for core in last_skims.names:
-                names.append(f'{core}_final')
+                names.append(f"{core}_final")
 
-        if which_ones in ['blended', 'all']:
+        if which_ones in ["blended", "all"]:
             for core in avg_skims.names:
-                names.append(f'{core}_blended')
+                names.append(f"{core}_blended")
 
         if not names:
-            raise ValueError('No skims to save')
+            raise ValueError("No skims to save")
         # Assembling a single final skim file can be done like this
         # We will want only the time for the last iteration and the distance averaged out for all iterations
-        working_name = export_name if mat_format == 'aem' else AequilibraeMatrix().random_name()
+        working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
 
-        kwargs = {'file_name': working_name,
-                  'zones': self.classes[0].graph.centroids.shape[0],
-                  'matrix_names': names}
+        kwargs = {"file_name": working_name, "zones": self.classes[0].graph.centroids.shape[0], "matrix_names": names}
 
         # Create the matrix to manipulate
         out_skims = AequilibraeMatrix()
         out_skims.create_empty(**kwargs)
 
         out_skims.index[:] = self.classes[0].graph.centroids[:]
-        out_skims.description = f'Assignment skim from procedure ID {self.procedure_id}'
+        out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}"
 
-        if which_ones in ['final', 'all']:
+        if which_ones in ["final", "all"]:
             for core in last_skims.names:
-                out_skims.matrix[f'{core}_final'][:, :] = last_skims.matrix[core][:, :]
+                out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
 
-        if which_ones in ['blended', 'all']:
+        if which_ones in ["blended", "all"]:
             for core in avg_skims.names:
-                out_skims.matrix[f'{core}_blended'][:, :] = avg_skims.matrix[core][:, :]
+                out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
 
         out_skims.matrices.flush()  # Make sure that all data went to the disk
 
         # If it were supposed to be an OMX, we export to one
-        if mat_format == 'omx':
+        if mat_format == "omx":
             out_skims.export(export_name)
 
         # Now we create the appropriate record
         record = mats.new_record(matrix_name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
-        record.procedure = 'Traffic Assignment'
-        record.description = 'Skimming for assignment procedure'
+        record.procedure = "Traffic Assignment"
+        record.description = "Skimming for assignment procedure"
         record.save()
