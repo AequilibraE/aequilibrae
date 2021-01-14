@@ -360,6 +360,10 @@ Volume delay functions
 [1] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."
 Transportation Science, Vol 24 Issue 2. `Conical <https://doi.org/10.1287/trsc.24.2.153>`_
 
+[2] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2
+`Technical Documentation - Final Report <https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf>`_
+(2020)
+
 Traffic assignment and equilibrium
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
