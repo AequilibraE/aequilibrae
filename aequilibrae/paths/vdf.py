@@ -33,7 +33,7 @@ class VDF:
             if value == "BPR":
                 self.__dict__["apply_vdf"] = bpr
                 self.__dict__["apply_derivative"] = delta_bpr
-            if value == "CONICAL":
+            elif value == "CONICAL":
                 self.__dict__["apply_vdf"] = conical
                 self.__dict__["apply_derivative"] = delta_conical
             else:
