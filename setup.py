@@ -15,19 +15,19 @@ ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.g
 pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
-    "aequilibrae.reference_files": ["spatialite.sqlite"],
+    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
     "aequilibrae.paths": ["parameters.pxi"],
-    "aequilibrae": ["parameter_default.yml", "parameters.yml"],
+    "aequilibrae": ["parameters.yml"],
+    "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
 }
 loose_modules = ["__version__", "parameters"]
-
 
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
         version=release_version,
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
-        install_requires=["numpy", "PyQt5", "pyaml"],
+        install_requires=["numpy", "PyQt5", "pyaml", "pandas", "requests", "shapely"],
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         zip_safe=False,
         description="A package for transportation modeling",
         author="Pedro Camargo",
-        author_email="pedro@xl-optim.com",
+        author_email="c@margo.co",
         url="https://github.com/AequilibraE/aequilibrae",
         license="See license.txt",
         classifiers=[

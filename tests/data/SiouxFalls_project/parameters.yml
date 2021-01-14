@@ -1,0 +1,199 @@
+assignment:
+  equilibrium:
+    maximum_iterations: 250
+    rgap: 0.0001
+distribution:
+  gravity:
+    max error: 0.0001
+    max iterations: 100
+    max trip length: -1
+  ipf:
+    balancing tolerance: 0.001
+    convergence level: 0.0001
+    max iterations: 5000
+network:
+  links:
+    fields:
+      one-way:
+      - link_id:
+          description: Link ID. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - a_node:
+          description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - b_node:
+          description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - direction:
+          description: Direction of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - distance:
+          description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
+          type: numeric
+      - modes:
+          description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
+          type: text
+      - link_type:
+          description: Classification of link (local, arterial, etc). THIS FIELD CANNOT
+            BE CHANGED
+          osm_source: highway
+          type: varchar
+      - name:
+          description: name
+          osm_source: name
+          type: text
+      two-way:
+      - lanes:
+          description: lanes
+          osm_behaviour: divide
+          osm_source: lanes
+          type: integer
+      - capacity:
+          description: capacity
+          type: numeric
+      - speed:
+          description: speed
+          osm_behaviour: copy
+          osm_source: maxspeed
+          type: numeric
+    link_types:
+    - centroid_connector:
+        description: VIRTUAL centroid connectors only
+        lane_capacity: 10000
+        lanes: 10
+        link_type_id: z
+    - default:
+        description: Default link type. Due to lack of information
+        lane_capacity: 900
+        lanes: 2
+        link_type_id: y
+  modes:
+  - car:
+      description: All motorized vehicles
+      letter: c
+  nodes:
+    fields:
+    - node_id:
+        description: node_id. THIS FIELD CANNOT BE CHANGED
+        type: integer
+    - is_centroid:
+        description: is_centroid
+        type: integer
+  osm:
+    all_link_types:
+    - secondary_link
+    - escalator
+    - trail
+    - cycleway
+    - path
+    - trunk_link
+    - secondary
+    - escape
+    - track
+    - road
+    - motorway_link
+    - primary
+    - corridor
+    - residential
+    - footway
+    - motorway
+    - primary_link
+    - unclassified
+    - bus_guideway
+    - tertiary_link
+    - living_street
+    - pedestrian
+    - bridleway
+    - elevator
+    - motor
+    - trunk
+    - tertiary
+    - service
+    - steps
+    - proposed
+    - raceway
+    - construction
+    - abandoned
+    - platform
+    - unclassified
+    modes:
+      bicycle:
+        link_types:
+        - cycleway
+        - corridor
+        - pedestrian
+        - path
+        - track
+        - trail
+        - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+        - cycleway
+        - footway
+        - steps
+        - corridor
+        - pedestrian
+        - elevator
+        - escalator
+        - path
+        - track
+        - trail
+        - bridleway
+        - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
+system:
+  cpus: 0
+  default_directory: C:\
+  driving side: right
+  logging: true
+  logging_directory: /temp/
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
+  temp directory: /temp

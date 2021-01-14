@@ -1,8 +1,7 @@
 from cython.parallel import prange
 
 def sum_axis1(totals, multiples, cores):
-    cdef int c
-    c = cores
+    cdef int c = cores
     cdef double [:] totals_view = totals
     cdef double [:, :] multiples_view = multiples
 
@@ -29,8 +28,7 @@ cpdef void sum_axis1_cython(double[:] totals,
 
 def linear_combination(results, array1, array2, stepsize, cores):
     cdef double stpsz
-    cdef int c
-    c = cores
+    cdef int c = cores
 
     stpsz = float(stepsize)
     cdef double [:, :] results_view = results
@@ -60,9 +58,8 @@ cpdef void linear_combination_cython(double stepsize,
 
 def linear_combination_skims(results, array1, array2, stepsize, cores):
     cdef double stpsz
-    cdef int c
+    cdef int c = cores
 
-    c = cores
     stpsz = float(stepsize)
     cdef double [:, :, :] results_view = results
     cdef double [:, :, :] array1_view = array1
@@ -93,8 +90,7 @@ cpdef void linear_combination_skims_cython(double stepsize,
 
 
 def triple_linear_combination(results, array1, array2, array3, stepsizes, cores):
-    cdef int c
-    c = cores
+    cdef int c = cores
 
     cdef double [:, :] results_view = results
     cdef double [:, :] array1_view = array1
@@ -125,9 +121,8 @@ cpdef void triple_linear_combination_cython(double [:] stepsizes,
 
 
 def triple_linear_combination_skims(results, array1, array2, array3, stepsizes, cores):
-    cdef int c
+    cdef int c = cores
 
-    c = cores
     cdef double [:, :, :] results_view = results
     cdef double [:, :, :] array1_view = array1
     cdef double [:, :, :] array2_view = array2
@@ -159,9 +154,8 @@ cpdef void triple_linear_combination_cython_skims(double [:] stepsizes,
 
 
 def copy_one_dimension(target, source, cores):
-    cdef int c
+    cdef int c = cores
 
-    c = cores
     cdef double [:] target_view = target
     cdef double [:] source_view = source
 
@@ -182,9 +176,8 @@ cpdef void copy_one_dimension_cython(double[:] target,
 
 
 def copy_two_dimensions(target, source, cores):
-    cdef int c
+    cdef int c = cores
 
-    c = cores
     cdef double [:, :] target_view = target
     cdef double [:, :] source_view = source
 
@@ -209,9 +202,8 @@ cpdef void copy_two_dimensions_cython(double[:, :] target,
 
 
 def copy_three_dimensions(target, source, cores):
-    cdef int c
+    cdef int c = cores
 
-    c = cores
     cdef double [:, :, :] target_view = target
     cdef double [:, :, :] source_view = source
 

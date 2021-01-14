@@ -1,14 +1,12 @@
 name: Documentation
 
-on:
-  release:
-    types: [prereleased, published]
+on:  [pull_request, release]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
+      max-parallel: 1
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.7
@@ -18,8 +16,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install wheel
         pip install -r requirements.txt
         pip install -r docs/requirements-docs.txt
+        python -m pip install sphinx-gallery --user
+        sudo apt-get install libsqlite3-mod-spatialite
+        sudo apt-get install -y libspatialite-dev
+        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Compile library
       run: |
@@ -34,7 +37,24 @@ jobs:
         cd docs
         make html
 
-    - name: Upload to S3
+    - name: Check history of versions
+      run: python docs/website/check_documentation_versions.py
+
+    - name: Upload to DEV on S3
+      if: ${{ github.event_name == 'pull_request'}}
+      uses: jakejarvis/s3-sync-action@master
+      with:
+        args: --acl public-read --follow-symlinks --delete
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
+        SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
+        DEST_DIR: 'python/dev/'      # optional: defaults to entire repository
+
+    - name: Upload to RELEASE on S3
+      if: ${{ github.event_name == 'release'}}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks --delete
@@ -47,9 +67,11 @@ jobs:
         DEST_DIR: 'python/latest/'      # optional: defaults to entire repository
 
     - name: Create Documentation history folder
+      if: ${{ github.event_name == 'release'}}
       run: python docs/website/redir.py
 
     - name: Upload documentation to history folder
+      if: ${{ github.event_name == 'release'}}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks --exclude '*.py'
@@ -61,7 +83,8 @@ jobs:
         SOURCE_DIR: 'docs/website/'      # optional: defaults to entire repository
         DEST_DIR: 'python/'      # optional: defaults to entire repository
 
-    - name: Upload documentation
+    - name: Upload documentation to LATEST on AWS
+      if: ${{ github.event_name == 'release'}}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks

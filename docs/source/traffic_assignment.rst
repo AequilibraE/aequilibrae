@@ -1,7 +1,7 @@
-.. _traffic_assignment:
+.. _traffic_assignment_description:
 
-Traffic Assignment
-==================
+Traffic Assignment Procedure
+============================
 
 Along with a network data model, traffic assignment is the most technically
 challenging portion to develop in a modeling platform, especially if you want it
@@ -52,12 +52,12 @@ providing a complete specification of the assignment procedure:
 
 Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
-:ref:`example_usage_parameters`
+:ref:`example_usage_parameters` .
 
 There are also some strict technical requirements for formulating the
 multi-class equilibrium assignment as a contrained convex optimization problem,
 as we have implemented it. These requirements are loosely listed in
-:ref:`_technical_requirements_multi_class` .
+:ref:`technical_requirements_multi_class` .
 
 If you want to see the assignment log on your terminal during the assignment,
 please look in the :ref:`example_logging` section of the use cases.
@@ -211,7 +211,7 @@ Technical requirements
 
 This documentation is not intended to discuss in detail the mathematical
 requirements of multi-class traffic assignment, which can be found discussed in
-detail on `Zill et all. <https://doi.org/10.1177%2F0361198119837496>`_
+detail on `Zill et all. <https://journals.sagepub.com/doi/10.1177/0361198119837496>`_
 
 A few requirements, however, need to be made clear.
 
@@ -240,7 +240,7 @@ practice, and is detailed below.
 The algorithm's two stop criteria currently used are the maximum number of
 iterations and the target Relative Gap, as specified above. These two parameters
 are collected directly from the :ref:`parameters_file`, described in detail in
-the :ref:`parameter_assignment` section.
+the :ref:`parameters_assignment` section.
 
 In order to override the parameter file values, one can set the assignment
 object member variables directly before execution.
@@ -358,19 +358,19 @@ Transpn Res. 9, 309-318.
 
 [3] Maria Mitradjieva and Per Olov Lindberg (2013)"The Stiff Is Moving—Conjugate
 Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
-`Transportation Science 2013 47:2, 280-293 <https://doi.org/10.1287/trsc.1120.0409>`_
+`Mitradjieva and Lindberg <https://doi.org/10.1287/trsc.1120.0409>`_
 
 [4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and
 Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research
-Record, Vol 2673, Issue 4 `DOI <https://doi.org/10.1177%2F0361198119837496>`_
+Record, Vol 2673, Issue 4 `Zill et. all <https://doi.org/10.1177%2F0361198119837496>`_
 
 [5] Rose, G., Daskin, M., Koppelman, F. (1988) "An examination of convergence
 error in equilibrium traffic assignment models",  Transportation Res. B, Vol 22
-Issue 4, PP 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
+Issue 4, PP 261-274 `Rose, Daskin and Koppelman <https://doi.org/10.1016/0191-2615(88)90003-3>`_
 
 [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in
 multi-class equilibrium assignment", Transportation Research Part B, Volume 70,
-pg 261-274 `DOI <https://doi.org/10.1016/0191-2615(88)90003-3>`_
+pg 261-274 `Florian and Morosan <https://doi.org/10.1016/j.trb.2014.06.011>`_
 
 Handling the network
 --------------------
@@ -502,9 +502,9 @@ Chicago Regional
 
 Network has:
 
-* Links: 2,522
-* Nodes: 1,020
-* Zones: 110
+* Links: 39,018
+* Nodes: 12,982
+* Zones: 1,790
 
 .. image:: images/chicago_regional_msa-500_iter.png
     :width: 590
@@ -520,7 +520,7 @@ Network has:
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
 
 Convergence Study
----------------
+-----------------
 
 Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago
@@ -545,7 +545,7 @@ applications.
 
 Computational performance
 -------------------------
-Running on a Thinkpad X1 extreme equipped with a 6 cores 9750H CPU and 32Gb of
+Running on a Thinkpad X1 extreme equipped with a 6 cores 8750H CPU and 32Gb of
 2667Hz RAM, AequilibraE performed 1,000 iterations of Frank-Wolfe assignment
 on the Chicago Network in just under 46 minutes, while Biconjugate Frank Wolfe
 takes just under 47 minutes.

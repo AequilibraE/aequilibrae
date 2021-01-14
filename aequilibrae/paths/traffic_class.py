@@ -1,3 +1,4 @@
+from uuid import uuid4
 from typing import Union
 import numpy as np
 from aequilibrae.paths.graph import Graph
@@ -37,6 +38,7 @@ class TrafficClass():
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
+        self._id = uuid4().hex
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent

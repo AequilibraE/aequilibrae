@@ -49,6 +49,9 @@ release = "30/07/2018"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "nbsphinx",
+    "sphinx_gallery.load_style",
+    "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.coverage",
@@ -57,10 +60,15 @@ extensions = [
     'sphinx.ext.autosummary',
 ]
 
+sphinx_gallery_conf = {
+    'examples_dirs': ['examples'],  # path to your example scripts
+    'gallery_dirs': ['_auto_examples'],  # path to where to save gallery generated output
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
-# The suffix(es) of source filenames.
+# The suffix(es) of source filenames.¶
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
@@ -79,11 +87,11 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", '*.pyx']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-
+highlight_language = 'none'
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

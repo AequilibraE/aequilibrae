@@ -6,6 +6,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths import binary_version
 from ...data import test_graph
 
 
@@ -15,6 +16,7 @@ class TestAllOrNothing(TestCase):
         self.mat_name = AequilibraeMatrix().random_name()
         self.g = Graph()
         self.g.load_from_disk(test_graph)
+        self.g.__version__ = binary_version
         self.g.set_graph(cost_field="distance")
 
         # Creates the matrix for assignment

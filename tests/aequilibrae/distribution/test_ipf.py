@@ -1,45 +1,49 @@
 from unittest import TestCase
-
+import os
+from shutil import copytree
+import uuid
+from tempfile import gettempdir
 import numpy as np
 
+from aequilibrae import Project
 from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeData
-from aequilibrae.matrix import AequilibraeMatrix
 
-zones = 100
-
-# row vector
-args = {"entries": zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
-row_vector = AequilibraeData()
-row_vector.create_empty(**args)
-row_vector.rows[:] = np.random.rand(zones)[:] * 1000
-row_vector.index[:] = np.arange(zones)[:]
-# column vector
-args["field_names"] = ["columns"]
-column_vector = AequilibraeData()
-column_vector.create_empty(**args)
-column_vector.columns[:] = np.random.rand(zones)[:] * 1000
-column_vector.index[:] = np.arange(zones)[:]
-# balance vectors
-column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
-
-# seed matrix_procedures
-name_test = AequilibraeMatrix().random_name()
-args = {"file_name": name_test, "zones": zones, "matrix_names": ["seed"]}
-
-matrix = AequilibraeMatrix()
-matrix.create_empty(**args)
-matrix.seed[:, :] = np.random.rand(zones, zones)[:, :]
-matrix.computational_view(["seed"])
-matrix.matrix_view[1, 1] = np.nan
-matrix.index[:] = np.arange(zones)[:]
+from ...data import siouxfalls_project
 
 
 class TestIpf(TestCase):
+    def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+
+        self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
+        copytree(siouxfalls_project, self.proj_dir)
+
     def test_fit(self):
+        proj = Project()
+        proj.open(self.proj_dir)
+        mats = proj.matrices
+        mats.update_database()
+        seed = mats.get_matrix('SiouxFalls_omx')
+        seed.computational_view('matrix')
+        # row vector
+        args = {"entries": seed.zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
+        row_vector = AequilibraeData()
+        row_vector.create_empty(**args)
+        row_vector.rows[:] = np.random.rand(seed.zones)[:] * 1000
+        row_vector.index[:] = seed.index[:]
+        # column vector
+        args["field_names"] = ["columns"]
+        column_vector = AequilibraeData()
+        column_vector.create_empty(**args)
+        column_vector.columns[:] = np.random.rand(seed.zones)[:] * 1000
+        column_vector.index[:] = seed.index[:]
+        # balance vectors
+        column_vector.columns[:] = column_vector.columns[:] * (row_vector.rows.sum() / column_vector.columns.sum())
+
         # The IPF per se
         args = {
-            "matrix": matrix,
+            "matrix": seed,
             "rows": row_vector,
             "row_field": "rows",
             "columns": column_vector,
@@ -47,18 +51,28 @@ class TestIpf(TestCase):
             "nan_as_zero": False,
         }
 
+        with self.assertRaises(TypeError):
+            fratar = Ipf(data='test', test='data')
+            fratar.fit()
+
+        with self.assertRaises(ValueError):
+            fratar = Ipf(**args)
+            fratar.parameters = ['test']
+            fratar.fit()
+
         fratar = Ipf(**args)
         fratar.fit()
 
         result = fratar.output
-        if (np.nansum(result.matrix_view) - np.nansum(row_vector.data["rows"])) > 0.001:
-            print(fratar.gap)
-            for f in fratar.report:
-                print(f)
-            self.fail("Ipf did not converge")
 
-        if fratar.gap > fratar.parameters["convergence level"]:
-            print(fratar.gap)
-            for f in fratar.report:
-                print(f)
-            self.fail("Ipf did not converge")
+        self.assertAlmostEqual(np.nansum(result.matrix_view), np.nansum(row_vector.data["rows"]), 4,
+                               "Ipf did not converge")
+        self.assertGreater(fratar.parameters["convergence level"], fratar.gap, "Ipf did not converge")
+
+        mr = fratar.save_to_project('my_matrix_ipf', 'my_matrix_ipf.aem')
+
+        self.assertTrue(os.path.isfile(os.path.join(mats.fldr, 'my_matrix_ipf.aem')),
+                        'Did not save file to the appropriate place')
+
+        self.assertEqual(mr.procedure_id, fratar.procedure_id, 'procedure ID saved wrong')
+        proj.close()
