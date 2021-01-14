@@ -4,7 +4,10 @@
 from cpython cimport array
 #import array
 import ctypes
+import numpy
+import cvxopt
 from libcpp.vector cimport vector
+from libcpp.pair cimport pair
 
 cdef extern from "TrafficAssignment.h":
     ctypedef struct Link:
@@ -43,6 +46,12 @@ cdef extern from "TrafficAssignment.h":
         void update_link_flows(unsigned int from_node)
         void get_congested_times(float *travel_time)
         float compute_gap()
+
+        pair[uint, uint] get_total_paths_for_partition(unsigned int origin, unsigned int num_partitions, unsigned int partition_index);
+        void get_problem_data_partitions(unsigned int origin, float *Q, float *c, float *A, float *b, float *G, float *h,
+                                            int num_partitions, int partition_index)
+        void update_path_flows_partition(unsigned long centroid, float *flows,int num_partitions, int partition_index)
+
 
 
 cdef class TrafficAssignmentCy:
@@ -169,6 +178,65 @@ cdef class TrafficAssignmentCy:
 
         self.thisptr.get_odpath_times(origin, destination, path_times.data.as_floats, path_flows.data.as_floats)
         return path_times, path_flows
+
+    def get_problem_data_partition(self, origin, num_partitions, partition):
+        pair_ret_val = self.thisptr.get_total_paths_for_partition(origin,num_partitions, partition);
+
+
+        cdef int total_destinations = pair_ret_val.first;
+        cdef int num_paths = pair_ret_val.second;
+
+        cdef array.array Q= array.array('f', [0.0 for i in range(num_paths*num_paths)])
+
+        cdef array.array q= array.array('f', [0.0 for i in range(num_paths)])
+
+        cdef array.array A= array.array('f',  [0.0 for i in range(total_destinations*num_paths)])
+
+        cdef array.array b= array.array('f', [0.0 for i in range(total_destinations)])
+
+        cdef array.array G= array.array('f', [0.0 for i in range(num_paths*num_paths)])
+        #array.resize(G, num_paths*num_paths)
+
+        cdef array.array h= array.array('f', [0.0 for i in range(num_paths)])
+        #array.resize(h,num_paths)
+
+        self.thisptr.get_problem_data_partitions(origin,Q.data.as_floats,q.data.as_floats,
+                                         A.data.as_floats, b.data.as_floats,
+                                         G.data.as_floats, h.data.as_floats,
+                                         num_partitions, partition)
+
+        A_diff = numpy.array(A, 'd')
+        A_diff.reshape((num_paths, total_destinations))
+
+        b_diff = numpy.array(b, 'd')
+
+        Q_diff = numpy.array(Q, 'd')
+        Q_diff.reshape((num_paths,num_paths))
+
+        q_diff = numpy.array(q, 'd')
+
+        G_diff = numpy.array(G,'d')
+        G_diff.reshape((num_paths,num_paths))
+
+        h_diff = numpy.array(h, 'd')
+
+        # print destinations_per_origin[0], t_paths, len(A)
+        Am = cvxopt.matrix(A_diff.astype(numpy.double), ((num_paths, total_destinations)),"d" )
+        bm = cvxopt.matrix(b_diff.astype(numpy.double), (total_destinations,1),"d" )
+
+        Qm = cvxopt.matrix(Q_diff.astype(numpy.double), (num_paths,num_paths),"d" )
+        qm = cvxopt.matrix(q_diff.astype(numpy.double), (num_paths,1),"d" )
+
+        Gm = cvxopt.matrix(G_diff.astype(numpy.double), (num_paths,num_paths),"d" )
+        hm = cvxopt.matrix(h_diff, (num_paths,1),"d" )
+
+
+        return Qm,qm,Am,bm,Gm,hm
+
+    def update_path_flows_for_partition(self, origin, flows, num_partitions, partition_index):
+        cdef array.array path_flows= array.array('f', flows)
+        self.thisptr.update_path_flows_partition(origin, path_flows.data.as_floats, num_partitions, partition_index)
+
 
     def compute_gap(self):
         return self.thisptr.compute_gap()

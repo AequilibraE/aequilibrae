@@ -11,6 +11,7 @@
 #include <map>
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 //#include "ShortestPathComputation.h"
 
 
@@ -132,6 +133,14 @@ public:
     void get_objective_data(unsigned int origin, float *Q, float *c);
     void get_equality_data(unsigned int origin, float *A, float *b);
     void get_inequality_data(unsigned int origin, float *G, float *h);
+
+    std::pair<unsigned int, unsigned int> get_total_paths_for_partition(unsigned int origin, unsigned int num_partitions, unsigned int partition_index);
+    void get_problem_data_partitions(unsigned int origin, float *Q, float *c, float *A, float *b, float *G, float *h,
+                                        int num_partitions, int partition_index);
+
+    void set_origin_flow_partition(unsigned int origin,int od_from, int od_to);
+    void update_path_flows_partition(unsigned long centroid, float *flows,int num_partitions, int partition_index);
+
 
 	virtual ~TrafficAssignment();
 };

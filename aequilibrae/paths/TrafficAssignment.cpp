@@ -571,3 +571,184 @@ float TrafficAssignment::compute_gap()
 
     return numerator/denominator;
 }
+
+
+std::pair<unsigned int, unsigned int> TrafficAssignment::get_total_paths_for_partition(unsigned int origin, unsigned int num_partitions, unsigned int partition_index)
+{
+
+    unsigned int ods_per_partition = centroidsDescriptors[origin].destinationDescriptors.size()/num_partitions;
+    unsigned int start_od = ods_per_partition*partition_index;
+    unsigned int end_od = ods_per_partition*(partition_index+1);
+    if ((end_od > centroidsDescriptors[origin].destinationDescriptors.size()) || (partition_index==num_partitions-1))
+    {
+        end_od = centroidsDescriptors[origin].destinationDescriptors.size();
+    }
+
+    unsigned int tot_paths = 0;
+    for (int k=start_od; k<end_od;k++)
+    {
+        unsigned long destination = centroidsDescriptors[origin].destinations[k];
+        tot_paths = tot_paths + centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();
+    }
+
+    std::pair<unsigned int,unsigned int> ret_val(end_od-start_od, tot_paths);
+    return ret_val;
+}
+
+
+void TrafficAssignment::update_path_flows_partition(unsigned long origin, float *flows,
+        int num_partitions, int partition_index)
+{
+    int ods_per_partition = centroidsDescriptors[origin].destinationDescriptors.size()/num_partitions;
+    int start_od = ods_per_partition*partition_index;
+    int end_od = ods_per_partition*(partition_index+1);
+
+    if ((end_od > centroidsDescriptors[origin].destinationDescriptors.size()) || (partition_index==num_partitions-1))
+    {
+        end_od = centroidsDescriptors[origin].destinationDescriptors.size();
+    }
+
+    int tot_paths = 0;
+    int path_index = 0;
+    for (int k=start_od; k<end_od;k++)
+    {
+        int destination = centroidsDescriptors[origin].destinations[k];
+
+        for (int j=0; j<centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();j++)
+        {
+            int idx = centroidsDescriptors[origin].destinationDescriptors[destination].path_indices[j];
+            centroidsDescriptors[origin].path_flows[idx] = flows[path_index];
+            path_index++;
+        }
+        tot_paths = tot_paths + centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();
+    }
+
+    update_link_flows(origin);
+
+}
+
+
+
+void TrafficAssignment::get_problem_data_partitions(unsigned int origin, float *Q, float *c, float *A, float *b, float *G, float *h,
+                                        int num_partitions, int partition_index)
+{
+    int ods_per_partition = centroidsDescriptors[origin].destinationDescriptors.size()/num_partitions;
+
+    int start_od = ods_per_partition*partition_index;
+    int end_od = ods_per_partition*(partition_index+1);
+    if ((end_od > centroidsDescriptors[origin].destinationDescriptors.size()) || (partition_index==num_partitions-1))
+    {
+        end_od = centroidsDescriptors[origin].destinationDescriptors.size();
+    }
+    set_origin_flow_partition(origin, start_od, end_od);
+
+    std::unordered_map<int,int> path_indices;
+    int tot_paths = 0;
+    for (int k=start_od; k<end_od;k++)
+    {
+        int destination = centroidsDescriptors[origin].destinations[k];
+
+        for (int p=0; p<centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();p++)
+        {
+            //path_indices.insert(centroidsDescriptors[origin].destinationDescriptors[destination].path_indices[p]);
+            path_indices[centroidsDescriptors[origin].destinationDescriptors[destination].path_indices[p]] = tot_paths;
+            tot_paths++;
+        }
+
+    }
+
+
+    std::map<int, std::vector<unsigned int> >::iterator it_links;
+    std::vector<unsigned int>::iterator it_a;
+    std::vector<unsigned int>::iterator it_b;
+    int index;
+    int num_paths = path_indices.size();
+
+
+    int q_elements = 0;
+    int c_elements = 0;
+    for (it_links=centroidsDescriptors[origin].path_link_incidence.begin(); it_links!=centroidsDescriptors[origin].path_link_incidence.end();it_links++) {
+        for (it_a=it_links->second.begin();it_a!=it_links->second.end(); it_a++) {
+            if (path_indices.count(*it_a) == 0)
+            {
+                continue;
+            }
+            int idx_a = path_indices[*it_a];
+
+            for (it_b=it_links->second.begin();it_b!=it_links->second.end(); it_b++) {
+                if (path_indices.count(*it_b) == 0)
+                {
+                    continue;
+                }
+                int idx_b = path_indices[*it_b];
+
+                index=num_paths*idx_a+idx_b;
+
+                Q[index] += 2*alphas_1[it_links->first];
+                q_elements++;
+
+            }
+
+            c[idx_a] += 2*alphas_1[it_links->first]*(link_flows[it_links->first]-link_flows_origin[origin][it_links->first]+link_flows_out_of_partition[it_links->first]);
+
+            c[idx_a] += alphas_2[it_links->first];
+
+            c_elements++;
+
+        }
+
+    }
+    unsigned int destinations_elapsed=0;
+
+    for (int k=start_od; k<end_od;k++)
+    {
+        int destination = centroidsDescriptors[origin].destinations[k];
+
+        for (int p=0; p<centroidsDescriptors[origin].destinationDescriptors[destination].path_indices.size();p++)
+        {
+            int id_path = centroidsDescriptors[origin].destinationDescriptors[destination].path_indices[p];
+            int mapped_path = path_indices[id_path];
+            index=tot_paths*(destinations_elapsed)+mapped_path;
+            A[index] = 1.0;
+
+        }
+        b[destinations_elapsed] = centroidsDescriptors[origin].destinationDescriptors[destination].demand;
+        destinations_elapsed += 1;
+    }
+
+    for (unsigned int i=0; i<tot_paths;i++) {
+        index=tot_paths*i+i;
+        G[index] = -1;
+        h[i]=0;
+    }
+
+
+}
+
+void TrafficAssignment::set_origin_flow_partition(unsigned int origin,int od_from, int od_to)
+{
+    for(int i=0; i<link_flows_out_of_partition.size(); i++)
+    {
+        link_flows_out_of_partition[i] = 0;
+    }
+
+    for (int k=0; k<centroidsDescriptors[origin].destinations.size(); k++)
+    {
+        int dest = centroidsDescriptors[origin].destinations[k];
+        if(k < od_from || k >= od_to) //this OD is out of the partition...
+        {
+            for (int p=0; p<centroidsDescriptors[origin].destinationDescriptors[dest].path_indices.size();
+                    p++)
+            {
+                int path_index = centroidsDescriptors[origin].destinationDescriptors[dest].path_indices[p];
+
+                for (std::vector<int>::iterator it=centroidsDescriptors[origin].paths[path_index].begin();
+                    it!=centroidsDescriptors[origin].paths[path_index].end();it++)
+                {
+                    link_flows_out_of_partition[*it] = link_flows_out_of_partition[*it]+centroidsDescriptors[origin].path_flows[path_index];
+                }
+            }
+        }
+    }
+
+}

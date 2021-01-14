@@ -53,6 +53,7 @@ class PathBasedAssignment(WorkerThread):
         self.rgap_target = assig_spec.rgap_target
         self.cores = assig_spec.cores
         self.max_iter = assig_spec.max_iter
+        self.paths_per_partition = 450 #hard-coded by now (check with Jan/Pedro later)
         self.cores = assig_spec.cores
         self.iteration_issue = []
         self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
@@ -381,15 +382,23 @@ class PathBasedAssignment(WorkerThread):
                     self.shortest_path_temp_wrapper(origin)
 
                 t_paths = self.t_assignment.get_total_paths(origin)
-                Q, q, A, b, G, h = self.t_assignment.get_problem_data(origin, destinations_per_origin[origin])
-                Am = cvxopt.matrix(A.tolist(), (t_paths, destinations_per_origin[origin]), "d")
-                bm = cvxopt.matrix(b.tolist(), (destinations_per_origin[origin], 1), "d")
-                Qm = cvxopt.matrix(Q.tolist(), (t_paths, t_paths), "d")
-                qm = cvxopt.matrix(q.tolist(), (t_paths, 1), "d")
-                Gm = cvxopt.matrix(G.tolist(), (t_paths, t_paths), "d")
-                hm = cvxopt.matrix(h.tolist(), (t_paths, 1), "d")
-                solution = cvxopt.solvers.qp(Qm.trans(), qm, Gm.trans(), hm, Am.trans(), bm)["x"]
-                self.t_assignment.update_path_flows(origin, solution)
+                num_partitions = int(t_paths/self.paths_per_partition)
+                if num_partitions < 1:
+                    num_partitions = 1
+
+                for k in range(0, num_partitions):
+                    Q1, q1, A1, b1, G1, h1 = self.t_assignment.get_problem_data_partition(origin, num_partitions, k)
+                    solution = cvxopt.solvers.qp(Q1.trans(), q1, G1.trans(), h1, A1.trans(), b1)["x"]
+                    self.t_assignment.update_path_flows_for_partition(origin, solution, num_partitions, k)
+
+                # Q, q, A, b, G, h = self.t_assignment.get_problem_data(origin, destinations_per_origin[origin])
+                # Am = cvxopt.matrix(A.tolist(), (t_paths, destinations_per_origin[origin]), "d")
+                # bm = cvxopt.matrix(b.tolist(), (destinations_per_origin[origin], 1), "d")
+                # Qm = cvxopt.matrix(Q.tolist(), (t_paths, t_paths), "d")
+                # qm = cvxopt.matrix(q.tolist(), (t_paths, 1), "d")
+                # Gm = cvxopt.matrix(G.tolist(), (t_paths, t_paths), "d")
+                # hm = cvxopt.matrix(h.tolist(), (t_paths, 1), "d")
+
 
                 if not use_boost:
                     # c++ data structures and aequilibrae data structures are not integrated yet
