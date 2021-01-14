@@ -13,7 +13,7 @@ class TestVDF(TestCase):
         fftime = np.zeros(11)
         capacity = np.zeros(11)
         congested_times = np.zeros(11)
-        dbpr = np.zeros(11)
+        delta = np.zeros(11)
 
         alpha.fill(9.0)
         beta.fill(1.06)
@@ -42,7 +42,11 @@ class TestVDF(TestCase):
         for i in range(11):
             self.assertAlmostEqual(should_be[i], congested_times[i], 5, "Conical is wrong")
 
-        delta_conical(dbpr, link_flows, capacity, fftime, alpha, beta, cores)
+        link_flows.fill(1)
+        link_flows += np.arange(11) * 0.0000001
 
-        for i in range(1, 10):
-            self.assertGreater(dbpr[i + 1], dbpr[i], "Delta is not increasing as it should")
+        conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
+        delta_conical(delta, link_flows, capacity, fftime, alpha, beta, cores)
+        for i in range(10):
+            # The derivative needs to be monotonically increasing.
+            self.assertGreater(delta[i + 1], delta[i], "Delta is not increasing as it should")
