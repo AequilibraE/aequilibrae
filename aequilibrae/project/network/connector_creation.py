@@ -9,37 +9,39 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project import network
 from aequilibrae import logger
 
+INFINITE_CAPACITY = 99999
 
-def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types='', connectors=1):
+
+def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types="", connectors=1):
     if len(mode_id) > 1:
-        raise Exception('We can only add centroid connectors for one mode at a time')
+        raise Exception("We can only add centroid connectors for one mode at a time")
 
     conn = database_connection()
     curr = conn.cursor()
 
-    curr.execute('select count(*) from nodes where node_id=?', [zone_id])
+    curr.execute("select count(*) from nodes where node_id=?", [zone_id])
     if curr.fetchone() is None:
-        warn('This centroid does not exist. Please create it first')
+        warn("This centroid does not exist. Please create it first")
         return
 
     proj_nodes = network.Nodes()
     node = proj_nodes.get(zone_id)
-    curr.execute('select count(*) from links where a_node=? and instr(modes,?) > 0', [zone_id, mode_id])
+    curr.execute("select count(*) from links where a_node=? and instr(modes,?) > 0", [zone_id, mode_id])
     if curr.fetchone()[0] > 0:
-        warn('Mode is already connected')
+        warn("Mode is already connected")
         return
 
     if len(link_types) > 0:
-        lt = f'*[{link_types}]*'
+        lt = f"*[{link_types}]*"
     else:
-        curr.execute('Select link_type_id from link_types')
-        lt = ''.join([x[0] for x in curr.fetchall()])
-        lt = f'*[{lt}]*'
+        curr.execute("Select link_type_id from link_types")
+        lt = "".join([x[0] for x in curr.fetchall()])
+        lt = f"*[{lt}]*"
 
-    sql = '''select node_id, ST_asBinary(geometry), modes, link_types from nodes where ST_Within(geometry, GeomFromWKB(?, ?)) and
+    sql = """select node_id, ST_asBinary(geometry), modes, link_types from nodes where ST_Within(geometry, GeomFromWKB(?, ?)) and
                     (nodes.rowid in (select rowid from SpatialIndex where f_table_name = 'nodes' and
                     search_frame = GeomFromWKB(?, ?)))
-            and link_types glob ? and instr(modes, ?)>0'''
+            and link_types glob ? and instr(modes, ?)>0"""
 
     # We expand the area by its average radius until it is 20 times
     # beginning with a strict search within the zone
@@ -53,10 +55,10 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types=''
         buffer += increase
 
     if buffer > increase:
-        msg = f'Could not find node inside zone {zone_id}. Search area was expanded until we found a suitable node'
+        msg = f"Could not find node inside zone {zone_id}. Search area was expanded until we found a suitable node"
         logger.warning(msg)
     if dt == []:
-        warn(f'FAILED! Could not find suitable nodes to connect within 5 times the diameter of zone {zone_id}.')
+        warn(f"FAILED! Could not find suitable nodes to connect within 5 times the diameter of zone {zone_id}.")
         return
 
     coords = []
@@ -68,9 +70,9 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types=''
 
     num_connectors = connectors
     if len(nodes) == 0:
-        raise Exception('We could not find any candidate nodes that satisfied your criteria')
+        raise Exception("We could not find any candidate nodes that satisfied your criteria")
     elif len(nodes) < connectors:
-        warn(f'We have fewer possible nodes than required connectors for zone {zone_id}. Will connect all of them.')
+        warn(f"We have fewer possible nodes than required connectors for zone {zone_id}. Will connect all of them.")
         num_connectors = len(nodes)
 
     if num_connectors == len(coords):
@@ -99,9 +101,9 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types=''
     if data:
         qry = ",".join(["?"] * len(data))
         dt = [mode_id, zone_id] + data
-        curr.execute(f'Update links set modes=modes || ? where a_node=? and b_node in ({qry})', dt)
+        curr.execute(f"Update links set modes=modes || ? where a_node=? and b_node in ({qry})", dt)
         nds = [x for x in nds if x not in data]
-        logger.warning(f'Mode {mode_id} added to {len(data)} existing centroid connectors for zone {zone_id}')
+        logger.warning(f"Mode {mode_id} added to {len(data)} existing centroid connectors for zone {zone_id}")
         conn.commit()
 
     curr.close()
@@ -113,12 +115,12 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, link_types=''
         link.geometry = LineString([node.geometry, node_to.geometry])
         link.modes = mode_id
         link.direction = 0
-        link.link_type = 'centroid_connector'
-        link.name = f'centroid connector zone {zone_id}'
-        link.capacity_ab = 99999
-        link.capacity_ba = 99999
+        link.link_type = "centroid_connector"
+        link.name = f"centroid connector zone {zone_id}"
+        link.capacity_ab = INFINITE_CAPACITY
+        link.capacity_ba = INFINITE_CAPACITY
         link.save()
     if nds:
-        logger.warning(f'{len(nds)} new centroid connectors for mode {mode_id} added for centroid {zone_id}')
+        logger.warning(f"{len(nds)} new centroid connectors for mode {mode_id} added for centroid {zone_id}")
 
     conn.commit()

@@ -38,6 +38,7 @@ class Zoning:
         fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
 
     """
+
     __items = {}
 
     def __init__(self, network):
@@ -53,27 +54,27 @@ class Zoning:
         """Creates a new zone
 
         Returns:
-            *zone* (:obj:`Zone`): A new link object populated only with link_id (not saved in the model yet)
+            *zone* (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
             """
 
         if zone_id in self.__items:
-            raise Exception(f'Zone ID {zone_id} already exists')
+            raise Exception(f"Zone ID {zone_id} already exists")
 
         data = {key: None for key in self.__fields}
-        data['zone_id'] = zone_id
+        data["zone_id"] = zone_id
 
-        logger.info(f'Zone with id {zone_id} was created')
+        logger.info(f"Zone with id {zone_id} was created")
         return self.__create_return_zone(data)
 
     def create_zoning_layer(self):
         """Creates the 'zones' table for project files that did not previously contain it"""
 
         if not self.__has_zoning():
-            qry_file = join(realpath(__file__), 'database_specification', 'tables', 'zones.sql')
+            qry_file = join(realpath(__file__), "database_specification", "tables", "zones.sql")
             run_queries_from_sql_file(self.conn, qry_file)
             self.__load()
         else:
-            warn('zones table already exists. Nothing was done', Warning)
+            warn("zones table already exists. Nothing was done", Warning)
 
     def extent(self) -> Polygon:
         """Queries the extent of the zoning system included in the model
@@ -98,12 +99,12 @@ class Zoning:
     def get(self, zone_id: str) -> Zone:
         """Get a zone from the model by its **zone_id**"""
         if zone_id not in self.__items:
-            raise ValueError(f'Zone {zone_id} does not exist in the model')
+            raise ValueError(f"Zone {zone_id} does not exist in the model")
         return self.__items[zone_id]
 
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the zones table fields and their metadata"""
-        return FieldEditor('zones')
+        return FieldEditor("zones")
 
     def all_zones(self) -> dict:
         """Returns a dictionary with all Zone objects available in the model. zone_id as key"""
@@ -114,27 +115,27 @@ class Zoning:
             zn.save()
 
     def __copy__(self):
-        raise Exception('Zones object cannot be copied')
+        raise Exception("Zones object cannot be copied")
 
     def __deepcopy__(self, memodict=None):
-        raise Exception('Zones object cannot be copied')
+        raise Exception("Zones object cannot be copied")
 
     def __has_zoning(self):
         curr = self.conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(['zone' in x[0].lower() for x in curr.fetchall()])
+        return any(["zone" in x[0].lower() for x in curr.fetchall()])
 
     def __load(self):
         tl = TableLoader()
-        zones_list = tl.load_table(self.__curr, 'zones')
+        zones_list = tl.load_table(self.__curr, "zones")
         self.__fields = deepcopy(tl.fields)
 
-        existing_list = [zn['zone_id'] for zn in zones_list]
+        existing_list = [zn["zone_id"] for zn in zones_list]
         if zones_list:
             self.__properties = list(zones_list[0].keys())
         for zn in zones_list:
-            if zn['zone_id'] not in self.__items:
-                self.__items[zn['zone_id']] = Zone(zn, self)
+            if zn["zone_id"] not in self.__items:
+                self.__items[zn["zone_id"]] = Zone(zn, self)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:

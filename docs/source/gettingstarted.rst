@@ -1,3 +1,4 @@
+.. _getting_started:
 
 Getting Started
 ===============
@@ -14,8 +15,8 @@ This page describes how to get started with AequilibraE.
 Installation
 ------------
 
-1. Install `Python 3.5, 3.6 or 3.7 <www.python.org>`__. We recommend Python
-   3.7 as of late 2019.
+1. Install `Python 3.6, 3.7 or 3.8 <www.python.org>`__. We recommend Python
+   3.7 as of January 2021.
 
 2. Install AequilibraE
 
@@ -51,7 +52,7 @@ Spatialite
 Although the presence of Spatialite is rather obiquitous in the GIS ecosystem,
 it has to be installed separately from Python or AequilibraE.
 
-This `blog post<https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
+This `blog post <https://xl-optim.com/spatialite-and-python-in-2020/>`_ has a more
 comprehensive explanation of what is the setup you need to get Spatialite working,
 but below there is something you can start with.
 
@@ -62,24 +63,27 @@ it is necessary to download Spatialite for Windows and inform AequilibraE of its
 location.
 
 One can download the appropriate version of the latest SpatiaLite release
-directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ .
+directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ , or the
+cached versions on AequilibraE's website for
+`64-Bit Python <https://www.aequilibrae.com/binaries/spatialite/spatialite-loadable-modules-5.0.0-win-amd64.7z>`_
+or
+`32-Bit Python <https://www.aequilibrae.com/binaries/spatialite/spatialite-loadable-modules-5.0.0-win-x86.7z>`_
 
 After unpacking the zip file into its own folder (say D:/spatialite), one can
-update the AequilibraE parameter file with the location of spatialite by using
-the *Parameters* module as follows:
+start their Python session by creating a *temporary* environment variable with said
+location, as follows:
 
 ::
 
-  from aequilibrae import Parameters
+  import os
+  from aequilibrae.utils.create_example import create_example
 
-  fldr = 'D:/spatialite'
+  os.environ['PATH'] = 'D:/spatialite' + ';' + os.environ['PATH']
 
-  p = Parameters()
-  p.parameters['system']['spatialite_path'] =  fldr
-  p.writeback()
+  project = create_example(fldr, 'nauru')
 
-It is not possible to use Spatialite with AequilibraE on windows by simply
-editing environment variables.
+For a permanent recording of the Spatialite location on your system, please refer
+to the blog post referenced above or Windows-specific documentation.
 
 Ubuntu Linux
 ^^^^^^^^^^^^
@@ -118,6 +122,6 @@ things to keep an eye on are:
 Substantial testing has been done with large real-world models (up to 8,000
 zones) and memory requirements did not exceed the traditional 32Gb found in most
 modelling computers these days. In most cases 16Gb of RAM is enough even for
-large models (2,000+ zones).  Parallelization is fully implemented for graph
+large models (3,000+ zones).  Parallelization is fully implemented for path
 computation, and can make use of as many CPUs as there are available in the
 system when doing traffic assignment.

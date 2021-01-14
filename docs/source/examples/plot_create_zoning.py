@@ -21,7 +21,7 @@ We also add centroid connectors to our network to make it a pretty complete exam
 from PIL import Image
 import matplotlib.pyplot as plt
 
-img = Image.open('plot_create_zoning.png')
+img = Image.open("plot_create_zoning.png")
 plt.imshow(img)
 
 # %%
@@ -39,10 +39,10 @@ from aequilibrae.utils.create_example import create_example
 fldr = join(gettempdir(), uuid4().hex)
 
 # Let's use the Nauru example project for display
-project = create_example(fldr, 'nauru')
+project = create_example(fldr, "nauru")
 
 # %%
-# We said we wanted 200 zones
+# We said we wanted 100 zones
 zones = 100
 
 # %% md
@@ -76,8 +76,10 @@ extent = network.extent()
 
 curr = project.conn.cursor()
 b = extent.bounds
-curr.execute('select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))',
-             [extent.wkb, zone_side, Point(b[2], b[3]).wkb])
+curr.execute(
+    "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))",
+    [extent.wkb, zone_side, Point(b[2], b[3]).wkb],
+)
 grid = curr.fetchone()[0]
 grid = shapely.wkb.loads(grid)
 
@@ -112,11 +114,11 @@ for i, zone_geo in enumerate(grid):
 # %%
 for zone_id, zone in zoning.all_zones().items():
     # We will connect for walk, with 1 connector per zone
-    zone.connect_mode(mode_id='w', connectors=1)
+    zone.connect_mode(mode_id="w", connectors=1)
 
     # And for cars, for cars with 2 connectors per zone
     # We also specify the link types we accept to connect to (can be used to avoid connection to ramps or freeways)
-    zone.connect_mode(mode_id='c', link_types='ytrusP', connectors=2)
+    zone.connect_mode(mode_id="c", link_types="ytrusP", connectors=2)
 
     # This takes a few minutes to compute, so we will break after processing the first 10 zones
     if zone_id >= 10:
@@ -136,7 +138,7 @@ airport.save()
 # When connecting a centroid not associated with a zone, we need to tell AequilibraE what is the initial area around
 # the centroid that needs to be considered when looking for candidate nodes
 # Distance here is in degrees, so 0.01 is equivalent to roughly 1.1km
-airport.connect_mode(airport.geometry.buffer(0.01), mode_id='c', link_types='ytrusP', connectors=1)
+airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytrusP", connectors=1)
 
 
 # %%
