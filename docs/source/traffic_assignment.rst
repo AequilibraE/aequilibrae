@@ -73,17 +73,22 @@ To begin building the assignment it is easy:
 Volume Delay Function
 +++++++++++++++++++++
 
-For now, the only available VDF function in AequilibraE is the BPR, but more
-functions will be added as needed/requested/possible.
+For now, the only VDF functions available in AequilibraE are the BPR
 
 :math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
+
+and Spiess' conical
+
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)`
+
+More functions will be added as needed/requested/possible.
 
 Setting the volume delay function is one of the first things you should do after
 instantiating an assignment problem in AequilibraE, and it is as simple as:
 
 ::
 
-    assig.set_vdf('BPR')
+    assig.set_vdf('CONICAL')
 
 The implementation of the VDF functions in AequilibraE is written in Cython and
 fully multi-threaded, and therefore descent methods that may evaluate such
@@ -349,6 +354,19 @@ instantiation of large NumPy arrays can be computationally expensive.
 References
 ++++++++++
 
+Volume delay functions
+^^^^^^^^^^^^^^^^^^^^^^
+
+[1] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."
+Transportation Science, Vol 24 Issue 2. `Conical <https://doi.org/10.1287/trsc.24.2.153>`_
+
+[2] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2
+`Technical Documentation - Final Report <https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf>`_
+(2020)
+
+Traffic assignment and equilibrium
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
 Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
 
@@ -356,7 +374,7 @@ Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
 approach to solving the road network equilibrium traffic assignment problem"
 Transpn Res. 9, 309-318.
 
-[3] Maria Mitradjieva and Per Olov Lindberg (2013)"The Stiff Is Moving—Conjugate
+[3] Maria Mitradjieva and Per Olov Lindberg (2013) "The Stiff Is Moving—Conjugate
 Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
 `Mitradjieva and Lindberg <https://doi.org/10.1287/trsc.1120.0409>`_
 
