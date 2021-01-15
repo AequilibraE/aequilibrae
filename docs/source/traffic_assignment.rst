@@ -374,7 +374,7 @@ Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
 approach to solving the road network equilibrium traffic assignment problem"
 Transpn Res. 9, 309-318.
 
-[3] Maria Mitradjieva and Per Olov Lindberg (2013)"The Stiff Is Moving—Conjugate
+[3] Maria Mitradjieva and Per Olov Lindberg (2013) "The Stiff Is Moving—Conjugate
 Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
 `Mitradjieva and Lindberg <https://doi.org/10.1287/trsc.1120.0409>`_
 

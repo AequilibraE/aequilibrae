@@ -4,8 +4,8 @@ from multiprocessing import cpu_count
 import numpy as np
 
 
-class TestVDF(TestCase):
-    def test_functions_available(self):
+class TestConical(TestCase):
+    def test_conial_cuntion(self):
         cores = cpu_count()
 
         alpha = np.zeros(11)
@@ -42,11 +42,19 @@ class TestVDF(TestCase):
         for i in range(11):
             self.assertAlmostEqual(should_be[i], congested_times[i], 5, "Conical is wrong")
 
-        link_flows.fill(1)
-        link_flows += np.arange(11) * 0.0000001
+        # Let's check the derivative for sections of the curve
+        dx = 0.00000001
+        for i in range(1, 11):
+            link_flows.fill(1 * 0.2 * i)
+            link_flows += np.arange(11) * dx
 
-        conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
-        delta_conical(delta, link_flows, capacity, fftime, alpha, beta, cores)
-        for i in range(10):
+            conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
+            delta_conical(delta, link_flows, capacity, fftime, alpha, beta, cores)
+
             # The derivative needs to be monotonically increasing.
-            self.assertGreater(delta[i + 1], delta[i], "Delta is not increasing as it should")
+            self.assertGreater(delta[1], delta[0], "Delta is not increasing as it should")
+
+            # We check if the analytical solution matches the numerical differentiation
+            dydx = (congested_times[1] - congested_times[0]) / dx
+            self.assertAlmostEqual(dydx, delta[1], 6, "Problems with derivative for the conical vdf")
+            print(dydx, delta[1])
