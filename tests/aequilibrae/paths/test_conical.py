@@ -5,7 +5,7 @@ import numpy as np
 
 
 class TestConical(TestCase):
-    def test_conial_cuntion(self):
+    def test_conial_funtion(self):
         cores = cpu_count()
 
         alpha = np.zeros(11)
