@@ -64,6 +64,14 @@ class TestLink(TestCase):
         self.assertEqual(link2.name, name, 'Failed to save the link name')
         self.assertAlmostEqual(link2.geometry, geo, 3, 'Failed to save the link geometry')
 
+        tot_prev = self.network.count_links()
+        lnk = self.links.new()
+        lnk.geometry = substring(self.link.geometry, 0, 0.88, normalized=True)
+        lnk.modes = 'c'
+        lnk.save()
+
+        self.assertEqual(tot_prev + 1, self.network.count_links(), 'Failed to save new link')
+
     def test_set_modes(self):
         self.link.set_modes('cbt')
 

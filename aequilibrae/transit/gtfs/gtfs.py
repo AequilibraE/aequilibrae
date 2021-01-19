@@ -32,7 +32,7 @@ class GTFS:
         self.schedule_exceptions = None
 
     def load_from_file(self, file_path, save_db=False, memory_db=False):
-        pass
+        raise NotImplementedError
 
     def load(self, path_to_folder):
         self.source_folder = path_to_folder
@@ -145,7 +145,7 @@ class GTFS:
         self.stop_times = parse_csv(stop_times_file)
 
     def load_calendar(self):
-        pass
+        raise NotImplementedError
 
     def load_calendar_dates(self):
         agency_file = os.path.join(self.source_folder, "calendar_dates.txt")
@@ -198,4 +198,4 @@ class GTFS:
             #         stop_times = self.stop_times[self.stop_times["trip_id"] == t]
 
     def get_routes_stops(self):
-        pass
+        raise NotImplementedError

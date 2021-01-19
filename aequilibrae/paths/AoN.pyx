@@ -19,6 +19,7 @@ cimport numpy as np
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
+include 'conical.pyx'
 include 'parallel_numpy.pyx'
 
 from .__version__ import binary_version as VERSION_COMPILED

@@ -4,6 +4,7 @@ pyaml
 PyQt5
 cython
 openmatrix
+pyshp
 requests
 shapely
 pandas == 1.0.1

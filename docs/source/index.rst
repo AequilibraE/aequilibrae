@@ -18,6 +18,9 @@ Examples
 
 Skip the *blah-blah-blah* and go straight to the point: :ref:`sphx_glr__auto_examples`
 
+or to :ref:`getting_started` if you are new to Python or are having trouble with Spatialite
+
+
 Contents
 ========
 .. sectnum::

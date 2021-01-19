@@ -82,6 +82,148 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
+    def create_from_geography(
+            self,
+            geo_file: str,
+            id_field: str,
+            dir_field: str,
+            cost_field: str,
+            centroids: np.ndarray,
+            skim_fields=[],
+            anode="A_NODE",
+            bnode="B_NODE",
+    ) -> None:
+        """
+        Creates a graph from a Shapefile. (Deprecated)
+
+        Args:
+            geo_file (:obj:`str`): Path to the geographic file to be used. File is usually the output of the network
+                                   preparation tool from the AequilibraE plugin for QGIS
+
+            id_field (:obj:`str`): Name of the field that has link IDs (must be unique)
+
+            dir_field (:obj:`str`): Name of the field that has the link directions of flow ([-1, 0, 1])
+
+            cost_field (:obj:`str`): Name of the field that has the cost data (field to minimized in shortest path)
+
+            centroids (:obj:`np.ndarray`): Numpy Array with a list of centroids included in this graph
+
+            skim_fields (:obj:`list`): List with the name of fields to be skimmed
+
+            anode (:obj:`str`): Name of the field with information of A_Node of links (if different than *A_NODE*)
+
+            bnode (:obj:`str`): Name of the field with information of B_Node of links (if different than *B_NODE*)
+        """
+
+        import shapefile
+
+        cost_field_name = cost_field
+        error = None
+        geo_file_records = shapefile.Reader(geo_file)
+        records = geo_file_records.records()
+
+        def find_field_index(fields, field_name):
+            for i, f in enumerate(fields):
+                if f[0] == field_name:
+                    return i - 1
+
+            f = [str(x[0]) for x in fields]
+            raise ValueError(field_name + " does not exist. Fields available are: " + ", ".join(f))
+
+        # collect the fields in the network
+        check_titles = [id_field, dir_field, anode, bnode, cost_field]
+        id_field = find_field_index(geo_file_records.fields, id_field)
+        dir_field = find_field_index(geo_file_records.fields, dir_field)
+        cost_field = find_field_index(geo_file_records.fields, cost_field)
+        anode = find_field_index(geo_file_records.fields, anode)
+        bnode = find_field_index(geo_file_records.fields, bnode)
+
+        # Appends all fields to the list of fields to be used
+        all_types = [
+            self.__integer_type,
+            self.__integer_type,
+            self.__integer_type,
+            self.__float_type,
+            np.int8,
+        ]
+        all_titles = [
+            "link_id",
+            "a_node",
+            "b_node",
+            cost_field_name,
+            "direction",
+        ]
+        check_fields = [id_field, dir_field, anode, bnode, cost_field]
+        types_to_check = [int, int, int, int, float]
+
+        # Loads the skim index fields
+        dict_field = {}
+        for k in skim_fields:
+            skim_index = find_field_index(geo_file_records.fields, k)
+            check_fields.append(skim_index)
+            check_titles.append(k)
+            types_to_check.append(float)
+
+            all_types.append(self.__float_type)
+            all_titles.append((k))
+            dict_field[k] = skim_index
+
+        dt = [(t, d) for t, d in zip(all_titles, all_types)]
+
+        # Check ID uniqueness and if there are any non-valid values
+        all_ids = []
+        for feat in records:
+            for i, j in enumerate(check_fields):
+                k = feat[j]
+                if not isinstance(k, types_to_check[i]):
+                    error = check_titles[i], "field has wrong type or empty values"
+                    break
+            all_ids.append(feat[check_fields[0]])
+            if error is not None:
+                break
+
+        if error is None:
+            # Checking uniqueness
+            all_ids = np.array(all_ids, np.int)
+            y = np.bincount(all_ids)
+            if np.max(y) > 1:
+                error = "IDs are not unique."
+
+        if error is None:
+            data = []
+
+            for feat in records:
+                line = []
+                line.append(feat[id_field])
+                line.append(feat[anode])
+                line.append(feat[bnode])
+                line.append(feat[cost_field])
+                line.append(feat[dir_field])
+
+                # We append the skims now
+                for k in all_titles:
+                    if k in dict_field:
+                        line.append(feat[dict_field[k]])
+                data.append(line)
+
+            network = np.asarray(data)
+            del data
+
+            self.network = np.zeros(network.shape[0], dtype=dt)
+            for k, t in enumerate(dt):
+                self.network[t[0]] = network[:, k].astype(t[1])
+            del network
+
+            self.type_loaded = "SHAPEFILE"
+            self.status = "OK"
+            self.network_ok = True
+            self.prepare_graph(centroids.astype(np.int64))
+            self.__source__ = geo_file
+            self.__field_name__ = None
+            self.__layer_name__ = None
+        if error is not None:
+            raise ValueError(error)
+
     def prepare_graph(self, centroids: np.ndarray) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
@@ -180,14 +322,11 @@ class Graph(object):
                             self.graph[i[0:-3]][a1:a2] = poss[i]
                             self.graph[i[0:-3]][a2:a3] = zers[i[0:-3] + "_ba"]
                             self.graph[i[0:-3]][a3:a4] = zers[i]
-                        elif i[-3:] == "_ba":
-                            pass
-                        else:
-                            if i in all_titles:
-                                self.graph[i][0:a1] = negs[i]
-                                self.graph[i][a1:a2] = poss[i]
-                                self.graph[i][a2:a3] = zers[i]
-                                self.graph[i][a3:a4] = zers[i]
+                        elif i[-3:] != "_ba" and i in all_titles:
+                            self.graph[i][0:a1] = negs[i]
+                            self.graph[i][a1:a2] = poss[i]
+                            self.graph[i][a2:a3] = zers[i]
+                            self.graph[i][a3:a4] = zers[i]
 
                 ind = np.lexsort((self.graph["b_node"], self.graph["a_node"]))
                 self.graph = self.graph[ind]
@@ -215,7 +354,7 @@ class Graph(object):
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
                 nans = ",".join([i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))])
                 if nans:
-                    logger.warn(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
+                    logger.warning(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
 
     def exclude_links(self, links: list) -> None:
         """

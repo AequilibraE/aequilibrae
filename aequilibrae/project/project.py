@@ -14,6 +14,7 @@ from aequilibrae import logger
 from aequilibrae.reference_files import spatialite_database
 from .project_creation import initialize_tables
 import logging
+from .project_cleaning import clean
 
 
 class Project:
@@ -38,7 +39,6 @@ class Project:
         self.conn: sqlite3.Connection = None
         self.network: Network = None
         self.about: About = None
-        self.zoning: Zoning = None
         self.logger: logging.Logger = None
 
     def open(self, project_path: str) -> None:
@@ -67,6 +67,7 @@ class Project:
         self.__set_logging_path()
         logger.info(f'Opened project on {self.project_base_path}')
         self.logger = logger
+        clean()
 
     def new(self, project_path: str) -> None:
         """Creates a new project
@@ -95,6 +96,8 @@ class Project:
     def close(self) -> None:
         """Safely closes the project"""
         if ENVIRON_VAR in os.environ:
+            self.conn.commit()
+            clean()
             self.conn.close()
             for obj in [self.parameters, self.network]:
                 del obj
@@ -130,16 +133,17 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
-        self.zoning = Zoning(self)
         self.matrices = Matrices()
         self.parameters = Parameters().parameters
 
     def check_file_indices(self) -> None:
         """ Makes results_database.sqlite and the matrices folder compatible with project database
-
-
         """
-        pass
+        raise NotImplementedError
+
+    @property
+    def zoning(self):
+        return Zoning(self.network)
 
     def __create_empty_project(self):
 

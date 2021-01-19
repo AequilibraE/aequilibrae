@@ -110,7 +110,7 @@ The first reasonable version
 The first important thing I noticed after releasing AequilibraE was that the code was written in procedural style, even
 though it would make a lot more sense doing it in a Object-Oriented fashion, which let me down the path of creating the
 objects (graph, assignment results, matrix) that the software still relies on and were the foundation blocks of the
-proper API that is in the making. That `version was release almost 3 years ago
+proper API that is in the making. That `version was release over 4 years ago
 <http://www.xl-optim.com/new-version-of-aequilibrae/>`_.
 
 Evolving into proper software
@@ -122,13 +122,10 @@ A few distinct improvements deserve to be highlighted.
 * Introduction of Unit Tests and automatic testing using `Travis <https://travis-ci.org/AequilibraE/aequilibrae>`_
 * Welcome of new collaborators: Jamie Cook, Andrew O'Brien, Yu-Chu Huang & Jan Zill
 * Introduction of style-checking with Flake8 and Black
-* Development of proper documentation (undergoing) and a recommended development virtual environment
+* Development of proper documentation and a recommended development virtual environment
 
-Other relevant Repositories
-###########################
+QGIS Plugin
+###########
 
-The other most important repository associated with this project is the one for the `QGIS GUI
-<https://github.com/AequilibraE/AequilibraE-GUI>`_  That is where everything started.
-
-The other important repository is the one with the `examples of usage <https://github.com/AequilibraE/examples_api>`_ of
-this code. That repository will probably be replaced with proper documentation for this project, but one thing at a time.
+The QGIS plugin is developed on a separate repository: `QGIS GUI <https://github.com/AequilibraE/AequilibraE-GUI>`_ 
+That is where everything started.

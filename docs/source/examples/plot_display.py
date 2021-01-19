@@ -23,22 +23,15 @@ plt.imshow(img)
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae import Project
+from aequilibrae.utils.create_example import create_example
 import folium
 
 # %%
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
-project = Project()
-project.new(fldr)
 
-# %%
-# We will create
-
-# We can create from a bounding box
-# or from a named place. For the sake of this example, we will choose the small nation of Nauru
-project.network.create_from_osm(place_name='Nauru')
-
+# Let's use the Nauru example project for display
+project = create_example(fldr, 'nauru')
 
 # %%
 # We grab all the links data as a Pandas dataframe so we can process it easier

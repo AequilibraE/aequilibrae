@@ -32,6 +32,9 @@ INSERT INTO 'about' (infoname) VALUES('aequilibrae_version');
 INSERT INTO 'about' (infoname) VALUES('projection');
 
 --#
+INSERT INTO 'about' (infoname) VALUES('driving_side');
+
+--#
 INSERT INTO 'about' (infoname) VALUES('license');
 
 --#
