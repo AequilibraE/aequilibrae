@@ -1,43 +1,32 @@
 from unittest import TestCase
+from tempfile import gettempdir
+from uuid import uuid4
+from os.path import join
 from aequilibrae.paths import TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
 from aequilibrae.paths.results import AssignmentResults
-
-from tempfile import gettempdir
-import os
-from ...data import test_graph
+from aequilibrae.utils.create_example import create_example
 
 
 class TestTrafficClass(TestCase):
     def test_set_pce(self):
-        mat_name = AequilibraeMatrix().random_name()
-        g = Graph()
-        g.load_from_disk(test_graph)
-        g.set_graph(cost_field="distance")
+        project = create_example(join(gettempdir(), "test_set_pce_" + uuid4().hex))
+        project.network.build_graphs()
+        car_graph = project.network.graphs["c"]  # type: Graph
+        car_graph.set_graph("distance")
+        car_graph.set_blocked_centroid_flows(False)
 
-        # Creates the matrix for assignment
-        args = {
-            "file_name": os.path.join(gettempdir(), mat_name),
-            "zones": g.num_zones,
-            "matrix_names": ["cars", "trucks"],
-            "index_names": ["my indices"],
-        }
-
-        matrix = AequilibraeMatrix()
-        matrix.create_empty(**args)
-
-        matrix.index[:] = g.centroids[:]
-        matrix.cars.fill(1.1)
-        matrix.trucks.fill(2.2)
+        matrix = project.matrices.get_matrix("demand_omx")
         matrix.computational_view()
 
-        tc = TrafficClass(graph=g, matrix=matrix)
+        tc = TrafficClass(graph=car_graph, matrix=matrix)
 
-        self.assertIsInstance(tc.results, AssignmentResults, 'Results have the wrong type')
-        self.assertIsInstance(tc._aon_results, AssignmentResults, 'Results have the wrong type')
+        self.assertIsInstance(tc.results, AssignmentResults, "Results have the wrong type")
+        self.assertIsInstance(tc._aon_results, AssignmentResults, "Results have the wrong type")
 
         with self.assertRaises(ValueError):
-            tc.set_pce('not a number')
+            tc.set_pce("not a number")
         tc.set_pce(1)
         tc.set_pce(3.9)
+        project.close()

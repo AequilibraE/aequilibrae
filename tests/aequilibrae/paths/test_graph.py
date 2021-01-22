@@ -20,49 +20,29 @@ from shutil import copytree, rmtree
 
 class TestGraph(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(tempfile.gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
+        self.project = Project()
+        self.project.open(self.temp_proj_folder)
+        self.project.network.build_graphs()
+        self.graph = self.project.network.graphs["c"]
 
-    def test_create_from_geography(self):
-        self.graph = Graph()
-        self.graph.create_from_geography(
-            test_network,
-            "link_id",
-            "dir",
-            "distance",
-            centroids=centroids,
-            skim_fields=[],
-            anode="A_NODE",
-            bnode="B_NODE",
-        )
-        self.graph.set_graph(cost_field="distance")
-        self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
-        self.graph.set_skimming("distance")
+    def tearDown(self) -> None:
+        self.project.close()
 
     def test_prepare_graph(self):
-        self.test_create_from_geography()
-        self.graph.prepare_graph(centroids)
-
-        reference_graph = Graph()
-        reference_graph.load_from_disk(test_graph)
-        reference_graph.__version__ = binary_version
-        if not np.array_equal(self.graph.graph, reference_graph.graph):
-            self.fail("Reference graph and newly-prepared graph are not equal")
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph(np.arange(5) + 1)
 
     def test_set_graph(self):
-        self.test_prepare_graph()
         self.graph.set_graph(cost_field="distance")
         self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
-        if self.graph.num_zones != centroids.shape[0]:
-            self.fail("Number of centroids not properly set")
-        if self.graph.num_links != 222:
-            self.fail("Number of links not properly set")
-        if self.graph.num_nodes != 93:
-            self.fail("Number of nodes not properly set - " + str(self.graph.num_nodes))
+        self.assertEqual(self.graph.num_zones, 24, "Number of centroids not properly set")
+        self.assertEqual(self.graph.num_links, 76, "Number of links not properly set")
+        self.assertEqual(self.graph.num_nodes, 24, "Number of nodes not properly set - " + str(self.graph.num_nodes))
 
     def test_save_to_disk(self):
-        self.test_create_from_geography()
         self.graph.save_to_disk(join(path_test, "aequilibrae_test_graph.aeg"))
         self.graph_id = self.graph.__id__
         self.graph_version = self.graph.__version__
@@ -76,62 +56,38 @@ class TestGraph(TestCase):
         new_graph = Graph()
         new_graph.load_from_disk(join(path_test, "aequilibrae_test_graph.aeg"))
 
-        comparisons = [
-            ("Graph", new_graph.graph, reference_graph.graph),
-            ("b_nodes", new_graph.b_node, reference_graph.b_node),
-            ("Forward-Star", new_graph.fs, reference_graph.fs),
-            ("cost", new_graph.cost, reference_graph.cost),
-            ("centroids", new_graph.centroids, reference_graph.centroids),
-            ("skims", new_graph.skims, reference_graph.skims),
-            ("link ids", new_graph.ids, reference_graph.ids),
-            ("Network", new_graph.network, reference_graph.network),
-            ("All Nodes", new_graph.all_nodes, reference_graph.all_nodes),
-            ("Nodes to indices", new_graph.nodes_to_indices, reference_graph.nodes_to_indices),
-        ]
-
-        for comparison, newg, refg in comparisons:
-            if not np.array_equal(newg, refg):
-                self.fail("Reference %s and %s created and saved to disk are not equal" % (comparison, comparison))
-
-        comparisons = [
-            ("nodes", new_graph.num_nodes, reference_graph.num_nodes),
-            ("links", new_graph.num_links, reference_graph.num_links),
-            ("zones", new_graph.num_zones, reference_graph.num_zones),
-            ("block through centroids", new_graph.block_centroid_flows, reference_graph.block_centroid_flows),
-            ("Graph ID", new_graph.__id__, self.graph_id),
-            ("Graph Version", new_graph.__version__, self.graph_version),
-        ]
-
-        for comparison, newg, refg in comparisons:
-            if newg != refg:
-                self.fail("Reference %s and %s created and saved to disk are not equal" % (comparison, comparison))
-
     def test_available_skims(self):
-        self.test_set_graph()
-        if self.graph.available_skims() != ["distance"]:
-            self.fail("Skim availability with problems")
+        self.graph.prepare_graph(np.arange(5) + 1)
+        avail = self.graph.available_skims()
+        data_fields = [
+            "distance",
+            "name",
+            "lanes",
+            "capacity",
+            "speed",
+            "b",
+            "free_flow_time",
+            "power",
+            "colum",
+            "volume",
+            "modes",
+        ]
+        for i in data_fields:
+            if i not in avail:
+                self.fail("Skim availability with problems")
 
     def test_exclude_links(self):
-        p = Project()
-        p.open(self.temp_proj_folder)
-        p.network.build_graphs()
-
-        g = p.network.graphs['c']  # type: Graph
-
         # excludes a link before any setting or preparation
-        g.exclude_links([12])
+        self.graph.set_blocked_centroid_flows(False)
 
-        g.set_graph('distance')
+        self.graph.set_graph("distance")
         r1 = PathResults()
-        r1.prepare(g)
-        r1.compute_path(1, 14)
-        self.assertEqual(list(r1.path), [2, 6, 10, 34])
+        r1.prepare(self.graph)
+        r1.compute_path(20, 21)
+        self.assertEqual(list(r1.path), [62])
 
-        # We exclude one link that we know was part of the last shortest path
-        g.exclude_links([10])
-        r2 = PathResults()
-        r2.prepare(g)
-        r2.compute_path(1, 14)
-        self.assertEqual(list(r2.path), [2, 7, 36, 34])
-
-        p.close()
+        r1 = PathResults()
+        self.graph.exclude_links([62])
+        r1.prepare(self.graph)
+        r1.compute_path(20, 21)
+        self.assertEqual(list(r1.path), [63, 69])

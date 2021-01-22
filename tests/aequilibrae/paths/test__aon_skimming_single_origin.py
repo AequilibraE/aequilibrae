@@ -1,21 +1,29 @@
 import unittest
-from aequilibrae.paths import Graph
+from tempfile import gettempdir
+from uuid import uuid4
+from os.path import join
 from aequilibrae.paths.results import SkimResults
 from aequilibrae.paths import skimming_single_origin
-from aequilibrae.paths import binary_version
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 import numpy as np
+from aequilibrae.utils.create_example import create_example
 
 # Adds the folder with the data to the path and collects the paths to the files
 from ...data import path_test, test_graph
 
 
 class TestSkimming_single_origin(unittest.TestCase):
+    def setUp(self) -> None:
+        path = join(gettempdir(), "skim_test_" + uuid4().hex)
+        self.project = create_example(path)
+
+    def tearDown(self) -> None:
+        self.project.close()
+
     def test_skimming_single_origin(self):
 
-        g = Graph()
-        g.load_from_disk(test_graph)
-        g.__version__ = binary_version
+        self.project.network.build_graphs()
+        g = self.project.network.graphs["c"]
         g.set_graph(cost_field="distance")
         g.set_skimming("distance")
 
