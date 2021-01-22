@@ -149,7 +149,7 @@ class Graph(object):
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
-        self.all_nodes = np.unique(np.hstack((centroids, nodes)).astype(self.__integer_type))
+        self.all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
         self.num_nodes = self.all_nodes.shape[0]
         self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
@@ -161,6 +161,7 @@ class Graph(object):
         df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node][:]
         df.loc[:, "b_node"] = self.nodes_to_indices[df.b_node][:]
         df = df.sort_values(by=["a_node", "b_node"])
+        df.index = np.arange(df.shape[0])
         df.loc[:, "id"] = np.arange(df.shape[0])
         self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
         self.fs.fill(-1)
@@ -177,7 +178,8 @@ class Graph(object):
         if nans:
             logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
         self.graph = df
-        self.ids = self.graph.id.values.astype(np.int64)
+        self.ids = self.graph.id.values.astype(self.__integer_type)
+        self.__build_arrays_for_computation()
 
     def exclude_links(self, links: list) -> None:
         """
@@ -215,6 +217,11 @@ class Graph(object):
                     fields.append(column)
                     types.append(self.network[column].dtype)
         return fields, types
+
+    def __build_arrays_for_computation(self):
+        self._comp_b_node = np.array(self.graph.b_node.values.astype(self.__integer_type), copy=True)
+        self._comp_link_id = np.array(self.graph.link_id.values.astype(self.__integer_type), copy=True)
+        self._comp_direction = np.array(self.graph.direction.values.astype(self.__integer_type), copy=True)
 
     def __build_dtype(self, all_titles) -> list:
         dtype = [
