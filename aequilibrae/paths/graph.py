@@ -285,10 +285,10 @@ class Graph(object):
         if t:
             Warning("Some skim field with wrong type. Converting to float64")
             for i, j in enumerate(skim_fields):
-                self.skims[:, i] = self.graph[j].astype(self.__float_type)
+                self.skims[:, i] = self.graph[j].astype(self.__float_type).values[:]
         else:
             for i, j in enumerate(skim_fields):
-                self.skims[:, i] = self.graph[j]
+                self.skims[:, i] = self.graph[j].values[:]
         self.skim_fields = skim_fields
 
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
