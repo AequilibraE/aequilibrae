@@ -169,10 +169,10 @@ class Graph(object):
         df.loc[:, "id"] = np.arange(df.shape[0])
         self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
         self.fs.fill(-1)
-        _, x, _ = np.intersect1d(df.a_node, nlist, assume_unique=False, return_indices=True)
+        y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
         del nlist
-        self.fs[: x.shape[0]] = x[:]
-        self.fs[self.num_nodes] = df.shape[0]
+        self.fs[y] = x[:]
+        self.fs[-1] = df.shape[0]
         for i in range(self.num_nodes, 1, -1):
             if self.fs[i - 1] == -1:
                 self.fs[i - 1] = self.fs[i]
