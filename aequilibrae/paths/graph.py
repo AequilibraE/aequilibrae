@@ -159,11 +159,10 @@ class Graph(object):
         self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
         self.nodes_to_indices.fill(-1)
         self.nodes_to_indices[self.all_nodes] = np.arange(self.num_nodes)
-
         self.num_links = df.shape[0]
 
-        df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node][:]
-        df.loc[:, "b_node"] = self.nodes_to_indices[df.b_node][:]
+        df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node.values][:]
+        df.loc[:, "b_node"] = self.nodes_to_indices[df.b_node.values][:]
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
         df.loc[:, "id"] = np.arange(df.shape[0])
@@ -259,9 +258,9 @@ class Graph(object):
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:
-                self.cost = self.graph[cost_field].values
+                self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:
-                self.cost = self.graph[cost_field].astype(self.__float_type).values
+                self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
                 warn("Cost field with wrong type. Converting to float64")
         else:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
