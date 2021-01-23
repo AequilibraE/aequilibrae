@@ -158,7 +158,8 @@ class Graph(object):
         self.num_nodes = self.all_nodes.shape[0]
         self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
         self.nodes_to_indices.fill(-1)
-        self.nodes_to_indices[self.all_nodes] = np.arange(self.num_nodes)
+        nlist = np.arange(self.num_nodes)
+        self.nodes_to_indices[self.all_nodes] = nlist
         self.num_links = df.shape[0]
 
         df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node.values][:]
@@ -168,9 +169,8 @@ class Graph(object):
         df.loc[:, "id"] = np.arange(df.shape[0])
         self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
         self.fs.fill(-1)
-        x = np.arange(self.num_nodes + 1, dtype=self.__integer_type)
-
-        _, _, x = np.intersect1d(x, df.a_node.values, assume_unique=False, return_indices=True)
+        _, x, _ = np.intersect1d(df.a_node, nlist, assume_unique=False, return_indices=True)
+        del nlist
         self.fs[: x.shape[0]] = x[:]
         self.fs[self.num_nodes] = df.shape[0]
         for i in range(self.num_nodes, 1, -1):
