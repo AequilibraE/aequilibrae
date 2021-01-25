@@ -130,7 +130,7 @@ class Graph(object):
                 neg_names.append(name + "_ba")
         not_pos = pd.DataFrame(not_pos, copy=True)[neg_names]
         not_pos.columns = names
-        not_pos.loc[:, "direction"] = 1
+        not_pos.loc[:, "direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
         not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
         not_pos.loc[:, "b_node"] = aux[:]
