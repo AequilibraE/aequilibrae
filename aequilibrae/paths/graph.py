@@ -39,14 +39,13 @@ class Graph(object):
         self.num_zones = -1
         self.network = pd.DataFrame([])  # This method will hold ALL information on the network
         self.graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
+        self.compact_graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
         self.all_nodes = False  # Holds an array with all nodes in the original network
         self.nodes_to_indices = False  # Holds the reverse of the all_nodes
-        self.fs = False  # This method will hold the forward star for the graph
-        self.b_node = False  # b node for each directed link
-
-        self.cost = None  # This array holds the values being used in the shortest path routine
+        self.fs = np.array([])  # This method will hold the forward star for the graph
+        self.cost = np.array([])  # This array holds the values being used in the shortest path routine
         self.capacity = None  # Array holds the capacity for links
         self.free_flow_time = None  # Array holds the free flow travel time by link
         self.skims = None
@@ -60,17 +59,16 @@ class Graph(object):
 
         self.centroids = None  # NumPy array of centroid IDs
 
-        self.network_ok = False
+        self.compressed_fs = np.array([])  # This method will hold the forward star for the graph
+        self.compressed_cost = np.array([])  # This array holds the values being used in the shortest path routine
+        self.compressed_nodes = 0
+        self.compressed_links = 0
+        self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
+
         self.__version__ = VERSION
 
         # Randomly generate a unique Graph ID randomly
         self.__id__ = uuid.uuid4().hex
-        self.__source__ = None  # Name of the file that originated the graph
-
-        # In case the graph is generated in QGIS, it is useful to have the name of the layer and fields that originated
-        # it
-        self.__field_name__ = None
-        self.__layer_name__ = None
 
     def default_types(self, tp: str):
         """
@@ -103,19 +101,19 @@ class Graph(object):
         self.__network_error_checking__()
 
         # Creates the centroids
-        if centroids is not None and isinstance(centroids, np.ndarray):
-            if np.issubdtype(centroids.dtype, np.integer):
-                if centroids.shape[0] > 0:
-                    if centroids.min() <= 0:
-                        raise ValueError("Centroid IDs need to be positive")
-                    else:
-                        if centroids.shape[0] != np.unique(centroids).shape[0]:
-                            raise ValueError("Centroid IDs are not unique")
-                self.centroids = np.array(list(centroids), np.uint32)
-            else:
-                raise ValueError("Centroids need to be an array of integers 64 bits")
-        else:
+
+        if centroids is None or not isinstance(centroids, np.ndarray):
             raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
+        if not np.issubdtype(centroids.dtype, np.integer):
+            raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
+        if centroids.shape[0] == 0:
+            raise ValueError("You need at least one centroid")
+        if centroids.min() <= 0:
+            raise ValueError("Centroid IDs need to be positive")
+        if centroids.shape[0] != np.unique(centroids).shape[0]:
+            raise ValueError("Centroid IDs are not unique")
+        self.centroids = np.array(centroids, np.uint32)
+
         self.__build_derived_properties()
 
         all_titles = list(self.network.columns)
@@ -170,7 +168,6 @@ class Graph(object):
         self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
         self.fs.fill(-1)
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
-        del nlist
         self.fs[y] = x[:]
         self.fs[-1] = df.shape[0]
         for i in range(self.num_nodes, 1, -1):
@@ -183,6 +180,83 @@ class Graph(object):
         self.graph = df
         self.ids = self.graph.id.values.astype(self.__integer_type)
         self.__build_arrays_for_computation()
+
+    def __build_compressed_graph(self) -> None:
+        self.g_link_crosswalk = np.zeros(self.graph.shape[0], self.__integer_type)
+
+        # Build link index
+        link_idx = np.empty(self.network["link_id"].max() + 1).astype(np.int)
+        link_idx[self.network["link_id"]] = np.arange(self.network.shape[0])
+
+        list_nodes = np.unique(np.hstack([self.network["a_node"], self.network["b_node"]]))
+        links_index = {x: [] for x in list_nodes}
+        for i in self.network:
+            links_index[i["a_node"]].append(i["link_id"])
+            links_index[i["b_node"]].append(i["link_id"])
+
+        nodes = np.hstack([self.network["a_node"], self.network["b_node"]])
+        counts = np.bincount(nodes)
+        # We don't want to merge centroids out of existence, obviously
+        counts[self.centroids] = 999
+
+        truth = (counts == 2).astype(np.int)
+        link_edge = truth[self.network.a_node] + truth[self.network.b_node]
+        link_edge = self.network.link_id[link_edge == 1]
+
+        simplified_links = np.empty(self.network["link_id"].max() + 1)
+        simplified_links.fill(-1)
+        simplified_links = simplified_links.astype(np.int)
+
+        # slink_directions = np.zeros(self.network["link_id"].max() + 1)
+
+        slink = 0
+        major_nodes = {}
+        for pre_link in link_edge:
+            if simplified_links[pre_link] >= 0:
+                continue
+
+            ab_dir = 1
+            ba_dir = 1
+            lidx = link_idx[pre_link]
+            a_node = self.network["a_node"][lidx]
+            b_node = self.network["b_node"][lidx]
+            direction = self.network["direction"][lidx]
+            n = a_node if counts[a_node] == 2 else b_node
+            first_node = b_node if counts[a_node] == 2 else a_node
+            ab_dir = (
+                0 if (first_node == a_node and direction < 0) or (first_node == b_node and direction > 0) else ab_dir
+            )
+            ba_dir = (
+                0 if (first_node == a_node and direction > 0) or (first_node == b_node and direction < 0) else ba_dir
+            )
+
+            while counts[n] == 2:
+                simplified_links[pre_link] = slink
+                for lnk in links_index[n]:
+                    if lnk == pre_link:
+                        continue
+                    break
+                pre_link = lnk
+                lidx = link_idx[pre_link]
+                a_node = self.network["a_node"][lidx]
+                b_node = self.network["b_node"][lidx]
+                direction = self.network["direction"][lidx]
+                ab_dir = 0 if (n == a_node and direction < 0) or (n == b_node and direction > 0) else ab_dir
+                ba_dir = 0 if (n == a_node and direction > 0) or (n == b_node and direction < 0) else ba_dir
+
+                n = self.network["a_node"][lidx] if n == self.network["b_node"][lidx] else self.network["b_node"][lidx]
+
+            if min(ab_dir, ba_dir) < 1:
+                print(1)
+            simplified_links[pre_link] = slink
+            last_node = b_node if counts[a_node] == 2 else a_node
+            major_nodes[slink] = [first_node, last_node]
+            slink += 1
+
+        for link in self.network["link_id"]:
+            if simplified_links[link] < 0:
+                simplified_links[link] = slink
+                slink += 1
 
     def exclude_links(self, links: list) -> None:
         """
@@ -222,6 +296,9 @@ class Graph(object):
         return fields, types
 
     def __build_arrays_for_computation(self):
+        self.graph.loc[:, "b_node"] = self.graph.b_node.values.astype(self.__integer_type)
+        self.graph.loc[:, "link_id"] = self.graph.link_id.values.astype(self.__integer_type)
+        self.graph.loc[:, "direction"] = self.graph.direction.values.astype(np.int8)
         self._comp_b_node = np.array(self.graph.b_node.values.astype(self.__integer_type), copy=True)
         self._comp_link_id = np.array(self.graph.link_id.values.astype(self.__integer_type), copy=True)
         self._comp_direction = np.array(self.graph.direction.values.astype(self.__integer_type), copy=True)
@@ -310,14 +387,12 @@ class Graph(object):
         Args:
             block_centroid_flows (:obj:`bool`): Blocking or not
         """
-        if isinstance(block_centroid_flows, bool):
-            if self.num_zones == 0:
-                warn("No centroids in the model. Nothing to block")
-            else:
-                self.block_centroid_flows = block_centroid_flows
-                self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-        else:
+        if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
+        if self.num_zones == 0:
+            warn("No centroids in the model. Nothing to block")
+            return
+        self.block_centroid_flows = block_centroid_flows
 
     # Procedure to pickle graph and save to disk
     def save_to_disk(self, filename: str) -> None:
@@ -337,7 +412,6 @@ class Graph(object):
         mygraph["nodes_to_indices"] = self.nodes_to_indices
         mygraph["num_nodes"] = self.num_nodes
         mygraph["fs"] = self.fs
-        mygraph["b_node"] = self.b_node
         mygraph["cost"] = self.cost
         mygraph["cost_field"] = self.cost_field
         mygraph["skims"] = self.skims
@@ -345,7 +419,6 @@ class Graph(object):
         mygraph["ids"] = self.ids
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
-        mygraph["network_ok"] = self.network_ok
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
         mygraph["mode"] = self.mode
@@ -371,7 +444,6 @@ class Graph(object):
             self.nodes_to_indices = mygraph["nodes_to_indices"]
             self.num_nodes = mygraph["num_nodes"]
             self.fs = mygraph["fs"]
-            self.b_node = mygraph["b_node"]
             self.cost = mygraph["cost"]
             self.cost_field = mygraph["cost_field"]
             self.skims = mygraph["skims"]
@@ -379,18 +451,15 @@ class Graph(object):
             self.ids = mygraph["ids"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
-            self.network_ok = mygraph["network_ok"]
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 
     def __build_derived_properties(self):
-        if self.centroids is not None:
-            if self.centroids.shape:
-                self.num_zones = self.centroids.shape[0]
-            else:
-                self.num_zones = 0
+        if self.centroids is None:
+            return
+        self.num_zones = self.centroids.shape[0] if self.centroids.shape else 0
 
     def available_skims(self) -> List[str]:
         """

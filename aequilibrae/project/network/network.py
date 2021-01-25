@@ -272,8 +272,6 @@ class Network:
             g = Graph()
             g.mode = m
             g.network = net
-            g.network_ok = True
-            g.status = "OK"
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             self.graphs[m] = g

@@ -33,6 +33,6 @@ class MultiThreadedAoN:
         self.connectors = np.zeros((results.nodes, results.cores), dtype=itype)
         self.temp_link_loads = np.zeros((results.links, results.classes["number"], results.cores), dtype=ftype)
         self.temp_node_loads = np.zeros((results.nodes, results.classes["number"], results.cores), dtype=ftype)
-        self.temp_b_nodes = np.zeros((graph.b_node.shape[0], results.cores), dtype=itype)
+        self.temp_b_nodes = np.zeros((graph.graph.b_node.shape[0], results.cores), dtype=itype)
         for i in range(results.cores):
-            self.temp_b_nodes[:, i] = graph.b_node[:]
+            self.temp_b_nodes[:, i] = graph.graph.b_node.values[:]

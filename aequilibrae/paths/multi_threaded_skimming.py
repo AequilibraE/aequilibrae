@@ -22,7 +22,7 @@ class MultiThreadedNetworkSkimming:
         self.temporary_skims = np.zeros((results.nodes, results.num_skims, results.cores), dtype=ftype)
         self.reached_first = np.zeros((results.nodes, results.cores), dtype=itype)
         self.connectors = np.zeros((results.nodes, results.cores), dtype=itype)
-        self.temp_b_nodes = np.zeros((graph.b_node.shape[0], results.cores), dtype=itype)
+        self.temp_b_nodes = np.zeros((graph.graph.b_node.values.shape[0], results.cores), dtype=itype)
 
         for i in range(results.cores):
-            self.temp_b_nodes[:, i] = graph.b_node
+            self.temp_b_nodes[:, i] = graph.graph.b_node.values[:]
