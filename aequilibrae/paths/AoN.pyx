@@ -69,7 +69,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # views from the graph
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:] g_view = graph.cost
-    cdef long long [:] ids_graph_view = graph.ids
+    cdef long long [:] ids_graph_view = graph.graph.id.values
     cdef long long [:] all_nodes_view = graph.all_nodes
     cdef long long [:] original_b_nodes_view = graph.graph.b_node.values
 
@@ -231,7 +231,7 @@ def path_computation(origin, destination, graph, results):
     cdef long long [:] original_b_nodes_view = graph.graph.b_node.values
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef long long [:] ids_graph_view = graph.ids
+    cdef long long [:] ids_graph_view = graph.graph.id.values
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [:] predecessors_view = results.predecessors
@@ -358,10 +358,9 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef long long nodes, orig, origin_index, i, block_flows_through_centroids, skims, zones, b
     #We transform the python variables in Cython variables
     orig = origin
-    origin_index = graph.nodes_to_indices[orig]
+    origin_index = graph.compact_nodes_to_indices[orig]
 
-    graph_fs = graph.fs
-
+    graph_fs = graph.compact_fs
     if result.__graph_id__ != graph.__id__:
 
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -369,7 +368,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if orig not in graph.centroids:
         raise ValueError("Centroid " + str(orig) + " is outside the range of zones in the graph")
 
-    if origin_index > graph.num_nodes:
+    if origin_index > graph.compact_num_nodes:
         raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
     if graph_fs[origin_index] == graph_fs[origin_index + 1]:
@@ -378,7 +377,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if VERSION_COMPILED != graph.__version__:
         raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
-    nodes = graph.num_nodes + 1
+    nodes = graph.compact_num_nodes + 1
     zones = graph.num_zones
     block_flows_through_centroids = graph.block_centroid_flows
     skims = result.num_skims
@@ -387,11 +386,11 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # memory views we will need
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph.fs
-    cdef double [:] g_view = graph.cost
-    cdef long long [:] ids_graph_view = graph.ids
-    cdef long long [:] original_b_nodes_view = graph.graph.b_node.values
-    cdef double [:, :] graph_skim_view = graph.skims[:, :]
+    cdef long long [:] graph_fs_view = graph_fs
+    cdef double [:] g_view = graph.compact_cost
+    cdef long long [:] ids_graph_view = graph.compact_graph.id.values
+    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 

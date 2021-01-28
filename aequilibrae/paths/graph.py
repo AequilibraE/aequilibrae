@@ -37,32 +37,41 @@ class Graph(object):
         self.num_links = -1
         self.num_nodes = -1
         self.num_zones = -1
+
+        self.compact_num_links = -1
+        self.compact_num_nodes = -1
+
         self.network = pd.DataFrame([])  # This method will hold ALL information on the network
         self.graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
+
+        self.compact_network = pd.DataFrame([])  # This method will hold info on the network without middle nodes
         self.compact_graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
-        self.all_nodes = False  # Holds an array with all nodes in the original network
-        self.nodes_to_indices = False  # Holds the reverse of the all_nodes
+        self.all_nodes = np.array(0)  # Holds an array with all nodes in the original network
+        self.nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
         self.fs = np.array([])  # This method will hold the forward star for the graph
         self.cost = np.array([])  # This array holds the values being used in the shortest path routine
-        self.capacity = None  # Array holds the capacity for links
-        self.free_flow_time = None  # Array holds the free flow travel time by link
         self.skims = None
+
+        self.compact_all_nodes = np.array(0)  # Holds an array with all nodes in the original network
+        self.compact_nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
+        self.compact_fs = np.array([])  # This method will hold the forward star for the graph
+        self.compact_cost = np.array([])  # This array holds the values being used in the shortest path routine
+        self.compact_skims = None
+
+        self.capacity = np.array([])  # Array holds the capacity for links
+        self.free_flow_time = np.array([])  # Array holds the free flow travel time by link
+
         # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
-        self.ids = np.array(0)  # 1-D Array with link IDs (sequence from 0 to N-1)
 
         self.block_centroid_flows = True
         self.penalty_through_centroids = np.inf
 
         self.centroids = None  # NumPy array of centroid IDs
 
-        self.compressed_fs = np.array([])  # This method will hold the forward star for the graph
-        self.compressed_cost = np.array([])  # This array holds the values being used in the shortest path routine
-        self.compressed_nodes = 0
-        self.compressed_links = 0
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
         self.__version__ = VERSION
@@ -114,12 +123,191 @@ class Graph(object):
             raise ValueError("Centroid IDs are not unique")
         self.centroids = np.array(centroids, np.uint32)
 
+        properties = self.__build_directed_graph(self.network, centroids)
+        self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
+        self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
 
-        all_titles = list(self.network.columns)
+        self.__build_compressed_graph()
+        self.compact_num_links = self.compact_graph.shape[0]
 
-        not_pos = self.network.loc[self.network.direction != 1, :]
-        not_negs = self.network.loc[self.network.direction != -1, :]
+    def __build_compressed_graph(self):
+        # Build link index
+        link_idx = np.empty(self.network.link_id.max() + 1).astype(np.int)
+        link_idx[self.network.link_id] = np.arange(self.network.shape[0])
+
+        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
+        links = np.hstack([self.network.link_id.values, self.network.link_id.values])
+
+        idx = np.argsort(nodes)
+        all_nodes = nodes[idx]
+        all_links = links[idx]
+        links_index = np.empty(all_nodes.max() + 1, np.int64)
+        links_index.fill(-1)
+        nlist = np.arange(all_nodes.max())
+
+        y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
+        links_index[y] = x[:]
+        links_index[-1] = all_links.shape[0]
+        for i in range(all_nodes.max(), 1, -1):
+            links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
+
+        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
+        counts = np.bincount(nodes)
+        counts[self.centroids] = 999
+
+        truth = (counts == 2).astype(np.int)
+        link_edge = truth[self.network.a_node.values] + truth[self.network.b_node.values]
+        link_edge = self.network.link_id.values[link_edge == 1]
+
+        simplified_links = np.empty(self.network.link_id.max() + 1)
+        simplified_links.fill(-1)
+        simplified_links = simplified_links.astype(np.int)
+        simplified_directions = np.zeros(self.network.link_id.max() + 1, np.int)
+
+        compressed_dir = np.zeros(self.network.link_id.max() + 1, np.int)
+        compressed_a_node = np.zeros(self.network.link_id.max() + 1, np.int)
+        compressed_b_node = np.zeros(self.network.link_id.max() + 1, np.int)
+
+        slink = 0
+        major_nodes = {}
+        tot = 0
+        tot_graph_add = 0
+        for pre_link in link_edge:
+            if simplified_links[pre_link] >= 0:
+                continue
+            ab_dir = 1
+            ba_dir = 1
+            lidx = link_idx[pre_link]
+            a_node = self.network.a_node.values[lidx]
+            b_node = self.network.b_node.values[lidx]
+            drc = self.network.direction.values[lidx]
+            n = a_node if counts[a_node] == 2 else b_node
+            first_node = b_node if counts[a_node] == 2 else a_node
+
+            ab_dir = 0 if (first_node == a_node and drc < 0) or (first_node == b_node and drc > 0) else ab_dir
+            ba_dir = 0 if (first_node == a_node and drc > 0) or (first_node == b_node and drc < 0) else ba_dir
+
+            while counts[n] == 2:
+                if simplified_links[pre_link] >= 0:
+                    raise Exception("How the heck did this happen?")
+                simplified_links[pre_link] = slink
+                simplified_directions[pre_link] = 1 if a_node == n else -1
+                for k in range(links_index[n], links_index[n + 1]):
+                    lnk = all_links[k]
+                    if lnk == pre_link:
+                        continue
+                    break
+                if lnk == pre_link:
+                    raise Exception("How the heck did this happen again?")
+                pre_link = lnk
+                lidx = link_idx[pre_link]
+                a_node = self.network.a_node.values[lidx]
+                b_node = self.network.b_node.values[lidx]
+                drc = self.network.direction.values[lidx]
+                ab_dir = 0 if (n == a_node and drc < 0) or (n == b_node and drc > 0) else ab_dir
+                ba_dir = 0 if (n == a_node and drc > 0) or (n == b_node and drc < 0) else ba_dir
+                n = (
+                    self.network.a_node.values[lidx]
+                    if n == self.network.b_node.values[lidx]
+                    else self.network.b_node.values[lidx]
+                )
+
+            if max(ab_dir, ba_dir) < 1:
+                tot += 1
+
+            tot_graph_add += ab_dir + ba_dir
+            simplified_links[pre_link] = slink
+            simplified_directions[pre_link] = 1 if a_node == n else -1
+            last_node = b_node if counts[a_node] == 2 else a_node
+            major_nodes[slink] = [first_node, last_node]
+
+            # Available directions are NOT indexed like the other arrays
+            compressed_a_node[slink] = first_node
+            compressed_b_node[slink] = last_node
+            if ab_dir > 0:
+                if ba_dir > 0:
+                    compressed_dir[slink] = 0
+                else:
+                    compressed_dir[slink] = 1
+            elif ba_dir > 0:
+                compressed_dir[slink] = -1
+            else:
+                compressed_dir[slink] = -999
+            slink += 1
+
+        links_to_remove = np.argwhere(simplified_links >= 0)
+        df = pd.DataFrame(self.network, copy=True)
+        df = df[~df.link_id.isin(links_to_remove[:, 0])]
+
+        comp_lnk = pd.DataFrame(
+            {
+                "a_node": compressed_a_node[:slink],
+                "b_node": compressed_b_node[:slink],
+                "direction": compressed_dir[:slink],
+                # '__augmented_link_id__': np.arange(slink),
+                "distance": np.zeros(slink, dtype=np.float64),
+            }
+        )
+
+        df = pd.concat([df, comp_lnk])
+
+        self.compact_network = df
+        properties = self.__build_directed_graph(df, self.centroids)
+        self.compact_all_nodes = properties[0]
+        self.compact_num_nodes = properties[1]
+        self.compact_nodes_to_indices = properties[2]
+        self.compact_fs = properties[3]
+        self.compact_graph = properties[4]
+
+        # indices = pd.DataFrame(self.graph[['id', 'link_id', 'direction']], copy=True)
+        # indices.loc[:, 'link_id'] = indices.link_id * indices.direction
+        # indices.set_index('link_id', inplace=True)
+
+        #
+        # comp_lnk_ab = pd.DataFrame(comp_lnk[comp_lnk.direction >= 0])
+        # comp_lnk_ab.loc[:, 'direction'] = 1
+        #
+        # comp_lnk_ba = pd.DataFrame(comp_lnk[comp_lnk.direction <= 0])
+        # comp_lnk_ba.loc[:, "direction"] = -1
+        # aux = np.array(comp_lnk_ba.a_node.values, copy=True)
+        # comp_lnk_ba.loc[:, "a_node"] = comp_lnk_ba.loc[:, "b_node"]
+        # comp_lnk_ba.loc[:, "b_node"] = aux[:]
+        #
+        # df = pd.concat([df, comp_lnk_ab, comp_lnk_ba])
+        # df = df.assign(__new_id__=0)
+        #
+        # # centroids will not change their IDs, as they are kept the same (the first N nodes in the graph)
+        # nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(np.int64)
+        # nodes = np.setdiff1d(nodes, self.centroids, assume_unique=True)
+        # compress_nodes = np.hstack((self.centroids, nodes)).astype(np.int64)
+        # compress_num_nodes = compress_nodes.shape[0]
+        # # nodes_to_indices = np.empty(int(compress_nodes.max()) + 1, np.int64)
+        # # nodes_to_indices.fill(-1)
+        # nlist = np.arange(compress_num_nodes)
+        # # nodes_to_indices[compress_nodes] = nlist
+        # num_links = df.shape[0]
+        # # df = df.sort_values(by=["a_node", "b_node"])
+        # # df.loc[:, "a_node"] = nodes_to_indices[df.a_node.values][:]
+        # # df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
+        # df = df.sort_values(by=["a_node", "b_node"])
+        # df.index = np.arange(df.shape[0])
+        # df.loc[:, "__new_id__"] = np.arange(df.shape[0])
+        # df.loc[:, 'id'] = df.__new_id__[:]
+        # compressed_fs = np.empty(compress_num_nodes + 1, dtype=np.int64)
+        # compressed_fs.fill(-1)
+        # y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
+        # compressed_fs[y] = x[:]
+        # compressed_fs[-1] = df.shape[0]
+        # for i in range(compress_num_nodes, 1, -1):
+        #     if compressed_fs[i - 1] == -1:
+        #         compressed_fs[i - 1] = compressed_fs[i]
+
+    def __build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
+        all_titles = list(network.columns)
+
+        not_pos = network.loc[network.direction != 1, :]
+        not_negs = network.loc[network.direction != -1, :]
 
         names, types = self.__build_column_names(all_titles)
         neg_names = []
@@ -151,112 +339,38 @@ class Graph(object):
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
         nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
-        self.all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
+        all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
-        self.num_nodes = self.all_nodes.shape[0]
-        self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
-        self.nodes_to_indices.fill(-1)
-        nlist = np.arange(self.num_nodes)
-        self.nodes_to_indices[self.all_nodes] = nlist
-        self.num_links = df.shape[0]
+        num_nodes = all_nodes.shape[0]
+        nodes_to_indices = np.empty(int(all_nodes.max()) + 1, self.__integer_type)
+        nodes_to_indices.fill(-1)
+        nlist = np.arange(num_nodes)
+        nodes_to_indices[all_nodes] = nlist
 
-        df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node.values][:]
-        df.loc[:, "b_node"] = self.nodes_to_indices[df.b_node.values][:]
+        df.loc[:, "a_node"] = nodes_to_indices[df.a_node.values][:]
+        df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
         df.loc[:, "id"] = np.arange(df.shape[0])
-        self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
-        self.fs.fill(-1)
+        fs = np.empty(num_nodes + 1, dtype=self.__integer_type)
+        fs.fill(-1)
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
-        self.fs[y] = x[:]
-        self.fs[-1] = df.shape[0]
-        for i in range(self.num_nodes, 1, -1):
-            if self.fs[i - 1] == -1:
-                self.fs[i - 1] = self.fs[i]
+        fs[y] = x[:]
+        fs[-1] = df.shape[0]
+        for i in range(num_nodes, 1, -1):
+            if fs[i - 1] == -1:
+                fs[i - 1] = fs[i]
 
         nans = ",".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
             logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
-        self.graph = df
-        self.ids = self.graph.id.values.astype(self.__integer_type)
-        self.__build_arrays_for_computation()
 
-    def __build_compressed_graph(self) -> None:
-        self.g_link_crosswalk = np.zeros(self.graph.shape[0], self.__integer_type)
+        df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
+        df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
+        df.loc[:, "link_id"] = df.link_id.values.astype(self.__integer_type)
+        df.loc[:, "direction"] = df.direction.values.astype(np.int8)
 
-        # Build link index
-        link_idx = np.empty(self.network["link_id"].max() + 1).astype(np.int)
-        link_idx[self.network["link_id"]] = np.arange(self.network.shape[0])
-
-        list_nodes = np.unique(np.hstack([self.network["a_node"], self.network["b_node"]]))
-        links_index = {x: [] for x in list_nodes}
-        for i in self.network:
-            links_index[i["a_node"]].append(i["link_id"])
-            links_index[i["b_node"]].append(i["link_id"])
-
-        nodes = np.hstack([self.network["a_node"], self.network["b_node"]])
-        counts = np.bincount(nodes)
-        # We don't want to merge centroids out of existence, obviously
-        counts[self.centroids] = 999
-
-        truth = (counts == 2).astype(np.int)
-        link_edge = truth[self.network.a_node] + truth[self.network.b_node]
-        link_edge = self.network.link_id[link_edge == 1]
-
-        simplified_links = np.empty(self.network["link_id"].max() + 1)
-        simplified_links.fill(-1)
-        simplified_links = simplified_links.astype(np.int)
-
-        # slink_directions = np.zeros(self.network["link_id"].max() + 1)
-
-        slink = 0
-        major_nodes = {}
-        for pre_link in link_edge:
-            if simplified_links[pre_link] >= 0:
-                continue
-
-            ab_dir = 1
-            ba_dir = 1
-            lidx = link_idx[pre_link]
-            a_node = self.network["a_node"][lidx]
-            b_node = self.network["b_node"][lidx]
-            direction = self.network["direction"][lidx]
-            n = a_node if counts[a_node] == 2 else b_node
-            first_node = b_node if counts[a_node] == 2 else a_node
-            ab_dir = (
-                0 if (first_node == a_node and direction < 0) or (first_node == b_node and direction > 0) else ab_dir
-            )
-            ba_dir = (
-                0 if (first_node == a_node and direction > 0) or (first_node == b_node and direction < 0) else ba_dir
-            )
-
-            while counts[n] == 2:
-                simplified_links[pre_link] = slink
-                for lnk in links_index[n]:
-                    if lnk == pre_link:
-                        continue
-                    break
-                pre_link = lnk
-                lidx = link_idx[pre_link]
-                a_node = self.network["a_node"][lidx]
-                b_node = self.network["b_node"][lidx]
-                direction = self.network["direction"][lidx]
-                ab_dir = 0 if (n == a_node and direction < 0) or (n == b_node and direction > 0) else ab_dir
-                ba_dir = 0 if (n == a_node and direction > 0) or (n == b_node and direction < 0) else ba_dir
-
-                n = self.network["a_node"][lidx] if n == self.network["b_node"][lidx] else self.network["b_node"][lidx]
-
-            if min(ab_dir, ba_dir) < 1:
-                print(1)
-            simplified_links[pre_link] = slink
-            last_node = b_node if counts[a_node] == 2 else a_node
-            major_nodes[slink] = [first_node, last_node]
-            slink += 1
-
-        for link in self.network["link_id"]:
-            if simplified_links[link] < 0:
-                simplified_links[link] = slink
-                slink += 1
+        return all_nodes, num_nodes, nodes_to_indices, fs, df
 
     def exclude_links(self, links: list) -> None:
         """
@@ -295,14 +409,6 @@ class Graph(object):
                     types.append(self.network[column].dtype)
         return fields, types
 
-    def __build_arrays_for_computation(self):
-        self.graph.loc[:, "b_node"] = self.graph.b_node.values.astype(self.__integer_type)
-        self.graph.loc[:, "link_id"] = self.graph.link_id.values.astype(self.__integer_type)
-        self.graph.loc[:, "direction"] = self.graph.direction.values.astype(np.int8)
-        self._comp_b_node = np.array(self.graph.b_node.values.astype(self.__integer_type), copy=True)
-        self._comp_link_id = np.array(self.graph.link_id.values.astype(self.__integer_type), copy=True)
-        self._comp_direction = np.array(self.graph.direction.values.astype(self.__integer_type), copy=True)
-
     def __build_dtype(self, all_titles) -> list:
         dtype = [
             ("link_id", self.__integer_type),
@@ -336,8 +442,10 @@ class Graph(object):
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
+                self.compact_cost = np.array(self.compact_graph[cost_field].values, copy=True)
             else:
                 self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+                self.compact_cost = np.array(self.compact_graph[cost_field].values, dtype=self.__float_type)
                 warn("Cost field with wrong type. Converting to float64")
         else:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
@@ -353,7 +461,7 @@ class Graph(object):
         """
         if not skim_fields:
             self.skim_fields = []
-            self.skims = None
+            self.skims = np.array([])
 
         if isinstance(skim_fields, str):
             skim_fields = [skim_fields]
@@ -368,14 +476,17 @@ class Graph(object):
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
+        self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
 
         if t:
             Warning("Some skim field with wrong type. Converting to float64")
             for i, j in enumerate(skim_fields):
                 self.skims[:, i] = self.graph[j].astype(self.__float_type).values[:]
+                self.compact_skims[:, i] = self.compact_graph[j].astype(self.__float_type).values[:]
         else:
             for i, j in enumerate(skim_fields):
                 self.skims[:, i] = self.graph[j].values[:]
+                self.compact_skims[:, i] = self.compact_graph[j].values[:]
         self.skim_fields = skim_fields
 
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
@@ -416,7 +527,6 @@ class Graph(object):
         mygraph["cost_field"] = self.cost_field
         mygraph["skims"] = self.skims
         mygraph["skim_fields"] = self.skim_fields
-        mygraph["ids"] = self.ids
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
         mygraph["graph_id"] = self.__id__
@@ -448,7 +558,6 @@ class Graph(object):
             self.cost_field = mygraph["cost_field"]
             self.skims = mygraph["skims"]
             self.skim_fields = mygraph["skim_fields"]
-            self.ids = mygraph["ids"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
             self.__id__ = mygraph["graph_id"]
