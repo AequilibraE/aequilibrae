@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime
 from warnings import warn
 from typing import List
-
 import numpy as np
+import pandas as pd
 from aequilibrae.starts_logging import logger
 from .__version__ import binary_version as VERSION
 
@@ -20,10 +20,16 @@ class Graph(object):
         self.__integer_type = np.int64
         self.__float_type = np.float64
 
-        self.required_default_fields = []
-        self.__reset_single_fields()
+        self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
+        self.__required_default_types = [
+            self.__integer_type,
+            self.__integer_type,
+            self.__integer_type,
+            np.int8,
+            self.__integer_type,
+        ]
         self.other_fields = ""
-        self.mode = ''
+        self.mode = ""
         self.date = str(datetime.now())
 
         self.description = "No description added so far"
@@ -31,8 +37,8 @@ class Graph(object):
         self.num_links = -1
         self.num_nodes = -1
         self.num_zones = -1
-        self.network = False  # This method will hold ALL information on the network
-        self.graph = False  # This method will hold an array with ALL fields in the graph.
+        self.network = pd.DataFrame([])  # This method will hold ALL information on the network
+        self.graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
         self.all_nodes = False  # Holds an array with all nodes in the original network
@@ -47,16 +53,14 @@ class Graph(object):
         # sake of the Cython code
         self.skim_fields = []  # List of skim fields to be used in computation
         self.cost_field = False  # Name of the cost field
-        self.ids = False  # 1-D Array with link IDs (sequence from 0 to N-1)
+        self.ids = np.array(0)  # 1-D Array with link IDs (sequence from 0 to N-1)
 
         self.block_centroid_flows = True
         self.penalty_through_centroids = np.inf
 
         self.centroids = None  # NumPy array of centroid IDs
 
-        self.status = "NO network loaded"
         self.network_ok = False
-        self.type_loaded = False
         self.__version__ = VERSION
 
         # Randomly generate a unique Graph ID randomly
@@ -81,148 +85,6 @@ class Graph(object):
             return self.__float_type
         else:
             raise ValueError("It must be either a int or a float")
-
-    def create_from_geography(
-            self,
-            geo_file: str,
-            id_field: str,
-            dir_field: str,
-            cost_field: str,
-            centroids: np.ndarray,
-            skim_fields=[],
-            anode="A_NODE",
-            bnode="B_NODE",
-    ) -> None:
-        """
-        Creates a graph from a Shapefile. (Deprecated)
-
-        Args:
-            geo_file (:obj:`str`): Path to the geographic file to be used. File is usually the output of the network
-                                   preparation tool from the AequilibraE plugin for QGIS
-
-            id_field (:obj:`str`): Name of the field that has link IDs (must be unique)
-
-            dir_field (:obj:`str`): Name of the field that has the link directions of flow ([-1, 0, 1])
-
-            cost_field (:obj:`str`): Name of the field that has the cost data (field to minimized in shortest path)
-
-            centroids (:obj:`np.ndarray`): Numpy Array with a list of centroids included in this graph
-
-            skim_fields (:obj:`list`): List with the name of fields to be skimmed
-
-            anode (:obj:`str`): Name of the field with information of A_Node of links (if different than *A_NODE*)
-
-            bnode (:obj:`str`): Name of the field with information of B_Node of links (if different than *B_NODE*)
-        """
-
-        import shapefile
-
-        cost_field_name = cost_field
-        error = None
-        geo_file_records = shapefile.Reader(geo_file)
-        records = geo_file_records.records()
-
-        def find_field_index(fields, field_name):
-            for i, f in enumerate(fields):
-                if f[0] == field_name:
-                    return i - 1
-
-            f = [str(x[0]) for x in fields]
-            raise ValueError(field_name + " does not exist. Fields available are: " + ", ".join(f))
-
-        # collect the fields in the network
-        check_titles = [id_field, dir_field, anode, bnode, cost_field]
-        id_field = find_field_index(geo_file_records.fields, id_field)
-        dir_field = find_field_index(geo_file_records.fields, dir_field)
-        cost_field = find_field_index(geo_file_records.fields, cost_field)
-        anode = find_field_index(geo_file_records.fields, anode)
-        bnode = find_field_index(geo_file_records.fields, bnode)
-
-        # Appends all fields to the list of fields to be used
-        all_types = [
-            self.__integer_type,
-            self.__integer_type,
-            self.__integer_type,
-            self.__float_type,
-            np.int8,
-        ]
-        all_titles = [
-            "link_id",
-            "a_node",
-            "b_node",
-            cost_field_name,
-            "direction",
-        ]
-        check_fields = [id_field, dir_field, anode, bnode, cost_field]
-        types_to_check = [int, int, int, int, float]
-
-        # Loads the skim index fields
-        dict_field = {}
-        for k in skim_fields:
-            skim_index = find_field_index(geo_file_records.fields, k)
-            check_fields.append(skim_index)
-            check_titles.append(k)
-            types_to_check.append(float)
-
-            all_types.append(self.__float_type)
-            all_titles.append((k))
-            dict_field[k] = skim_index
-
-        dt = [(t, d) for t, d in zip(all_titles, all_types)]
-
-        # Check ID uniqueness and if there are any non-valid values
-        all_ids = []
-        for feat in records:
-            for i, j in enumerate(check_fields):
-                k = feat[j]
-                if not isinstance(k, types_to_check[i]):
-                    error = check_titles[i], "field has wrong type or empty values"
-                    break
-            all_ids.append(feat[check_fields[0]])
-            if error is not None:
-                break
-
-        if error is None:
-            # Checking uniqueness
-            all_ids = np.array(all_ids, np.int)
-            y = np.bincount(all_ids)
-            if np.max(y) > 1:
-                error = "IDs are not unique."
-
-        if error is None:
-            data = []
-
-            for feat in records:
-                line = []
-                line.append(feat[id_field])
-                line.append(feat[anode])
-                line.append(feat[bnode])
-                line.append(feat[cost_field])
-                line.append(feat[dir_field])
-
-                # We append the skims now
-                for k in all_titles:
-                    if k in dict_field:
-                        line.append(feat[dict_field[k]])
-                data.append(line)
-
-            network = np.asarray(data)
-            del data
-
-            self.network = np.zeros(network.shape[0], dtype=dt)
-            for k, t in enumerate(dt):
-                self.network[t[0]] = network[:, k].astype(t[1])
-            del network
-
-            self.type_loaded = "SHAPEFILE"
-            self.status = "OK"
-            self.network_ok = True
-            self.prepare_graph(centroids.astype(np.int64))
-            self.__source__ = geo_file
-            self.__field_name__ = None
-            self.__layer_name__ = None
-        if error is not None:
-            raise ValueError(error)
 
     def prepare_graph(self, centroids: np.ndarray) -> None:
         """
@@ -256,105 +118,71 @@ class Graph(object):
             raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
         self.__build_derived_properties()
 
-        if not self.network_ok:
-            raise ValueError("Network not yet properly loaded")
-        else:
-            all_titles = self.network.dtype.names
+        all_titles = list(self.network.columns)
 
-            if self.status == "OK":
-                negs = self.network[self.network["direction"] == -1]
-                poss = self.network[self.network["direction"] == 1]
-                zers = self.network[self.network["direction"] == 0]
+        not_pos = self.network.loc[self.network.direction != 1, :]
+        not_negs = self.network.loc[self.network.direction != -1, :]
 
-                self.num_links = negs.shape[0] + poss.shape[0]
-                self.num_links += zers.shape[0] * 2
+        names, types = self.__build_column_names(all_titles)
+        neg_names = []
+        for name in names:
+            if name in not_pos.columns:
+                neg_names.append(name)
+            elif name + "_ba" in not_pos.columns:
+                neg_names.append(name + "_ba")
+        not_pos = pd.DataFrame(not_pos, copy=True)[neg_names]
+        not_pos.columns = names
+        not_pos.loc[:, "direction"] = -1
+        aux = np.array(not_pos.a_node.values, copy=True)
+        not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
+        not_pos.loc[:, "b_node"] = aux[:]
+        del aux
 
-                dtype = self.__build_dtype(all_titles)
+        pos_names = []
+        for name in names:
+            if name in not_negs.columns:
+                pos_names.append(name)
+            elif name + "_ab" in not_negs.columns:
+                pos_names.append(name + "_ab")
+        not_negs = pd.DataFrame(not_negs, copy=True)[pos_names]
+        not_negs.columns = names
+        not_negs.loc[:, "direction"] = 1
 
-                self.graph = np.zeros(self.num_links, dtype=dtype)
-                a1 = negs.shape[0]
-                a2 = a1 + poss.shape[0]
-                a3 = a2 + zers.shape[0]
-                a4 = a3 + zers.shape[0]
+        df = pd.concat([not_negs, not_pos])
 
-                # Create the graph-specific node numbers
-                self.all_nodes = np.unique(np.hstack((self.network["a_node"], self.network["b_node"]))).astype(
-                    self.__integer_type
-                )
-                # We put the centroids as the first N elements of this array
-                if self.num_zones:
-                    for i in self.centroids:
-                        self.all_nodes = np.delete(self.all_nodes, np.argwhere(self.all_nodes == i))
+        # Now we take care of centroids
+        nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
+        nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
+        self.all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
-                self.all_nodes = np.hstack((centroids, self.all_nodes)).astype(self.__integer_type)
-                self.num_nodes = self.all_nodes.shape[0]
-                self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
-                self.nodes_to_indices.fill(-1)
-                self.nodes_to_indices[self.all_nodes] = np.arange(self.num_nodes)
+        self.num_nodes = self.all_nodes.shape[0]
+        self.nodes_to_indices = np.empty(int(self.all_nodes.max()) + 1, self.__integer_type)
+        self.nodes_to_indices.fill(-1)
+        nlist = np.arange(self.num_nodes)
+        self.nodes_to_indices[self.all_nodes] = nlist
+        self.num_links = df.shape[0]
 
-                for i in all_titles:
-                    if i == "link_id":
-                        self.graph[i][0:a1] = negs[i]
-                        self.graph[i][a1:a2] = poss[i]
-                        self.graph[i][a2:a3] = zers[i]
-                        self.graph[i][a3:a4] = zers[i]
+        df.loc[:, "a_node"] = self.nodes_to_indices[df.a_node.values][:]
+        df.loc[:, "b_node"] = self.nodes_to_indices[df.b_node.values][:]
+        df = df.sort_values(by=["a_node", "b_node"])
+        df.index = np.arange(df.shape[0])
+        df.loc[:, "id"] = np.arange(df.shape[0])
+        self.fs = np.empty(self.num_nodes + 1, dtype=self.__integer_type)
+        self.fs.fill(-1)
+        y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
+        del nlist
+        self.fs[y] = x[:]
+        self.fs[-1] = df.shape[0]
+        for i in range(self.num_nodes, 1, -1):
+            if self.fs[i - 1] == -1:
+                self.fs[i - 1] = self.fs[i]
 
-                    elif i == "a_node":
-                        self.graph[i][0:a1] = self.nodes_to_indices[negs["b_node"]]
-                        self.graph[i][a1:a2] = self.nodes_to_indices[poss[i]]
-                        self.graph[i][a2:a3] = self.nodes_to_indices[zers["b_node"]]
-                        self.graph[i][a3:a4] = self.nodes_to_indices[zers[i]]
-
-                    elif i == "b_node":
-                        self.graph[i][0:a1] = self.nodes_to_indices[negs["a_node"]]
-                        self.graph[i][a1:a2] = self.nodes_to_indices[poss[i]]
-                        self.graph[i][a2:a3] = self.nodes_to_indices[zers["a_node"]]
-                        self.graph[i][a3:a4] = self.nodes_to_indices[zers[i]]
-
-                    elif i == "direction":
-                        self.graph[i][0:a1] = -1
-                        self.graph[i][a1:a2] = 1
-                        self.graph[i][a2:a3] = -1
-                        self.graph[i][a3:a4] = 1
-                    else:
-                        if i[-3:] == "_ab":
-                            self.graph[i[0:-3]][0:a1] = negs[i[0:-3] + "_ba"]
-                            self.graph[i[0:-3]][a1:a2] = poss[i]
-                            self.graph[i[0:-3]][a2:a3] = zers[i[0:-3] + "_ba"]
-                            self.graph[i[0:-3]][a3:a4] = zers[i]
-                        elif i[-3:] != "_ba" and i in all_titles:
-                            self.graph[i][0:a1] = negs[i]
-                            self.graph[i][a1:a2] = poss[i]
-                            self.graph[i][a2:a3] = zers[i]
-                            self.graph[i][a3:a4] = zers[i]
-
-                ind = np.lexsort((self.graph["b_node"], self.graph["a_node"]))
-                self.graph = self.graph[ind]
-                del ind
-                self.graph["id"] = np.arange(self.num_links)
-                self.fs = np.zeros(self.num_nodes + 1, dtype=self.__integer_type)
-
-                a = self.graph["a_node"][0]
-                p = 0
-                k = 0
-
-                for i in range(1, self.num_links):
-                    if a != self.graph["a_node"][i]:
-                        for j in range(p, self.graph["a_node"][i]):
-                            self.fs[j + 1] = k
-                        p = a
-                        a = self.graph["a_node"][i]
-                        k = i
-
-                for j in range(p, self.num_nodes):
-                    self.fs[j + 1] = k
-
-                self.fs[self.num_nodes] = self.graph.shape[0]
-                self.ids = self.graph["id"]
-                self.b_node = np.array(self.graph["b_node"], self.__integer_type)
-                nans = ",".join([i for i in self.graph.dtype.names if np.any(np.isnan(self.graph[i]))])
-                if nans:
-                    logger.warning(f'Field(s) {nans} has(ve) at least one NaN value. Check your computations')
+        nans = ",".join([i for i in df.columns if df[i].isnull().any().any()])
+        if nans:
+            logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
+        self.graph = df
+        self.ids = self.graph.id.values.astype(self.__integer_type)
+        self.__build_arrays_for_computation()
 
     def exclude_links(self, links: list) -> None:
         """
@@ -363,25 +191,40 @@ class Graph(object):
         Args:
             links (:obj:`list`): List of link IDs to be excluded from the graph
         """
-        net = self.network
-
+        filter = self.network.link_id.isin(links)
         # We check is the list makes sense in order to warn the user
-        larray = np.array(links, np.int64)
-        # We find out if any of these links are not even part of the network
-        mask = np.in1d(larray, net['link_id'])
-        missing = list(larray[~mask])
-        if missing:
-            warn('At least one link does not exist in the network and therefore cannot be excluded')
-            warn(f'links: {",".join(missing)}')
+        if filter.sum() != len(set(links)):
+            warn("At least one link does not exist in the network and therefore cannot be excluded")
 
-        mask = np.in1d(net['link_id'], links)
-        # Makes all unwanted links to
-        net['b_node'][mask] = net['a_node'][mask]
+        self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
-        self.network = net
         self.prepare_graph(self.centroids)
         self.set_blocked_centroid_flows(self.block_centroid_flows)
         self.__id__ = uuid.uuid4().hex
+
+    def __build_column_names(self, all_titles: [str]) -> (list, list):
+        fields = [x for x in self.required_default_fields]
+        types = [x for x in self.__required_default_types]
+        for column in all_titles:
+            if column not in self.required_default_fields and column[0:-3] not in self.required_default_fields:
+                if column[-3:] == "_ab":
+                    if column[:-3] + "_ba" in all_titles:
+                        fields.append(column[:-3])
+                        types.append(self.network[column].dtype)
+                    else:
+                        raise ValueError("Field {} exists for ab direction but does not exist for ba".format(column))
+                elif column[-3:] == "_ba":
+                    if column[:-3] + "_ab" not in all_titles:
+                        raise ValueError("Field {} exists for ba direction but does not exist for ab".format(column))
+                else:
+                    fields.append(column)
+                    types.append(self.network[column].dtype)
+        return fields, types
+
+    def __build_arrays_for_computation(self):
+        self._comp_b_node = np.array(self.graph.b_node.values.astype(self.__integer_type), copy=True)
+        self._comp_link_id = np.array(self.graph.link_id.values.astype(self.__integer_type), copy=True)
+        self._comp_direction = np.array(self.graph.direction.values.astype(self.__integer_type), copy=True)
 
     def __build_dtype(self, all_titles) -> list:
         dtype = [
@@ -394,13 +237,13 @@ class Graph(object):
         for i in all_titles:
             if i not in self.required_default_fields and i[0:-3] not in self.required_default_fields:
                 if i[-3:] == "_ab":
-                    if i[:-3] + '_ba' in all_titles:
+                    if i[:-3] + "_ba" in all_titles:
                         dtype.append((i[:-3], self.network[i].dtype))
                     else:
-                        raise ValueError('Field {} exists for ab direction but does not exist for ba'.format(i))
+                        raise ValueError("Field {} exists for ab direction but does not exist for ba".format(i))
                 elif i[-3:] == "_ba":
-                    if i[:-3] + '_ab' not in all_titles:
-                        raise ValueError('Field {} exists for ba direction but does not exist for ab'.format(i))
+                    if i[:-3] + "_ab" not in all_titles:
+                        raise ValueError("Field {} exists for ba direction but does not exist for ab".format(i))
                 else:
                     dtype.append((i, self.network[i].dtype))
         return dtype
@@ -412,15 +255,15 @@ class Graph(object):
         Args:
             cost_field (:obj:`str`): Field name. Must be numeric
         """
-        if cost_field in self.graph.dtype.names:
+        if cost_field in self.graph.columns:
             self.cost_field = cost_field
             if self.graph[cost_field].dtype == self.__float_type:
-                self.cost = self.graph[cost_field]
+                self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:
-                self.cost = self.graph[cost_field].astype(self.__float_type)
-                Warning("Cost field with wrong type. Converting to float64")
+                self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
+                warn("Cost field with wrong type. Converting to float64")
         else:
-            raise ValueError("cost_field not available in the graph:" + str(self.graph.dtype.names))
+            raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
 
         self.__build_derived_properties()
 
@@ -441,7 +284,7 @@ class Graph(object):
             raise ValueError("You need to provide a list of skims or the same of a single field")
 
         # Check if list of fields make sense
-        k = [x for x in skim_fields if x not in self.graph.dtype.names]
+        k = [x for x in skim_fields if x not in self.graph.columns]
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
@@ -452,10 +295,10 @@ class Graph(object):
         if t:
             Warning("Some skim field with wrong type. Converting to float64")
             for i, j in enumerate(skim_fields):
-                self.skims[:, i] = self.graph[j].astype(self.__float_type)
+                self.skims[:, i] = self.graph[j].astype(self.__float_type).values[:]
         else:
             for i, j in enumerate(skim_fields):
-                self.skims[:, i] = self.graph[j]
+                self.skims[:, i] = self.graph[j].values[:]
         self.skim_fields = skim_fields
 
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
@@ -469,7 +312,7 @@ class Graph(object):
         """
         if isinstance(block_centroid_flows, bool):
             if self.num_zones == 0:
-                warn('No centroids in the model. Nothing to block')
+                warn("No centroids in the model. Nothing to block")
             else:
                 self.block_centroid_flows = block_centroid_flows
                 self.b_node = np.array(self.graph["b_node"], self.__integer_type)
@@ -502,9 +345,7 @@ class Graph(object):
         mygraph["ids"] = self.ids
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
-        mygraph["status"] = self.status
         mygraph["network_ok"] = self.network_ok
-        mygraph["type_loaded"] = self.type_loaded
         mygraph["graph_id"] = self.__id__
         mygraph["graph_version"] = self.__version__
         mygraph["mode"] = self.mode
@@ -538,9 +379,7 @@ class Graph(object):
             self.ids = mygraph["ids"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
-            self.status = mygraph["status"]
             self.network_ok = mygraph["network_ok"]
-            self.type_loaded = mygraph["type_loaded"]
             self.__id__ = mygraph["graph_id"]
             self.__version__ = mygraph["graph_version"]
             self.mode = mygraph["mode"]
@@ -553,15 +392,6 @@ class Graph(object):
             else:
                 self.num_zones = 0
 
-    # We return the list of the fields that are the same for both directions to their initial states
-    def __reset_single_fields(self):
-        self.required_default_fields = ["link_id", "a_node", "b_node", "direction", "id"]
-
-    # We add a new fields that is the same for both directions
-    def __add_single_field(self, new_field):
-        if new_field not in self.required_default_fields:
-            self.required_default_fields.append(new_field)
-
     def available_skims(self) -> List[str]:
         """
         Returns graph fields that are available to be set as skims
@@ -569,18 +399,17 @@ class Graph(object):
         Returns:
             *list* (:obj:`str`): Field names
         """
-        graph_fields = list(self.graph.dtype.names)
-        return [x for x in graph_fields if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
+        return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 
     # We check if all minimum fields are there
     def __network_error_checking__(self):
 
         # Checking field names
-        has_fields = self.network.dtype.names
+        has_fields = self.network.columns
         must_fields = ["link_id", "a_node", "b_node", "direction"]
         for field in must_fields:
             if field not in has_fields:
-                raise ValueError(f'could not find field {field} in the network array')
+                raise ValueError(f"could not find field {field} in the network array")
 
         # Uniqueness of the id
         link_ids = self.network["link_id"].astype(np.int)
@@ -591,37 +420,8 @@ class Graph(object):
         if np.max(self.network["direction"]) > 1 or np.min(self.network["direction"]) < -1:
             raise ValueError('"direction" field not limited to (-1,0,1) values')
 
-    # Needed for when we load the graph directly
-    def __graph_error_checking__(self):
-        # Checking field names
-        self.status = "graph loaded"
-        has_fields = self.graph.dtype.names
-        must_fields = ["link_id", "a_node", "b_node", "id"]
-        for field in must_fields:
-            if field not in has_fields:
-                self.status = 'could not find field "%s" in the network array' % field
-
-                # checking data types
-        must_types = [self.__integer_type, self.__integer_type, self.__integer_type, self.__integer_type]
-        for field, ytype in zip(must_fields, must_types):
-            if self.graph[field].dtype != ytype:
-                self.status = ('Field "%s" in the network array has the wrong type. '
-                               'Please refer to the documentation' % field)
-
-        # Uniqueness of the graph id
-        a = self.graph["id"].astype(np.int)
-        if a.shape[0] != np.unique(a).shape[0]:
-            self.status = '"id" field not unique'
-
-        a = np.bincount(self.graph["link_id"].astype(np.int))
-        if np.max(a) > 2:
-            self.status = '"link_id" field has more than one link per direction'
-
-        if np.min(self.graph["id"]) != 0:
-            self.status = '"id" field needs to start in 0 and go to number of links - 1'
-
-        if np.max(self.graph["id"]) > self.graph["id"].shape[0] - 1:
-            self.status = '"id" field needs to start in 0 and go to number of links - 1'
+        if "id" not in self.network.columns:
+            self.network = self.network.assign(id=np.nan)
 
     def __determine_types__(self, new_type, current_type):
 

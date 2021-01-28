@@ -14,7 +14,7 @@ from aequilibrae import logger
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
 except ImportError as ie:
-    logger.warning(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -73,8 +73,8 @@ class NetworkSkimming(WorkerThread):
         self.results = SkimResults()
         self.aux_res = MultiThreadedNetworkSkimming()
         self.report = []
-        self.procedure_id = ''
-        self.procedure_date = ''
+        self.procedure_id = ""
+        self.procedure_date = ""
         self.cumulative = 0
 
     def doWork(self):
@@ -94,9 +94,9 @@ class NetworkSkimming(WorkerThread):
         for orig in list(self.graph.centroids):
             i = int(self.graph.nodes_to_indices[orig])
             if i >= self.graph.nodes_to_indices.shape[0]:
-                self.report.append("Centroid " + str(orig) + " is beyond the domain of the graph")
+                self.report.append(f"Centroid {orig} is beyond the domain of the graph")
             elif self.graph.fs[int(i)] == self.graph.fs[int(i) + 1]:
-                self.report.append("Centroid " + str(orig) + " does not exist in the graph")
+                self.report.append(f"Centroid {orig} does not exist in the graph")
             else:
                 pool.apply_async(self.__func_skim_thread, args=(orig, all_threads))
         pool.close()
@@ -109,7 +109,7 @@ class NetworkSkimming(WorkerThread):
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
 
-    def save_to_project(self, name: str, format='omx') -> None:
+    def save_to_project(self, name: str, format="omx") -> None:
         """Saves skim results to the project folder and creates record in the database
 
         Args:
@@ -117,12 +117,12 @@ class NetworkSkimming(WorkerThread):
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
         """
 
-        file_name = f'{name}.{format.lower()}'
+        file_name = f"{name}.{format.lower()}"
         mats = Matrices()
         record = mats.new_record(name, file_name, self.results.skims)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
-        record.procedure = 'Network skimming'
+        record.procedure = "Network skimming"
         record.save()
 
     def __func_skim_thread(self, origin, all_threads):

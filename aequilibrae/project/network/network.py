@@ -3,6 +3,7 @@ from warnings import warn
 from sqlite3 import Connection as sqlc
 from typing import Dict
 import numpy as np
+import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
@@ -20,10 +21,11 @@ from aequilibrae import logger
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 
 
-class Network():
+class Network:
     """
     Network class. Member of an AequilibraE Project
     """
+
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
     protected_fields = protected_fields
@@ -46,12 +48,27 @@ class Network():
             :obj:`list`: List of all fields that can be skimmed
         """
         curr = self.conn.cursor()
-        curr.execute('PRAGMA table_info(links);')
+        curr.execute("PRAGMA table_info(links);")
         field_names = curr.fetchall()
-        ignore_fields = ['ogc_fid', 'geometry'] + self.req_link_flds
+        ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
 
-        skimmable = ['INT', 'INTEGER', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'BIGINT', 'UNSIGNED BIG INT',
-                     'INT2', 'INT8', 'REAL', 'DOUBLE', 'DOUBLE PRECISION', 'FLOAT', 'DECIMAL', 'NUMERIC']
+        skimmable = [
+            "INT",
+            "INTEGER",
+            "TINYINT",
+            "SMALLINT",
+            "MEDIUMINT",
+            "BIGINT",
+            "UNSIGNED BIG INT",
+            "INT2",
+            "INT8",
+            "REAL",
+            "DOUBLE",
+            "DOUBLE PRECISION",
+            "FLOAT",
+            "DECIMAL",
+            "NUMERIC",
+        ]
         all_fields = []
 
         for f in field_names:
@@ -62,11 +79,11 @@ class Network():
                     all_fields.append(f[1])
                     break
 
-        all_fields.append('distance')
+        all_fields.append("distance")
         real_fields = []
         for f in all_fields:
             if f[-2:] == "ab":
-                if f[:-2] + 'ba' in all_fields:
+                if f[:-2] + "ba" in all_fields:
                     real_fields.append(f[:-3])
             elif f[-3:] != "_ba":
                 real_fields.append(f)
@@ -85,13 +102,13 @@ class Network():
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-            self,
-            west: float = None,
-            south: float = None,
-            east: float = None,
-            north: float = None,
-            place_name: str = None,
-            modes=["car", "transit", "bicycle", "walk"],
+        self,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
+        place_name: str = None,
+        modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -172,8 +189,8 @@ class Network():
         width = haversine(east, (north + south) / 2, west, (north + south) / 2)
         area = height * width
 
-        par = Parameters().parameters['osm']
-        max_query_area_size = par['max_query_area_size']
+        par = Parameters().parameters["osm"]
+        max_query_area_size = par["max_query_area_size"]
 
         if area < max_query_area_size:
             polygons = [bbox]
@@ -226,52 +243,37 @@ class Network():
         curr = self.conn.cursor()
 
         if fields is None:
-            curr.execute('PRAGMA table_info(links);')
+            curr.execute("PRAGMA table_info(links);")
             field_names = curr.fetchall()
 
-            ignore_fields = ['ogc_fid', 'geometry']
+            ignore_fields = ["ogc_fid", "geometry"]
             all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
         else:
-            fields.extend(['link_id', 'a_node', 'b_node', 'direction', 'modes'])
+            fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
             all_fields = list(set(fields))
 
         if modes is None:
-            modes = curr.execute('select mode_id from modes;').fetchall()
+            modes = curr.execute("select mode_id from modes;").fetchall()
             modes = [m[0] for m in modes]
         elif isinstance(modes, str):
             modes = [modes]
 
-        raw_links = curr.execute(f"select {','.join(all_fields)} from links").fetchall()
-        links = []
-        for link in raw_links:
-            lk = list(map(lambda x: np.nan if x is None else x, link))
-            links.append(lk)
+        sql = f"select {','.join(all_fields)} from links"
 
-        data = np.core.records.fromrecords(links, names=all_fields)
-
-        valid_fields = []
-        removed_fields = []
-        for f in all_fields:
-            if np.issubdtype(data[f].dtype, np.floating) or np.issubdtype(data[f].dtype, np.integer):
-                valid_fields.append(f)
-            else:
-                removed_fields.append(f)
-        if len(removed_fields) > 1:
-            logger.warning(f'Fields were removed from Graph for being non-numeric: {",".join(removed_fields)}')
-
-        curr.execute('select node_id from nodes where is_centroid=1 order by node_id;')
+        df = pd.read_sql(sql, self.conn).fillna(value=np.nan)
+        valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+        curr.execute("select node_id from nodes where is_centroid=1 order by node_id;")
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
 
+        data = df[valid_fields]
         for m in modes:
-            w = np.core.defchararray.find(data['modes'], m)
-            net = np.array(data[valid_fields], copy=True)
-            net['b_node'][w < 0] = net['a_node'][w < 0]
-
+            net = pd.DataFrame(data, copy=True)
+            net.loc[~net.modes.str.contains(m), "b_node"] = net.loc[~net.modes.str.contains(m), "a_node"]
             g = Graph()
             g.mode = m
             g.network = net
             g.network_ok = True
-            g.status = 'OK'
+            g.status = "OK"
             g.prepare_graph(centroids)
             g.set_blocked_centroid_flows(True)
             self.graphs[m] = g
@@ -284,7 +286,7 @@ class Network():
             *time_field* (:obj:`str`): Network field with travel time information
         """
         for m, g in self.graphs.items():  # type: str, Graph
-            if time_field not in list(g.graph.dtype.names):
+            if time_field not in list(g.graph.columns):
                 raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
             g.free_flow_time = time_field
             g.set_graph(time_field)
@@ -297,7 +299,7 @@ class Network():
         Returns:
             :obj:`int`: Number of links
         """
-        return self.__count_items('link_id', 'links', 'link_id>=0')
+        return self.__count_items("link_id", "links", "link_id>=0")
 
     def count_centroids(self) -> int:
         """
@@ -306,7 +308,7 @@ class Network():
         Returns:
             :obj:`int`: Number of centroids
         """
-        return self.__count_items('node_id', 'nodes', 'is_centroid=1')
+        return self.__count_items("node_id", "nodes", "is_centroid=1")
 
     def count_nodes(self) -> int:
         """
@@ -315,7 +317,7 @@ class Network():
         Returns:
             :obj:`int`: Number of nodes
         """
-        return self.__count_items('node_id', 'nodes', 'node_id>=0')
+        return self.__count_items("node_id", "nodes", "node_id>=0")
 
     def extent(self):
         """Queries the extent of the network included in the model

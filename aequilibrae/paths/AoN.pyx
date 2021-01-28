@@ -71,7 +71,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:] g_view = graph.cost
     cdef long long [:] ids_graph_view = graph.ids
     cdef long long [:] all_nodes_view = graph.all_nodes
-    cdef long long [:] original_b_nodes_view = graph.graph['b_node']
+    cdef long long [:] original_b_nodes_view = graph._comp_b_node
 
     if skims > 0:
         gskim = graph.skims
@@ -212,10 +212,6 @@ def path_computation(origin, destination, graph, results):
     if results.__graph_id__ != graph.__id__:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
-    # Consistency checks
-    # if origin >= graph.fs.shape[0]:
-    #     raise ValueError ("Node " + str(origin) + " is outside the range of nodes in the graph")
-
     if VERSION_COMPILED != graph.__version__:
         raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
@@ -232,7 +228,7 @@ def path_computation(origin, destination, graph, results):
     #In order to release the GIL for this procedure, we create all the
     #memmory views we will need
     cdef double [:] g_view = graph.cost
-    cdef long long [:] original_b_nodes_view = graph.graph['b_node']
+    cdef long long [:] original_b_nodes_view = graph._comp_b_node
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
     cdef long long [:] ids_graph_view = graph.ids
@@ -296,8 +292,8 @@ def path_computation(origin, destination, graph, results):
             while p != origin_index:
                 p = predecessors_view[p]
                 connector = conn_view[dest_index]
-                all_connectors.append(graph.graph['link_id'][connector])
-                link_directions.append(graph.graph['direction'][connector])
+                all_connectors.append(graph._comp_link_id[connector])
+                link_directions.append(graph._comp_direction[connector])
                 mileposts.append(g_view[connector])
                 all_nodes.append(p)
                 dest_index = p
@@ -341,8 +337,8 @@ def update_path_trace(results, destination, graph):
                 while p != origin_index:
                     p = results.predecessors[p]
                     connector = results.connectors[dest_index]
-                    all_connectors.append(graph.graph['link_id'][connector])
-                    link_directions.append(graph.graph['direction'][connector])
+                    all_connectors.append(graph._comp_link_id[connector])
+                    link_directions.append(graph._comp_direction[connector])
                     mileposts.append(graph.cost[connector])
                     all_nodes.append(p)
                     dest_index = p
