@@ -44,7 +44,6 @@ class Graph(object):
         self.network = pd.DataFrame([])  # This method will hold ALL information on the network
         self.graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
 
-        self.compact_network = pd.DataFrame([])  # This method will hold info on the network without middle nodes
         self.compact_graph = pd.DataFrame([])  # This method will hold an array with ALL fields in the graph.
 
         # These are the fields actually used in computing paths
@@ -252,8 +251,8 @@ class Graph(object):
         comp_lnk.loc[:, "link_id"] += max_link_id
 
         df = pd.concat([df, comp_lnk])
-        self.compact_network = df[["id", "link_id", "a_node", "b_node", "direction"]]
-        properties = self.__build_directed_graph(self.compact_network, self.centroids)
+        df = df[["id", "link_id", "a_node", "b_node", "direction"]]
+        properties = self.__build_directed_graph(df, self.centroids)
         self.compact_all_nodes = properties[0]
         self.compact_num_nodes = properties[1]
         self.compact_nodes_to_indices = properties[2]
