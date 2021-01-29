@@ -192,7 +192,7 @@ class Graph(object):
                 if simplified_links[pre_link] >= 0:
                     raise Exception("How the heck did this happen?")
                 simplified_links[pre_link] = slink
-                simplified_directions[pre_link] = 1 if a_node == n else -1
+                simplified_directions[pre_link] = -1 if a_node == n else 1
                 for k in range(links_index[n], links_index[n + 1]):
                     lnk = all_links[k]
                     if lnk == pre_link:
@@ -218,7 +218,7 @@ class Graph(object):
 
             tot_graph_add += ab_dir + ba_dir
             simplified_links[pre_link] = slink
-            simplified_directions[pre_link] = 1 if a_node == n else -1
+            simplified_directions[pre_link] = -1 if a_node == n else 1
             last_node = b_node if counts[a_node] == 2 else a_node
             major_nodes[slink] = [first_node, last_node]
 
@@ -245,63 +245,60 @@ class Graph(object):
                 "a_node": compressed_a_node[:slink],
                 "b_node": compressed_b_node[:slink],
                 "direction": compressed_dir[:slink],
-                # '__augmented_link_id__': np.arange(slink),
-                "distance": np.zeros(slink, dtype=np.float64),
+                "link_id": np.arange(slink),
             }
         )
+        max_link_id = self.network.link_id.max() * 10
+        comp_lnk.loc[:, "link_id"] += max_link_id
 
         df = pd.concat([df, comp_lnk])
-
-        self.compact_network = df
-        properties = self.__build_directed_graph(df, self.centroids)
+        self.compact_network = df[["id", "link_id", "a_node", "b_node", "direction"]]
+        properties = self.__build_directed_graph(self.compact_network, self.centroids)
         self.compact_all_nodes = properties[0]
         self.compact_num_nodes = properties[1]
         self.compact_nodes_to_indices = properties[2]
         self.compact_fs = properties[3]
         self.compact_graph = properties[4]
 
-        # indices = pd.DataFrame(self.graph[['id', 'link_id', 'direction']], copy=True)
-        # indices.loc[:, 'link_id'] = indices.link_id * indices.direction
-        # indices.set_index('link_id', inplace=True)
+        crosswalk = pd.DataFrame(
+            {
+                "link_id": np.arange(simplified_directions.shape[0]),
+                "link_direction": simplified_directions,
+                "compressed_link": simplified_links,
+                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(np.int),
+            }
+        )
 
-        #
-        # comp_lnk_ab = pd.DataFrame(comp_lnk[comp_lnk.direction >= 0])
-        # comp_lnk_ab.loc[:, 'direction'] = 1
-        #
-        # comp_lnk_ba = pd.DataFrame(comp_lnk[comp_lnk.direction <= 0])
-        # comp_lnk_ba.loc[:, "direction"] = -1
-        # aux = np.array(comp_lnk_ba.a_node.values, copy=True)
-        # comp_lnk_ba.loc[:, "a_node"] = comp_lnk_ba.loc[:, "b_node"]
-        # comp_lnk_ba.loc[:, "b_node"] = aux[:]
-        #
-        # df = pd.concat([df, comp_lnk_ab, comp_lnk_ba])
-        # df = df.assign(__new_id__=0)
-        #
-        # # centroids will not change their IDs, as they are kept the same (the first N nodes in the graph)
-        # nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(np.int64)
-        # nodes = np.setdiff1d(nodes, self.centroids, assume_unique=True)
-        # compress_nodes = np.hstack((self.centroids, nodes)).astype(np.int64)
-        # compress_num_nodes = compress_nodes.shape[0]
-        # # nodes_to_indices = np.empty(int(compress_nodes.max()) + 1, np.int64)
-        # # nodes_to_indices.fill(-1)
-        # nlist = np.arange(compress_num_nodes)
-        # # nodes_to_indices[compress_nodes] = nlist
-        # num_links = df.shape[0]
-        # # df = df.sort_values(by=["a_node", "b_node"])
-        # # df.loc[:, "a_node"] = nodes_to_indices[df.a_node.values][:]
-        # # df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
-        # df = df.sort_values(by=["a_node", "b_node"])
-        # df.index = np.arange(df.shape[0])
-        # df.loc[:, "__new_id__"] = np.arange(df.shape[0])
-        # df.loc[:, 'id'] = df.__new_id__[:]
-        # compressed_fs = np.empty(compress_num_nodes + 1, dtype=np.int64)
-        # compressed_fs.fill(-1)
-        # y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
-        # compressed_fs[y] = x[:]
-        # compressed_fs[-1] = df.shape[0]
-        # for i in range(compress_num_nodes, 1, -1):
-        #     if compressed_fs[i - 1] == -1:
-        #         compressed_fs[i - 1] = compressed_fs[i]
+        crosswalk = crosswalk[crosswalk.compressed_link >= 0]
+        crosswalk.loc[:, "compressed_link"] += max_link_id
+
+        cw2 = pd.DataFrame(crosswalk, copy=True)
+        cw2.loc[:, "link_direction"] *= -1
+        cw2.loc[:, "compressed_direction"] = -1
+
+        crosswalk = pd.concat([crosswalk, cw2])
+        crosswalk = crosswalk.assign(key=crosswalk.compressed_link * crosswalk.compressed_direction)
+        crosswalk.drop(["compressed_link", "compressed_direction"], axis=1, inplace=True)
+
+        final_ids = pd.DataFrame(self.compact_graph[["id", "link_id", "direction"]], copy=True)
+        final_ids = final_ids.assign(key=final_ids.link_id * final_ids.direction)
+        final_ids.drop(["link_id", "direction"], axis=1, inplace=True)
+
+        agg_crosswalk = crosswalk.merge(final_ids, on="key")
+        agg_crosswalk.loc[:, "key"] = agg_crosswalk.link_id * agg_crosswalk.link_direction
+        agg_crosswalk.drop(["link_id", "link_direction"], axis=1, inplace=True)
+
+        direct_crosswalk = final_ids[final_ids.key.abs() < max_link_id]
+
+        crosswalk = pd.concat([agg_crosswalk, direct_crosswalk])[["key", "id"]]
+        crosswalk.columns = ["__graph_correlation_key__", "__compressed_id__"]
+
+        self.graph = self.graph.assign(__graph_correlation_key__=self.graph.link_id * self.graph.direction)
+        self.graph = self.graph.merge(crosswalk, on="__graph_correlation_key__", how="left")
+        self.graph.drop(["__graph_correlation_key__"], axis=1, inplace=True)
+
+        # We build a groupby to save time later
+        self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
     def __build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
         all_titles = list(network.columns)
@@ -440,12 +437,13 @@ class Graph(object):
         """
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
+            self.compact_cost = np.zeros(self.compact_graph.id.max() + 1, self.__float_type)
+            df = self.__graph_groupby.sum()[[cost_field]].reset_index()
+            self.compact_cost[df.index.values] = df[cost_field].values[:]
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
-                self.compact_cost = np.array(self.compact_graph[cost_field].values, copy=True)
             else:
                 self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
-                self.compact_cost = np.array(self.compact_graph[cost_field].values, dtype=self.__float_type)
                 warn("Cost field with wrong type. Converting to float64")
         else:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
@@ -473,20 +471,20 @@ class Graph(object):
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
+        self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
+        df = self.__graph_groupby.sum()[skim_fields].reset_index()
+        for i, skm in enumerate(skim_fields):
+            self.compact_skims[df.index.values, i] = df[skm].values[:].astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
-        self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
-
+        t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
         if t:
             Warning("Some skim field with wrong type. Converting to float64")
             for i, j in enumerate(skim_fields):
                 self.skims[:, i] = self.graph[j].astype(self.__float_type).values[:]
-                self.compact_skims[:, i] = self.compact_graph[j].astype(self.__float_type).values[:]
         else:
             for i, j in enumerate(skim_fields):
                 self.skims[:, i] = self.graph[j].values[:]
-                self.compact_skims[:, i] = self.compact_graph[j].values[:]
         self.skim_fields = skim_fields
 
     def set_blocked_centroid_flows(self, block_centroid_flows) -> None:
