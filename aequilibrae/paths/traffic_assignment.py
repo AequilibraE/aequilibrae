@@ -252,9 +252,9 @@ class TrafficAssignment(object):
         if self.time_field not in c.graph.graph.columns:
             return
 
-        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field], copy=True).astype(np.float64)
-        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
-        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
+        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field].values, copy=True).astype(np.float64)
+        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
+        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self.__dict__["cores"] = c.results.cores
 
         if self.capacity_field not in c.graph.graph.columns:

@@ -141,7 +141,7 @@ class TestTrafficAssignment(TestCase):
         msa10 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
-        correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
+        correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
         self.assignment.max_iter = 30

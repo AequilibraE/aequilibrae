@@ -238,6 +238,7 @@ class Graph(object):
         links_to_remove = np.argwhere(simplified_links >= 0)
         df = pd.DataFrame(self.network, copy=True)
         df = df[~df.link_id.isin(links_to_remove[:, 0])]
+        df = df[df.a_node != df.b_node]
 
         comp_lnk = pd.DataFrame(
             {
@@ -295,6 +296,10 @@ class Graph(object):
         self.graph = self.graph.assign(__graph_correlation_key__=self.graph.link_id * self.graph.direction)
         self.graph = self.graph.merge(crosswalk, on="__graph_correlation_key__", how="left")
         self.graph.drop(["__graph_correlation_key__"], axis=1, inplace=True)
+
+        # If will refer all the links that have no correlation to an element beyond the last link
+        # This element will always be zero during assignment
+        self.graph.loc[self.graph.__compressed_id__.isna(), "__compressed_id__"] = self.compact_graph.id.max() + 1
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
