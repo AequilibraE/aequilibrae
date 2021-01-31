@@ -33,9 +33,8 @@ class Project:
 
     def __init__(self):
         self.path_to_file: str = None
-        self.project_base_path = ''
+        self.project_base_path = ""
         self.source: str = None
-        self.parameters = {}
         self.conn: sqlite3.Connection = None
         self.network: Network = None
         self.about: About = None
@@ -51,9 +50,9 @@ class Project:
         """
 
         if self.__other_project_still_open():
-            raise Exception('You already have a project open. Close that project before opening another one')
+            raise Exception("You already have a project open. Close that project before opening another one")
 
-        file_name = os.path.join(project_path, 'project_database.sqlite')
+        file_name = os.path.join(project_path, "project_database.sqlite")
         if not os.path.isfile(file_name):
             raise FileNotFoundError("Model does not exist. Check your path and try again")
 
@@ -65,7 +64,7 @@ class Project:
 
         self.__load_objects()
         self.__set_logging_path()
-        logger.info(f'Opened project on {self.project_base_path}')
+        logger.info(f"Opened project on {self.project_base_path}")
         self.logger = logger
         clean()
 
@@ -76,10 +75,10 @@ class Project:
             *project_path* (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
         if self.__other_project_still_open():
-            raise Exception('You already have a project open. Close that project before creating a new one')
+            raise Exception("You already have a project open. Close that project before creating a new one")
 
         self.project_base_path = project_path
-        self.path_to_file = os.path.join(self.project_base_path, 'project_database.sqlite')
+        self.path_to_file = os.path.join(self.project_base_path, "project_database.sqlite")
         self.source = self.path_to_file
 
         if os.path.isdir(project_path):
@@ -91,7 +90,7 @@ class Project:
         self.about.create()
         self.__set_logging_path()
         self.logger = logger
-        logger.info(f'Created project on {self.project_base_path}')
+        logger.info(f"Created project on {self.project_base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
@@ -105,9 +104,9 @@ class Project:
             self.matrices._clear()
             del self.network.link_types
             del self.network.modes
-            logger.info(f'Closed project on {self.project_base_path}')
+            logger.info(f"Closed project on {self.project_base_path}")
         else:
-            warnings.warn('There is no Aequilibrae project open that you could close')
+            warnings.warn("There is no Aequilibrae project open that you could close")
 
     def load(self, project_path: str) -> None:
         """
@@ -127,14 +126,17 @@ class Project:
         return Log(self.project_base_path)
 
     def __load_objects(self):
-        matrix_folder = os.path.join(self.project_base_path, 'matrices')
+        matrix_folder = os.path.join(self.project_base_path, "matrices")
         if not os.path.isdir(matrix_folder):
             os.mkdir(matrix_folder)
 
         self.network = Network(self)
         self.about = About(self.conn)
         self.matrices = Matrices()
-        self.parameters = Parameters().parameters
+
+    @property
+    def parameters(self) -> dict:
+        return Parameters().parameters
 
     def check_file_indices(self) -> None:
         """ Makes results_database.sqlite and the matrices folder compatible with project database
@@ -161,7 +163,7 @@ class Project:
 
         # Create actual tables
         cursor = self.conn.cursor()
-        cursor.execute('PRAGMA foreign_keys = ON;')
+        cursor.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
         initialize_tables(self.conn)
 
@@ -177,7 +179,7 @@ class Project:
             par = p._default
         do_log = par["system"]["logging"]
         for handler in logger.handlers:
-            if handler.name == 'aequilibrae':
+            if handler.name == "aequilibrae":
                 logger.removeHandler(handler)
         if do_log:
             formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
@@ -186,7 +188,7 @@ class Project:
                 a = open(log_file, "w")
                 a.close()
             ch = logging.FileHandler(log_file)
-            ch.name = 'aequilibrae'
+            ch.name = "aequilibrae"
             ch.setFormatter(formatter)
             ch.setLevel(logging.DEBUG)
             logger.addHandler(ch)
