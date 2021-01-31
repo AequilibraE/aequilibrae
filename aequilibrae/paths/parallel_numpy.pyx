@@ -249,8 +249,8 @@ cpdef void assign_link_loads_cython(double[:, :] actual,
     cdef long long links = actual.shape[0]
     cdef long long n = actual.shape[1]
 
-    for j in prange(links, nogil=True, num_threads=cores):
-        for i in range(n):
+    for i in prange(links, nogil=True, num_threads=cores):
+        for j in range(n):
             k = crosswalk[i]
             actual[i, j] = compressed[k, j]
 
