@@ -27,7 +27,7 @@ if __name__ == "__main__":
         name="aequilibrae",
         version=release_version,
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
-        install_requires=["numpy", "PyQt5", "pyaml", "pandas", "requests", "shapely"],
+        install_requires=["numpy", "PyQt5", "pyaml", "pandas", "requests", "shapely", "scipy"],
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
