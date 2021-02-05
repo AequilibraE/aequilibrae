@@ -159,9 +159,7 @@ class Graph(object):
         link_edge = truth[self.network.a_node.values] + truth[self.network.b_node.values]
         link_edge = self.network.link_id.values[link_edge == 1]
 
-        simplified_links = np.empty(self.network.link_id.max() + 1)
-        simplified_links.fill(-1)
-        simplified_links = simplified_links.astype(np.int)
+        simplified_links = np.repeat(-1, self.network.link_id.max() + 1)
         simplified_directions = np.zeros(self.network.link_id.max() + 1, np.int)
 
         compressed_dir = np.zeros(self.network.link_id.max() + 1, np.int)
@@ -188,17 +186,12 @@ class Graph(object):
             ba_dir = 0 if (first_node == a_node and drc > 0) or (first_node == b_node and drc < 0) else ba_dir
 
             while counts[n] == 2:
-                if simplified_links[pre_link] >= 0:
-                    raise Exception("How the heck did this happen?")
+                # assert (simplified_links[pre_link] >= 0), "How the heck did this happen?"
                 simplified_links[pre_link] = slink
                 simplified_directions[pre_link] = -1 if a_node == n else 1
-                for k in range(links_index[n], links_index[n + 1]):
-                    lnk = all_links[k]
-                    if lnk == pre_link:
-                        continue
-                    break
-                if lnk == pre_link:
-                    raise Exception("How the heck did this happen again?")
+
+                # Gets the link from the list that is not the link we are coming from
+                lnk = [all_links[k] for k in range(links_index[n], links_index[n + 1]) if pre_link != all_links[k]][0]
                 pre_link = lnk
                 lidx = link_idx[pre_link]
                 a_node = self.network.a_node.values[lidx]
@@ -343,8 +336,8 @@ class Graph(object):
         all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
         num_nodes = all_nodes.shape[0]
-        nodes_to_indices = np.empty(int(all_nodes.max()) + 1, self.__integer_type)
-        nodes_to_indices.fill(-1)
+
+        nodes_to_indices = np.repeat(-1, int(all_nodes.max()) + 1)
         nlist = np.arange(num_nodes)
         nodes_to_indices[all_nodes] = nlist
 

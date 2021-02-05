@@ -102,7 +102,7 @@ class AssignmentResults:
         if self.link_loads is not None:
             self.no_path.fill(0)
             self.link_loads.fill(0)
-            self.link_loads.fill(0)
+            self.total_link_loads.fill(0)
             self.compact_link_loads.fill(0)
             self.compact_total_link_loads.fill(0)
         else:
