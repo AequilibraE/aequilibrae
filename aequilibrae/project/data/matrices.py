@@ -25,10 +25,18 @@ class Matrices:
         if matrices_list:
             self.__properties = list(matrices_list[0].keys())
         for lt in matrices_list:
+            if lt["name"] in self.__items:
+                if not self.__items[lt["name"]]._exists:
+                    del self.__items[lt["name"]]
             if lt["name"] not in self.__items:
                 if isfile(join(self.fldr, lt["file_name"])):
                     lt["fldr"] = self.fldr
                     self.__items[lt["name"].lower()] = MatrixRecord(lt)
+
+    def reload(self):
+        """Discards all memory matrices in memory and loads recreate them"""
+        self.__items.clear()
+        self.__init__()
 
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
