@@ -275,9 +275,6 @@ for function in ["power", "expo"]:
     # We get the output matrix and save it to OMX too,
     gravity.save_to_project(name=f"demand_{function}_modeled", file_name=f"demand_{function}_modeled.omx")
 
-# We put the aem files directly in the folder, so we update the database with them
-proj_matrices.update_database()
-
 # %%
 
 # We update the matrices table/records and verify that the new matrices are indeed there
