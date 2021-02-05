@@ -273,7 +273,7 @@ for function in ["power", "expo"]:
     gravity.apply()
 
     # We get the output matrix and save it to OMX too,
-    gravity.save_to_project(name=f"demand_{function}_model", file_name=f"demand_{function}_model.omx")
+    gravity.save_to_project(name=f"demand_{function}_modeled", file_name=f"demand_{function}_modeled.omx")
 
 # We put the aem files directly in the folder, so we update the database with them
 proj_matrices.update_database()
@@ -301,8 +301,8 @@ args = {
 ipf = Ipf(**args)
 ipf.fit()
 
-ipf.save_to_project(name="demand_ipf", file_name="demand_ipf.aem")
-ipf.save_to_project(name="demand_ipf_omx", file_name="demand_ipf.omx")
+ipf.save_to_project(name="demand_ipfd", file_name="demand_ipfd.aem")
+ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 
 # %%
 
@@ -323,7 +323,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR")
 
 # %%
 
-demand = proj_matrices.get_matrix("demand_power_model")
+demand = proj_matrices.get_matrix("demand_power_modeled")
 
 # let's see what is the core we ended up getting. It should be 'gravity'
 demand.names
