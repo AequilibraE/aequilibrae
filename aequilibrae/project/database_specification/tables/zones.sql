@@ -10,6 +10,8 @@ SELECT AddGeometryColumn( 'zones', 'geometry', 4326, 'MULTIPOLYGON', 'XY', 1);
 --#
 CREATE UNIQUE INDEX idx_zone ON zones (zone_id);
 --#
+SELECT CreateSpatialIndex( 'zones' , 'geometry' );
+--#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('zones','zone_id', 'Unique node ID');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('zones','area', 'Area of the zone in km2');

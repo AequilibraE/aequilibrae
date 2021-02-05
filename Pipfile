@@ -23,7 +23,7 @@ jupyter = "*"
 jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
-
+pytest-xdist="*
 
 [packages]
 numpy = ">=1.14.0"
