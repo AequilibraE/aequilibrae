@@ -22,7 +22,6 @@ class Matrices:
         tl = TableLoader()
         matrices_list = tl.load_table(self.curr, "matrices")
         self.__fields = [x for x in tl.fields]
-        existing_list = [lt["name"] for lt in matrices_list]
         if matrices_list:
             self.__properties = list(matrices_list[0].keys())
         for lt in matrices_list:
@@ -30,10 +29,6 @@ class Matrices:
                 if isfile(join(self.fldr, lt["file_name"])):
                     lt["fldr"] = self.fldr
                     self.__items[lt["name"].lower()] = MatrixRecord(lt)
-
-        to_del = [key for key in self.__items.keys() if key not in existing_list]
-        for key in to_del:
-            del self.__items[key]
 
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
