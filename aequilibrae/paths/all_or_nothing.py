@@ -9,9 +9,9 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import logger
 
 try:
-    from aequilibrae.paths.AoN import one_to_all
+    from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 except ImportError as ie:
-    logger.warning(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -72,11 +72,14 @@ class allOrNothing(WorkerThread):
                     self.report.append("Centroid " + str(orig) + " is not connected")
                 else:
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
-                    # self.func_assig_thread(orig, all_threads)
         pool.close()
         pool.join()
-        self.results.link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
-
+        # TODO: Multi-thread this sum
+        self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
+        assign_link_loads(
+            self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
+        )
+        self.results.total_flows()
         if pyqt:
             self.assignment.emit(["finished_threaded_procedure", None])
 
@@ -93,4 +96,4 @@ class allOrNothing(WorkerThread):
             self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
-            self.assignment.emit(["text AoN", f'{self.cumulative:,}/{self.matrix.zones:,}'])
+            self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])

@@ -37,10 +37,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # Is is used to actual path computation and to refer to outputs of path computation
 
     orig = origin
-    origin_index = graph.nodes_to_indices[orig]
+    origin_index = graph.compact_nodes_to_indices[orig]
 
     #We transform the python variables in Cython variables
-    nodes = graph.num_nodes
+    nodes = graph.compact_num_nodes
 
 
     skims = len(graph.skim_fields)
@@ -48,16 +48,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     if VERSION_COMPILED != graph.__version__:
         raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
-    if result.critical_links['save']:
-        critical_queries = len(result.critical_links['queries'])
-        aux_link_flows = np.zeros(result.links, ITYPE)
-    else:
-        aux_link_flows = np.zeros(1, ITYPE)
-
-    if result.link_extraction['save']:
-        link_extract_queries = len(result.link_extraction['queries'])
-
-    nodes = graph.num_nodes
     zones = graph.num_zones
     block_flows_through_centroids = graph.block_centroid_flows
 
@@ -67,14 +57,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     classes = matrix.matrix_view.shape[2]
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph.fs
-    cdef double [:] g_view = graph.cost
-    cdef long long [:] ids_graph_view = graph.ids
-    cdef long long [:] all_nodes_view = graph.all_nodes
-    cdef long long [:] original_b_nodes_view = graph._comp_b_node
+    cdef long long [:] graph_fs_view = graph.compact_fs
+    cdef double [:] g_view = graph.compact_cost
+    cdef long long [:] ids_graph_view = graph.compact_graph.id.values
+    cdef long long [:] all_nodes_view = graph.compact_all_nodes
+    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
 
     if skims > 0:
-        gskim = graph.skims
+        gskim = graph.compact_skims
         tskim = aux_result.temporary_skims[:, :, curr_thread]
         fskm = result.skims.matrix_view[origin_index, :, :]
     else:
@@ -96,25 +86,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[:, :, curr_thread]
     cdef double [:, :] node_load_view = aux_result.temp_node_loads[:, :, curr_thread]
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
-
-    # path file variables
-    # 'origin', 'node', 'predecessor', 'connector'
-    if result.path_file['save']:
-        path_file = 1
-        posit = origin_index * graph.num_nodes * result.path_file['save']
-        posit1 = posit + graph.num_nodes
-    else:
-        posit = 0
-        posit1 = 1
-
-    cdef unsigned int [:] pred_view = result.path_file['results'].predecessor[posit:posit1]
-    cdef unsigned int [:] c_view = result.path_file['results'].connector[posit:posit1]
-    cdef unsigned int [:] o_view = result.path_file['results'].origin[posit:posit1]
-    cdef unsigned int [:] n_view = result.path_file['results'].node[posit:posit1]
-
-    # select link variables
-    cdef double [:, :] sel_link_view = result.critical_links['results'].matrix_view[origin_index,:,:]
-    cdef long long [:] aux_link_flows_view = aux_link_flows
 
     #Now we do all procedures with NO GIL
     with nogil:
@@ -166,31 +137,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        if path_file > 0:
-            put_path_file_on_disk(orig,
-                                  pred_view,
-                                  predecessors_view,
-                                  c_view,
-                                  conn_view,
-                                  all_nodes_view,
-                                  o_view,
-                                  n_view)
-
-    for i in range(critical_queries):
-        critical_links_view = return_an_int_view(result.path_file['queries']['elements'][i])
-        query_type = 0
-        if result.path_file['queries'][ type][i] == "or":
-            query_type = 1
-        with nogil:
-            perform_select_link_analysis(orig,
-                                         classes,
-                                         demand_view,
-                                         predecessors_view,
-                                         conn_view,
-                                         aux_link_flows_view,
-                                         sel_link_view,
-                                         query_type)
-
     return origin
 
 def path_computation(origin, destination, graph, results):
@@ -228,10 +174,10 @@ def path_computation(origin, destination, graph, results):
     #In order to release the GIL for this procedure, we create all the
     #memmory views we will need
     cdef double [:] g_view = graph.cost
-    cdef long long [:] original_b_nodes_view = graph._comp_b_node
+    cdef long long [:] original_b_nodes_view = graph.graph.b_node.values
     cdef long long [:] graph_fs_view = graph.fs
     cdef double [:, :] graph_skim_view = graph.skims
-    cdef long long [:] ids_graph_view = graph.ids
+    cdef long long [:] ids_graph_view = graph.graph.id.values
     block_flows_through_centroids = graph.block_centroid_flows
 
     cdef long long [:] predecessors_view = results.predecessors
@@ -239,7 +185,7 @@ def path_computation(origin, destination, graph, results):
     cdef double [:, :] skim_matrix_view = results._skimming_array
     cdef long long [:] reached_first_view = results.reached_first
 
-    new_b_nodes = graph.b_node.copy()
+    new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
     #Now we do all procedures with NO GIL
@@ -292,8 +238,8 @@ def path_computation(origin, destination, graph, results):
             while p != origin_index:
                 p = predecessors_view[p]
                 connector = conn_view[dest_index]
-                all_connectors.append(graph._comp_link_id[connector])
-                link_directions.append(graph._comp_direction[connector])
+                all_connectors.append(graph.graph.link_id.values[connector])
+                link_directions.append(graph.graph.direction.values[connector])
                 mileposts.append(g_view[connector])
                 all_nodes.append(p)
                 dest_index = p
@@ -337,8 +283,8 @@ def update_path_trace(results, destination, graph):
                 while p != origin_index:
                     p = results.predecessors[p]
                     connector = results.connectors[dest_index]
-                    all_connectors.append(graph._comp_link_id[connector])
-                    link_directions.append(graph._comp_direction[connector])
+                    all_connectors.append(graph.graph.link_id.values[connector])
+                    link_directions.append(graph.graph.direction.values[connector])
                     mileposts.append(graph.cost[connector])
                     all_nodes.append(p)
                     dest_index = p
@@ -358,10 +304,9 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef long long nodes, orig, origin_index, i, block_flows_through_centroids, skims, zones, b
     #We transform the python variables in Cython variables
     orig = origin
-    origin_index = graph.nodes_to_indices[orig]
+    origin_index = graph.compact_nodes_to_indices[orig]
 
-    graph_fs = graph.fs
-
+    graph_fs = graph.compact_fs
     if result.__graph_id__ != graph.__id__:
 
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -369,7 +314,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if orig not in graph.centroids:
         raise ValueError("Centroid " + str(orig) + " is outside the range of zones in the graph")
 
-    if origin_index > graph.num_nodes:
+    if origin_index > graph.compact_num_nodes:
         raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
     if graph_fs[origin_index] == graph_fs[origin_index + 1]:
@@ -378,7 +323,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if VERSION_COMPILED != graph.__version__:
         raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
-    nodes = graph.num_nodes + 1
+    nodes = graph.compact_num_nodes + 1
     zones = graph.num_zones
     block_flows_through_centroids = graph.block_centroid_flows
     skims = result.num_skims
@@ -387,11 +332,11 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     # memory views we will need
 
     # views from the graph
-    cdef long long [:] graph_fs_view = graph.fs
-    cdef double [:] g_view = graph.cost
-    cdef long long [:] ids_graph_view = graph.ids
-    cdef long long [:] original_b_nodes_view = graph.b_node
-    cdef double [:, :] graph_skim_view = graph.skims[:, :]
+    cdef long long [:] graph_fs_view = graph_fs
+    cdef double [:] g_view = graph.compact_cost
+    cdef long long [:] ids_graph_view = graph.compact_graph.id.values
+    cdef long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
+    cdef double [:, :] graph_skim_view = graph.compact_skims[:, :]
 
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 
