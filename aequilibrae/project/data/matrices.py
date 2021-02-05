@@ -66,10 +66,10 @@ class Matrices:
 
             name = None
             if not mat.is_omx():
-                name = str(mat.name)
+                name = str(mat.name).lower()
 
             if not name:
-                name = fl
+                name = fl.lower()
 
             name = name.replace(".", "_").replace(" ", "_")
 
@@ -82,8 +82,7 @@ class Matrices:
             rec.save()
 
     def list(self) -> pd.DataFrame:
-        """
-
+        """ List of all matrices available
         Returns:
              df (:obj:`pd.DataFrame`:) Pandas DataFrame listing all matrices available in the model
         """
