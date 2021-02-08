@@ -1,3 +1,4 @@
+from functools import reduce
 import importlib.util as iutil
 import os
 import tempfile
@@ -704,13 +705,14 @@ class AequilibraeMatrix(object):
             omx_export.close()
 
         elif file_extension == ".CSV":
-            def f(name): 
+
+            def f(name):
                 coo = coo_matrix(self.matrix[name])
-                data = {"row": self.index[coo.row], "column": self.index[coo.col], core: coo.data}
+                data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
                 return pd.DataFrame(data).set_index(["row", "column"])
-                
+
             dfs = [f(name) for name in self.names]
-            df = reduce(lambda a,b: a.join(b,how='outer'), dfs)     
+            df = reduce(lambda a, b: a.join(b, how="outer"), dfs)
             df.to_csv(output_name, index=True)
 
     def load(self, file_path: str):

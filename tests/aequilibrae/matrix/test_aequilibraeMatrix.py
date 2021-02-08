@@ -120,7 +120,7 @@ class TestAequilibraeMatrix(TestCase):
         df.fillna(0, inplace=True)
         self.assertEqual(df.shape[0], 2500, "Exported wrong size")
         self.assertEqual(df.shape[1], 5, "Exported wrong size")
-        self.assertEqual(df.mat.sum(), np.nansum(self.new_matrix.matrices), "Exported wrong matrix total")
+        self.assertAlmostEqual(df.mat.sum(), np.nansum(self.new_matrix.matrices), 5, "Exported wrong matrix total")
 
     def test_export_to_omx(self):
         self.new_matrix.export(self.omx_export_name)
