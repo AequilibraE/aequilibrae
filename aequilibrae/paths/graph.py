@@ -293,6 +293,7 @@ class Graph(object):
         # If will refer all the links that have no correlation to an element beyond the last link
         # This element will always be zero during assignment
         self.graph.loc[self.graph.__compressed_id__.isna(), "__compressed_id__"] = self.compact_graph.id.max() + 1
+        self.graph.loc[:, "__compressed_id__"] = self.graph.__compressed_id__.astype(self.__integer_type)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -436,7 +437,7 @@ class Graph(object):
             self.cost_field = cost_field
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 1, self.__float_type)
             df = self.__graph_groupby.sum()[[cost_field]].reset_index()
-            self.compact_cost[df.index.values] = df[cost_field].values[:]
+            self.compact_cost[df.index.values[:-1]] = df[cost_field].values[:-1]
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:

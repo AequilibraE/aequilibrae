@@ -76,9 +76,8 @@ class allOrNothing(WorkerThread):
         pool.join()
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
-        assign_link_loads(
-            self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
-        )
+        assign_link_loads(self.results.link_loads, self.results.compact_link_loads,
+                          self.results.crosswalk, self.results.cores)
         self.results.total_flows()
         if pyqt:
             self.assignment.emit(["finished_threaded_procedure", None])

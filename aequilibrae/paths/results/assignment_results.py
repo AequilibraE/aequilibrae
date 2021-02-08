@@ -89,7 +89,7 @@ class AssignmentResults:
             self.skim_names = [x for x in graph.skim_fields]
             self.lids = graph.graph.link_id.values
             self.direcs = graph.graph.direction.values
-            self.crosswalk = graph.graph.__compressed_id__.values
+            self.crosswalk = graph.graph.__compressed_id__.values.astype(np.int64)
             self.__redim()
             self.__graph_id__ = graph.__id__
 
