@@ -56,7 +56,9 @@ class Node(SafeClass):
         else:
             data, sql = self.__save_existing_node()
 
-        curr.execute(sql, data)
+        if data:
+            curr.execute(sql, data)
+
         conn.commit()
         conn.close()
         self.__new = False
@@ -113,7 +115,7 @@ class Node(SafeClass):
 
         if not data:
             logger.warning(f"Nothing to update for node {self.node_id}")
-            return
+            return [], ""
 
         txts = ",".join(txts) + " where node_id=?"
         data.append(self.node_id)
