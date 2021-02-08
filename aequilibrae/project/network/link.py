@@ -72,10 +72,9 @@ class Link(SafeClass):
         else:
             data, sql = self.__save_existing_link()
 
-        if not data:
-            return
-        logger.error(sql)
-        curr.execute(sql, data)
+        if data:
+            curr.execute(sql, data)
+
         conn.commit()
         conn.close()
         self.__new = False
