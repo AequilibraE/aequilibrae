@@ -174,7 +174,7 @@ class Link(SafeClass):
 
         if not data:
             logger.warning(f'Nothing to update for link {self.link_id}')
-            return None, None
+            return [], ''
 
         txts = ','.join(txts) + ' where link_id=?'
         data.append(self.link_id)
