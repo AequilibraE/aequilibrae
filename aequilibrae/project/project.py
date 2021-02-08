@@ -101,7 +101,6 @@ class Project:
             for obj in [self.parameters, self.network]:
                 del obj
             del os.environ[ENVIRON_VAR]
-            self.matrices._clear()
             del self.network.link_types
             del self.network.modes
             logger.info(f"Closed project on {self.project_base_path}")
@@ -132,7 +131,10 @@ class Project:
 
         self.network = Network(self)
         self.about = About(self.conn)
-        self.matrices = Matrices()
+
+    @property
+    def matrices(self) -> Matrices:
+        return Matrices()
 
     @property
     def parameters(self) -> dict:
