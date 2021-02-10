@@ -310,7 +310,7 @@ class TrafficAssignment(object):
             raise ValueError('Field not in graph')
 
         if np.any(np.isnan(c.graph.graph[time_field].values)):
-            raise ValueError(f"At least one link free-flow time is NaN")
+            raise ValueError("At least one link free-flow time is NaN")
 
         if c.graph.graph[time_field].values.min() <= 0:
             raise ValueError('There is at least one link with zero or negative free-flow time')
@@ -336,7 +336,7 @@ class TrafficAssignment(object):
             raise ValueError('Field not in graph')
 
         if np.any(np.isnan(c.graph.graph[capacity_field].values)):
-            raise ValueError(f"At least one link capacity is NaN")
+            raise ValueError("At least one link capacity is NaN")
 
         if c.graph.graph[capacity_field].values.min() <= 0:
             raise ValueError('There is at least one link with zero or negative capacity')
