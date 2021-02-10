@@ -355,7 +355,7 @@ class Graph(object):
             if fs[i - 1] == -1:
                 fs[i - 1] = fs[i]
 
-        nans = ",".join([i for i in df.columns if df[i].isnull().any().any()])
+        nans = ", ".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
             logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
@@ -380,8 +380,9 @@ class Graph(object):
 
         self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
-        self.prepare_graph(self.centroids)
-        self.set_blocked_centroid_flows(self.block_centroid_flows)
+        if self.centroids is not None:
+            self.prepare_graph(self.centroids)
+            self.set_blocked_centroid_flows(self.block_centroid_flows)
         self.__id__ = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: [str]) -> (list, list):
@@ -436,7 +437,7 @@ class Graph(object):
             self.cost_field = cost_field
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 1, self.__float_type)
             df = self.__graph_groupby.sum()[[cost_field]].reset_index()
-            self.compact_cost[df.index.values] = df[cost_field].values[:]
+            self.compact_cost[df.index.values[:-1]] = df[cost_field].values[:-1]
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:

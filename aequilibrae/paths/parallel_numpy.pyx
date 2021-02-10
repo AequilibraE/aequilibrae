@@ -242,9 +242,9 @@ def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void assign_link_loads_cython(double[:, :] actual,
-                                        double[:, :] compressed,
-                                        long long[:] crosswalk,
-                                        int cores):
+                                    double[:, :] compressed,
+                                    long long[:] crosswalk,
+                                    int cores):
     cdef long long i, j, k
     cdef long long links = actual.shape[0]
     cdef long long n = actual.shape[1]
@@ -278,4 +278,5 @@ cpdef void aggregate_link_costs_cython(double[:] actual,
 
     for i in range(links):
         k = crosswalk[i]
-        compressed[k] += actual[i]
+        if k < c_l:
+            compressed[k] += actual[i]

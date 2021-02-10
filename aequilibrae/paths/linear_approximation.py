@@ -330,7 +330,6 @@ class LinearApproximation(WorkerThread):
                 aon.execute()
                 aon_flows.append(c._aon_results.total_link_loads * c.pce)
             self.aon_total_flow = np.sum(aon_flows, axis=0)
-
             flows = []
             if self.iter == 1:
                 for c in self.traffic_classes:
@@ -358,7 +357,6 @@ class LinearApproximation(WorkerThread):
                         )
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads * c.pce)
-
             self.fw_total_flow = np.sum(flows, axis=0)
 
             # Check convergence
@@ -366,7 +364,6 @@ class LinearApproximation(WorkerThread):
             converged = False
             if self.iter > 1:
                 converged = self.check_convergence()
-
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
@@ -392,14 +389,12 @@ class LinearApproximation(WorkerThread):
                 *self.vdf_parameters,
                 self.cores,
             )
-
             for c in self.traffic_classes:
                 aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
                 if self.time_field in c.graph.skim_fields:
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
                 c._aon_results.reset()
-
         if self.rgap > self.rgap_target:
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
