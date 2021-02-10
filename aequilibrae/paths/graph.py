@@ -293,7 +293,6 @@ class Graph(object):
         # If will refer all the links that have no correlation to an element beyond the last link
         # This element will always be zero during assignment
         self.graph.loc[self.graph.__compressed_id__.isna(), "__compressed_id__"] = self.compact_graph.id.max() + 1
-        self.graph.loc[:, "__compressed_id__"] = self.graph.__compressed_id__.astype(self.__integer_type)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -356,7 +355,7 @@ class Graph(object):
             if fs[i - 1] == -1:
                 fs[i - 1] = fs[i]
 
-        nans = ",".join([i for i in df.columns if df[i].isnull().any().any()])
+        nans = ", ".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
             logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
@@ -381,8 +380,9 @@ class Graph(object):
 
         self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
-        self.prepare_graph(self.centroids)
-        self.set_blocked_centroid_flows(self.block_centroid_flows)
+        if self.centroids is not None:
+            self.prepare_graph(self.centroids)
+            self.set_blocked_centroid_flows(self.block_centroid_flows)
         self.__id__ = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: [str]) -> (list, list):
