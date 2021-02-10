@@ -1,3 +1,4 @@
+from functools import reduce
 import importlib.util as iutil
 import os
 import tempfile
@@ -6,6 +7,8 @@ from shutil import copyfile
 from typing import List
 import functools
 import numpy as np
+import pandas as pd
+from scipy.sparse import coo_matrix
 
 # Checks if we can display OMX
 spec = iutil.find_spec("openmatrix")
@@ -78,8 +81,8 @@ class AequilibraeMatrix(object):
         self.zones = None
         self.dtype = None
         self.names = []  # type: [str]
-        self.name = ''
-        self.description = ''
+        self.name = ""
+        self.description = ""
         self.current_index = None
         self.__omx = False
         self.omx_file = None  # type: omx.File
@@ -101,7 +104,7 @@ class AequilibraeMatrix(object):
             names = [names]
 
         if len(names) != len(self.view_names):
-            raise ValueError('Number of names needs to be equal to computational view')
+            raise ValueError("Number of names needs to be equal to computational view")
 
         exists = [n for n in names if n in self.names]
         if exists:
@@ -117,13 +120,13 @@ class AequilibraeMatrix(object):
         self.computational_view(names)
 
     def create_empty(
-            self,
-            file_name: str = None,
-            zones: int = None,
-            matrix_names: List[str] = None,
-            data_type: np.dtype = np.float64,
-            index_names: List[str] = None,
-            compressed: bool = False,
+        self,
+        file_name: str = None,
+        zones: int = None,
+        matrix_names: List[str] = None,
+        data_type: np.dtype = np.float64,
+        index_names: List[str] = None,
+        compressed: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -235,7 +238,7 @@ class AequilibraeMatrix(object):
             *object* (:obj:`np.ndarray`): NumPy array
         """
         if core not in self.names:
-            raise AttributeError('Matrix core does not exist in this matrix')
+            raise AttributeError("Matrix core does not exist in this matrix")
         if self.__omx:
             return np.array(self.omx_file[core])
         else:
@@ -245,13 +248,13 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-            self,
-            file_path: str,
-            omx_path: str,
-            cores: List[str] = None,
-            mappings: List[str] = None,
-            robust: bool = True,
-            compressed: bool = False,
+        self,
+        file_path: str,
+        omx_path: str,
+        cores: List[str] = None,
+        mappings: List[str] = None,
+        robust: bool = True,
+        compressed: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -702,26 +705,15 @@ class AequilibraeMatrix(object):
             omx_export.close()
 
         elif file_extension == ".CSV":
-            names = self.view_names
-            self.computational_view(cores)
-            output = open(output_name, "w")
 
-            titles = ["row", "column"]
-            for core in self.view_names:
-                titles.append(core)
-            output.write(",".join(titles))
+            def f(name):
+                coo = coo_matrix(self.matrix[name])
+                data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
+                return pd.DataFrame(data).set_index(["row", "column"])
 
-            for i in range(self.zones):
-                for j in range(self.zones):
-                    record = [self.index[i], self.index[j]]
-                    if len(self.view_names) > 1:
-                        record.extend(self.matrix_view[i, j, :])
-                    else:
-                        record.append(self.matrix_view[i, j])
-                    output.write(",".join(str(x) for x in record))
-            output.flush()
-            output.close()
-            self.computational_view(names)
+            dfs = [f(name) for name in self.names]
+            df = reduce(lambda a, b: a.join(b, how="outer"), dfs)
+            df.to_csv(output_name, index=True)
 
     def load(self, file_path: str):
         """
@@ -818,10 +810,11 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
 
-    def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None,
-             compress: bool = None) -> None:
+    def copy(
+        self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
+    ) -> None:
         """
         Copies a list of cores (or all cores) from one matrix file to another one
 
@@ -860,10 +853,7 @@ class AequilibraeMatrix(object):
             temp = AequilibraeMatrix()
 
             fp = self.random_name()
-            temp.create_from_omx(file_path=fp,
-                                 omx_path=self.file_path,
-                                 cores=mcores,
-                                 mappings=self.index_names)
+            temp.create_from_omx(file_path=fp, omx_path=self.file_path, cores=mcores, mappings=self.index_names)
             output = temp.copy(output_name, cores, names, compress)
             if names is None:
                 names = mcores
