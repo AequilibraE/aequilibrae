@@ -17,6 +17,8 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data import Matrices
+from aequilibrae import logger
+
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -231,7 +233,7 @@ class TrafficAssignment(object):
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algo == "all-or-nothing":
-            self.assignment = allOrNothing(self)
+            self.assignment = LinearApproximation(self, algo)
         elif algo in ["msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algo)
         else:
@@ -303,17 +305,17 @@ class TrafficAssignment(object):
         """
 
         if not self.classes:
-            raise ValueError('Your need add at least one traffic classes first')
+            raise ValueError("Your need add at least one traffic classes first")
 
         c = self.classes[0]
         if time_field not in c.graph.graph.columns:
-            raise ValueError('Field not in graph')
+            raise ValueError("Field not in graph")
 
         if np.any(np.isnan(c.graph.graph[time_field].values)):
             raise ValueError("At least one link free-flow time is NaN")
 
         if c.graph.graph[time_field].values.min() <= 0:
-            raise ValueError('There is at least one link with zero or negative free-flow time')
+            raise ValueError("There is at least one link with zero or negative free-flow time")
 
         self.__dict__["free_flow_tt"] = np.array(c.graph.graph[time_field].values, copy=True).astype(np.float64)
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
@@ -329,17 +331,17 @@ class TrafficAssignment(object):
         """
 
         if not self.classes:
-            raise ValueError('Your need add at least one traffic classes first')
+            raise ValueError("Your need add at least one traffic classes first")
 
         c = self.classes[0]
         if capacity_field not in c.graph.graph.columns:
-            raise ValueError('Field not in graph')
+            raise ValueError("Field not in graph")
 
         if np.any(np.isnan(c.graph.graph[capacity_field].values)):
             raise ValueError("At least one link capacity is NaN")
 
         if c.graph.graph[capacity_field].values.min() <= 0:
-            raise ValueError('There is at least one link with zero or negative capacity')
+            raise ValueError("There is at least one link with zero or negative capacity")
 
         self.__dict__["cores"] = c.results.cores
         self.__dict__["capacity"] = np.array(c.graph.graph[capacity_field], copy=True).astype(np.float64)
