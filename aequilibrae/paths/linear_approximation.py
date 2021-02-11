@@ -338,6 +338,10 @@ class LinearApproximation(WorkerThread):
                     if c.results.num_skims > 0:
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
                     flows.append(c.results.total_link_loads * c.pce)
+
+                if self.algorithm == "all-or-nothing":
+                    break
+
             else:
                 self.__calculate_step_direction()
                 self.calculate_stepsize()
@@ -395,7 +399,7 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
                 c._aon_results.reset()
-        if self.rgap > self.rgap_target:
+        if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         if pyqt:
