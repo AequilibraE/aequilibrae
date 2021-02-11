@@ -17,7 +17,6 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae import Parameters
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data import Matrices
-from aequilibrae import logger
 
 
 spec = iutil.find_spec("openmatrix")
