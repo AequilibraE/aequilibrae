@@ -231,9 +231,7 @@ class TrafficAssignment(object):
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        if algo == "all-or-nothing":
-            self.assignment = LinearApproximation(self, algo)
-        elif algo in ["msa", "frank-wolfe", "cfw", "bfw"]:
+        if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algo)
         else:
             raise Exception("Algorithm not listed in the case selection")
