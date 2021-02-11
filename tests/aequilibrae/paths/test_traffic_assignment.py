@@ -37,6 +37,11 @@ class TestTrafficAssignment(TestCase):
         self.matrix.close()
         self.project.close()
 
+    def test_matrix_with_wrong_type(self):
+        self.matrix.matrix_view = np.array(self.matrix.matrix_view, np.int32)
+        with self.assertRaises(TypeError):
+            _ = TrafficClass(self.car_graph, self.matrix)
+
     def test_set_vdf(self):
         with self.assertRaises(ValueError):
             self.assignment.set_vdf("CQS")
@@ -107,16 +112,34 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     def test_set_time_field(self):
+
+        with self.assertRaises(ValueError):
+            self.assignment.set_time_field('capacity')
+
+        self.assignment.add_class(self.assigclass)
+
         N = random.randint(1, 50)
         val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-        self.assignment.set_time_field(val)
-        self.assertEqual(self.assignment.time_field, val)
+        with self.assertRaises(ValueError):
+            self.assignment.set_time_field(val)
+
+        self.assignment.set_time_field('free_flow_time')
+        self.assertEqual(self.assignment.time_field, 'free_flow_time')
 
     def test_set_capacity_field(self):
+
+        with self.assertRaises(ValueError):
+            self.assignment.set_capacity_field('capacity')
+
+        self.assignment.add_class(self.assigclass)
+
         N = random.randint(1, 50)
         val = "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
-        self.assignment.set_capacity_field(val)
-        self.assertEqual(self.assignment.capacity_field, val)
+        with self.assertRaises(ValueError):
+            self.assignment.set_capacity_field(val)
+
+        self.assignment.set_capacity_field('capacity')
+        self.assertEqual(self.assignment.capacity_field, 'capacity')
 
     def test_execute_and_save_results(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
@@ -141,7 +164,7 @@ class TestTrafficAssignment(TestCase):
         msa10 = self.assignment.assignment.rgap
 
         self.assigclass.results.total_flows()
-        correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
+        correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
         self.assignment.max_iter = 30

@@ -28,6 +28,9 @@ class TrafficClass():
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
+        if matrix.matrix_view.dtype != graph.default_types('float'):
+            raise TypeError("Matrix's computational view need to be of type np.float64")
+
         self.graph = graph
         self.matrix = matrix
         self.pce = 1

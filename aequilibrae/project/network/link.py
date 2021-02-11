@@ -72,10 +72,9 @@ class Link(SafeClass):
         else:
             data, sql = self.__save_existing_link()
 
-        if not data:
-            return
-        logger.error(sql)
-        curr.execute(sql, data)
+        if data:
+            curr.execute(sql, data)
+
         conn.commit()
         conn.close()
         self.__new = False
@@ -175,7 +174,7 @@ class Link(SafeClass):
 
         if not data:
             logger.warning(f'Nothing to update for link {self.link_id}')
-            return None, None
+            return [], ''
 
         txts = ','.join(txts) + ' where link_id=?'
         data.append(self.link_id)

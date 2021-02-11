@@ -9,6 +9,7 @@ import numpy as np
 import uuid
 from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example, no_index_omx, siouxfalls_skims
+import pandas as pd
 
 zones = 50
 
@@ -41,9 +42,7 @@ class TestAequilibraeMatrix(TestCase):
         self.matrix.mat[:, :] = np.random.rand(self.matrix.zones, self.matrix.zones)[:, :]
         self.matrix.mat[:, :] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
         self.matrix.setName("Test matrix - " + str(random.randint(1, 10)))
-        self.matrix.setDescription(
-            "Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
-        )
+        self.matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         self.new_matrix = self.matrix
 
     def tearDown(self) -> None:
@@ -54,7 +53,7 @@ class TestAequilibraeMatrix(TestCase):
             os.remove(self.copy_matrix_name) if os.path.exists(self.copy_matrix_name) else None
             os.remove(self.omx_export_name) if os.path.exists(self.omx_export_name) else None
         except Exception as e:
-            print(f'Could not delete.  {e.args}')
+            print(f"Could not delete.  {e.args}")
 
     def test_load(self):
         self.new_matrix = AequilibraeMatrix()
@@ -78,9 +77,7 @@ class TestAequilibraeMatrix(TestCase):
         if np.sum(self.new_matrix.mat) != np.sum(self.new_matrix.matrix_view):
             self.fail("Assigning to matrix view did not work")
         self.new_matrix.setName("Test matrix - " + str(random.randint(1, 10)))
-        self.new_matrix.setDescription(
-            "Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
-        )
+        self.new_matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         del self.new_matrix
 
     def test_computational_view_with_omx(self):
@@ -119,7 +116,11 @@ class TestAequilibraeMatrix(TestCase):
 
     def test_export_to_csv(self):
         self.new_matrix.export(self.csv_export_name)
-        del self.new_matrix
+        df = pd.read_csv(self.csv_export_name)
+        df.fillna(0, inplace=True)
+        self.assertEqual(df.shape[0], 2500, "Exported wrong size")
+        self.assertEqual(df.shape[1], 5, "Exported wrong size")
+        self.assertAlmostEqual(df.mat.sum(), np.nansum(self.new_matrix.matrices), 5, "Exported wrong matrix total")
 
     def test_export_to_omx(self):
         self.new_matrix.export(self.omx_export_name)
@@ -131,9 +132,7 @@ class TestAequilibraeMatrix(TestCase):
             sm = np.nansum(self.new_matrix.matrix[m])
             sm2 = np.nansum(np.array(omxfile[m]))
 
-            self.assertEqual(
-                sm, sm2, "Matrix {} was exported with the wrong value".format(m)
-            )
+            self.assertEqual(sm, sm2, "Matrix {} was exported with the wrong value".format(m))
         del omxfile
 
     def test_nan_to_num(self):
@@ -194,9 +193,9 @@ class TestAequilibraeMatrix(TestCase):
         a.load(self.sf_skims)
 
         with self.assertRaises(AttributeError):
-            a.get_matrix('does not exist')
+            a.get_matrix("does not exist")
 
-        q = a.get_matrix('distance')
+        q = a.get_matrix("distance")
         self.assertEqual(q.shape[0], 24)
 
         a = AequilibraeMatrix()
@@ -209,28 +208,28 @@ class TestAequilibraeMatrix(TestCase):
         a = AequilibraeMatrix()
         a.load(self.sf_skims)
 
-        a.computational_view(['distance'])
+        a.computational_view(["distance"])
         new_mat = np.random.rand(a.zones, a.zones)
         a.matrix_view *= new_mat
 
         res = a.matrix_view.sum()
 
-        a.save('new_name_for_matrix')
-        self.assertEqual(res, a.matrix_view.sum(), 'Saved wrong result')
+        a.save("new_name_for_matrix")
+        self.assertEqual(res, a.matrix_view.sum(), "Saved wrong result")
 
-        a.save(['new_name_for_matrix2'])
-        self.assertEqual(a.view_names[0], 'new_name_for_matrix2', 'Did not update computational view')
-        self.assertEqual(len(a.view_names), 1, 'computational view with the wrong number of matrices')
+        a.save(["new_name_for_matrix2"])
+        self.assertEqual(a.view_names[0], "new_name_for_matrix2", "Did not update computational view")
+        self.assertEqual(len(a.view_names), 1, "computational view with the wrong number of matrices")
 
-        a.computational_view(['distance', 'new_name_for_matrix'])
-
-        with self.assertRaises(ValueError):
-            a.save(['just_one_name'])
-
-        a.save(['one_name', 'two_names'])
+        a.computational_view(["distance", "new_name_for_matrix"])
 
         with self.assertRaises(ValueError):
-            a.save('distance')
+            a.save(["just_one_name"])
+
+        a.save(["one_name", "two_names"])
+
+        with self.assertRaises(ValueError):
+            a.save("distance")
 
         b = AequilibraeMatrix()
         b.load(self.name_test)

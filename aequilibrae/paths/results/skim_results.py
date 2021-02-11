@@ -34,9 +34,6 @@ class SkimResults:
 
     def __init__(self):
         self.skims = AequilibraeMatrix()
-        self.path = None
-        self.path_nodes = None
-        self.milepost = None
         self.cores = mp.cpu_count()
 
         self.links = -1
@@ -44,9 +41,9 @@ class SkimResults:
         self.zones = -1
         self.num_skims = -1
         self.__graph_id__ = None
-        self.graph: Graph = None
+        self.graph = Graph()
 
-    def prepare(self, graph):
+    def prepare(self, graph: Graph):
         """
         Prepares the object with dimensions corresponding to the graph objects
 
@@ -57,9 +54,9 @@ class SkimResults:
         if not graph.cost_field:
             raise Exception('Cost field needs to be set for computation. use graph.set_graph("your_cost_field")')
 
-        self.nodes = graph.num_nodes + 1
+        self.nodes = graph.compact_num_nodes + 1
         self.zones = graph.num_zones
-        self.links = graph.num_links + 1
+        self.links = graph.compact_num_links + 1
         self.num_skims = len(graph.skim_fields)
 
         self.skims = AequilibraeMatrix()
@@ -97,16 +94,3 @@ class SkimResults:
                     self.cores = cores
         else:
             raise ValueError("Number of cores needs to be an integer")
-
-    def reset(self) -> None:
-        """
-        Resets object to prepared and pre-computation state
-        """
-        if self.skims is not None:
-            self.skims.fill(np.inf)
-            self.path = None
-            self.path_nodes = None
-            self.milepost = None
-
-        else:
-            raise ValueError("Exception: Path results object was not yet prepared/initialized")

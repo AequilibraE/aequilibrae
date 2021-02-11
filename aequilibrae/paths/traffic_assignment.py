@@ -1,7 +1,6 @@
 from os import environ, path
 import importlib.util as iutil
 from typing import List
-from warnings import warn
 from uuid import uuid4
 import sqlite3
 from datetime import datetime
@@ -186,7 +185,6 @@ class TrafficAssignment(object):
         if len(ids) < len(classes):
             raise Exception("Classes need to be unique. Your list of classes has repeated items")
         self.classes = classes  # type: List[TrafficClass]
-        self.__collect_data()
 
     def add_class(self, traffic_class: TrafficClass) -> None:
         """
@@ -201,7 +199,6 @@ class TrafficAssignment(object):
             raise Exception("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
-        self.__collect_data()
 
     def algorithms_available(self) -> list:
         """
@@ -242,26 +239,6 @@ class TrafficAssignment(object):
 
         self.__dict__["algorithm"] = algo
 
-        self.__collect_data()
-
-    def __collect_data(self):
-        if not self.classes:
-            return
-
-        c = self.classes[0]
-        if self.time_field not in c.graph.graph.columns:
-            return
-
-        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[self.time_field], copy=True).astype(np.float64)
-        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0]).astype(np.float64)
-        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True).astype(np.float64)
-        self.__dict__["cores"] = c.results.cores
-
-        if self.capacity_field not in c.graph.graph.columns:
-            return
-
-        self.__dict__["capacity"] = np.array(c.graph.graph[self.capacity_field], copy=True).astype(np.float64)
-
     def set_vdf_parameters(self, par: dict) -> None:
         """
         Sets the parameters for the Volume-delay function.
@@ -290,14 +267,14 @@ class TrafficAssignment(object):
                 pars.append(array)
 
                 if np.any(np.isnan(array)):
-                    warn(f"At least one {p1} is NaN. Results will make no sense")
+                    raise ValueError(f"At least one {p1} is NaN")
 
                 if p1 == "alpha":
                     if array.min() < 0:
-                        warn(f"At least one {p1} is smaller than zero. Results will make no sense")
+                        raise ValueError(f"At least one {p1} is smaller than zero")
                 else:
                     if array.min() < 1:
-                        warn(f"At least one {p1} is smaller than one. Results will make no sense")
+                        raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
 
@@ -324,8 +301,24 @@ class TrafficAssignment(object):
         Args:
             time_field (:obj:`str`): Field name
         """
+
+        if not self.classes:
+            raise ValueError('Your need add at least one traffic classes first')
+
+        c = self.classes[0]
+        if time_field not in c.graph.graph.columns:
+            raise ValueError('Field not in graph')
+
+        if np.any(np.isnan(c.graph.graph[time_field].values)):
+            raise ValueError("At least one link free-flow time is NaN")
+
+        if c.graph.graph[time_field].values.min() <= 0:
+            raise ValueError('There is at least one link with zero or negative free-flow time')
+
+        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[time_field].values, copy=True).astype(np.float64)
+        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
+        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
-        self.__collect_data()
 
     def set_capacity_field(self, capacity_field: str) -> None:
         """
@@ -334,8 +327,23 @@ class TrafficAssignment(object):
         Args:
             capacity_field (:obj:`str`): Field name
         """
+
+        if not self.classes:
+            raise ValueError('Your need add at least one traffic classes first')
+
+        c = self.classes[0]
+        if capacity_field not in c.graph.graph.columns:
+            raise ValueError('Field not in graph')
+
+        if np.any(np.isnan(c.graph.graph[capacity_field].values)):
+            raise ValueError("At least one link capacity is NaN")
+
+        if c.graph.graph[capacity_field].values.min() <= 0:
+            raise ValueError('There is at least one link with zero or negative capacity')
+
+        self.__dict__["cores"] = c.results.cores
+        self.__dict__["capacity"] = np.array(c.graph.graph[capacity_field], copy=True).astype(np.float64)
         self.capacity_field = capacity_field
-        self.__collect_data()
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above

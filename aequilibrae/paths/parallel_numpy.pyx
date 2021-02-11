@@ -81,9 +81,9 @@ cpdef void linear_combination_skims_cython(double stepsize,
     cdef long long b = results.shape[1]
     cdef long long c = results.shape[2]
 
-    for k in range(c):
-        for j in range(b):
-            for i in prange(a, nogil=True, num_threads=cores):
+    for i in prange(a, nogil=True, num_threads=cores):
+        for k in range(c):
+            for j in range(b):
                 results[i, j, k] = array1[i, j, k] * stepsize + array2[i, j, k] * (1.0 - stepsize)
 
 
@@ -114,8 +114,8 @@ cpdef void triple_linear_combination_cython(double [:] stepsizes,
     cdef long long l = results.shape[0]
     cdef long long k = results.shape[1]
 
-    for j in range(k):
-        for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(l, nogil=True, num_threads=cores):
+        for j in range(k):
             results[i, j] = array1[i, j] * stepsizes[0] + array2[i, j] * stepsizes[1]  + array3[i, j] * stepsizes[2]
 
 
@@ -145,9 +145,9 @@ cpdef void triple_linear_combination_cython_skims(double [:] stepsizes,
     cdef long long b = results.shape[1]
     cdef long long c = results.shape[2]
 
-    for k in range(c):
-        for j in range(b):
-            for i in prange(a, nogil=True, num_threads=cores):
+    for i in prange(a, nogil=True, num_threads=cores):
+        for k in range(c):
+            for j in range(b):
                 results[i, j, k] = array1[i, j, k] * stepsizes[0] + array2[i, j, k] * stepsizes[1]  + \
                                    array3[i, j, k] * stepsizes[2]
 
@@ -194,8 +194,8 @@ cpdef void copy_two_dimensions_cython(double[:, :] target,
     cdef long long l = target.shape[0]
     cdef long long k = target.shape[1]
 
-    for j in range(k):
-        for i in prange(l, nogil=True, num_threads=cores):
+    for i in prange(l, nogil=True, num_threads=cores):
+        for j in range(k):
             target[i, j] = source[i, j]
 
 
@@ -221,7 +221,62 @@ cpdef void copy_three_dimensions_cython(double[:, :, :] target,
     cdef long long b = target.shape[1]
     cdef long long c = target.shape[2]
 
-    for k in range(c):
-        for j in range(b):
-            for i in prange(a, nogil=True, num_threads=cores):
+    for i in prange(a, nogil=True, num_threads=cores):
+        for k in range(c):
+            for j in range(b):
                 target[i, j, k] = source[i, j, k]
+
+
+
+def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
+    cdef int c = cores
+
+    cdef double [:, :] actual_view = actual_links
+    cdef double [:, :] compressed_view = compressed_links
+    cdef long long [:] crosswalk_view = crosswalk
+
+    assign_link_loads_cython(actual_view, compressed_view, crosswalk_view, c)
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void assign_link_loads_cython(double[:, :] actual,
+                                    double[:, :] compressed,
+                                    long long[:] crosswalk,
+                                    int cores):
+    cdef long long i, j, k
+    cdef long long links = actual.shape[0]
+    cdef long long n = actual.shape[1]
+
+    for i in prange(links, nogil=True, num_threads=cores):
+        for j in range(n):
+            k = crosswalk[i]
+            actual[i, j] = compressed[k, j]
+
+
+def aggregate_link_costs(actual_costs, compressed_costs, crosswalk):
+    cdef double [:] actual_view = actual_costs
+    cdef double [:] compressed_view = compressed_costs
+    cdef long long [:] crosswalk_view = crosswalk
+
+    aggregate_link_costs_cython(actual_view, compressed_view, crosswalk_view)
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void aggregate_link_costs_cython(double[:] actual,
+                                       double[:] compressed,
+                                       long long[:] crosswalk):
+    cdef long long i, j, k
+    cdef long long links = actual.shape[0]
+    cdef long long c_l = compressed.shape[0]
+
+    for i in range(c_l):
+        compressed[i] = 0
+
+    for i in range(links):
+        k = crosswalk[i]
+        if k < c_l:
+            compressed[k] += actual[i]
