@@ -194,8 +194,8 @@ cpdef void copy_two_dimensions_cython(double[:, :] target,
     cdef long long l = target.shape[0]
     cdef long long k = target.shape[1]
 
-    for i in prange(l, nogil=True, num_threads=cores):
-        for j in range(k):
+    for j in range(k):
+        for i in prange(l, nogil=True, num_threads=cores):
             target[i, j] = source[i, j]
 
 
