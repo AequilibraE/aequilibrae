@@ -147,13 +147,22 @@ class LinearApproximation(WorkerThread):
         # this needs more work
         numerator = 0.0
         denominator = 0.0
+        prev_dir_minus_current_sol = {}
+        aon_minus_current_sol = {}
+        aon_minus_prev_dir = {}
+
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c.__id__]
-            prev_dir_minus_current_sol = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
-            numerator += prev_dir_minus_current_sol * aon_minus_current_sol
-            denominator += prev_dir_minus_current_sol * aon_minus_prev_dir
+            prev_dir_minus_current_sol[c.__id__] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_current_sol[c.__id__] = np.sum(
+                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
+            )
+            aon_minus_prev_dir[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
+
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                numerator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_current_sol[c_1.__id__]
+                denominator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_prev_dir[c_1.__id__]
 
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
@@ -178,23 +187,36 @@ class LinearApproximation(WorkerThread):
         mu_denominator = 0.0
         nu_nom = 0.0
         nu_denom = 0.0
+
+        w_ = {}
+        x_ = {}
+        y_ = {}
+        z_ = {}
+
         for c in self.traffic_classes:
-            x_ = np.sum(
-                (self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                 + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                 - c.results.link_loads[:, :]
-                 ),
+            x_[c.__id__] = np.sum(
+                (
+                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
+                ),
                 axis=1,
             )
 
-            y_ = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            z_ = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            mu_numerator += x_ * y_
-            mu_denominator += x_ * np.sum(
-                self.previous_step_direction[c.__id__].link_loads - self.step_direction[c.__id__].link_loads[:, :], axis=1
+            y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            z_[c.__id__] = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+
+            w_[c.__id__] = np.sum(
+                self.previous_step_direction[c.__id__].link_loads - self.step_direction[c.__id__].link_loads[:, :],
+                axis=1,
             )
-            nu_nom += z_ * y_
-            nu_denom += z_ * z_
+
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                mu_numerator += x_[c_0.__id__] * y_[c_1.__id__]
+                mu_denominator += x_[c_0.__id__] * w_[c_1.__id__]
+                nu_nom += z_[c_0.__id__] * y_[c_1.__id__]
+                nu_denom += z_[c_0.__id__] * z_[c_1.__id__]
 
         mu_numerator = np.sum(mu_numerator * self.vdf_der)
         mu_denominator = np.sum(mu_denominator * self.vdf_der)
@@ -223,11 +245,11 @@ class LinearApproximation(WorkerThread):
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if (
-                (self.iter == 2)
-                or (self.stepsize == 1.0)
-                or (self.do_fw_step)
-                or (self.algorithm == "frank-wolfe")
-                or (self.algorithm == "msa")
+            (self.iter == 2)
+            or (self.stepsize == 1.0)
+            or (self.do_fw_step)
+            or (self.algorithm == "frank-wolfe")
+            or (self.algorithm == "msa")
         ):
             # logger.info("FW step")
             self.do_fw_step = False
