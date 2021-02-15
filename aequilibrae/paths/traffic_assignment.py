@@ -182,9 +182,9 @@ class TrafficAssignment(object):
             classes (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
-        ids = set([x._id for x in classes])
+        ids = set([x.__id__ for x in classes])
         if len(ids) < len(classes):
-            raise Exception("Classes need to be unique. Your list of classes has repeated items")
+            raise Exception("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
 
     def add_class(self, traffic_class: TrafficClass) -> None:
@@ -195,7 +195,7 @@ class TrafficAssignment(object):
             traffic_class (:obj:`TrafficClass`:) Traffic class
         """
 
-        ids = [x._id for x in self.classes if x._id == traffic_class._id]
+        ids = [x.__id__ for x in self.classes if x.__id__ == traffic_class.__id__]
         if len(ids) > 0:
             raise Exception("Traffic class already in the assignment")
 

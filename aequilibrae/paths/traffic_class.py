@@ -16,6 +16,7 @@ class TrafficClass():
         tc = TrafficClass(graph, demand_matrix)
         tc.set_pce(1.3)
     """
+
     def __init__(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class
@@ -41,7 +42,7 @@ class TrafficClass():
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
-        self._id = uuid4().hex
+        self.__id__ = uuid4().hex
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -52,3 +53,9 @@ class TrafficClass():
         if not isinstance(pce, (float, int)):
             raise ValueError('PCE needs to be either integer or float ')
         self.pce = pce
+
+    def __setattr__(self, key, value):
+
+        if key not in ['graph', 'matrix', 'pce', 'mode', 'class_flow', 'results', '_aon_results', '__id__']:
+            raise KeyError('Traffic Class does not have that element')
+        self.__dict__[key] = value
