@@ -161,8 +161,8 @@ class LinearApproximation(WorkerThread):
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
-                numerator += prev_dir_minus_current_sol[c_0] * aon_minus_current_sol[c_1]
-                denominator += prev_dir_minus_current_sol[c_0] * aon_minus_prev_dir[c_1]
+                numerator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_current_sol[c_1.__id__]
+                denominator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_prev_dir[c_1.__id__]
 
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
@@ -213,10 +213,10 @@ class LinearApproximation(WorkerThread):
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
-                mu_numerator += x_[c_0] * y_[c_1]
-                mu_denominator += x_[c_0] * w_[c_1]
-                nu_nom += z_[c_0] * y_[c_1]
-                nu_denom += z_[c_0] * z_[c_1]
+                mu_numerator += x_[c_0.__id__] * y_[c_1.__id__]
+                mu_denominator += x_[c_0.__id__] * w_[c_1.__id__]
+                nu_nom += z_[c_0.__id__] * y_[c_1.__id__]
+                nu_denom += z_[c_0.__id__] * z_[c_1.__id__]
 
         mu_numerator = np.sum(mu_numerator * self.vdf_der)
         mu_denominator = np.sum(mu_denominator * self.vdf_der)
