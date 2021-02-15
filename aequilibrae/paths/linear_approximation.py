@@ -147,13 +147,22 @@ class LinearApproximation(WorkerThread):
         # this needs more work
         numerator = 0.0
         denominator = 0.0
+        prev_dir_minus_current_sol = {}
+        aon_minus_current_sol = {}
+        aon_minus_prev_dir = {}
+
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c.__id__]
-            prev_dir_minus_current_sol = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_prev_dir = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
-            numerator += prev_dir_minus_current_sol * aon_minus_current_sol
-            denominator += prev_dir_minus_current_sol * aon_minus_prev_dir
+            prev_dir_minus_current_sol[c.__id__] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_current_sol[c.__id__] = np.sum(
+                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
+            )
+            aon_minus_prev_dir[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
+
+        for c_0 in self.traffic_classes:
+            for c_1 in self.traffic_classes:
+                numerator += prev_dir_minus_current_sol[c_0] * aon_minus_current_sol[c_1]
+                denominator += prev_dir_minus_current_sol[c_0] * aon_minus_prev_dir[c_1]
 
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
