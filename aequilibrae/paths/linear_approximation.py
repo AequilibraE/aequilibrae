@@ -48,6 +48,7 @@ class LinearApproximation(WorkerThread):
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
         self.iteration_issue = []
+        self.save_path_files = assig_spec.save_path_files
         self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
         if algorithm == "bfw":
             self.convergence_report["beta0"] = []
@@ -354,6 +355,10 @@ class LinearApproximation(WorkerThread):
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
                 aon.execute()
+
+                if self.save_path_files:
+                    c._aon_results.save_path_file_to_disk(iteration=self.iter)
+
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)

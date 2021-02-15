@@ -235,7 +235,7 @@ class AssignmentResults:
             )
 
         if not file_name:
-            file_name = f"path_iter{iteration}_"
+            file_name = f"paths/path_iter{iteration}_"
 
         for origin in [0]:  # range(self.zones):
             predecessors_this_o = self.predecessors[origin]
@@ -254,4 +254,3 @@ class AssignmentResults:
                 # last entry is -1
                 df_ = pd.DataFrame(data=path_for_origin[:-1], columns=["link_id"])
                 df_.to_parquet(f"{file_name}_{origin}_{destination}.parquet")
-                # display(df_)

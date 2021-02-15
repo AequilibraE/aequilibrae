@@ -239,7 +239,7 @@ class TrafficAssignment(object):
 
         self.__dict__["algorithm"] = algo
 
-    def save_path_files(self, save_it):
+    def save_paths_to_file(self, save_it) -> None:
         """
         Turn path saving on or off.
 
