@@ -113,6 +113,7 @@ class TrafficAssignment(object):
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
         self.__dict__["cores"] = None  # type: int
+        self.__dict__["save_path_files"] = False  # type: bool
 
         self.__dict__["procedure_id"] = uuid4().hex
         self.__dict__["description"] = ""
@@ -237,6 +238,20 @@ class TrafficAssignment(object):
             raise Exception("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+
+    def save_path_files(self, save_it):
+        """
+        Turn path saving on or off.
+
+        Args:
+            save_it (:obj:`bool`): Boolean to indicate whether paths should be saved
+
+        """
+        if self.classes is None:
+            raise Exception("You need to set traffic classes before turning path saving on or off")
+        self.__dict__["save_path_files"] = save_it
+        for c in self.classes:
+            c._aon_results.save_path_file = save_it
 
     def set_vdf_parameters(self, par: dict) -> None:
         """

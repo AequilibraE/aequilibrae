@@ -42,7 +42,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     #We transform the python variables in Cython variables
     nodes = graph.compact_num_nodes
 
-
     skims = len(graph.skim_fields)
 
     if VERSION_COMPILED != graph.__version__:
@@ -136,6 +135,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    if result.save_path_file:
+        result.predecessors[origin_index] = aux_result.predecessors[:, curr_thread]
+        result.connectors[origin_index] = aux_result.connectors[:, curr_thread]
 
     return origin
 

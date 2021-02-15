@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import numpy as np
+import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
@@ -50,6 +51,11 @@ class AssignmentResults:
 
         self.lids = None
         self.direcs = None
+
+        # test for path saving
+        self.predecessors = {}
+        self.connectors = {}
+        self.save_path_file = False
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
@@ -219,3 +225,33 @@ class AssignmentResults:
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
             raise NotImplementedError
+
+    # TODO: integrate in line above
+    def save_path_file_to_disk(self, file_name=None, iteration=0):
+
+        if not self.save_path_file:
+            raise ValueError(
+                "Cannot save paths to disk due to save_path_file not set to True, please set it before assigning."
+            )
+
+        if not file_name:
+            file_name = f"path_iter{iteration}_"
+
+        for origin in [0]:  # range(self.zones):
+            predecessors_this_o = self.predecessors[origin]
+            connectors_this_o = self.connectors[origin]
+            for destination in range(self.zones):
+                # tracing backwards from each destination for this one-to-all shortest path
+                path_for_origin = []
+                predecessor = predecessors_this_o[destination]
+                connector = connectors_this_o[destination]
+                while predecessor >= 0:
+                    # SAVE CONNECTOR HERE or return array
+                    path_for_origin.append(connector)
+                    predecessor = predecessors_this_o[predecessor]
+                    connector = connectors_this_o[predecessor]
+
+                # last entry is -1
+                df_ = pd.DataFrame(data=path_for_origin[:-1], columns=["link_id"])
+                df_.to_parquet(f"{file_name}_{origin}_{destination}.parquet")
+                # display(df_)
