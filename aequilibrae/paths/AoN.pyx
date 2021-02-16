@@ -137,6 +137,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
+    if result.keep_predecessors:
+        result.predecessors[origin_index] = np.ascontiguousarray(aux_result.predecessors[:, curr_thread])
+
     return origin
 
 def path_computation(origin, destination, graph, results):

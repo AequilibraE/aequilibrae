@@ -51,6 +51,10 @@ class AssignmentResults:
         self.lids = None
         self.direcs = None
 
+        # data structures for bush-based assignment
+        self.keep_predecessors = False
+        self.predecessors = None
+
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """
