@@ -8,8 +8,8 @@ import socket
 import numpy as np
 import pandas as pd
 from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
+from aequilibrae.paths.path_based_assignment import PathBasedAssignment
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.matrix import AequilibraeData
@@ -107,7 +107,7 @@ class TrafficAssignment(object):
         self.__dict__["vdf_parameters"] = None  # type: list
         self.__dict__["time_field"] = None  # type: str
         self.__dict__["capacity_field"] = None  # type: str
-        self.__dict__["assignment"] = None  # type: LinearApproximation
+        self.__dict__["assignment"] = None  # type: LinearApproximation or PathBasedAssignment
         self.__dict__["capacity"] = None  # type: np.ndarray
         self.__dict__["free_flow_tt"] = None  # type: np.ndarray
         self.__dict__["total_flow"] = None  # type: np.ndarray
@@ -130,12 +130,12 @@ class TrafficAssignment(object):
         if instance == "rgap_target":
             if not isinstance(value, float):
                 return False, value, "Relative gap needs to be a float"
-            if isinstance(self.assignment, LinearApproximation):
+            if isinstance(self.assignment, LinearApproximation) or isinstance(self.assignment, PathBasedAssignment):
                 self.assignment.rgap_target = value
         elif instance == "max_iter":
             if not isinstance(value, int):
                 return False, value, "Number of iterations needs to be an integer"
-            if isinstance(self.assignment, LinearApproximation):
+            if isinstance(self.assignment, LinearApproximation) or isinstance(self.assignment, PathBasedAssignment):
                 self.assignment.max_iter = value
         elif instance == "vdf":
             v = value.lower()
@@ -233,6 +233,8 @@ class TrafficAssignment(object):
 
         if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algo)
+        elif algorithm.lower() in ["bush-based"]:
+            self.assignment = PathBasedAssignment(self, algo)
         else:
             raise Exception("Algorithm not listed in the case selection")
 
