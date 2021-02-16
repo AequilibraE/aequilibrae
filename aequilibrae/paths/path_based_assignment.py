@@ -4,7 +4,6 @@ from typing import List, Dict
 from warnings import warn
 import cvxopt
 import array
-import scipy
 
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
@@ -21,16 +20,6 @@ try:
     from aequilibrae.paths.AoN import one_to_all
 except ImportError as ie:
     logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
-if int(scipy.__version__.split(".")[1]) >= 3:
-    from scipy.optimize import root_scalar
-
-    recent_scipy = True
-else:
-    from scipy.optimize import root as root_scalar
-
-    recent_scipy = False
-    logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
