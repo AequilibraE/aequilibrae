@@ -95,7 +95,7 @@ class TrafficAssignment(object):
     """
 
     bpr_parameters = ["alpha", "beta"]
-    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
+    all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw", "bush-based"]
 
     def __init__(self) -> None:
         parameters = Parameters().parameters["assignment"]["equilibrium"]
