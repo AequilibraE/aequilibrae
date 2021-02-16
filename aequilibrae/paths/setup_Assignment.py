@@ -65,6 +65,7 @@ ext_bushbased = [
         sources=["TrafficAssignmentCy.pyx", "TrafficAssignment.cpp"],
         language="c++",
         extra_compile_args=["-ffast-math", "-O3"],
+        include_dirs=[np.get_include()],
     )
 ]
 

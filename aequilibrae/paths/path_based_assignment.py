@@ -17,7 +17,7 @@ try:
 
     # temp for one to all shortest path hack
     from aequilibrae.paths.multi_threaded_aon import MultiThreadedAoN
-    from aequilibrae.paths.AoN import one_to_all
+    from aequilibrae.paths.AoN import one_to_all, aggregate_link_costs
 except ImportError as ie:
     logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -63,6 +63,8 @@ class PathBasedAssignment(WorkerThread):
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
         assert len(self.traffic_classes) == 1, "Path based assignment is currently implemented for single class only."
+        self.traffic_classes[0]._aon_results.keep_predecessors = True
+
         self.num_classes = len(assig_spec.classes)
 
         self.cap_field = assig_spec.capacity_field
@@ -83,11 +85,6 @@ class PathBasedAssignment(WorkerThread):
         self.vdf_der = np.array(assig_spec.congested_time, copy=True)
         self.congested_value = np.array(assig_spec.congested_time, copy=True)
 
-        for c in self.traffic_classes:
-            r = AssignmentResults()
-            r.prepare(c.graph, c.matrix)
-        #     self.step_direction[c.mode] = r
-
         self.t_assignment = None
 
         cvxopt.solvers.options["show_progress"] = False
@@ -100,7 +97,7 @@ class PathBasedAssignment(WorkerThread):
         """Wrapper around OpenBenchmark.build_datastructure"""
 
         # fix to one class for now
-        graph_ = pd.DataFrame(self.traffic_classes[0].graph.graph)
+        graph_ = self.traffic_classes[0].graph.graph
 
         # unique nodes
         x_ = set(graph_["a_node"].unique())
@@ -146,6 +143,7 @@ class PathBasedAssignment(WorkerThread):
 
     def initial_iteration(self):
         c = self.traffic_classes[0]
+        # aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
         matrix = c.matrix
         graph = c.graph
         results = c._aon_results
@@ -160,7 +158,8 @@ class PathBasedAssignment(WorkerThread):
             _ = one_to_all(origin_aeq, matrix, graph, results, aux_res, th)
 
             # set precedence to aux_res.predecessors[:,0]
-            prec = aux_res.predecessors[:, 0]
+            # prec = aux_res.predecessors[:, 0]
+            prec = results.predecessors[origin]
             self.t_assignment.set_precedence(prec)
             self.t_assignment.compute_path_link_sequence_external_precedence(origin)
             self.t_assignment.set_initial_path_flows(origin)
@@ -173,6 +172,7 @@ class PathBasedAssignment(WorkerThread):
 
     def shortest_path_temp_wrapper(self, origin):
         c = self.traffic_classes[0]
+        aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
         matrix = c.matrix
         graph = c.graph
         results = c._aon_results
@@ -184,7 +184,8 @@ class PathBasedAssignment(WorkerThread):
         _ = one_to_all(origin_aeq, matrix, graph, results, aux_res, th)
 
         # set precedence to aux_res.predecessors[:,0]
-        prec = aux_res.predecessors[:, 0]
+        # prec = aux_res.predecessors[:, 0]
+        prec = results.predecessors[origin]
         self.t_assignment.set_precedence(prec)
         self.t_assignment.compute_path_link_sequence_external_precedence(origin)
 
@@ -222,9 +223,13 @@ class PathBasedAssignment(WorkerThread):
         num_links = len(self.links)
         num_nodes = len(self.nodes)
         num_centroids = len(self.origins)
-        logger.info(f" Initialised data structures, num nodes = {num_nodes}, num links = {num_links}")
+        logger.info(
+            f" Initialised data structures, num nodes = {num_nodes}, num links = {num_links},"
+            f" num centroids = {num_centroids}"
+        )
 
         self.t_assignment = TrafficAssignmentCy.TrafficAssignmentCy(self.links, num_links, num_nodes, num_centroids)
+
         destinations_per_origin = {}
         for (o, d) in self.ods:
             self.t_assignment.insert_od(o, d, self.ods[o, d])

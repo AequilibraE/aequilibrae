@@ -19,6 +19,7 @@ ext_module2 = Extension(
     [whole_path2, whole_path3],
     language="c++",
     extra_compile_args=["-ffast-math"],
+    include_dirs=[np.get_include()],
 )
 
 pkgs = [pkg for pkg in find_packages()]

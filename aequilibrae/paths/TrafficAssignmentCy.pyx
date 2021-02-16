@@ -5,6 +5,7 @@ from cpython cimport array
 #import array
 import ctypes
 import numpy
+cimport numpy
 import cvxopt
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair
