@@ -96,8 +96,14 @@ class PathBasedAssignment(WorkerThread):
     def initialise_data_structures(self):
         """Wrapper around OpenBenchmark.build_datastructure"""
 
-        # fix to one class for now
-        graph_ = self.traffic_classes[0].graph.graph
+        # FIXME: this is a hack to get network simplificaiton integrated, however the duplicated cost
+        # calculation in the C++ part of the code are now WRONG. Will need to remove those bits anyways
+        # so ignore for now.
+        graph_ = self.traffic_classes[0].graph.compact_graph
+        temp_graph = self.traffic_classes[0].graph.graph[["time", "capacity", "alpha", "beta", "__compressed_id__"]]
+        # pick the first one in the original graph, arbitrary and wrong, see comment above
+        temp_graph = temp_graph.drop_duplicates(subset="__compressed_id__")
+        graph_ = graph_.merge(temp_graph, left_on="id", right_on="__compressed_id__")
 
         # unique nodes
         x_ = set(graph_["a_node"].unique())
@@ -106,7 +112,7 @@ class PathBasedAssignment(WorkerThread):
 
         # links
         def create_link(row):
-            link_id = row["link_id"]
+            link_id = row["id"]  # "link_id"]
             t0 = row["time"]
             capacity = row["capacity"]
             alfa = row["alpha"]
@@ -144,6 +150,7 @@ class PathBasedAssignment(WorkerThread):
     def initial_iteration(self):
         c = self.traffic_classes[0]
         # aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
+        aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
         matrix = c.matrix
         graph = c.graph
         results = c._aon_results
@@ -155,6 +162,7 @@ class PathBasedAssignment(WorkerThread):
             )
             th = 0  # th is thread id
             origin_aeq = origin + 1  # sort out this mess
+
             _ = one_to_all(origin_aeq, matrix, graph, results, aux_res, th)
 
             # set precedence to aux_res.predecessors[:,0]
