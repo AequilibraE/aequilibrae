@@ -30,7 +30,7 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        twine upload dist/*.whl
+        twine upload dist/*-manylinux*.whl
 
     - name: Save wheels to AWS
       uses: jakejarvis/s3-sync-action@master
@@ -41,5 +41,5 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
-        SOURCE_DIR: 'dist/'      # optional: defaults to entire repository
+        SOURCE_DIR: 'aequilibrae/dist/'      # optional: defaults to entire repository
         DEST_DIR: 'wheels/'      # optional: defaults to entire repository
