@@ -26,9 +26,9 @@ jobs:
 
     - name: run dir
       run: |
-        ls
-        cd aequilibrae
-        ls
+        mkdir -p dist
+        cp -v /*-manylinux*.whl dist/
+        cp -v aequilibrae/*-manylinux*.whl dist/
 
     - name: Publish wheels to PyPI
       if: ${{ github.event_name == 'release'}}
