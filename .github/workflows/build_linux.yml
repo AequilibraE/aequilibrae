@@ -43,7 +43,3 @@ jobs:
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: './*.whl'      # optional: defaults to entire repository
         DEST_DIR: '/wheels/'      # optional: defaults to entire repository
-      run: |
-        twine upload ./*-manylinux2014_x86_64.whl
-
-
