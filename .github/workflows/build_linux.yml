@@ -24,10 +24,9 @@ jobs:
         build-requirements: 'setuptools numpy cython pyaml pyqt5 requests scipy shapely pandas'
         pip-wheel-args: '--no-deps'
 
-    - name: run dir
-      run: |
+    - name: Moves wheels
         mkdir -p dist
-        cp -v /*-manylinux*.whl dist/
+        cp -v ./*-manylinux*.whl dist/
         cp -v aequilibrae/*-manylinux*.whl dist/
 
     - name: Publish wheels to PyPI
