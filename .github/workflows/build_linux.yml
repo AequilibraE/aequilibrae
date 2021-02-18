@@ -25,6 +25,7 @@ jobs:
         pip-wheel-args: '--no-deps'
 
     - name: Moves wheels
+      run: |
         mkdir -p dist
         cp -v ./*-manylinux*.whl dist/
         cp -v aequilibrae/*-manylinux*.whl dist/
