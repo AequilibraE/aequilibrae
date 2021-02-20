@@ -4,6 +4,7 @@ import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.starts_logging import logger
 
 
 class TrafficClass():
@@ -35,10 +36,14 @@ class TrafficClass():
         self.graph = graph
         self.matrix = matrix
         self.pce = 1
+        self.vot = 0
         self.mode = graph.mode
         self.class_flow: np.array
         self.results = AssignmentResults()
         self.results.prepare(self.graph, self.matrix)
+        self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types('float'))
+        self.fixed_cost_field = ''
+        self.fc_multiplier = 1.0
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
@@ -54,8 +59,38 @@ class TrafficClass():
             raise ValueError('PCE needs to be either integer or float ')
         self.pce = pce
 
+    def set_fixed_cost(self, field_name: str, multiplier=1):
+        """Sets value of time
+
+        Args:
+            field_name (:obj:`str`): Name of the graph field with fixed costs for this class
+            multiplier (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
+        """
+        self.fc_multiplier = float(multiplier)
+        if field_name not in self.graph.graph.columns:
+            raise ValueError('Field does not exist in the graph')
+
+        self.fixed_cost_field = field_name
+        if np.any(np.isnan(self.graph.graph[field_name].values)):
+            logger.warning(f'Cost field {field_name} has NaN values. Converted to zero')
+
+        if self.graph.graph[field_name].min() < 0:
+            msg = f'Cost field {field_name} has negative values. That is not allowed'
+            logger.error(msg)
+            raise ValueError(msg)
+
+    def set_vot(self, value_of_time: float) -> None:
+        """Sets value of time
+
+        Args:
+            value_of_time (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
+        """
+
+        self.vot = float(value_of_time)
+
     def __setattr__(self, key, value):
 
-        if key not in ['graph', 'matrix', 'pce', 'mode', 'class_flow', 'results', '_aon_results', '__id__']:
+        if key not in ['graph', 'matrix', 'pce', 'mode', 'class_flow', 'results',
+                       '_aon_results', '__id__', 'vot', 'fixed_cost', 'fc_multiplier', 'fixed_cost_field']:
             raise KeyError('Traffic Class does not have that element')
         self.__dict__[key] = value

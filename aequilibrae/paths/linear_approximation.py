@@ -196,9 +196,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             x_[c.__id__] = np.sum(
                 (
-                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                    - c.results.link_loads[:, :]
+                        self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                        + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                        - c.results.link_loads[:, :]
                 ),
                 axis=1,
             )
@@ -245,11 +245,11 @@ class LinearApproximation(WorkerThread):
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if (
-            (self.iter == 2)
-            or (self.stepsize == 1.0)
-            or (self.do_fw_step)
-            or (self.algorithm == "frank-wolfe")
-            or (self.algorithm == "msa")
+                (self.iter == 2)
+                or (self.stepsize == 1.0)
+                or (self.do_fw_step)
+                or (self.algorithm == "frank-wolfe")
+                or (self.algorithm == "msa")
         ):
             # logger.info("FW step")
             self.do_fw_step = False
@@ -336,6 +336,14 @@ class LinearApproximation(WorkerThread):
         self.execute()
 
     def execute(self):
+        # We build the fixed cost field
+        for c in self.traffic_classes:
+            if c.fixed_cost_field:
+                c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier
+                c.fixed_cost[np.isnan(c.fixed_cost)] = 0
+
+        # TODO: Review how to eliminate this. It looks unecessary
+        # Just need to create some arrays for cost
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
@@ -349,7 +357,8 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
             for c in self.traffic_classes:  # type: TrafficClass
-                aggregate_link_costs(self.congested_time, c.graph.compact_cost, c.results.crosswalk)
+                cost = c.fixed_cost + self.congested_time
+                aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
