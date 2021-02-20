@@ -196,9 +196,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             x_[c.__id__] = np.sum(
                 (
-                        self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                        + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                        - c.results.link_loads[:, :]
+                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
                 ),
                 axis=1,
             )
@@ -245,11 +245,11 @@ class LinearApproximation(WorkerThread):
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if (
-                (self.iter == 2)
-                or (self.stepsize == 1.0)
-                or (self.do_fw_step)
-                or (self.algorithm == "frank-wolfe")
-                or (self.algorithm == "msa")
+            (self.iter == 2)
+            or (self.stepsize == 1.0)
+            or (self.do_fw_step)
+            or (self.algorithm == "frank-wolfe")
+            or (self.algorithm == "msa")
         ):
             # logger.info("FW step")
             self.do_fw_step = False
