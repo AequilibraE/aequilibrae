@@ -201,8 +201,8 @@ class LinearApproximation(WorkerThread):
             y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_[c.__id__] = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
 
-            w_[c.__id__] = np.sum(self.previous_step_direction[c.__id__].link_loads -
-                                  self.step_direction[c.__id__].link_loads[:, :], axis=1)
+            w_[c.__id__] = np.sum(self.previous_step_direction[c.__id__].link_loads
+                                  - self.step_direction[c.__id__].link_loads[:, :], axis=1)
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
