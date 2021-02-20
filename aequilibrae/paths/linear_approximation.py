@@ -342,7 +342,7 @@ class LinearApproximation(WorkerThread):
                 c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
-        # TODO: Review how to eliminate this. It looks unecessary
+        # TODO: Review how to eliminate this. It looks unnecessary
         # Just need to create some arrays for cost
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
@@ -357,7 +357,7 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
             for c in self.traffic_classes:  # type: TrafficClass
-                cost = c.fixed_cost + self.congested_time
+                cost = c.fixed_cost + self.congested_time * c.vot
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
