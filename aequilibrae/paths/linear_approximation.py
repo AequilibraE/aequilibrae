@@ -244,14 +244,7 @@ class LinearApproximation(WorkerThread):
 
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
-        if (
-            (self.iter == 2)
-            or (self.stepsize == 1.0)
-            or (self.do_fw_step)
-            or (self.algorithm == "frank-wolfe")
-            or (self.algorithm == "msa")
-        ):
-            # logger.info("FW step")
+        if self.iter == 2 or self.stepsize == 1.0 or self.do_fw_step or self.algorithm in ["msa", "frank-wolfe"]:
             self.do_fw_step = False
             self.do_conjugate_step = True
             self.conjugate_stepsize = 0.0
