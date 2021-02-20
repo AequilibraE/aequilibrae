@@ -35,8 +35,8 @@ class TrafficClass():
 
         self.graph = graph
         self.matrix = matrix
-        self.pce = 1
-        self.vot = 0
+        self.pce = 1.0
+        self.vot = 1.0
         self.mode = graph.mode
         self.class_flow: np.array
         self.results = AssignmentResults()

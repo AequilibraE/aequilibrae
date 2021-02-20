@@ -196,9 +196,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             x_[c.__id__] = np.sum(
                 (
-                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                    - c.results.link_loads[:, :]
+                        self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                        + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                        - c.results.link_loads[:, :]
                 ),
                 axis=1,
             )
@@ -262,27 +262,21 @@ class LinearApproximation(WorkerThread):
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
-                stp_dr = self.step_direction[c.__id__]
+                sdr = self.step_direction[c.__id__]
                 pre_previous = self.pre_previous_step_direction[c.__id__]
-                copy_two_dimensions(pre_previous.link_loads, stp_dr.link_loads, self.cores)
+                copy_two_dimensions(pre_previous.link_loads, sdr.link_loads, self.cores)
                 pre_previous.total_flows()
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(pre_previous.skims.matrix_view, stp_dr.skims.matrix_view, self.cores)
+                    copy_three_dimensions(pre_previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
 
-                linear_combination(
-                    stp_dr.link_loads, stp_dr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
-                )
+                linear_combination(sdr.link_loads, c._aon_results.link_loads, sdr.link_loads,
+                                   self.conjugate_stepsize, self.cores)
 
                 if c.results.num_skims > 0:
-                    linear_combination_skims(
-                        stp_dr.skims.matrix_view,
-                        stp_dr.skims.matrix_view,
-                        c._aon_results.skims.matrix_view,
-                        self.conjugate_stepsize,
-                        self.cores,
-                    )
-                stp_dr.total_flows()
-                sd_flows.append(stp_dr.total_link_loads)
+                    linear_combination_skims(sdr.skims.matrix_view, c._aon_results.skims.matrix_view,
+                                             sdr.skims.matrix_view, self.conjugate_stepsize, self.cores)
+                sdr.total_flows()
+                sd_flows.append(sdr.total_link_loads)
         # biconjugate
         else:
             self.calculate_biconjugate_direction()
@@ -297,24 +291,14 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
 
-                triple_linear_combination(
-                    stp_dir.link_loads,
-                    c._aon_results.link_loads,
-                    stp_dir.link_loads,
-                    prev_stp_dir.link_loads,
-                    self.betas,
-                    self.cores,
-                )
+                triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
+                                          prev_stp_dir.link_loads, self.betas, self.cores)
+
                 stp_dir.total_flows()
                 if c.results.num_skims > 0:
-                    triple_linear_combination_skims(
-                        stp_dir.skims.matrix_view,
-                        c._aon_results.skims.matrix_view,
-                        stp_dir.skims.matrix_view,
-                        prev_stp_dir.skims.matrix_view,
-                        self.betas,
-                        self.cores,
-                    )
+                    triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
+                                                    stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
+                                                    self.betas, self.cores)
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
