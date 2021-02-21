@@ -129,7 +129,7 @@ class Links:
 
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
-        self.curr.execute("select max(link_id) from Links")
+        self.curr.execute("select coalesce(max(link_id),0) from Links")
         self.__max_id = self.curr.fetchone()[0]
         tl = TableLoader()
         tl.load_structure(self.curr, "links")
