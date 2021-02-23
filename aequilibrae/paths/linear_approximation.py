@@ -193,15 +193,22 @@ class LinearApproximation(WorkerThread):
         z_ = {}
 
         for c in self.traffic_classes:
-            x_[c.__id__] = np.sum((self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                                   + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                                   - c.results.link_loads[:, :]), axis=1)
+            x_[c.__id__] = np.sum(
+                (
+                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
+                ),
+                axis=1,
+            )
 
             y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_[c.__id__] = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
 
-            w_[c.__id__] = np.sum(self.previous_step_direction[c.__id__].link_loads
-                                  - self.step_direction[c.__id__].link_loads[:, :], axis=1)
+            w_[c.__id__] = np.sum(
+                self.previous_step_direction[c.__id__].link_loads - self.step_direction[c.__id__].link_loads[:, :],
+                axis=1,
+            )
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
@@ -261,12 +268,18 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(pre_previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
 
-                linear_combination(sdr.link_loads, c._aon_results.link_loads, sdr.link_loads,
-                                   self.conjugate_stepsize, self.cores)
+                linear_combination(
+                    sdr.link_loads, c._aon_results.link_loads, sdr.link_loads, self.conjugate_stepsize, self.cores
+                )
 
                 if c.results.num_skims > 0:
-                    linear_combination_skims(sdr.skims.matrix_view, c._aon_results.skims.matrix_view,
-                                             sdr.skims.matrix_view, self.conjugate_stepsize, self.cores)
+                    linear_combination_skims(
+                        sdr.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        sdr.skims.matrix_view,
+                        self.conjugate_stepsize,
+                        self.cores,
+                    )
                 sdr.total_flows()
                 sd_flows.append(sdr.total_link_loads)
         # biconjugate
@@ -283,14 +296,25 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
 
-                triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
-                                          prev_stp_dir.link_loads, self.betas, self.cores)
+                triple_linear_combination(
+                    stp_dir.link_loads,
+                    c._aon_results.link_loads,
+                    stp_dir.link_loads,
+                    prev_stp_dir.link_loads,
+                    self.betas,
+                    self.cores,
+                )
 
                 stp_dir.total_flows()
                 if c.results.num_skims > 0:
-                    triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
-                                                    stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
-                                                    self.betas, self.cores)
+                    triple_linear_combination_skims(
+                        stp_dir.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        stp_dir.skims.matrix_view,
+                        prev_stp_dir.skims.matrix_view,
+                        self.betas,
+                        self.cores,
+                    )
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
@@ -326,7 +350,7 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
             for c in self.traffic_classes:  # type: TrafficClass
-                cost = c.fixed_cost + self.congested_time * c.vot
+                cost = c.fixed_cost / c.vot + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
@@ -432,7 +456,16 @@ class LinearApproximation(WorkerThread):
             self.vdf.apply_vdf(
                 self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
             )
-            return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
+
+            link_cost_term = self.congested_value * (self.step_direction_flow - self.fw_total_flow)
+
+            # class specific terms
+            class_specific_term = 0.0
+            for c in self.traffic_classes:
+                cost = c.fixed_cost / c.vot
+                class_diff = self.step_direction[c.__id__].link_loads - c.results.link_loads
+                class_specific_term += cost * class_diff
+            return np.sum(link_cost_term + class_specific_term)
 
         try:
             if recent_scipy:
