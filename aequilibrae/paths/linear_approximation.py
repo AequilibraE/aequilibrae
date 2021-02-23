@@ -1,7 +1,6 @@
 import importlib.util as iutil
 import numpy as np
 from typing import List, Dict
-from warnings import warn
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
