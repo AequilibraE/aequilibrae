@@ -495,7 +495,9 @@ class LinearApproximation(WorkerThread):
                 self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
-                    tiny_step = 1e-4
+                    tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
+                    # works well in practice, however for a large number of iterations this might be too much so
+                    # use this heuristic instead.
                     logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
                     self.stepsize = tiny_step
                 else:
