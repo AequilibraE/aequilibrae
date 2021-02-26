@@ -467,14 +467,16 @@ class LinearApproximation(WorkerThread):
                 class_specific_term += cost * class_diff
             return np.sum(link_cost_term + class_specific_term)
 
+        x_tol = max(min(1e-5, self.rgap * 0.01), 1e-12)
+
         try:
             if recent_scipy:
-                min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
+                min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
                 self.stepsize = min_res.root
                 if not min_res.converged:
                     logger.warning("Descent direction stepsize finder has not converged")
             else:
-                min_res = root_scalar(derivative_of_objective, 1 / self.iter)
+                min_res = root_scalar(derivative_of_objective, 1 / self.iter, xtol=x_tol)
                 if not min_res.success:
                     logger.warning("Descent direction stepsize finder has not converged")
                 self.stepsize = min_res.x[0]
@@ -493,9 +495,9 @@ class LinearApproximation(WorkerThread):
                 self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
-                    msa_step = 1.0 / self.iter
-                    logger.warning(f"# Alert: Adding {msa_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = msa_step
+                    tiny_step = 1e-4
+                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
