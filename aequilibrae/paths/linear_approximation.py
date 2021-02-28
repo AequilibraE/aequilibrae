@@ -467,7 +467,7 @@ class LinearApproximation(WorkerThread):
                 class_specific_term += cost * class_diff
             return np.sum(link_cost_term + class_specific_term)
 
-        x_tol = max(min(1e-5, self.rgap * 0.01), 1e-12)
+        x_tol = max(self.rgap * 1e-6, 1e-12)
 
         try:
             if recent_scipy:
