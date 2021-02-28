@@ -25,6 +25,60 @@ cpdef void sum_axis1_cython(double[:] totals,
 
 
 
+def sum_a_times_b_minus_c(array1, array2, array3, cores):
+    cdef int c = cores
+    cdef double result
+    cdef double [:] array1_view = array1
+    cdef double [:] array2_view = array2
+    cdef double [:] array3_view = array3
+
+    result = sum_a_times_b_minus_c_cython(array1_view, array2_view, array3_view, c)
+    return result
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef double sum_a_times_b_minus_c_cython(double[:] array1,
+                                          double[:] array2,
+                                          double[:] array3,
+                                          int cores):
+    cdef long long i
+    cdef double row_result
+    cdef double result = 0.0
+    cdef long long l = array1.shape[0]
+
+    for i in prange(l, nogil=True, num_threads=cores):
+        row_result = array1[i] * (array2[i] - array3[i])
+        result += row_result
+
+    return result
+
+def linear_combination_1d(results, array1, array2, stepsize, cores):
+    cdef double stpsz
+    cdef int c = cores
+
+    stpsz = float(stepsize)
+    cdef double [:] results_view = results
+    cdef double [:] array1_view = array1
+    cdef double [:] array2_view = array2
+
+    linear_combination_cython_1d(stpsz, results_view, array1_view, array2_view, c)
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef void linear_combination_cython_1d(double stepsize,
+                                        double[:] results,
+                                        double[:] array1,
+                                        double[:] array2,
+                                        int cores):
+    cdef long long i
+    cdef long long l = results.shape[0]
+
+    for i in prange(l, nogil=True, num_threads=cores):
+        results[i] = array1[i] * stepsize + array2[i] * (1.0 - stepsize)
+
 
 def linear_combination(results, array1, array2, stepsize, cores):
     cdef double stpsz

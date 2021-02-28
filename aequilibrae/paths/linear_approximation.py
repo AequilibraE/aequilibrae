@@ -11,6 +11,7 @@ try:
     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
     from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
+    from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
 except ImportError as ie:
     logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -332,7 +333,10 @@ class LinearApproximation(WorkerThread):
         # We build the fixed cost field
         for c in self.traffic_classes:
             if c.fixed_cost_field:
-                c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier
+                # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
+                # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
+                # not want this there I think
+                c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
         # TODO: Review how to eliminate this. It looks unnecessary
@@ -350,7 +354,8 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
             for c in self.traffic_classes:  # type: TrafficClass
-                cost = c.fixed_cost / c.vot + self.congested_time
+                # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
+                cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
@@ -450,22 +455,26 @@ class LinearApproximation(WorkerThread):
             self.stepsize = 1.0 / self.iter
             return
 
-        def derivative_of_objective(stepsize):
-            x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        # class specific terms, stepsize dependence drops out
+        class_specific_term = 0.0
+        for c in self.traffic_classes:
+            # fixed cost is scaled by vot
+            class_link_costs = sum_a_times_b_minus_c(
+                c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
+            )
+            class_specific_term += class_link_costs
 
+        def derivative_of_objective(stepsize):
+            x = np.zeros_like(self.fw_total_flow)
+            linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
+            # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
             self.vdf.apply_vdf(
                 self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
             )
-
-            link_cost_term = self.congested_value * (self.step_direction_flow - self.fw_total_flow)
-
-            # class specific terms
-            class_specific_term = 0.0
-            for c in self.traffic_classes:
-                cost = c.fixed_cost / c.vot
-                class_diff = self.step_direction[c.__id__].link_loads - c.results.link_loads
-                class_specific_term += cost * class_diff
-            return np.sum(link_cost_term + class_specific_term)
+            link_cost_term = sum_a_times_b_minus_c(
+                self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+            )
+            return link_cost_term + class_specific_term
 
         x_tol = max(self.rgap * 1e-6, 1e-12)
 
