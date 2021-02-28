@@ -464,7 +464,9 @@ class LinearApproximation(WorkerThread):
             )
             class_specific_term += class_link_costs
 
-        def derivative_of_objective(stepsize):
+        from functools import partial
+
+        def derivative_of_objective_(stepsize, class_specific_term_const):
             x = np.zeros_like(self.fw_total_flow)
             linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
             # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
@@ -474,7 +476,9 @@ class LinearApproximation(WorkerThread):
             link_cost_term = sum_a_times_b_minus_c(
                 self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
             )
-            return link_cost_term + class_specific_term
+            return link_cost_term + class_specific_term_const
+
+        derivative_of_objective = partial(derivative_of_objective_, class_specific_term_const=class_specific_term)
 
         x_tol = max(self.rgap * 1e-6, 1e-12)
 
