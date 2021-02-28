@@ -1,4 +1,5 @@
 import importlib.util as iutil
+from functools import partial
 import numpy as np
 from typing import List, Dict
 from ..utils import WorkerThread
@@ -449,13 +450,21 @@ class LinearApproximation(WorkerThread):
             self.equilibration.emit(["iterations", self.iter])
             self.equilibration.emit(["finished_threaded_procedure"])
 
-    def calculate_stepsize(self):
-        """Calculate optimal stepsize in descent direction"""
-        if self.algorithm == "msa":
-            self.stepsize = 1.0 / self.iter
-            return
+    def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
+        """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
+        the corresponding contribution needs to be passed in"""
+        x = np.zeros_like(self.fw_total_flow)
+        linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
+        # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
+        link_cost_term = sum_a_times_b_minus_c(
+            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+        )
+        return link_cost_term + const_term
 
-        # class specific terms, stepsize dependence drops out
+    def __derivative_of_objective_stepsize_independent(self):
+        """The part of the derivative of the objective function that does not dependent on stepsize. Non-zero
+        only for fixed cost contributions."""
         class_specific_term = 0.0
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
@@ -463,24 +472,20 @@ class LinearApproximation(WorkerThread):
                 c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
             )
             class_specific_term += class_link_costs
+        return class_specific_term
 
-        from functools import partial
+    def calculate_stepsize(self):
+        """Calculate optimal stepsize in descent direction"""
+        if self.algorithm == "msa":
+            self.stepsize = 1.0 / self.iter
+            return
 
-        def derivative_of_objective_(stepsize, class_specific_term_const):
-            x = np.zeros_like(self.fw_total_flow)
-            linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
-            # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
-            self.vdf.apply_vdf(
-                self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
-            )
-            link_cost_term = sum_a_times_b_minus_c(
-                self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
-            )
-            return link_cost_term + class_specific_term_const
+        class_specific_term = self.__derivative_of_objective_stepsize_independent()
+        derivative_of_objective = partial(
+            self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term
+        )
 
-        derivative_of_objective = partial(derivative_of_objective_, class_specific_term_const=class_specific_term)
-
-        x_tol = max(self.rgap * 1e-6, 1e-12)
+        x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
         try:
             if recent_scipy:
