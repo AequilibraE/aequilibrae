@@ -117,7 +117,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         node_load_view,
                         w)
 
-        save_path_file(classes, origin_index, links, zones, predecessors_view, conn_view)
+        # TODO JAN: first do it with gil, then without
+        # save_path_file(classes, origin_index, links, zones, predecessors_view, conn_view)
 
 
         if skims > 0:
@@ -141,6 +142,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    # TODO Jan: move into nogil territory, see above
+    save_path_file(classes, origin_index, links, zones, predecessors_view, conn_view)
 
     return origin
 

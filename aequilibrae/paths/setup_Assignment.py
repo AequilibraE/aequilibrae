@@ -22,6 +22,7 @@ import os
 import sys
 import platform
 import numpy as np
+import pyarrow as pa
 import Cython.Compiler.Options
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
@@ -43,8 +44,8 @@ if "WINDOWS" in platform.platform().upper():
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=['/openmp'],
-            extra_link_args=['/openmp'],
+            extra_compile_args=["/openmp", "-ffast-math", "-O3"],
+            extra_link_args=["/openmp"],
             include_dirs=[np.get_include()],
         )
     ]
@@ -53,10 +54,15 @@ else:
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=['-fopenmp'],
-            extra_link_args=['-fopenmp'],
-            include_dirs=[np.get_include()],
+            extra_compile_args=["-fopenmp", "-std=c++11", "-ffast-math", "-O3"],
+            extra_link_args=["-fopenmp"],
+            include_dirs=[np.get_include(), pa.get_include()],
+            language="c++",
         )
     ]
 
-setup(name='AoN', ext_modules=cythonize(ext_modules), )
+for ext in ext_modules:
+    ext.libraries.extend(pa.get_libraries())
+    ext.library_dirs.extend(pa.get_library_dirs())
+
+setup(name="AoN", ext_modules=cythonize(ext_modules))
