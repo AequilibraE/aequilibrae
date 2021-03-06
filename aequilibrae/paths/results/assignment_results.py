@@ -159,7 +159,7 @@ class AssignmentResults:
         elif cores == 0:
             self.cores = mp.cpu_count()
         elif cores > 0:
-            cores = max(mp.cpu_count(), cores)
+            cores = min(mp.cpu_count(), cores)
             if self.cores != cores:
                 self.cores = cores
         if self.link_loads.shape[0]:
