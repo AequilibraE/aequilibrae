@@ -29,7 +29,7 @@ cpdef void save_path_file(long classes,
     cdef string file_name
     cdef vector[long long] path_for_od_pair_and_class
 
-    cdef np.npy_intp dims = <np.npy_intp> (1)
+    cdef np.npy_intp dims
 
     for class_ in range(classes):
         for node in range(zones):
@@ -43,6 +43,8 @@ cpdef void save_path_file(long classes,
                 predecessor = pred[predecessor]
                 connector = conn[predecessor]
                 ctr += 1
+
+            dims = <np.npy_intp> path_for_od_pair_and_class.size()
 
             file_name = b'test_' + to_string(origin_index) + b'.parquet'
 
