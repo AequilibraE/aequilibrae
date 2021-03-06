@@ -21,11 +21,12 @@ include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
+include 'path_file_saving.pyx'
 
 from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
-    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1
+    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
     cdef int critical_queries = 0
     cdef int path_file = 0
     cdef int skims
@@ -41,7 +42,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     #We transform the python variables in Cython variables
     nodes = graph.compact_num_nodes
-
+    links = graph.compact_num_links
 
     skims = len(graph.skim_fields)
 
@@ -115,6 +116,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         reached_first_view,
                         node_load_view,
                         w)
+
+        save_path_file(classes, origin_index, links, zones, predecessors_view, conn_view)
+
+
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
