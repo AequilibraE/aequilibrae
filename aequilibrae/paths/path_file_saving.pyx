@@ -35,13 +35,22 @@ cpdef void save_path_file(long origin_index,
     cdef np.npy_intp dims
 
     for node in range(zones):
+
+        # now part of test below
+        #if node == origin_index:
+        #    continue
+
         path_for_od_pair_and_class.clear()
         # tracing backwards from each destination for this one-to-all shortest path
         predecessor = pred[node]
+        # need to check if disconnected, also makes sure o==d is not included
+        if predecessor == -1:
+            continue
+
         connector = conn[node]
         while predecessor >= 0:
             path_for_od_pair_and_class.push_back(connector)
-            print(f"o={origin_index}, d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
+            # print(f"o={origin_index}, d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
             connector = conn[predecessor]
 
