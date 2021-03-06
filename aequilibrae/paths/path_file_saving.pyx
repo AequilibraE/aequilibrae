@@ -2,12 +2,15 @@
 
 from libcpp.vector cimport vector
 from libcpp.string cimport string
-
+from string_helper cimport to_string
 
 import pyarrow as pa
 cimport pyarrow as pa
+
 import numpy as np
 cimport numpy as np
+
+import pyarrow.parquet as pq
 
 # from pyarrow.lib cimport *
 
@@ -25,10 +28,8 @@ cpdef void save_path_file(long classes,
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
     cdef vector[long long] path_for_od_pair_and_class
-    cdef long long* temp
 
-    # no method lookup overhead, is this premature optimization?
-    push_back_link = path_for_od_pair_and_class.push_back
+    cdef np.npy_intp dims = <np.npy_intp> (1)
 
     for class_ in range(classes):
         for node in range(zones):
@@ -38,16 +39,14 @@ cpdef void save_path_file(long classes,
             predecessor = pred[node]
             connector = conn[node]
             while predecessor >= 0:
-                push_back_link(connector)
+                path_for_od_pair_and_class.push_back(connector)
                 predecessor = pred[predecessor]
                 connector = conn[predecessor]
                 ctr += 1
 
-            file_name = "test_";
+            file_name = b'test_' + to_string(origin_index) + b'.parquet'
 
             # get a view on data underlying vector, then as numpy array. avoids copying.
-            temp = path_for_od_pair_and_class.data();
-
-            # pq.write_table(pa.array(path_for_origin[0:ctr]), file_name)
+            pq.write_table(pa.array(np.PyArray_SimpleNewFromData(1, &dims, np.NPY_LONGLONG, path_for_od_pair_and_class.data())), file_name)
 
 
