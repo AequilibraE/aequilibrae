@@ -54,8 +54,8 @@ else:
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=["-fopenmp", "-std=c++11", "-ffast-math", "-O3"],
-            extra_link_args=["-fopenmp"],
+            extra_compile_args=["-fopenmp", "-std=c++11", "-ffast-math", "-O3", "-fsanitize=address"],
+            extra_link_args=["-fopenmp", "-fsanitize=address"],
             include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
         )

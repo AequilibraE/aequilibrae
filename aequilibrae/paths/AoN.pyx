@@ -144,7 +144,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
 
     # TODO Jan: move into nogil territory, see above
-    save_path_file(origin_index, links, zones, predecessors_view, conn_view)
+    #import sys
+    print(f"pred for {curr_thread}, o={origin_index}: {aux_result.predecessors[:, curr_thread]}"); sys.stdout.flush()
+    print(f"aux for {curr_thread}, o={origin_index}: {aux_result.connectors[:, curr_thread]}"); sys.stdout.flush()
+
+    # save_path_file(origin_index, links, zones, predecessors_view, conn_view)
 
     return origin
 

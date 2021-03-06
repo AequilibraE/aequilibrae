@@ -4,6 +4,9 @@ from libcpp.vector cimport vector
 from libcpp.string cimport string
 from string_helper cimport to_string
 
+
+import sys
+
 import pyarrow as pa
 cimport pyarrow as pa
 
@@ -33,20 +36,20 @@ cpdef void save_path_file(long origin_index,
 
     for node in range(zones):
         path_for_od_pair_and_class.clear()
-
         # tracing backwards from each destination for this one-to-all shortest path
         predecessor = pred[node]
         connector = conn[node]
         while predecessor >= 0:
             path_for_od_pair_and_class.push_back(connector)
+            print(f"o={origin_index}, d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
             connector = conn[predecessor]
 
-        #file_name = b'test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
+        file_name = b'test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
 
         # get a view on data underlying vector, then as numpy array. avoids copying.
-        #dims = <np.npy_intp> (path_for_od_pair_and_class.size() + 1)
-        #temp_data = path_for_od_pair_and_class.data()
-        #pq.write_table(pa.array(np.PyArray_SimpleNewFromData(1, &dims, np.NPY_LONGLONG, temp_data)), file_name)
+        dims = <np.npy_intp> (path_for_od_pair_and_class.size() + 1)
+        temp_data = path_for_od_pair_and_class.data()
+        pq.write_table(pa.array(np.PyArray_SimpleNewFromData(1, &dims, np.NPY_LONGLONG, temp_data)), file_name)
 
 
