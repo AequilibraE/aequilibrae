@@ -297,7 +297,7 @@ class TrafficAssignment(object):
             c.results.set_cores(cores)
             c._aon_results.set_cores(cores)
 
-    def save_path_files(self, save_it: bool) -> None:
+    def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
 
         Args:
@@ -305,7 +305,8 @@ class TrafficAssignment(object):
         """
         if self.classes is None:
             raise Exception("You need to set traffic classes before turning path saving on or off")
-        self.__dict__["save_path_files"] = save_it
+
+        # self.save_path_files = save_it
         for c in self.classes:
             c._aon_results.save_path_file = save_it
 
