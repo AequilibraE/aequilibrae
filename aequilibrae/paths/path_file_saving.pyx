@@ -21,12 +21,11 @@ import sys
 
 import pyarrow as pa
 cimport pyarrow as pa
+import pyarrow.parquet as pq
 
 import numpy as np
 cimport numpy as np
 np.import_array()
-
-import pyarrow.parquet as pq
 
 # from pyarrow.lib cimport *
 
@@ -63,29 +62,29 @@ cpdef void save_path_file(long origin_index,
         connector = conn[node]
         path_for_od_pair_and_class.push_back(connector)
 
-        #print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
+        # print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
         while predecessor >= 0:
-            #print(f"    d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
+            # print(f"    d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
             if predecessor != -1:
                 connector = conn[predecessor]
-                path_for_od_pair_and_class.push_back(connector)
+                # need this to avoid ading last element. Would it be faster to resize after loop?
+                if connector != -1:
+                    path_for_od_pair_and_class.push_back(connector)
 
         file_name = b'test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
 
-        print(f"size of path vec {path_for_od_pair_and_class.size()}")
+        # print(f"size of path vec {path_for_od_pair_and_class.size()}")
 
         # get a view on data underlying vector, then as numpy array. avoids copying.
-        #dims = <np.npy_intp> (path_for_od_pair_and_class.size())
         dims[0] = <np.npy_intp> (path_for_od_pair_and_class.size())
-        print(f"dims = {dims}")
+        # print(f"dims = {dims}")
 
         temp_data = &path_for_od_pair_and_class[0] #.data()
-        print(f"temp[0] = {temp_data[0]}")
+        # print(f"temp[0] = {temp_data[0]}")
 
         numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
-        print(f"np array = {numpy_array}")
-
-        pq.write_table(pa.array(numpy_array), file_name)
+        # print(f"np array = {numpy_array}")
+        pq.write_table(pa.table({"data": numpy_array}), str(file_name))
 
 
