@@ -364,9 +364,9 @@ class LinearApproximation(WorkerThread):
 
                 if c._aon_results.save_path_file:
                     # TODO Jan: make base dir user configurable
-                    path_base_dir = "path_saving"
+                    path_base_dir = os.path.join("path_saving", f"iter{self.iter}")
                     # TODO Jan: what identifier do we use for the class?
-                    c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_i{self.iter}_c{c.mode}")
+                    c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}")
                     Path(path_base_dir).mkdir(parents=True, exist_ok=True)
 
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
