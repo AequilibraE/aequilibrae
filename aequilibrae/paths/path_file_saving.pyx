@@ -1,3 +1,15 @@
+"""
+Shortest path saving.
+TODO cython:
+ - all in gil land, need to get rid of python things below.
+
+TODO python:
+ - need iteration and class name in the path of the file (and pass to cython)
+ - make saving directory user configurable
+ - need to save compressed graph correspondence once
+ -
+"""
+
 # distutils: language = c++
 
 from libcpp.vector cimport vector
@@ -12,6 +24,7 @@ cimport pyarrow as pa
 
 import numpy as np
 cimport numpy as np
+np.import_array()
 
 import pyarrow.parquet as pq
 
@@ -32,7 +45,8 @@ cpdef void save_path_file(long origin_index,
     cdef vector[long long] path_for_od_pair_and_class
     cdef long long* temp_data
 
-    cdef np.npy_intp dims
+    cdef np.npy_intp dims[1]
+    cdef np.ndarray[np.longlong_t, ndim=1] numpy_array
 
     for node in range(zones):
 
@@ -46,19 +60,32 @@ cpdef void save_path_file(long origin_index,
         # need to check if disconnected, also makes sure o==d is not included
         if predecessor == -1:
             continue
-
         connector = conn[node]
+        path_for_od_pair_and_class.push_back(connector)
+
+        #print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
         while predecessor >= 0:
-            path_for_od_pair_and_class.push_back(connector)
-            # print(f"o={origin_index}, d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
+            #print(f"    d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
-            connector = conn[predecessor]
+            if predecessor != -1:
+                connector = conn[predecessor]
+                path_for_od_pair_and_class.push_back(connector)
 
         file_name = b'test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
 
+        print(f"size of path vec {path_for_od_pair_and_class.size()}")
+
         # get a view on data underlying vector, then as numpy array. avoids copying.
-        dims = <np.npy_intp> (path_for_od_pair_and_class.size() + 1)
-        temp_data = path_for_od_pair_and_class.data()
-        pq.write_table(pa.array(np.PyArray_SimpleNewFromData(1, &dims, np.NPY_LONGLONG, temp_data)), file_name)
+        #dims = <np.npy_intp> (path_for_od_pair_and_class.size())
+        dims[0] = <np.npy_intp> (path_for_od_pair_and_class.size())
+        print(f"dims = {dims}")
+
+        temp_data = &path_for_od_pair_and_class[0] #.data()
+        print(f"temp[0] = {temp_data[0]}")
+
+        numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
+        print(f"np array = {numpy_array}")
+
+        pq.write_table(pa.array(numpy_array), file_name)
 
 
