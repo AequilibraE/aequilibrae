@@ -72,7 +72,7 @@ cpdef void save_path_file(long origin_index,
                 if connector != -1:
                     path_for_od_pair_and_class.push_back(connector)
 
-        file_name = b'test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
+        file_name = b'path_saving/test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
 
         # print(f"size of path vec {path_for_od_pair_and_class.size()}")
 
@@ -85,6 +85,6 @@ cpdef void save_path_file(long origin_index,
 
         numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
         # print(f"np array = {numpy_array}")
-        pq.write_table(pa.table({"data": numpy_array}), str(file_name))
+        pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
 
 
