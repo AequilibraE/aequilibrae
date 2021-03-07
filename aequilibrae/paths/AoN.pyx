@@ -145,10 +145,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     # TODO Jan: move into nogil territory, see above
     cdef string path_file_base
+    cdef string path_index_file_base
+    import os
     if result.save_path_file == True:
-        base_string = f"{result.path_file_dir}_o{origin_index}_d"
+        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
+        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
         path_file_base = base_string.encode('utf-8')
-        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base)
+        path_index_file_base = index_string.encode('utf-8')
+        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
 
     return origin
 

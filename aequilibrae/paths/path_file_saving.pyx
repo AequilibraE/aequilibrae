@@ -41,12 +41,15 @@ cpdef void save_path_file(long origin_index,
                           long zones,
                           long long [:] pred,
                           long long [:] conn,
-                          string path_file_base): #nogil:
+                          string path_file,
+                          string index_file): #nogil:
 
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
-    cdef vector[long long] path_for_od_pair_and_class
+    cdef vector[long long] path_data
     cdef long long* temp_data
+
+    cdef np.ndarray[np.longlong_t, ndim=1] size_of_path_arrays = np.empty(zones, dtype=np.longlong)
 
     cdef np.npy_intp dims[1]
     cdef np.ndarray[np.longlong_t, ndim=1] numpy_array
@@ -57,14 +60,14 @@ cpdef void save_path_file(long origin_index,
         #if node == origin_index:
         #    continue
 
-        path_for_od_pair_and_class.clear()
+        # path_for_od_pair_and_class.clear()
         # tracing backwards from each destination for this one-to-all shortest path
         predecessor = pred[node]
         # need to check if disconnected, also makes sure o==d is not included
         if predecessor == -1:
             continue
         connector = conn[node]
-        path_for_od_pair_and_class.push_back(connector)
+        path_data.push_back(connector)
 
         # print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
         while predecessor >= 0:
@@ -74,25 +77,33 @@ cpdef void save_path_file(long origin_index,
                 connector = conn[predecessor]
                 # need this to avoid ading last element. Would it be faster to resize after loop?
                 if connector != -1:
-                    path_for_od_pair_and_class.push_back(connector)
+                    path_data.push_back(connector)
 
         # print(f"size of path vec {path_for_od_pair_and_class.size()}")
 
         # get a view on data underlying vector, then as numpy array. avoids copying.
-        dims[0] = <np.npy_intp> (path_for_od_pair_and_class.size())
+        dims[0] = <np.npy_intp> (path_data.size())
         # print(f"dims = {dims}")
 
-        temp_data = &path_for_od_pair_and_class[0] #.data()
-        # print(f"temp[0] = {temp_data[0]}")
-
-        numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
-        # print(f"np array = {numpy_array}")
+        #size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
+        size_of_path_arrays[node] = <np.longlong_t> path_data.size()
 
 
-        # parquet
-        #file_name = path_file_base + to_string(node) + b'.parquet'
-        #pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
-        # feather
-        file_name = path_file_base + to_string(node) + b'.feather'
-        feather.write_feather(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
+
+
+    temp_data = &path_data[0] #.data()
+    # print(f"temp[0] = {temp_data[0]}")
+
+    numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
+    # print(f"np array = {numpy_array}")
+
+
+    # parquet
+    #file_name = path_file_base + to_string(node) + b'.parquet'
+    #pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
+    # feather
+    # file_name = path_file_base + to_string(node) + b'.feather'
+
+    feather.write_feather(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
+    feather.write_feather(pa.table({"data": size_of_path_arrays}), index_file.decode('utf-8'))
 
