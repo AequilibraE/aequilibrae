@@ -113,6 +113,7 @@ class TrafficAssignment(object):
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
         self.__dict__["cores"] = None  # type: int
+        self.__dict__["save_path_files"] = False  # type: bool
 
         self.__dict__["procedure_id"] = uuid4().hex
         self.__dict__["description"] = ""
@@ -161,6 +162,9 @@ class TrafficAssignment(object):
         elif instance == "cores":
             if not isinstance(value, int):
                 return False, value, f"Value for {instance} is not integer"
+        elif instance == "save_path_files":
+            if not isinstance(value, bool):
+                return False, value, f"Value for {instance} is not boolean"
         if instance not in self.__dict__:
             return False, value, f"trafficAssignment class does not have property {instance}"
         return True, value, ""
@@ -292,6 +296,18 @@ class TrafficAssignment(object):
         for c in self.classes:
             c.results.set_cores(cores)
             c._aon_results.set_cores(cores)
+
+    def save_path_files(self, save_it: bool) -> None:
+        """Turn path saving on or off.
+
+        Args:
+            save_it (:obj:`bool`): Boolean to indicate whether paths should be saved
+        """
+        if self.classes is None:
+            raise Exception("You need to set traffic classes before turning path saving on or off")
+        self.__dict__["save_path_files"] = save_it
+        for c in self.classes:
+            c._aon_results.save_path_file = save_it
 
     def set_time_field(self, time_field: str) -> None:
         """

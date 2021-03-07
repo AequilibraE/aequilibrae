@@ -51,6 +51,10 @@ class AssignmentResults:
         self.lids = None
         self.direcs = None
 
+        # save path files. Need extra metadata for file paths
+        self.save_path_file = False
+        self.path_file_dir = None
+
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """

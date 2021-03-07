@@ -40,7 +40,8 @@ cpdef void save_path_file(long origin_index,
                           long num_links,
                           long zones,
                           long long [:] pred,
-                          long long [:] conn): #nogil:
+                          long long [:] conn,
+                          string path_file_base): #nogil:
 
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
@@ -89,9 +90,9 @@ cpdef void save_path_file(long origin_index,
 
 
         # parquet
-        #file_name = b'path_saving/test_' + to_string(origin_index) + b"_" + to_string(node) + b'.parquet'
+        #file_name = path_file_base + to_string(node) + b'.parquet'
         #pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
         # feather
-        file_name = b'path_saving/test_' + to_string(origin_index) + b"_" + to_string(node) + b'.feather'
+        file_name = path_file_base + to_string(node) + b'.feather'
         feather.write_feather(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
 
