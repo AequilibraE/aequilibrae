@@ -18,7 +18,6 @@ from aequilibrae import Parameters
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data import Matrices
 
-
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 
@@ -117,6 +116,7 @@ class TrafficAssignment(object):
         self.__dict__["procedure_id"] = uuid4().hex
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
+        self.__dict__["steps_below_needed_to_terminate"] = 1
 
     def __setattr__(self, instance, value) -> None:
 
@@ -259,7 +259,9 @@ class TrafficAssignment(object):
                     raise ValueError(f"{p1} should exist in the set of parameters provided")
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
-                    array = np.array(self.classes[0].graph.graph[p], copy=True).astype(np.float64)
+                    c = self.classes[0]
+                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+                    array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
                 else:
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
                     array.fill(self.vdf_parameters[p1])
@@ -314,7 +316,8 @@ class TrafficAssignment(object):
         if c.graph.graph[time_field].values.min() <= 0:
             raise ValueError("There is at least one link with zero or negative free-flow time")
 
-        self.__dict__["free_flow_tt"] = np.array(c.graph.graph[time_field].values, copy=True).astype(np.float64)
+        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
@@ -341,7 +344,8 @@ class TrafficAssignment(object):
             raise ValueError("There is at least one link with zero or negative capacity")
 
         self.__dict__["cores"] = c.results.cores
-        self.__dict__["capacity"] = np.array(c.graph.graph[capacity_field], copy=True).astype(np.float64)
+        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
@@ -398,29 +402,22 @@ class TrafficAssignment(object):
             *DataFrame* (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
         """
 
+        idx = self.classes[0].graph.graph.__supernet_id__
         assig_results = [cls.results.get_load_results() for cls in self.classes]
 
         class1 = self.classes[0]
         res1 = assig_results[0]
 
-        tot_flow = self.assignment.fw_total_flow
-        voc = self.assignment.fw_total_flow / self.capacity
+        tot_flow = self.assignment.fw_total_flow[idx]
+        voc = self.assignment.fw_total_flow / self.capacity[idx]
+        congested_time = self.congested_time[idx]
+        free_flow_tt = self.free_flow_tt[idx]
 
         entries = res1.data.shape[0]
-        fields = [
-            "Congested_Time_AB",
-            "Congested_Time_BA",
-            "Congested_Time_Max",
-            "Delay_factor_AB",
-            "Delay_factor_BA",
-            "Delay_factor_Max",
-            "VOC_AB",
-            "VOC_BA",
-            "VOC_max",
-            "PCE_AB",
-            "PCE_BA",
-            "PCE_tot",
-        ]
+        fields = ["Congested_Time_AB", "Congested_Time_BA", "Congested_Time_Max",
+                  "Delay_factor_AB", "Delay_factor_BA", "Delay_factor_Max",
+                  "VOC_AB", "VOC_BA", "VOC_max",
+                  "PCE_AB", "PCE_BA", "PCE_tot"]
 
         types = [np.float64] * len(fields)
         agg = AequilibraeData()
@@ -439,12 +436,12 @@ class TrafficAssignment(object):
         ab_ids = indexing[link_ids[ABs]]
         ba_ids = indexing[link_ids[BAs]]
 
-        agg.data["Congested_Time_AB"][ab_ids] = np.nan_to_num(self.congested_time[ABs])
-        agg.data["Congested_Time_BA"][ba_ids] = np.nan_to_num(self.congested_time[BAs])
+        agg.data["Congested_Time_AB"][ab_ids] = np.nan_to_num(congested_time[ABs])
+        agg.data["Congested_Time_BA"][ba_ids] = np.nan_to_num(congested_time[BAs])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][ab_ids] = np.nan_to_num(self.congested_time[ABs] / self.free_flow_tt[ABs])
-        agg.data["Delay_factor_BA"][ba_ids] = np.nan_to_num(self.congested_time[BAs] / self.free_flow_tt[BAs])
+        agg.data["Delay_factor_AB"][ab_ids] = np.nan_to_num(congested_time[ABs] / free_flow_tt[ABs])
+        agg.data["Delay_factor_BA"][ba_ids] = np.nan_to_num(congested_time[BAs] / free_flow_tt[BAs])
         agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
 
         agg.data["VOC_AB"][ab_ids] = np.nan_to_num(voc[ABs])
