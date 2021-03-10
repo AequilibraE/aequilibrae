@@ -89,7 +89,9 @@ class AssignmentResults:
             self.skim_names = [x for x in graph.skim_fields]
             self.lids = graph.graph.link_id.values
             self.direcs = graph.graph.direction.values
-            self.crosswalk = graph.graph.__compressed_id__.values.astype(np.int64)
+            self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
+            self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
+            self.__graph_ids = graph.graph.__supernet_id__.values
             self.__redim()
             self.__graph_id__ = graph.__id__
 
@@ -193,7 +195,7 @@ class AssignmentResults:
         ba_ids = indexing[self.lids[BAs]]
 
         # Link flows
-        link_flows = self.link_loads[:, :]
+        link_flows = self.link_loads[self.__graph_ids, :]
         for i, n in enumerate(self.classes["names"]):
             # AB Flows
             res.data[n + "_ab"][ab_ids] = np.nan_to_num(link_flows[ABs, i])
