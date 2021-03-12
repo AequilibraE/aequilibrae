@@ -124,6 +124,12 @@ class Graph(object):
 
         properties = self.__build_directed_graph(self.network, centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
+
+        # We generate IDs that we KNOW will be constant across modes
+        self.graph.sort_values(by=['link_id', 'direction'], inplace=True)
+        self.graph.loc[:, "__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
+        self.graph.sort_values(by=['a_node', 'b_node'], inplace=True)
+
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
 

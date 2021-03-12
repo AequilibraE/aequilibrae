@@ -1,4 +1,5 @@
 import importlib.util as iutil
+from functools import partial
 import numpy as np
 from typing import List, Dict
 from ..utils import WorkerThread
@@ -11,6 +12,7 @@ try:
     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
     from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
+    from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
 except ImportError as ie:
     logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -55,18 +57,11 @@ class LinearApproximation(WorkerThread):
 
         self.assig = assig_spec  # type: TrafficAssignment
 
-        if None in [
-            assig_spec.classes,
-            assig_spec.vdf,
-            assig_spec.capacity_field,
-            assig_spec.time_field,
-            assig_spec.vdf_parameters,
-        ]:
+        if None in [assig_spec.classes, assig_spec.vdf, assig_spec.capacity_field,
+                    assig_spec.time_field, assig_spec.vdf_parameters]:
             all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
-            raise Exception(
-                "Parameter missing. Setting the algorithm is the last thing to do "
-                f"when assigning. Check if you have all of these: {all_par}"
-            )
+            raise Exception("Parameter missing. Setting the algorithm is the last thing to do "
+                            f"when assigning. Check if you have all of these: {all_par}")
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
         self.num_classes = len(assig_spec.classes)
@@ -83,7 +78,7 @@ class LinearApproximation(WorkerThread):
         self.fw_class_flow = 0
         # rgap can be a bit wiggly, specifying how many times we need to be below target rgap is a quick way to
         # ensure a better result. We might want to demand that the solution is that many consecutive times below.
-        self.steps_below_needed_to_terminate = 1
+        self.steps_below_needed_to_terminate = assig_spec.steps_below_needed_to_terminate
         self.steps_below = 0
 
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
@@ -137,9 +132,8 @@ class LinearApproximation(WorkerThread):
                 self.pre_previous_step_direction[c.__id__] = r
 
     def calculate_conjugate_stepsize(self):
-        self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
-        )
+        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity,
+                                  self.free_flow_tt, *self.vdf_parameters, self.cores)
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -153,9 +147,8 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c.__id__]
             prev_dir_minus_current_sol[c.__id__] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol[c.__id__] = np.sum(
-                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
-            )
+            aon_minus_current_sol[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :],
+                                                     axis=1)
             aon_minus_prev_dir[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
 
         for c_0 in self.traffic_classes:
@@ -175,9 +168,8 @@ class LinearApproximation(WorkerThread):
             self.conjugate_stepsize = alpha
 
     def calculate_biconjugate_direction(self):
-        self.vdf.apply_derivative(
-            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
-        )
+        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity,
+                                  self.free_flow_tt, *self.vdf_parameters, self.cores)
 
         # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
         # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
@@ -267,6 +259,7 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     linear_combination_skims(sdr.skims.matrix_view, c._aon_results.skims.matrix_view,
                                              sdr.skims.matrix_view, self.conjugate_stepsize, self.cores)
+
                 sdr.total_flows()
                 sd_flows.append(sdr.total_link_loads)
         # biconjugate
@@ -308,7 +301,10 @@ class LinearApproximation(WorkerThread):
         # We build the fixed cost field
         for c in self.traffic_classes:
             if c.fixed_cost_field:
-                c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier
+                # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
+                # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
+                # not want this there I think
+                c.fixed_cost[c.graph.graph.__supernet_id__] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
         # TODO: Review how to eliminate this. It looks unnecessary
@@ -326,7 +322,8 @@ class LinearApproximation(WorkerThread):
 
             aon_flows = []
             for c in self.traffic_classes:  # type: TrafficClass
-                cost = c.fixed_cost + self.congested_time * c.vot
+                # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
+                cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
@@ -356,17 +353,12 @@ class LinearApproximation(WorkerThread):
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c.__id__]
                     cls_res = c.results
-                    linear_combination(
-                        cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
-                    )
+                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads,
+                                       self.stepsize, self.cores)
+
                     if cls_res.num_skims > 0:
-                        linear_combination_skims(
-                            cls_res.skims.matrix_view,
-                            stp_dir.skims.matrix_view,
-                            cls_res.skims.matrix_view,
-                            self.stepsize,
-                            self.cores,
-                        )
+                        linear_combination_skims(cls_res.skims.matrix_view, stp_dir.skims.matrix_view,
+                                                 cls_res.skims.matrix_view, self.stepsize, self.cores)
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
             self.fw_total_flow = np.sum(flows, axis=0)
@@ -387,19 +379,14 @@ class LinearApproximation(WorkerThread):
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
+                self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
                     break
-                else:
-                    self.steps_below += 1
+            else:
+                self.steps_below = 0
 
-            self.vdf.apply_vdf(
-                self.congested_time,
-                self.fw_total_flow,
-                self.capacity,
-                self.free_flow_tt,
-                *self.vdf_parameters,
-                self.cores,
-            )
+            self.vdf.apply_vdf(self.congested_time, self.fw_total_flow, self.capacity,
+                               self.free_flow_tt, *self.vdf_parameters, self.cores)
 
             for c in self.traffic_classes:
                 c._aon_results.reset()
@@ -420,28 +407,48 @@ class LinearApproximation(WorkerThread):
             self.equilibration.emit(["iterations", self.iter])
             self.equilibration.emit(["finished_threaded_procedure"])
 
+    def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
+        """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
+        the corresponding contribution needs to be passed in"""
+        x = np.zeros_like(self.fw_total_flow)
+        linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
+        # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
+        link_cost_term = sum_a_times_b_minus_c(self.congested_value, self.step_direction_flow,
+                                               self.fw_total_flow, self.cores)
+        return link_cost_term + const_term
+
+    def __derivative_of_objective_stepsize_independent(self):
+        """The part of the derivative of the objective function that does not dependent on stepsize. Non-zero
+        only for fixed cost contributions."""
+        class_specific_term = 0.0
+        for c in self.traffic_classes:
+            # fixed cost is scaled by vot
+            class_link_costs = sum_a_times_b_minus_c(c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0],
+                                                     c.results.link_loads[:, 0], self.cores)
+            class_specific_term += class_link_costs
+        return class_specific_term
+
     def calculate_stepsize(self):
         """Calculate optimal stepsize in descent direction"""
         if self.algorithm == "msa":
             self.stepsize = 1.0 / self.iter
             return
 
-        def derivative_of_objective(stepsize):
-            x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
+        class_specific_term = self.__derivative_of_objective_stepsize_independent()
+        derivative_of_objective = partial(self.__derivative_of_objective_stepsize_dependent,
+                                          const_term=class_specific_term)
 
-            self.vdf.apply_vdf(
-                self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
-            )
-            return np.sum(self.congested_value * (self.step_direction_flow - self.fw_total_flow))
+        x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
         try:
             if recent_scipy:
-                min_res = root_scalar(derivative_of_objective, bracket=[0, 1])
+                min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
                 self.stepsize = min_res.root
                 if not min_res.converged:
                     logger.warning("Descent direction stepsize finder has not converged")
             else:
-                min_res = root_scalar(derivative_of_objective, 1 / self.iter)
+                min_res = root_scalar(derivative_of_objective, 1 / self.iter, xtol=x_tol)
                 if not min_res.success:
                     logger.warning("Descent direction stepsize finder has not converged")
                 self.stepsize = min_res.x[0]
@@ -460,9 +467,11 @@ class LinearApproximation(WorkerThread):
                 self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
-                    msa_step = 1.0 / self.iter
-                    logger.warning(f"# Alert: Adding {msa_step} as step size to make it non-zero. {e.args}")
-                    self.stepsize = msa_step
+                    tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
+                    # works well in practice, however for a large number of iterations this might be too much so
+                    # use this heuristic instead.
+                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0
                     # need to reset conjugate / bi-conjugate direction search
