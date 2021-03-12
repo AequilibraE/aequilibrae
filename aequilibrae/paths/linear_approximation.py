@@ -87,7 +87,7 @@ class LinearApproximation(WorkerThread):
         self.fw_class_flow = 0
         # rgap can be a bit wiggly, specifying how many times we need to be below target rgap is a quick way to
         # ensure a better result. We might want to demand that the solution is that many consecutive times below.
-        self.steps_below_needed_to_terminate = 1
+        self.steps_below_needed_to_terminate = assig_spec.steps_below_needed_to_terminate
         self.steps_below = 0
 
         # if this is one, we do not have a new direction and will get stuck. Make it 1.
@@ -429,10 +429,11 @@ class LinearApproximation(WorkerThread):
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
+                self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
                     break
-                else:
-                    self.steps_below += 1
+            else:
+                self.steps_below = 0
 
             self.vdf.apply_vdf(
                 self.congested_time,
