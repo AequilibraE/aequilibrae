@@ -3,11 +3,11 @@ Toll analysis
 =============
 
 On this example we show how to perform traffic assignment considering fixed
-link costs (e.g. tolls) besides data
+link costs (e.g. tolls) besides travel time. We also do assignment with
+three different vehicle classes
 """
 
 ## Imports
-from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 import urllib
@@ -67,6 +67,7 @@ motoDemand.computational_view('motorcycle')
 motoClass = TrafficClass(motoGraph, motoDemand)
 motoClass.set_pce(0.2)
 motoClass.set_vot(35)
+# Fixed cost can be any field (or field_AB/BA in the network).  And the factor defaults to 1.0
 motoClass.set_fixed_cost('toll', 0.0125)
 
 # %%
@@ -80,6 +81,8 @@ truckClass.set_fixed_cost('toll', 0.05)
 
 
 assig = TrafficAssignment()
+# Different (and better) than some commercial software, your results are as proportional as the
+# convergence models allow and your results do not depend on the order you put the classes in.
 assig.set_classes([carClass, motoClass, truckClass])
 
 assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
@@ -94,25 +97,42 @@ assig.set_algorithm('bfw')
 
 # You would obviously pick a much tighter convergence criterium and correspondingly larger number of iterations
 assig.max_iter = 30
-assig.rgap_target = 0.1
+assig.rgap_target = 0.01
 
 assig.execute()  # we then execute the assignment
-assig.save_results('our first assignment')
+assig.save_results('test_assignment')
+
 
 # %% md
-# We can also plot convergence
+# Let's validate our results against those previously converged to 1 e-5
 import matplotlib.pyplot as plt
+import sqlite3
+import pandas as pd
 
-df = assig.report()
-x = df.iteration.values
-y = df.rgap.values
+charted = ['car', 'motorcycle', 'trucks', 'pce']
+mod_res_path = join(disk_pth, 'results_database.sqlite' )
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+conn = sqlite3.connect(mod_res_path)
+assig_results = pd.read_sql(f'Select * from test_assignment', conn)
+ref_results = pd.read_sql(f'Select * from fully_converged', conn)
+conn.close()
 
-plt.plot(x, y, "blue")
-plt.yscale("log")
-plt.grid(True, which="both")
-plt.xlabel(r"Iterations")
-plt.ylabel(r"Relative Gap")
+assig_results.set_index(['link_id'], inplace=True)
+assig_results.columns = [x.lower() for x in assig_results.columns]
+
+ref_results.set_index(['link_id'], inplace=True)
+ref_results.columns = [x.lower() for x in ref_results.columns]
+
+df = assig_results.join(ref_results,rsuffix='_ref')
+
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize = (15, 10))
+
+
+for per, ax in zip(charted, [ax1, ax2, ax3, ax4]):
+    ax.scatter(df[f'{per}_tot'],df[f'{per}_tot_ref'])
+    ax.set(title=per.upper())
+    ax.grid()
+    ax.set_xlabel('my flows')
+    ax.set_ylabel('reference')
+
 plt.show()
