@@ -16,6 +16,7 @@ We have compiled two very distinct example datasets imported from the
 
 * `Sioux Falls <http://www.aequilibrae.com/data/SiouxFalls.7z>`_
 * `Chicago Regional <http://www.aequilibrae.com/data/Chicago.7z>`_
+* `Birmingham <http://www.aequilibrae.com/data/Birmingham.7z>`_
 
 While the Sioux Falls network is probably the most traditional example network
 available for evaluating network algorithms, the Chicago Regional model is a

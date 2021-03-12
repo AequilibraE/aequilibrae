@@ -78,3 +78,4 @@ documentation for all versions since 0.5.3.
 * `0.6.5 <https://aequilibrae.com/python/V.0.6.5/>`_
 * `0.7.0 <https://aequilibrae.com/python/V.0.7.0/>`_
 * `0.7.1 <https://aequilibrae.com/python/V.0.7.1/>`_
+* `0.7.2 <https://aequilibrae.com/python/V.0.7.2/>`_
