@@ -304,7 +304,7 @@ class LinearApproximation(WorkerThread):
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
                 # not want this there I think
-                c.fixed_cost[:] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
+                c.fixed_cost[c.graph.graph.__supernet_id__] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
         # TODO: Review how to eliminate this. It looks unnecessary
