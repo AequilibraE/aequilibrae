@@ -4,7 +4,6 @@ TODO cython:
  - all in gil land, need to get rid of python things below.
 
 TODO python:
- - need iteration and class name in the path of the file (and pass to cython)
  - make saving directory user configurable
  - need to save compressed graph correspondence once
  -
@@ -62,7 +61,7 @@ cpdef void save_path_file(long origin_index,
         path_data.push_back(connector)
 
         # print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
-        while predecessor >= 0:``
+        while predecessor >= 0:
             # print(f"    d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
             if predecessor != -1:
