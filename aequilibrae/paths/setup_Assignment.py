@@ -57,10 +57,8 @@ else:
             ["AoN.pyx"],
             extra_compile_args=["-fopenmp", "-std=c++11", "-O3"],  # do we want -Ofast?
             extra_link_args=["-lparquet", "-fopenmp"],
-            # libraries=["ParquetWriter"],
             include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
-            # library_dirs=['.'],
             runtime_library_dirs=["/mnt/c/Users/jan.zill/code/aequilibrae/.venv/lib/python3.7/site-packages/pyarrow/"],
         )
     ]

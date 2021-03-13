@@ -12,9 +12,11 @@
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------"""
+import os
 
 # cython: language_level=3
 cimport numpy as np
+from libcpp cimport bool
 
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
@@ -88,6 +90,18 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] node_load_view = aux_result.temp_node_loads[:, :, curr_thread]
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
 
+    # path saving file paths
+    cdef string path_file_base
+    cdef string path_index_file_base
+    cdef bool save_paths = False
+    if result.save_path_file == True:
+        save_paths = True
+        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
+        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
+        path_file_base = base_string.encode('utf-8')
+        path_index_file_base = index_string.encode('utf-8')
+
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -117,8 +131,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         node_load_view,
                         w)
 
-        # TODO JAN: first do it with gil, then without
-        # save_path_file(origin_index, links, zones, predecessors_view, conn_view)
+        if save_paths == True:
+            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
 
 
         if skims > 0:
@@ -142,17 +156,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
-
-    # TODO Jan: move into nogil territory, see above
-    cdef string path_file_base
-    cdef string path_index_file_base
-    import os
-    if result.save_path_file == True:
-        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
-        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
-        path_file_base = base_string.encode('utf-8')
-        path_index_file_base = index_string.encode('utf-8')
-        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
 
     return origin
 

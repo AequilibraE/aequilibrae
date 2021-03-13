@@ -14,13 +14,8 @@ TODO python:
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libc.stdint cimport int64_t
-from libcpp.memory cimport shared_ptr
 
-from pyarrow.lib cimport *
-
-#import pyarrow as pa
-#cimport pyarrow as pa
-#pa.import_pyarrow()
+# from pyarrow.lib cimport *
 
 cdef extern from "ParquetWriter.cpp":
     pass
