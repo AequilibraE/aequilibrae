@@ -44,9 +44,10 @@ if "WINDOWS" in platform.platform().upper():
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=["/openmp", "-ffast-math", "-O3"],
+            extra_compile_args=["/openmp", "/O3"],  # this might have to be /O2
             extra_link_args=["/openmp"],
-            include_dirs=[np.get_include()],
+            include_dirs=[np.get_include(), pa.get_include()],
+            language="c++",
         )
     ]
 else:
