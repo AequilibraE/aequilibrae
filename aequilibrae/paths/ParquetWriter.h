@@ -5,9 +5,11 @@
 #include <vector>
 #include <string>
 
-#include <arrow/python/pyarrow.h>
+//#include <arrow/python/pyarrow.h>
 #include <arrow/api.h>
 #include <parquet/arrow/writer.h>
+#include <arrow/io/file.h>
+
 
 
 

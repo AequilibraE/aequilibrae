@@ -16,12 +16,11 @@ from libcpp.string cimport string
 from libc.stdint cimport int64_t
 from libcpp.memory cimport shared_ptr
 
-# from ParquetWriter cimport ParquetWriter
-# from pyarrow.lib cimport *
+from pyarrow.lib cimport *
 
-import pyarrow as pa
-cimport pyarrow as pa
-pa.import_pyarrow()
+#import pyarrow as pa
+#cimport pyarrow as pa
+#pa.import_pyarrow()
 
 cdef extern from "ParquetWriter.cpp":
     pass
