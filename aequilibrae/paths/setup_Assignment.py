@@ -46,7 +46,7 @@ if "WINDOWS" in platform.platform().upper():
             ["AoN.pyx"],
             extra_compile_args=["/openmp", "/O2"],
             extra_link_args=["/openmp"],
-            include_dirs=[np.get_include(), pa.get_include()],
+            include_dirs=[np.get_include()],
             language="c++",
         )
     ]
@@ -57,10 +57,15 @@ else:
             ["AoN.pyx"],
             extra_compile_args=["-fopenmp", "-std=c++11", "-O3"],  # do we want -Ofast?
             extra_link_args=["-fopenmp"],
+            # libraries=["ParquetWriter"],
             include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
+            # library_dirs=['.'],
+            runtime_library_dirs=["/mnt/c/Users/jan.zill/code/aequilibrae/.venv/lib/python3.7/site-packages/pyarrow/"],
         )
     ]
+
+# ext_modules[0].define_macros.append(("_GLIBCXX_USE_CXX11_ABI", "0"))
 
 for ext in ext_modules:
     ext.libraries.extend(pa.get_libraries())

@@ -11,7 +11,9 @@
 
 using arrow::Int64Builder;
 
-//ParquetWriter::ParquetWriter();
+ParquetWriter::ParquetWriter() {}
+ParquetWriter::~ParquetWriter() {}
+
 
 #define EXIT_ON_FAILURE(expr)                      \
   do {                                             \

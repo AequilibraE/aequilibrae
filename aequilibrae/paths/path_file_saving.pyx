@@ -10,21 +10,27 @@ TODO python:
 """
 
 # distutils: language = c++
-# distutils: sources = ParquetWriter.cpp
 
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 from libc.stdint cimport int64_t
+from libcpp.memory cimport shared_ptr
+
+# from ParquetWriter cimport ParquetWriter
+# from pyarrow.lib cimport *
 
 import pyarrow as pa
 cimport pyarrow as pa
 pa.import_pyarrow()
 
-import numpy as np
-cimport numpy as np
-np.import_array()
+cdef extern from "ParquetWriter.cpp":
+    pass
 
-from ParquetWriter cimport ParquetWriter
+cdef extern from "ParquetWriter.h":
+    cdef cppclass ParquetWriter nogil:
+        ParquetWriter() except +
+        int write_parquet(vector[int64_t] vec, string filename)
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -41,8 +47,6 @@ cpdef void save_path_file(long origin_index,
     cdef string file_name
     cdef vector[int64_t] path_data
     cdef vector[int64_t] size_of_path_arrays
-
-    cdef ParquetWriter writer = ParquetWriter()
 
     for node in range(zones):
         predecessor = pred[node]
@@ -69,6 +73,7 @@ cpdef void save_path_file(long origin_index,
         size_of_path_arrays.push_back(<int64_t> path_data.size())
 
 
-
+    cdef ParquetWriter* writer = new ParquetWriter()
     writer.write_parquet(path_data, path_file)
     writer.write_parquet(size_of_path_arrays, index_file)
+    del writer
