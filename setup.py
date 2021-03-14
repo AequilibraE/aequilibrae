@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import pyarrow as pa
 from setuptools import setup, find_packages
 from setuptools import Extension
 from Cython.Distutils import build_ext
@@ -10,7 +11,7 @@ sys.dont_write_bytecode = True
 
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include()])
+ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()])
 
 pkgs = [pkg for pkg in find_packages()]
 

@@ -1,23 +1,3 @@
-"""
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
-
- Name:       Auxiliary code
- Purpose:    Compiles AequilibraE's Cython code
-
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camrgo
-
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
-
- Created:    01/01/2013
- Updated:    2020/02/10
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
- """
 import os
 import sys
 import platform
@@ -46,7 +26,7 @@ if "WINDOWS" in platform.platform().upper():
             ["AoN.pyx"],
             extra_compile_args=["/openmp", "/O2"],
             extra_link_args=["/openmp"],
-            include_dirs=[np.get_include()],
+            include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
         )
     ]
