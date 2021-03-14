@@ -8,6 +8,7 @@ from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae import logger
 
 try:
@@ -72,6 +73,7 @@ class LinearApproximation(WorkerThread):
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
+        self.procedure_id = assig_spec.procedure_id
 
         self.iter = 0
         self.rgap = np.inf
@@ -330,7 +332,8 @@ class LinearApproximation(WorkerThread):
 
                 if c._aon_results.save_path_file:
                     # TODO Jan: make base dir user configurable
-                    path_base_dir = os.path.join("path_saving", f"iter{self.iter}")
+                    pth = os.environ.get(ENVIRON_VAR)
+                    path_base_dir = os.path.join(pth, "path_files", self.procedure_id, f"iter{self.iter}")
                     # TODO Jan: what identifier do we use for the class?
                     c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}")
                     Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
