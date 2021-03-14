@@ -5,9 +5,9 @@
 #include <string>
 
 #include <arrow/api.h>
-#include <parquet/arrow/writer.h>
+//#include <parquet/arrow/writer.h>
 #include <arrow/io/file.h>
-//#include <arrow/io/api.h>
+#include <arrow/io/api.h>
 #include <arrow/ipc/feather.h>
 
 using arrow::Int64Builder;
@@ -26,23 +26,48 @@ ParquetWriter::~ParquetWriter() {}
   } while (0);
 
 
-int ParquetWriter::write_parquet(std::vector<int64_t> vec, std::string filename)
-{
-    std::shared_ptr<arrow::Table> table;
-    EXIT_ON_FAILURE(VectorToColumnarTable(vec, &table));
+//int ParquetWriter::write_parquet(std::vector<int64_t> vec, std::string filename)
+//{
+//    std::shared_ptr<arrow::Table> table;
+//    EXIT_ON_FAILURE(VectorToColumnarTable(vec, &table));
+//
+//    std::shared_ptr<arrow::io::FileOutputStream> outfile;
+//    PARQUET_ASSIGN_OR_THROW(
+//        outfile,
+//        arrow::io::FileOutputStream::Open(filename));
+//
+//    PARQUET_THROW_NOT_OK(
+//        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 1));
+//
+//    PARQUET_THROW_NOT_OK(outfile->Close());
+//
+//    return 1;
+//}
 
-    std::shared_ptr<arrow::io::FileOutputStream> outfile;
-    PARQUET_ASSIGN_OR_THROW(
-        outfile,
-        arrow::io::FileOutputStream::Open(filename));
+// Jan 14/3/21: ARROW macros give me compile errors, parquet macros work. For now, define your own
+// macro for error checking, but look into problems a bit more
 
-    PARQUET_THROW_NOT_OK(
-        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 1));
+#define A_ASSIGN_OR_RAISE_IMPL(result_name, lhs, rexpr)          \
+  do {                                                           \
+    auto&& result_name = (rexpr);                                \
+    if (!result_name.ok()) {                                     \
+      std::cerr << "Feather conversion gone wrong" << std::endl; \
+      return EXIT_FAILURE;                                       \
+    }                                                            \
+  } while (0);
 
-    PARQUET_THROW_NOT_OK(outfile->Close());
+#define A_ASSIGN_OR_RAISE(lhs, rexpr)                                              \
+  A_ASSIGN_OR_RAISE_IMPL(ARROW_ASSIGN_OR_RAISE_NAME(_error_or_value, __COUNTER__), \
+                             lhs, rexpr);
 
-    return 1;
-}
+#define A_RETURN_NOT_OK(status)                               \
+  do {                                                        \
+    if (!status.ok()) {                                       \
+      std::cerr << "Feather writing gone wrong" << std::endl; \
+      return EXIT_FAILURE;                                    \
+    }                                                         \
+  } while (0);
+
 
 int ParquetWriter::write_feather(std::vector<int64_t> vec, std::string filename)
 {
@@ -50,12 +75,12 @@ int ParquetWriter::write_feather(std::vector<int64_t> vec, std::string filename)
     EXIT_ON_FAILURE(VectorToColumnarTable(vec, &table));
 
     std::shared_ptr<arrow::io::FileOutputStream> outfile;
-    //ARROW_ASSIGN_OR_RAISE
-    PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filename));
 
-    PARQUET_THROW_NOT_OK(arrow::ipc::feather::WriteTable(*table, outfile.get()));
+    A_ASSIGN_OR_RAISE(outfile, arrow::io::FileOutputStream::Open(filename));
 
-    PARQUET_THROW_NOT_OK(outfile->Close());
+    A_RETURN_NOT_OK(arrow::ipc::feather::WriteTable(*table, outfile.get()));
+
+    A_RETURN_NOT_OK(outfile->Close());
 
     return 1;
 }

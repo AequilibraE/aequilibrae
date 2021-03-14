@@ -18,7 +18,7 @@ cdef extern from "ParquetWriter.cpp":
 cdef extern from "ParquetWriter.h":
     cdef cppclass ParquetWriter nogil:
         ParquetWriter() except +
-        int write_parquet(vector[int64_t] vec, string filename)
+        #int write_parquet(vector[int64_t] vec, string filename)
         int write_feather(vector[int64_t] vec, string filename)
 
 

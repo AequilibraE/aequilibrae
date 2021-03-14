@@ -6,10 +6,10 @@
 #include <string>
 
 #include <arrow/api.h>
-#include <parquet/arrow/writer.h>
+//#include <parquet/arrow/writer.h>
 #include <arrow/io/file.h>
 
-//#include <arrow/io/api.h>
+#include <arrow/io/api.h>
 #include <arrow/ipc/feather.h>
 
 
@@ -22,7 +22,7 @@ public:
     ParquetWriter();
     ~ParquetWriter();
 
-    int write_parquet(std::vector<int64_t> vec, std::string filename);
+    //int write_parquet(std::vector<int64_t> vec, std::string filename);
     int write_feather(std::vector<int64_t> vec, std::string filename);
 
 private:

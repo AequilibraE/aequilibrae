@@ -46,7 +46,7 @@ if "WINDOWS" in platform.platform().upper():
             ["AoN.pyx"],
             extra_compile_args=["/openmp", "/O2"],
             extra_link_args=["/openmp"],
-            include_dirs=[np.get_include()],
+            include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
         )
     ]
@@ -56,18 +56,19 @@ else:
             "AoN",
             ["AoN.pyx"],
             extra_compile_args=["-fopenmp", "-std=c++11", "-O3"],  # do we want -Ofast?
-            extra_link_args=["-lparquet", "-fopenmp"],
+            extra_link_args=["-fopenmp"],
             include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
-            runtime_library_dirs=["/mnt/c/Users/jan.zill/code/aequilibrae/.venv/lib/python3.7/site-packages/pyarrow/"],
         )
     ]
+    # I got inexplicable segfaults without this line, added as recommended in
+    # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
+    ext_modules[0].define_macros.append(("_GLIBCXX_USE_CXX11_ABI", "0"))
 
 
 for ext in ext_modules:
     ext.libraries.extend(pa.get_libraries())
-    ext.libraries.extend(["parquet"])
+    # ext.libraries.extend(["parquet"])
     ext.library_dirs.extend(pa.get_library_dirs())
-    ext.define_macros.append(("_GLIBCXX_USE_CXX11_ABI", "0"))
 
 setup(name="AoN", ext_modules=cythonize(ext_modules))
