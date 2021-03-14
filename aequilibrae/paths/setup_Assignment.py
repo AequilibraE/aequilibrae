@@ -28,9 +28,6 @@ if "WINDOWS" in platform.platform().upper():
             extra_link_args=["/openmp"],
             include_dirs=[np.get_include(), pa.get_include()],
             language="c++",
-            libraries=pa.get_libraries(),
-            library_dirs=pa.get_library_dirs(),
-            runtime_library_dirs=pa.get_library_dirs(),
         )
     ]
 else:
@@ -45,6 +42,7 @@ else:
             # I got inexplicable segfaults without the following line, see
             # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
             define_macros=[("_GLIBCXX_USE_CXX11_ABI", "0")],
+            runtime_library_dirs=pa.get_library_dirs(),
         )
     ]
 
@@ -56,6 +54,5 @@ for ext in ext_modules:
     ext.libraries.extend(pa.get_libraries())
     ext.libraries.extend(["parquet"])
     ext.library_dirs.extend(pa.get_library_dirs())
-    ext.runtime_library_dirs.extend(pa.get_library_dirs())
 
 setup(name="AoN", ext_modules=cythonize(ext_modules))
