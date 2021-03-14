@@ -23,7 +23,9 @@ include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
-include 'path_file_saving.pyx'
+#include 'path_file_saving.pyx'
+include 'path_file_saving_nogil.pyx'
+
 
 from .__version__ import binary_version as VERSION_COMPILED
 
@@ -96,8 +98,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef bool save_paths = False
     if result.save_path_file == True:
         save_paths = True
-        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
-        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
+        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
+        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
@@ -156,6 +158,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    #if result.save_path_file == True:
+    #    save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
+
 
     return origin
 
