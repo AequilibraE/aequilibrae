@@ -41,14 +41,13 @@ else:
             language="c++",
         )
     ]
-    # I got inexplicable segfaults without this line, added as recommended in
+    # I got inexplicable segfaults without the following line, see
     # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
     ext_modules[0].define_macros.append(("_GLIBCXX_USE_CXX11_ABI", "0"))
 
 
 for ext in ext_modules:
     ext.libraries.extend(pa.get_libraries())
-    # ext.libraries.extend(["parquet"])
     ext.library_dirs.extend(pa.get_library_dirs())
 
 setup(name="AoN", ext_modules=cythonize(ext_modules))
