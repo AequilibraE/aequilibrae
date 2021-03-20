@@ -23,7 +23,7 @@ jupyter = "*"
 jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
-pytest-xdist="*
+pytest-xdist="*"
 
 [packages]
 numpy = ">=1.14.0"
@@ -33,6 +33,7 @@ pyshp = "*"
 cython = "*"
 scipy = "*"
 openmatrix = "*"
+shapely = "*"
 
 [scripts]
 notebook = "jupyter notebook"
