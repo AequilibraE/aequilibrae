@@ -981,7 +981,7 @@ class AequilibraeMatrix(object):
             raise ReferenceError("Matrix is not set for computation")
         if len(self.view_names) > 1:
             raise ValueError("Vector for a multi-core matrix is ambiguous")
-        return self.matrix_view.astype(np.float).sum(axis=axis)[:]
+        return self.matrix_view.astype(np.float64).sum(axis=axis)[:]
 
     def __builds_hash__(self):
         return {self.index[i]: i for i in range(self.zones)}

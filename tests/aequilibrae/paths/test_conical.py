@@ -19,7 +19,7 @@ class TestConical(TestCase):
         beta.fill(1.06)
         fftime.fill(1)
         capacity.fill(1)
-        link_flows = np.arange(11).astype(np.float) * 0.2
+        link_flows = np.arange(11).astype(np.float64) * 0.2
 
         conical(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
 
