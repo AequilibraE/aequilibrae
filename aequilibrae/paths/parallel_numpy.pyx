@@ -24,15 +24,15 @@ cpdef void sum_axis1_cython(double[:] totals,
           totals[i] += multiples[i, j]
 
 
-
-def sum_a_times_b_minus_c(array1, array2, array3, cores):
+def sum_a_times_b_minus_c(array1, array2, array3, class_pce, cores):
     cdef int c = cores
+    cdef double pce = class_pce
     cdef double result
     cdef double [:] array1_view = array1
     cdef double [:] array2_view = array2
     cdef double [:] array3_view = array3
 
-    result = sum_a_times_b_minus_c_cython(array1_view, array2_view, array3_view, c)
+    result = sum_a_times_b_minus_c_cython(array1_view, array2_view, array3_view, pce, c)
     return result
 
 @cython.wraparound(False)
@@ -41,6 +41,7 @@ def sum_a_times_b_minus_c(array1, array2, array3, cores):
 cpdef double sum_a_times_b_minus_c_cython(double[:] array1,
                                           double[:] array2,
                                           double[:] array3,
+                                          double pce,
                                           int cores):
     cdef long long i
     cdef double row_result
@@ -48,7 +49,7 @@ cpdef double sum_a_times_b_minus_c_cython(double[:] array1,
     cdef long long l = array1.shape[0]
 
     for i in prange(l, nogil=True, num_threads=cores):
-        row_result = array1[i] * (array2[i] - array3[i])
+        row_result = array1[i] * (array2[i] - array3[i]) / pce
         result += row_result
 
     return result

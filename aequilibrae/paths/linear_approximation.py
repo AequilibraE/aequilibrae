@@ -415,7 +415,7 @@ class LinearApproximation(WorkerThread):
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
         self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
         link_cost_term = sum_a_times_b_minus_c(self.congested_value, self.step_direction_flow,
-                                               self.fw_total_flow, self.cores)
+                                               self.fw_total_flow, 1.0, self.cores)
         return link_cost_term + const_term
 
     def __derivative_of_objective_stepsize_independent(self):
@@ -425,7 +425,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0],
-                                                     c.results.link_loads[:, 0], self.cores)
+                                                     c.results.link_loads[:, 0], c.pce, self.cores)
             class_specific_term += class_link_costs
         return class_specific_term
 
