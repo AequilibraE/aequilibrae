@@ -42,6 +42,7 @@ else:
             # I got inexplicable segfaults without the following line, see
             # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
             define_macros=[("_GLIBCXX_USE_CXX11_ABI", "0")],
+            # rpath only for *nix
             runtime_library_dirs=pa.get_library_dirs(),
         )
     ]
