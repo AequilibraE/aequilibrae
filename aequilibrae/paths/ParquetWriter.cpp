@@ -41,8 +41,9 @@ int ParquetWriter::write_parquet(std::vector<int64_t> vec, std::string filename)
     props_builder.compression(parquet::Compression::GZIP);
     auto props = props_builder.build();
 
+    // TODO Jan: do we want length as max chunk size?
     PARQUET_THROW_NOT_OK(
-        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 1));//vec->length(), props));
+        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, vec.size(), props));
 
     PARQUET_THROW_NOT_OK(outfile->Close());
 
