@@ -38,10 +38,10 @@ int ParquetWriter::write_parquet(std::vector<int64_t> vec, std::string filename)
     // regarding compression, if you care about speed use feather (lz4)
     // for parquet, we use gzip because it has the best compression ratio,
     // see e.g. https://stackoverflow.com/a/56410326
-    props_builder.compression(parquet::Compression::GZIP);
+    // Note: looks like feather is better in all regards for our use case
+    props_builder.compression(parquet::Compression::GZIP); // SNAPPY, GZIP
     auto props = props_builder.build();
 
-    // TODO Jan: do we want length as max chunk size, or number of columns?
     PARQUET_THROW_NOT_OK(
         parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, vec.size(), props));
 
