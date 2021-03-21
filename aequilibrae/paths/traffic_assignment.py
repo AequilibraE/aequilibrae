@@ -264,7 +264,7 @@ class TrafficAssignment(object):
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
                     c = self.classes[0]
-                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
                     array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
                 else:
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
@@ -312,6 +312,24 @@ class TrafficAssignment(object):
         for c in self.classes:
             c._aon_results.save_path_file = save_it
 
+    def set_path_file_format(self, file_format: str) -> None:
+        """Specify path saving format. Either parquet wiht compression gzip or feather.
+
+        Args:
+            file_format (:obj:`str`): Name of file format to use for path files
+        """
+        if self.classes is None:
+            raise Exception("You need to set traffic classes before specifying path saving options")
+
+        if file_format == "feather":
+            for c in self.classes:
+                c._aon_results.write_feather = True
+        elif file_format == "parquet":
+            for c in self.classes:
+                c._aon_results.write_feather = False
+        else:
+            raise Exception(f"Unsupported path file format {file_format} - only feather or parquet available.")
+
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'fftime'
@@ -333,7 +351,7 @@ class TrafficAssignment(object):
         if c.graph.graph[time_field].values.min() <= 0:
             raise ValueError("There is at least one link with zero or negative free-flow time")
 
-        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
@@ -361,7 +379,7 @@ class TrafficAssignment(object):
             raise ValueError("There is at least one link with zero or negative capacity")
 
         self.__dict__["cores"] = c.results.cores
-        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
 
@@ -431,10 +449,20 @@ class TrafficAssignment(object):
         free_flow_tt = self.free_flow_tt[idx]
 
         entries = res1.data.shape[0]
-        fields = ["Congested_Time_AB", "Congested_Time_BA", "Congested_Time_Max",
-                  "Delay_factor_AB", "Delay_factor_BA", "Delay_factor_Max",
-                  "VOC_AB", "VOC_BA", "VOC_max",
-                  "PCE_AB", "PCE_BA", "PCE_tot"]
+        fields = [
+            "Congested_Time_AB",
+            "Congested_Time_BA",
+            "Congested_Time_Max",
+            "Delay_factor_AB",
+            "Delay_factor_BA",
+            "Delay_factor_Max",
+            "VOC_AB",
+            "VOC_BA",
+            "VOC_max",
+            "PCE_AB",
+            "PCE_BA",
+            "PCE_tot",
+        ]
 
         types = [np.float64] * len(fields)
         agg = AequilibraeData()

@@ -99,11 +99,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef bool write_feather = True
     if result.save_path_file == True:
         save_paths = True
-        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
-        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
+        write_feather = result.write_feather
+        if write_feather:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
+        else:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
-        write_feather = result.write_feather
+
 
 
     #Now we do all procedures with NO GIL
