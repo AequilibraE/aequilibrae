@@ -1,3 +1,4 @@
+import sys
 from aequilibrae.starts_logging import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
@@ -8,12 +9,32 @@ from aequilibrae import transit
 from aequilibrae import project
 import warnings
 
+
+# win hack, see https://stackoverflow.com/a/62723124
+if "win" in sys.platform:
+    import os
+    import ctypes
+    import pyarrow as pa
+
+    dlls_to_load = [
+        "arrow.dll",
+        "arrow_dataset.dll",
+        "arrow_flight.dll",
+        "arrow_python.dll",
+        "arrow_python_flight.dll",
+        "msvcp140.dll",
+        "parquet.dll",
+    ]
+    for dll_ in dlls_to_load:
+        ctypes.CDLL(os.path.join(pa.get_library_dirs()[0], dll_))
+        # we preload with the full path
+
 compiled = True
 try:
     from aequilibrae.paths.AoN import path_computation
 except Exception as e:
     compiled = False
-    warnings.warn(f'Failed to import compiled modules. {e.args}')
+    warnings.warn(f"Failed to import compiled modules. {e.args}")
 
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
