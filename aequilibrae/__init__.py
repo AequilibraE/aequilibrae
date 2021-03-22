@@ -10,7 +10,8 @@ from aequilibrae import project
 import warnings
 
 
-# win hack, see https://stackoverflow.com/a/62723124
+# win hack to have access to dynamically loaded pyarrow libraries without tampering with system path or copying dlls,
+# see https://stackoverflow.com/a/62723124
 if "win" in sys.platform:
     import os
     import ctypes
@@ -27,7 +28,6 @@ if "win" in sys.platform:
     ]
     for dll_ in dlls_to_load:
         ctypes.CDLL(os.path.join(pa.get_library_dirs()[0], dll_))
-        # we preload with the full path
 
 compiled = True
 try:
