@@ -1,4 +1,3 @@
-import os
 import sys
 import platform
 import numpy as np
@@ -34,9 +33,7 @@ else:
     # NOTE: on linux and mac, create appropriately named symlinks after pip install pyarrow with
     # python -c "import pyarrow; pyarrow.create_library_symlinks()"
     # Only needs to be done once
-    import pyarrow
-
-    pyarrow.create_library_symlinks()
+    pa.create_library_symlinks()
 
     ext_modules = [
         Extension(
