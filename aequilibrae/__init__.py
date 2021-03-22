@@ -1,4 +1,3 @@
-import sys
 from aequilibrae.starts_logging import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
@@ -7,12 +6,13 @@ from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
+import platform
 import warnings
 
 
 # win hack to have access to dynamically loaded pyarrow libraries without tampering with system path or copying dlls,
 # see https://stackoverflow.com/a/62723124
-if "win" in sys.platform:
+if "WINDOWS" in platform.platform().upper():
     import os
     import ctypes
     import pyarrow as pa
