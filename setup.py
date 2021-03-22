@@ -18,7 +18,7 @@ ext_module = Extension(
 
 if "WINDOWS" in platform.platform().upper():
     ext_module.extra_compile_args.extend(["/openmp", "/O2"])
-    ext_module.extra_link_args.extend(["/openmp", "/parquet"])
+    ext_module.extra_link_args.extend(["/openmp"])
 else:
     # NOTE: on linux and mac, create appropriately named symlinks after pip install pyarrow with
     # python -c "import pyarrow; pyarrow.create_library_symlinks()"
