@@ -11,7 +11,9 @@ sys.dont_write_bytecode = True
 
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()])
+ext_module = Extension(
+    "aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()], language="c++"
+)
 
 pkgs = [pkg for pkg in find_packages()]
 
