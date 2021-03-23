@@ -156,7 +156,7 @@ class Graph(object):
         links_index[y] = x[:]
         links_index[-1] = all_links.shape[0]
 
-        for i in range(all_nodes.max() + 1, 1, -1):
+        for i in range(all_nodes.max() + 1, 0, -1):
             links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
 
         # We keep all centroids for sure
