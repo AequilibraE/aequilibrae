@@ -51,7 +51,11 @@ else:
         )
     ]
 
+
 for ext in ext_modules:
+    # apparently apple does not include c++11 in libstdc++ and for older macos systems this is the standard.
+    if platform.system() == "Darwin":
+        ext.extra_compile_args.append("-stdlib=libc++")
     ext.libraries.extend(pa.get_libraries())
     ext.libraries.extend(["parquet"])
     ext.library_dirs.extend(pa.get_library_dirs())
