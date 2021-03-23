@@ -38,23 +38,24 @@ cpdef void save_path_file(long origin_index,
     cdef np.npy_intp dims_ind[1]
     cdef np.ndarray[np.longlong_t, ndim=1] numpy_array_ind
 
-    for node in range(zones):
-        predecessor = pred[node]
-        # need to check if disconnected, also makes sure o==d is not included
-        if predecessor == -1:
-            continue
-        connector = conn[node]
-        path_data.push_back(connector)
+    with nogil:
+        for node in range(zones):
+            predecessor = pred[node]
+            # need to check if disconnected, also makes sure o==d is not included
+            if predecessor == -1:
+                continue
+            connector = conn[node]
+            path_data.push_back(connector)
 
-        while predecessor >= 0:
-            predecessor = pred[predecessor]
-            if predecessor != -1:
-                connector = conn[predecessor]
-                # need this to avoid ading last element. Would it be faster to resize after loop?
-                if connector != -1:
-                    path_data.push_back(connector)
+            while predecessor >= 0:
+                predecessor = pred[predecessor]
+                if predecessor != -1:
+                    connector = conn[predecessor]
+                    # need this to avoid ading last element. Would it be faster to resize after loop?
+                    if connector != -1:
+                        path_data.push_back(connector)
 
-        size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
+            size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
 
     # get a view on data underlying vector, then as numpy array. avoids copying.
     dims[0] = <np.npy_intp> (path_data.size())
