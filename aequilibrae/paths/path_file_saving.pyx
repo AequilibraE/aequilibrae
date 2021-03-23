@@ -27,7 +27,6 @@ cpdef void save_path_file(long origin_index,
                           bool write_feather):
 
     cdef long long class_, node, predecessor, connector, ctr
-    cdef string file_name
     cdef vector[long long] path_data
     # could make this an ndarray and not do the conversion, we know the size of the index array is zones
     cdef vector[long long] size_of_path_arrays
@@ -71,5 +70,5 @@ cpdef void save_path_file(long origin_index,
         feather.write_feather(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
         feather.write_feather(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
     else:
-        pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
+        pq.write_table(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
         pq.write_table(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
