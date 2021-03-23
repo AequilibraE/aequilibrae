@@ -23,7 +23,8 @@ cpdef void save_path_file(long origin_index,
                           long long [:] pred,
                           long long [:] conn,
                           string path_file,
-                          string index_file):
+                          string index_file,
+                          bool write_feather):
 
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
@@ -46,9 +47,7 @@ cpdef void save_path_file(long origin_index,
         connector = conn[node]
         path_data.push_back(connector)
 
-        # print(f" (b) d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
         while predecessor >= 0:
-            # print(f"    d={node},   pred = {predecessor}, connector = {connector}"); sys.stdout.flush
             predecessor = pred[predecessor]
             if predecessor != -1:
                 connector = conn[predecessor]
@@ -56,30 +55,21 @@ cpdef void save_path_file(long origin_index,
                 if connector != -1:
                     path_data.push_back(connector)
 
-        # print(f"size of path vec {path_for_od_pair_and_class.size()}")
-
-
         size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
 
     # get a view on data underlying vector, then as numpy array. avoids copying.
     dims[0] = <np.npy_intp> (path_data.size())
     dims_ind[0] = <np.npy_intp> (size_of_path_arrays.size())
-    # print(f"dims = {dims}")
 
     temp_data = &path_data[0]
     temp_data_ind = &size_of_path_arrays[0]
-    # print(f"temp[0] = {temp_data[0]}")
 
     numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
     numpy_array_ind = np.PyArray_SimpleNewFromData(1, dims_ind, np.NPY_LONGLONG, temp_data_ind)
-    # print(f"np array = {numpy_array}")
 
-
-    # parquet
-    #file_name = path_file_base + to_string(node) + b'.parquet'
-    #pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
-    # feather
-    # file_name = path_file_base + to_string(node) + b'.feather'
-
-    feather.write_feather(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
-    feather.write_feather(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
+    if write_feather:
+        feather.write_feather(pa.table({"data": numpy_array}), path_file.decode('utf-8'))
+        feather.write_feather(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))
+    else:
+        pq.write_table(pa.table({"data": numpy_array}), file_name.decode('utf-8'))
+        pq.write_table(pa.table({"data": numpy_array_ind}), index_file.decode('utf-8'))

@@ -140,11 +140,6 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         node_load_view,
                         w)
 
-#        if save_paths == True:
-#            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base,
-#                path_index_file_base, write_feather)
-
-
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
@@ -168,7 +163,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
 
     if result.save_path_file == True:
-        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
+        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
     return origin
 
