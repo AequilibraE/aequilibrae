@@ -32,12 +32,18 @@ int ParquetWriter::write_parquet(std::vector<int64_t> vec, std::string filename)
     EXIT_ON_FAILURE(VectorToColumnarTable(vec, &table));
 
     std::shared_ptr<arrow::io::FileOutputStream> outfile;
-    PARQUET_ASSIGN_OR_THROW(
-        outfile,
-        arrow::io::FileOutputStream::Open(filename));
+    PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filename));
+
+    parquet::WriterProperties::Builder props_builder;
+    // regarding compression, if you care about speed use feather (lz4)
+    // for parquet, we use gzip because it has the best compression ratio,
+    // see e.g. https://stackoverflow.com/a/56410326
+    // Note: looks like feather is better in all regards for our use case
+    props_builder.compression(parquet::Compression::GZIP); // SNAPPY, GZIP
+    auto props = props_builder.build();
 
     PARQUET_THROW_NOT_OK(
-        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 1));
+        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, vec.size(), props));
 
     PARQUET_THROW_NOT_OK(outfile->Close());
 
@@ -50,11 +56,9 @@ int ParquetWriter::write_feather(std::vector<int64_t> vec, std::string filename)
     EXIT_ON_FAILURE(VectorToColumnarTable(vec, &table));
 
     std::shared_ptr<arrow::io::FileOutputStream> outfile;
-
     PARQUET_ASSIGN_OR_THROW(outfile, arrow::io::FileOutputStream::Open(filename));
 
     PARQUET_THROW_NOT_OK(arrow::ipc::feather::WriteTable(*table, outfile.get()));
-
     PARQUET_THROW_NOT_OK(outfile->Close());
 
     return 1;

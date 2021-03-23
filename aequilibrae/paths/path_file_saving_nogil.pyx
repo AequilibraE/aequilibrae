@@ -31,7 +31,8 @@ cpdef void save_path_file(long origin_index,
                           long long [:] pred,
                           long long [:] conn,
                           string path_file,
-                          string index_file) nogil:
+                          string index_file,
+                          bool write_feather) nogil:
 
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
@@ -64,6 +65,10 @@ cpdef void save_path_file(long origin_index,
 
 
     cdef ParquetWriter* writer = new ParquetWriter()
-    writer.write_feather(path_data, path_file)
-    writer.write_feather(size_of_path_arrays, index_file)
+    if write_feather:
+        writer.write_feather(path_data, path_file)
+        writer.write_feather(size_of_path_arrays, index_file)
+    else:
+        writer.write_parquet(path_data, path_file)
+        writer.write_parquet(size_of_path_arrays, index_file)
     del writer

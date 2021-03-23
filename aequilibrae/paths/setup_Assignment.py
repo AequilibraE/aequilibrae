@@ -1,4 +1,3 @@
-import os
 import sys
 import platform
 import numpy as np
@@ -31,6 +30,11 @@ if "WINDOWS" in platform.platform().upper():
         )
     ]
 else:
+    # NOTE: on linux and mac, create appropriately named symlinks after pip install pyarrow with
+    # python -c "import pyarrow; pyarrow.create_library_symlinks()"
+    # Only needs to be done once
+    pa.create_library_symlinks()
+
     ext_modules = [
         Extension(
             "AoN",
@@ -42,13 +46,10 @@ else:
             # I got inexplicable segfaults without the following line, see
             # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
             define_macros=[("_GLIBCXX_USE_CXX11_ABI", "0")],
+            # rpath only for *nix, we hack it in __init__ for win
             runtime_library_dirs=pa.get_library_dirs(),
         )
     ]
-
-# NOTE: on linux and mac, create appropriately named symlinks after pip install pyarrow with
-# python -c "import pyarrow; pyarrow.create_library_symlinks()"
-# Only needs to be done once.
 
 for ext in ext_modules:
     ext.libraries.extend(pa.get_libraries())

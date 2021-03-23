@@ -6,14 +6,35 @@ from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
+import platform
 import warnings
+
+
+# win hack to have access to dynamically loaded pyarrow libraries without tampering with system path or copying dlls,
+# see https://stackoverflow.com/a/62723124
+if "WINDOWS" in platform.platform().upper():
+    import os
+    import ctypes
+    import pyarrow as pa
+
+    dlls_to_load = [
+        "arrow.dll",
+        "arrow_dataset.dll",
+        "arrow_flight.dll",
+        "arrow_python.dll",
+        "arrow_python_flight.dll",
+        "msvcp140.dll",
+        "parquet.dll",
+    ]
+    for dll_ in dlls_to_load:
+        ctypes.CDLL(os.path.join(pa.get_library_dirs()[0], dll_))
 
 compiled = True
 try:
     from aequilibrae.paths.AoN import path_computation
 except Exception as e:
     compiled = False
-    warnings.warn(f'Failed to import compiled modules. {e.args}')
+    warnings.warn(f"Failed to import compiled modules. {e.args}")
 
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel

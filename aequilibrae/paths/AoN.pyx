@@ -23,7 +23,7 @@ include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
-#include 'path_file_saving.pyx'
+# include 'path_file_saving.pyx'
 include 'path_file_saving_nogil.pyx'
 
 
@@ -96,12 +96,19 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef string path_file_base
     cdef string path_index_file_base
     cdef bool save_paths = False
+    cdef bool write_feather = True
     if result.save_path_file == True:
         save_paths = True
-        base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
-        index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
+        write_feather = result.write_feather
+        if write_feather:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
+        else:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
+
 
 
     #Now we do all procedures with NO GIL
@@ -134,7 +141,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         w)
 
         if save_paths == True:
-            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
+            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base,
+                path_index_file_base, write_feather)
 
 
         if skims > 0:
