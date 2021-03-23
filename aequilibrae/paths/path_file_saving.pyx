@@ -23,7 +23,7 @@ cpdef void save_path_file(long origin_index,
                           long long [:] pred,
                           long long [:] conn,
                           string path_file,
-                          string index_file): #nogil:
+                          string index_file):
 
     cdef long long class_, node, predecessor, connector, ctr
     cdef string file_name
@@ -71,7 +71,7 @@ cpdef void save_path_file(long origin_index,
     # print(f"temp[0] = {temp_data[0]}")
 
     numpy_array = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data)
-    numpy_array_ind = np.PyArray_SimpleNewFromData(1, dims, np.NPY_LONGLONG, temp_data_ind)
+    numpy_array_ind = np.PyArray_SimpleNewFromData(1, dims_ind, np.NPY_LONGLONG, temp_data_ind)
     # print(f"np array = {numpy_array}")
 
 

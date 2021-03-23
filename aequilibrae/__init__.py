@@ -1,5 +1,3 @@
-import platform
-import warnings
 from aequilibrae.starts_logging import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
@@ -8,35 +6,7 @@ from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
-
-# win hack to have access to dynamically loaded pyarrow libraries without tampering with system path or copying dlls,
-# see https://stackoverflow.com/a/62723124
-if "WINDOWS" in platform.platform().upper():
-    import os
-    import glob
-    import ctypes
-    import pyarrow as pa
-
-    cwd = os.getcwd()
-    pa_dirs = pa.get_library_dirs()
-
-    # dlls_to_load = [
-    #     "arrow.dll",
-    #     "arrow_dataset.dll",
-    #     "arrow_flight.dll",
-    #     "arrow_python.dll",
-    #     "arrow_python_flight.dll",
-    #     "msvcp140.dll",
-    #     "parquet.dll",
-    # ]
-
-    for pa_dir in pa_dirs:
-        os.chdir(pa_dir)
-        dlls_to_load = glob.glob(".dll")
-        for dll_ in dlls_to_load:
-            ctypes.CDLL(dll_)  # TODO: WINDLL or CDLL
-
-    os.chdir(cwd)
+import warnings
 
 compiled = True
 try:

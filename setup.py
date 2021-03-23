@@ -1,6 +1,5 @@
 import sys
 import os
-import platform
 import numpy as np
 import pyarrow as pa
 from setuptools import setup, find_packages
@@ -12,31 +11,7 @@ sys.dont_write_bytecode = True
 
 here = os.path.dirname(os.path.realpath(__file__))
 whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension(
-    "aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()], language="c++"
-)
-
-if "WINDOWS" in platform.platform().upper():
-    ext_module.extra_compile_args.extend(["/openmp", "/O2"])
-    ext_module.extra_link_args.extend(["/openmp"])
-else:
-    # NOTE: on linux and mac, create appropriately named symlinks after pip install pyarrow
-    pa.create_library_symlinks()
-    ext_module.extra_compile_args.extend(["-std=c++11", "-O3"])  # do we want -Ofast? #"-fopenmp",
-    ext_module.extra_link_args = ["-lparquet"]
-    # I got inexplicable segfaults without the following line, see
-    # https://arrow.apache.org/docs/python/extending.html# (see end of doc)
-    ext_module.define_macros.extend([("_GLIBCXX_USE_CXX11_ABI", "0")])
-    # rpath only for *nix, we hack it in __init__ for win
-    # this is not ideal for packaging, see https://discuss.python.org/t/packaging-dlls-on-windows/1401
-    ext_module.runtime_library_dirs.extend(pa.get_library_dirs())
-ext_module.libraries.extend(pa.get_libraries())
-ext_module.libraries.extend(["parquet"])
-ext_module.library_dirs.extend(pa.get_library_dirs())
-
-# apparently apple does not include c++11 in libstdc++ and for older macos systems this is the standard.
-if platform.system() == "Darwin":
-    ext_module.extra_compile_args.append("-stdlib=libc++")
+ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()])
 
 pkgs = [pkg for pkg in find_packages()]
 

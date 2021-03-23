@@ -23,8 +23,8 @@ include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
-# include 'path_file_saving.pyx'
-include 'path_file_saving_nogil.pyx'
+include 'path_file_saving.pyx'
+# include 'path_file_saving_nogil.pyx'
 
 
 from .__version__ import binary_version as VERSION_COMPILED
@@ -140,9 +140,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         node_load_view,
                         w)
 
-        if save_paths == True:
-            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base,
-                path_index_file_base, write_feather)
+#        if save_paths == True:
+#            save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base,
+#                path_index_file_base, write_feather)
 
 
         if skims > 0:
@@ -167,9 +167,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-    #if result.save_path_file == True:
-    #    save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
-
+    if result.save_path_file == True:
+        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base)
 
     return origin
 
