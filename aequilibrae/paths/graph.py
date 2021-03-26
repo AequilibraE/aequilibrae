@@ -143,22 +143,23 @@ class Graph(object):
 
         nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
         links = np.hstack([self.network.link_id.values, self.network.link_id.values])
+        counts = np.bincount(nodes)
 
         idx = np.argsort(nodes)
         all_nodes = nodes[idx]
         all_links = links[idx]
-        links_index = np.empty(all_nodes.max() + 1, np.int64)
+        links_index = np.empty(all_nodes.max() + 2, np.int64)
         links_index.fill(-1)
-        nlist = np.arange(all_nodes.max())
+        nlist = np.arange(all_nodes.max() + 2)
 
         y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
         links_index[y] = x[:]
         links_index[-1] = all_links.shape[0]
-        for i in range(all_nodes.max(), 1, -1):
+
+        for i in range(all_nodes.max() + 1, 0, -1):
             links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
 
-        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
-        counts = np.bincount(nodes)
+        # We keep all centroids for sure
         counts[self.centroids] = 999
 
         truth = (counts == 2).astype(np.int)
