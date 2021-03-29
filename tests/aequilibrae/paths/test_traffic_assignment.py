@@ -29,7 +29,7 @@ class TestTrafficAssignment(TestCase):
         self.matrix.computational_view()
 
         self.assignment = TrafficAssignment()
-        self.assigclass = TrafficClass(self.car_graph, self.matrix)
+        self.assigclass = TrafficClass('car', self.car_graph, self.matrix)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
@@ -40,7 +40,7 @@ class TestTrafficAssignment(TestCase):
     def test_matrix_with_wrong_type(self):
         self.matrix.matrix_view = np.array(self.matrix.matrix_view, np.int32)
         with self.assertRaises(TypeError):
-            _ = TrafficClass(self.car_graph, self.matrix)
+            _ = TrafficClass('car', self.car_graph, self.matrix)
 
     def test_set_vdf(self):
         with self.assertRaises(ValueError):
@@ -195,7 +195,7 @@ class TestTrafficAssignment(TestCase):
 
         # For the last algorithm, we set skimming
         self.car_graph.set_skimming(["free_flow_time", "distance"])
-        assigclass = TrafficClass(self.car_graph, self.matrix)
+        assigclass = TrafficClass('car', self.car_graph, self.matrix)
         self.assignment.set_classes([assigclass])
 
         self.assignment.set_algorithm("bfw")
