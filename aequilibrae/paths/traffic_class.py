@@ -1,4 +1,3 @@
-from uuid import uuid4
 from typing import Union
 import numpy as np
 from aequilibrae.paths.graph import Graph
@@ -18,11 +17,13 @@ class TrafficClass():
         tc.set_pce(1.3)
     """
 
-    def __init__(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
+    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class
 
          Args:
+            name (:obj:`str`): UNIQUE class name.
+
             graph (:obj:`Graph`): Class/mode-specific graph
 
             matrix (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
@@ -47,7 +48,7 @@ class TrafficClass():
         self.results.reset()
         self._aon_results = AssignmentResults()
         self._aon_results.prepare(self.graph, self.matrix)
-        self.__id__ = uuid4().hex
+        self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent

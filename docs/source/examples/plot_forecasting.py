@@ -74,7 +74,7 @@ demand.computational_view(["matrix"])
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(graph, demand)
+assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
@@ -189,7 +189,6 @@ imped.view_names
 # We set the matrices for being used in computation
 demand.computational_view(["matrix"])
 
-
 # %%
 
 for function in ["power", "expo"]:
@@ -204,7 +203,6 @@ for function in ["power", "expo"]:
     with open(join(fldr, f"{function}_convergence.log"), "w") as otp:
         for r in gc.report:
             otp.write(r + "\n")
-
 
 # %% md
 
@@ -333,7 +331,7 @@ demand.computational_view("gravity")
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(graph, demand)
+assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)

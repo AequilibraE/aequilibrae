@@ -526,19 +526,24 @@ class TrafficAssignment(object):
             *info* (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
         """
 
-        classes = {'matrix_totals': {}}
+        classes = {}
+
         for cls in self.classes:
+            uclass = {}
+
             if len(cls.matrix.view_names) == 1:
-                classes['matrix_totals'][cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in
-                                                            cls.matrix.view_names}
+                uclass['matrix_totals'] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in
+                                           cls.matrix.view_names}
             else:
-                classes['matrix_totals'][cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
-                                                            enumerate(cls.matrix.view_names)}
-            classes['Value-of-time'] = cls.vot
-            classes['PCE'] = cls.pce
+                uclass['matrix_totals'] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
+                                           enumerate(cls.matrix.view_names)}
+            uclass['network mode'] = cls.graph.mode
+            uclass['Value-of-time'] = cls.vot
+            uclass['PCE'] = cls.pce
             if cls.fixed_cost_field:
-                classes['Fixed cost field'] = cls.fixed_cost_field
-                classes['Fixed cost multiplier'] = cls.fc_multiplier
+                uclass['Fixed cost field'] = cls.fixed_cost_field
+                uclass['Fixed cost multiplier'] = cls.fc_multiplier
+            classes[cls.__id__] = uclass
 
         info = {
             "Algorithm": self.algorithm,
