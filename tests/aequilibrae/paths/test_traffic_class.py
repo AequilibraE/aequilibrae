@@ -20,7 +20,7 @@ class TestTrafficClass(TestCase):
         matrix = project.matrices.get_matrix("demand_omx")
         matrix.computational_view()
 
-        tc = TrafficClass(graph=car_graph, matrix=matrix)
+        tc = TrafficClass(name='car', graph=car_graph, matrix=matrix)
 
         self.assertIsInstance(tc.results, AssignmentResults, "Results have the wrong type")
         self.assertIsInstance(tc._aon_results, AssignmentResults, "Results have the wrong type")
