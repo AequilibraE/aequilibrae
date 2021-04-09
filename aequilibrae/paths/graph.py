@@ -126,9 +126,9 @@ class Graph(object):
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        self.graph.sort_values(by=['link_id', 'direction'], inplace=True)
+        self.graph.sort_values(by=["link_id", "direction"], inplace=True)
         self.graph.loc[:, "__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
-        self.graph.sort_values(by=['a_node', 'b_node'], inplace=True)
+        self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
 
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
@@ -143,22 +143,23 @@ class Graph(object):
 
         nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
         links = np.hstack([self.network.link_id.values, self.network.link_id.values])
+        counts = np.bincount(nodes)
 
         idx = np.argsort(nodes)
         all_nodes = nodes[idx]
         all_links = links[idx]
-        links_index = np.empty(all_nodes.max() + 1, np.int64)
+        links_index = np.empty(all_nodes.max() + 2, np.int64)
         links_index.fill(-1)
-        nlist = np.arange(all_nodes.max())
+        nlist = np.arange(all_nodes.max() + 2)
 
         y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
         links_index[y] = x[:]
         links_index[-1] = all_links.shape[0]
-        for i in range(all_nodes.max(), 1, -1):
+
+        for i in range(all_nodes.max() + 1, 0, -1):
             links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
 
-        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
-        counts = np.bincount(nodes)
+        # We keep all centroids for sure
         counts[self.centroids] = 999
 
         truth = (counts == 2).astype(np.int)
@@ -478,7 +479,7 @@ class Graph(object):
         self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
         df = self.__graph_groupby.sum()[skim_fields].reset_index()
         for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values, i] = df[skm].values[:].astype(self.__float_type)
+            self.compact_skims[df.index.values[:-1], i] = df[skm].values[:-1].astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
