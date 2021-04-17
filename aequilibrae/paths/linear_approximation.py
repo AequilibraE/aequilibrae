@@ -366,11 +366,12 @@ class LinearApproximation(WorkerThread):
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
+                # TODO: do we write these to a temp dir, and then blob store by iteration, class, origin, destination
+                # in sqlite? could have one db per path file saving? -> after aon obviously
                 if c._aon_results.save_path_file:
                     # TODO Jan: make base dir user configurable
                     pth = os.environ.get(ENVIRON_VAR)
                     path_base_dir = os.path.join(pth, "path_files", self.procedure_id, f"iter{self.iter}")
-                    # TODO Jan: what identifier do we use for the class?
                     c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}_{c.__id__}")
                     Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
 
