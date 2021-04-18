@@ -366,16 +366,20 @@ class LinearApproximation(WorkerThread):
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
-                if c._aon_results.save_path_file and (self.iter == 1):
+                if c._aon_results.save_path_file:
                     # TODO (Jan 18/4/21): make base dir user configurable
                     pth = os.environ.get(ENVIRON_VAR)
                     path_base_dir = os.path.join(pth, "path_files", self.procedure_id, f"iter{self.iter}")
                     c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}_{c.__id__}")
                     Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
-                    # save link_id to simplified graph id, this could change
-                    c.graph.save_compressed_correspondence(
-                        os.path.join(c._aon_results.path_file_dir, "correspondence_c{c.mode}_{c.__id__}.feather")
-                    )
+                    if self.iter == 1:
+                        # save link_id to simplified graph id, this could change
+                        c.graph.save_compressed_correspondence(
+                            os.path.join(
+                                os.path.join(pth, "path_files", self.procedure_id),
+                                f"correspondence_c{c.mode}_{c.__id__}.feather",
+                            )
+                        )
 
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
