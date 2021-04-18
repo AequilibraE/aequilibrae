@@ -264,6 +264,11 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores)
                 sd_flows.append(aon_res.total_link_loads)
 
+            # need this for select link analysis
+            self.betas[0] = 1.0
+            self.betas[1] = 0.0
+            self.betas[2] = 0.0
+
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
             self.do_conjugate_step = False
@@ -436,10 +441,10 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
-            if self.algorithm == "bfw":
-                self.convergence_report["beta0"].append(self.betas[0])
-                self.convergence_report["beta1"].append(self.betas[1])
-                self.convergence_report["beta2"].append(self.betas[2])
+            # if self.algorithm == "bfw":
+            self.convergence_report["beta0"].append(self.betas[0])
+            self.convergence_report["beta1"].append(self.betas[1])
+            self.convergence_report["beta2"].append(self.betas[2])
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
@@ -539,8 +544,8 @@ class LinearApproximation(WorkerThread):
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
-            if self.algorithm == "bfw":
-                self.betas.fill(-1)
+            # if self.algorithm == "bfw":
+            #    self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
