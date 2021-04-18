@@ -92,10 +92,35 @@ class SelectLink(object):
 
         self.num_iters = np.max(assignment_report["convergence"]["iteration"])
 
-        # assignment_method =
+        assignment_method = assignment_report["setup"]["Algorithm"]
 
-        # FIXME (Jan 18/4/21): depending on assignment method, this should be different
-        self.demand_weights = np.repeat(1.0 / self.num_iters, self.num_iters)
+        if assignment_method == "msa":
+            self.demand_weights = np.repeat(1.0 / self.num_iters, self.num_iters)
+        elif assignment_method in ["fw", "cfw", "bfw", "frank-wolfe"]:
+            self._figure_out_demand_weights_for_linear_approximation(assignment_report)
+        else:
+            raise ValueError(
+                f"Asignment method {assignment_method} cannot be used for select link analysis at the moment."
+            )
+
+    def _figure_out_demand_weights_for_linear_approximation(self, assignment_report):
+        """ Linear approximation contribution for each iteration. """
+
+        # solution^n+1 = alpha^n * sol^n + (1-alpha^n) * direction^n
+        # direction = beta_0 * aon + beta_1 * previous_direction + beta_2 * pre_previous_direction
+        alphas = assignment_report["convergence"]["alpha"]
+        # beta_0 = assignment_report["convergence"]["beta0"]
+        # beta_1 = assignment_report["convergence"]["beta1"]
+        # beta_2 = assignment_report["convergence"]["beta2"]
+
+        self.demand_weights = np.repeat(0.0, self.num_iters)
+
+        if assignment_report["setup"]["Algorithm"] in ["fw", "frank-wolfe"]:
+            for i in range(self.num_iters, 0, -1):
+                alpha = alphas[i]
+                # demand_weights[i] += alpha * direction + (1.0 - alpha) * current
+                self.demand_weights[i] += alpha
+                self.demand_weights[: i - 1] += 1.0 - alpha
 
     def _read_path_file(self, iteration, traffic_class, origin):
 
