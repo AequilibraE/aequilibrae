@@ -137,6 +137,7 @@ class SelectLink(object):
         num_centroids = self.classes[0].matrix.zones
 
         for iteration in self.num_iters:
+            logger.info(f"Procesing iteration {iteration} for select link analysis")
             weight = self.demand_weights[iteration]
             for c in self.classes:
                 comp_link_id = self.select_link_id_compressed[c.__id__]
