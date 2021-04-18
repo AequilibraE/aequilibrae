@@ -71,12 +71,12 @@ class SelectLink(object):
 
     def _read_assignment_results(self) -> None:
         conn = database_connection()
-        results_df = pd.read_sql(f"SELECT * FROM 'results'", conn)
+        results_df = pd.read_sql("SELECT * FROM 'results'", conn)
         conn.close()
         self.assignment_results = results_df.loc[results_df.table_name == self.table_name]
         assert (
             len(self.assignment_results) == 1
-        ), "{len(self.assignment_results)} assignment result with this table name, need exactly one"
+        ), f"Found {len(self.assignment_results)} assignment result with this table name, need exactly one"
 
     def _calculate_demand_weights(self):
         """Each iteration of traffic assignment contributes a certain fraction to the total solutions. This method
