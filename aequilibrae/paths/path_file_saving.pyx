@@ -53,7 +53,7 @@ cpdef void save_path_file(long origin_index,
                 predecessor = pred[predecessor]
                 if predecessor != -1:
                     connector = conn[predecessor]
-                    # need this to avoid ading last element. Would it be faster to resize after loop?
+                    # need this to avoid adding last element. Would it be faster to resize after loop?
                     if connector != -1:
                         path_data.push_back(connector)
 
