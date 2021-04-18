@@ -366,14 +366,16 @@ class LinearApproximation(WorkerThread):
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
-                # TODO: do we write these to a temp dir, and then blob store by iteration, class, origin, destination
-                # in sqlite? could have one db per path file saving? -> after aon obviously
-                if c._aon_results.save_path_file:
-                    # TODO Jan: make base dir user configurable
+                if c._aon_results.save_path_file and (self.iter == 1):
+                    # TODO (Jan 18/4/21): make base dir user configurable
                     pth = os.environ.get(ENVIRON_VAR)
                     path_base_dir = os.path.join(pth, "path_files", self.procedure_id, f"iter{self.iter}")
                     c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}_{c.__id__}")
                     Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
+                    # save link_id to simplified graph id, this could change
+                    c.graph.save_compressed_correspondence(
+                        os.path.join(c._aon_results.path_file_dir, "correspondence_c{c.mode}_{c.__id__}.feather")
+                    )
 
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
@@ -460,6 +462,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
+
+        # TODO (Jan 18/4/21): Do we want to blob store path files (by iteration, class, origin, destination) in sqlite?
+        # or do we just use one big hdf5 file?
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

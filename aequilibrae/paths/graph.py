@@ -630,3 +630,6 @@ class Graph(object):
         else:
             raise ValueError("WRONG TYPE OR NULL VALUE")
         return def_type
+
+    def save_compressed_correspondence(self, path):
+        pd.to_feather(self.graph[["link_id", "__supernet_id__", "__compressed_id__"]], path)
