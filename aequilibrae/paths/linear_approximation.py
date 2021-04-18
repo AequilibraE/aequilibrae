@@ -174,20 +174,22 @@ class LinearApproximation(WorkerThread):
 
         alpha = numerator / denominator
         if alpha < 0.0:
-            self.stepdirection = 0.0
+            self.conjugate_stepsize = 0.0
         elif alpha > self.conjugate_direction_max:
-            self.stepdirection = self.conjugate_direction_max
+            self.conjugate_stepsize = self.conjugate_direction_max
         else:
             self.conjugate_stepsize = alpha
+
+        # need this for select link analysis
+        self.betas[0] = 1.0 - self.conjugate_stepsize
+        self.betas[1] = self.conjugate_stepsize
+        self.betas[2] = 0.0
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
 
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
         mu_numerator = 0.0
         mu_denominator = 0.0
         nu_nom = 0.0

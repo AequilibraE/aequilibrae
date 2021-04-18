@@ -92,6 +92,8 @@ class SelectLink(object):
 
         self.num_iters = np.max(assignment_report["convergence"]["iteration"])
 
+        # assignment_method =
+
         # FIXME (Jan 18/4/21): depending on assignment method, this should be different
         self.demand_weights = np.repeat(1.0 / self.num_iters, self.num_iters)
 
