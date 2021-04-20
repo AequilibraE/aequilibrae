@@ -43,6 +43,8 @@ cpdef void save_path_file(long origin_index,
             predecessor = pred[node]
             # need to check if disconnected, also makes sure o==d is not included
             if predecessor == -1:
+                # need to store index here
+                size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
                 continue
             connector = conn[node]
             path_data.push_back(connector)
@@ -51,7 +53,7 @@ cpdef void save_path_file(long origin_index,
                 predecessor = pred[predecessor]
                 if predecessor != -1:
                     connector = conn[predecessor]
-                    # need this to avoid ading last element. Would it be faster to resize after loop?
+                    # need this to avoid adding last element. Would it be faster to resize after loop?
                     if connector != -1:
                         path_data.push_back(connector)
 

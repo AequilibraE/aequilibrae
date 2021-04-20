@@ -174,20 +174,22 @@ class LinearApproximation(WorkerThread):
 
         alpha = numerator / denominator
         if alpha < 0.0:
-            self.stepdirection = 0.0
+            self.conjugate_stepsize = 0.0
         elif alpha > self.conjugate_direction_max:
-            self.stepdirection = self.conjugate_direction_max
+            self.conjugate_stepsize = self.conjugate_direction_max
         else:
             self.conjugate_stepsize = alpha
+
+        # need this for select link analysis
+        self.betas[0] = 1.0 - self.conjugate_stepsize
+        self.betas[1] = self.conjugate_stepsize
+        self.betas[2] = 0.0
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
 
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
         mu_numerator = 0.0
         mu_denominator = 0.0
         nu_nom = 0.0
@@ -261,6 +263,11 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores)
                 sd_flows.append(aon_res.total_link_loads)
+
+            # need this for select link analysis
+            self.betas[0] = 1.0
+            self.betas[1] = 0.0
+            self.betas[2] = 0.0
 
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
@@ -367,12 +374,19 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 if c._aon_results.save_path_file:
-                    # TODO Jan: make base dir user configurable
+                    # TODO (Jan 18/4/21): make base dir user configurable
                     pth = os.environ.get(ENVIRON_VAR)
                     path_base_dir = os.path.join(pth, "path_files", self.procedure_id, f"iter{self.iter}")
-                    # TODO Jan: what identifier do we use for the class?
                     c._aon_results.path_file_dir = os.path.join(path_base_dir, f"path_c{c.mode}_{c.__id__}")
                     Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
+                    if self.iter == 1:
+                        # save link_id to simplified graph id, this could change
+                        c.graph.save_compressed_correspondence(
+                            os.path.join(
+                                os.path.join(pth, "path_files", self.procedure_id),
+                                f"correspondence_c{c.mode}_{c.__id__}.feather",
+                            )
+                        )
 
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
@@ -427,10 +441,10 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
-            if self.algorithm == "bfw":
-                self.convergence_report["beta0"].append(self.betas[0])
-                self.convergence_report["beta1"].append(self.betas[1])
-                self.convergence_report["beta2"].append(self.betas[2])
+            # if self.algorithm == "bfw":
+            self.convergence_report["beta0"].append(self.betas[0])
+            self.convergence_report["beta1"].append(self.betas[1])
+            self.convergence_report["beta2"].append(self.betas[2])
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
@@ -459,6 +473,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
+
+        # TODO (Jan 18/4/21): Do we want to blob store path files (by iteration, class, origin, destination) in sqlite?
+        # or do we just use one big hdf5 file?
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
@@ -527,8 +544,6 @@ class LinearApproximation(WorkerThread):
             # However, using zero would mean the overall solution would not get updated, and therefore we assert the stepsize
             # in order to add a small fraction of the AoN. A heuristic value equal to the corresponding MSA step size
             # seems to work well in practice.
-            if self.algorithm == "bfw":
-                self.betas.fill(-1)
             if derivative_of_objective(0.0) < derivative_of_objective(1.0):
                 if self.algorithm == "frank-wolfe" or self.conjugate_failed:
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
