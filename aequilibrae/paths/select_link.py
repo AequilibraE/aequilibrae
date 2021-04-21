@@ -55,7 +55,7 @@ class SelectLink(object):
 
     def _initialise_matrices(self) -> None:
         for c in self.classes:
-            self.matrices[c.__id__] = np.zeros_like(c.matrix)
+            self.matrices[c.__id__] = np.zeros_like(c.matrix.matrix_view)
 
     def _read_compressed_graph_correspondence(self) -> None:
         pth = os.environ.get(ENVIRON_VAR)
@@ -133,7 +133,7 @@ class SelectLink(object):
 
             # if (assignment_report["setup"]["Algorithm"] in ["cfw", "bfw"]) and (i > 1):
             #     self.demand_weights[i] *= beta_0
-            #     self.demand_weights[:(i - 1)] *= beta_2
+            #     self.demand_weights[:(i - 1)] *= beta_1
             #
             # if (assignment_report["setup"]["Algorithm"] == "bfw") and (i > 2):
             #     self.demand_weights[:(i-2)] *= beta_2
@@ -201,6 +201,7 @@ class SelectLink(object):
                     destinations_this_o_and_iter = np.array(
                         [path_o_index.loc[path_o_index["data"] >= x].index.min() for x in idx_to_look_up]
                     )
+                    destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
                     self.matrices[c.__id__][origin, destinations_this_o_and_iter] += (
                         weight * demand_mat[origin, destinations_this_o_and_iter]
