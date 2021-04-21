@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from typing import List
 import numpy as np
 import pandas as pd
@@ -40,6 +41,9 @@ class SelectLink(object):
         self.matrices = {}
         self.compressed_graph_correspondences = {}
         self.select_link_id_compressed = {}
+
+        # for critical link analyis
+        self.critical_link_dict = None
 
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
@@ -154,7 +158,18 @@ class SelectLink(object):
 
         return path_o, path_o_index
 
-    def run_select_link_analysis(self, link_id: int) -> None:
+    def get_path_for_destination(self, path_o, path_o_index, destination):
+        """ Return all link ids, i.e. the full path, for a given destination """
+        if destination == 0:
+            lower_incl = 0
+        else:
+            lower_incl = path_o_index.loc[path_o_index.index == destination - 1].values[0][0]
+
+        upper_non_incl = path_o_index.loc[path_o_index.index == destination].values[0][0]
+        links_on_path = path_o.loc[(path_o.index >= lower_incl) & (path_o.index < upper_non_incl)].values.flatten()
+        return links_on_path
+
+    def run_select_link_analysis(self, link_id: int, do_critical_link_analysis=False) -> None:
         assert len(self.classes) > 0, "Need at least one traffic class to run select link analysis, use set_classes"
 
         self.select_link_id = link_id
@@ -179,6 +194,9 @@ class SelectLink(object):
         # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self._calculate_demand_weights()
 
+        if do_critical_link_analysis:
+            self.critical_link_dict = defaultdict(float)
+
         # now process each iteration.
         num_centroids = self.classes[0].matrix.zones
 
@@ -197,12 +215,24 @@ class SelectLink(object):
                     idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.values
 
                     # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                    path_o_index = path_o_index.drop_duplicates(keep="first")
+                    path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
                     destinations_this_o_and_iter = np.array(
-                        [path_o_index.loc[path_o_index["data"] >= x].index.min() for x in idx_to_look_up]
+                        [
+                            path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] >= x].index.min()
+                            for x in idx_to_look_up
+                        ]
                     )
                     destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
                     self.matrices[c.__id__][origin, destinations_this_o_and_iter] += (
                         weight * demand_mat[origin, destinations_this_o_and_iter]
                     )
+
+                    if do_critical_link_analysis:
+                        for destination in destinations_this_o_and_iter:
+                            links_on_path = self.get_path_for_destination(path_o, path_o_index, destination)
+                            # each of these links will carry the weight of this iteration, need a map with default
+                            # zero insertion and insert combining values -> defaultdict, then add. This will all have
+                            # to be in C++ I think, it looks dog slow
+                            for l_ in links_on_path:
+                                self.critical_link_dict[l_] += weight * demand_mat[origin, destination]
