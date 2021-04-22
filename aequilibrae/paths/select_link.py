@@ -1,11 +1,9 @@
 import os
+from collections import defaultdict
 from typing import List
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths import TrafficClass
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae import logger
 from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae.project.database_connection import database_connection
@@ -44,6 +42,9 @@ class SelectLink(object):
         self.compressed_graph_correspondences = {}
         self.select_link_id_compressed = {}
 
+        # for critical link analyis
+        self.critical_link_dict = None
+
     def set_classes(self, classes: List[TrafficClass]) -> None:
         """
         Sets Traffic classes to be used for Select Link Analysis
@@ -58,7 +59,7 @@ class SelectLink(object):
 
     def _initialise_matrices(self) -> None:
         for c in self.classes:
-            self.matrices[c.__id__] = np.zeros_like(c.matrix)
+            self.matrices[c.__id__] = np.zeros_like(c.matrix.matrix_view)
 
     def _read_compressed_graph_correspondence(self) -> None:
         pth = os.environ.get(ENVIRON_VAR)
@@ -104,7 +105,7 @@ class SelectLink(object):
             )
 
         sum_of_contribs = np.sum(self.demand_weights)
-        assert np.close(sum_of_contribs, 1.0), f"Contribution of iterations is not one, but {sum_of_contribs}"
+        assert np.allclose(sum_of_contribs, 1.0), f"Contribution of iterations is not one, but {sum_of_contribs}"
 
     def _figure_out_demand_weights_for_linear_approximation(self, assignment_report):
         """ Linear approximation contribution for each iteration. """
@@ -112,20 +113,38 @@ class SelectLink(object):
         # solution^n+1 = alpha^n * sol^n + (1-alpha^n) * direction^n
         # direction = beta_0 * aon + beta_1 * previous_direction + beta_2 * pre_previous_direction
         alphas = assignment_report["convergence"]["alpha"]
-        # beta_0 = assignment_report["convergence"]["beta0"]
-        # beta_1 = assignment_report["convergence"]["beta1"]
-        # beta_2 = assignment_report["convergence"]["beta2"]
+        print(alphas)
+        # betas_0 = assignment_report["convergence"]["beta0"]
+        # betas_1 = assignment_report["convergence"]["beta1"]
+        # betas_2 = assignment_report["convergence"]["beta2"]
 
         self.demand_weights = np.repeat(1.0, self.num_iters)
 
-        if assignment_report["setup"]["Algorithm"] in ["fw", "frank-wolfe"]:
-            for i in range(self.num_iters, 0, -1):
-                alpha = alphas[i]
-                # demand_weights[i] += alpha * direction + (1.0 - alpha) * current
-                self.demand_weights[i] *= alpha
-                self.demand_weights[: i - 1] *= 1.0 - alpha
+        # FIXME (Jan 21/4/21): implement CFW and BFW, this is only valid for FW
+        # can we just multiply previous like below?
+        # if assignment_report["setup"]["Algorithm"] in ["fw", "frank-wolfe"]:
+        for i in range(0, self.num_iters):
+            alpha = alphas[i]
+            # beta_0 = betas_0[i]
+            # beta_1 = betas_1[i]
+            # beta_2 = betas_2[i]
+            # demand_weights[i] += alpha * direction + (1.0 - alpha) * current
+            # for FW: direction = AON, so multiply current weight
+            # for CFW: direction = beta_0 * AON + beta_1 * previous_direction
+            # for BFW: direction = beta_0 * AON + beta_1 * previous_direction + beta_2 * pre_previous_direction
+            self.demand_weights[i] *= alpha
+            self.demand_weights[:i] *= 1.0 - alpha
+
+            # if (assignment_report["setup"]["Algorithm"] in ["cfw", "bfw"]) and (i > 1):
+            #     self.demand_weights[i] *= beta_0
+            #     self.demand_weights[:(i - 1)] *= beta_1
+            #
+            # if (assignment_report["setup"]["Algorithm"] == "bfw") and (i > 2):
+            #     self.demand_weights[:(i-2)] *= beta_2
 
     def _read_path_file(self, iteration, traffic_class, origin):
+
+        iteration += 1  # aequilibrae's iterations are 1-based, but I used numpy's 0-based indexing in select_link
 
         pth = os.environ.get(ENVIRON_VAR)
         path_base_dir = os.path.join(pth, "path_files", self.assignment_results.procedure_id.values[0])
@@ -139,16 +158,21 @@ class SelectLink(object):
 
         return path_o, path_o_index
 
-    def run_select_link_analysis(self, link_id: int) -> None:
+    def get_path_for_destination(self, path_o, path_o_index, destination):
+        """ Return all link ids, i.e. the full path, for a given destination """
+        if destination == 0:
+            lower_incl = 0
+        else:
+            lower_incl = path_o_index.loc[path_o_index.index == destination - 1].values[0][0]
+
+        upper_non_incl = path_o_index.loc[path_o_index.index == destination].values[0][0]
+        links_on_path = path_o.loc[(path_o.index >= lower_incl) & (path_o.index < upper_non_incl)].values.flatten()
+        return links_on_path
+
+    def run_select_link_analysis(self, link_id: int, do_critical_link_analysis=False) -> None:
         assert len(self.classes) > 0, "Need at least one traffic class to run select link analysis, use set_classes"
 
         self.select_link_id = link_id
-        # look up compressed id for each class. Should be the same.
-        for c in self.classes:
-            graph = self.compressed_graph_correspondences[c.__id__]
-            self.select_link_id_compressed[c.__id__] = graph.loc[graph["link_id"] == self.link_id][
-                "__compressed_id__"
-            ].values[0]
 
         # initialise select link matrices to zero
         self._initialise_matrices()
@@ -159,14 +183,24 @@ class SelectLink(object):
         # read in compressed correspondence, depends on read_assignment results for path lookup
         self._read_compressed_graph_correspondence()
 
+        # look up compressed id for each class. Should be the same.
+        for c in self.classes:
+            graph = self.compressed_graph_correspondences[c.__id__]
+            self.select_link_id_compressed[c.__id__] = graph.loc[graph["link_id"] == self.select_link_id][
+                "__compressed_id__"
+            ].values[0]
+
         # now get weight of each iteration to weight corresponding demand.
-        # FIXME (Jan 18/4/21): this is MSA only atm, needs to be implemented
+        # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self._calculate_demand_weights()
+
+        if do_critical_link_analysis:
+            self.critical_link_dict = defaultdict(float)
 
         # now process each iteration.
         num_centroids = self.classes[0].matrix.zones
 
-        for iteration in self.num_iters:
+        for iteration in range(self.num_iters):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
             weight = self.demand_weights[iteration]
             for c in self.classes:
@@ -181,11 +215,24 @@ class SelectLink(object):
                     idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.values
 
                     # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                    path_o_index = path_o_index.drop_duplicates(keep="first")
+                    path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
                     destinations_this_o_and_iter = np.array(
-                        [path_o_index.loc[path_o_index["data"] >= x].index.min() for x in idx_to_look_up]
+                        [
+                            path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] >= x].index.min()
+                            for x in idx_to_look_up
+                        ]
                     )
+                    destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
                     self.matrices[c.__id__][origin, destinations_this_o_and_iter] += (
                         weight * demand_mat[origin, destinations_this_o_and_iter]
                     )
+
+                    if do_critical_link_analysis:
+                        for destination in destinations_this_o_and_iter:
+                            links_on_path = self.get_path_for_destination(path_o, path_o_index, destination)
+                            # each of these links will carry the weight of this iteration, need a map with default
+                            # zero insertion and insert combining values -> defaultdict, then add. This will all have
+                            # to be in C++ I think, it looks dog slow
+                            for l_ in links_on_path:
+                                self.critical_link_dict[l_] += weight * demand_mat[origin, destination]

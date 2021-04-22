@@ -25,6 +25,7 @@ if compiled:
     from aequilibrae.paths.all_or_nothing import allOrNothing
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
     from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.select_link import SelectLink
     from aequilibrae.project import Project
     from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
     from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
