@@ -7,6 +7,12 @@ assignees: ''
 
 ---
 
+**BEFORE REQUESTING A FEATURE**
+
+1. Have you searched the documentation to make sure the feature is not there?
+2. Are you sure of the technical reasons that motivate your feature request?
+3. Have you consulted with the user and developer community? https://groups.google.com/g/aequilibrae5. 
+
 **Purpose of use**
 Are you reporting something you found during a research project, consulting/professional project or personal project?
 Is that a funded project?

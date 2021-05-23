@@ -53,7 +53,7 @@ class LinearApproximation(WorkerThread):
         self.cores = assig_spec.cores
         self.iteration_issue = []
         self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
-        if algorithm == "bfw":
+        if algorithm in ["cfw", "bfw"]:
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
@@ -146,10 +146,6 @@ class LinearApproximation(WorkerThread):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
-
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
         numerator = 0.0
         denominator = 0.0
         prev_dir_minus_current_sol = {}
@@ -174,20 +170,20 @@ class LinearApproximation(WorkerThread):
 
         alpha = numerator / denominator
         if alpha < 0.0:
-            self.stepdirection = 0.0
+            self.conjugate_stepsize = 0.0
         elif alpha > self.conjugate_direction_max:
-            self.stepdirection = self.conjugate_direction_max
+            self.conjugate_stepsize = self.conjugate_direction_max
         else:
             self.conjugate_stepsize = alpha
+
+        self.betas[0] = 1.0 - self.conjugate_stepsize
+        self.betas[1] = self.conjugate_stepsize
+        self.betas[2] = 0.0
 
     def calculate_biconjugate_direction(self):
         self.vdf.apply_derivative(
             self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
         )
-
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
         mu_numerator = 0.0
         mu_denominator = 0.0
         nu_nom = 0.0
@@ -434,7 +430,7 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
-            if self.algorithm == "bfw":
+            if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
