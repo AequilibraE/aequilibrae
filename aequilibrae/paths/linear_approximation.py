@@ -201,14 +201,9 @@ class LinearApproximation(WorkerThread):
         z_ = {}
 
         for c in self.traffic_classes:
-            x_[c.__id__] = np.sum(
-                (
-                        self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                        + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                        - c.results.link_loads[:, :]
-                ),
-                axis=1,
-            )
+            x_[c.__id__] = np.sum((self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                                   + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                                   - c.results.link_loads[:, :]), axis=1)
 
             y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_[c.__id__] = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
@@ -349,9 +344,8 @@ class LinearApproximation(WorkerThread):
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
                 # not want this there I think
-                c.fixed_cost[c.graph.graph.__supernet_id__] = (
-                        c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
-                )
+                c.fixed_cost[c.graph.graph.__supernet_id__] = c.graph.graph[c.fixed_cost_field].values[
+                                                              :] * c.fc_multiplier / c.vot
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
         # TODO: Review how to eliminate this. It looks unnecessary
