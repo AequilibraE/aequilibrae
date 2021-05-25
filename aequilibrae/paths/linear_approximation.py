@@ -401,6 +401,10 @@ class LinearApproximation(WorkerThread):
                     flows.append(cls_res.total_link_loads)
             self.fw_total_flow = np.sum(flows, axis=0)
 
+            # Check convergence
+            # This needs to be done with the current costs, and not the future ones
+            converged = self.check_convergence() if self.iter > 1 else False
+
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -409,10 +413,6 @@ class LinearApproximation(WorkerThread):
                 *self.vdf_parameters,
                 self.cores,
             )
-
-            # Check convergence
-            # This needs to be done with the current costs, and not the future ones
-            converged = self.check_convergence() if self.iter > 1 else False
 
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
@@ -424,6 +424,13 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
+            for c in self.traffic_classes:
+                c._aon_results.reset()
+                if self.time_field not in c.graph.skim_fields:
+                    continue
+                idx = c.graph.skim_fields.index(self.time_field)
+                c.graph.skims[:, idx] = self.congested_time[:]
+
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
@@ -431,13 +438,6 @@ class LinearApproximation(WorkerThread):
                     break
             else:
                 self.steps_below = 0
-
-            for c in self.traffic_classes:
-                c._aon_results.reset()
-                if self.time_field not in c.graph.skim_fields:
-                    continue
-                idx = c.graph.skim_fields.index(self.time_field)
-                c.graph.skims[:, idx] = self.congested_time[:]
 
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
