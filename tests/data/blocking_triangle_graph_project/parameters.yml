@@ -210,6 +210,6 @@ system:
   cpus: 0
   default_directory: C:\
   logging: true
-  logging_directory: /home/burger/projects/model_engine/movici_simulation_core/tests/ae_wrapper/ae_project/ae_project_dir
+  logging_directory: /temp/
   spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp

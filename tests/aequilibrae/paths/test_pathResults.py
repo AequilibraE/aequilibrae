@@ -174,4 +174,3 @@ class TestBlockingTrianglePathResults(TestCase):
         self.r.update_trace(6)
         self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
         self.assertEqual(list(self.r.path), [4, 1, 6])
-
