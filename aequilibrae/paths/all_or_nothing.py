@@ -76,8 +76,9 @@ class allOrNothing(WorkerThread):
         pool.join()
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
-        assign_link_loads(self.results.link_loads, self.results.compact_link_loads,
-                          self.results.crosswalk, self.results.cores)
+        assign_link_loads(
+            self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
+        )
         if pyqt:
             self.assignment.emit(["finished_threaded_procedure", None])
 
@@ -88,10 +89,8 @@ class allOrNothing(WorkerThread):
             all_threads[thread_id] = all_threads["count"]
             all_threads["count"] += 1
 
-        x = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th)
+        _ = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
-        if x != origin:
-            self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
             self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])

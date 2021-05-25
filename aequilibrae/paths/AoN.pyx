@@ -81,7 +81,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] final_skim_matrices_view = fskm
 
     # views from the result object
-    cdef long long [:] no_path_view = result.no_path[origin_index, :]
+    cdef double [:] not_assigned_view = result.not_assigned[:]
 
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
@@ -134,9 +134,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         predecessors_view,
                         conn_view,
                         link_loads_view,
-                        no_path_view,
                         reached_first_view,
                         node_load_view,
+                        not_assigned_view,
                         w)
 
         if skims > 0:

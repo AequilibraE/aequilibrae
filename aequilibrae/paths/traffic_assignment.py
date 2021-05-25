@@ -414,10 +414,6 @@ class TrafficAssignment(object):
         Args:
             table_name (:obj:`str`): Name of the table to hold this assignment result
         """
-        df = self.results()
-        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
-        df.to_sql(table_name, conn)
-        conn.close()
 
         conn = database_connection()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
@@ -428,6 +424,11 @@ class TrafficAssignment(object):
             data,
         )
         conn.commit()
+        conn.close()
+
+        df = self.results()
+        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
+        df.to_sql(table_name, conn)
         conn.close()
 
     def results(self) -> pd.DataFrame:
@@ -530,13 +531,13 @@ class TrafficAssignment(object):
 
         for cls in self.classes:
             uclass = {}
-
-            if len(cls.matrix.view_names) == 1:
-                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
-            else:
-                uclass["matrix_totals"] = {
-                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
-                }
+            uclass["not_assigned"] = cls.results.not_assigned.tolist()
+            uclass["matrix_totals"] = {
+                nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
+            }
+            uclass["intrazonals"] = {
+                nm: np.sum(np.diag(cls.matrix.matrix_view[:, :, i])) for i, nm in enumerate(cls.matrix.view_names)
+            }
             uclass["network mode"] = cls.graph.mode
             uclass["Value-of-time"] = cls.vot
             uclass["PCE"] = cls.pce
