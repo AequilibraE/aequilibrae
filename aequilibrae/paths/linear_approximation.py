@@ -401,6 +401,15 @@ class LinearApproximation(WorkerThread):
                     flows.append(cls_res.total_link_loads)
             self.fw_total_flow = np.sum(flows, axis=0)
 
+            self.vdf.apply_vdf(
+                self.congested_time,
+                self.fw_total_flow,
+                self.capacity,
+                self.free_flow_tt,
+                *self.vdf_parameters,
+                self.cores,
+            )
+
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
@@ -422,15 +431,6 @@ class LinearApproximation(WorkerThread):
                     break
             else:
                 self.steps_below = 0
-
-            self.vdf.apply_vdf(
-                self.congested_time,
-                self.fw_total_flow,
-                self.capacity,
-                self.free_flow_tt,
-                *self.vdf_parameters,
-                self.cores,
-            )
 
             for c in self.traffic_classes:
                 c._aon_results.reset()
