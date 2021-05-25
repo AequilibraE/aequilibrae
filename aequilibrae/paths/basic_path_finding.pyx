@@ -36,9 +36,9 @@ cpdef void network_loading(long classes,
                            long long [:] pred,
                            long long [:] conn,
                            double[:, :] link_loads,
-                           long long [:] no_path,
                            long long [:] reached_first,
                            double [:, :] node_load,
+                           double [:] not_assigned,
                            long found) nogil:
 
     cdef long long i, j, predecessor, connector, node
@@ -66,6 +66,8 @@ cpdef void network_loading(long classes,
         for i in range(zones):
             if not isnan(demand[i, j]):
                 node_load[i, j] = demand[i, j]
+                if pred[i] == -1:
+                    not_assigned[j] += demand[i, j]
 
     #Recursively cascades to the origin
     for i in range(found, 0, -1):

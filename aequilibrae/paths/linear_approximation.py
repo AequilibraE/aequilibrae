@@ -51,8 +51,8 @@ class LinearApproximation(WorkerThread):
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
         self.cores = assig_spec.cores
-        self.iteration_issue = []
         self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
+        self.not_assigned = []
         if algorithm == "bfw":
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
@@ -203,9 +203,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             x_[c.__id__] = np.sum(
                 (
-                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                    - c.results.link_loads[:, :]
+                        self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                        + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                        - c.results.link_loads[:, :]
                 ),
                 axis=1,
             )
@@ -350,7 +350,7 @@ class LinearApproximation(WorkerThread):
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
                 # not want this there I think
                 c.fixed_cost[c.graph.graph.__supernet_id__] = (
-                    c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
+                        c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
                 )
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
@@ -392,6 +392,7 @@ class LinearApproximation(WorkerThread):
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
                 aon.execute()
+
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)
@@ -401,6 +402,7 @@ class LinearApproximation(WorkerThread):
             flows = []
             if self.iter == 1:
                 for c in self.traffic_classes:
+                    c.results.not_assigned[:] = c._aon_results.not_assigned[:]
                     copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads, self.cores)
                     c.results.total_flows()
                     if c.results.num_skims > 0:
@@ -419,7 +421,8 @@ class LinearApproximation(WorkerThread):
                     linear_combination(
                         cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
                     )
-
+                    c.results.not_assigned[:] = self.stepsize * c.results.not_assigned[:] + \
+                                                (1 - self.stepsize) * c._aon_results.not_assigned[:]
                     if cls_res.num_skims > 0:
                         linear_combination_skims(
                             cls_res.skims.matrix_view,

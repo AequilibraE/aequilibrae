@@ -90,8 +90,6 @@ class allOrNothing(WorkerThread):
 
         x = one_to_all(origin, self.matrix, self.graph, self.results, self.aux_res, th)
         self.cumulative += 1
-        if x != origin:
-            self.report.append(x)
         if pyqt:
             self.assignment.emit(["zones finalized", self.cumulative])
             self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])

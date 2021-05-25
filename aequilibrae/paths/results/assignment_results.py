@@ -29,8 +29,8 @@ class AssignmentResults:
         self.link_loads = np.array([])  # The actual results for assignment
         self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
         self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
+        self.not_assigned = np.array([])  # Array of not-assigned demand for all of the user classes
         self.skims = AequilibraeMatrix()  # The array of skims
-        self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
         p = Parameters().parameters["system"]["cpus"]
         if not isinstance(p, int):
@@ -72,12 +72,13 @@ class AssignmentResults:
         self.__integer_type = graph.default_types("int")
 
         if matrix.view_names is None:
-            raise ("Please set the matrix_procedures computational view")
-        else:
-            self.classes["number"] = 1
-            if len(matrix.matrix_view.shape) > 2:
-                self.classes["number"] = matrix.matrix_view.shape[2]
-            self.classes["names"] = matrix.view_names
+            raise Exception("Please set the matrix_procedures computational view")
+
+        self.classes["number"] = 1
+        if len(matrix.matrix_view.shape) > 2:
+            self.classes["number"] = matrix.matrix_view.shape[2]
+        self.classes["names"] = matrix.view_names
+        self.not_assigned = np.zeros(self.classes["number"])
 
         if graph is None:
             raise ("Please provide a graph")
@@ -107,11 +108,11 @@ class AssignmentResults:
         if self.num_skims > 0:
             self.skims.matrices.fill(0)
         if self.link_loads is not None:
-            self.no_path.fill(0)
             self.link_loads.fill(0)
             self.total_link_loads.fill(0)
             self.compact_link_loads.fill(0)
             self.compact_total_link_loads.fill(0)
+            self.not_assigned.fill(0)
         else:
             raise ValueError("Exception: Assignment results object was not yet prepared/initialized")
 
@@ -121,7 +122,6 @@ class AssignmentResults:
 
         self.link_loads = np.zeros((self.links, self.classes["number"]), self.__float_type)
         self.total_link_loads = np.zeros(self.links, self.__float_type)
-        self.no_path = np.zeros((self.zones, self.zones), dtype=self.__integer_type)
 
         if self.num_skims > 0:
             self.skims = AequilibraeMatrix()
