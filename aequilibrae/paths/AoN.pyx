@@ -256,7 +256,7 @@ def path_computation(origin, destination, graph, results):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-    if predecessors_view[dest_index] > 0:
+    if predecessors_view[dest_index] >= 0:
         all_connectors = []
         link_directions = []
         all_nodes = [dest_index]
@@ -301,7 +301,7 @@ def update_path_trace(results, destination, graph):
 
         results.milepost = None
         results.path_nodes = None
-        if results.predecessors[dest_index] > 0:
+        if results.predecessors[dest_index] >= 0:
             all_connectors = []
             link_directions = []
             all_nodes = [dest_index]
