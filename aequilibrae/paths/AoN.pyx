@@ -97,7 +97,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef string path_index_file_base
     cdef bool save_paths = False
     cdef bool write_feather = True
-    if result.save_path_file == True:
+    if result.save_path_file:
         save_paths = True
         write_feather = result.write_feather
         if write_feather:
