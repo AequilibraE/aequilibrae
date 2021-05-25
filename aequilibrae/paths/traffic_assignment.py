@@ -409,7 +409,7 @@ class TrafficAssignment(object):
         res1 = assig_results[0]
 
         tot_flow = self.assignment.fw_total_flow[idx]
-        voc = self.assignment.fw_total_flow / self.capacity[idx]
+        voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
 
