@@ -7,6 +7,7 @@ data_folder = join(dirname(dirname(abspath(__file__))), 'data')
 test_network = join(dirname(dirname(abspath(__file__))), "data", "Final_Network.shp")
 test_graph = join(dirname(dirname(abspath(__file__))), "data", "test_graph.aeg")
 path_test = tempfile.gettempdir()
+triangle_graph_blocking = join(dirname(dirname(abspath(__file__))), "data", "blocking_triangle_graph_project")
 
 gtfs_folder = join(dirname(dirname(abspath(__file__))), "data/gtfs")
 gtfs_zip = join(dirname(dirname(abspath(__file__))), "data/gtfs.zip")

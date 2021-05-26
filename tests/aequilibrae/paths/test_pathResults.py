@@ -1,15 +1,17 @@
 import os
+import uuid
+from shutil import copytree
 from tempfile import gettempdir
 from uuid import uuid4
 from os.path import join
 import sys
 from unittest import TestCase
 
+from aequilibrae import Project
 from aequilibrae.paths import path_computation, Graph
 from aequilibrae.paths.results import PathResults
-from aequilibrae.paths import binary_version
 from aequilibrae.utils.create_example import create_example
-from ...data import test_graph
+from ...data import triangle_graph_blocking
 import numpy as np
 
 # Adds the folder with the data to the path and collects the paths to the files
@@ -84,3 +86,91 @@ class TestPathResults(TestCase):
         self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path update failed. Wrong link directions")
         self.assertEqual(list(self.r.path_nodes), [5, 9, 10], "Path update failed. Wrong sequence of path nodes")
         self.assertEqual(list(self.r.milepost), [0, 5, 8], "Path update failed. Wrong milepost results")
+
+
+class TestBlockingTrianglePathResults(TestCase):
+    def setUp(self) -> None:
+        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
+        copytree(triangle_graph_blocking, self.proj_dir)
+        self.project = Project()
+        self.project.open(self.proj_dir)
+        self.project.network.build_graphs(modes=["c"])
+        self.g = self.project.network.graphs["c"]  # type: Graph
+        self.g.set_graph("free_flow_time")
+        self.g.set_blocked_centroid_flows(True)
+
+        self.r = PathResults()
+        self.r.prepare(self.g)
+
+    def tearDown(self) -> None:
+        self.project.close()
+        del self.r
+
+    def test_compute_paths(self):
+        self.r.compute_path(1, 2)
+        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+        self.assertEqual(list(self.r.path), [1, 2])
+
+        self.r.compute_path(2, 1)
+        self.assertEqual(list(self.r.path_nodes), [2, 1])
+        self.assertEqual(list(self.r.path), [3])
+
+        self.r.compute_path(3, 1)
+        self.assertEqual(list(self.r.path_nodes), [3, 2, 1])
+        self.assertEqual(list(self.r.path), [2, 3])
+
+        self.r.compute_path(3, 2)
+        self.assertEqual(list(self.r.path_nodes), [3, 2])
+        self.assertEqual(list(self.r.path), [2])
+
+        self.r.compute_path(1, 3)
+        self.assertEqual(list(self.r.path_nodes), [1, 3])
+        self.assertEqual(list(self.r.path), [1])
+
+        self.r.compute_path(2, 3)
+        self.assertEqual(list(self.r.path_nodes), [2, 1, 3])
+        self.assertEqual(list(self.r.path), [3, 1])
+
+    def test_compute_blocking_paths(self):
+        self.r.compute_path(4, 5)
+        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
+        self.assertEqual(list(self.r.path), [4, 1, 2, 5])
+
+        self.r.compute_path(5, 4)
+        self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 4])
+        self.assertEqual(list(self.r.path), [5, 3, 4])
+
+        self.r.compute_path(6, 4)
+        self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 1, 4])
+        self.assertEqual(list(self.r.path), [6, 2, 3, 4])
+
+        self.r.compute_path(6, 5)
+        self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 5])
+        self.assertEqual(list(self.r.path), [6, 2, 5])
+
+        self.r.compute_path(4, 6)
+        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
+        self.assertEqual(list(self.r.path), [4, 1, 6])
+
+        self.r.compute_path(5, 6)
+        self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 3, 6])
+        self.assertEqual(list(self.r.path), [5, 3, 1, 6])
+
+    def test_update_trace(self):
+        self.r.compute_path(1, 2)
+        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+        self.assertEqual(list(self.r.path), [1, 2])
+
+        self.r.update_trace(3)
+        self.assertEqual(list(self.r.path_nodes), [1, 3])
+        self.assertEqual(list(self.r.path), [1])
+
+    def test_update_blocking_trace(self):
+        self.r.compute_path(4, 5)
+        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
+        self.assertEqual(list(self.r.path), [4, 1, 2, 5])
+
+        self.r.update_trace(6)
+        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
+        self.assertEqual(list(self.r.path), [4, 1, 6])
