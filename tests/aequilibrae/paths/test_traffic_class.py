@@ -39,6 +39,11 @@ class TestTrafficClass(TestCase):
 
     def test_set_fixed_cost(self):
         self.assertEqual(self.tc.fc_multiplier, 1.0)
+
+        with self.assertRaises(ValueError):
+            self.tc.set_fixed_cost("Field_Does_Not_Exist", 2.5)
+        self.assertEqual(self.tc.fc_multiplier, 1.0)
+
         self.tc.set_fixed_cost("distance", 3.0)
         self.assertEqual(self.tc.fc_multiplier, 3.0)
         self.assertEqual(self.tc.fixed_cost_field, "distance")
