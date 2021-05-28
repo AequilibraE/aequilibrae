@@ -29,7 +29,7 @@ class TestTrafficAssignment(TestCase):
         self.matrix.computational_view()
 
         self.assignment = TrafficAssignment()
-        self.assigclass = TrafficClass('car', self.car_graph, self.matrix)
+        self.assigclass = TrafficClass("car", self.car_graph, self.matrix)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
@@ -40,7 +40,7 @@ class TestTrafficAssignment(TestCase):
     def test_matrix_with_wrong_type(self):
         self.matrix.matrix_view = np.array(self.matrix.matrix_view, np.int32)
         with self.assertRaises(TypeError):
-            _ = TrafficClass('car', self.car_graph, self.matrix)
+            _ = TrafficClass("car", self.car_graph, self.matrix)
 
     def test_set_vdf(self):
         with self.assertRaises(ValueError):
@@ -114,7 +114,7 @@ class TestTrafficAssignment(TestCase):
     def test_set_time_field(self):
 
         with self.assertRaises(ValueError):
-            self.assignment.set_time_field('capacity')
+            self.assignment.set_time_field("capacity")
 
         self.assignment.add_class(self.assigclass)
 
@@ -123,13 +123,13 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(ValueError):
             self.assignment.set_time_field(val)
 
-        self.assignment.set_time_field('free_flow_time')
-        self.assertEqual(self.assignment.time_field, 'free_flow_time')
+        self.assignment.set_time_field("free_flow_time")
+        self.assertEqual(self.assignment.time_field, "free_flow_time")
 
     def test_set_capacity_field(self):
 
         with self.assertRaises(ValueError):
-            self.assignment.set_capacity_field('capacity')
+            self.assignment.set_capacity_field("capacity")
 
         self.assignment.add_class(self.assigclass)
 
@@ -138,8 +138,25 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(ValueError):
             self.assignment.set_capacity_field(val)
 
-        self.assignment.set_capacity_field('capacity')
-        self.assertEqual(self.assignment.capacity_field, 'capacity')
+        self.assignment.set_capacity_field("capacity")
+        self.assertEqual(self.assignment.capacity_field, "capacity")
+
+    def test_set_save_path_files(self):
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, False)
+        self.assignment.set_save_path_files(True)
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, True)
+
+    def test_set_path_file_format(self):
+        with self.assertRaises(Exception):
+            self.assignment.set_path_file_format("shiny_format")
+        self.assignment.set_path_file_format("parquet")
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.write_feather, False)
+        self.assignment.set_path_file_format("feather")
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.write_feather, True)
 
     def test_execute_and_save_results(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
@@ -195,7 +212,7 @@ class TestTrafficAssignment(TestCase):
 
         # For the last algorithm, we set skimming
         self.car_graph.set_skimming(["free_flow_time", "distance"])
-        assigclass = TrafficClass('car', self.car_graph, self.matrix)
+        assigclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignment.set_classes([assigclass])
 
         self.assignment.set_algorithm("bfw")
