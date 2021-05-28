@@ -313,7 +313,7 @@ class TrafficAssignment(object):
             c._aon_results.save_path_file = save_it
 
     def set_path_file_format(self, file_format: str) -> None:
-        """Specify path saving format. Either parquet wiht compression gzip or feather.
+        """Specify path saving format. Either parquet or feather.
 
         Args:
             file_format (:obj:`str`): Name of file format to use for path files
@@ -532,17 +532,17 @@ class TrafficAssignment(object):
             uclass = {}
 
             if len(cls.matrix.view_names) == 1:
-                uclass['matrix_totals'] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in
-                                           cls.matrix.view_names}
+                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
             else:
-                uclass['matrix_totals'] = {nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in
-                                           enumerate(cls.matrix.view_names)}
-            uclass['network mode'] = cls.graph.mode
-            uclass['Value-of-time'] = cls.vot
-            uclass['PCE'] = cls.pce
+                uclass["matrix_totals"] = {
+                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
+                }
+            uclass["network mode"] = cls.graph.mode
+            uclass["Value-of-time"] = cls.vot
+            uclass["PCE"] = cls.pce
             if cls.fixed_cost_field:
-                uclass['Fixed cost field'] = cls.fixed_cost_field
-                uclass['Fixed cost multiplier'] = cls.fc_multiplier
+                uclass["Fixed cost field"] = cls.fixed_cost_field
+                uclass["Fixed cost multiplier"] = cls.fc_multiplier
             classes[cls.__id__] = uclass
 
         info = {
