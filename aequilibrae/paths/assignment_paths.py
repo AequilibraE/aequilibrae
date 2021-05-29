@@ -99,12 +99,14 @@ class AssignmentPaths(object):
         path_o, path_o_index = self.read_path_file(origin, iteration, traffic_class_id)
         return self.get_path_for_destination_from_files(path_o, path_o_index, destination)
 
+    @staticmethod
     def get_path_for_destination_from_files(self, path_o: pd.DataFrame, path_o_index: pd.DataFrame, destination: int):
+        " for a given path file and path index file, and a given destination, return the path links in o-d order"
         if destination == 0:
             lower_incl = 0
         else:
             lower_incl = path_o_index.loc[path_o_index.index == destination - 1].values[0][0]
         upper_non_incl = path_o_index.loc[path_o_index.index == destination].values[0][0]
         links_on_path = path_o.loc[(path_o.index >= lower_incl) & (path_o.index < upper_non_incl)].values.flatten()
-        # TODO: do we want d->o, like here, or do we turn it around so links are o to d?
+        links_on_path = links_on_path.flip()
         return links_on_path
