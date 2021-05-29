@@ -88,7 +88,7 @@ class AssignmentPaths(object):
         ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.id, self.classes))}"
         traffic_class = possible_traffic_classes[0]
         base_dir = os.path.join(
-            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.mode}"
+            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.name}"
         )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
