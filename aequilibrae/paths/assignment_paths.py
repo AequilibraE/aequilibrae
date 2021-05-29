@@ -41,7 +41,7 @@ class AssignmentResultsTable(object):
 
     def _parse_procedure_report(self) -> Dict:
         rep_with_replacement = (
-            self.assignment_results["table_name"].values[0].replace("inf", "np.inf").replace("nan", "np.nan")
+            self.assignment_results["procedure_report"].values[0].replace("inf", "np.inf").replace("nan", "np.nan")
         )
         report = eval(rep_with_replacement)
         report["convergence"] = eval(report["convergence"])
@@ -69,15 +69,17 @@ class AssignmentPaths(object):
         self.proj_dir = os.environ.get(ENVIRON_VAR)
         self.table_name = table_name
         self.assignment_results = AssignmentResultsTable(table_name)
+        self.path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id)
         self.classes = self.assignment_results.get_traffic_class_names_and_id()
         self.compressed_graph_correspondences = self._read_compressed_graph_correspondence()
-        self.path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id)
 
     def _read_compressed_graph_correspondence(self) -> Dict:
+        compressed_graph_correspondences = {}
         for c in self.classes:
-            self.compressed_graph_correspondences[c.id] = pd.read_feather(
-                os.path.join(self.path_base_dir, f"correspondence_c{c.mode}_{c.id}.feather")
+            compressed_graph_correspondences[c.id] = pd.read_feather(
+                os.path.join(self.path_base_dir, f"correspondence_c{c.id}_{c.name}.feather")
             )
+        return compressed_graph_correspondences
 
     def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> (pd.DataFrame, pd.DataFrame):
         possible_traffic_classes = list(filter(lambda x: x.id == traffic_class_id, self.classes))
@@ -86,7 +88,7 @@ class AssignmentPaths(object):
         ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.id, self.classes))}"
         traffic_class = possible_traffic_classes[0]
         base_dir = os.path.join(
-            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.mode}_{traffic_class.id}"
+            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.mode}"
         )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
