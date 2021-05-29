@@ -183,25 +183,34 @@ class TestTrafficAssignment(TestCase):
         path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
         self.assertTrue(path_file_dir.is_dir())
 
-        # assert correspondence for simplified graph exists
-        self.assertTrue(
-            (path_file_dir / f"correspondence_c{self.assigclass.mode}_{self.assigclass.__id__}.feather").is_file()
-        )
+        # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
+        # and therefore we compare the files directly, otherwise a translation from the simplified ids to link_ids
+        # would need to be performed.
+        # Reference files were generated on 29/5/21, any changes to the test project will need to be applied to the
+        # reference files. Also, the name given to the traffic class (see setUp above) has to be "car".
+        class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
+        reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
 
-        # assert all iter dirs and files exist
-        class_id = f"path_c{self.assigclass.mode}_{self.assigclass.__id__}"
+        ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
+        correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
+        is_eq = correspondence == ref_correspondence
+        self.assertTrue(is_eq.all().all())
 
+        path_class_id = f"path_{class_id}"
         for i in range(1, self.assignment.max_iter + 1):
-            iter_dir = path_file_dir / f"iter{i}"
-            class_dir = iter_dir / class_id
-            self.assertTrue(iter_dir.is_dir())
-            self.assertTrue(class_dir.is_dir())
+            class_dir = path_file_dir / f"iter{i}" / path_class_id
+            ref_class_dir = reference_path_file_dir / f"iter{i}" / path_class_id
             for o in self.assigclass.matrix.index:
                 o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
-                this_o_path_file = class_dir / f"o{o_ind}.feather"
-                self.assertTrue(this_o_path_file.is_file())
-                this_o_index_file = class_dir / f"o{o_ind}_indexdata.feather"
-                self.assertTrue(this_o_index_file.is_file())
+                this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
+                ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
+                is_eq = this_o_path_file == ref_this_o_path_file
+                self.assertTrue(is_eq.all().all())
+
+                this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
+                ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
+                is_eq = this_o_index_file == ref_this_o_index_file
+                self.assertTrue(is_eq.all().all())
 
         self.assignment.set_save_path_files(False)
 
