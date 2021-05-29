@@ -1,5 +1,6 @@
 from unittest import TestCase
 import os
+import pathlib
 import sqlite3
 import uuid
 import string
@@ -140,6 +141,7 @@ class TestTrafficAssignment(TestCase):
         self.assertEqual(self.assignment.capacity_field, "capacity")
 
     def test_set_save_path_files(self):
+        self.assignment.set_classes([self.assigclass])
         # make sure default is false
         for c in self.assignment.classes:
             self.assertEqual(c._aon_results.save_path_file, False)
@@ -153,6 +155,7 @@ class TestTrafficAssignment(TestCase):
             self.assertEqual(c._aon_results.save_path_file, False)
 
     def test_set_path_file_format(self):
+        self.assignment.set_classes([self.assigclass])
         with self.assertRaises(Exception):
             self.assignment.set_path_file_format("shiny_format")
         self.assignment.set_path_file_format("parquet")
@@ -161,6 +164,26 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_path_file_format("feather")
         for c in self.assignment.classes:
             self.assertEqual(c._aon_results.write_feather, True)
+
+    def test_save_path_files(self):
+        self.assignment.add_class(self.assigclass)
+        self.assignment.set_save_path_files(True)
+
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+
+        self.assignment.max_iter = 2
+        self.assignment.set_algorithm("msa")
+        self.assignment.execute()
+
+        path_file_dir = os.path.join(self.project.project_base_path, "path_files", self.assignment.procedure_id)
+        self.assertTrue(pathlib.Path(path_file_dir).is_dir())
+
+        self.assignment.set_save_path_files(False)
 
     def test_execute_and_save_results(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
