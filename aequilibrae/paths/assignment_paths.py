@@ -101,7 +101,7 @@ class AssignmentPaths(object):
 
     @staticmethod
     def get_path_for_destination_from_files(self, path_o: pd.DataFrame, path_o_index: pd.DataFrame, destination: int):
-        " for a given path file and path index file, and a given destination, return the path links in o-d order"
+        """ for a given path file and path index file, and a given destination, return the path links in o-d order"""
         if destination == 0:
             lower_incl = 0
         else:
