@@ -112,7 +112,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     def test_set_time_field(self):
-
         with self.assertRaises(ValueError):
             self.assignment.set_time_field("capacity")
 
@@ -127,7 +126,6 @@ class TestTrafficAssignment(TestCase):
         self.assertEqual(self.assignment.time_field, "free_flow_time")
 
     def test_set_capacity_field(self):
-
         with self.assertRaises(ValueError):
             self.assignment.set_capacity_field("capacity")
 
@@ -142,11 +140,17 @@ class TestTrafficAssignment(TestCase):
         self.assertEqual(self.assignment.capacity_field, "capacity")
 
     def test_set_save_path_files(self):
+        # make sure default is false
         for c in self.assignment.classes:
             self.assertEqual(c._aon_results.save_path_file, False)
         self.assignment.set_save_path_files(True)
         for c in self.assignment.classes:
             self.assertEqual(c._aon_results.save_path_file, True)
+
+        # reset for most assignment tests
+        self.assignment.set_save_path_files(False)
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, False)
 
     def test_set_path_file_format(self):
         with self.assertRaises(Exception):
@@ -180,7 +184,6 @@ class TestTrafficAssignment(TestCase):
 
         msa10 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
@@ -189,7 +192,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.execute()
         msa25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.98, correl)
 
@@ -198,7 +200,6 @@ class TestTrafficAssignment(TestCase):
 
         fw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.99, correl)
 
@@ -206,7 +207,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.execute()
         cfw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.995, correl)
 
@@ -219,7 +219,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.execute()
         bfw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.999, correl)
 
