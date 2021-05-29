@@ -108,5 +108,5 @@ class AssignmentPaths(object):
             lower_incl = path_o_index.loc[path_o_index.index == destination - 1].values[0][0]
         upper_non_incl = path_o_index.loc[path_o_index.index == destination].values[0][0]
         links_on_path = path_o.loc[(path_o.index >= lower_incl) & (path_o.index < upper_non_incl)].values.flatten()
-        links_on_path = links_on_path.flip()
+        links_on_path = np.flip(links_on_path)
         return links_on_path
