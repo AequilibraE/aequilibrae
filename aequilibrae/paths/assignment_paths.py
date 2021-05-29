@@ -62,7 +62,7 @@ class AssignmentPaths(object):
     """ Class for accessing path files optionally generated during assignment.
     ::
         paths = AssignmentPath(table_name_with_assignment_results)
-        paths.get_path_for_destination(origin, destination, traffic_class_name, iteration)
+        paths.get_path_for_destination(origin, destination, iteration, traffic_class_id)
     """
 
     def __init__(self, table_name: str) -> None:
