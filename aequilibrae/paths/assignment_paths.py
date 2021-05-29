@@ -79,7 +79,7 @@ class AssignmentPaths(object):
                 os.path.join(self.path_base_dir, f"correspondence_c{c.mode}_{c.id}.feather")
             )
 
-    def _read_path_file(self, iteration: int, traffic_class_id: str, origin: int) -> (pd.DataFrame, pd.DataFrame):
+    def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> (pd.DataFrame, pd.DataFrame):
         possible_traffic_classes = list(filter(lambda x: x.id == traffic_class_id, self.classes))
         assert (
             len(possible_traffic_classes) == 1
@@ -94,17 +94,17 @@ class AssignmentPaths(object):
         path_o_index = pd.read_feather(path_o_index_f)
         return path_o, path_o_index
 
-    # make this o, d, iter, class
-    def get_path_for_destination(self, path_o, path_o_index, destination):
-        """ Return all link ids, i.e. the full path, for a given destination """
+    def get_path_for_destination(self, origin: int, destination: int, iteration: int, traffic_class_id: str):
+        """ Return all link ids, i.e. the full path, for a given destination"""
+        path_o, path_o_index = self.read_path_file(origin, iteration, traffic_class_id)
+        return self.get_path_for_destination_from_files(path_o, path_o_index, destination)
+
+    def get_path_for_destination_from_files(self, path_o: pd.DataFrame, path_o_index: pd.DataFrame, destination: int):
         if destination == 0:
             lower_incl = 0
         else:
             lower_incl = path_o_index.loc[path_o_index.index == destination - 1].values[0][0]
-
         upper_non_incl = path_o_index.loc[path_o_index.index == destination].values[0][0]
         links_on_path = path_o.loc[(path_o.index >= lower_incl) & (path_o.index < upper_non_incl)].values.flatten()
-
         # TODO: do we want d->o, like here, or do we turn it around so links are o to d?
-
         return links_on_path
