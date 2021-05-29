@@ -180,8 +180,28 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        path_file_dir = os.path.join(self.project.project_base_path, "path_files", self.assignment.procedure_id)
-        self.assertTrue(pathlib.Path(path_file_dir).is_dir())
+        path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
+        self.assertTrue(path_file_dir.is_dir())
+
+        # assert correspondence for simplified graph exists
+        self.assertTrue(
+            (path_file_dir / f"correspondence_c{self.assigclass.mode}_{self.assigclass.__id__}.feather").is_file()
+        )
+
+        # assert all iter dirs and files exist
+        class_id = f"path_c{self.assigclass.mode}_{self.assigclass.__id__}"
+
+        for i in range(1, self.assignment.max_iter + 1):
+            iter_dir = path_file_dir / f"iter{i}"
+            class_dir = iter_dir / class_id
+            self.assertTrue(iter_dir.is_dir())
+            self.assertTrue(class_dir.is_dir())
+            for o in self.assigclass.matrix.index:
+                o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
+                this_o_path_file = class_dir / f"o{o_ind}.feather"
+                self.assertTrue(this_o_path_file.is_file())
+                this_o_index_file = class_dir / f"o{o_ind}_indexdata.feather"
+                self.assertTrue(this_o_index_file.is_file())
 
         self.assignment.set_save_path_files(False)
 
