@@ -51,7 +51,7 @@ cpdef void save_path_file(long origin_index,
                 if (predecessor != -1) and (connector != -1):
                     path_data.push_back(connector)
 
-        size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
+            size_of_path_arrays.push_back(<np.longlong_t> path_data.size())
 
     # get a view on data underlying vector, then as numpy array. avoids copying.
     dims[0] = <np.npy_intp> (path_data.size())
