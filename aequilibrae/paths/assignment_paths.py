@@ -69,40 +69,32 @@ class AssignmentPaths(object):
         self.proj_dir = os.environ.get(ENVIRON_VAR)
         self.table_name = table_name
         self.assignment_results = AssignmentResultsTable(table_name)
-        self.num_iters = None
-        # we need class __id__ and class_name, which we
-        # self.classes = self._get_class_parameters()
-        self.compressed_graph_correspondences = {}
+        self.classes = self.assignment_results.get_traffic_class_names_and_id()
+        self.compressed_graph_correspondences = self._read_compressed_graph_correspondence()
+        self.path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id)
 
-    # def _get_class_parameters(self):
-
-    def _read_compressed_graph_correspondence(self) -> None:
-
-        path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id.values[0])
-
+    def _read_compressed_graph_correspondence(self) -> Dict:
         for c in self.classes:
-            self.compressed_graph_correspondences[c.__id__] = pd.read_feather(
-                os.path.join(path_base_dir, f"correspondence_c{c.mode}_{c.__id__}.feather")
+            self.compressed_graph_correspondences[c.id] = pd.read_feather(
+                os.path.join(self.path_base_dir, f"correspondence_c{c.mode}_{c.id}.feather")
             )
 
-    def _read_path_file(self, iteration, traffic_class, origin):
-
-        iteration += 1  # aequilibrae's iterations are 1-based, but I used numpy's 0-based indexing in select_link
-
-        pth = os.environ.get(ENVIRON_VAR)
-        path_base_dir = os.path.join(pth, "path_files", self.assignment_results.procedure_id.values[0])
-        base_dir = os.path.join(path_base_dir, f"iter{iteration}", f"path_c{traffic_class.mode}_{traffic_class.__id__}")
-
+    def _read_path_file(self, iteration: int, traffic_class_id: str, origin: int) -> (pd.DataFrame, pd.DataFrame):
+        possible_traffic_classes = list(filter(lambda x: x.id == traffic_class_id, self.classes))
+        assert (
+            len(possible_traffic_classes) == 1
+        ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.id, self.classes))}"
+        traffic_class = possible_traffic_classes[0]
+        base_dir = os.path.join(
+            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.mode}_{traffic_class.id}"
+        )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
-
         path_o = pd.read_feather(path_o_f)
         path_o_index = pd.read_feather(path_o_index_f)
-
         return path_o, path_o_index
 
     # make this o, d, iter, class
-
     def get_path_for_destination(self, path_o, path_o_index, destination):
         """ Return all link ids, i.e. the full path, for a given destination """
         if destination == 0:
