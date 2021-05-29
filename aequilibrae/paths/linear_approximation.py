@@ -176,6 +176,8 @@ class LinearApproximation(WorkerThread):
         else:
             self.conjugate_stepsize = alpha
 
+        # for reporting, we use a different convention, consistent with BFW: beta_0 corresponds to multiplier for AON;
+        # in calculations we follow the conventions of our TRB paper.
         self.betas[0] = 1.0 - self.conjugate_stepsize
         self.betas[1] = self.conjugate_stepsize
         self.betas[2] = 0.0
@@ -271,14 +273,14 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(pre_previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
 
                 linear_combination(
-                    sdr.link_loads, c._aon_results.link_loads, sdr.link_loads, self.conjugate_stepsize, self.cores
+                    sdr.link_loads, sdr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
                 )
 
                 if c.results.num_skims > 0:
                     linear_combination_skims(
                         sdr.skims.matrix_view,
-                        c._aon_results.skims.matrix_view,
                         sdr.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
                         self.conjugate_stepsize,
                         self.cores,
                     )
