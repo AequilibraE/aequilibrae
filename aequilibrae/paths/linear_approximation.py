@@ -339,11 +339,8 @@ class LinearApproximation(WorkerThread):
                     path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c.__id__}"
                 )
                 Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
-                if self.iter == 1:
-                    # save link_id to simplified graph id, this could change
-                    c.graph.save_compressed_correspondence(
-                        os.path.join(path_base_dir, f"correspondence_c{c.mode}_{c.__id__}.feather")
-                    )
+                if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
+                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c.__id__)
 
     def doWork(self):
         self.execute()
