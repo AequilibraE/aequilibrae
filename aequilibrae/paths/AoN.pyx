@@ -24,7 +24,6 @@ include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
-# include 'path_file_saving_nogil.pyx'
 
 
 from .__version__ import binary_version as VERSION_COMPILED
