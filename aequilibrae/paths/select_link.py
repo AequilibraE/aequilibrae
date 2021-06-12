@@ -95,14 +95,16 @@ class SelectLink(object):
             #     self.demand_weights[:(i-2)] *= beta_2
 
     def __lookup_compressed_links_for_link(self, link_ids: List[int]) -> List[int]:
-        """" look up compressed ids for each class for a given list of network link ids"""
-        select_link_ids_compressed = {}
-        for c in self.classes:
-            graph = self.paths.compressed_graph_correspondences[c.__id__]
-            select_link_ids_compressed[c.__id__] = graph.loc[graph["link_id"].isin(link_ids)][
-                "__compressed_id__"
-            ].to_numpy()
-        return select_link_ids_compressed
+        """" TODO: look up compressed ids for each class for a given list of network link ids"""
+        # FIXME: for now just pass in simplified ids directly
+        # select_link_ids_compressed = {}
+        # for c in self.classes:
+        #     graph = self.paths.compressed_graph_correspondences[c.__id__]
+        #     select_link_ids_compressed[c.__id__] = graph.loc[graph["link_id"].isin(link_ids)][
+        #         "__compressed_id__"
+        #     ].to_numpy()
+        # return select_link_ids_compressed
+        return link_ids
 
     def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """ For each class and each link, initialise select link demand matrix"""
@@ -122,7 +124,7 @@ class SelectLink(object):
         link_ids_simplified = self.__lookup_compressed_links_for_link(link_ids)
         select_link_matrices = self.__initialise_matrices(link_ids_simplified)
 
-        for iteration in range(self.num_iters):
+        for iteration in range(1, self.num_iters + 1):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
             weight = self.demand_weights[iteration]
             for c in self.classes:
