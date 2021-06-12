@@ -1,6 +1,6 @@
 import os
 from collections import defaultdict
-from typing import Dict
+from typing import List, Dict
 import numpy as np
 import pandas as pd
 
@@ -27,27 +27,16 @@ class SelectLink(object):
             demand_matrices (dict): Dict with assignment class id and corresponding demand matrix
         """
         self.table_name = table_name
-        self.select_link_id = None
-        self.assignment_results = None
-
         self.paths = AssignmentPaths(self.table_name)
         self.num_iters = self.paths.assignment_results.get_number_of_iterations()
-
         # TODO: assert class ids and matrix keys are identical in the following
         self.classes = self.paths.get_traffic_class_names_and_id()
         self.demand_matrices = demand_matrices
-
-        self.select_link_matrices = {}
-        self._initialise_matrices()
-
+        self.num_zones = demand_matrices.values[0].zones  # TODO: is this the way to go?
         # get weight of each iteration to weight corresponding demand.
         # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self.demand_weights = None
         self._calculate_demand_weights()
-
-    def _initialise_matrices(self) -> None:
-        for c in self.classes:
-            self.select_link_matrices[c.id] = np.zeros_like(self.demand_matrices[c.id].matrix_view)
 
     def _calculate_demand_weights(self):
         """Each iteration of traffic assignment contributes a certain fraction to the total solutions. This method
@@ -102,47 +91,60 @@ class SelectLink(object):
             # if (assignment_report["setup"]["Algorithm"] == "bfw") and (i > 2):
             #     self.demand_weights[:(i-2)] *= beta_2
 
-    # FIXME: pass in a list of links
-    def run_select_link_analysis(self, link_id: int) -> None:
-        assert len(self.classes) > 0, "Need at least one traffic class to run select link analysis, use set_classes"
-
-        # FIXME
-        self.select_link_id = link_id
-        # look up compressed id for each class. Should be the same.
+    def __lookup_compressed_links_for_link(self, link_ids: List[int]) -> List[int]:
+        """" look up compressed ids for each class for a given list of network link ids"""
+        select_link_ids_compressed = {}
         for c in self.classes:
-            graph = self.compressed_graph_correspondences[c.__id__]
-            self.select_link_id_compressed[c.__id__] = graph.loc[graph["link_id"] == self.select_link_id][
+            graph = self.paths.assignment_results.compressed_graph_correspondences[c.id]
+            select_link_ids_compressed[c.id] = graph.loc[graph["link_id"].isin(link_ids)][
                 "__compressed_id__"
-            ].values[0]
-        # end FIXME
+            ].to_numpy()
+        return select_link_ids_compressed
 
-        # now process each iteration.
-        num_centroids = self.classes[0].matrix.zones  # FIXME no TrafficClasses anymore
+    def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[Dict[np.array]]:
+        """ For each class and each link, initialise select link demand matrix"""
+        select_link_matrices = {
+            c.id: {link_id: np.zeros_like(self.demand_matrices[c.id].matrix_view)}
+            for c in self.classes
+            for link_id in simplified_link_ids
+        }
+        return select_link_matrices
+
+    def run_select_link_analysis(self, link_ids: List[int]) -> None:
+        """" Select link analysis for a provided set of links. Processing is done per iteration, class, and origin.
+         Providing a list of links means we only need to read each path file once from disk. Note that link ids refer
+         to the network ids, these are then turned into simplified ids; this means a bi-directional link will have two
+         associated simplified link ids"""
+        assert len(set(link_ids)) == len(link_ids), "Please provide a unique list of link ids"
+        link_ids_simplified = self.__lookup_compressed_links_for_link(link_ids)
+        select_link_matrices = self._initialise_matrices(link_ids_simplified)
 
         for iteration in range(self.num_iters):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
             weight = self.demand_weights[iteration]
             for c in self.classes:
-                comp_link_id = self.select_link_id_compressed[c.id]
-                demand_mat = c.matrix.matrix_view
+                class_id = c.id
+                logger.info(f"  Procesing class {class_id}")
+                comp_link_ids = link_ids_simplified[class_id]
+                for origin in range(self.num_zones):
+                    path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
+                    for comp_link_id in comp_link_ids:
+                        # these are the indexes of the path file where the SLs appear, so need to turn these into
+                        # destinations by looking up the values in the path file
+                        idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.to_numpy()
 
-                for origin in range(num_centroids):
-                    path_o, path_o_index = self._read_path_file(iteration, c, origin)
+                        # drop disconnected zones (and intrazonal). Depends on index being ordered.
+                        path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
+                        destinations_this_o_and_iter = np.array(
+                            [
+                                path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] >= x].index.min()
+                                for x in idx_to_look_up
+                            ]
+                        )
+                        destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
-                    # these are the indeces of the path file where the SL appears, so need to turn these into
-                    # destinations by looking up the values in the path file
-                    idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.values
+                        select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
+                            weight * self.demand_matrices[class_id][origin, destinations_this_o_and_iter]
+                        )
 
-                    # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                    path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
-                    destinations_this_o_and_iter = np.array(
-                        [
-                            path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] >= x].index.min()
-                            for x in idx_to_look_up
-                        ]
-                    )
-                    destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
-
-                    self.matrices[c.__id__][origin, destinations_this_o_and_iter] += (
-                        weight * demand_mat[origin, destinations_this_o_and_iter]
-                    )
+        return select_link_matrices
