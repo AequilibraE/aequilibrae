@@ -20,9 +20,9 @@ from aequilibrae.project.database_connection import database_connection
 
 
 class TrafficClassIdentifier(object):
-    def __init__(self, name: str, id: str):
-        self.name = name
-        self.id = id
+    def __init__(self, network_mode: str, identifier: str):
+        self.mode = network_mode
+        self.__id__ = identifier
 
 
 class AssignmentResultsTable(object):
@@ -56,7 +56,7 @@ class AssignmentResultsTable(object):
 
     def get_traffic_class_names_and_id(self) -> List[TrafficClassIdentifier]:
         all_classes = self.procedure_report["setup"]["Classes"]
-        return [TrafficClassIdentifier(k, v["network mode"]) for k, v in all_classes.items()]
+        return [TrafficClassIdentifier(v["network mode"], k) for k, v in all_classes.items()]
 
     def get_number_of_iterations(self):
         return np.max(self.procedure_report["convergence"]["iteration"])
@@ -91,19 +91,20 @@ class AssignmentPaths(object):
     def _read_compressed_graph_correspondence(self) -> Dict:
         compressed_graph_correspondences = {}
         for c in self.classes:
-            compressed_graph_correspondences[c.id] = pd.read_feather(
-                os.path.join(self.path_base_dir, f"correspondence_c{c.id}_{c.name}.feather")
+            compressed_graph_correspondences[c.__id__] = pd.read_feather(
+                os.path.join(self.path_base_dir, f"correspondence_c{c.__id__}_{c.mode}.feather")
             )
         return compressed_graph_correspondences
 
     def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> (pd.DataFrame, pd.DataFrame):
-        possible_traffic_classes = list(filter(lambda x: x.id == traffic_class_id, self.classes))
+        # TODO: make file ending and read method type dependent, info now stored in assignment results table
+        possible_traffic_classes = list(filter(lambda x: x.__id__ == traffic_class_id, self.classes))
         assert (
             len(possible_traffic_classes) == 1
-        ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.id, self.classes))}"
+        ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.__id__, self.classes))}"
         traffic_class = possible_traffic_classes[0]
         base_dir = os.path.join(
-            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.name}"
+            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.__id__}_{traffic_class.mode}"
         )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")

@@ -98,7 +98,7 @@ class SelectLink(object):
         """" look up compressed ids for each class for a given list of network link ids"""
         select_link_ids_compressed = {}
         for c in self.classes:
-            graph = self.paths.assignment_results.compressed_graph_correspondences[c.id]
+            graph = self.paths.compressed_graph_correspondences[c.__id__]
             select_link_ids_compressed[c.id] = graph.loc[graph["link_id"].isin(link_ids)][
                 "__compressed_id__"
             ].to_numpy()
@@ -107,7 +107,7 @@ class SelectLink(object):
     def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """ For each class and each link, initialise select link demand matrix"""
         select_link_matrices = {
-            c.id: {link_id: np.zeros_like(self.demand_matrices[c.id].matrix_view)}
+            c.__id__: {link_id: np.zeros_like(self.demand_matrices[c.__id__].matrix_view)}
             for c in self.classes
             for link_id in simplified_link_ids
         }
@@ -120,13 +120,13 @@ class SelectLink(object):
          associated simplified link ids"""
         assert len(set(link_ids)) == len(link_ids), "Please provide a unique list of link ids"
         link_ids_simplified = self.__lookup_compressed_links_for_link(link_ids)
-        select_link_matrices = self._initialise_matrices(link_ids_simplified)
+        select_link_matrices = self.__initialise_matrices(link_ids_simplified)
 
         for iteration in range(self.num_iters):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
             weight = self.demand_weights[iteration]
             for c in self.classes:
-                class_id = c.id
+                class_id = c.__id__
                 logger.info(f"  Procesing class {class_id}")
                 comp_link_ids = link_ids_simplified[class_id]
                 for origin in range(self.num_zones):
