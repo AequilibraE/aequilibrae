@@ -101,7 +101,7 @@ class SelectLink(object):
             ].to_numpy()
         return select_link_ids_compressed
 
-    def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[Dict[np.array]]:
+    def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """ For each class and each link, initialise select link demand matrix"""
         select_link_matrices = {
             c.id: {link_id: np.zeros_like(self.demand_matrices[c.id].matrix_view)}
