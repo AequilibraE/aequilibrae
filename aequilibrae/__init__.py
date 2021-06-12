@@ -13,7 +13,7 @@ try:
     from aequilibrae.paths.AoN import path_computation
 except Exception as e:
     compiled = False
-    warnings.warn(f'Failed to import compiled modules. {e.args}')
+    warnings.warn(f"Failed to import compiled modules. {e.args}")
 
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
@@ -25,6 +25,7 @@ if compiled:
     from aequilibrae.paths.all_or_nothing import allOrNothing
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
     from aequilibrae.paths.graph import Graph
+    from aequilibrae.paths.assignment_paths import AssignmentPaths
     from aequilibrae.project import Project
     from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
     from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults

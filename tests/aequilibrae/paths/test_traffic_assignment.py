@@ -1,5 +1,6 @@
 from unittest import TestCase
 import os
+import pathlib
 import sqlite3
 import uuid
 import string
@@ -29,7 +30,7 @@ class TestTrafficAssignment(TestCase):
         self.matrix.computational_view()
 
         self.assignment = TrafficAssignment()
-        self.assigclass = TrafficClass('car', self.car_graph, self.matrix)
+        self.assigclass = TrafficClass("car", self.car_graph, self.matrix)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
@@ -40,7 +41,7 @@ class TestTrafficAssignment(TestCase):
     def test_matrix_with_wrong_type(self):
         self.matrix.matrix_view = np.array(self.matrix.matrix_view, np.int32)
         with self.assertRaises(TypeError):
-            _ = TrafficClass('car', self.car_graph, self.matrix)
+            _ = TrafficClass("car", self.car_graph, self.matrix)
 
     def test_set_vdf(self):
         with self.assertRaises(ValueError):
@@ -112,9 +113,8 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     def test_set_time_field(self):
-
         with self.assertRaises(ValueError):
-            self.assignment.set_time_field('capacity')
+            self.assignment.set_time_field("capacity")
 
         self.assignment.add_class(self.assigclass)
 
@@ -123,13 +123,12 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(ValueError):
             self.assignment.set_time_field(val)
 
-        self.assignment.set_time_field('free_flow_time')
-        self.assertEqual(self.assignment.time_field, 'free_flow_time')
+        self.assignment.set_time_field("free_flow_time")
+        self.assertEqual(self.assignment.time_field, "free_flow_time")
 
     def test_set_capacity_field(self):
-
         with self.assertRaises(ValueError):
-            self.assignment.set_capacity_field('capacity')
+            self.assignment.set_capacity_field("capacity")
 
         self.assignment.add_class(self.assigclass)
 
@@ -138,8 +137,85 @@ class TestTrafficAssignment(TestCase):
         with self.assertRaises(ValueError):
             self.assignment.set_capacity_field(val)
 
-        self.assignment.set_capacity_field('capacity')
-        self.assertEqual(self.assignment.capacity_field, 'capacity')
+        self.assignment.set_capacity_field("capacity")
+        self.assertEqual(self.assignment.capacity_field, "capacity")
+
+    def test_set_save_path_files(self):
+        self.assignment.set_classes([self.assigclass])
+        # make sure default is false
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, False)
+        self.assignment.set_save_path_files(True)
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, True)
+
+        # reset for most assignment tests
+        self.assignment.set_save_path_files(False)
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.save_path_file, False)
+
+    def test_set_path_file_format(self):
+        self.assignment.set_classes([self.assigclass])
+        with self.assertRaises(Exception):
+            self.assignment.set_path_file_format("shiny_format")
+        self.assignment.set_path_file_format("parquet")
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.write_feather, False)
+        self.assignment.set_path_file_format("feather")
+        for c in self.assignment.classes:
+            self.assertEqual(c._aon_results.write_feather, True)
+
+    def test_save_path_files(self):
+        self.assignment.add_class(self.assigclass)
+        self.assignment.set_save_path_files(True)
+
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+
+        self.assignment.max_iter = 2
+        self.assignment.set_algorithm("msa")
+        self.assignment.execute()
+
+        path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
+        self.assertTrue(path_file_dir.is_dir())
+
+        # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
+        # and therefore we compare the files directly, otherwise a translation from the simplified ids to link_ids
+        # would need to be performed.
+        # Reference files were generated on 12/6/21, any changes to the test project will need to be applied to the
+        # reference files. Also, the name given to the traffic class (see setUp above) has to be "car".
+        class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
+        reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
+
+        ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        self.assertTrue(node_correspondence.equals(ref_node_correspondence))
+
+        ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
+        correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
+        self.assertTrue(correspondence.equals(ref_correspondence))
+
+        path_class_id = f"path_{class_id}"
+        for i in range(1, self.assignment.max_iter + 1):
+            class_dir = path_file_dir / f"iter{i}" / path_class_id
+            ref_class_dir = reference_path_file_dir / f"iter{i}" / path_class_id
+            for o in self.assigclass.matrix.index:
+                o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
+                this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
+                ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
+                is_eq = this_o_path_file == ref_this_o_path_file
+                self.assertTrue(is_eq.all().all())
+
+                this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
+                ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
+                is_eq = this_o_index_file == ref_this_o_index_file
+                self.assertTrue(is_eq.all().all())
+
+        self.assignment.set_save_path_files(False)
 
     def test_execute_and_save_results(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
@@ -163,7 +239,6 @@ class TestTrafficAssignment(TestCase):
 
         msa10 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
@@ -172,7 +247,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.execute()
         msa25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.98, correl)
 
@@ -181,7 +255,6 @@ class TestTrafficAssignment(TestCase):
 
         fw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.99, correl)
 
@@ -189,20 +262,18 @@ class TestTrafficAssignment(TestCase):
         self.assignment.execute()
         cfw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.995, correl)
 
         # For the last algorithm, we set skimming
         self.car_graph.set_skimming(["free_flow_time", "distance"])
-        assigclass = TrafficClass('car', self.car_graph, self.matrix)
+        assigclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignment.set_classes([assigclass])
 
         self.assignment.set_algorithm("bfw")
         self.assignment.execute()
         bfw25 = self.assignment.assignment.rgap
 
-        self.assigclass.results.total_flows()
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.999, correl)
 

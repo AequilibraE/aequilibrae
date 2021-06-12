@@ -23,11 +23,13 @@ class TestAssignmentResults(TestCase):
         a.set_cores(-2)
         self.assertEqual(a.cores, max(1, mp.cpu_count() - 2))
 
-    #
+    def test_set_save_path_file(self):
+        a = AssignmentResults()
+
+        # Never save by default
+        self.assertEqual(a.save_path_file, False)
+
     # def test_set_critical_links(self):
-    #     self.fail()
-    #
-    # def test_set_save_path_file(self):
     #     self.fail()
     #
     # def test_get_load_results(self):

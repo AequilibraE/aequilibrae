@@ -12,20 +12,24 @@
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------"""
+import os
 
 # cython: language_level=3
 cimport numpy as np
+from libcpp cimport bool
 
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
+include 'path_file_saving.pyx'
+
 
 from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
-    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1
+    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
     cdef int critical_queries = 0
     cdef int path_file = 0
     cdef int skims
@@ -41,7 +45,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     #We transform the python variables in Cython variables
     nodes = graph.compact_num_nodes
-
+    links = graph.compact_num_links
 
     skims = len(graph.skim_fields)
 
@@ -87,6 +91,25 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef double [:, :] node_load_view = aux_result.temp_node_loads[:, :, curr_thread]
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
 
+    # path saving file paths
+    cdef string path_file_base
+    cdef string path_index_file_base
+    cdef bool save_paths = False
+    cdef bool write_feather = True
+    if result.save_path_file:
+        save_paths = True
+        write_feather = result.write_feather
+        if write_feather:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.feather")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.feather")
+        else:
+            base_string = os.path.join(result.path_file_dir, f"o{origin_index}.parquet")
+            index_string = os.path.join(result.path_file_dir, f"o{origin_index}_indexdata.parquet")
+        path_file_base = base_string.encode('utf-8')
+        path_index_file_base = index_string.encode('utf-8')
+
+
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -115,6 +138,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                         reached_first_view,
                         node_load_view,
                         w)
+
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
@@ -136,6 +160,9 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    if result.save_path_file == True:
+        save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
     return origin
 

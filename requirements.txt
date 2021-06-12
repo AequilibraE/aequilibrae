@@ -8,3 +8,4 @@ pyshp
 requests
 shapely
 pandas == 1.0.1
+pyarrow

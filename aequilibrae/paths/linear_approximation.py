@@ -1,11 +1,14 @@
 import importlib.util as iutil
 from functools import partial
 import numpy as np
+from pathlib import Path
+import os
 from typing import List, Dict
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae import logger
 
 try:
@@ -77,6 +80,7 @@ class LinearApproximation(WorkerThread):
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
+        self.procedure_id = assig_spec.procedure_id
 
         self.iter = 0
         self.rgap = np.inf
@@ -326,6 +330,18 @@ class LinearApproximation(WorkerThread):
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
+    def __maybe_create_path_file_directories(self):
+        pth = os.environ.get(ENVIRON_VAR)
+        path_base_dir = os.path.join(pth, "path_files", self.procedure_id)
+        for c in self.traffic_classes:
+            if c._aon_results.save_path_file:
+                c._aon_results.path_file_dir = os.path.join(
+                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c.__id__}"
+                )
+                Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
+                if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
+                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c.__id__)
+
     def doWork(self):
         self.execute()
 
@@ -355,10 +371,14 @@ class LinearApproximation(WorkerThread):
                 self.equilibration.emit(["iterations", self.iter])
 
             aon_flows = []
+
+            self.__maybe_create_path_file_directories()
+
             for c in self.traffic_classes:  # type: TrafficClass
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
+
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
@@ -444,6 +464,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
+
+        # TODO (Jan 18/4/21): Do we want to blob store path files (by iteration, class, origin, destination) in sqlite?
+        # or do we just use one big hdf5 file?
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
