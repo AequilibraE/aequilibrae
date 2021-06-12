@@ -99,7 +99,7 @@ class SelectLink(object):
         select_link_ids_compressed = {}
         for c in self.classes:
             graph = self.paths.compressed_graph_correspondences[c.__id__]
-            select_link_ids_compressed[c.id] = graph.loc[graph["link_id"].isin(link_ids)][
+            select_link_ids_compressed[c.__id__] = graph.loc[graph["link_id"].isin(link_ids)][
                 "__compressed_id__"
             ].to_numpy()
         return select_link_ids_compressed

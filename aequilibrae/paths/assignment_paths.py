@@ -92,7 +92,7 @@ class AssignmentPaths(object):
         compressed_graph_correspondences = {}
         for c in self.classes:
             compressed_graph_correspondences[c.__id__] = pd.read_feather(
-                os.path.join(self.path_base_dir, f"correspondence_c{c.__id__}_{c.mode}.feather")
+                os.path.join(self.path_base_dir, f"correspondence_c{c.mode}_{c.__id__}.feather")
             )
         return compressed_graph_correspondences
 
@@ -104,7 +104,7 @@ class AssignmentPaths(object):
         ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.__id__, self.classes))}"
         traffic_class = possible_traffic_classes[0]
         base_dir = os.path.join(
-            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.__id__}_{traffic_class.mode}"
+            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.mode}_{traffic_class.__id__}"
         )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
