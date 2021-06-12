@@ -191,10 +191,13 @@ class TestTrafficAssignment(TestCase):
         class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
         reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
 
+        ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        self.assertTrue(node_correspondence.equals(ref_node_correspondence))
+
         ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
         correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
-        is_eq = correspondence == ref_correspondence
-        self.assertTrue(is_eq.all().all())
+        self.assertTrue(correspondence.equals(ref_correspondence))
 
         path_class_id = f"path_{class_id}"
         for i in range(1, self.assignment.max_iter + 1):
