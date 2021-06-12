@@ -543,6 +543,9 @@ class TrafficAssignment(object):
             if cls.fixed_cost_field:
                 uclass["Fixed cost field"] = cls.fixed_cost_field
                 uclass["Fixed cost multiplier"] = cls.fc_multiplier
+            uclass["save_path_files"] = cls._aon_results.save_path_file
+            uclass["path_file_feather_format"] = cls._aon_results.write_feather
+
             classes[cls.__id__] = uclass
 
         info = {
