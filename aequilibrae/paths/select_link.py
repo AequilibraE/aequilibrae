@@ -97,21 +97,21 @@ class SelectLink(object):
     def __lookup_compressed_links_for_link(self, link_ids: List[int]) -> List[int]:
         """" TODO: look up compressed ids for each class for a given list of network link ids"""
         # FIXME: for now just pass in simplified ids directly
-        # select_link_ids_compressed = {}
-        # for c in self.classes:
+        select_link_ids_compressed = {}
+        for c in self.classes:
+            select_link_ids_compressed[c.__id__] = link_ids
         #     graph = self.paths.compressed_graph_correspondences[c.__id__]
         #     select_link_ids_compressed[c.__id__] = graph.loc[graph["link_id"].isin(link_ids)][
         #         "__compressed_id__"
         #     ].to_numpy()
-        # return select_link_ids_compressed
-        return link_ids
+        return select_link_ids_compressed
 
     def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """ For each class and each link, initialise select link demand matrix"""
         select_link_matrices = {
             c.__id__: {link_id: np.zeros_like(self.demand_matrices[c.__id__].matrix_view)}
             for c in self.classes
-            for link_id in simplified_link_ids
+            for link_id in simplified_link_ids[c.__id__]
         }
         return select_link_matrices
 
@@ -126,7 +126,7 @@ class SelectLink(object):
 
         for iteration in range(1, self.num_iters + 1):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
-            weight = self.demand_weights[iteration]
+            weight = self.demand_weights[iteration - 1]  # zero based
             for c in self.classes:
                 class_id = c.__id__
                 logger.info(f"  Procesing class {class_id}")
@@ -149,7 +149,7 @@ class SelectLink(object):
                         destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
                         select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
-                            weight * self.demand_matrices[class_id][origin, destinations_this_o_and_iter]
+                            weight * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
                         )
 
         return select_link_matrices
