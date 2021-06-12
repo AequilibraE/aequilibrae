@@ -26,16 +26,19 @@ class SelectLink(object):
             table_name (str): Name of the traffic assignment result table used to generate the required path files
             demand_matrices (dict): Dict with assignment class id and corresponding demand matrix
         """
-        self.table_name = table_name
-        self.paths = AssignmentPaths(self.table_name)
+        self.paths = AssignmentPaths(table_name)
         self.num_iters = self.paths.assignment_results.get_number_of_iterations()
-        # TODO: assert class ids and matrix keys are identical in the following
-        self.classes = self.paths.get_traffic_class_names_and_id()
+
+        # TODO:
+        #  assert class ids and matrix keys are identical in the following
+        #  assert sum of demand matrix is equal to result in assignment results for each class
+        self.classes = self.paths.assignment_results.get_traffic_class_names_and_id()
         self.demand_matrices = demand_matrices
-        self.num_zones = demand_matrices.values[0].zones  # TODO: is this the way to go?
+        self.num_zones = list(self.demand_matrices.values())[0].matrix_view.shape[0]  # TODO: is this the way to go?
+
         # get weight of each iteration to weight corresponding demand.
-        # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self.demand_weights = None
+        # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self._calculate_demand_weights()
 
     def _calculate_demand_weights(self):
