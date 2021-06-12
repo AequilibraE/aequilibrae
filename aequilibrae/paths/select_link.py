@@ -136,7 +136,7 @@ class SelectLink(object):
             weight = self.demand_weights[iteration - 1]  # zero based
             for c in self.classes:
                 class_id = c.__id__
-                logger.info(f"  Procesing class {class_id}")
+                # logger.info(f" Procesing class {class_id}")
                 comp_link_ids = link_ids_simplified[class_id]
                 for origin in range(self.num_zones):
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
@@ -160,5 +160,5 @@ class SelectLink(object):
                                 weight
                                 * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
                             )
-
+        logger.info(f"Select link analysis for links {link_ids} finished.")
         return select_link_matrices
