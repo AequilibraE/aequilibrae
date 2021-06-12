@@ -8,6 +8,13 @@ from aequilibrae.paths.assignment_paths import AssignmentPaths, TrafficClassIden
 from aequilibrae import logger
 
 
+# TODO:
+#  - implement per-iteration contribution for CFW and BFW
+#  - some assertions as per constructor comments
+#  - demand matrix operations do not take cores into account (i.e. we assume we have a 2d demand matrix per class)
+#  - tests
+
+
 class SelectLink(object):
     """ Class for select link analysis. Depends on traffic assignment results with path files saved to disk.
     ::
@@ -142,14 +149,16 @@ class SelectLink(object):
                         path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
                         destinations_this_o_and_iter = np.array(
                             [
-                                path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] >= x].index.min()
+                                path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] > x].index.min()
                                 for x in idx_to_look_up
                             ]
                         )
                         destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
-                        select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
-                            weight * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
-                        )
+                        if destinations_this_o_and_iter.shape[0] > 0:
+                            select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
+                                weight
+                                * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
+                            )
 
         return select_link_matrices
