@@ -10,12 +10,13 @@ from aequilibrae.project.database_connection import database_connection
 # TODO: let's make it optional to keep path files in memory, although this can get out of control very quickly it should
 # be much quicker when working with a single origin
 
-# TODO: factor out AssignmentResultsTable into different file, also get rid of dirty eval bu changing creation
+# TODO: factor out AssignmentResultsTable into different file, also get rid of dirty eval by changing creation
 
 # FIXME: this is for zone_index and compressed link ids
 # for link ids, look up what we are doing in graph - we might want to keep the order of links for a single compressed
 # link
-# for zones, we need to do the inverse of graph.compact_nodes_to_indices
+# for zones, we need to do the inverse of graph.compact_nodes_to_indices -> implemented now, but let's just use it
+# when retrieving paths for an o and d
 
 
 class TrafficClassIdentifier(object):
@@ -56,6 +57,15 @@ class AssignmentResultsTable(object):
     def get_traffic_class_names_and_id(self) -> List[TrafficClassIdentifier]:
         all_classes = self.procedure_report["setup"]["Classes"]
         return [TrafficClassIdentifier(k, v["network mode"]) for k, v in all_classes.items()]
+
+    def get_number_of_iterations(self):
+        return np.max(self.procedure_report["convergence"]["iteration"])
+
+    def get_assignment_method(self):
+        return self.procedure_report["setup"]["Algorithm"]
+
+    def get_alphas(self):
+        return self.procedure_report["convergence"]["alpha"]
 
 
 class AssignmentPaths(object):
