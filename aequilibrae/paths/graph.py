@@ -637,4 +637,4 @@ class Graph(object):
         graph_path = join(path, f"correspondence_c{mode_name}_{mode_id}.feather")
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indeces_c{mode_name}_{mode_id}.feather")
-        pd.DataFrame(self.nodes_to_indices).to_feather(node_path)
+        pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)

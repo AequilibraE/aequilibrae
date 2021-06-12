@@ -186,7 +186,7 @@ class TestTrafficAssignment(TestCase):
         # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
         # and therefore we compare the files directly, otherwise a translation from the simplified ids to link_ids
         # would need to be performed.
-        # Reference files were generated on 29/5/21, any changes to the test project will need to be applied to the
+        # Reference files were generated on 12/6/21, any changes to the test project will need to be applied to the
         # reference files. Also, the name given to the traffic class (see setUp above) has to be "car".
         class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
         reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
