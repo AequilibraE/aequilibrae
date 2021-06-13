@@ -145,6 +145,9 @@ class SelectLink(object):
                 # logger.info(f" Procesing class {class_id}")
                 comp_link_ids = link_ids_simplified[class_id]
                 for origin in range(self.num_zones):
+                    # skip zero-demand origins
+                    if np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
+                        continue
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
                     # drop disconnected zones (and intrazonal). Depends on index being ordered.
                     path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
