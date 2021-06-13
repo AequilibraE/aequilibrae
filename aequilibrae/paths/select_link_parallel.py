@@ -78,14 +78,9 @@ class SelectLinkParallel(object):
                     if origin % 100 == 0:
                         logger.info(f" Procesing origin {origin}")
                     # skip zero-demand origins
-                    # TODO (Jan 13/6/21): this mess has to be cleaned up at some point, why do we have 2d matrices?
-                    # if len(self.demand_matrices[class_id].matrix_view.shape) == 2:
                     if not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :]):
                         continue
-                    # elif not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
-                    #     continue
                     sl_mat = select_link_matrices[class_id]
-                    # FROM HERE
                     path_o_f, path_o_index_f = self.paths.get_path_file_names(origin, iteration, class_id)
                     select_link_for_origin(
                         link_ids,
@@ -97,18 +92,5 @@ class SelectLinkParallel(object):
                         weight,
                         sl_mat,
                     )
-
-                    # path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
-                    # path_o = path_o.to_numpy().flatten()
-                    # path_o_index = path_o_index.to_numpy().flatten()
-                    # # # TODO JAN: why did I do this? was this from before I fixed the path file saving bug?
-                    # # # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                    # # path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
-                    # dest_this_o_and_iter = np.array([np.argwhere(path_o_index > x).min() for x in np.argwhere(path_o == link_id).flatten()]).astype(int)
-                    # select_link_matrices[class_id][origin, dest_this_o_and_iter] += (
-                    #     weight
-                    #     * self.demand_matrices[class_id].matrix_view[origin, dest_this_o_and_iter]
-                    # )
-
         # logger.info(f"Select link analysis for links {link_id} finished.")
         return select_link_matrices
