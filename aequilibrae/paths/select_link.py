@@ -48,7 +48,7 @@ class SelectLink(object):
         # FIXME (Jan 21/4/21): this is MSA and FW only atm, needs to be implemented for CFW and BFW
         self._calculate_demand_weights()
 
-    def _calculate_demand_weights(self):
+    def _calculate_demand_weights(self) -> None:
         """Each iteration of traffic assignment contributes a certain fraction to the total solutions. This method
         figures out how much so we can calculate select link matrices by weighting paths per iteration."""
 
@@ -66,7 +66,7 @@ class SelectLink(object):
         sum_of_contribs = np.sum(self.demand_weights)
         assert np.allclose(sum_of_contribs, 1.0), f"Contribution of iterations is not one, but {sum_of_contribs}"
 
-    def _figure_out_demand_weights_for_linear_approximation(self):
+    def _figure_out_demand_weights_for_linear_approximation(self) -> None:
         """ Linear approximation contribution for each iteration. """
 
         # solution^n+1 = alpha^n * sol^n + (1-alpha^n) * direction^n
@@ -122,7 +122,7 @@ class SelectLink(object):
         }
         return select_link_matrices
 
-    def run_select_link_analysis(self, link_ids: List[int]) -> None:
+    def run_select_link_analysis(self, link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """" Select link analysis for a provided set of links. Processing is done per iteration, class, and origin.
          Providing a list of links means we only need to read each path file once from disk. Note that link ids refer
          to the network ids, these are then turned into simplified ids; this means a bi-directional link will have two

@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from aequilibrae import logger
@@ -96,7 +96,7 @@ class AssignmentPaths(object):
             )
         return compressed_graph_correspondences
 
-    def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> (pd.DataFrame, pd.DataFrame):
+    def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # TODO: make file ending and read method type dependent, info now stored in assignment results table
         possible_traffic_classes = list(filter(lambda x: x.__id__ == traffic_class_id, self.classes))
         assert (
@@ -112,13 +112,17 @@ class AssignmentPaths(object):
         path_o_index = pd.read_feather(path_o_index_f)
         return path_o, path_o_index
 
-    def get_path_for_destination(self, origin: int, destination: int, iteration: int, traffic_class_id: str):
+    def get_path_for_destination(
+        self, origin: int, destination: int, iteration: int, traffic_class_id: str
+    ) -> np.array:
         """ Return all link ids, i.e. the full path, for a given destination"""
         path_o, path_o_index = self.read_path_file(origin, iteration, traffic_class_id)
         return self.get_path_for_destination_from_files(path_o, path_o_index, destination)
 
     @staticmethod
-    def get_path_for_destination_from_files(path_o: pd.DataFrame, path_o_index: pd.DataFrame, destination: int):
+    def get_path_for_destination_from_files(
+        path_o: pd.DataFrame, path_o_index: pd.DataFrame, destination: int
+    ) -> np.array:
         """ for a given path file and path index file, and a given destination, return the path links in o-d order"""
         if destination == 0:
             lower_incl = 0

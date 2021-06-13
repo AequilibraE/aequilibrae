@@ -7,10 +7,9 @@ from tempfile import gettempdir
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.paths.assignment_paths import AssignmentPaths, AssignmentResultsTable, TrafficClassIdentifier
 from aequilibrae.utils.create_example import create_example
-from ...data import siouxfalls_project
 
 # TODO (Jan 13/6/21): Do we want to add a result table to the SiouxFalls project in tests/data? Or maybe in the
-#  reference project? This here depends on an assignment run, not ideal.
+#  reference project? This here depends on an assignment run.
 
 
 class TestAssignmentPaths(TestCase):
