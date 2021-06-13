@@ -85,33 +85,41 @@ class TestAssignmentPaths(TestCase):
         self.assertEqual(convergence_info["rgap"], [np.inf])
         self.assertEqual(convergence_info["warnings"], [""])
 
-    #
-    #
-    # def test_read_assignment_results(self):
-    #
-    # reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
-    #
-    # ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-    # node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-    # self.assertTrue(node_correspondence.equals(ref_node_correspondence))
-    #
-    # ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
-    # correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
-    # self.assertTrue(correspondence.equals(ref_correspondence))
-    #
-    # path_class_id = f"path_{class_id}"
-    # for i in range(1, self.assignment.max_iter + 1):
-    #     class_dir = path_file_dir / f"iter{i}" / path_class_id
-    #     ref_class_dir = reference_path_file_dir / f"iter{i}" / path_class_id
-    #     for o in self.assigclass.matrix.index:
-    #         o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
-    #         this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
-    #         ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
-    #         is_eq = this_o_path_file == ref_this_o_path_file
-    #         self.assertTrue(is_eq.all().all())
-    #
-    #         this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
-    #         ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
-    #         is_eq = this_o_index_file == ref_this_o_index_file
-    #         self.assertTrue(is_eq.all().all())
-    #
+    def test_assignment_path_reader(self):
+        paths = AssignmentPaths(self.result_name)
+        self.assertEqual(paths.proj_dir, self.project.project_base_path)
+        self.assertIsInstance(paths.assignment_results, AssignmentResultsTable)
+        self.assertEqual(len(paths.classes), 1)
+        self.assertIsInstance(paths.classes[0], TrafficClassIdentifier)
+        self.assertEqual(len(paths.compressed_graph_correspondences), 1)
+        self.assertIsInstance(paths.compressed_graph_correspondences[self.traffic_class_name], pd.DataFrame)
+
+        o, d, iteration = 0, 1, 1
+        path_0_1 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_0_1), [0])
+
+        # following is taken from path computation tests, we use compressed_id, which for SF is link_id - 1
+        # and node index, which here is node_nr - 1.
+        o, d = 4, 1
+        path_4_1 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_4_1), [11, 13])
+
+        o, d = 4, 9
+        path_4_9 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_4_9), [12, 24])
+
+        o, d = 9, 4
+        path_9_4 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_9_4), [25, 22])
+
+        # Let's try some longer paths, and try directionality: 17->18 does not exist, but 18->17 does
+        o, d = 5, 17
+        path_5_17 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_5_17), [15, 19, 17])
+        o, d = 5, 18
+        path_5_18 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
+        self.assertEqual(list(path_5_18), [15, 21, 48, 52])
+
+
+#        read_path_file
+#        get_path_for_destination_from_files
