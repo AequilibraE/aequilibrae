@@ -20,12 +20,18 @@ from aequilibrae.project.database_connection import database_connection
 
 
 class TrafficClassIdentifier(object):
+    """"Minimal wrapper to replace full traffic class."""
+
     def __init__(self, network_mode: str, identifier: str):
         self.mode = network_mode
         self.__id__ = identifier
 
 
 class AssignmentResultsTable(object):
+    """ Traffic assignment results from project database.
+       table_name (str): Name of assignment result table.
+    """
+
     def __init__(self, table_name: str) -> None:
         self.proj_dir = os.environ.get(ENVIRON_VAR)
         self.table_name = table_name
@@ -86,9 +92,9 @@ class AssignmentPaths(object):
         self.assignment_results = AssignmentResultsTable(table_name)
         self.path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id)
         self.classes = self.assignment_results.get_traffic_class_names_and_id()
-        self.compressed_graph_correspondences = self._read_compressed_graph_correspondence()
+        self.compressed_graph_correspondences = self.__read_compressed_graph_correspondence()
 
-    def _read_compressed_graph_correspondence(self) -> Dict:
+    def __read_compressed_graph_correspondence(self) -> Dict:
         compressed_graph_correspondences = {}
         for c in self.classes:
             compressed_graph_correspondences[c.__id__] = pd.read_feather(

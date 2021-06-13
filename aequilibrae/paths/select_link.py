@@ -113,13 +113,19 @@ class SelectLink(object):
         #     ].to_numpy()
         return select_link_ids_compressed
 
-    def __initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
+    def _initialise_matrices(self, simplified_link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
         """ For each class and each link, initialise select link demand matrix"""
-        select_link_matrices = {
-            c.__id__: {link_id: np.zeros_like(self.demand_matrices[c.__id__].matrix_view)}
-            for c in self.classes
-            for link_id in simplified_link_ids[c.__id__]
-        }
+        select_link_matrices = {}
+        for c in self.classes:
+            select_link_matrices[c.__id__] = {}
+            for link_id in simplified_link_ids[c.__id__]:
+                select_link_matrices[c.__id__][link_id] = np.zeros_like(self.demand_matrices[c.__id__].matrix_view)
+        # TODO: nested list comprehension
+        # select_link_matrices = {
+        #     c.__id__: {link_id: np.zeros_like(self.demand_matrices[c.__id__].matrix_view)}
+        #     for c in self.classes
+        #     for link_id in simplified_link_ids[c.__id__]
+        # }
         return select_link_matrices
 
     def run_select_link_analysis(self, link_ids: List[int]) -> Dict[str, Dict[int, np.array]]:
@@ -129,7 +135,7 @@ class SelectLink(object):
          associated simplified link ids"""
         assert len(set(link_ids)) == len(link_ids), "Please provide a unique list of link ids"
         link_ids_simplified = self.__lookup_compressed_links_for_link(link_ids)
-        select_link_matrices = self.__initialise_matrices(link_ids_simplified)
+        select_link_matrices = self._initialise_matrices(link_ids_simplified)
 
         for iteration in range(1, self.num_iters + 1):
             logger.info(f"Procesing iteration {iteration} for select link analysis")
@@ -156,9 +162,20 @@ class SelectLink(object):
                         destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
                         if destinations_this_o_and_iter.shape[0] > 0:
-                            select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
-                                weight
-                                * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
-                            )
+                            # check shape
+                            if len(self.demand_matrices[class_id].matrix_view.shape) == 2:
+                                select_link_matrices[class_id][comp_link_id][origin, destinations_this_o_and_iter] += (
+                                    weight
+                                    * self.demand_matrices[class_id].matrix_view[origin, destinations_this_o_and_iter]
+                                )
+                            else:
+                                select_link_matrices[class_id][comp_link_id][
+                                    origin, destinations_this_o_and_iter, :
+                                ] += (
+                                    weight
+                                    * self.demand_matrices[class_id].matrix_view[
+                                        origin, destinations_this_o_and_iter, :
+                                    ]
+                                )
         logger.info(f"Select link analysis for links {link_ids} finished.")
         return select_link_matrices
