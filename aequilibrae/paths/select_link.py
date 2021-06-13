@@ -149,10 +149,9 @@ class SelectLink(object):
                         logger.info(f" Procesing origin {origin}")
                     # skip zero-demand origins
                     # TODO (Jan 13/6/21): this mess has to be cleaned up at some point, why do we have 2d matrices?
-                    if (len(self.demand_matrices[class_id].matrix_view.shape) == 2) and (
-                        not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :])
-                    ):
-                        continue
+                    if len(self.demand_matrices[class_id].matrix_view.shape) == 2:
+                        if not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :]):
+                            continue
                     elif not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
                         continue
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
@@ -171,6 +170,7 @@ class SelectLink(object):
                         )
                         destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
+                        # TODO (Jan 13/6/21): this mess has to be cleaned up at some point, why do we have 2d matrices?
                         if destinations_this_o_and_iter.shape[0] > 0:
                             # check shape
                             if len(self.demand_matrices[class_id].matrix_view.shape) == 2:
