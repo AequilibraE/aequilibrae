@@ -1,13 +1,8 @@
 from unittest import TestCase
 import os
-import pathlib
-import sqlite3
 import pandas as pd
 import numpy as np
 import uuid
-import string
-import random
-from random import choice
 from tempfile import gettempdir
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.paths.assignment_paths import AssignmentPaths, AssignmentResultsTable, TrafficClassIdentifier
@@ -120,6 +115,8 @@ class TestAssignmentPaths(TestCase):
         path_5_18 = paths.get_path_for_destination(o, d, iteration, self.traffic_class_name)
         self.assertEqual(list(path_5_18), [15, 21, 48, 52])
 
-
-#        read_path_file
-#        get_path_for_destination_from_files
+        p1, p2 = paths.read_path_file(o, iteration, self.traffic_class_name)
+        self.assertIsInstance(p1, pd.DataFrame)
+        self.assertIsInstance(p2, pd.DataFrame)
+        p_5_18 = paths.get_path_for_destination_from_files(p1, p2, d)
+        self.assertEqual(list(path_5_18), list(p_5_18))
