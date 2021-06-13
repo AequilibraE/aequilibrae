@@ -23,7 +23,7 @@ class SelectLink(object):
         name = 'assignment_results_table_name"
         sl = SelectLink(name, matrices)
         link_ids_for_sl = [111]
-        sl.run_select_link_analysis(link_id_for_sl)
+        select_link_matrix = sl.run_select_link_analysis(link_id_for_sl)
     """
 
     def __init__(self, table_name: str, demand_matrices: Dict) -> None:
