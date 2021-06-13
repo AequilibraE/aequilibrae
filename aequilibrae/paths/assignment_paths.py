@@ -102,7 +102,7 @@ class AssignmentPaths(object):
             )
         return compressed_graph_correspondences
 
-    def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_path_file_names(self, origin: int, iteration: int, traffic_class_id: str) -> (str, str):
         # TODO: make file ending and read method type dependent, info now stored in assignment results table
         possible_traffic_classes = list(filter(lambda x: x.__id__ == traffic_class_id, self.classes))
         assert (
@@ -114,6 +114,11 @@ class AssignmentPaths(object):
         )
         path_o_f = os.path.join(base_dir, f"o{origin}.feather")
         path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
+        return path_o_f, path_o_index_f
+
+    def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        # TODO: make file ending and read method type dependent, info now stored in assignment results table
+        path_o_f, path_o_index_f = self.get_path_file_names(origin, iteration, traffic_class_id)
         path_o = pd.read_feather(path_o_f)
         path_o_index = pd.read_feather(path_o_index_f)
         return path_o, path_o_index

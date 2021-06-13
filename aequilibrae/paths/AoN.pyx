@@ -24,9 +24,33 @@ include 'bpr.pyx'
 include 'conical.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
-
+include 'select_link.pyx'
 
 from .__version__ import binary_version as VERSION_COMPILED
+
+def select_link_for_origin(link_ids, num_links, origin_index, path_file, index_file,
+                           demand, weight, select_link_matrix):
+    cdef long long o_index = origin_index
+    cdef double iteration_weight = weight
+    cdef double [:] demand_view = demand.matrix_view[origin_index, :]
+
+    path_links_numpy = feather.read_feather(path_file).to_numpy().flatten()
+    index_numpy = feather.read_feather(index_file).to_numpy().flatten()
+    cdef long long [:] path_links = path_links_numpy[:]
+    cdef long long [:] path_index = index_numpy[:]
+    cdef long long path_links_size = path_links_numpy.shape[0]
+    cdef long long path_index_size = index_numpy.shape[0]
+    cdef long long link_id
+    cdef double [:] select_link_view
+
+    # TODO (Jan 13/6/21): move this inside the c++ code and parallelis over links
+    for i in range(num_links):
+        link_id = link_ids[i]
+        select_link_view = select_link_matrix[origin_index, :, i]
+
+        select_link_for_origin_cython(link_id, o_index, path_links, path_links_size, path_index,
+                                      path_index_size, demand_view, iteration_weight, select_link_view)
+
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links

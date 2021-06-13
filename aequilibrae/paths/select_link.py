@@ -155,18 +155,16 @@ class SelectLink(object):
                     elif not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
                         continue
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
+
                     # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                    path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
+                    # path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
 
                     for comp_link_id in comp_link_ids:
                         # these are the indexes of the path file where the SLs appear, so need to turn these into
                         # destinations by looking up the values in the path file
                         idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.to_numpy()
                         destinations_this_o_and_iter = np.array(
-                            [
-                                path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] > x].index.min()
-                                for x in idx_to_look_up
-                            ]
+                            [path_o_index.loc[path_o_index["data"] > x].index.min() for x in idx_to_look_up]
                         )
                         destinations_this_o_and_iter = destinations_this_o_and_iter.astype(int)
 
@@ -187,5 +185,5 @@ class SelectLink(object):
                                         origin, destinations_this_o_and_iter, :
                                     ]
                                 )
-        logger.info(f"Select link analysis for links {link_ids} finished.")
+        # logger.info(f"Select link analysis for links {link_ids} finished.")
         return select_link_matrices
