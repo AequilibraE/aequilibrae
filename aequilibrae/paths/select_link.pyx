@@ -1,18 +1,6 @@
 # distutils: language = c++
 
 from libcpp.vector cimport vector
-from cython.operator cimport dereference as deref
-from cython.parallel import prange
-
-import pyarrow as pa
-cimport pyarrow as pa
-
-import pyarrow.parquet as pq
-import pyarrow.feather as feather
-
-import numpy as np
-cimport numpy as np
-np.import_array()
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

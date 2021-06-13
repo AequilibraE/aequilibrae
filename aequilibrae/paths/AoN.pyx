@@ -17,6 +17,7 @@ import os
 # cython: language_level=3
 cimport numpy as np
 from libcpp cimport bool
+from cython.parallel import prange
 
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
@@ -29,7 +30,7 @@ include 'select_link.pyx'
 from .__version__ import binary_version as VERSION_COMPILED
 
 def select_link_for_origin(link_ids, num_links, origin_index, path_file, index_file,
-                           demand, weight, select_link_matrix):
+                           demand, weight, select_link_matrix, cores):
     cdef long long o_index = origin_index
     cdef double iteration_weight = weight
     cdef double [:] demand_view = demand.matrix_view[origin_index, :]
@@ -41,15 +42,18 @@ def select_link_for_origin(link_ids, num_links, origin_index, path_file, index_f
     cdef long long path_links_size = path_links_numpy.shape[0]
     cdef long long path_index_size = index_numpy.shape[0]
     cdef long long link_id
-    cdef double [:] select_link_view
+    cdef double [:, :] select_link_view = select_link_matrix[origin_index, :, :]
 
-    # TODO (Jan 13/6/21): move this inside the c++ code and parallelis over links
-    for i in range(num_links):
-        link_id = link_ids[i]
-        select_link_view = select_link_matrix[origin_index, :, i]
+    cdef long long [:] link_ids_c = link_ids
+    cdef long long num_links_c = num_links
+    cdef long long i
+    cdef long long num_cores = cores
 
+    # TODO (Jan 13/6/21): move this inside the c++ code and parallelise over links
+    for i in prange(num_links_c, nogil=True, num_threads=num_cores):
+        link_id = link_ids_c[i]
         select_link_for_origin_cython(link_id, o_index, path_links, path_links_size, path_index,
-                                      path_index_size, demand_view, iteration_weight, select_link_view)
+                                      path_index_size, demand_view, iteration_weight, select_link_view[:,i])
 
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):

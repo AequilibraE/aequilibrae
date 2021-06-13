@@ -29,6 +29,7 @@ class SelectLinkParallel(object):
         self.demand_weights = None
         # FIXME (Jan 21/4/21): this is MSA only atm, needs to be implemented for CFW and BFW
         self._calculate_demand_weights()
+        self.cores = mp.cpu_count()
 
     def _calculate_demand_weights(self) -> None:
         """Each iteration of traffic assignment contributes a certain fraction to the total solutions. This method
@@ -57,6 +58,32 @@ class SelectLinkParallel(object):
             )
 
         return select_link_matrices
+
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        Args:
+            *cores* (:obj:`int`): Number of cores to be used in computation
+        """
+
+        if not isinstance(cores, int):
+            raise ValueError("Number of cores needs to be an integer")
+
+        if cores < 0:
+            self.cores = max(1, mp.cpu_count() + cores)
+        elif cores == 0:
+            self.cores = mp.cpu_count()
+        elif cores > 0:
+            cores = min(mp.cpu_count(), cores)
+            if self.cores != cores:
+                self.cores = cores
 
     def run_select_link_analysis(self, link_ids: List[int]) -> Dict[str, np.array]:
         """" Select link analysis for a provided set of links. Processing is done per iteration, class, and origin.
@@ -91,6 +118,7 @@ class SelectLinkParallel(object):
                         self.demand_matrices[class_id],
                         weight,
                         sl_mat,
+                        self.cores,
                     )
         # logger.info(f"Select link analysis for links {link_id} finished.")
         return select_link_matrices
