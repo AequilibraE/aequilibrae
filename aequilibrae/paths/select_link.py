@@ -142,12 +142,19 @@ class SelectLink(object):
             weight = self.demand_weights[iteration - 1]  # zero based
             for c in self.classes:
                 class_id = c.__id__
-                # logger.info(f" Procesing class {class_id}")
+                logger.info(f" Procesing class {class_id}")
                 comp_link_ids = link_ids_simplified[class_id]
                 for origin in range(self.num_zones):
+                    if origin % 100 == 0:
+                        logger.info(f" Procesing origin {origin}")
                     # skip zero-demand origins
-                    if not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
-                        continue
+                    # TODO (Jan 13/6/21): this mess has to be cleaned up at some point, why do we have 2d matrices?
+                    if len(self.demand_matrices[class_id].matrix_view.shape) == 2:
+                        if not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :]):
+                            continue
+                    else:
+                        if not np.nansum(self.demand_matrices[class_id].matrix_view[origin, :, :]):
+                            continue
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
                     # drop disconnected zones (and intrazonal). Depends on index being ordered.
                     path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
