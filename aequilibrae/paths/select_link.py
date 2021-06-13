@@ -140,13 +140,13 @@ class SelectLink(object):
                 comp_link_ids = link_ids_simplified[class_id]
                 for origin in range(self.num_zones):
                     path_o, path_o_index = self.paths.read_path_file(origin, iteration, class_id)
+                    # drop disconnected zones (and intrazonal). Depends on index being ordered.
+                    path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
+
                     for comp_link_id in comp_link_ids:
                         # these are the indexes of the path file where the SLs appear, so need to turn these into
                         # destinations by looking up the values in the path file
                         idx_to_look_up = path_o.loc[path_o.data == comp_link_id].index.to_numpy()
-
-                        # drop disconnected zones (and intrazonal). Depends on index being ordered.
-                        path_o_index_no_zeros = path_o_index.drop_duplicates(keep="first")
                         destinations_this_o_and_iter = np.array(
                             [
                                 path_o_index_no_zeros.loc[path_o_index_no_zeros["data"] > x].index.min()
