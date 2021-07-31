@@ -8,6 +8,7 @@ import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
+from aequilibrae.utils import WorkerThread
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
@@ -27,7 +28,7 @@ if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 
-class Network:
+class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
