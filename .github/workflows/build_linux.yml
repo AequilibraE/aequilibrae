@@ -29,6 +29,14 @@ jobs:
         mkdir -p dist
         cp -v ./*-manylinux*.whl dist/
 
+    - name: Stores artifacts along with the workflow result
+      if: ${{ github.event_name == 'push'}}
+      uses: actions/upload-artifact@v2
+      with:
+        name: library
+        path: dist/*.whl
+        if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+
     - name: Publish wheels to PyPI
       if: ${{ github.event_name == 'release'}}
       env:

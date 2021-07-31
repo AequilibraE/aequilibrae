@@ -25,6 +25,14 @@ jobs:
       run: |
         python setup.py sdist bdist_wheel
 
+    - name: Stores artifacts along with the workflow result
+      if: ${{ github.event_name == 'push'}}
+      uses: actions/upload-artifact@v2
+      with:
+        name: library
+        path: dist/*.whl
+        if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+
     - name: Publish
       if: ${{ github.event_name == 'release'}}
       env:
