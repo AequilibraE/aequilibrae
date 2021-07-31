@@ -2,6 +2,7 @@ import math
 from warnings import warn
 from sqlite3 import Connection as sqlc
 from typing import Dict
+import importlib.util as iutil
 import numpy as np
 import pandas as pd
 import shapely.wkb
@@ -20,11 +21,18 @@ from aequilibrae.parameters import Parameters
 from aequilibrae import logger
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
+
 
 class Network:
     """
     Network class. Member of an AequilibraE Project
     """
+    if pyqt:
+        netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
@@ -102,13 +110,13 @@ class Network:
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -211,13 +219,22 @@ class Network:
                     polygons.append(box)
         logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
+        if pyqt:
+            self.downloader.downloading.connect(self.signal_handler)
+
         self.downloader.doWork()
 
         logger.info("Building Network")
         self.builder = OSMBuilder(self.downloader.json, self.source)
+        if pyqt:
+            self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
 
         logger.info("Network built successfully")
+
+    def signal_handler(self, val):
+        if pyqt:
+            self.netsignal.emit(val)
 
     def build_graphs(self, fields: list = None, modes: list = None) -> None:
         """Builds graphs for all modes currently available in the model
