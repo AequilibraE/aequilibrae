@@ -41,6 +41,7 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
+        WorkerThread.__init__(self, None)
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
