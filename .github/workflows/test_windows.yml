@@ -30,7 +30,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: [ '3.6', '3.7', '3.8' ]
+        python-version: [ '3.6', '3.7', '3.8']
         architecture: ['x64']
       max-parallel: 20
     steps:
@@ -46,7 +46,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel
         pip install -r requirements.txt
-        pip install pytest
+        pip install pytest openmatrix
 
     - name: Download spatialite
       run: |
