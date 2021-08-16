@@ -33,6 +33,7 @@ pyshp = "*"
 cython = "*"
 scipy = "*"
 openmatrix = "*"
+rtree = "*"
 
 [scripts]
 notebook = "jupyter notebook"
