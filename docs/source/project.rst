@@ -15,7 +15,7 @@ variety of data types and uses.
 
 The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
 with all the GIS capability supported by
-`SpatiaLite <https://www.gaia-gis.it/fossil/libspatialite/index>`_. The
+`SpatiaLite <http://www.gaia-gis.it/gaia-sins/>`_. The
 impressive performance, portability, self containment and open-source character
 of these two pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
@@ -23,10 +23,9 @@ Since working with Spatialite is not just a matter of *pip installing* a
 package, please refer to :ref:`dependencies`.
 
 .. note::
-   This portion of AequilibraE is under intense development, and important
-   changes to the project structure and the API should be expected until at
-   least version 0.7.X. Versions 0.8 and beyond should see a much more stable
-   API, with new capabilities being incorporated in each release.
+   AequilibraE 0.7.0 brought and important changes to the project structure and
+   the API. Versions 0.8 and beyond should see a much more stable API, with new
+   capabilities being incorporated after that.
 
 Project structure
 -----------------
