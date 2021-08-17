@@ -4,6 +4,9 @@ Contributing to AequilibraE
 This page presents some initial instructions on how to setup your system to start contributing to AequilibraE and lists
 the requirements for all pull-requests to be merged into master.
 
+.. note::
+   The recommendations on this page are current as of August 2021.
+
 Software Design and requirements
 --------------------------------
 
@@ -25,7 +28,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.6, 3.7, 3.8 and 3.9 but we recommend using Python 3.8 for development.
+AequilibraE is currently tested for Python 3.6, 3.7, 3.8 and 3.9, but we recommend using Python 3.8 for development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
@@ -40,17 +43,18 @@ Non-Windows
 Windows
 ~~~~~~~
 
-Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated
-command prompt.
+Make sure to clone the AequilibraE repository and run the following from within
+that cloned repo using an elevated command prompt.
 
-Python 3.7 needs to be installed, and the following instructions assume you are using `Chocolatey
+Python 3.8 (or whatever version you chose) needs to be installed, and the
+following instructions assume you are using `Chocolatey
 <https://chocolatey.org/>`_ as a package manager.
 ::
 
-    cinst python3 --version 3.7
+    cinst python3 --version 3.8
     cinst python
 
-    set PATH=C:\Python37;%PATH%
+    set PATH=C:\Python38;%PATH%
     python -m pip install pipenv
     virtualenv .venv #Only if you want to save the virtual environment in the same folder
     python -m pipenv install --dev
@@ -96,7 +100,10 @@ GitHub has a nice visual explanation on how collaboration is done `GitHub Flow
 
 * The master branch contains the latest working/release version of AequilibraE
 * Work is done in an issue/feature branch (or a fork) and then pushed to a new brach
-* The `test system <www.travis.org>`_ automatically runs unit tests
+* Automated testing is run using Github Actions. All tests must pass
+    * Unit testing
+    * Build/packaging tests
+    * Documentation building test
 * If the tests pass, then a manual pull request can be approved to merge into master
 * The master branch is protected and therefore can only be written to after the code has been reviewed and approved
 * No individual has the privileges to push to the master branch
@@ -174,7 +181,7 @@ Releases
 ~~~~~~~~~
 
 AequilibraE releases are automatically  uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (6 to 12 times per year).
+<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (2 to 6 times per year).
 
 
 Finally
