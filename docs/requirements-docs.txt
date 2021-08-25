@@ -12,4 +12,3 @@ pillow
 matplotlib
 folium
 geopandas
-urllib
