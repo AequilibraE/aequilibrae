@@ -114,7 +114,7 @@ links.refresh_fields()
 
 # %%
 ## We can now add all links to the project!
-
+print('start adding')
 for idx, record in gdf.iterrows():
     new_link = links.new()
 
@@ -125,55 +125,75 @@ for idx, record in gdf.iterrows():
     new_link.link_type = record.link_type
     new_link.name = record.name
     new_link.geometry = record.geometry
-
     new_link.save()
 
-
-# %%
-# We grab all the links data as a Pandas dataframe so we can process it easier
-links = project.network.links.data
-
-# We create a Folium layer
-network_links = folium.FeatureGroup("links")
-
-# We do some Python magic to transform this dataset into the format required by Folium
-# We are only getting link_id and link_type into the map, but we could get other pieces of info as well
-for i, row in links.iterrows():
-    points = row.geometry.to_wkt().replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
-    points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
-    # we need to take from x/y to lat/long
-    points = [[x[1], x[0]] for x in eval(points)]
-
-    line = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.link_type}',
-                                         color='blue', weight=10).add_to(network_links)
-
-# %%
-# We get the center of the region we are working with some SQL magic
-curr = project.conn.cursor()
-curr.execute('select avg(xmin), avg(ymin) from idx_links_geometry')
-long, lat = curr.fetchone()
-
-# %%
-map_osm = folium.Map(location=[lat, long], zoom_start=14)
-network_links.add_to(map_osm)
-folium.LayerControl().add_to(map_osm)
-map_osm
-
-# %%
-project.close()
-
-# %%
-# **Don't know Queluz? Here is a picture of its most impressive urban structure**
-
-# %%
-from PIL import Image
-import matplotlib.pyplot as plt
-
-pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
-pic_local = join(fldr, 'queluz.jpg')
-urllib.request.urlretrieve(pic, pic_local)
-
-img = Image.open(pic_local)
-plt.imshow(img)
+    # We only do this to clear memory
+    links.refresh()
 
 
+# # %%
+# # Let's load it on KeplerGL ?
+# from keplergl import KeplerGl
+#
+# # We need a little trick to load the project spatialite in GeoPandas
+# sql = "SELECT link_id, name, link_type, modes, Hex(ST_AsBinary(geometry)) geometry FROM links;"
+# links_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
+#
+# # Let's add the nodes too for good measure
+# sql = "SELECT node_id, Hex(ST_AsBinary(geometry)) geometry FROM nodes;"
+# nodes_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
+#
+# # Then we can create the map, add the layer and display it
+# map_1 = KeplerGl(height=400)
+# map_1.add_data(links_layer, 'links')
+# map_1.add_data(nodes_layer, 'nodes')
+# map_1
+#
+#
+# # %%
+# # We grab all the links data as a Pandas dataframe so we can process it easier
+# links = project.network.links.data
+#
+# # We create a Folium layer
+# network_links = folium.FeatureGroup("links")
+#
+# # We do some Python magic to transform this dataset into the format required by Folium
+# # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
+# for i, row in links.iterrows():
+#     points = row.geometry.to_wkt().replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
+#     points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
+#     # we need to take from x/y to lat/long
+#     points = [[x[1], x[0]] for x in eval(points)]
+#
+#     line = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.link_type}',
+#                                          color='blue', weight=10).add_to(network_links)
+#
+# # %%
+# # We get the center of the region we are working with some SQL magic
+# curr = project.conn.cursor()
+# curr.execute('select avg(xmin), avg(ymin) from idx_links_geometry')
+# long, lat = curr.fetchone()
+#
+# # %%
+# map_osm = folium.Map(location=[lat, long], zoom_start=14)
+# network_links.add_to(map_osm)
+# folium.LayerControl().add_to(map_osm)
+# map_osm
+#
+# # %%
+# project.close()
+#
+# # %%
+# # **Don't know Queluz? Here is a picture of its most impressive urban structure**
+#
+# # %%
+# from PIL import Image
+# import matplotlib.pyplot as plt
+#
+# pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
+# pic_local = join(fldr, 'queluz.jpg')
+# urllib.request.urlretrieve(pic, pic_local)
+#
+# img = Image.open(pic_local)
+# plt.imshow(img)
+#
