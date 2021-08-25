@@ -62,49 +62,49 @@ for i, ltype in enumerate(types_to_add):
     # new_type.description = 'Your custom description here if you have one'
     new_type.save()
 
-# %%
-# We need to use a similar process for modes
-
-md = project.network.modes
-md_dict = md.all_modes()
-existing_modes = {k: v.mode_name for k, v in md_dict.items()}
-
-# %%
-# Now let's see the modes we have in the network that we DON'T have already in
-# the model
-
-# We get all the unique mode combinations and merge into a single string
-all_variations_string = ''.join(gdf.modes.unique())
-
-# We then get all the unique modes in that string above
-all_modes = set(all_variations_string)
-
-# This would all fit nicely in a single line of code, btw. Try it!
-
-# %%
-# Now let's add any new mode to the project
-
-modes_to_add = [mode for mode in all_modes if mode not in existing_modes]
-for i, mode_id in enumerate(modes_to_add):
-    new_mode = md.new(mode_id)
-    # You would need to figure out the right name for each one, but this will do
-    new_mode.mode_name = f'Mode_from_original_data_{mode_id}'
-    # new_type.description = 'Your custom description here if you have one'
-
-    # It is a little different, because you need to add it to the project
-    project.network.modes.add(new_mode)
-    new_mode.save()
-
-# %%
-## We cannot use the existing link_id, so we create a new field to not loose
-# this information
-links = project.network.links
-link_data = links.fields()
-# Create the field and add a good description for it
-link_data.add('source_id', 'link_id from the data source')
-
-# We need to refresh the fields so the adding method can see it
-links.refresh_fields()
+# # %%
+# # We need to use a similar process for modes
+#
+# md = project.network.modes
+# md_dict = md.all_modes()
+# existing_modes = {k: v.mode_name for k, v in md_dict.items()}
+#
+# # %%
+# # Now let's see the modes we have in the network that we DON'T have already in
+# # the model
+#
+# # We get all the unique mode combinations and merge into a single string
+# all_variations_string = ''.join(gdf.modes.unique())
+#
+# # We then get all the unique modes in that string above
+# all_modes = set(all_variations_string)
+#
+# # This would all fit nicely in a single line of code, btw. Try it!
+#
+# # %%
+# # Now let's add any new mode to the project
+#
+# modes_to_add = [mode for mode in all_modes if mode not in existing_modes]
+# for i, mode_id in enumerate(modes_to_add):
+#     new_mode = md.new(mode_id)
+#     # You would need to figure out the right name for each one, but this will do
+#     new_mode.mode_name = f'Mode_from_original_data_{mode_id}'
+#     # new_type.description = 'Your custom description here if you have one'
+#
+#     # It is a little different, because you need to add it to the project
+#     project.network.modes.add(new_mode)
+#     new_mode.save()
+#
+# # %%
+# ## We cannot use the existing link_id, so we create a new field to not loose
+# # this information
+# links = project.network.links
+# link_data = links.fields()
+# # Create the field and add a good description for it
+# link_data.add('source_id', 'link_id from the data source')
+#
+# # We need to refresh the fields so the adding method can see it
+# links.refresh_fields()
 
 #
 # # %%
