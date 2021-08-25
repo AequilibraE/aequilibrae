@@ -1,6 +1,6 @@
 """
-Project from a link layer in Geopackage
-=======================================
+Project from a link layer from GeoPandas
+========================================
 
 On this example we show how to create an empty project and populate it with a
 network coming from a link layer we load with GeoPandas. It can easily be
@@ -29,8 +29,8 @@ project.new(fldr)
 # Now we obtain the link data for our example (in this case from a link layer
 # we will download from the AequilibraE website)
 # With data, we load it on GeoPandas
-dest_path = join(fldr, "queluz.gpkg")
-urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.gpkg', dest_path)
+dest_path = join(fldr, "queluz.csv")
+urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.csv', dest_path)
 
 gdf = gpd.read_file(dest_path)
 
@@ -109,7 +109,6 @@ links.refresh_fields()
 
 # %%
 ## We can now add all links to the project!
-print('start adding')
 for idx, record in gdf.iterrows():
     new_link = links.new()
 
