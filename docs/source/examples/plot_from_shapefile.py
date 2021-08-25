@@ -6,7 +6,7 @@ On this example we show how to create an empty project and populate it with a
 network coming from a link layer we load with GeoPandas. It can easily be
 replaced with a different form of loading the data
 
-We use Folium to visualize the resulting network
+We use KeplerGL to visualize the resulting network
 """
 
 # %%
