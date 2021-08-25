@@ -106,24 +106,24 @@ link_data.add('source_id', 'link_id from the data source')
 # We need to refresh the fields so the adding method can see it
 links.refresh_fields()
 
-
-# %%
-## We can now add all links to the project!
-for idx, record in gdf.iterrows():
-    new_link = links.new()
-
-    # Now let's add all the fields we had
-    new_link.source_id = record.link_id
-    new_link.direction = record.direction
-    new_link.modes = record.modes
-    new_link.link_type = record.link_type
-    new_link.name = record.name
-    new_link.geometry = record.geometry
-    new_link.save()
-
-    # We only do this to clear memory
-    links.refresh()
-
+#
+# # %%
+# ## We can now add all links to the project!
+# for idx, record in gdf.iterrows():
+#     new_link = links.new()
+#
+#     # Now let's add all the fields we had
+#     new_link.source_id = record.link_id
+#     new_link.direction = record.direction
+#     new_link.modes = record.modes
+#     new_link.link_type = record.link_type
+#     new_link.name = record.name
+#     new_link.geometry = record.geometry
+#     new_link.save()
+#
+#     # We only do this to clear memory
+#     links.refresh()
+#
 project.close()
 # # %%
 # # Let's load it on KeplerGL ?
