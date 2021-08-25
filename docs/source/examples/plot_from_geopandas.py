@@ -97,8 +97,9 @@ for i, mode_id in enumerate(modes_to_add):
     new_mode.save()
 
 # %%
-## We cannot use the existing link_id, so we create a new field to not loose
+# We cannot use the existing link_id, so we create a new field to not loose
 # this information
+
 links = project.network.links
 link_data = links.fields()
 # Create the field and add a good description for it
@@ -106,7 +107,6 @@ link_data.add('source_id', 'link_id from the data source')
 
 # We need to refresh the fields so the adding method can see it
 links.refresh_fields()
-
 
 # %%
 ## We can now add all links to the project!
@@ -122,27 +122,24 @@ for idx, record in df.iterrows():
     new_link.geometry = load_wkt(record.WKT)
     new_link.save()
 
-    # We only do this to clear memory
-    links.refresh()
-#
-project.close()
-# # %%
-# # Let's load it on KeplerGL ?
-# from keplergl import KeplerGl
-#
-# # We need a little trick to load the project spatialite in GeoPandas
-# sql = "SELECT link_id, name, link_type, modes, Hex(ST_AsBinary(geometry)) geometry FROM links;"
-# links_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
-#
-# # Let's add the nodes too for good measure
-# sql = "SELECT node_id, Hex(ST_AsBinary(geometry)) geometry FROM nodes;"
-# nodes_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
-#
-# # Then we can create the map, add the layer and display it
-# map_1 = KeplerGl(height=400)
-# map_1.add_data(links_layer, 'links')
-# map_1.add_data(nodes_layer, 'nodes')
-# map_1
+# %%
+# Let's load it on KeplerGL ?
+
+from keplergl import KeplerGl
+
+# We need a little trick to load the project spatialite in GeoPandas
+sql = "SELECT link_id, name, link_type, modes, Hex(ST_AsBinary(geometry)) geometry FROM links;"
+links_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
+
+# Let's add the nodes too for good measure
+sql = "SELECT node_id, Hex(ST_AsBinary(geometry)) geometry FROM nodes;"
+nodes_layer = gpd.GeoDataFrame.from_postgis(sql, project.conn, geom_col="geometry")
+
+# Then we can create the map, add the layer and display it
+map_1 = KeplerGl(height=400)
+map_1.add_data(links_layer, 'links')
+map_1.add_data(nodes_layer, 'nodes')
+map_1
 #
 #
 # # %%
@@ -175,20 +172,19 @@ project.close()
 # folium.LayerControl().add_to(map_osm)
 # map_osm
 #
-# # %%
-# project.close()
+# %%
+project.close()
 #
-# # %%
-# # **Don't know Queluz? Here is a picture of its most impressive urban structure**
-#
-# # %%
-# from PIL import Image
-# import matplotlib.pyplot as plt
-#
-# pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
-# pic_local = join(fldr, 'queluz.jpg')
-# urllib.request.urlretrieve(pic, pic_local)
-#
-# img = Image.open(pic_local)
-# plt.imshow(img)
-#
+# %%
+# **Don't know Queluz? Here is a picture of its most impressive urban structure**
+
+from PIL import Image
+import matplotlib.pyplot as plt
+
+pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
+pic_local = join(fldr, 'queluz.jpg')
+urllib.request.urlretrieve(pic, pic_local)
+
+img = Image.open(pic_local)
+plt.imshow(img)
+
