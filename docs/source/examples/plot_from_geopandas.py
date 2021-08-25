@@ -33,11 +33,11 @@ dest_path = join(fldr, "queluz.gpkg")
 urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.gpkg', dest_path)
 
 gdf = gpd.read_file(dest_path)
-
-# %%
-# Let's see what we have here
-
-gdf.head()
+#
+# # %%
+# # Let's see what we have here
+#
+# gdf.head()
 
 # %%
 # Let's see if we have to add new link_types to the model before we add links
