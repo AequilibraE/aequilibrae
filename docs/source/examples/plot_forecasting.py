@@ -318,7 +318,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR")
 
 # %%
 
-demand = proj_matrices.get_matrix("demand_power_modeled")
+demand = proj_matrices.get_matrix("demand_ipfd")
 
 # let's see what is the core we ended up getting. It should be 'gravity'
 demand.names
@@ -326,7 +326,7 @@ demand.names
 # %%
 
 # Let's use the IPF matrix
-demand.computational_view("gravity")
+demand.computational_view("matrix")
 
 assig = TrafficAssignment()
 
@@ -347,8 +347,8 @@ assig.set_time_field("free_flow_time")
 assig.set_algorithm("bfw")
 
 # since I haven't checked the parameters file, let's make sure convergence criteria is good
-assig.max_iter = 1000
-assig.rgap_target = 0.0001
+assig.max_iter = 500
+assig.rgap_target = 0.00001
 
 assig.execute()  # we then execute the assignment
 
