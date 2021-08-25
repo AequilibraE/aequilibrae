@@ -4,7 +4,6 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae import Project
 import geopandas as gpd
-import folium
 import urllib.request
 from string import ascii_lowercase
 
