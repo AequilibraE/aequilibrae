@@ -15,7 +15,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae import Project
-import geopandas as gpd
+import pandas as pd
 import folium
 import urllib.request
 from string import ascii_lowercase
@@ -32,7 +32,7 @@ project.new(fldr)
 dest_path = join(fldr, "queluz.csv")
 urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.csv', dest_path)
 
-gdf = gpd.read_file(dest_path)
+df = pd.read_csv(dest_path)
 
 # %%
 # # Let's see if we have to add new link_types to the model before we add links

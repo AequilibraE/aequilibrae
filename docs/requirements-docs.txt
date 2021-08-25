@@ -11,4 +11,4 @@ nbsphinx
 pillow
 matplotlib
 folium
-geopandas
+keplergl
