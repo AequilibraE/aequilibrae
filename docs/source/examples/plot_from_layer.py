@@ -1,10 +1,10 @@
 """
-Project from a link layer from GeoPandas
-========================================
+Project from a link layer from a link layer
+===========================================
 
 On this example we show how to create an empty project and populate it with a
-network coming from a link layer we load with GeoPandas. It can easily be
-replaced with a different form of loading the data
+network coming from a link layer we load from a text file. It can easily be
+replaced with a different form of loading the data (GeoPandas, for example)
 
 We use Folium to visualize the resulting network
 """
@@ -29,7 +29,7 @@ project.new(fldr)
 # %%
 # Now we obtain the link data for our example (in this case from a link layer
 # we will download from the AequilibraE website)
-# With data, we load it on GeoPandas
+# With data, we load it on Pandas
 dest_path = join(fldr, "queluz.csv")
 urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.csv', dest_path)
 
