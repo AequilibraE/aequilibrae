@@ -11,3 +11,5 @@ nbsphinx
 pillow
 matplotlib
 folium
+geopandas
+urllib
