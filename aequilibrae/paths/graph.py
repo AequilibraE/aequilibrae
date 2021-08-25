@@ -139,7 +139,7 @@ class Graph(object):
 
     def __build_compressed_graph(self):
         # Build link index
-        link_idx = np.empty(self.network.link_id.max() + 1).astype(np.int)
+        link_idx = np.empty(self.network.link_id.max() + 1).astype(int)
         link_idx[self.network.link_id] = np.arange(self.network.shape[0])
 
         nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
@@ -163,16 +163,16 @@ class Graph(object):
         # We keep all centroids for sure
         counts[self.centroids] = 999
 
-        truth = (counts == 2).astype(np.int)
+        truth = (counts == 2).astype(int)
         link_edge = truth[self.network.a_node.values] + truth[self.network.b_node.values]
         link_edge = self.network.link_id.values[link_edge == 1]
 
         simplified_links = np.repeat(-1, self.network.link_id.max() + 1)
-        simplified_directions = np.zeros(self.network.link_id.max() + 1, np.int)
+        simplified_directions = np.zeros(self.network.link_id.max() + 1, int)
 
-        compressed_dir = np.zeros(self.network.link_id.max() + 1, np.int)
-        compressed_a_node = np.zeros(self.network.link_id.max() + 1, np.int)
-        compressed_b_node = np.zeros(self.network.link_id.max() + 1, np.int)
+        compressed_dir = np.zeros(self.network.link_id.max() + 1, int)
+        compressed_a_node = np.zeros(self.network.link_id.max() + 1, int)
+        compressed_b_node = np.zeros(self.network.link_id.max() + 1, int)
 
         slink = 0
         major_nodes = {}
@@ -266,7 +266,7 @@ class Graph(object):
                 "link_id": np.arange(simplified_directions.shape[0]),
                 "link_direction": simplified_directions,
                 "compressed_link": simplified_links,
-                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(np.int),
+                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(int),
             }
         )
 
@@ -594,7 +594,7 @@ class Graph(object):
                 raise ValueError(f"could not find field {field} in the network array")
 
         # Uniqueness of the id
-        link_ids = self.network["link_id"].astype(np.int)
+        link_ids = self.network["link_id"].astype(int)
         if link_ids.shape[0] != np.unique(link_ids).shape[0]:
             raise ValueError('"link_id" field not unique')
 

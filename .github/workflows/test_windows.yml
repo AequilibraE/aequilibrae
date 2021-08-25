@@ -16,9 +16,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel
           pip install -r requirements.txt
-          pip install flake8
+          pip install -r test_requirements.txt
 
       - name: Lint with flake8
         run: |
@@ -44,9 +43,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel
         pip install -r requirements.txt
-        pip install pytest openmatrix
+        pip install -r test_requirements.txt
 
     - name: Download spatialite
       run: |
@@ -60,3 +58,7 @@ jobs:
         python setup_Assignment.py build_ext --inplace
         cd ..
         cd ..
+
+    - name: Runs test
+      run: |
+        python -m pytest
