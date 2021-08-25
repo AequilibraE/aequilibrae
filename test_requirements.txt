@@ -5,6 +5,5 @@ pytest-cov
 coveralls
 flake8
 tables
-geopandas
 wheel
 openmatrix
