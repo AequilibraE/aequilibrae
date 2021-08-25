@@ -35,32 +35,32 @@ urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.csv', dest_path)
 gdf = gpd.read_file(dest_path)
 
 # %%
-# Let's see if we have to add new link_types to the model before we add links
-# The links we have in the data are:
-link_types = gdf.link_type.unique()
-
-# %%
-# And the existing link types are
-lt = project.network.link_types
-lt_dict = lt.all_types()
-existing_types = [ltype.link_type for ltype in lt_dict.values()]
-
-# We could also get it directly from the project database
-# existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
-
-
-# %%
-# We add the link types that do not exist yet
-# The trickier part is to choose a unique link type ID for each link type
-# You might want to tailor the link type for your use, but here we get letters
-# in alphabetical order
-
-types_to_add = [ltype for ltype in link_types if ltype not in existing_types]
-for i, ltype in enumerate(types_to_add):
-    new_type = lt.new(ascii_lowercase[i])
-    new_type.link_type = ltype
-    # new_type.description = 'Your custom description here if you have one'
-    new_type.save()
+# # Let's see if we have to add new link_types to the model before we add links
+# # The links we have in the data are:
+# link_types = gdf.link_type.unique()
+#
+# # %%
+# # And the existing link types are
+# lt = project.network.link_types
+# lt_dict = lt.all_types()
+# existing_types = [ltype.link_type for ltype in lt_dict.values()]
+#
+# # We could also get it directly from the project database
+# # existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
+#
+#
+# # %%
+# # We add the link types that do not exist yet
+# # The trickier part is to choose a unique link type ID for each link type
+# # You might want to tailor the link type for your use, but here we get letters
+# # in alphabetical order
+#
+# types_to_add = [ltype for ltype in link_types if ltype not in existing_types]
+# for i, ltype in enumerate(types_to_add):
+#     new_type = lt.new(ascii_lowercase[i])
+#     new_type.link_type = ltype
+#     # new_type.description = 'Your custom description here if you have one'
+#     new_type.save()
 
 # # %%
 # # We need to use a similar process for modes
