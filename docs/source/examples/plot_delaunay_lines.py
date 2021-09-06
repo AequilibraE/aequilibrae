@@ -62,3 +62,7 @@ for idx, lnk in df.iterrows():
     geo = lnk.geometry
     plt.plot(*geo.xy, color='blue', linewidth=4 * lnk.matrix_tot / max_vol)
 plt.show()
+
+# %%
+# Close the project
+project.close()
