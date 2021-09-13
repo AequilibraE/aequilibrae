@@ -62,7 +62,7 @@ class DelaunayAnalysis:
         edges.to_sql(DELAUNAY_TABLE, conn, index=False)
 
         # Now we create the geometries for the delaunay triangulation
-        conn.execute("select AddGeometryColumn( 'delaunay_network', 'geometry', 4326, 'LINESTRING', 'XY', 0);")
+        conn.execute(f"select AddGeometryColumn( '{DELAUNAY_TABLE}', 'geometry', 4326, 'LINESTRING', 'XY', 0);")
         conn.execute("CREATE UNIQUE INDEX unique_link_id_delaunay on delaunay_network(link_id)")
 
         node_geo_sql = '''INSERT INTO delaunay_network (link_id, geometry)
