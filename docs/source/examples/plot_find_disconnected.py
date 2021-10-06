@@ -4,23 +4,14 @@ Finding disconnected links
 
 On this example, we show how to find disconnected links in an AequilibraE network
 
-We use the Nauru example to find disconnected
-
-You are obviously welcome to create whatever zone system you would like, as long as
-you have the geometries for them. In that case, you can just skip the Hex bin computation
-part of this notebook.
-
-We also add centroid connectors to our network to make it a pretty complete example
+We use the Nauru example to find disconnected links
 """
 
-# %%
-# **What we want to create a zoning system like this**
-
-import matplotlib.pyplot as plt
 # %%
 import numpy as np
 import pandas as pd
 from PIL import Image
+import matplotlib.pyplot as plt
 
 img = Image.open("disconnected_network.png")
 plt.imshow(img)
