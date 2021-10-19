@@ -12,3 +12,4 @@ pillow
 matplotlib
 folium
 keplergl
+sphinx-git
