@@ -120,13 +120,13 @@ class AequilibraeMatrix(object):
         self.computational_view(names)
 
     def create_empty(
-        self,
-        file_name: str = None,
-        zones: int = None,
-        matrix_names: List[str] = None,
-        data_type: np.dtype = np.float64,
-        index_names: List[str] = None,
-        compressed: bool = False,
+            self,
+            file_name: str = None,
+            zones: int = None,
+            matrix_names: List[str] = None,
+            data_type: np.dtype = np.float64,
+            index_names: List[str] = None,
+            compressed: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -248,13 +248,13 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-        self,
-        file_path: str,
-        omx_path: str,
-        cores: List[str] = None,
-        mappings: List[str] = None,
-        robust: bool = True,
-        compressed: bool = False,
+            self,
+            file_path: str,
+            omx_path: str,
+            cores: List[str] = None,
+            mappings: List[str] = None,
+            robust: bool = True,
+            compressed: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -810,10 +810,10 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
 
     def copy(
-        self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
+            self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
     ) -> None:
         """
         Copies a list of cores (or all cores) from one matrix file to another one
@@ -981,7 +981,7 @@ class AequilibraeMatrix(object):
             raise ReferenceError("Matrix is not set for computation")
         if len(self.view_names) > 1:
             raise ValueError("Vector for a multi-core matrix is ambiguous")
-        return self.matrix_view.astype(np.float).sum(axis=axis)[:]
+        return self.matrix_view.astype(float).sum(axis=axis)[:]
 
     def __builds_hash__(self):
         return {self.index[i]: i for i in range(self.zones)}
