@@ -18,7 +18,7 @@ This page describes how to get started with AequilibraE.
 Installation
 ------------
 
-1. Install `Python 3.6, 3.7, 3.8 or 3.9 <www.python.org>`__. We recommend Python
+1. Install `Python 3.7, 3.8 or 3.9 <www.python.org>`__. We recommend Python
    3.8.
 
 2. Install AequilibraE
