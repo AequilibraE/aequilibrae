@@ -28,7 +28,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.6, 3.7, 3.8 and 3.9, but we recommend using Python 3.8 for development.
+AequilibraE is currently tested for Python 3.7, 3.8 and 3.9, but we recommend using Python 3.8 for development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
