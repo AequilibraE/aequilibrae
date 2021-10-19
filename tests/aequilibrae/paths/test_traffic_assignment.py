@@ -193,10 +193,13 @@ class TestTrafficAssignment(TestCase):
 
         ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
         node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        ref_node_correspondence.node_index = ref_node_correspondence.node_index.astype(node_correspondence.node_index.dtype)
         self.assertTrue(node_correspondence.equals(ref_node_correspondence))
 
         ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
         correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
+        for col in correspondence.columns:
+            ref_correspondence[col] = ref_correspondence[col].astype(correspondence[col].dtype)
         self.assertTrue(correspondence.equals(ref_correspondence))
 
         path_class_id = f"path_{class_id}"
