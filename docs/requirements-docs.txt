@@ -11,3 +11,4 @@ nbsphinx
 pillow
 matplotlib
 folium
+sphinx-git

@@ -58,6 +58,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx_autodoc_annotation",
     'sphinx.ext.autosummary',
+    'sphinx_git',
 ]
 
 sphinx_gallery_conf = {
