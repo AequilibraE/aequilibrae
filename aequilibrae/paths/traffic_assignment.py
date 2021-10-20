@@ -257,7 +257,7 @@ class TrafficAssignment(object):
             raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
         self.__dict__["vdf_parameters"] = par
         pars = []
-        if self.vdf.function in ["BPR", "CONICAL"]:
+        if self.vdf.function in ["BPR", "CONICAL", "INRETS"]:
             for p1 in ["alpha", "beta"]:
                 if p1 not in par:
                     raise ValueError(f"{p1} should exist in the set of parameters provided")

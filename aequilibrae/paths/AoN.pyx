@@ -4,7 +4,7 @@
  Purpose:    Implement shortest path and network loading routines
  Original Author:  Pedro Camargo (c@margo.co)
  Contributors:
- Last edited by: Pedro Camrgo
+ Last edited by: Arthur E.
  Website:    www.AequilibraE.com
  Repository:  https://github.com/AequilibraE/AequilibraE
  Created:    15/09/2013
@@ -22,6 +22,7 @@ from libcpp cimport bool
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'conical.pyx'
+include 'inrets.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 
