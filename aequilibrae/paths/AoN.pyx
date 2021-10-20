@@ -21,6 +21,7 @@ from libcpp cimport bool
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
+include 'bpr2.pyx'
 include 'conical.pyx'
 include 'inrets.pyx'
 include 'parallel_numpy.pyx'
