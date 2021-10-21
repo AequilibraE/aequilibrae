@@ -5,7 +5,7 @@ This page presents some initial instructions on how to setup your system to star
 the requirements for all pull-requests to be merged into master.
 
 .. note::
-   The recommendations on this page are current as of August 2021.
+   The recommendations on this page are current as of October 2021.
 
 Software Design and requirements
 --------------------------------
@@ -96,10 +96,28 @@ Contributing to AequilibraE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GitHub has a nice visual explanation on how collaboration is done `GitHub Flow
-<https://guides.github.com/introduction/flow>`_.  (For us,) The most important points there are:
+<https://guides.github.com/introduction/flow>`_.
 
-* The master branch contains the latest working/release version of AequilibraE
-* Work is done in an issue/feature branch (or a fork) and then pushed to a new brach
+In a nutshell:
+
+1. For the repository into your account
+2. Write your code
+3. Write your tests (and run them locally)
+4. Write documentation
+5. Issue a Pull request against the ``develop`` branch of AequilibraE
+
+In a more verbose way...
+
+* The ``master`` branch contains the latest release version of AequilibraE
+* The ``develop`` branch contains all new features and bug fixes that will be
+  included in the next release. It can be seen as a *release candidate*, so work is not often
+  performed in that branch.
+* Tests are automatically run on PR's, and thy do not need to be strictly passing for any
+  new feature to me merged into the ``develop`` branch, although you shouldn't expect your
+  PR to be accepted if it causes too make breaks, lacks tests or documentation
+* The project maintainers have absolute discretion to accept or reject PR's, but reasons
+  for refusing contributions will always be made clear on the PR's comments/review.
+* Work is done in an issue/feature branch (or a fork) and then pushed to a new branch
 * Automated testing is run using Github Actions. All tests must pass
     * Unit testing
     * Build/packaging tests
