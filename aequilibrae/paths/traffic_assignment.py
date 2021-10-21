@@ -8,7 +8,6 @@ import socket
 import numpy as np
 import pandas as pd
 from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
