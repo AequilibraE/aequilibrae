@@ -29,36 +29,36 @@ def delta_bpr(dbpr, link_flows, capacity, fftime, alpha, beta, cores):
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void bpr_cython(double[:] congested_time,
-                      double[:] link_flows,
-                      double [:] capacity,
-                      double [:] fftime,
-                      double[:] alpha,
-                      double [:] beta,
-                      int cores):
-  cdef long long i
-  cdef long long l = congested_time.shape[0]
+                    double[:] link_flows,
+                    double [:] capacity,
+                    double [:] fftime,
+                    double[:] alpha,
+                    double [:] beta,
+                    int cores):
+    cdef long long i
+    cdef long long l = congested_time.shape[0]
 
-  for i in prange(l, nogil=True, num_threads=cores):
-      if link_flows[i] > 0:
-        congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
-      else:
-        congested_time[i] = fftime[i]
+    for i in prange(l, nogil=True, num_threads=cores):
+        if link_flows[i] > 0:
+            congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
+        else:
+            congested_time[i] = fftime[i]
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef void dbpr_cython(double[:] deltaresult,
-                       double[:] link_flows,
-                       double [:] capacity,
-                       double [:] fftime,
-                       double[:] alpha,
-                       double [:] beta,
-                       int cores):
-  cdef long long i
-  cdef long long l = deltaresult.shape[0]
+                    double[:] link_flows,
+                    double [:] capacity,
+                    double [:] fftime,
+                    double[:] alpha,
+                    double [:] beta,
+                    int cores):
+    cdef long long i
+    cdef long long l = deltaresult.shape[0]
 
-  for i in prange(l, nogil=True, num_threads=cores):
-    if link_flows[i] > 0:
-        deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
+    for i in prange(l, nogil=True, num_threads=cores):
+        if link_flows[i] > 0:
+            deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
     else:
         deltaresult[i] = fftime[i]
