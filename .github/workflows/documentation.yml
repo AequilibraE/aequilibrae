@@ -1,6 +1,11 @@
 name: Documentation
 
-on:  [pull_request, release]
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+  release:
 
 jobs:
   build:
@@ -54,7 +59,7 @@ jobs:
         DEST_DIR: 'python/dev/'      # optional: defaults to entire repository
 
     - name: Upload to develop branch to S3
-      if: ${{github.ref == 'refs/heads/develop' && github.event.pull_request.merged }}
+      if: ${{github.ref == 'refs/heads/develop' && github.event_name == 'push'}}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks --delete
