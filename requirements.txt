@@ -5,6 +5,6 @@ PyQt5
 cython
 pyshp
 requests
-shapely
+shapely >= 1.7.0
 pandas
 pyarrow
