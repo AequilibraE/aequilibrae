@@ -4,6 +4,9 @@ Contributing to AequilibraE
 This page presents some initial instructions on how to setup your system to start contributing to AequilibraE and lists
 the requirements for all pull-requests to be merged into master.
 
+.. note::
+   The recommendations on this page are current as of October 2021.
+
 Software Design and requirements
 --------------------------------
 
@@ -25,7 +28,7 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.6, 3.7 and 3.8, but we recommend using Python 3.7 for development.
+AequilibraE is currently tested for Python 3.7, 3.8 and 3.9, but we recommend using Python 3.8 for development.
 
 We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
 
@@ -35,22 +38,23 @@ Non-Windows
 ~~~~~~~~~~~
 ::
 
-./ci.sh setup_dev
+    ./ci.sh setup_dev
 
 Windows
 ~~~~~~~
 
-Make sure to clone the AequilibraE repository and run the following from within that cloned repo using an elevated
-command prompt.
+Make sure to clone the AequilibraE repository and run the following from within
+that cloned repo using an elevated command prompt.
 
-Python 3.7 needs to be installed, and the following instructions assume you are using `Chocolatey
+Python 3.8 (or whatever version you chose) needs to be installed, and the
+following instructions assume you are using `Chocolatey
 <https://chocolatey.org/>`_ as a package manager.
 ::
 
-    cinst python3 --version 3.7
+    cinst python3 --version 3.8
     cinst python
 
-    set PATH=C:\Python37;%PATH%
+    set PATH=C:\Python38;%PATH%
     python -m pip install pipenv
     virtualenv .venv #Only if you want to save the virtual environment in the same folder
     python -m pipenv install --dev
@@ -81,7 +85,8 @@ Imports
 ~~~~~~~
 
 * Imports should be one per line.
-* Imports should be grouped into standard library, third-party, and intra-library imports. 
+* Imports should be grouped into standard library, third-party, and intra-library imports (`ctrl+shit+o`
+  does it automatically on PyCharm).
 * Imports of NumPy should follow the following convention:
 
 ::
@@ -92,19 +97,40 @@ Contributing to AequilibraE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GitHub has a nice visual explanation on how collaboration is done `GitHub Flow
-<https://guides.github.com/introduction/flow>`_.  (For us,) The most important points there are:
+<https://guides.github.com/introduction/flow>`_.
 
-* The master branch contains the latest working/release version of AequilibraE
-* Work is done in an issue/feature branch (or a fork) and then pushed to a new brach
-* The `test system <www.travis.org>`_ automatically runs unit tests
-* If the tests pass, then a manual pull request can be approved to merge into master
-* The master branch is protected and therefore can only be written to after the code has been reviewed and approved
-* No individual has the privileges to push to the master branch
+In a nutshell:
+
+1. Fork the repository into your account
+2. Write your code
+3. Write your tests (and run them locally)
+4. Write documentation
+5. Issue a Pull request against the ``develop`` branch of AequilibraE
+
+In a more verbose way...
+
+* The ``master`` branch contains the latest release version of AequilibraE.
+* The ``develop`` branch contains all new features and bug fixes that will be
+  included in the next release. It can be seen as a *release candidate*, so work is not often
+  performed on that branch.
+* Tests are automatically run on PR's, and thy do not need to be strictly passing for any
+  new feature to be merged into the ``develop`` branch, although you shouldn't expect your
+  PR to be accepted if it causes too many breaks, lacks tests or documentation.
+* The project maintainers have absolute discretion to accept or reject PR's, but reasons
+  for refusing contributions will always be made clear on the PR's comments/review.
+* Work is done in an issue/feature branch (or a fork) and then pushed to a new branch.
+* Automated testing is run using Github Actions. All tests must pass
+    * Unit testing
+    * Build/packaging tests
+    * Documentation building test
+* If the tests pass, then a manual pull request can be approved to merge into master.
+* The master branch is protected and therefore can only be written to after the code has been reviewed and approved.
+* No individual has the privileges to push to the master branch.
 
 Release versions
 ~~~~~~~~~~~~~~~~~
 
-AequilibraE uses the the de-facto Python standard for `versioning
+AequilibraE uses the de-facto Python standard for `versioning
 <http://the-hitchhikers-guide-to-packaging.readthedocs.io/en/latest/specification.html>`_
 
 ::
@@ -174,7 +200,7 @@ Releases
 ~~~~~~~~~
 
 AequilibraE releases are automatically  uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (6 to 12 times per year).
+<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (2 to 6 times per year).
 
 
 Finally

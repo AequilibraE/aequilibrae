@@ -91,8 +91,6 @@ class Node(SafeClass):
 
         curr.execute("BEGIN;")
         curr.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
-        curr.execute("Update Links set a_node=? where a_node=?", [new_id, self.node_id])
-        curr.execute("Update Links set b_node=? where b_node=?", [new_id, self.node_id])
         curr.execute("COMMIT;")
         conn.close()
         logger.info(f"Node {self.node_id} was renumbered to {new_id}")

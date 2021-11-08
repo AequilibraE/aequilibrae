@@ -285,7 +285,7 @@ class OSMBuilder(WorkerThread):
     def unique_count(a):
         # From: https://stackoverflow.com/a/21124789/1480643
         unique, inverse = np.unique(a, return_inverse=True)
-        count = np.zeros(len(unique), np.int64)
+        count = np.zeros(len(unique), int)
         np.add.at(count, inverse, 1)
         return np.vstack((unique, count)).T
 
