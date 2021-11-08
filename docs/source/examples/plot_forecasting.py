@@ -74,7 +74,7 @@ demand.computational_view(["matrix"])
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(graph, demand)
+assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
@@ -189,7 +189,6 @@ imped.view_names
 # We set the matrices for being used in computation
 demand.computational_view(["matrix"])
 
-
 # %%
 
 for function in ["power", "expo"]:
@@ -204,7 +203,6 @@ for function in ["power", "expo"]:
     with open(join(fldr, f"{function}_convergence.log"), "w") as otp:
         for r in gc.report:
             otp.write(r + "\n")
-
 
 # %% md
 
@@ -320,7 +318,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR")
 
 # %%
 
-demand = proj_matrices.get_matrix("demand_power_modeled")
+demand = proj_matrices.get_matrix("demand_ipfd")
 
 # let's see what is the core we ended up getting. It should be 'gravity'
 demand.names
@@ -328,12 +326,12 @@ demand.names
 # %%
 
 # Let's use the IPF matrix
-demand.computational_view("gravity")
+demand.computational_view("matrix")
 
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(graph, demand)
+assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
@@ -349,8 +347,8 @@ assig.set_time_field("free_flow_time")
 assig.set_algorithm("bfw")
 
 # since I haven't checked the parameters file, let's make sure convergence criteria is good
-assig.max_iter = 1000
-assig.rgap_target = 0.0001
+assig.max_iter = 500
+assig.rgap_target = 0.00001
 
 assig.execute()  # we then execute the assignment
 

@@ -4,7 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
 
 [dev-packages]
 sphinx = "*"
@@ -23,7 +23,7 @@ jupyter = "*"
 jupyter-contrib-nbextensions = "*"
 jupyter-nbextensions-configurator = "*"
 matplotlib = "*"
-pytest-xdist="*
+pytest-xdist="*"
 
 [packages]
 numpy = ">=1.14.0"
@@ -33,6 +33,7 @@ pyshp = "*"
 cython = "*"
 scipy = "*"
 openmatrix = "*"
+rtree = "*"
 
 [scripts]
 notebook = "jupyter notebook"

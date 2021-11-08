@@ -1,11 +1,14 @@
 import importlib.util as iutil
 from functools import partial
 import numpy as np
+from pathlib import Path
+import os
 from typing import List, Dict
 from ..utils import WorkerThread
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae import logger
 
 try:
@@ -50,18 +53,25 @@ class LinearApproximation(WorkerThread):
         self.cores = assig_spec.cores
         self.iteration_issue = []
         self.convergence_report = {"iteration": [], "rgap": [], "alpha": [], "warnings": []}
-        if algorithm == "bfw":
+        if algorithm in ["cfw", "bfw"]:
             self.convergence_report["beta0"] = []
             self.convergence_report["beta1"] = []
             self.convergence_report["beta2"] = []
 
         self.assig = assig_spec  # type: TrafficAssignment
 
-        if None in [assig_spec.classes, assig_spec.vdf, assig_spec.capacity_field,
-                    assig_spec.time_field, assig_spec.vdf_parameters]:
+        if None in [
+            assig_spec.classes,
+            assig_spec.vdf,
+            assig_spec.capacity_field,
+            assig_spec.time_field,
+            assig_spec.vdf_parameters,
+        ]:
             all_par = "Traffic classes, VDF, VDF_parameters, capacity field & time_field"
-            raise Exception("Parameter missing. Setting the algorithm is the last thing to do "
-                            f"when assigning. Check if you have all of these: {all_par}")
+            raise Exception(
+                "Parameter missing. Setting the algorithm is the last thing to do "
+                f"when assigning. Check if you have all of these: {all_par}"
+            )
 
         self.traffic_classes = assig_spec.classes  # type: List[TrafficClass]
         self.num_classes = len(assig_spec.classes)
@@ -70,6 +80,7 @@ class LinearApproximation(WorkerThread):
         self.time_field = assig_spec.time_field
         self.vdf = assig_spec.vdf
         self.vdf_parameters = assig_spec.vdf_parameters
+        self.procedure_id = assig_spec.procedure_id
 
         self.iter = 0
         self.rgap = np.inf
@@ -132,12 +143,9 @@ class LinearApproximation(WorkerThread):
                 self.pre_previous_step_direction[c.__id__] = r
 
     def calculate_conjugate_stepsize(self):
-        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity,
-                                  self.free_flow_tt, *self.vdf_parameters, self.cores)
-
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
+        self.vdf.apply_derivative(
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+        )
         numerator = 0.0
         denominator = 0.0
         prev_dir_minus_current_sol = {}
@@ -147,8 +155,9 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c.__id__]
             prev_dir_minus_current_sol[c.__id__] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :],
-                                                     axis=1)
+            aon_minus_current_sol[c.__id__] = np.sum(
+                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
+            )
             aon_minus_prev_dir[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
 
         for c_0 in self.traffic_classes:
@@ -161,19 +170,22 @@ class LinearApproximation(WorkerThread):
 
         alpha = numerator / denominator
         if alpha < 0.0:
-            self.stepdirection = 0.0
+            self.conjugate_stepsize = 0.0
         elif alpha > self.conjugate_direction_max:
-            self.stepdirection = self.conjugate_direction_max
+            self.conjugate_stepsize = self.conjugate_direction_max
         else:
             self.conjugate_stepsize = alpha
 
-    def calculate_biconjugate_direction(self):
-        self.vdf.apply_derivative(self.vdf_der, self.fw_total_flow, self.capacity,
-                                  self.free_flow_tt, *self.vdf_parameters, self.cores)
+        # for reporting, we use a different convention, consistent with BFW: beta_0 corresponds to multiplier for AON;
+        # in calculations we follow the conventions of our TRB paper.
+        self.betas[0] = 1.0 - self.conjugate_stepsize
+        self.betas[1] = self.conjugate_stepsize
+        self.betas[2] = 0.0
 
-        # TODO: This should be a sum over all supernetwork links, it's not tested for multi-class yet
-        # if we can assume that all links appear in the subnetworks, then this is correct, otherwise
-        # this needs more work
+    def calculate_biconjugate_direction(self):
+        self.vdf.apply_derivative(
+            self.vdf_der, self.fw_total_flow, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores
+        )
         mu_numerator = 0.0
         mu_denominator = 0.0
         nu_nom = 0.0
@@ -185,15 +197,22 @@ class LinearApproximation(WorkerThread):
         z_ = {}
 
         for c in self.traffic_classes:
-            x_[c.__id__] = np.sum((self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
-                                   + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
-                                   - c.results.link_loads[:, :]), axis=1)
+            x_[c.__id__] = np.sum(
+                (
+                    self.step_direction[c.__id__].link_loads[:, :] * self.stepsize
+                    + self.previous_step_direction[c.__id__].link_loads[:, :] * (1.0 - self.stepsize)
+                    - c.results.link_loads[:, :]
+                ),
+                axis=1,
+            )
 
             y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             z_[c.__id__] = np.sum(self.step_direction[c.__id__].link_loads[:, :] - c.results.link_loads[:, :], axis=1)
 
-            w_[c.__id__] = np.sum(self.previous_step_direction[c.__id__].link_loads
-                                  - self.step_direction[c.__id__].link_loads[:, :], axis=1)
+            w_[c.__id__] = np.sum(
+                self.previous_step_direction[c.__id__].link_loads - self.step_direction[c.__id__].link_loads[:, :],
+                axis=1,
+            )
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
@@ -253,12 +272,18 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(pre_previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
 
-                linear_combination(sdr.link_loads, c._aon_results.link_loads, sdr.link_loads,
-                                   self.conjugate_stepsize, self.cores)
+                linear_combination(
+                    sdr.link_loads, sdr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
+                )
 
                 if c.results.num_skims > 0:
-                    linear_combination_skims(sdr.skims.matrix_view, c._aon_results.skims.matrix_view,
-                                             sdr.skims.matrix_view, self.conjugate_stepsize, self.cores)
+                    linear_combination_skims(
+                        sdr.skims.matrix_view,
+                        sdr.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        self.conjugate_stepsize,
+                        self.cores,
+                    )
 
                 sdr.total_flows()
                 sd_flows.append(sdr.total_link_loads)
@@ -276,14 +301,25 @@ class LinearApproximation(WorkerThread):
                 if c.results.num_skims > 0:
                     copy_three_dimensions(ppst.skims.matrix_view, stp_dir.skims.matrix_view, self.cores)
 
-                triple_linear_combination(stp_dir.link_loads, c._aon_results.link_loads, stp_dir.link_loads,
-                                          prev_stp_dir.link_loads, self.betas, self.cores)
+                triple_linear_combination(
+                    stp_dir.link_loads,
+                    c._aon_results.link_loads,
+                    stp_dir.link_loads,
+                    prev_stp_dir.link_loads,
+                    self.betas,
+                    self.cores,
+                )
 
                 stp_dir.total_flows()
                 if c.results.num_skims > 0:
-                    triple_linear_combination_skims(stp_dir.skims.matrix_view, c._aon_results.skims.matrix_view,
-                                                    stp_dir.skims.matrix_view, prev_stp_dir.skims.matrix_view,
-                                                    self.betas, self.cores)
+                    triple_linear_combination_skims(
+                        stp_dir.skims.matrix_view,
+                        c._aon_results.skims.matrix_view,
+                        stp_dir.skims.matrix_view,
+                        prev_stp_dir.skims.matrix_view,
+                        self.betas,
+                        self.cores,
+                    )
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
@@ -293,6 +329,18 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(prev_stp_dir.skims.matrix_view, ppst.skims.matrix_view, self.cores)
 
         self.step_direction_flow = np.sum(sd_flows, axis=0)
+
+    def __maybe_create_path_file_directories(self):
+        pth = os.environ.get(ENVIRON_VAR)
+        path_base_dir = os.path.join(pth, "path_files", self.procedure_id)
+        for c in self.traffic_classes:
+            if c._aon_results.save_path_file:
+                c._aon_results.path_file_dir = os.path.join(
+                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c.__id__}"
+                )
+                Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
+                if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
+                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c.__id__)
 
     def doWork(self):
         self.execute()
@@ -304,7 +352,9 @@ class LinearApproximation(WorkerThread):
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
                 # not want this there I think
-                c.fixed_cost[c.graph.graph.__supernet_id__] = c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
+                c.fixed_cost[c.graph.graph.__supernet_id__] = (
+                    c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
+                )
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
         # TODO: Review how to eliminate this. It looks unnecessary
@@ -321,10 +371,14 @@ class LinearApproximation(WorkerThread):
                 self.equilibration.emit(["iterations", self.iter])
 
             aon_flows = []
+
+            self.__maybe_create_path_file_directories()
+
             for c in self.traffic_classes:  # type: TrafficClass
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
+
                 aon = allOrNothing(c.matrix, c.graph, c._aon_results)
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
@@ -353,12 +407,18 @@ class LinearApproximation(WorkerThread):
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c.__id__]
                     cls_res = c.results
-                    linear_combination(cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads,
-                                       self.stepsize, self.cores)
+                    linear_combination(
+                        cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
+                    )
 
                     if cls_res.num_skims > 0:
-                        linear_combination_skims(cls_res.skims.matrix_view, stp_dir.skims.matrix_view,
-                                                 cls_res.skims.matrix_view, self.stepsize, self.cores)
+                        linear_combination_skims(
+                            cls_res.skims.matrix_view,
+                            stp_dir.skims.matrix_view,
+                            cls_res.skims.matrix_view,
+                            self.stepsize,
+                            self.cores,
+                        )
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
             self.fw_total_flow = np.sum(flows, axis=0)
@@ -367,15 +427,31 @@ class LinearApproximation(WorkerThread):
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
 
+            self.vdf.apply_vdf(
+                self.congested_time,
+                self.fw_total_flow,
+                self.capacity,
+                self.free_flow_tt,
+                *self.vdf_parameters,
+                self.cores,
+            )
+
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
 
-            if self.algorithm == "bfw":
+            if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
+
+            for c in self.traffic_classes:
+                c._aon_results.reset()
+                if self.time_field not in c.graph.skim_fields:
+                    continue
+                idx = c.graph.skim_fields.index(self.time_field)
+                c.graph.skims[:, idx] = self.congested_time[:]
 
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
@@ -385,19 +461,12 @@ class LinearApproximation(WorkerThread):
             else:
                 self.steps_below = 0
 
-            self.vdf.apply_vdf(self.congested_time, self.fw_total_flow, self.capacity,
-                               self.free_flow_tt, *self.vdf_parameters, self.cores)
-
-            for c in self.traffic_classes:
-                c._aon_results.reset()
-                if self.time_field not in c.graph.skim_fields:
-                    continue
-                idx = c.graph.skim_fields.index(self.time_field)
-                c.graph.skims[:, idx] = self.congested_time[:]
-
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
+
+        # TODO (Jan 18/4/21): Do we want to blob store path files (by iteration, class, origin, destination) in sqlite?
+        # or do we just use one big hdf5 file?
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
@@ -414,8 +483,9 @@ class LinearApproximation(WorkerThread):
         linear_combination_1d(x, self.step_direction_flow, self.fw_total_flow, stepsize, self.cores)
         # x = self.fw_total_flow + stepsize * (self.step_direction_flow - self.fw_total_flow)
         self.vdf.apply_vdf(self.congested_value, x, self.capacity, self.free_flow_tt, *self.vdf_parameters, self.cores)
-        link_cost_term = sum_a_times_b_minus_c(self.congested_value, self.step_direction_flow,
-                                               self.fw_total_flow, self.cores)
+        link_cost_term = sum_a_times_b_minus_c(
+            self.congested_value, self.step_direction_flow, self.fw_total_flow, self.cores
+        )
         return link_cost_term + const_term
 
     def __derivative_of_objective_stepsize_independent(self):
@@ -424,8 +494,9 @@ class LinearApproximation(WorkerThread):
         class_specific_term = 0.0
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
-            class_link_costs = sum_a_times_b_minus_c(c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0],
-                                                     c.results.link_loads[:, 0], self.cores)
+            class_link_costs = sum_a_times_b_minus_c(
+                c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
+            )
             class_specific_term += class_link_costs
         return class_specific_term
 
@@ -436,8 +507,9 @@ class LinearApproximation(WorkerThread):
             return
 
         class_specific_term = self.__derivative_of_objective_stepsize_independent()
-        derivative_of_objective = partial(self.__derivative_of_objective_stepsize_dependent,
-                                          const_term=class_specific_term)
+        derivative_of_objective = partial(
+            self.__derivative_of_objective_stepsize_dependent, const_term=class_specific_term
+        )
 
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 

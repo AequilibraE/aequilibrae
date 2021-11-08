@@ -1,3 +1,4 @@
+from os.path import join
 import logging
 import pickle
 import uuid
@@ -126,9 +127,9 @@ class Graph(object):
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
-        self.graph.sort_values(by=['link_id', 'direction'], inplace=True)
+        self.graph.sort_values(by=["link_id", "direction"], inplace=True)
         self.graph.loc[:, "__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
-        self.graph.sort_values(by=['a_node', 'b_node'], inplace=True)
+        self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
 
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
@@ -138,39 +139,40 @@ class Graph(object):
 
     def __build_compressed_graph(self):
         # Build link index
-        link_idx = np.empty(self.network.link_id.max() + 1).astype(np.int)
+        link_idx = np.empty(self.network.link_id.max() + 1).astype(int)
         link_idx[self.network.link_id] = np.arange(self.network.shape[0])
 
         nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
         links = np.hstack([self.network.link_id.values, self.network.link_id.values])
+        counts = np.bincount(nodes)
 
         idx = np.argsort(nodes)
         all_nodes = nodes[idx]
         all_links = links[idx]
-        links_index = np.empty(all_nodes.max() + 1, np.int64)
+        links_index = np.empty(all_nodes.max() + 2, np.int64)
         links_index.fill(-1)
-        nlist = np.arange(all_nodes.max())
+        nlist = np.arange(all_nodes.max() + 2)
 
         y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
         links_index[y] = x[:]
         links_index[-1] = all_links.shape[0]
-        for i in range(all_nodes.max(), 1, -1):
+
+        for i in range(all_nodes.max() + 1, 0, -1):
             links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
 
-        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
-        counts = np.bincount(nodes)
+        # We keep all centroids for sure
         counts[self.centroids] = 999
 
-        truth = (counts == 2).astype(np.int)
+        truth = (counts == 2).astype(int)
         link_edge = truth[self.network.a_node.values] + truth[self.network.b_node.values]
         link_edge = self.network.link_id.values[link_edge == 1]
 
         simplified_links = np.repeat(-1, self.network.link_id.max() + 1)
-        simplified_directions = np.zeros(self.network.link_id.max() + 1, np.int)
+        simplified_directions = np.zeros(self.network.link_id.max() + 1, int)
 
-        compressed_dir = np.zeros(self.network.link_id.max() + 1, np.int)
-        compressed_a_node = np.zeros(self.network.link_id.max() + 1, np.int)
-        compressed_b_node = np.zeros(self.network.link_id.max() + 1, np.int)
+        compressed_dir = np.zeros(self.network.link_id.max() + 1, int)
+        compressed_a_node = np.zeros(self.network.link_id.max() + 1, int)
+        compressed_b_node = np.zeros(self.network.link_id.max() + 1, int)
 
         slink = 0
         major_nodes = {}
@@ -264,7 +266,7 @@ class Graph(object):
                 "link_id": np.arange(simplified_directions.shape[0]),
                 "link_direction": simplified_directions,
                 "compressed_link": simplified_links,
-                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(np.int),
+                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(int),
             }
         )
 
@@ -478,7 +480,7 @@ class Graph(object):
         self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
         df = self.__graph_groupby.sum()[skim_fields].reset_index()
         for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values, i] = df[skm].values[:].astype(self.__float_type)
+            self.compact_skims[df.index.values[:-1], i] = df[skm].values[:-1].astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
@@ -592,7 +594,7 @@ class Graph(object):
                 raise ValueError(f"could not find field {field} in the network array")
 
         # Uniqueness of the id
-        link_ids = self.network["link_id"].astype(np.int)
+        link_ids = self.network["link_id"].astype(int)
         if link_ids.shape[0] != np.unique(link_ids).shape[0]:
             raise ValueError('"link_id" field not unique')
 
@@ -629,3 +631,10 @@ class Graph(object):
         else:
             raise ValueError("WRONG TYPE OR NULL VALUE")
         return def_type
+
+    def save_compressed_correspondence(self, path, mode_name, mode_id):
+        """ Save graph and nodes_to_indeces to disk"""
+        graph_path = join(path, f"correspondence_c{mode_name}_{mode_id}.feather")
+        self.graph.to_feather(graph_path)
+        node_path = join(path, f"nodes_to_indeces_c{mode_name}_{mode_id}.feather")
+        pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)

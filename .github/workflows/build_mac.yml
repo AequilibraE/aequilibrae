@@ -7,7 +7,7 @@ jobs:
     runs-on:  macos-latest
     strategy:
       matrix:
-        python-version: [ '3.6', '3.7', '3.8' ]
+        python-version: [ '3.7', '3.8' , '3.9' ]
     steps:
     - uses: actions/checkout@v2
     - name: Set Python environment
@@ -25,6 +25,14 @@ jobs:
       run: |
         python setup.py sdist bdist_wheel
 
+    - name: Stores artifacts along with the workflow result
+      if: ${{ github.event_name == 'push'}}
+      uses: actions/upload-artifact@v2
+      with:
+        name: library
+        path: dist/*.whl
+        if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+
     - name: Publish
       if: ${{ github.event_name == 'release'}}
       env:
@@ -34,7 +42,7 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ github.event_name == 'release'}}
+      if: ${{ github.event_name == 'release' && matrix.python-version == '3.8'}}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

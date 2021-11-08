@@ -7,6 +7,13 @@ assignees: ''
 
 ---
 
+**BEFORE REPORTING A BUG**
+
+1. Have you searched online for a solution for your issue?
+2. Have you consulted with the user and developer community? https://groups.google.com/g/aequilibrae
+3. Have you collected COMPLETE information on the issue you are reporting?
+
+
 **Purpose of use**
 Are you reporting something you found during a research project, consulting/professional project or personal project?
 Is that a funded project?

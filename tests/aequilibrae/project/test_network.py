@@ -22,6 +22,7 @@ class TestNetwork(TestCase):
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
         self.siouxfalls.open(self.proj_path)
+        self.proj_path2 = os.path.join(gettempdir(), uuid.uuid4().hex)
 
     def tearDown(self) -> None:
         self.siouxfalls.close()
@@ -34,7 +35,7 @@ class TestNetwork(TestCase):
         if random() < thresh:
             self.siouxfalls.close()
             self.project = Project()
-            self.project.new(self.proj_path)
+            self.project.new(self.proj_path2)
             # self.network.create_from_osm(west=153.1136245, south=-27.5095487, east=153.115, north=-27.5085, modes=["car"])
             self.project.network.create_from_osm(west=-112.185, south=36.59, east=-112.179, north=36.60)
             curr = self.project.conn.cursor()

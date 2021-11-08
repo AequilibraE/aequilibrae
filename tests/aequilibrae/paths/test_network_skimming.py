@@ -8,12 +8,7 @@ import os
 from shutil import copytree, rmtree
 import uuid
 from tempfile import gettempdir
-from aequilibrae.project import Project
-
-from ...data import siouxfalls_project
-
-# Adds the folder with the data to the path and collects the paths to the files
-from ...data import test_graph
+from aequilibrae.utils.create_example import create_example
 
 
 class TestNetwork_skimming(TestCase):
@@ -21,10 +16,8 @@ class TestNetwork_skimming(TestCase):
         os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
 
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
-        copytree(siouxfalls_project, self.proj_dir)
 
-        self.project = Project()
-        self.project.open(self.proj_dir)
+        self.project = create_example(self.proj_dir)
         self.network = self.project.network
         self.curr = self.project.conn.cursor()
 
@@ -42,6 +35,7 @@ class TestNetwork_skimming(TestCase):
         graph = self.network.graphs['c']
         graph.set_graph(cost_field="distance")
         graph.set_skimming("distance")
+        graph.set_blocked_centroid_flows(False)
 
         # skimming results
         res = SkimResults()

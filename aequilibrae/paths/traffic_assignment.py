@@ -112,6 +112,7 @@ class TrafficAssignment(object):
         self.__dict__["total_flow"] = None  # type: np.ndarray
         self.__dict__["congested_time"] = None  # type: np.ndarray
         self.__dict__["cores"] = None  # type: int
+        self.__dict__["save_path_files"] = False  # type: bool
 
         self.__dict__["procedure_id"] = uuid4().hex
         self.__dict__["description"] = ""
@@ -161,6 +162,9 @@ class TrafficAssignment(object):
         elif instance == "cores":
             if not isinstance(value, int):
                 return False, value, f"Value for {instance} is not integer"
+        elif instance == "save_path_files":
+            if not isinstance(value, bool):
+                return False, value, f"Value for {instance} is not boolean"
         if instance not in self.__dict__:
             return False, value, f"trafficAssignment class does not have property {instance}"
         return True, value, ""
@@ -260,7 +264,7 @@ class TrafficAssignment(object):
                 p = par[p1]
                 if isinstance(self.vdf_parameters[p1], str):
                     c = self.classes[0]
-                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+                    array = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
                     array[c.graph.graph.__supernet_id__] = c.graph.graph[p]
                 else:
                     array = np.zeros(self.classes[0].graph.graph.shape[0], np.float64)
@@ -295,6 +299,37 @@ class TrafficAssignment(object):
             c.results.set_cores(cores)
             c._aon_results.set_cores(cores)
 
+    def set_save_path_files(self, save_it: bool) -> None:
+        """Turn path saving on or off.
+
+        Args:
+            save_it (:obj:`bool`): Boolean to indicate whether paths should be saved
+        """
+        if self.classes is None:
+            raise Exception("You need to set traffic classes before turning path saving on or off")
+
+        # self.save_path_files = save_it
+        for c in self.classes:
+            c._aon_results.save_path_file = save_it
+
+    def set_path_file_format(self, file_format: str) -> None:
+        """Specify path saving format. Either parquet or feather.
+
+        Args:
+            file_format (:obj:`str`): Name of file format to use for path files
+        """
+        if self.classes is None:
+            raise Exception("You need to set traffic classes before specifying path saving options")
+
+        if file_format == "feather":
+            for c in self.classes:
+                c._aon_results.write_feather = True
+        elif file_format == "parquet":
+            for c in self.classes:
+                c._aon_results.write_feather = False
+        else:
+            raise Exception(f"Unsupported path file format {file_format} - only feather or parquet available.")
+
     def set_time_field(self, time_field: str) -> None:
         """
         Sets the graph field that contains free flow travel time -> e.g. 'fftime'
@@ -316,7 +351,7 @@ class TrafficAssignment(object):
         if c.graph.graph[time_field].values.min() <= 0:
             raise ValueError("There is at least one link with zero or negative free-flow time")
 
-        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
@@ -344,7 +379,7 @@ class TrafficAssignment(object):
             raise ValueError("There is at least one link with zero or negative capacity")
 
         self.__dict__["cores"] = c.results.cores
-        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types('float'))
+        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
 
@@ -409,15 +444,25 @@ class TrafficAssignment(object):
         res1 = assig_results[0]
 
         tot_flow = self.assignment.fw_total_flow[idx]
-        voc = self.assignment.fw_total_flow / self.capacity[idx]
+        voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
 
         entries = res1.data.shape[0]
-        fields = ["Congested_Time_AB", "Congested_Time_BA", "Congested_Time_Max",
-                  "Delay_factor_AB", "Delay_factor_BA", "Delay_factor_Max",
-                  "VOC_AB", "VOC_BA", "VOC_max",
-                  "PCE_AB", "PCE_BA", "PCE_tot"]
+        fields = [
+            "Congested_Time_AB",
+            "Congested_Time_BA",
+            "Congested_Time_Max",
+            "Delay_factor_AB",
+            "Delay_factor_BA",
+            "Delay_factor_Max",
+            "VOC_AB",
+            "VOC_BA",
+            "VOC_max",
+            "PCE_AB",
+            "PCE_BA",
+            "PCE_tot",
+        ]
 
         types = [np.float64] * len(fields)
         agg = AequilibraeData()
@@ -482,13 +527,26 @@ class TrafficAssignment(object):
         """
 
         classes = {}
+
         for cls in self.classes:
+            uclass = {}
+
             if len(cls.matrix.view_names) == 1:
-                classes[cls.graph.mode] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
+                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
             else:
-                classes[cls.graph.mode] = {
+                uclass["matrix_totals"] = {
                     nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
                 }
+            uclass["network mode"] = cls.graph.mode
+            uclass["Value-of-time"] = cls.vot
+            uclass["PCE"] = cls.pce
+            if cls.fixed_cost_field:
+                uclass["Fixed cost field"] = cls.fixed_cost_field
+                uclass["Fixed cost multiplier"] = cls.fc_multiplier
+            uclass["save_path_files"] = cls._aon_results.save_path_file
+            uclass["path_file_feather_format"] = cls._aon_results.write_feather
+
+            classes[cls.__id__] = uclass
 
         info = {
             "Algorithm": self.algorithm,
