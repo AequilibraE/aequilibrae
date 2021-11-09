@@ -327,7 +327,7 @@ create trigger updated_node_id after update of node_id on nodes
 --#
 
 -- Guarantees that link direction is one of the required values
-create trigger links_direction_update before update on links
+create trigger links_direction_update before update of direction on links
 when new.direction != -1 AND new.direction != 0 AND new.direction != 1
 begin
   select RAISE(ABORT,'Link direction needs to be -1, 0 or 1');
@@ -348,7 +348,7 @@ begin
 
 --#
 -- Guarantees that link direction is one of the required values
-create trigger nodes_iscentroid_update before update on nodes
+create trigger nodes_iscentroid_update before update of is_centroid on nodes
 when new.is_centroid != 0 AND new.is_centroid != 1
 begin
   select RAISE(ABORT,'is_centroid flag needs to be 0 or 1');
