@@ -50,7 +50,7 @@ layers = [network_links, network_nodes, car, walk, bike, transit]
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
-    points = row.geometry.to_wkt().replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
+    points = row.geometry.wkt.replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
     points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
