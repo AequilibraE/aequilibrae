@@ -40,7 +40,8 @@ cpdef void bpr_cython(double[:] congested_time,
 
     for i in prange(l, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            congested_time[i] = fftime[i] * (1 + alpha[i] * (pow(link_flows[i] / capacity[i], beta[i])))
+            congested_time[i] = fftime[i] * (1 + alpha[i] * (
+            pow(link_flows[i] / capacity[i], beta[i])))
         else:
             congested_time[i] = fftime[i]
 
@@ -59,6 +60,7 @@ cpdef void dbpr_cython(double[:] deltaresult,
 
     for i in prange(l, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
-            deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
+            deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (
+            pow(link_flows[i] / capacity[i], beta[i]-1))) / capacity[i]
     else:
         deltaresult[i] = fftime[i]

@@ -66,10 +66,10 @@ cpdef void dbpr2_cython(double[:] deltaresult,
         if link_flows[i] > 0:
             if link_flows[i] > capacity[i]:
                 deltaresult[i] = fftime[i] * (alpha[i] * 2 * beta[i] * (
-                    pow(link_flows[i] / capacity[i], (2*beta[i])-1))) / 
-                    capacity[i]
+                    pow(link_flows[i] / capacity[i], (2*beta[i])-1))) / ( 
+                    capacity[i])
             else:
                 deltaresult[i] = fftime[i] * (alpha[i] * beta[i] * (
-                pow(link_flows[i] / capacity[i], beta[i]-1)))/ capacity[i]
+                    pow(link_flows[i] / capacity[i], beta[i]-1))) / capacity[i]
         else:
             deltaresult[i] = fftime[i]

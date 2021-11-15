@@ -42,7 +42,8 @@ cpdef void conical_cython(double[:] congested_time,
         if link_flows[i] > 0:
 
             congested_time[i] = fftime[i] * (
-                sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2)) - alpha[i] * (
+                sqrt(pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2)\
+                + pow(beta[i], 2)) - alpha[i] * (
                 1 - link_flows[i] / capacity[i]) - beta[i] + 2)
         else:
             congested_time[i] = fftime[i]
@@ -63,8 +64,9 @@ cpdef void dconical_cython(double[:] deltaresult,
     for i in prange(l, nogil=True, num_threads=cores):
         if link_flows[i] > 0:
             deltaresult[i] = fftime[i] * ((alpha[i] / capacity[i]) - (
-                    (pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i])) / (capacity[i] * sqrt(
-                    pow(alpha[i], 2) * pow(1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2)))))
+                    (pow(alpha[i], 2) * (1 - link_flows[i] / capacity[i])) / (
+                    capacity[i] * sqrt(pow(alpha[i], 2) * pow(
+                    1 - link_flows[i] / capacity[i], 2) + pow(beta[i], 2)))))
 
         else:
             deltaresult[i] = fftime[i]
