@@ -3,6 +3,7 @@ from aequilibrae.paths.AoN import inrets, delta_inrets
 from multiprocessing import cpu_count
 import numpy as np
 
+
 class TestInrets(TestCase):
     def test_inrets_funtion(self):
         cores = cpu_count()
@@ -57,4 +58,3 @@ class TestInrets(TestCase):
             dydx = (congested_times[1] - congested_times[0]) / dx
             self.assertAlmostEqual(dydx, delta[1], 6, "Problems with derivative for the inrets vdf")
             print(dydx, delta[1])
-            
