@@ -8,7 +8,6 @@ import socket
 import numpy as np
 import pandas as pd
 from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
@@ -257,7 +256,7 @@ class TrafficAssignment(object):
             raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
         self.__dict__["vdf_parameters"] = par
         pars = []
-        if self.vdf.function in ["BPR", "CONICAL"]:
+        if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
             for p1 in ["alpha", "beta"]:
                 if p1 not in par:
                     raise ValueError(f"{p1} should exist in the set of parameters provided")
