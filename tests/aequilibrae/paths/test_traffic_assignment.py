@@ -245,7 +245,7 @@ class TestTrafficAssignment(TestCase):
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
-        self.assignment.max_iter = 50
+        self.assignment.max_iter = 500
         self.assignment.rgap_target = 0.0001
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
@@ -267,7 +267,7 @@ class TestTrafficAssignment(TestCase):
         cfw25 = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
-        # self.assertLess(0.995, correl)
+        self.assertLess(0.995, correl)
 
         # For the last algorithm, we set skimming
         self.car_graph.set_skimming(["free_flow_time", "distance"])
