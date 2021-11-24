@@ -92,6 +92,10 @@ class Nodes:
         for k in lst:
             del self.__items[k]
 
+    def refresh_connection(self):
+        """Opens a new database connection to avoid thread conflict"""
+        self.conn = database_connection()
+
     def new_centroid(self, node_id: int) -> Node:
         """Creates a new centroid with a given ID
 
