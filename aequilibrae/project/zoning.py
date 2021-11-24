@@ -114,6 +114,10 @@ class Zoning:
         for zn in self.__items.values():  # type: Zone
             zn.save()
 
+    def refresh_connection(self):
+        """Opens a new database connection to avoid thread conflict"""
+        self.conn = database_connection()
+
     def __copy__(self):
         raise Exception("Zones object cannot be copied")
 
