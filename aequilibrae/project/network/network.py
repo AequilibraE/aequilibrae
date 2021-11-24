@@ -8,6 +8,8 @@ import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
+
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils import WorkerThread
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.osm_builder import OSMBuilder
@@ -358,7 +360,10 @@ class Network(WorkerThread):
         links = [shapely.wkb.loads(x[0]) for x in curr.fetchall()]
         return unary_union(links).convex_hull
 
+    def refresh_connection(self):
+        """Opens a new database connection to avoid thread conflict"""
+        self.conn = database_connection()
+
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        c = self.conn.cursor()
-        c.execute(f"""select count({field}) from {table} where {condition};""")
-        return c.fetchone()[0]
+        c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
+        return c
