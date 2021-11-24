@@ -117,6 +117,7 @@ class Zoning:
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
         self.conn = database_connection()
+        self.__curr = self.conn.cursor()
 
     def __copy__(self):
         raise Exception("Zones object cannot be copied")
