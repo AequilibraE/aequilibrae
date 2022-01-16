@@ -175,5 +175,3 @@ if response.status_code == 200:
 
     img = Image.open(pic_local)
     plt.imshow(img)
-else:
-    print(1)
