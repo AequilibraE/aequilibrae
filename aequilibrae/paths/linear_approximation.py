@@ -353,7 +353,7 @@ class LinearApproximation(WorkerThread):
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
                 # not want this there I think
                 c.fixed_cost[c.graph.graph.__supernet_id__] = (
-                    c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
+                        c.graph.graph[c.fixed_cost_field].values[:] * c.fc_multiplier / c.vot
                 )
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
@@ -398,9 +398,6 @@ class LinearApproximation(WorkerThread):
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
                     flows.append(c.results.total_link_loads)
 
-                if self.algorithm == "all-or-nothing":
-                    break
-
             else:
                 self.__calculate_step_direction()
                 self.calculate_stepsize()
@@ -421,8 +418,10 @@ class LinearApproximation(WorkerThread):
                         )
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
-            self.fw_total_flow = np.sum(flows, axis=0)
 
+            self.fw_total_flow = np.sum(flows, axis=0)
+            if self.algorithm == "all-or-nothing":
+                break
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
