@@ -5,17 +5,18 @@ import zipfile
 from os.path import join
 from os import walk
 
-pth = 'https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip'
-
-outfolder = gettempdir()
-
-dest_path = join(outfolder, "mod_spatialite-NG-win-amd64.zip")
-urllib.request.urlretrieve(pth, dest_path)
-
-fldr = join(outfolder, 'temp_data')
-zipfile.ZipFile(dest_path).extractall(fldr)
-
 if 'WINDOWS' in platform.platform().upper():
+
+    pth = 'https://github.com/AequilibraE/aequilibrae/releases/download/V0.6.0.post1/mod_spatialite-NG-win-amd64.zip'
+
+    outfolder = gettempdir()
+
+    dest_path = join(outfolder, "mod_spatialite-NG-win-amd64.zip")
+    urllib.request.urlretrieve(pth, dest_path)
+
+    fldr = join(outfolder, 'temp_data')
+    zipfile.ZipFile(dest_path).extractall(fldr)
+
     # We now set sqlite. Only needed in thge windows server in Github
     plats = {'x86': 'https://sqlite.org/2020/sqlite-dll-win32-x86-3320100.zip',
              'x64': 'https://sqlite.org/2020/sqlite-dll-win64-x64-3320100.zip'}

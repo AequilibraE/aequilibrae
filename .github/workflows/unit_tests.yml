@@ -1,4 +1,4 @@
-name: Tests on Windows with linting
+name: Tests on all platforms with linting
 
 on: [pull_request]
 
@@ -10,7 +10,7 @@ jobs:
       - name: Set Python environment
         uses: actions/setup-python@v1
         with:
-          python-version: 3.7
+          python-version: 3.8
           architecture: x64
 
       - name: Install dependencies
@@ -26,11 +26,13 @@ jobs:
 
   testing:
     needs: linting
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os}}
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9', '3.10']
         architecture: ['x64']
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
       max-parallel: 20
     steps:
     - uses: actions/checkout@v2
@@ -56,8 +58,7 @@ jobs:
       run: |
         cd aequilibrae/paths
         python setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        cd ../..
 
     - name: Runs test
       run: |
