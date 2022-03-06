@@ -8,7 +8,6 @@ import socket
 import numpy as np
 import pandas as pd
 from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.paths.traffic_class import TrafficClass
@@ -257,7 +256,7 @@ class TrafficAssignment(object):
             raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
         self.__dict__["vdf_parameters"] = par
         pars = []
-        if self.vdf.function in ["BPR", "CONICAL"]:
+        if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
             for p1 in ["alpha", "beta"]:
                 if p1 not in par:
                     raise ValueError(f"{p1} should exist in the set of parameters provided")
@@ -406,16 +405,19 @@ class TrafficAssignment(object):
         """Processes assignment"""
         self.assignment.execute()
 
-    def save_results(self, table_name: str) -> None:
+    def save_results(self, table_name: str, keep_zero_flows=True) -> None:
         """Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
 
         Args:
             table_name (:obj:`str`): Name of the table to hold this assignment result
+            keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
         """
         df = self.results()
         conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
+        if not keep_zero_flows:
+            df = df[df.PCE_tot > 0]
         df.to_sql(table_name, conn)
         conn.close()
 

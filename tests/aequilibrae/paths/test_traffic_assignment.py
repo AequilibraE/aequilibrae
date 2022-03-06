@@ -193,7 +193,9 @@ class TestTrafficAssignment(TestCase):
 
         ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
         node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-        ref_node_correspondence.node_index = ref_node_correspondence.node_index.astype(node_correspondence.node_index.dtype)
+        ref_node_correspondence.node_index = ref_node_correspondence.node_index.astype(
+            node_correspondence.node_index.dtype
+        )
         self.assertTrue(node_correspondence.equals(ref_node_correspondence))
 
         ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
@@ -240,15 +242,16 @@ class TestTrafficAssignment(TestCase):
             # We have no skimming setup
             self.assignment.save_skims("my_skims", "all")
 
-        msa10 = self.assignment.assignment.rgap
+        msa10_rgap = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
-        self.assignment.max_iter = 50
+        self.assignment.max_iter = 500
+        self.assignment.rgap_target = 0.0001
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
-        msa25 = self.assignment.assignment.rgap
+        msa25_rgap = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.98, correl)
@@ -256,14 +259,16 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm("frank-wolfe")
         self.assignment.execute()
 
-        fw25 = self.assignment.assignment.rgap
+        fw25_rgap = self.assignment.assignment.rgap
+        fw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.99, correl)
 
         self.assignment.set_algorithm("cfw")
         self.assignment.execute()
-        cfw25 = self.assignment.assignment.rgap
+        cfw25_rgap = self.assignment.assignment.rgap
+        cfw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.995, correl)
@@ -275,15 +280,20 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.set_algorithm("bfw")
         self.assignment.execute()
-        bfw25 = self.assignment.assignment.rgap
+        bfw25_rgap = self.assignment.assignment.rgap
+        bfw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.999, correl)
 
-        self.assertLess(msa25, msa10)
-        self.assertLess(fw25, msa25)
-        self.assertLess(cfw25, fw25)
-        self.assertLess(bfw25, cfw25)
+        self.assertLess(msa25_rgap, msa10_rgap)
+        # MSA and FW do not reach 1e-4 within 500 iterations, cfw and bfw do
+        self.assertLess(fw25_rgap, msa25_rgap)
+        self.assertLess(cfw25_rgap, self.assignment.rgap_target)
+        self.assertLess(bfw25_rgap, self.assignment.rgap_target)
+        # we expect bfw to converge quicker than cfw
+        self.assertLess(cfw25_iters, fw25_iters)
+        self.assertLess(bfw25_iters, cfw25_iters)
 
         self.assignment.save_results("save_to_database")
         self.assignment.save_skims("my_skims", "all")

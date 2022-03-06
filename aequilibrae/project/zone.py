@@ -1,3 +1,4 @@
+import random
 from sqlite3 import Connection
 from warnings import warn
 from shapely.geometry import Point, MultiPolygon
@@ -56,13 +57,19 @@ class Zone(SafeClass):
         conn.commit()
         conn.close()
 
-    def add_centroid(self, point: Point) -> None:
+    def add_centroid(self, point: Point, robust=True) -> None:
         """Adds a centroid to the network file
 
                Args:
                    *point* (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
                    If None, uses the geometric center of the zone
+                   *robust* (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
+                   Defaults to True.
                """
+
+        # This is VERY small in real-world terms (between zero and 11cm)
+        shift = 0.000001
+
         curr = self.conn.cursor()
 
         curr.execute("select count(*) from nodes where node_id=?", [self.zone_id])
@@ -75,8 +82,22 @@ class Zone(SafeClass):
         if point is None:
             point = self.geometry.centroid
 
+        if robust:
+            check_sql = """SELECT count(*) FROM nodes
+                             WHERE  nodes.geometry = GeomFromWKB(?, 4326) AND
+                          nodes.ROWID IN (
+                           SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
+                           search_frame = GeomFromWKB(?, 4326))
+                       """
+
+            test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+            while sum(test_list):
+                test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+                point = Point(point.x + random.random() * shift,
+                              point.y + random.random() * shift)
+
         data = [self.zone_id, point.wkb, self.__srid__]
-        curr.execute(sql, data)
+        self.conn.execute(sql, data)
         self.conn.commit()
 
     def connect_mode(self, mode_id: str, link_types="", connectors=1) -> None:
