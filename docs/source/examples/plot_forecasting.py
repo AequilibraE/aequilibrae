@@ -158,7 +158,7 @@ imped.names
 # But before using the data, let's get some impedance for the intrazonals
 # Let's assume it is 75% of the closest zone
 
-imped_core = "free_flow_time_final"
+imped_core = "car_free_flow_time_final"
 imped.computational_view([imped_core])
 
 # If we run the code below more than once, we will be overwriting the diagonal values with non-sensical data
