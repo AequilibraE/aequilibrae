@@ -1,17 +1,18 @@
-from unittest import TestCase
 import os
 import pathlib
-import sqlite3
-import uuid
-import string
 import random
+import sqlite3
+import string
+import uuid
 from random import choice
 from tempfile import gettempdir
+from unittest import TestCase
+
 import numpy as np
 import pandas as pd
+
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.utils.create_example import create_example
-
 from ...data import siouxfalls_project
 
 
@@ -238,17 +239,13 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        with self.assertRaises(ValueError):
-            # We have no skimming setup
-            self.assignment.save_skims("my_skims", "all")
-
         msa10_rgap = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
         self.assignment.max_iter = 500
-        self.assignment.rgap_target = 0.0001
+        self.assignment.rgap_target = 0.001
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
         msa25_rgap = self.assignment.assignment.rgap
@@ -296,7 +293,7 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(bfw25_iters, cfw25_iters)
 
         self.assignment.save_results("save_to_database")
-        self.assignment.save_skims("my_skims", "all")
+        self.assignment.save_skims(matrix_name="my_skims", which_ones="all")
 
         with self.assertRaises(ValueError):
             self.assignment.save_results("save_to_database")
