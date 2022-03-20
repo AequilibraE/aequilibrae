@@ -11,6 +11,7 @@ from aequilibrae.paths.graph import Graph
 from .__version__ import binary_version, release_name, minor_version, release_version
 from aequilibrae import logger
 
+
 try:
     from aequilibrae.paths.AoN import (
         one_to_all,
