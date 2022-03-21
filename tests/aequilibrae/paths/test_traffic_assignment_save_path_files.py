@@ -17,7 +17,6 @@ class TestTrafficAssignmentPathFiles(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
-
         proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
         os.mkdir(proj_path)
         zipfile.ZipFile(join(dirname(siouxfalls_project), 'sioux_falls_single_class.zip')).extractall(proj_path)
@@ -90,8 +89,8 @@ class TestTrafficAssignmentPathFiles(TestCase):
         class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
         reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
 
-        ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-        node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
+        ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indices_{class_id}.feather")
+        node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indices_{class_id}.feather")
         ref_node_correspondence.node_index = ref_node_correspondence.node_index.astype(
             node_correspondence.node_index.dtype
         )
