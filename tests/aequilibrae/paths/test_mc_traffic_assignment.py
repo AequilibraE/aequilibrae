@@ -43,8 +43,11 @@ class TestMCTrafficAssignment(TestCase):
 
         self.assignment = TrafficAssignment()
         self.carclass = TrafficClass("car", self.car_graph, self.car_matrix)
+        self.carclass.set_pce(1.0)
         self.motoclass = TrafficClass("motorcycle", self.moto_graph, self.moto_matrix)
+        self.carclass.set_pce(0.2)
         self.truckclass = TrafficClass("truck", self.truck_graph, self.truck_matrix)
+        self.carclass.set_pce(2.5)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
@@ -63,9 +66,6 @@ class TestMCTrafficAssignment(TestCase):
         self.assignment.set_classes([self.carclass, self.truckclass, self.motoclass])
 
     def test_execute_and_save_results(self):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
-        results = pd.read_sql("select volume from links order by link_id", conn)
-
         self.assignment.set_classes([self.carclass, self.truckclass, self.motoclass])
 
         for cls in self.assignment.classes:

@@ -1,15 +1,17 @@
 import importlib.util as iutil
-from functools import partial
-import numpy as np
-from pathlib import Path
 import os
+from functools import partial
+from pathlib import Path
 from typing import List, Dict
-from ..utils import WorkerThread
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.project.database_connection import ENVIRON_VAR
+
+import numpy as np
+
 from aequilibrae import logger
+from aequilibrae.paths.all_or_nothing import allOrNothing
+from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.project.database_connection import ENVIRON_VAR
+from ..utils import WorkerThread
 
 try:
     from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
@@ -433,6 +435,11 @@ class LinearApproximation(WorkerThread):
                 self.cores,
             )
 
+            for c in self.traffic_classes:
+                if self.time_field in c.graph.skim_fields:
+                    k = c.graph.skim_fields.index(self.time_field)
+                    aggregate_link_costs(self.congested_time[:], c.graph.compact_skims[:, k], c.results.crosswalk)
+
             self.convergence_report["iteration"].append(self.iter)
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
@@ -443,13 +450,6 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            for c in self.traffic_classes:
-                c._aon_results.reset()
-                if self.time_field not in c.graph.skim_fields:
-                    continue
-                idx = c.graph.skim_fields.index(self.time_field)
-                c.graph.skims[:, idx] = self.congested_time[:]
-
             logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
@@ -458,12 +458,17 @@ class LinearApproximation(WorkerThread):
             else:
                 self.steps_below = 0
 
+            if self.iter < self.max_iter:
+                for c in self.traffic_classes:
+                    c._aon_results.reset()
+                    if self.time_field not in c.graph.skim_fields:
+                        continue
+                    idx = c.graph.skim_fields.index(self.time_field)
+                    c.graph.skims[:, idx] = self.congested_time[:]
+
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
-
-        # TODO (Jan 18/4/21): Do we want to blob store path files (by iteration, class, origin, destination) in sqlite?
-        # or do we just use one big hdf5 file?
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")

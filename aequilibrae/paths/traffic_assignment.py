@@ -620,7 +620,6 @@ class TrafficAssignment(object):
             out_skims.index[:] = self.classes[0].graph.centroids[:]
             out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls.__id__}"
 
-
             if which_ones in ["final", "all"]:
                 for core in last_skims.names:
                     out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
