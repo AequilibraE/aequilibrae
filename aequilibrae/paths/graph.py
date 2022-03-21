@@ -633,8 +633,8 @@ class Graph(object):
         return def_type
 
     def save_compressed_correspondence(self, path, mode_name, mode_id):
-        """ Save graph and nodes_to_indeces to disk"""
+        """ Save graph and nodes_to_indices to disk"""
         graph_path = join(path, f"correspondence_c{mode_name}_{mode_id}.feather")
         self.graph.to_feather(graph_path)
-        node_path = join(path, f"nodes_to_indeces_c{mode_name}_{mode_id}.feather")
+        node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
