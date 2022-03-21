@@ -339,7 +339,14 @@ class LinearApproximation(WorkerThread):
 
     def execute(self):
         # We build the fixed cost field
+
         for c in self.traffic_classes:
+            # Sizes the temporary objects used for the results
+            c.results.prepare(c.graph, c.matrix)
+            c._aon_results.prepare(c.graph, c.matrix)
+            c.results.reset()
+
+            # Prepares the fixed cost to be used
             if c.fixed_cost_field:
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
                 # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
