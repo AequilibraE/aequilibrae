@@ -578,18 +578,18 @@ class TrafficAssignment(object):
         if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
-        file_name = f"{matrix_name}.{mat_format}"
-
         mats = Matrices()
-        export_name = path.join(mats.fldr, file_name)
-
-        if path.isfile(export_name):
-            raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
-
-        if mats.check_exists(matrix_name):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
-
         for cls in self.classes:
+            file_name = f"{matrix_name}_{cls.__id__}.{mat_format}"
+
+            export_name = path.join(mats.fldr, file_name)
+
+            if path.isfile(export_name):
+                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+
+            if mats.check_exists(matrix_name):
+                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+
             avg_skims = cls.results.skims  # type: AequilibraeMatrix
 
             # The ones for the last iteration are here
@@ -598,11 +598,11 @@ class TrafficAssignment(object):
             names = []
             if which_ones in ["final", "all"]:
                 for core in last_skims.names:
-                    names.append(f"{cls.__id__}_{core}_final")
+                    names.append(f"{core}_final")
 
             if which_ones in ["blended", "all"]:
                 for core in avg_skims.names:
-                    names.append(f"{cls.__id__}_{core}_blended")
+                    names.append(f"{core}_blended")
 
             if not names:
                 continue
@@ -622,11 +622,11 @@ class TrafficAssignment(object):
 
             if which_ones in ["final", "all"]:
                 for core in last_skims.names:
-                    out_skims.matrix[f"{cls.__id__}_{core}_final"][:, :] = last_skims.matrix[core][:, :]
+                    out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
 
             if which_ones in ["blended", "all"]:
                 for core in avg_skims.names:
-                    out_skims.matrix[f"{cls.__id__}_{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
+                    out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
 
             out_skims.matrices.flush()  # Make sure that all data went to the disk
 
@@ -634,10 +634,11 @@ class TrafficAssignment(object):
             if mat_format == "omx":
                 out_skims.export(export_name)
 
+            out_skims.description = f"Skimming for assignment procedure. Class {cls.__id__}"
             # Now we create the appropriate record
-            record = mats.new_record(matrix_name, file_name)
+            record = mats.new_record(f"{matrix_name}_{cls.__id__}", file_name)
             record.procedure_id = self.procedure_id
             record.timestamp = self.procedure_date
             record.procedure = "Traffic Assignment"
-            record.description = "Skimming for assignment procedure"
+            record.description = out_skims.description
             record.save()

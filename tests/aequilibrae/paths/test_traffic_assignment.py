@@ -211,7 +211,7 @@ class TestTrafficAssignment(TestCase):
         self.assertLess(bfw25_iters, cfw25_iters)
 
         self.assignment.save_results("save_to_database")
-        self.assignment.save_skims(matrix_name="my_skims", which_ones="all")
+        self.assignment.save_skims(matrix_name="all_skims", which_ones="all")
 
         with self.assertRaises(ValueError):
             self.assignment.save_results("save_to_database")
