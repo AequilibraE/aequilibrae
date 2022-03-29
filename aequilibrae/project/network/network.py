@@ -1,28 +1,29 @@
+import importlib.util as iutil
 import math
-from warnings import warn
 from sqlite3 import Connection as sqlc
 from typing import Dict
-import importlib.util as iutil
+from warnings import warn
+
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
+from aequilibrae import logger
+from aequilibrae.parameters import Parameters
+from aequilibrae.paths import Graph
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.utils import WorkerThread
 from aequilibrae.project.network import OSMDownloader
-from aequilibrae.project.network.osm_builder import OSMBuilder
-from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.haversine import haversine
-from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.paths import Graph
-from aequilibrae.parameters import Parameters
-from aequilibrae import logger
+from aequilibrae.project.network.osm_builder import OSMBuilder
+from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
+from aequilibrae.utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None

@@ -1,20 +1,21 @@
-import sqlite3
+import logging
 import os
 import shutil
-from aequilibrae.starts_logging import StartsLogging
+import sqlite3
+import warnings
+
+from aequilibrae import logger
+from aequilibrae.log import Log
+from aequilibrae.parameters import Parameters
+from aequilibrae.project.about import About
+from aequilibrae.project.data import Matrices
+from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
-from aequilibrae.project.data import Matrices
-from aequilibrae.project.about import About
-from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
-from aequilibrae.parameters import Parameters
-from aequilibrae.log import Log
-import warnings
-from aequilibrae import logger
 from aequilibrae.reference_files import spatialite_database
-from .project_creation import initialize_tables
-import logging
+from aequilibrae.starts_logging import StartsLogging
 from .project_cleaning import clean
+from .project_creation import initialize_tables
 
 
 class Project:

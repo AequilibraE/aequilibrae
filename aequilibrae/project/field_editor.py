@@ -1,8 +1,9 @@
+import re
 import string
 from typing import List
-from aequilibrae.project.database_connection import database_connection
+
 from aequilibrae import logger
-import re
+from aequilibrae.project.database_connection import database_connection
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
