@@ -84,6 +84,7 @@ class Modes:
         logger.warning(f'Mode {mode_id} was successfully removed from the database')
         self.__update_list_of_modes()
 
+    @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
         return FieldEditor('modes')

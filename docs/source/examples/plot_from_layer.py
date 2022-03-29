@@ -102,7 +102,7 @@ for i, mode_id in enumerate(modes_to_add):
 # this information
 
 links = project.network.links
-link_data = links.fields()
+link_data = links.fields
 # Create the field and add a good description for it
 link_data.add('source_id', 'link_id from the data source')
 

@@ -32,7 +32,7 @@ class Zoning(BasicTable):
         zone_downtown.employment = 10039
         zone_downtown.save()
 
-        fields = zones.fields()
+        fields = zones.fields
 
         # We can also add one more field to the table
         fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
