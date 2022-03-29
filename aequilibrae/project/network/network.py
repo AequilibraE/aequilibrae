@@ -12,7 +12,6 @@ from shapely.ops import unary_union
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.paths import Graph
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.haversine import haversine
@@ -44,6 +43,8 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
+        from aequilibrae.paths import Graph
+
         WorkerThread.__init__(self, None)
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
@@ -262,6 +263,7 @@ class Network(WorkerThread):
             p.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
+        from aequilibrae.paths import Graph
         curr = self.conn.cursor()
 
         if fields is None:
@@ -305,7 +307,7 @@ class Network(WorkerThread):
         Args:
             *time_field* (:obj:`str`): Network field with travel time information
         """
-        for m, g in self.graphs.items():  # type: str, Graph
+        for m, g in self.graphs.items():
             if time_field not in list(g.graph.columns):
                 raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
             g.free_flow_time = time_field
