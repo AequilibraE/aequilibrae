@@ -1,16 +1,15 @@
+import os
+import uuid
+from copy import copy, deepcopy
+from random import randint, random
+from shutil import copytree, rmtree
+from tempfile import gettempdir
 from unittest import TestCase, TestLoader
 
-from sqlite3 import IntegrityError
-from copy import copy, deepcopy
-import os
-from shutil import copytree, rmtree
-from random import randint, random
-import uuid
-from tempfile import gettempdir
-from shapely.geometry import Point
 import shapely.wkb
-from aequilibrae.project import Project
+from shapely.geometry import Point
 
+from aequilibrae.project import Project
 from ...data import siouxfalls_project
 
 TestLoader.sortTestMethodsUsing = None
@@ -75,7 +74,7 @@ class TestNodes(TestCase):
 
     def test_fields(self):
         nodes = self.network.nodes
-        f_editor = nodes.fields()
+        f_editor = nodes.fields
 
         fields = sorted(f_editor.all_fields())
         self.curr.execute('pragma table_info(nodes)')

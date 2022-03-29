@@ -1,30 +1,41 @@
+import importlib.util as iutil
 import math
-from warnings import warn
 from sqlite3 import Connection as sqlc
 from typing import Dict
+from warnings import warn
+
 import numpy as np
 import pandas as pd
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
+
+from aequilibrae import logger
+from aequilibrae.parameters import Parameters
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import OSMDownloader
-from aequilibrae.project.network.osm_builder import OSMBuilder
-from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.network.haversine import haversine
-from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
+from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.paths import Graph
-from aequilibrae.parameters import Parameters
-from aequilibrae import logger
+from aequilibrae.project.network.osm_builder import OSMBuilder
+from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
+from aequilibrae.utils import WorkerThread
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 
-class Network:
+class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
+    if pyqt:
+        netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
@@ -32,6 +43,9 @@ class Network:
     link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
+        from aequilibrae.paths import Graph
+
+        WorkerThread.__init__(self, None)
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
@@ -102,13 +116,13 @@ class Network:
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -211,13 +225,22 @@ class Network:
                     polygons.append(box)
         logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes)
+        if pyqt:
+            self.downloader.downloading.connect(self.signal_handler)
+
         self.downloader.doWork()
 
         logger.info("Building Network")
         self.builder = OSMBuilder(self.downloader.json, self.source)
+        if pyqt:
+            self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
 
         logger.info("Network built successfully")
+
+    def signal_handler(self, val):
+        if pyqt:
+            self.netsignal.emit(val)
 
     def build_graphs(self, fields: list = None, modes: list = None) -> None:
         """Builds graphs for all modes currently available in the model
@@ -240,6 +263,7 @@ class Network:
             p.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
+        from aequilibrae.paths import Graph
         curr = self.conn.cursor()
 
         if fields is None:
@@ -283,7 +307,7 @@ class Network:
         Args:
             *time_field* (:obj:`str`): Network field with travel time information
         """
-        for m, g in self.graphs.items():  # type: str, Graph
+        for m, g in self.graphs.items():
             if time_field not in list(g.graph.columns):
                 raise ValueError(f"{time_field} not available. Check if you have NULL values in the database")
             g.free_flow_time = time_field
@@ -339,7 +363,10 @@ class Network:
         links = [shapely.wkb.loads(x[0]) for x in curr.fetchall()]
         return unary_union(links).convex_hull
 
+    def refresh_connection(self):
+        """Opens a new database connection to avoid thread conflict"""
+        self.conn = database_connection()
+
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        c = self.conn.cursor()
-        c.execute(f"""select count({field}) from {table} where {condition};""")
-        return c.fetchone()[0]
+        c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
+        return c

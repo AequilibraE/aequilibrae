@@ -56,6 +56,6 @@ class TestModes(TestCase):
             modes.new(m)
 
     def test_fields(self):
-        fields = self.proj.network.modes.fields()
+        fields = self.proj.network.modes.fields
         fields.all_fields()
         self.assertEqual(fields._table, 'modes', 'Returned wrong table handler')

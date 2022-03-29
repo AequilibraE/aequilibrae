@@ -23,7 +23,7 @@ project = create_example(fldr)
 
 # We the project open, we can tell the logger to direct all messages to the terminal as well
 stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+formatter = logging.Formatter("%(asctime)s;%(name)s; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 

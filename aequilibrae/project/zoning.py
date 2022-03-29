@@ -1,19 +1,19 @@
 from copy import deepcopy
-from sqlite3 import Connection
 from os.path import join, realpath
 from warnings import warn
+
 import shapely.wkb
-from shapely.ops import unary_union
 from shapely.geometry import Polygon
-from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.project.project_creation import run_queries_from_sql_file
-from .zone import Zone
+from shapely.ops import unary_union
+
 from aequilibrae import logger
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.project_creation import run_queries_from_sql_file
+from aequilibrae.project.table_loader import TableLoader
+from .basic_table import BasicTable
+from .zone import Zone
 
 
-class Zoning:
+class Zoning(BasicTable):
     """
     Access to the API resources to manipulate the zones table in the project
 
@@ -32,7 +32,7 @@ class Zoning:
         zone_downtown.employment = 10039
         zone_downtown.save()
 
-        fields = zones.fields()
+        fields = zones.fields
 
         # We can also add one more field to the table
         fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
@@ -42,10 +42,9 @@ class Zoning:
     __items = {}
 
     def __init__(self, network):
+        super().__init__()
         self.network = network
-        self.__all_types = []
-        self.conn = database_connection()
-        self.__curr = self.conn.cursor()
+        self.__table_type__ = 'zones'
         self.__fields = []
         if self.__has_zoning():
             self.__load()
@@ -76,24 +75,14 @@ class Zoning:
         else:
             warn("zones table already exists. Nothing was done", Warning)
 
-    def extent(self) -> Polygon:
-        """Queries the extent of the zoning system included in the model
-
-        Returns:
-            *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the zoning system.
-        """
-        self.__curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
-        poly = shapely.wkb.loads(self.__curr.fetchone()[0])
-        return poly
-
     def coverage(self) -> Polygon:
         """ Returns a single polygon for the entire zoning coverage
 
         Returns:
             *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        self.__curr.execute('Select ST_asBinary("geometry") from zones;')
-        polygons = [shapely.wkb.loads(x[0]) for x in self.__curr.fetchall()]
+        self._curr.execute('Select ST_asBinary("geometry") from zones;')
+        polygons = [shapely.wkb.loads(x[0]) for x in self._curr.fetchall()]
         return unary_union(polygons)
 
     def get(self, zone_id: str) -> Zone:
@@ -102,23 +91,13 @@ class Zoning:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
         return self.__items[zone_id]
 
-    def fields(self) -> FieldEditor:
-        """Returns a FieldEditor class instance to edit the zones table fields and their metadata"""
-        return FieldEditor("zones")
-
     def all_zones(self) -> dict:
         """Returns a dictionary with all Zone objects available in the model. zone_id as key"""
         return self.__items
 
     def save(self):
-        for zn in self.__items.values():  # type: Zone
-            zn.save()
-
-    def __copy__(self):
-        raise Exception("Zones object cannot be copied")
-
-    def __deepcopy__(self, memodict=None):
-        raise Exception("Zones object cannot be copied")
+        for item in self.__items.values():
+            item.save()
 
     def __has_zoning(self):
         curr = self.conn.cursor()
@@ -127,7 +106,7 @@ class Zoning:
 
     def __load(self):
         tl = TableLoader()
-        zones_list = tl.load_table(self.__curr, "zones")
+        zones_list = tl.load_table(self._curr, "zones")
         self.__fields = deepcopy(tl.fields)
 
         existing_list = [zn["zone_id"] for zn in zones_list]
