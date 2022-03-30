@@ -1,10 +1,10 @@
 import os
 from sqlite3 import Connection
-from aequilibrae.parameters import Parameters
-from aequilibrae import logger
 
 
 def spatialite_connection(conn: Connection) -> Connection:
+    from aequilibrae.parameters import Parameters
+    from aequilibrae import logger
     conn.enable_load_extension(True)
     par = Parameters()
     spatialite_path = par.parameters["system"]["spatialite_path"]

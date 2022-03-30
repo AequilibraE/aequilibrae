@@ -18,6 +18,7 @@ from aequilibrae import Project
 from shapely.wkt import loads as load_wkt
 import pandas as pd
 import folium
+import requests
 import urllib.request
 from string import ascii_lowercase
 
@@ -101,7 +102,7 @@ for i, mode_id in enumerate(modes_to_add):
 # this information
 
 links = project.network.links
-link_data = links.fields()
+link_data = links.fields
 # Create the field and add a good description for it
 link_data.add('source_id', 'link_id from the data source')
 
@@ -134,7 +135,7 @@ network_links = folium.FeatureGroup("links")
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
-    points = row.geometry.to_wkt().replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
+    points = row.geometry.wkt.replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
     points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
@@ -165,8 +166,12 @@ import matplotlib.pyplot as plt
 
 pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
 pic_local = join(fldr, 'queluz.jpg')
-urllib.request.urlretrieve(pic, pic_local)
+headers = {'User-Agent': "AequilibraE (https://aequilibrae.com/; contact@aequilibrae.com)  python-library/0.7"}
 
-img = Image.open(pic_local)
-plt.imshow(img)
+response = requests.get(pic, headers=headers)
+if response.status_code == 200:
+    with open(pic_local, 'wb') as f:
+        f.write(response.content)
 
+    img = Image.open(pic_local)
+    plt.imshow(img)

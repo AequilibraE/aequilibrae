@@ -44,8 +44,8 @@ class LinkTypes:
         default_link_type.save()
 
         # We can also create a completely new link_type and add to the model
-        new_type = all_link_types.new('a')
-        new_type.link_type_name = 'Arterial'  # Only ASCII letters and *_* allowed
+        new_type = link_types.new('a')
+        new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed
         # other fields are not mandatory
 
         # We then save it to the database

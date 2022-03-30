@@ -41,13 +41,10 @@ class TrafficClass:
         self.mode = graph.mode
         self.class_flow: np.array
         self.results = AssignmentResults()
-        self.results.prepare(self.graph, self.matrix)
         self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
-        self.results.reset()
         self._aon_results = AssignmentResults()
-        self._aon_results.prepare(self.graph, self.matrix)
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:

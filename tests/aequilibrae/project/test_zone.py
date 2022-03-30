@@ -1,3 +1,4 @@
+import sqlite3
 from warnings import warn
 from math import sqrt
 from uuid import uuid4
@@ -119,6 +120,20 @@ class TestZone(TestCase):
 
         node2 = nodes.get(2)
         self.assertEqual(node2.geometry, Point(0, 0))
+
+        # Tests ne behaviour to deal with centroids that would fall exactly on top of existing nodes
+        point_that_should = zone1.geometry.centroid
+        self.__change_project()
+        zones = self.proj.zoning
+        network = self.proj.network
+        nd = network.nodes.get(1000)
+        nd.geometry = point_that_should
+        nd.save()
+
+        zone1 = zones.get(1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            zone1.add_centroid(None, robust=False)
+        zone1.add_centroid(None, robust=True)
 
     def test_connect_mode(self):
         self.__change_project()

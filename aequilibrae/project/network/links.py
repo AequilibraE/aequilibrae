@@ -1,16 +1,18 @@
-import os
 from copy import deepcopy
-import shapely.wkb
+
 import pandas as pd
-from aequilibrae.project.network.link import Link
+import shapely.wkb
+
 from aequilibrae import logger
-from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.field_editor import FieldEditor
+from aequilibrae.project.network.link import Link
+from aequilibrae.project.table_loader import TableLoader
 
 
-class Links:
+class Links(BasicTable):
     """
     Access to the API resources to manipulate the links table in the network
 
@@ -39,8 +41,8 @@ class Links:
     sql = ""
 
     def __init__(self):
-        self.conn = database_connection()
-        self.curr = self.conn.cursor()
+        super().__init__()
+        self.__table_type__ = 'links'
         if self.sql == "":
             self.refresh_fields()
 
@@ -115,24 +117,20 @@ class Links:
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            self.curr.execute("Delete from Links where link_id=?", [link_id])
-            d = self.curr.rowcount
+            self._curr.execute("Delete from Links where link_id=?", [link_id])
+            d = self._curr.rowcount
             self.conn.commit()
         if d:
             logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
             self.__existence_error(link_id)
 
-    def save(self):
-        for link in self.__items.values():  # type: Link
-            link.save()
-
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
-        self.curr.execute("select coalesce(max(link_id),0) from Links")
-        self.__max_id = self.curr.fetchone()[0]
+        self._curr.execute("select coalesce(max(link_id),0) from Links")
+        self.__max_id = self._curr.fetchone()[0]
         tl = TableLoader()
-        tl.load_structure(self.curr, "links")
+        tl.load_structure(self._curr, "links")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -152,20 +150,9 @@ class Links:
         for k in lst:
             del self.__items[k]
 
-    @staticmethod
-    def fields() -> FieldEditor:
-        """Returns a FieldEditor class instance to edit the Links table fields and their metadata
-
-        Returns:
-            *field_editor* (:obj:`FieldEditor`): A field editor configured for editing the Links table
-            """
-        return FieldEditor("links")
-
-    def __copy__(self):
-        raise Exception("Links object cannot be copied")
-
-    def __deepcopy__(self, memodict=None):
-        raise Exception("Links object cannot be copied")
+    def save(self):
+        for item in self.__items.values():
+            item.save()
 
     def __del__(self):
         self.__items.clear()
@@ -174,8 +161,8 @@ class Links:
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        self.curr.execute(f"{self.sql} where link_id=?", [link_id])
-        data = self.curr.fetchone()
+        self._curr.execute(f"{self.sql} where link_id=?", [link_id])
+        data = self._curr.fetchone()
         if data:
             return {key: val for key, val in zip(self.__fields, data)}
         raise ValueError("Link_id does not exist on the network")

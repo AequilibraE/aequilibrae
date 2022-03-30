@@ -2,13 +2,15 @@
 
 from libcpp.vector cimport vector
 from libcpp.string cimport string
+import importlib.util as iutil
+spec = iutil.find_spec("pyarrow")
 
-import pyarrow as pa
-cimport pyarrow as pa
-
-# need to decide or make optional which format we want
-import pyarrow.parquet as pq
-import pyarrow.feather as feather
+if spec is not None:
+    import pyarrow as pa
+    cimport pyarrow as pa
+    # need to decide or make optional which format we want
+    import pyarrow.parquet as pq
+    import pyarrow.feather as feather
 
 import numpy as np
 cimport numpy as np

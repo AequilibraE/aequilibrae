@@ -1,8 +1,9 @@
+import re
 import string
 from typing import List
-from aequilibrae.project.database_connection import database_connection
+
 from aequilibrae import logger
-import re
+from aequilibrae.project.database_connection import database_connection
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
@@ -27,10 +28,10 @@ class FieldEditor:
         proj.open('Path/to/project/folder')
 
         # To edit the fields of the link_types table
-        lt_fields = proj.network.link_types.fields()
+        lt_fields = proj.network.link_types.fields
 
         # To edit the fields of the modes table
-        m_fields = proj.network.modes.fields()
+        m_fields = proj.network.modes.fields
 
     Field descriptions are kept in the table *attributes_documentation*
     """

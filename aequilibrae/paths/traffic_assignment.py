@@ -1,22 +1,23 @@
-from os import environ, path
 import importlib.util as iutil
-from typing import List
-from uuid import uuid4
+import socket
 import sqlite3
 from datetime import datetime
-import socket
+from os import environ, path
+from typing import List
+from uuid import uuid4
+
 import numpy as np
 import pandas as pd
-from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.paths.all_or_nothing import allOrNothing
-from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.matrix import AequilibraeData
-from aequilibrae.project.database_connection import database_connection
+
 from aequilibrae import Parameters
+from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths.linear_approximation import LinearApproximation
+from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.data import Matrices
+from aequilibrae.project.database_connection import ENVIRON_VAR
+from aequilibrae.project.database_connection import database_connection
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -257,7 +258,7 @@ class TrafficAssignment(object):
             raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
         self.__dict__["vdf_parameters"] = par
         pars = []
-        if self.vdf.function in ["BPR", "CONICAL"]:
+        if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
             for p1 in ["alpha", "beta"]:
                 if p1 not in par:
                     raise ValueError(f"{p1} should exist in the set of parameters provided")
@@ -406,16 +407,19 @@ class TrafficAssignment(object):
         """Processes assignment"""
         self.assignment.execute()
 
-    def save_results(self, table_name: str) -> None:
+    def save_results(self, table_name: str, keep_zero_flows=True) -> None:
         """Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
 
         Args:
             table_name (:obj:`str`): Name of the table to hold this assignment result
+            keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
         """
         df = self.results()
         conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
+        if not keep_zero_flows:
+            df = df[df.PCE_tot > 0]
         df.to_sql(table_name, conn)
         conn.close()
 
@@ -574,64 +578,67 @@ class TrafficAssignment(object):
         if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
-        file_name = f"{matrix_name}.{mat_format}"
-
         mats = Matrices()
-        export_name = path.join(mats.fldr, file_name)
+        for cls in self.classes:
+            file_name = f"{matrix_name}_{cls.__id__}.{mat_format}"
 
-        if path.isfile(export_name):
-            raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
+            export_name = path.join(mats.fldr, file_name)
 
-        if mats.check_exists(matrix_name):
-            raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
+            if path.isfile(export_name):
+                raise FileExistsError(f"{file_name} already exists. Choose a different name or matrix format")
 
-        avg_skims = self.classes[0].results.skims  # type: AequilibraeMatrix
+            if mats.check_exists(matrix_name):
+                raise FileExistsError(f"{matrix_name} already exists. Choose a different name")
 
-        # The ones for the last iteration are here
-        last_skims = self.classes[0]._aon_results.skims  # type: AequilibraeMatrix
+            avg_skims = cls.results.skims  # type: AequilibraeMatrix
 
-        names = []
-        if which_ones in ["final", "all"]:
-            for core in last_skims.names:
-                names.append(f"{core}_final")
+            # The ones for the last iteration are here
+            last_skims = cls._aon_results.skims  # type: AequilibraeMatrix
 
-        if which_ones in ["blended", "all"]:
-            for core in avg_skims.names:
-                names.append(f"{core}_blended")
+            names = []
+            if which_ones in ["final", "all"]:
+                for core in last_skims.names:
+                    names.append(f"{core}_final")
 
-        if not names:
-            raise ValueError("No skims to save")
-        # Assembling a single final skim file can be done like this
-        # We will want only the time for the last iteration and the distance averaged out for all iterations
-        working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
+            if which_ones in ["blended", "all"]:
+                for core in avg_skims.names:
+                    names.append(f"{core}_blended")
 
-        kwargs = {"file_name": working_name, "zones": self.classes[0].graph.centroids.shape[0], "matrix_names": names}
+            if not names:
+                continue
+            # Assembling a single final skim file can be done like this
+            # We will want only the time for the last iteration and the distance averaged out for all iterations
+            working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
 
-        # Create the matrix to manipulate
-        out_skims = AequilibraeMatrix()
-        out_skims.create_empty(**kwargs)
+            kwargs = {"file_name": working_name, "zones": self.classes[0].graph.centroids.shape[0],
+                      "matrix_names": names}
 
-        out_skims.index[:] = self.classes[0].graph.centroids[:]
-        out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}"
+            # Create the matrix to manipulate
+            out_skims = AequilibraeMatrix()
+            out_skims.create_empty(**kwargs)
 
-        if which_ones in ["final", "all"]:
-            for core in last_skims.names:
-                out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
+            out_skims.index[:] = self.classes[0].graph.centroids[:]
+            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls.__id__}"
 
-        if which_ones in ["blended", "all"]:
-            for core in avg_skims.names:
-                out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
+            if which_ones in ["final", "all"]:
+                for core in last_skims.names:
+                    out_skims.matrix[f"{core}_final"][:, :] = last_skims.matrix[core][:, :]
 
-        out_skims.matrices.flush()  # Make sure that all data went to the disk
+            if which_ones in ["blended", "all"]:
+                for core in avg_skims.names:
+                    out_skims.matrix[f"{core}_blended"][:, :] = avg_skims.matrix[core][:, :]
 
-        # If it were supposed to be an OMX, we export to one
-        if mat_format == "omx":
-            out_skims.export(export_name)
+            out_skims.matrices.flush()  # Make sure that all data went to the disk
 
-        # Now we create the appropriate record
-        record = mats.new_record(matrix_name, file_name)
-        record.procedure_id = self.procedure_id
-        record.timestamp = self.procedure_date
-        record.procedure = "Traffic Assignment"
-        record.description = "Skimming for assignment procedure"
-        record.save()
+            # If it were supposed to be an OMX, we export to one
+            if mat_format == "omx":
+                out_skims.export(export_name)
+
+            out_skims.description = f"Skimming for assignment procedure. Class {cls.__id__}"
+            # Now we create the appropriate record
+            record = mats.new_record(f"{matrix_name}_{cls.__id__}", file_name)
+            record.procedure_id = self.procedure_id
+            record.timestamp = self.procedure_date
+            record.procedure = "Traffic Assignment"
+            record.description = out_skims.description
+            record.save()
