@@ -32,7 +32,6 @@ jobs:
         cd ..
 
     - name: Stores artifacts along with the workflow result
-#      if: ${{ github.event_name == 'push'}}
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.numpy_version }}
