@@ -1,10 +1,10 @@
-numpy >= 1.14.0
+numpy
 scipy
 pyaml
 PyQt5
 cython
 pyshp
 requests
-shapely >= 1.7.0
+shapely
 pandas
 pyarrow
