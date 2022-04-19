@@ -54,11 +54,8 @@ jobs:
         python setup_windows_spatialite.py
         cd ..
 
-    - name: Compile library
-      run: |
-        cd aequilibrae/paths
-        python setup_Assignment.py build_ext --inplace
-        cd ../..
+    - name: Build
+      run: python setup.py sdist bdist_wheel
 
     - name: Runs test
       run: |
