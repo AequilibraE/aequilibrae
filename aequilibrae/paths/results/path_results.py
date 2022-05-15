@@ -1,6 +1,7 @@
 import numpy as np
-from aequilibrae.paths.graph import Graph
+
 from aequilibrae import logger
+from aequilibrae.paths.graph import Graph
 
 try:
     from aequilibrae.paths.AoN import update_path_trace, path_computation
@@ -110,7 +111,7 @@ class PathResults:
         self.connectors = np.zeros(self.nodes, dtype=self.__integer_type)
         self.reached_first = np.zeros(self.nodes, dtype=self.__integer_type)
         if self.num_skims:
-            self.skims = np.empty((graph.all_nodes[-1] + 1, self.num_skims), self.__float_type)
+            self.skims = np.empty((np.max(graph.all_nodes) + 1, self.num_skims), self.__float_type)
             self.skims.fill(np.inf)
             self._skimming_array = np.zeros((self.nodes, self.num_skims), self.__float_type)
         else:

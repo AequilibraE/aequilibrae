@@ -1,18 +1,20 @@
 import os
+import sys
 import uuid
+import zipfile
+from os.path import join
 from shutil import copytree
 from tempfile import gettempdir
-from uuid import uuid4
-from os.path import join
-import sys
 from unittest import TestCase
+from uuid import uuid4
+
+import numpy as np
 
 from aequilibrae import Project
 from aequilibrae.paths import path_computation, Graph
 from aequilibrae.paths.results import PathResults
 from aequilibrae.utils.create_example import create_example
-from ...data import triangle_graph_blocking
-import numpy as np
+from ...data import triangle_graph_blocking, st_varent_network
 
 # Adds the folder with the data to the path and collects the paths to the files
 lib_path = os.path.abspath(os.path.join("..", "../tests"))
@@ -62,7 +64,6 @@ class TestPathResults(TestCase):
             new_r.reset()
 
     def test_compute_paths(self):
-
         path_computation(5, 2, self.g, self.r)
 
         self.assertEqual(list(self.r.path), [12, 14], "Path computation failed. Wrong sequence of links")
@@ -71,7 +72,6 @@ class TestPathResults(TestCase):
         self.assertEqual(list(self.r.milepost), [0, 4, 9], "Path computation failed. Wrong milepost results")
 
     def test_compute_with_skimming(self):
-
         r = PathResults()
         self.g.set_skimming("free_flow_time")
         r.prepare(self.g)
@@ -174,3 +174,24 @@ class TestBlockingTrianglePathResults(TestCase):
         self.r.update_trace(6)
         self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
         self.assertEqual(list(self.r.path), [4, 1, 6])
+
+
+class TestCentroidsLast(TestCase):
+    def test_compute_paths_centroid_last_node_id(self):
+        # Issue 307 consisted of not being able to compute paths between two
+        # centroids if we were skimming and one of them had the highest node_id
+        # in the entire network
+        zipfile.ZipFile(st_varent_network).extractall(gettempdir())
+        self.st_varent = join(gettempdir(), 'St_Varent')
+        self.project = Project()
+        self.project.open(self.st_varent)
+        self.project.network.build_graphs()
+        self.g = self.project.network.graphs["c"]  # type: Graph
+        self.g.set_graph("distance")
+        self.g.set_skimming('distance')
+
+        self.r = PathResults()
+        self.r.prepare(self.g)
+
+        self.r.compute_path(387, 1067)
+        self.project.close()
