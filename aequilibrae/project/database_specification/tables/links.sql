@@ -1,16 +1,18 @@
-CREATE TABLE  if not exists links (ogc_fid      INTEGER PRIMARY KEY,
-                                   link_id      INTEGER NOT NULL UNIQUE,
-                                   a_node       INTEGER,
-                                   b_node       INTEGER,
-                                   direction    INTEGER NOT NULL DEFAULT 0,
-                                   distance     NUMERIC,
-                                   modes        TEXT    NOT NULL,
-                                   link_type    TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
-                                   'name'       TEXT,
-                                   speed_ab     NUMERIC,
-                                   speed_ba     NUMERIC,
-                                   capacity_ab  NUMERIC,
-                                   capacity_ba  NUMERIC
+CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
+                                   link_id         INTEGER NOT NULL UNIQUE,
+                                   a_node          INTEGER,
+                                   b_node          INTEGER,
+                                   direction       INTEGER NOT NULL DEFAULT 0,
+                                   distance        NUMERIC,
+                                   modes           TEXT    NOT NULL,
+                                   link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
+                                   'name'          TEXT,
+                                   speed_ab        NUMERIC,
+                                   speed_ba        NUMERIC,
+                                   travel_time_ab  NUMERIC,
+                                   travel_time_ba  NUMERIC,
+                                   capacity_ab     NUMERIC,
+                                   capacity_ba     NUMERIC
                                  );
 
 --#
@@ -57,4 +59,6 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
+--#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
 
