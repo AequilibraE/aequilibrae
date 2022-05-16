@@ -30,3 +30,5 @@ siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_pr
 
 #
 no_triggers_project = join(dirname(dirname(abspath(__file__))), "data/no_triggers_project")
+
+st_varent_network = join(dirname(abspath(__file__)), 'St_Varent_issue307.zip')
