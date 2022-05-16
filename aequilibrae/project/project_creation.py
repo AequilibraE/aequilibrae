@@ -66,7 +66,6 @@ def remove_triggers(conn: Connection) -> None:
 
 
 def run_queries_from_sql_file(conn: Connection, qry_file: str) -> None:
-
     with open(qry_file, "r") as sql_file:
         query_list = sql_file.read()
 
