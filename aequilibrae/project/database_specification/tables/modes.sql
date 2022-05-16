@@ -2,17 +2,7 @@ CREATE TABLE if not exists modes (mode_name   VARCHAR UNIQUE NOT NULL,
                                   mode_id     VARCHAR UNIQUE NOT NULL       PRIMARY KEY,
                                   description VARCHAR,
                                   pce         NUMERIC        NOT NULL DEFAULT 1.0,
-                                  vot         NUMERIC        NOT NULL DEFAULT 0,
-                                  alpha       NUMERIC,
-                                  beta        NUMERIC,
-                                  gamma       NUMERIC,
-                                  delta       NUMERIC,
-                                  epsilon     NUMERIC,
-                                  zeta        NUMERIC,
-                                  iota        NUMERIC,
-                                  sigma       NUMERIC,
-                                  phi         NUMERIC,
-                                  tau         NUMERIC);
+                                  vot         NUMERIC        NOT NULL DEFAULT 0);
 
 --#
 INSERT INTO 'modes' (mode_name, mode_id, description) VALUES('car', 'c', 'All motorized vehicles');

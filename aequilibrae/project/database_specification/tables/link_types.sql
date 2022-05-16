@@ -3,16 +3,7 @@ CREATE TABLE  if not exists link_types (link_type     VARCHAR UNIQUE NOT NULL PR
                                         description   VARCHAR,
                                         lanes         NUMERIC,
                                         lane_capacity NUMERIC,
-                                        alpha         NUMERIC,
-                                        beta          NUMERIC,
-                                        gamma         NUMERIC,
-                                        delta         NUMERIC,
-                                        epsilon       NUMERIC,
-                                        zeta          NUMERIC,
-                                        iota          NUMERIC,
-                                        sigma         NUMERIC,
-                                        phi           NUMERIC,
-                                        tau           NUMERIC);
+                                        speed         NUMERIC);
 
 --#
 INSERT INTO 'link_types' (link_type, link_type_id, description, lanes, lane_capacity) VALUES('centroid_connector', 'z', 'VIRTUAL centroid connectors only', 10, 10000);

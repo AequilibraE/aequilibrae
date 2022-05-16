@@ -9,7 +9,7 @@ model's network, and its main role is to support processes such as adding
 centroids and centroid connectors and to store reference data like default
 lane capacity for each link type.
 
-.. _tables_section6.2.1:
+.. _basic_fields:
 
 Basic fields
 ------------
@@ -21,20 +21,7 @@ link_table on the field *link_type*, while the latter is a single character that
 can be concatenated into the *nodes*** layer to identify the link_types that
 connect into each node.
 
-.. _tables_section6.2.2:
-
-Additional fields
------------------
-
-This table also has ten other fields named after the greek letters
-*alpha, beta, gamma, delta, epsilon, zeta, iota, sigma, phi* and *tau*.
-These fields are all numeric and exist to allow the user to store additional
-data related to link types (e.g. parameters for Volume-Delay functions).
-
-Descriptions of these fields can be included in the *link_types_attributes*
-table for the user's convenience.
-
-.. _tables_section6.2.3:
+.. _reserved_values:
 
 Reserved values
 ---------------
@@ -49,7 +36,7 @@ removed from the model without breaking it.
   when link types are irrelevant. The identifying letter for this mode is **y**.
   That is right, you have from a to x to create your own link types. :-D
 
-.. _tables_section6.2.4:
+.. _adding_new_link_types:
 
 Adding new link_types to an existing project
 --------------------------------------------
@@ -62,7 +49,7 @@ Adding new link_types to a project
 ----------------------------------
 **STILL NEED TO BUILD THE API FOR SUCH**
 
-.. _tables_section6.2.5:
+.. _consistency_triggers:
 
 Consistency triggers
 --------------------
@@ -71,7 +58,7 @@ As it happens with the links and nodes tables,
 with the links table through the use of database triggers
 
 
-.. _tables_section6.2.5.0:
+.. _change_reserved_types:
 
 Changes to reserved link_types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -81,7 +68,7 @@ and *link_type_id* fields, as well as the removal of any of these records are
 blocked by database triggers, as to ensure that there is always one generic
 physical link type and one virtual link type present in the model.
 
-.. _tables_section6.2.5.1:
+.. _change_link_type_for_link:
 
 Changing the link_type for a certain link
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -95,14 +82,14 @@ exists in the link table. If if it does not, the transaction will fail.
 We also need to update the **modes** field the nodes connected to the link with
 a new string of all the different link type IDs connected to them.
 
-.. _tables_section6.2.5.2:
+.. _adding_new_link:
 
 Adding a new link
 ^^^^^^^^^^^^^^^^^
-The exact same behaviour as for :ref:`tables_section6.2.5.1` applies in this
+The exact same behaviour as for :ref:`change_link_type_for_link` applies in this
 case, but it requires an specific trigger on the **creation** of the link.
 
-.. _tables_section6.2.5.3:
+.. _editing_lt_on_lt_table:
 
 Editing a link_type in the link_types table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -118,21 +105,21 @@ fails, the transaction will fail.
 The requirements for uniqueness and non-absent values are guaranteed during the
 construction of the modes table by using the keys **UNIQUE** and **NOT NULL**.
 
-.. _tables_section6.2.5.4:
+.. _adding_new_ltype:
 
 Adding a new link_type to the link_types table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In this case, only the first behaviour mentioned above on
-:ref:`tables_section6.2.5.3` applies, the verification that the link_type_id is
+:ref:`editing_lt_on_lt_table` applies, the verification that the link_type_id is
 exactly one character long. Therefore only one new trigger is required.
 
-.. _tables_section6.2.5.5:
+.. _deleting_ltype:
 
 Removing a link_type from the link_types table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In counterpoint, only the second behaviour mentioned above on
-:ref:`tables_section6.2.5.3` applies in this case, the verification that the old
+:ref:`editing_lt_on_lt_table` applies in this case, the verification that the old
 link_type is not still in use by the network. Therefore only one new trigger is
 required.
 
