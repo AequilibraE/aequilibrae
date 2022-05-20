@@ -20,9 +20,7 @@ jobs:
           pip install -r test_requirements.txt
 
       - name: Lint with flake8
-        run: |
-          pip install
-          flake8
+        run: flake8
 
   testing:
     needs: linting
@@ -56,20 +54,16 @@ jobs:
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
       run: |              
-         cd tests
-         python setup_windows_spatialite.py
-         cd ..
+         python tests/setup_windows_spatialite.py
 
     - name: Compile library
       run: |
         cd aequilibrae/paths
         python setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        cd ../..
 
     - name: Build
       run: python setup.py sdist bdist_wheel
 
     - name: Runs test
-      run: |
-        python -m pytest
+      run: python -m pytest
