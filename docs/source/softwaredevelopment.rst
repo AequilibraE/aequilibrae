@@ -177,7 +177,7 @@ Documentation
 
 All the AequilibraE documentation is (unfortunately) written in `reStructuredText
 <http://docutils.sourceforge.net/rst.html>`__  and built with `Sphinx <http://www.sphinx-doc.org/en/stable/>`__.
-Although Restructured Text is often unecessarily convoluted to write, Sphinx is capable of converting it to standard-
+Although Restructured Text is often unnecessarily convoluted to write, Sphinx is capable of converting it to standard-
 looking html pages, while also bringing the docstring documentation along for the ride.
 
 To build the documentation, first make sure the required packages are installed. If you have correctly setup the dev

@@ -35,7 +35,7 @@ jobs:
       run: python setup.py sdist bdist_wheel
 
     - name: Stores artifacts along with the workflow result
-      if: ${{ github.event_name == 'push'}}
+#      if: ${{ github.event_name == 'push'}}
       uses: actions/upload-artifact@v2
       with:
         name: library

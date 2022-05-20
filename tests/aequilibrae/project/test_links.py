@@ -1,12 +1,12 @@
-from unittest import TestCase
-from copy import copy, deepcopy
 import os
-from shutil import copytree, rmtree
 import uuid
+from copy import copy, deepcopy
 from random import randint
+from shutil import copytree, rmtree
 from tempfile import gettempdir
-from aequilibrae.project import Project
+from unittest import TestCase
 
+from aequilibrae.project import Project
 from ...data import siouxfalls_project
 
 
@@ -87,7 +87,7 @@ class TestLinks(TestCase):
 
     def test_fields(self):
         links = self.network.links
-        f_editor = links.fields()
+        f_editor = links.fields
 
         fields = sorted(f_editor.all_fields())
         self.curr.execute('pragma table_info(links)')

@@ -23,7 +23,7 @@ project = create_example(fldr)
 
 # We the project open, we can tell the logger to direct all messages to the terminal as well
 stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+formatter = logging.Formatter("%(asctime)s;%(name)s; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 
@@ -144,7 +144,7 @@ proj_matrices.list()
 demand = proj_matrices.get_matrix("demand_aem")
 
 # And the skims
-imped = proj_matrices.get_matrix("base_year_assignment_skims")
+imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 
 # %%
 
@@ -157,7 +157,6 @@ imped.names
 
 # But before using the data, let's get some impedance for the intrazonals
 # Let's assume it is 75% of the closest zone
-
 imped_core = "free_flow_time_final"
 imped.computational_view([imped_core])
 
@@ -243,7 +242,7 @@ vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
 # %%
 
 # Impedance
-imped = proj_matrices.get_matrix("base_year_assignment_skims")
+imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 imped.computational_view(["final_time_with_intrazonals"])
 
 # If we wanted the main diagonal to not be considered...
