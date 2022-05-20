@@ -45,21 +45,20 @@ jobs:
         pip install -r requirements.txt
         pip install -r test_requirements.txt
 
-    - name: Download spatialite
+    - name: Download spatialite on Linux
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-              sudo apt-get install libsqlite3-mod-spatialite
-              sudo apt-get install -y libspatialite-dev
-              pip3 install spatialite
-              sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-         elif [ "$RUNNER_OS" == "Windows" ]; then
-              cd tests
-              python setup_windows_spatialite.py
-              cd ..
-         else
-              echo "$RUNNER_OS not supported"
-              exit 1
-         fi
+        sudo apt-get install libsqlite3-mod-spatialite
+        sudo apt-get install -y libspatialite-dev
+        pip3 install spatialite
+        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+
+    - name: Download spatialite on Windows
+      if: matrix.os == 'windows-latest'
+      run: |              
+         cd tests
+         python setup_windows_spatialite.py
+         cd ..
 
     - name: Compile library
       run: |
