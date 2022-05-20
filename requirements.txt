@@ -1,4 +1,4 @@
-numpy >= 1.14.0
+numpy>=1.18.0,<1.22
 scipy
 pyaml
 PyQt5
