@@ -60,7 +60,7 @@ class TestNetwork_skimming(TestCase):
         skm.save_to_project('tEst_Skimming')
 
         matrix_dir = join(self.proj_dir, 'matrices')
-        if not isfile(matrix_dir, 'test_skimming.omx'):
+        if not isfile(join(matrix_dir, 'test_skimming.omx')):
             for path in Path(self.proj_dir).rglob('*'):
                 print(path.name)
             print(glob.glob(join(self.proj_dir, 'matrices', '*.*')))
