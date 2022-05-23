@@ -1,5 +1,6 @@
 import glob
 from os.path import join, isfile
+from pathlib import Path
 from unittest import TestCase
 import numpy as np
 from aequilibrae.paths.network_skimming import NetworkSkimming
@@ -58,7 +59,10 @@ class TestNetwork_skimming(TestCase):
 
         skm.save_to_project('tEst_Skimming')
 
-        if not isfile(join(self.proj_dir, 'matrices', 'test_skimming.omx')):
+        matrix_dir = join(self.proj_dir, 'matrices')
+        if not isfile(matrix_dir, 'test_skimming.omx'):
+            for path in Path(self.proj_dir).rglob('*'):
+                print(path.name)
             print(glob.glob(join(self.proj_dir, 'matrices', '*.*')))
             self.fail('Did not save project to project')
 
