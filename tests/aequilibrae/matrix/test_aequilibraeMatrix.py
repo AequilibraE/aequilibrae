@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+from os.path import join
 from shutil import copyfile
 import openmatrix as omx
 from unittest import TestCase
@@ -18,13 +19,13 @@ class TestAequilibraeMatrix(TestCase):
     matrix = None
 
     def setUp(self) -> None:
-        self.sf_skims = f"/Aequilibrae_matrix_{uuid.uuid4()}.omx"
-        copyfile(siouxfalls_skims, self.sf_skims)
         temp_folder = gettempdir()
-        self.name_test = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
-        self.copy_matrix_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.aem"
-        self.csv_export_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.csv"
-        self.omx_export_name = temp_folder + f"/Aequilibrae_matrix_{uuid.uuid4()}.omx"
+        self.sf_skims = join(temp_folder, f"Aequilibrae_matrix_{uuid.uuid4()}.omx")
+        copyfile(siouxfalls_skims, self.sf_skims)
+        self.name_test = join(temp_folder, f"Aequilibrae_matrix_{uuid.uuid4()}.aem")
+        self.copy_matrix_name = join(temp_folder, f"Aequilibrae_matrix_{uuid.uuid4()}.aem")
+        self.csv_export_name = join(temp_folder, f"Aequilibrae_matrix_{uuid.uuid4()}.csv")
+        self.omx_export_name = join(temp_folder, f"Aequilibrae_matrix_{uuid.uuid4()}.omx")
 
         if self.matrix is not None:
             return

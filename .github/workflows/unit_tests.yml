@@ -1,4 +1,4 @@
-name: Tests on Windows with linting
+name: Tests on all platforms with linting
 
 on: [pull_request]
 
@@ -10,7 +10,7 @@ jobs:
       - name: Set Python environment
         uses: actions/setup-python@v1
         with:
-          python-version: 3.7
+          python-version: 3.9
           architecture: x64
 
       - name: Install dependencies
@@ -20,17 +20,16 @@ jobs:
           pip install -r test_requirements.txt
 
       - name: Lint with flake8
-        run: |
-          pip install
-          flake8
+        run: flake8
 
   testing:
     needs: linting
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os}}
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8']
-        architecture: ['x64']
+        python-version: [ '3.7', '3.8', '3.9']
+        os: [windows-latest, ubuntu-latest]
+
       max-parallel: 20
     steps:
     - uses: actions/checkout@v2
@@ -38,27 +37,32 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: ${{ matrix.architecture }}
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r test_requirements.txt
 
-    - name: Download spatialite
+    - name: Download spatialite on Linux
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        cd tests
-        python setup_windows_spatialite.py
-        cd ..
+        sudo apt-get install libsqlite3-mod-spatialite
+        sudo apt-get install -y libspatialite-dev
+        pip3 install spatialite
+        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+
+    - name: Download spatialite on Windows
+      if: matrix.os == 'windows-latest'
+      run:  python tests/setup_windows_spatialite.py
 
     - name: Compile library
       run: |
         cd aequilibrae/paths
         python setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        cd ../..
+
+    - name: Build
+      run: python setup.py sdist bdist_wheel
 
     - name: Runs test
-      run: |
-        python -m pytest
+      run: python -m pytest
