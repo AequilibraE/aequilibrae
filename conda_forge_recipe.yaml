@@ -1,0 +1,52 @@
+{% set name = "aequilibrae" %}
+{% set version = "0.7.3" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/aequilibrae-{{ version }}.tar.gz
+  sha256: 0a77819f9b392692f1d7abf2ca22d3f91546727a9263bbd9d9b5b9eabaafaf40
+
+build:
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv
+  noarch: python
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+  host:
+    - pip
+    - python >= 3.8
+    - cython
+  run:
+    - numpy >= 1.14.0
+    - pandas
+    - pyaml
+    - pyarrow
+    - pyshp
+    - python >= 3.8
+    - requests
+    - scipy
+    - shapely >= 1.7.0
+    - {{ pin_compatible('numpy') }}
+
+test:
+  imports:
+    - aequilibrae
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/AequilibraE/aequilibrae
+  summary: A package for transportation modeling
+  license: AequilibraE Developers
+  license_file: LICENSE.txt
+
+extra:
+  recipe-maintainers:
+    - pedrocamargo
