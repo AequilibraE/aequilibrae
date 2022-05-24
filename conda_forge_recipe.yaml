@@ -1,5 +1,5 @@
 {% set name = "aequilibrae" %}
-{% set version = "0.7.3" %}
+{% set version = "0.7.4" %}
 
 package:
   name: {{ name|lower }}
@@ -22,7 +22,7 @@ requirements:
     - python >= 3.8
     - cython
   run:
-    - numpy >= 1.14.0
+    - numpy>=1.18.0,<1.22
     - pandas
     - pyaml
     - pyarrow
