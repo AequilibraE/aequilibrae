@@ -242,7 +242,7 @@ class Network(WorkerThread):
     def signal_handler(self, val):
         if pyqt:
             self.netsignal.emit(val)
-            
+
     def create_from_gmns(self, link_file_path: str, node_file_path: str) -> None:
         """
             Documentation in progress...
@@ -275,7 +275,7 @@ class Network(WorkerThread):
         gmns_nodes_df = pd.read_csv(node_file_path)
 
         # Checking if all required fields are in GMNS links and nodes files
-        
+
         for field in p.parameters["network"]["gmns"]["required_node_fields"]:
             if field not in gmns_nodes_df.columns.to_list():
                 raise ValueError(f"In GMNS nodes file: field '{field}' required, but not found.")
@@ -289,7 +289,7 @@ class Network(WorkerThread):
 
         if gmns_geometry_field not in gmns_links_df.columns.to_list():
             raise ValueError("To create an aequilibrae links table, a 'geometry' field must be provided. Geometry field not found in GMNS links file.")
-        
+
         # Adding 'lanes_ab' and 'lanes_ba' fields to links table
         # Also, adding 'notes' field to AequilibraE links and nodes tables if not already added
 
@@ -318,7 +318,7 @@ class Network(WorkerThread):
             gmns_links_df[gmns_distance_field] = None
 
         # Getting list of two-way links
-        
+
         df_count = gmns_links_df.groupby(["from_node_id", "to_node_id"], as_index=False).count()
         df_two_way_count = df_count[df_count.link_id >= 2]
         if df_two_way_count.shape[0] > 0:
@@ -342,12 +342,12 @@ class Network(WorkerThread):
 
         direction = gmns_links_df[gmns_direction_field].to_list()
 
-        if two_way_indices != []:    
+        if two_way_indices != []:
             for idx in two_way_indices:
                 direction[idx] = 0
 
         ## Assuming direction from 'from_node_id' to 'to_node_id' (direction=1) in case there is no information about it
-        
+
         for idx, i in enumerate(direction):
             if i not in [1, 0, -1]:
                 direction[idx] = 1
@@ -360,7 +360,7 @@ class Network(WorkerThread):
         capacity_ba = ['' for _ in range(len(gmns_links_df))]
         lanes_ab = ['' for _ in range(len(gmns_links_df))]
         lanes_ba = ['' for _ in range(len(gmns_links_df))]
-        
+
         for idx, row in gmns_links_df.iterrows():
             if gmns_speed_field in gmns_links_df.columns.to_list():
                 if direction[idx] == 1:
@@ -370,7 +370,7 @@ class Network(WorkerThread):
                 else:
                     speed_ab[idx] = row[gmns_speed_field]
                     speed_ba[idx] = row[gmns_speed_field]
-            
+
             if gmns_capacity_field in gmns_links_df.columns.to_list():
                 if direction[idx] == 1:
                     capacity_ab[idx] = row[gmns_capacity_field]
@@ -379,7 +379,7 @@ class Network(WorkerThread):
                 else:
                     capacity_ab[idx] = row[gmns_capacity_field]
                     capacity_ba[idx] = row[gmns_capacity_field]
-            
+
             if gmns_lanes_field in gmns_links_df.columns.to_list():
                 if direction[idx] == 1:
                     lanes_ab[idx] = row[gmns_lanes_field]
@@ -434,7 +434,7 @@ class Network(WorkerThread):
                 while not saved:
                     try:
                         ascii_lt = string.ascii_letters[ascii_idx]
-                    except:
+                    except IndexError:
                         raise ValueError("Error during creation of new link_type: all letters are currently in use.")
 
                     if ascii_lt not in list(self.link_types.all_types()):
@@ -468,7 +468,7 @@ class Network(WorkerThread):
                             modes.add(new_mode)
                             new_mode.description = 'Mode from GMNS link table'
                             new_mode.save()
-                    
+
         else:
             if gmns_link_type_field == "link_type_name" and gmns_link_type_field not in gmns_links_df.columns.to_list():
                 raise ValueError("GMNS table does not have information about modes or link types.")
@@ -484,7 +484,7 @@ class Network(WorkerThread):
 
                 elif row[gmns_link_type_field] in car_link_types:
                     modes_list[idx] = "c"
-                
+
                 elif row[gmns_link_type_field] in transit_link_types:
                     modes_list[idx] = "t"
 
@@ -499,7 +499,7 @@ class Network(WorkerThread):
             for idx, row in gmns_links_df.iterrows():
                 if row.bike_facility in gmns_bike_facilities and "b" not in modes_list[idx]:
                     modes_list[idx] += "b"
-        
+
         if 'ped_facility' in gmns_links_df.columns.to_list():
             for idx, row in gmns_links_df.iterrows():
                 if row.ped_facility in gmns_ped_facilities and "w" not in modes_list[idx]:
@@ -517,25 +517,25 @@ class Network(WorkerThread):
 
         aeq_links_df = pd.DataFrame({
             'link_id': gmns_links_df[gmns_link_id_field],
-            'a_node': gmns_links_df[gmns_a_node_field], 
-            'b_node': gmns_links_df[gmns_b_node_field], 
+            'a_node': gmns_links_df[gmns_a_node_field],
+            'b_node': gmns_links_df[gmns_b_node_field],
             'direction': direction,
             'distance': gmns_links_df[gmns_distance_field],
             'modes': modes_list,
             'link_type': link_types_list,
-            'name': name_list, 
+            'name': name_list,
             'speed_ab': speed_ab,
             'speed_ba': speed_ba,
             'capacity_ab': capacity_ab,
             'capacity_ba': capacity_ba,
-            'geometry': gmns_links_df.geometry, 
+            'geometry': gmns_links_df.geometry,
             'lanes_ab': lanes_ab,
             'lanes_ba': lanes_ba,
             'notes': 'from GMNS file'
         })
 
         n_query = '''
-            insert into nodes(node_id, is_centroid, geometry, notes) 
+            insert into nodes(node_id, is_centroid, geometry, notes)
             values(?,?,MakePoint(?,?, 4326),?);
         '''
         n_params_list = []
@@ -546,7 +546,7 @@ class Network(WorkerThread):
         self.conn.commit()
 
         l_query = '''
-            insert into links(link_id, a_node, b_node, direction, distance, modes, link_type, name, speed_ab, speed_ba, capacity_ab, capacity_ba, geometry, lanes_ab, lanes_ba, notes) 
+            insert into links(link_id, a_node, b_node, direction, distance, modes, link_type, name, speed_ab, speed_ba, capacity_ab, capacity_ba, geometry, lanes_ab, lanes_ba, notes)
             values(?,?,?,?,?,?,?,?,?,?,?,?,GeomFromTEXT(?,4326),?,?,?);
         '''
         l_params_list = []
@@ -559,7 +559,7 @@ class Network(WorkerThread):
                 row.distance,
                 row.modes,
                 row.link_type,
-                row['name'],    
+                row['name'],
                 row.speed_ab,
                 row.speed_ba,
                 row.capacity_ab,
@@ -569,7 +569,7 @@ class Network(WorkerThread):
                 row.lanes_ba,
                 row.notes
             ])
-        
+
         self.conn.executemany(l_query, l_params_list)
         self.conn.commit()
 
