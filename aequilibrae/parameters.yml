@@ -75,7 +75,7 @@ network:
       description: All links capable of supporting transit-vehicles
       letter: t
   - walk:
-      description: Linkes where walking is permitted
+      description: Links where walking is permitted
       letter: w
   - bicycle:
       description: All Bicycles
@@ -195,6 +195,192 @@ network:
         - trail
         - bridleway
         - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
+  gmns:
+    node_fields:
+      node_id: node_id
+    link_fields:
+      link_id: link_id
+      name: name
+      link_type: facility_type
+      modes: allowed_uses
+      a_node: from_node_id
+      b_node: to_node_id
+      direction: dir_flag
+      distance: length
+      speed: free_speed
+      capacity: capacity
+      lanes: lanes
+      geometry: geometry
+    modes_from_link_types: false
+    required_node_fields:
+      - node_id
+      - x_coord
+      - y_coord
+    required_link_fields:
+      - link_id
+      - from_node_id
+      - to_node_id
+      - directed
+    all_link_types:
+      - secondary_link
+      - escalator
+      - trail
+      - cycleway
+      - path
+      - trunk_link
+      - secondary
+      - escape
+      - track
+      - road
+      - motorway_link
+      - primary
+      - corridor
+      - residential
+      - footway
+      - motorway
+      - primary_link
+      - unclassified
+      - bus_guideway
+      - tertiary_link
+      - living_street
+      - pedestrian
+      - bridleway
+      - elevator
+      - motor
+      - trunk
+      - tertiary
+      - service
+      - steps
+      - proposed
+      - raceway
+      - construction
+      - abandoned
+      - platform
+      - unclassified
+    modes:
+      gmns_users:
+        - auto: 
+          - description: Includes_all_vehicles
+          - letters: shHT
+        - all: 
+          - description: Links_where_vehicles_and_walking_is_permitted
+          - letters: shHTwb
+        - bike:
+          - description: All_bicycles
+          - letters: b
+        - car:
+          - description: Includes_all_types_of_cars
+          - letters: shH
+        - hov2:
+          - description: Includes_high_occupancy_vehicles_having_two_occupants
+          - letters: h
+        - hov3+:
+          - description: Includes_high_occupancy_vehicles_having_a_minimum_of_three_occupants
+          - letters: H
+        - sov:
+          - description: Includes_single_occupancy_vehicles
+          - letters: s
+        - truck:
+          - description: Includes_trucks
+          - letters: T
+        - walk:
+          - description: Links_where_walking_is_permitted
+          - letters: w
+      bicycle:
+        gmns_users:
+          - bike
+          - all
+        link_types:
+          - cycleway
+          - corridor
+          - pedestrian
+          - path
+          - track
+          - trail
+          - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        gmns_users:
+          - sov
+          - hov2
+          - hov3+
+          - all
+          - auto
+          - car
+          - truck
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - escape
+          - road
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        gmns_users:
+          - sov
+          - hov2
+          - hov3+
+          - all
+          - auto
+          - car
+          - truck
+          - bus
+        link_types:
+          - motor
+          - motorway
+          - trunk
+          - primary
+          - secondary
+          - tertiary
+          - unclassified
+          - residential
+          - motorway_link
+          - trunk_link
+          - primary_link
+          - secondary_link
+          - tertiary_link
+          - living_street
+          - service
+          - escape
+          - road
+          - bus_guideway
+        unknown_tags: true
+      walk:
+        gmns_users:
+          - walk
+          - all
+        link_types:
+          - cycleway
+          - footway
+          - steps
+          - corridor
+          - pedestrian
+          - elevator
+          - escalator
+          - path
+          - track
+          - trail
+          - bridleway
+          - unclassified
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true
