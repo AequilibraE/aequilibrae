@@ -30,7 +30,7 @@ class Project:
 
         newfile = Project()
         newfile.new('path/to/new/project/folder')
-        """
+    """
 
     def __init__(self):
         self.path_to_file: str = None
@@ -142,8 +142,7 @@ class Project:
         return Parameters().parameters
 
     def check_file_indices(self) -> None:
-        """ Makes results_database.sqlite and the matrices folder compatible with project database
-        """
+        """Makes results_database.sqlite and the matrices folder compatible with project database"""
         raise NotImplementedError
 
     @property

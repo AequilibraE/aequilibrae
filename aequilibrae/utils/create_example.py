@@ -4,7 +4,7 @@ from os.path import dirname, join
 from aequilibrae import Project
 
 
-def create_example(path: str, from_model='sioux_falls') -> Project:
+def create_example(path: str, from_model="sioux_falls") -> Project:
     """Copies an example model to a new project project and returns the project handle
 
     Args:
@@ -14,15 +14,15 @@ def create_example(path: str, from_model='sioux_falls') -> Project:
     Returns:
         *project* (:obj:`Project`): Aequilibrae Project handle (open)
 
-        """
+    """
     if os.path.isdir(path):
-        raise FileExistsError('Cannot overwrite an existing directory')
+        raise FileExistsError("Cannot overwrite an existing directory")
 
-    if not os.path.isfile(join(dirname(__file__), f'../reference_files/{from_model}.zip')):
-        raise FileExistsError('Example not found')
+    if not os.path.isfile(join(dirname(__file__), f"../reference_files/{from_model}.zip")):
+        raise FileExistsError("Example not found")
 
     os.mkdir(path)
-    zipfile.ZipFile(join(dirname(__file__), f'../reference_files/{from_model}.zip')).extractall(path)
+    zipfile.ZipFile(join(dirname(__file__), f"../reference_files/{from_model}.zip")).extractall(path)
     proj = Project()
     proj.open(path)
     return proj

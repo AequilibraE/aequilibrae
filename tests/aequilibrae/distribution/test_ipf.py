@@ -14,7 +14,7 @@ from ...data import siouxfalls_project
 
 class TestIpf(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.proj_dir)
@@ -24,8 +24,8 @@ class TestIpf(TestCase):
         proj.open(self.proj_dir)
         mats = proj.matrices
         mats.update_database()
-        seed = mats.get_matrix('SiouxFalls_omx')
-        seed.computational_view('matrix')
+        seed = mats.get_matrix("SiouxFalls_omx")
+        seed.computational_view("matrix")
         # row vector
         args = {"entries": seed.zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
         row_vector = AequilibraeData()
@@ -52,12 +52,12 @@ class TestIpf(TestCase):
         }
 
         with self.assertRaises(TypeError):
-            fratar = Ipf(data='test', test='data')
+            fratar = Ipf(data="test", test="data")
             fratar.fit()
 
         with self.assertRaises(ValueError):
             fratar = Ipf(**args)
-            fratar.parameters = ['test']
+            fratar.parameters = ["test"]
             fratar.fit()
 
         fratar = Ipf(**args)
@@ -65,14 +65,16 @@ class TestIpf(TestCase):
 
         result = fratar.output
 
-        self.assertAlmostEqual(np.nansum(result.matrix_view), np.nansum(row_vector.data["rows"]), 4,
-                               "Ipf did not converge")
+        self.assertAlmostEqual(
+            np.nansum(result.matrix_view), np.nansum(row_vector.data["rows"]), 4, "Ipf did not converge"
+        )
         self.assertGreater(fratar.parameters["convergence level"], fratar.gap, "Ipf did not converge")
 
-        mr = fratar.save_to_project('my_matrix_ipf', 'my_matrix_ipf.aem')
+        mr = fratar.save_to_project("my_matrix_ipf", "my_matrix_ipf.aem")
 
-        self.assertTrue(os.path.isfile(os.path.join(mats.fldr, 'my_matrix_ipf.aem')),
-                        'Did not save file to the appropriate place')
+        self.assertTrue(
+            os.path.isfile(os.path.join(mats.fldr, "my_matrix_ipf.aem")), "Did not save file to the appropriate place"
+        )
 
-        self.assertEqual(mr.procedure_id, fratar.procedure_id, 'procedure ID saved wrong')
+        self.assertEqual(mr.procedure_id, fratar.procedure_id, "procedure ID saved wrong")
         proj.close()

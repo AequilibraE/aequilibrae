@@ -27,7 +27,7 @@ class TestPathResultsDisconnected(TestCase):
         self.project.close()
 
     def test_path_disconnected_delete_link(self):
-        self.project.conn.executemany('delete from Links where link_id=?', [[2], [4], [5], [14]])
+        self.project.conn.executemany("delete from Links where link_id=?", [[2], [4], [5], [14]])
         self.project.conn.commit()
 
         self.project.network.build_graphs()
@@ -37,9 +37,9 @@ class TestPathResultsDisconnected(TestCase):
         self.r = PathResults()
         self.r.prepare(self.g)
         self.r.compute_path(1, 5)
-        self.assertEqual(None, self.r.path, 'Failed to return None for disconnected')
+        self.assertEqual(None, self.r.path, "Failed to return None for disconnected")
         self.r.compute_path(1, 2)
-        self.assertEqual(len(self.r.path), 1, 'Returned the wrong thing for existing path on disconnected network')
+        self.assertEqual(len(self.r.path), 1, "Returned the wrong thing for existing path on disconnected network")
 
     def test_path_disconnected_penalize_link_in_memory(self):
         links = [2, 4, 5, 14]
@@ -52,6 +52,6 @@ class TestPathResultsDisconnected(TestCase):
         r = PathResults()
         r.prepare(g)
         r.compute_path(1, 5)
-        self.assertEqual(None, r.path, 'Failed to return None for disconnected')
+        self.assertEqual(None, r.path, "Failed to return None for disconnected")
         r.compute_path(1, 2)
-        self.assertEqual(len(r.path), 1, 'Returned the wrong thing for existing path on disconnected network')
+        self.assertEqual(len(r.path), 1, "Returned the wrong thing for existing path on disconnected network")

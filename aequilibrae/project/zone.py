@@ -60,12 +60,12 @@ class Zone(SafeClass):
     def add_centroid(self, point: Point, robust=True) -> None:
         """Adds a centroid to the network file
 
-               Args:
-                   *point* (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
-                   If None, uses the geometric center of the zone
-                   *robust* (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
-                   Defaults to True.
-               """
+        Args:
+            *point* (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
+            If None, uses the geometric center of the zone
+            *robust* (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
+            Defaults to True.
+        """
 
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
@@ -93,8 +93,7 @@ class Zone(SafeClass):
             test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
             while sum(test_list):
                 test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
-                point = Point(point.x + random.random() * shift,
-                              point.y + random.random() * shift)
+                point = Point(point.x + random.random() * shift, point.y + random.random() * shift)
 
         data = [self.zone_id, point.wkb, self.__srid__]
         self.conn.execute(sql, data)
@@ -103,26 +102,26 @@ class Zone(SafeClass):
     def connect_mode(self, mode_id: str, link_types="", connectors=1) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
-           Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
-           all those that satisfy the mode and link_types criteria and are inside the zone.
+        Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
+        all those that satisfy the mode and link_types criteria and are inside the zone.
 
-           The selection of the nodes that will be connected is done simply by computing running the
-           `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
-           clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
+        The selection of the nodes that will be connected is done simply by computing running the
+        `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
+        clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
 
-           When there are no node candidates inside the zone, the search area is progressively expanded until
-           at least one candidate is found.
+        When there are no node candidates inside the zone, the search area is progressively expanded until
+        at least one candidate is found.
 
-           If fewer candidates than required connectors are found, all candidates are connected.
+        If fewer candidates than required connectors are found, all candidates are connected.
 
-               Args:
-                   *mode_id* (:obj:`str`): Mode ID we are trying to connect
+            Args:
+                *mode_id* (:obj:`str`): Mode ID we are trying to connect
 
-                   *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
-                   eg: yCdR. Defaults to ALL link types
+                *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
+                eg: yCdR. Defaults to ALL link types
 
-                   *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
-           """
+                *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+        """
         connector_creation(
             self.geometry,
             zone_id=self.zone_id,
@@ -135,8 +134,8 @@ class Zone(SafeClass):
     def disconnect_mode(self, mode_id: str) -> None:
         """Removes centroid connectors for the desired mode from the network file
 
-               Args:
-                   *mode_id* (:obj:`str`): Mode ID we are trying to disconnect from this zone
+        Args:
+            *mode_id* (:obj:`str`): Mode ID we are trying to disconnect from this zone
         """
 
         curr = self.conn.cursor()

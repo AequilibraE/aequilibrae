@@ -11,11 +11,11 @@ pyqt = spec is not None
 
 class TestOSMDownloader(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
     def test_do_work(self):
         thresh = 0.05
-        if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
+        if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
             thresh = 1.01
 
         if random() < thresh:
@@ -24,11 +24,11 @@ class TestOSMDownloader(TestCase):
             if self.o.json:
                 self.fail("It found links in the middle of the ocean")
         else:
-            print('Skipped check to not load OSM servers')
+            print("Skipped check to not load OSM servers")
 
     def test_do_work2(self):
         thresh = 0.05
-        if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
+        if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
             thresh = 1.01
 
         if random() < thresh:
@@ -43,4 +43,4 @@ class TestOSMDownloader(TestCase):
             if len(self.o.json[0]["elements"]) < 10:
                 self.fail("It found too few elements in the middle of the Grand Canyon")
         else:
-            print('Skipped check to not load OSM servers')
+            print("Skipped check to not load OSM servers")

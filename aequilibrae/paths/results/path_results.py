@@ -6,7 +6,7 @@ from aequilibrae.paths.graph import Graph
 try:
     from aequilibrae.paths.AoN import update_path_trace, path_computation
 except ImportError as ie:
-    logger.warning(f'Could not import procedures from the binary. {ie.args}')
+    logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 
 class PathResults:
@@ -81,7 +81,7 @@ class PathResults:
         """
 
         if self.graph is None:
-            raise Exception('You need to set graph skimming before you compute a path')
+            raise Exception("You need to set graph skimming before you compute a path")
 
         path_computation(origin, destination, self.graph, self)
         if self.graph.skim_fields:

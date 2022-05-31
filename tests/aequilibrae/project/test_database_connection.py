@@ -8,7 +8,7 @@ from aequilibrae.project import Project
 
 class TestDatabaseConnection(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(tempfile.gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(tempfile.gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
     def test_database_connection(self):
         # Errors when project does not exist
@@ -25,7 +25,7 @@ class TestDatabaseConnection(TestCase):
         proj.open(temp_proj_folder)
         conn = database_connection()
         cursor = conn.cursor()
-        cursor.execute('select count(*) from links')
+        cursor.execute("select count(*) from links")
 
         self.assertEqual(cursor.fetchone()[0], 0, "Returned more links thant it should have")
         proj.close()

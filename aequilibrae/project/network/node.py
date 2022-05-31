@@ -35,7 +35,7 @@ class Node(SafeClass):
 
         # We can just save the node
         node1.save()
-        """
+    """
 
     def __init__(self, dataset):
         super().__init__(dataset)
@@ -122,29 +122,29 @@ class Node(SafeClass):
     def connect_mode(self, area: Polygon, mode_id: str, link_types="", connectors=1):
         """Adds centroid connectors for the desired mode to the network file
 
-           Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
-           all those that satisfy the mode and link_types criteria and are inside the provided area.
+        Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
+        all those that satisfy the mode and link_types criteria and are inside the provided area.
 
-           The selection of the nodes that will be connected is done simply by computing running the
-           `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
-           clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
+        The selection of the nodes that will be connected is done simply by computing running the
+        `KMeans2 <https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.vq.kmeans2.html>`_
+        clustering algorithm from SciPy and selecting the nodes closest to each cluster centroid.
 
-           When there are no node candidates inside the provided area, is it progressively expanded until
-           at least one candidate is found.
+        When there are no node candidates inside the provided area, is it progressively expanded until
+        at least one candidate is found.
 
-           If fewer candidates than required connectors are found, all candidates are connected.
+        If fewer candidates than required connectors are found, all candidates are connected.
 
-               Args:
+            Args:
 
-                   *area* (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
+                *area* (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
 
-                   *mode_id* (:obj:`str`): Mode ID we are trying to connect
+                *mode_id* (:obj:`str`): Mode ID we are trying to connect
 
-                   *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
-                   eg: yCdR. Defaults to ALL link types
+                *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
+                eg: yCdR. Defaults to ALL link types
 
-                   *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
-               """
+                *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+        """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
             warn("Connecting a mode only makes sense for centroids and not for regular nodes")
             return

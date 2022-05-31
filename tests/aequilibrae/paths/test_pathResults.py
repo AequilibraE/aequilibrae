@@ -90,7 +90,7 @@ class TestPathResults(TestCase):
 
 class TestBlockingTrianglePathResults(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(triangle_graph_blocking, self.proj_dir)
         self.project = Project()
@@ -182,13 +182,13 @@ class TestCentroidsLast(TestCase):
         # centroids if we were skimming and one of them had the highest node_id
         # in the entire network
         zipfile.ZipFile(st_varent_network).extractall(gettempdir())
-        self.st_varent = join(gettempdir(), 'St_Varent')
+        self.st_varent = join(gettempdir(), "St_Varent")
         self.project = Project()
         self.project.open(self.st_varent)
         self.project.network.build_graphs()
         self.g = self.project.network.graphs["c"]  # type: Graph
         self.g.set_graph("distance")
-        self.g.set_skimming('distance')
+        self.g.set_skimming("distance")
 
         self.r = PathResults()
         self.r.prepare(self.g)

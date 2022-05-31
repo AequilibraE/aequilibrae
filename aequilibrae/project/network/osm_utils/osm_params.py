@@ -1,8 +1,8 @@
 import requests
 from aequilibrae.parameters import Parameters
 
-par = Parameters().parameters['osm']
-accept_language = par['accept_language']
+par = Parameters().parameters["osm"]
+accept_language = par["accept_language"]
 memory = 0
 
 user_agent = "AequilibraE (https://github.com/aequilibrae/aequilibrae-GUI)"

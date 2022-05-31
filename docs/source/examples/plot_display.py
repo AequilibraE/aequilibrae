@@ -14,7 +14,8 @@ each mode in the network, a layer for all links and a layer for all nodes
 # %%
 from PIL import Image
 import matplotlib.pyplot as plt
-img = Image.open('plot_network_image.png')
+
+img = Image.open("plot_network_image.png")
 plt.imshow(img)
 
 
@@ -31,7 +32,7 @@ import folium
 fldr = join(gettempdir(), uuid4().hex)
 
 # Let's use the Nauru example project for display
-project = create_example(fldr, 'nauru')
+project = create_example(fldr, "nauru")
 
 # %%
 # We grab all the links data as a Pandas dataframe so we can process it easier
@@ -50,43 +51,55 @@ layers = [network_links, network_nodes, car, walk, bike, transit]
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
-    points = row.geometry.wkt.replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
-    points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
+    points = row.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
+    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
-    _ = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.modes}',
-                                      color='gray', weight=2).add_to(network_links)
+    _ = folium.vector_layers.PolyLine(
+        points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="gray", weight=2
+    ).add_to(network_links)
 
-    if 'w' in row.modes:
-        _ = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.modes}',
-                                             color='green', weight=4).add_to(walk)
+    if "w" in row.modes:
+        _ = folium.vector_layers.PolyLine(
+            points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="green", weight=4
+        ).add_to(walk)
 
-    if 'b' in row.modes:
-        _ = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.modes}',
-                                             color='green', weight=4).add_to(bike)
+    if "b" in row.modes:
+        _ = folium.vector_layers.PolyLine(
+            points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="green", weight=4
+        ).add_to(bike)
 
-    if 'c' in row.modes:
-        _ = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.modes}',
-                                             color='red', weight=4).add_to(car)
+    if "c" in row.modes:
+        _ = folium.vector_layers.PolyLine(
+            points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="red", weight=4
+        ).add_to(car)
 
-    if 't' in row.modes:
-        _ = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.modes}',
-                                             color='yellow', weight=4).add_to(transit)
+    if "t" in row.modes:
+        _ = folium.vector_layers.PolyLine(
+            points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="yellow", weight=4
+        ).add_to(transit)
 
 # And now we get the nodes
 
 for i, row in nodes.iterrows():
     point = (row.geometry.y, row.geometry.x)
 
-    _ = folium.vector_layers.CircleMarker(point, popup=f'<b>link_id: {row.node_id}</b>', tooltip=f'{row.modes}',
-                                          color='black', radius=5, fill=True, fillColor='black',
-                                          fillOpacity=1.0).add_to(network_nodes)
+    _ = folium.vector_layers.CircleMarker(
+        point,
+        popup=f"<b>link_id: {row.node_id}</b>",
+        tooltip=f"{row.modes}",
+        color="black",
+        radius=5,
+        fill=True,
+        fillColor="black",
+        fillOpacity=1.0,
+    ).add_to(network_nodes)
 
 # %%
 # We get the center of the region we are working with some SQL magic
 curr = project.conn.cursor()
-curr.execute('select avg(xmin), avg(ymin) from idx_links_geometry')
+curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%

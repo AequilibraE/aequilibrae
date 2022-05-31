@@ -45,14 +45,15 @@ class Link(SafeClass):
         # We can just save the link
         link1.save()
         link2.save()
-        """
+    """
+
     def __init__(self, dataset):
         super().__init__(dataset)
         self.__fields = list(dataset.keys())
 
-        self.__new = dataset['geometry'] is None
+        self.__new = dataset["geometry"] is None
         self.__stil_exists = True
-        self._table = 'links'
+        self._table = "links"
 
     def delete(self):
         """Deletes link from database"""
@@ -90,9 +91,9 @@ class Link(SafeClass):
         """
 
         if not isinstance(modes, str):
-            raise ValueError('Modes field needs to be a string')
-        if modes == '':
-            raise ValueError('Modes field needs to have at least one mode')
+            raise ValueError("Modes field needs to be a string")
+        if modes == "":
+            raise ValueError("Modes field needs to have at least one mode")
 
         self.__dict__["modes"] = modes
 
@@ -107,7 +108,7 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id in self.modes:
-            logger.warning('Mode already active for this link')
+            logger.warning("Mode already active for this link")
             return
 
         self.__dict__["modes"] += mode_id
@@ -124,13 +125,13 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id not in self.modes:
-            logger.warning('Mode already inactive for this link')
+            logger.warning("Mode already inactive for this link")
             return
 
         if len(self.modes) == 1:
-            raise ValueError('Link needs to have at least one mode')
+            raise ValueError("Link needs to have at least one mode")
 
-        self.__dict__['modes'] = self.modes.replace(mode_id, '')
+        self.__dict__["modes"] = self.modes.replace(mode_id, "")
 
     def data_fields(self) -> list:
         """lists all data fields for the link, as available in the database
@@ -149,48 +150,48 @@ class Link(SafeClass):
             mode_id = mode.mode_id
         elif isinstance(mode, str):
             if len(mode) > 1:
-                raise ValueError('A mode_id is a single character')
+                raise ValueError("A mode_id is a single character")
             mode_id = mode
         else:
-            raise TypeError('You should provide a mode id (string) or a Mode object')
+            raise TypeError("You should provide a mode id (string) or a Mode object")
         return mode_id
 
     def __save_existing_link(self):
         data = []
-        if self.link_id != self.__original__['link_id']:
-            raise ValueError('One cannot change the link_id')
+        if self.link_id != self.__original__["link_id"]:
+            raise ValueError("One cannot change the link_id")
 
         txts = []
         for key, val in self.__dict__.items():
             if key not in self.__original__:
                 continue
             if val != self.__original__[key]:
-                if key == 'geometry' and val is not None:
+                if key == "geometry" and val is not None:
                     data.extend([val.wkb, self.__srid__])
-                    txts.append('geometry=GeomFromWKB(?, ?)')
+                    txts.append("geometry=GeomFromWKB(?, ?)")
                 else:
                     data.append(val)
                     txts.append(f'"{key}"=?')
 
         if not data:
-            logger.warning(f'Nothing to update for link {self.link_id}')
-            return [], ''
+            logger.warning(f"Nothing to update for link {self.link_id}")
+            return [], ""
 
-        txts = ','.join(txts) + ' where link_id=?'
+        txts = ",".join(txts) + " where link_id=?"
         data.append(self.link_id)
-        sql = f'Update Links set {txts}'
+        sql = f"Update Links set {txts}"
         return data, sql
 
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":
             raise AttributeError(f'"{instance}" is not a valid attribute for a link')
-        if instance == 'modes':
+        if instance == "modes":
             self.set_modes(value)
-        elif instance == 'a_node':
-            raise AttributeError('Setting a_node is not allowed')
-        elif instance == 'b_node':
-            raise AttributeError('Setting b_node is not allowed')
-        elif instance == 'link_id':
-            raise ValueError('Changing a link_id is not supported. Create a new one and delete this')
+        elif instance == "a_node":
+            raise AttributeError("Setting a_node is not allowed")
+        elif instance == "b_node":
+            raise AttributeError("Setting b_node is not allowed")
+        elif instance == "link_id":
+            raise ValueError("Changing a link_id is not supported. Create a new one and delete this")
         else:
             self.__dict__[instance] = value

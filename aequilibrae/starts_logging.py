@@ -34,7 +34,7 @@ def StartsLogging():
         if do_log:
             ch = logging.FileHandler(log_file)
         ch.setFormatter(formatter)
-        ch.name = 'aequilibrae'
+        ch.name = "aequilibrae"
         ch.setLevel(logging.DEBUG)
         logger.addHandler(ch)
     return logger

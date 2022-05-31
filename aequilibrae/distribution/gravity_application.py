@@ -152,8 +152,8 @@ class GravityApplication:
         self.output = None
         self.gap = np.inf
         self.logger = logging.getLogger("aequilibrae")
-        self.procedure_date = ''
-        self.procedure_id = ''
+        self.procedure_date = ""
+        self.procedure_id = ""
         self.__ipf = None  # type: Ipf
 
     def apply(self):
@@ -205,7 +205,7 @@ class GravityApplication:
         self.output = self.__ipf.output
         self.gap = self.__ipf.gap
 
-        self.report.extend(self.__ipf.report[1:] + ['', ''])
+        self.report.extend(self.__ipf.report[1:] + ["", ""])
         self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view))))
         intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
@@ -229,8 +229,8 @@ class GravityApplication:
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
-        record.procedure = 'Synthetic gravity trip distribution'
-        record.description = f'Synthetic gravity trip distribution. {self.model.function}'
+        record.procedure = "Synthetic gravity trip distribution"
+        record.description = f"Synthetic gravity trip distribution. {self.model.function}"
         record.save()
 
     def __get_parameters(self):
@@ -312,13 +312,16 @@ class GravityApplication:
 
             elif self.model.function == "POWER":
                 # self.output.matrices[self.core_name][i, :] = (np.power(self.impedance.matrix_view[i, :, 0], - self.model.alpha) * p * a)[:]
-                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p
-                                                 * a)[:]
+                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p * a)[
+                    :
+                ]
             elif self.model.function == "GAMMA":
-                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], self.model.alpha)
-                                                 * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
-                                                 * p
-                                                 * a)[:]
+                self.output.matrix_view[i, :] = (
+                    np.power(self.impedance.matrix_view[i, :], self.model.alpha)
+                    * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
+                    * p
+                    * a
+                )[:]
 
         # Deals with infinite and NaNs
         infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)

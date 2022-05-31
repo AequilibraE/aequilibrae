@@ -30,10 +30,10 @@ class Log:
             *log_contents* (:obj:`list`): List with all entries in the log file
         """
 
-        with open(self.log_file_path, 'r') as file:
+        with open(self.log_file_path, "r") as file:
             return [x.strip() for x in file.readlines()]
 
     def clear(self):
         """Clears the log file. Use it wisely"""
-        with open(self.log_file_path, 'w') as _:
+        with open(self.log_file_path, "w") as _:
             pass

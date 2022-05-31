@@ -18,8 +18,8 @@ class TestLinkType(TestCase):
         self.proj.open(self.temp_proj_folder)
         self.curr = self.proj.conn.cursor()
 
-        letters = [random.choice(string.ascii_letters + '_') for x in range(20)]
-        self.random_string = ''.join(letters)
+        letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
+        self.random_string = "".join(letters)
 
     def tearDown(self) -> None:
         self.proj.close()
@@ -30,15 +30,15 @@ class TestLinkType(TestCase):
         lt = random.choice([x for x in ltypes.all_types().values()])
 
         with self.assertRaises(ValueError):
-            lt.link_type_id = 'test my description'
+            lt.link_type_id = "test my description"
 
         with self.assertRaises(ValueError):
-            lt.link_type_id = 'K'
+            lt.link_type_id = "K"
 
     def test_empty(self):
         ltypes = self.proj.network.link_types
 
-        newt = ltypes.new('Z')
+        newt = ltypes.new("Z")
         # a.link_type = 'just a_test'
         with self.assertRaises(IntegrityError):
             newt.save()
@@ -46,7 +46,7 @@ class TestLinkType(TestCase):
     def test_save(self):
         ltypes = self.proj.network.link_types
 
-        newt = ltypes.new('Z')
+        newt = ltypes.new("Z")
         newt.link_type = self.random_string
         newt.description = self.random_string[::-1]
         newt.save()
