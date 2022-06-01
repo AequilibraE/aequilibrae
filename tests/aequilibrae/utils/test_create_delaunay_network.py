@@ -16,13 +16,13 @@ class TestDelaunayAnalysis(TestCase):
     def test_create_delaunay_network(self):
         da = DelaunayAnalysis()
         with self.assertRaises(ValueError):
-            da.create_network('nodes')
+            da.create_network("nodes")
 
         da.create_network()
-        self.assertEqual(59, self.proj.conn.execute('select count(*) from delaunay_network').fetchone()[0])
+        self.assertEqual(59, self.proj.conn.execute("select count(*) from delaunay_network").fetchone()[0])
 
-        da.create_network('network', True)
-        self.assertEqual(62, self.proj.conn.execute('select count(*) from delaunay_network').fetchone()[0])
+        da.create_network("network", True)
+        self.assertEqual(62, self.proj.conn.execute("select count(*) from delaunay_network").fetchone()[0])
 
         with self.assertRaises(ValueError):
             da.create_network()
@@ -32,4 +32,4 @@ class TestDelaunayAnalysis(TestCase):
         demand.computational_view(["matrix"])
         da = DelaunayAnalysis()
         da.create_network()
-        da.assign_matrix(demand, 'delaunay_test')
+        da.assign_matrix(demand, "delaunay_test")

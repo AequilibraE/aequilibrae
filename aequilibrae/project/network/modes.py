@@ -53,6 +53,7 @@ class Modes:
         new_mode.description = 'this is my new description'
         new_mode.save()
     """
+
     __items = {}
 
     def __init__(self, net):
@@ -62,14 +63,14 @@ class Modes:
         self.__update_list_of_modes()
 
     def add(self, mode: Mode) -> None:
-        """ We add a mode to the project"""
+        """We add a mode to the project"""
         self.__update_list_of_modes()
         if mode.mode_id in self.__all_modes:
             raise ValueError("Mode already exists in the model")
 
         self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
         self.conn.commit()
-        logger.info(f'mode {mode.mode_name}({mode.mode_id}) was added to the project')
+        logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
         mode.save()
         self.__update_list_of_modes()
 
@@ -79,21 +80,21 @@ class Modes:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
             self.conn.commit()
         except IntegrityError as e:
-            logger.error(f'Failed to remove mode {mode_id}. {e.args}')
+            logger.error(f"Failed to remove mode {mode_id}. {e.args}")
             raise e
-        logger.warning(f'Mode {mode_id} was successfully removed from the database')
+        logger.warning(f"Mode {mode_id} was successfully removed from the database")
         self.__update_list_of_modes()
 
     @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
-        return FieldEditor('modes')
+        return FieldEditor("modes")
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""
         self.__update_list_of_modes()
         if mode_id not in self.__all_modes:
-            raise ValueError(f'Mode {mode_id} does not exist in the model')
+            raise ValueError(f"Mode {mode_id} does not exist in the model")
         return Mode(mode_id)
 
     def get_by_name(self, mode: str) -> Mode:
@@ -102,7 +103,7 @@ class Modes:
         self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
         found = self.curr.fetchone()
         if len(found) == 0:
-            raise ValueError(f'Mode {mode} does not exist in the model')
+            raise ValueError(f"Mode {mode} does not exist in the model")
         return Mode(found[0])
 
     def all_modes(self) -> dict:
@@ -122,10 +123,10 @@ class Modes:
         self.__all_modes = [x[0] for x in self.curr.fetchall()]
 
     def __copy__(self):
-        raise Exception('Modes object cannot be copied')
+        raise Exception("Modes object cannot be copied")
 
     def __deepcopy__(self, memodict=None):
-        raise Exception('Modes object cannot be copied')
+        raise Exception("Modes object cannot be copied")
 
     def __del__(self):
         self.__items.clear()
@@ -133,4 +134,4 @@ class Modes:
     def __has_mode(self):
         curr = self.conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(['modes' in x[0] for x in curr.fetchall()])
+        return any(["modes" in x[0] for x in curr.fetchall()])

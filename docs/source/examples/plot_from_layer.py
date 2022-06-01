@@ -32,7 +32,7 @@ project.new(fldr)
 # we will download from the AequilibraE website)
 # With data, we load it on Pandas
 dest_path = join(fldr, "queluz.csv")
-urllib.request.urlretrieve('https://aequilibrae.com/data/queluz.csv', dest_path)
+urllib.request.urlretrieve("https://aequilibrae.com/data/queluz.csv", dest_path)
 
 df = pd.read_csv(dest_path)
 
@@ -76,7 +76,7 @@ existing_modes = {k: v.mode_name for k, v in md_dict.items()}
 # the model
 
 # We get all the unique mode combinations and merge into a single string
-all_variations_string = ''.join(df.modes.unique())
+all_variations_string = "".join(df.modes.unique())
 
 # We then get all the unique modes in that string above
 all_modes = set(all_variations_string)
@@ -90,7 +90,7 @@ modes_to_add = [mode for mode in all_modes if mode not in existing_modes]
 for i, mode_id in enumerate(modes_to_add):
     new_mode = md.new(mode_id)
     # You would need to figure out the right name for each one, but this will do
-    new_mode.mode_name = f'Mode_from_original_data_{mode_id}'
+    new_mode.mode_name = f"Mode_from_original_data_{mode_id}"
     # new_type.description = 'Your custom description here if you have one'
 
     # It is a little different, because you need to add it to the project
@@ -104,7 +104,7 @@ for i, mode_id in enumerate(modes_to_add):
 links = project.network.links
 link_data = links.fields
 # Create the field and add a good description for it
-link_data.add('source_id', 'link_id from the data source')
+link_data.add("source_id", "link_id from the data source")
 
 # We need to refresh the fields so the adding method can see it
 links.refresh_fields()
@@ -135,18 +135,19 @@ network_links = folium.FeatureGroup("links")
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
-    points = row.geometry.wkt.replace('LINESTRING ', '').replace('(', '').replace(')', '').split(', ')
-    points = '[[' + '],['.join([p.replace(' ', ', ') for p in points]) + ']]'
+    points = row.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
+    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
-    line = folium.vector_layers.PolyLine(points, popup=f'<b>link_id: {row.link_id}</b>', tooltip=f'{row.link_type}',
-                                         color='blue', weight=10).add_to(network_links)
+    line = folium.vector_layers.PolyLine(
+        points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.link_type}", color="blue", weight=10
+    ).add_to(network_links)
 
 # %%
 # We get the center of the region we are working with some SQL magic
 curr = project.conn.cursor()
-curr.execute('select avg(xmin), avg(ymin) from idx_links_geometry')
+curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%
@@ -164,13 +165,13 @@ project.close()
 from PIL import Image
 import matplotlib.pyplot as plt
 
-pic = 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg'
-pic_local = join(fldr, 'queluz.jpg')
-headers = {'User-Agent': "AequilibraE (https://aequilibrae.com/; contact@aequilibrae.com)  python-library/0.7"}
+pic = "https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg"
+pic_local = join(fldr, "queluz.jpg")
+headers = {"User-Agent": "AequilibraE (https://aequilibrae.com/; contact@aequilibrae.com)  python-library/0.7"}
 
 response = requests.get(pic, headers=headers)
 if response.status_code == 200:
-    with open(pic_local, 'wb') as f:
+    with open(pic_local, "wb") as f:
         f.write(response.content)
 
     img = Image.open(pic_local)

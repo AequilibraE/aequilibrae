@@ -39,10 +39,10 @@ class OSMDownloader(WorkerThread):
         self.filter = self.get_osm_filter(modes)
         self.report = []
         self.json = []
-        par = Parameters().parameters['osm']
-        self.overpass_endpoint = par['overpass_endpoint']
-        self.timeout = par['timeout']
-        self.sleeptime = par['sleeptime']
+        par = Parameters().parameters["osm"]
+        self.overpass_endpoint = par["overpass_endpoint"]
+        self.timeout = par["timeout"]
+        self.sleeptime = par["sleeptime"]
 
     def doWork(self):
         infrastructure = 'way["highway"]'
@@ -52,9 +52,9 @@ class OSMDownloader(WorkerThread):
         )
         self.__emit_all(["maxValue", len(self.polygons)])
         self.__emit_all(["Value", 0])
-        m = ''
+        m = ""
         if memory > 0:
-            m = f'[maxsize: {memory}]'
+            m = f"[maxsize: {memory}]"
         for counter, poly in enumerate(self.polygons):
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
             logger.debug(msg)
@@ -69,7 +69,7 @@ class OSMDownloader(WorkerThread):
                 infrastructure=infrastructure,
                 filters=self.filter,
                 timeout=self.timeout,
-                memory=m
+                memory=m,
             )
             json = self.overpass_request(data={"data": query_str}, timeout=self.timeout)
             if json["elements"]:

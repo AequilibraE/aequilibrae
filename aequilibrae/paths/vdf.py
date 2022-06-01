@@ -48,6 +48,5 @@ class VDF:
             raise AttributeError("This class only allows you to set the VDF to use")
 
     def functions_available(self) -> list:
-        """returns a list of all functions available
-        """
+        """returns a list of all functions available"""
         return all_vdf_functions

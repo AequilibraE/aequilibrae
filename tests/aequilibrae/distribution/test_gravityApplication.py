@@ -8,7 +8,7 @@ import os
 zones = 10
 
 # row vector
-args = {"entries": zones, "field_names": [u"rows"], "data_types": [np.float64], "memory_mode": True}
+args = {"entries": zones, "field_names": ["rows"], "data_types": [np.float64], "memory_mode": True}
 
 row_vector = AequilibraeData()
 row_vector.create_empty(**args)

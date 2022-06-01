@@ -6,8 +6,10 @@ def clean():
     # extraneous nodes at a few key moments (i.e. opening and closing the model)
     conn = database_connection()
 
-    sqls = ['''DELETE from Nodes where is_centroid=0 and
-                                      (SELECT count(*) FROM links WHERE a_node = node_id OR b_node = node_id) = 0;''']
+    sqls = [
+        """DELETE from Nodes where is_centroid=0 and
+                                      (SELECT count(*) FROM links WHERE a_node = node_id OR b_node = node_id) = 0;"""
+    ]
 
     for sql in sqls:
         conn.execute(sql)

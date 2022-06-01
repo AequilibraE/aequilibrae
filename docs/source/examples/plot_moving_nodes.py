@@ -38,13 +38,13 @@ node.save()
 # We plot the entire network
 links.refresh()
 curr = project.conn.cursor()
-curr.execute('Select link_id from links;')
+curr.execute("Select link_id from links;")
 
 for lid in curr.fetchall():
     geo = links.get(lid[0]).geometry
-    plt.plot(*geo.xy, color='blue')
+    plt.plot(*geo.xy, color="blue")
 
-plt.plot(*node.geometry.xy, 'ro', color='black')
+plt.plot(*node.geometry.xy, "ro", color="black")
 
 plt.show()
 

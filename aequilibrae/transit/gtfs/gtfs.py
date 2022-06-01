@@ -9,13 +9,13 @@ from .parse_csv import parse_csv
 
 class GTFS:
     """
-     Reader for GTFS (from https://developers.google.com/transit/gtfs/reference/)
+    Reader for GTFS (from https://developers.google.com/transit/gtfs/reference/)
 
-     Provides a memory container for GTFS that can be:
+    Provides a memory container for GTFS that can be:
 
-        * Passed to transit assignment algorithms in memory
-        * Edited and saved back to disk
-        * Displayed in a GIS environment
+       * Passed to transit assignment algorithms in memory
+       * Edited and saved back to disk
+       * Displayed in a GIS environment
     """
 
     def __init__(self):

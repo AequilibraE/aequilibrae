@@ -512,13 +512,13 @@ class TrafficAssignment(object):
     def report(self) -> pd.DataFrame:
         """Returns the assignment convergence report
 
-         Returns:
-            *DataFrame* (:obj:`pd.DataFrame`): Convergence report
+        Returns:
+           *DataFrame* (:obj:`pd.DataFrame`): Convergence report
         """
         return pd.DataFrame(self.assignment.convergence_report)
 
     def info(self) -> dict:
-        """ Returns information for the traffic assignment procedure
+        """Returns information for the traffic assignment procedure
 
         Dictionary contains keys  'Algorithm', 'Classes', 'Computer name', 'Procedure ID',
         'Maximum iterations' and 'Target RGap'.
@@ -610,8 +610,11 @@ class TrafficAssignment(object):
             # We will want only the time for the last iteration and the distance averaged out for all iterations
             working_name = export_name if mat_format == "aem" else AequilibraeMatrix().random_name()
 
-            kwargs = {"file_name": working_name, "zones": self.classes[0].graph.centroids.shape[0],
-                      "matrix_names": names}
+            kwargs = {
+                "file_name": working_name,
+                "zones": self.classes[0].graph.centroids.shape[0],
+                "matrix_names": names,
+            }
 
             # Create the matrix to manipulate
             out_skims = AequilibraeMatrix()

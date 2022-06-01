@@ -11,7 +11,7 @@ class BasicTable:
     """
 
     def __init__(self):
-        self.__table_type__ = ''
+        self.__table_type__ = ""
         self.conn = database_connection()
         self._curr = self.conn.cursor()
 

@@ -40,7 +40,7 @@ class TestGravityCalibration(TestCase):
     def test_calibrate_with_omx(self):
         imped = AequilibraeMatrix()
         imped.load(siouxfalls_skims)
-        imped.computational_view(['free_flow_time'])
+        imped.computational_view(["free_flow_time"])
 
         mat = AequilibraeMatrix()
         mat.load(siouxfalls_demand)

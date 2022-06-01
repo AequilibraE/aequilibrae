@@ -42,7 +42,7 @@ class Links(BasicTable):
 
     def __init__(self):
         super().__init__()
-        self.__table_type__ = 'links'
+        self.__table_type__ = "links"
         if self.sql == "":
             self.refresh_fields()
 
@@ -56,7 +56,7 @@ class Links(BasicTable):
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
         link_id = int(link_id)
         if link_id in self.__items:
             link = self.__items[link_id]
@@ -71,9 +71,9 @@ class Links(BasicTable):
     def new(self) -> Link:
         """Creates a new link
 
-            Returns:
-                *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
-                """
+        Returns:
+            *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
+        """
 
         data = {key: None for key in self.__fields}
         data["direction"] = 0
@@ -92,7 +92,7 @@ class Links(BasicTable):
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
 
         data = self.__link_data(int(link_id))
         data["link_id"] = self.__new_link_id()
@@ -136,7 +136,7 @@ class Links(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """ Returns all links data as a Pandas dataFrame
+        """Returns all links data as a Pandas dataFrame
 
         Returns:
             *table* (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry

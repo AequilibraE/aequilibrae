@@ -16,50 +16,49 @@ has_omx = spec is not None
 class Ipf:
     """Iterative proportional fitting procedure
 
-        ::
+    ::
 
-            import pandas as pd
-            from aequilibrae.distribution import Ipf
-            from aequilibrae.matrix import AequilibraeMatrix
-            from aequilibrae.matrix import AequilibraeData
+        import pandas as pd
+        from aequilibrae.distribution import Ipf
+        from aequilibrae.matrix import AequilibraeMatrix
+        from aequilibrae.matrix import AequilibraeData
 
-            matrix = AequilibraeMatrix()
+        matrix = AequilibraeMatrix()
 
-            # Here we can create from OMX or load from an AequilibraE matrix.
-            matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
+        # Here we can create from OMX or load from an AequilibraE matrix.
+        matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
 
-            # The matrix will be operated one (see the note on overwriting), so it does
-            # not make sense load an OMX matrix
+        # The matrix will be operated one (see the note on overwriting), so it does
+        # not make sense load an OMX matrix
 
 
-            source_vectors = pd.read_csv(path/to/CSVs)
-            zones = source_vectors.zone.shape[0]
+        source_vectors = pd.read_csv(path/to/CSVs)
+        zones = source_vectors.zone.shape[0]
 
-            args = {"entries": zones, "field_names": ["productions", "attractions"],
-                    "data_types": [np.float64, np.float64], "memory_mode": True}
+        args = {"entries": zones, "field_names": ["productions", "attractions"],
+                "data_types": [np.float64, np.float64], "memory_mode": True}
 
-            vectors = AequilibraEData()
-            vectors.create_empty(**args)
+        vectors = AequilibraEData()
+        vectors.create_empty(**args)
 
-            vectors.productions[:] = source_vectors.productions[:]
-            vectors.attractions[:] = source_vectors.attractions[:]
+        vectors.productions[:] = source_vectors.productions[:]
+        vectors.attractions[:] = source_vectors.attractions[:]
 
-            # We assume that the indices would be sorted and that they would match the matrix indices
-            vectors.index[:] = source_vectors.zones[:]
+        # We assume that the indices would be sorted and that they would match the matrix indices
+        vectors.index[:] = source_vectors.zones[:]
 
-            args = {
-                    "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
-                    "column_field": "attractions", "nan_as_zero": False}
+        args = {
+                "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
+                "column_field": "attractions", "nan_as_zero": False}
 
-            fratar = Ipf(**args)
+        fratar = Ipf(**args)
 
-             fratar.fit()
+         fratar.fit()
 
-            # We can get back to our OMX matrix in the end
-            fratar.output.export(path/to_omx/output.omx)
-            fratar.output.export(path/to_aem/output.aem)
-
-"""
+        # We can get back to our OMX matrix in the end
+        fratar.output.export(path/to_omx/output.omx)
+        fratar.output.export(path/to_aem/output.aem)
+    """
 
     def __init__(self, **kwargs):
         """
@@ -110,8 +109,8 @@ class Ipf:
         self.error_free = True
         self.report = ["  #####    IPF computation    #####  ", ""]
         self.gap = None
-        self.procedure_date = ''
-        self.procedure_id = ''
+        self.procedure_date = ""
+        self.procedure_id = ""
 
     def __check_data(self):
         self.error = None
@@ -191,8 +190,9 @@ class Ipf:
 
             if self.matrix.is_omx():
                 self.output = AequilibraeMatrix()
-                self.output.create_from_omx(self.output.random_name(), self.matrix.file_path,
-                                            cores=self.matrix.view_names)
+                self.output.create_from_omx(
+                    self.output.random_name(), self.matrix.file_path, cores=self.matrix.view_names
+                )
                 self.output.computational_view()
             else:
                 self.output = self.matrix.copy(self.output_name)
@@ -259,7 +259,7 @@ class Ipf:
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
-        record.procedure = 'Iterative Proportional fitting'
+        record.procedure = "Iterative Proportional fitting"
         record.save()
         return record
 

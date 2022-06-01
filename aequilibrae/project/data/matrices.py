@@ -85,7 +85,7 @@ class Matrices:
             rec.save()
 
     def list(self) -> pd.DataFrame:
-        """ List of all matrices available
+        """List of all matrices available
         Returns:
              df (:obj:`pd.DataFrame`:) Pandas DataFrame listing all matrices available in the model
         """

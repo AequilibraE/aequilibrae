@@ -48,7 +48,7 @@ class GravityCalibration:
         with open('path.to/report.txt', 'w') as f:
             for line in gravity.report:
                 f.write(f'{line}\n')
-        """
+    """
 
     def __init__(self, **kwargs):
         """
@@ -139,9 +139,9 @@ class GravityCalibration:
 
             # weighted average cost
             self.report.append("Iteration: 1")
-            cstar = np.nansum(
-                self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :] * a
-            ) / np.nansum(self.result_matrix.gravity[:, :] * a)
+            cstar = np.nansum(self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :] * a) / np.nansum(
+                self.result_matrix.gravity[:, :] * a
+            )
 
             b0 = 1 / cstar
 
@@ -264,9 +264,9 @@ class GravityCalibration:
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 
-        return np.nansum(
-            self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]
-        ) / np.nansum(self.result_matrix.gravity[:, :])
+        return np.nansum(self.impedance.matrix_view[:, :] * self.result_matrix.gravity[:, :]) / np.nansum(
+            self.result_matrix.gravity[:, :]
+        )
 
     def __get_parameters(self):
         par = Parameters().parameters

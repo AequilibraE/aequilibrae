@@ -7,7 +7,7 @@ import os
 class Test(TestCase):
     def test_placegetter(self):
         thresh = 0.05
-        if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
+        if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
             thresh = 1.01
 
         if random() < thresh:
@@ -20,4 +20,4 @@ class Test(TestCase):
             if place is not None:
                 self.fail("Returned a bounding box for a place that does not exist")
         else:
-            print('Skipped check to not load OSM servers')
+            print("Skipped check to not load OSM servers")

@@ -51,31 +51,31 @@ print(link.distance, new_link.distance)
 # %%
 # We can plot the two links only
 plt.clf()
-plt.plot(*link.geometry.xy, color='blue')
-plt.plot(*new_link.geometry.xy, color='blue')
+plt.plot(*link.geometry.xy, color="blue")
+plt.plot(*new_link.geometry.xy, color="blue")
 
 for node in [link.a_node, link.b_node, new_link.b_node]:
     geo = all_nodes.get(node).geometry
-    plt.plot(*geo.xy, 'ro', color='black')
+    plt.plot(*geo.xy, "ro", color="black")
 plt.show()
 
 # %%
 # Or we plot the entire network
 plt.clf()
 curr = project.conn.cursor()
-curr.execute('Select link_id from links;')
+curr.execute("Select link_id from links;")
 
 for lid in curr.fetchall():
     geo = links.get(lid[0]).geometry
-    plt.plot(*geo.xy, color='blue')
+    plt.plot(*geo.xy, color="blue")
 
 all_nodes = project.network.nodes
 curr = project.conn.cursor()
-curr.execute('Select node_id from nodes;')
+curr.execute("Select node_id from nodes;")
 
 for nid in curr.fetchall():
     geo = all_nodes.get(nid[0]).geometry
-    plt.plot(*geo.xy, 'ro', color='black')
+    plt.plot(*geo.xy, "ro", color="black")
 
 plt.show()
 
