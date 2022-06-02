@@ -50,7 +50,7 @@ class GravityCalibration:
                 f.write(f'{line}\n')
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, project=None, **kwargs):
         """
         Instantiates the Gravity calibration problem
 
@@ -74,6 +74,7 @@ class GravityCalibration:
 
         """
 
+        self.project = project
         self.__required_parameters = ["max trip length", "max iterations", "max error"]
         self.parameters = kwargs.get("parameters", self.__get_parameters())
 
@@ -260,7 +261,7 @@ class GravityCalibration:
             "nan_as_zero": self.nan_as_zero,
         }
 
-        self.gravity = GravityApplication(**args)
+        self.gravity = GravityApplication(self.project, **args)
         self.gravity.apply()
         self.result_matrix = self.gravity.output
 

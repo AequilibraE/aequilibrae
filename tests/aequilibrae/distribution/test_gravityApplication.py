@@ -1,9 +1,13 @@
 from unittest import TestCase
+from unittest.mock import Mock
 from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
 from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 import numpy as np
 import tempfile
 import os
+from aequilibrae.parameters import Parameters
+
+from aequilibrae.project.project import Project
 
 zones = 10
 
@@ -53,6 +57,9 @@ model_power.alpha = -0.2
 
 
 class TestGravityApplication(TestCase):
+    def setUp(self):
+        self.proj = Parameters()
+
     def test_apply(self):
         args = {
             "impedance": matrix,
@@ -66,7 +73,7 @@ class TestGravityApplication(TestCase):
 
         for model_name, model_obj in models:
             args["model"] = model_obj
-            distributed_matrix = GravityApplication(**args)
+            distributed_matrix = GravityApplication(project=self.proj, **args)
             distributed_matrix.apply()
 
             if distributed_matrix.gap > distributed_matrix.parameters["convergence level"]:

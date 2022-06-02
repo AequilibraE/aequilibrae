@@ -1,10 +1,10 @@
 from aequilibrae.project.database_connection import database_connection
 
 
-def clean():
+def clean(project_path):
     # Since we cannot decide the order of trigger execution in SQLITE, we make sure to remove any
     # extraneous nodes at a few key moments (i.e. opening and closing the model)
-    conn = database_connection()
+    conn = database_connection(project_path)
 
     sqls = [
         """DELETE from Nodes where is_centroid=0 and

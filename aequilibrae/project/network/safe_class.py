@@ -1,11 +1,14 @@
 import shapely.wkb
 
+from aequilibrae.project.database_connection import database_connection
+
 
 class SafeClass:
     _srid = 4326
 
-    def __init__(self, data_set: dict) -> None:
+    def __init__(self, data_set: dict, project) -> None:
         self.__original__ = {}
+        self._project = project
         self._table = ""
         self.__srid__ = 4326
         for k, v in data_set.items():
@@ -33,3 +36,6 @@ class SafeClass:
         data.extend([self.geometry.wkb, self.__srid__])
         sql = f'Insert into {self._table} ({",".join(up_keys)}) values({markers})'
         return data, sql
+
+    def conn(self):
+        return database_connection(self._project.project_base_path)

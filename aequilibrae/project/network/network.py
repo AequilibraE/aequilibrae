@@ -50,10 +50,11 @@ class Network(WorkerThread):
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
+        self.project = project
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
-        self.links = Links()
-        self.nodes = Nodes()
+        self.links = Links(self)
+        self.nodes = Nodes(self)
 
     def skimmable_fields(self):
         """
@@ -232,7 +233,8 @@ class Network(WorkerThread):
         self.downloader.doWork()
 
         logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.source)
+        self.builder = OSMBuilder(self.downloader.json, self.source, project=self.project)
+
         if pyqt:
             self.builder.building.connect(self.signal_handler)
         self.builder.doWork()

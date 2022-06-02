@@ -1,7 +1,6 @@
 from warnings import warn
 from shapely.geometry import Polygon
 from .safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
 from .connector_creation import connector_creation
 from aequilibrae import logger
 
@@ -37,15 +36,15 @@ class Node(SafeClass):
         node1.save()
     """
 
-    def __init__(self, dataset):
-        super().__init__(dataset)
+    def __init__(self, dataset, project):
+        super().__init__(dataset, project)
         self.__new = dataset["geometry"] is None
         self.__fields = list(dataset.keys())
         self._table = "nodes"
 
     def save(self):
         """Saves node to database"""
-        conn = database_connection()
+        conn = self.conn()
 
         if self.node_id != self.__original__["node_id"]:
             raise ValueError("One cannot change the node_id")
@@ -85,7 +84,7 @@ class Node(SafeClass):
             warn("This is already the node number")
             return
 
-        conn = database_connection()
+        conn = self.conn()
         curr = conn.cursor()
 
         curr.execute("BEGIN;")
@@ -149,7 +148,9 @@ class Node(SafeClass):
             warn("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
-        connector_creation(area, self.node_id, self.__srid__, mode_id, link_types, connectors)
+        connector_creation(
+            area, self.node_id, self.__srid__, mode_id, link_types, connectors, network=self._project.network
+        )
 
     def __setattr__(self, instance, value) -> None:
         if instance not in self.__dict__ and instance[:1] != "_":

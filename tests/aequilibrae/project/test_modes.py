@@ -24,7 +24,7 @@ class TestModes(TestCase):
         self.proj.close()
 
     def test_add(self):
-        new_mode = Mode("F")
+        new_mode = Mode("F", self.proj.project_base_path)
         name = [random.choice(string.ascii_letters + "_") for x in range(random.randint(1, 20))]
         name = "".join(name)
         new_mode.mode_name = name

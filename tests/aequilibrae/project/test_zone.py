@@ -67,7 +67,7 @@ class TestZone(TestCase):
     def __change_project(self):
         self.proj.close()
         self.proj = Project()
-        self.proj = create_example(join(gettempdir(), uuid4().hex), "nauru")
+        self.proj = create_example(join(gettempdir(), "aeq", uuid4().hex), "nauru")
         zones = 5
         network = self.proj.network
         nodes = network.nodes

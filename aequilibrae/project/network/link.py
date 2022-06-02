@@ -1,5 +1,4 @@
 from .safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network.mode import Mode
 from aequilibrae import logger
 
@@ -47,8 +46,8 @@ class Link(SafeClass):
         link2.save()
     """
 
-    def __init__(self, dataset):
-        super().__init__(dataset)
+    def __init__(self, dataset, project):
+        super().__init__(dataset, project)
         self.__fields = list(dataset.keys())
 
         self.__new = dataset["geometry"] is None
@@ -57,7 +56,7 @@ class Link(SafeClass):
 
     def delete(self):
         """Deletes link from database"""
-        conn = database_connection()
+        conn = self.conn()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM links where link_id="{self.link_id}"')
         conn.commit()
@@ -65,7 +64,7 @@ class Link(SafeClass):
 
     def save(self):
         """Saves link to database"""
-        conn = database_connection()
+        conn = self.conn()
         curr = conn.cursor()
 
         if self.__new:

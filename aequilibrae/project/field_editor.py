@@ -38,7 +38,8 @@ class FieldEditor:
 
     _alowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self, project_path, table_name: str) -> None:
+        self.project_path = project_path
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -131,7 +132,7 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        conn = database_connection()
+        conn = database_connection(self.project_path)
         curr = conn.cursor()
         curr.execute(qry)
         dt = curr.fetchall()
@@ -139,7 +140,7 @@ class FieldEditor:
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        conn = database_connection()
+        conn = database_connection(self.project_path)
         if values is None:
             conn.execute(qry)
         else:

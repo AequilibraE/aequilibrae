@@ -1,6 +1,5 @@
 import string
 from .safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
 
 
 class LinkType(SafeClass):
@@ -9,14 +8,14 @@ class LinkType(SafeClass):
     __alowed_characters = string.ascii_letters + "_"
 
     def delete(self):
-        conn = database_connection()
+        conn = self.conn()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM link_types where link_type_id="{self.link_type_id}"')
         conn.commit()
         del self
 
     def save(self):
-        conn = database_connection()
+        conn = self.conn()
         curr = conn.cursor()
 
         curr.execute(f'select count(*) from link_types where link_type_id="{self.link_type_id}"')

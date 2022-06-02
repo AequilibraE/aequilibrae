@@ -2,6 +2,8 @@ import os
 import sys
 import tempfile
 import logging
+
+from aequilibrae.context import get_active_project
 from .parameters import Parameters
 import glob
 
@@ -9,9 +11,12 @@ sys.dont_write_bytecode = True
 
 
 # TODO: Add tests for logging
-def StartsLogging():
+def StartsLogging(project_path=None):
     # CREATE THE LOGGER
-    p = Parameters()
+    if not project_path:
+        proj = get_active_project(must_exist=False)
+        project_path = proj.project_base_path if proj is not None else ""
+    p = Parameters(project_path)
     par = p.parameters
     if p.parameters is None:
         par = p._default

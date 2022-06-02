@@ -1,22 +1,22 @@
 import sqlite3
 import uuid
 from os.path import join
-from os import environ
 from itertools import combinations
 import pandas as pd
 import numpy as np
 from scipy.spatial import Delaunay
 
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.context import get_active_project
 from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.project.database_connection import ENVIRON_VAR
 
 DELAUNAY_TABLE = "delaunay_network"
 
 
 class DelaunayAnalysis:
-    def __init__(self):
+    def __init__(self, project=None):
+        self.project = project or get_active_project()
         self.procedure_id = uuid.uuid4().hex
 
     def create_network(self, source="zones", overwrite=False):
@@ -31,7 +31,7 @@ class DelaunayAnalysis:
         if source not in ["zones", "network"]:
             raise ValueError("Source must be 'zones' or 'network'")
 
-        conn = database_connection()
+        conn = database_connection(self.project.project_base_path)
 
         tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type ='table'", conn)
         if DELAUNAY_TABLE in tables.name.values:
@@ -99,7 +99,7 @@ class DelaunayAnalysis:
         g.set_blocked_centroid_flows(True)
 
         tc = TrafficClass("delaunay", g, matrix)
-        ta = TrafficAssignment()
+        ta = TrafficAssignment(self.project)
         ta.set_classes([tc])
         ta.set_time_field("distance")
         ta.set_capacity_field("capacity")
@@ -122,6 +122,7 @@ class DelaunayAnalysis:
         for x in matrix.view_names:
             cols.extend([f"{x}_ab", f"{x}_ba", f"{x}_tot"])
         df = ta.results()[cols]
-        conn = sqlite3.connect(join(environ[ENVIRON_VAR], "results_database.sqlite"))
+
+        conn = sqlite3.connect(join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(result_name, conn)
         conn.close()

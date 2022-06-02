@@ -28,15 +28,15 @@ class TestMode(TestCase):
     def test_build(self):
         for val in ["1", "ab", "", None]:
             with self.assertRaises(ValueError):
-                m = Mode(val)
+                m = Mode(val, self.proj.project_base_path)
 
         for letter in range(10):
             letter = random.choice(string.ascii_letters)
-            m = Mode(letter)
+            m = Mode(letter, self.proj.project_base_path)
             del m
 
     def test_changing_mode_id(self):
-        m = Mode("c")
+        m = Mode("c", self.proj.project_base_path)
         with self.assertRaises(ValueError):
             m.mode_id = "test my description"
 
@@ -44,7 +44,7 @@ class TestMode(TestCase):
         self.curr.execute("select mode_id from 'modes'")
 
         letter = random.choice([x[0] for x in self.curr.fetchall()])
-        m = Mode(letter)
+        m = Mode(letter, self.proj.project_base_path)
         m.mode_name = self.random_string
         m.description = self.random_string[::-1]
         m.save()
@@ -56,12 +56,12 @@ class TestMode(TestCase):
         self.assertEqual(mname, self.random_string, "Didn't save the mode name correctly")
 
     def test_empty(self):
-        a = Mode("k")
+        a = Mode("k", self.proj.project_base_path)
         a.mode_name = "just a_test"
         with self.assertRaises(ValueError):
             a.save()
 
-        a = Mode("l")
+        a = Mode("l", self.proj.project_base_path)
         a.mode_name = "just_a_test_test_with_l"
         with self.assertRaises(ValueError):
             a.save()

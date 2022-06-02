@@ -3,8 +3,8 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from aequilibrae import logger
-from aequilibrae.project.database_connection import ENVIRON_VAR
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.context import get_active_project
 
 
 # TODO: let's make it optional to keep path files in memory, although this can get out of control very quickly it should
@@ -25,8 +25,8 @@ class TrafficClassIdentifier(object):
 
 
 class AssignmentResultsTable(object):
-    def __init__(self, table_name: str) -> None:
-        self.proj_dir = os.environ.get(ENVIRON_VAR)
+    def __init__(self, table_name: str, project=None) -> None:
+        self.proj_dir = (project or get_active_project()).project_base_path
         self.table_name = table_name
         self.assignment_results = self._read_assignment_results()
         self.table_name = self.assignment_results["table_name"].values[0]
@@ -65,15 +65,16 @@ class AssignmentPaths(object):
         paths.get_path_for_destination(origin, destination, iteration, traffic_class_id)
     """
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self, table_name: str, project=None) -> None:
         """
         Instantiates the class
          Args:
             table_name (str): Name of the traffic assignment result table used to generate the required path files
         """
-        self.proj_dir = os.environ.get(ENVIRON_VAR)
+        project = project or get_active_project()
+        self.proj_dir = project.project_base_path
         self.table_name = table_name
-        self.assignment_results = AssignmentResultsTable(table_name)
+        self.assignment_results = AssignmentResultsTable(table_name, project)
         self.path_base_dir = os.path.join(self.proj_dir, "path_files", self.assignment_results.procedure_id)
         self.classes = self.assignment_results.get_traffic_class_names_and_id()
         self.compressed_graph_correspondences = self._read_compressed_graph_correspondence()
