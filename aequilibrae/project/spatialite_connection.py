@@ -1,5 +1,13 @@
 import os
 from sqlite3 import Connection
+import sqlite3
+import numpy as np
+
+sqlite3.register_adapter(np.int64, int)
+sqlite3.register_adapter(np.int32, int)
+sqlite3.register_adapter(np.float32, float)
+sqlite3.register_adapter(np.float64, float)
+sqlite3.register_adapter(np.object0, str)
 
 
 def spatialite_connection(conn: Connection) -> Connection:

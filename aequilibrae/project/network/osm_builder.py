@@ -4,6 +4,8 @@ import gc
 from typing import List
 import importlib.util as iutil
 import numpy as np
+import pandas as pd
+
 from aequilibrae.project.network.link_types import LinkTypes
 from .haversine import haversine
 from aequilibrae import logger
@@ -38,6 +40,7 @@ class OSMBuilder(WorkerThread):
         self.__model_link_type_ids = []
         self.__link_type_quick_reference = {}
         self.nodes = {}
+        self.node_df = []
         self.links = {}
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
 
@@ -80,12 +83,17 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Setting data structures for nodes"])
         self.__emit_all(["maxValue", len(n)])
 
+        self.node_df = []
         for i, node in enumerate(n):
             nid = node.pop("id")
             _ = node.pop("type")
+            node['node_id'] = i + self.node_start
             self.nodes[nid] = node
+            self.node_df.append([node['node_id'], nid, node['lon'], node['lat']])
             self.__emit_all(["Value", i])
         del n
+        self.node_df = pd.DataFrame(self.node_df, columns=['A', 'B', 'C', 'D']).drop_duplicates(
+            subset=['C', 'D']).to_records(index=False)
 
         logger.info("Setting data structures for links")
         self.__emit_all(["text", "Setting data structures for links"])
@@ -116,6 +124,12 @@ class OSMBuilder(WorkerThread):
         fields = self.get_link_fields()
         self.__update_table_structure()
         field_names = ",".join(fields)
+
+        logger.info("Adding network nodes")
+        self.__emit_all(["text", "Adding network nodes"])
+        sql = 'insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))'
+        self.conn.executemany(sql, self.node_df)
+        self.conn.commit()
 
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
@@ -173,10 +187,6 @@ class OSMBuilder(WorkerThread):
                     sql = self.insert_qry.format(table, field_names, ','.join(['?'] * (len(attributes) - 1)))
                     try:
                         self.curr.execute(sql, attributes)
-                        self.curr.execute('Select a_node, b_node from links where link_id=?', [vars["link_id"]])
-                        a, b = self.curr.fetchone()
-                        self.curr.executemany('update nodes set osm_id=? where node_id=?',
-                                              [[linknodes[intersections[i]], a], [linknodes[intersections[i + 1]], b]])
                     except Exception as e:
                         data = list(vars.values())
                         logger.error("error when inserting link {}. Error {}".format(data, e.args))
