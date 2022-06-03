@@ -1,17 +1,18 @@
+import gc
+import importlib.util as iutil
 import sqlite3
 import string
-import gc
 from typing import List
-import importlib.util as iutil
+
 import numpy as np
 import pandas as pd
 
-from aequilibrae.project.network.link_types import LinkTypes
-from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from ...utils import WorkerThread
+from aequilibrae.project.network.link_types import LinkTypes
+from .haversine import haversine
 from ..spatialite_connection import spatialite_connection
+from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -130,6 +131,7 @@ class OSMBuilder(WorkerThread):
         sql = 'insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))'
         self.conn.executemany(sql, self.node_df)
         self.conn.commit()
+        del self.node_df
 
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
@@ -139,12 +141,14 @@ class OSMBuilder(WorkerThread):
         counter = 0
         mode_codes, not_found_tags = self.modes_per_link_type()
         owf, twf = self.field_osm_source()
-
-        for osm_id, link in self.links.items():
+        all_attrs = []
+        all_osm_ids = list(self.links.keys())
+        for osm_id in all_osm_ids:
+            link = self.links.pop(osm_id)
             self.__emit_all(["Value", counter])
             counter += 1
             if counter % 1000 == 0:
-                logger.info(f'Inserting segments from {counter:,} out of {L:,} OSM link objects')
+                logger.info(f'Creating segments from {counter:,} out of {L:,} OSM link objects')
             vars["osm_id"] = osm_id
             vars['link_type'] = 'default'
             linknodes = link["nodes"]
@@ -184,17 +188,21 @@ class OSMBuilder(WorkerThread):
             if len(vars["modes"]) > 0:
                 for i in range(segments):
                     attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
-                    sql = self.insert_qry.format(table, field_names, ','.join(['?'] * (len(attributes) - 1)))
-                    try:
-                        self.curr.execute(sql, attributes)
-                    except Exception as e:
-                        data = list(vars.values())
-                        logger.error("error when inserting link {}. Error {}".format(data, e.args))
-                        logger.error(sql)
+                    all_attrs.append(attributes)
                     vars["link_id"] += 1
-                self.conn.commit()
+
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
             self.links[osm_id] = []
+        sql = self.insert_qry.format(table, field_names, ','.join(['?'] * (len(all_attrs[0]) - 1)))
+        logger.info("Adding network links")
+        self.__emit_all(["text", "Adding network links"])
+        try:
+            self.curr.executemany(sql, all_attrs)
+        except Exception as e:
+            logger.error("error when inserting link {}. Error {}".format(all_attrs[0], e.args))
+            logger.error(sql)
+            raise e
+
         self.conn.commit()
         self.curr.close()
 
