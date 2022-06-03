@@ -19,9 +19,9 @@ def placegetter(place: str) -> Tuple[Union[None, List[float]], list]:
     Adapted from http://www.github.com/gboeing/osmnx
     """
 
-    par = Parameters().parameters['osm']
-    nominatim_endpoint = par['nominatim_endpoint']
-    max_attempts = par['max_attempts']
+    par = Parameters().parameters["osm"]
+    nominatim_endpoint = par["nominatim_endpoint"]
+    max_attempts = par["max_attempts"]
 
     params = {"q": place, "format": "json"}
 

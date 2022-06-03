@@ -33,9 +33,9 @@ class Parameters:
     """
 
     def __init__(self):
-        """ Loads parameters from file. The place is always the same. The root of the package"""
+        """Loads parameters from file. The place is always the same. The root of the package"""
 
-        proj_path = os.environ.get('AEQUILIBRAE_PROJECT_PATH', '')
+        proj_path = os.environ.get("AEQUILIBRAE_PROJECT_PATH", "")
         default_path = os.path.dirname(os.path.realpath(__file__))
 
         self.file = os.path.join(proj_path, "parameters.yml")
@@ -50,7 +50,7 @@ class Parameters:
         else:
             self.parameters = deepcopy(self._default)
             if proj_path:
-                warn('No pre-existing parameter file exists for this project. Will use default')
+                warn("No pre-existing parameter file exists for this project. Will use default")
 
     def write_back(self):
         """Writes the parameters back to file"""

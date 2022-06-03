@@ -39,7 +39,7 @@ class TestProject(TestCase):
         fields = curr.fetchall()
         fields = [x[1] for x in fields]
 
-        if 'distance' not in fields:
+        if "distance" not in fields:
             self.fail("Table LINKS was not created correctly")
 
         curr = self.proj.conn.cursor()
@@ -47,8 +47,8 @@ class TestProject(TestCase):
         nfields = curr.fetchall()
         nfields = [x[1] for x in nfields]
 
-        if 'is_centroid' not in nfields:
-            self.fail('Table NODES was not created correctly')
+        if "is_centroid" not in nfields:
+            self.fail("Table NODES was not created correctly")
 
     def test_close(self):
 

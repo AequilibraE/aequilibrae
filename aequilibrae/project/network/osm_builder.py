@@ -73,9 +73,9 @@ class OSMBuilder(WorkerThread):
         # So we get rid of everything we don't need
         for i in range(tot_items, 0, -1):
             item = self.osm_items.pop(-1)
-            if item['type'] == "way":
+            if item["type"] == "way":
                 alinks.append(item)
-            elif item['type'] == "node":
+            elif item["type"] == "node":
                 n.append(item)
             self.__emit_all(["Value", tot_items - i])
         gc.collect()
@@ -148,9 +148,9 @@ class OSMBuilder(WorkerThread):
             self.__emit_all(["Value", counter])
             counter += 1
             if counter % 1000 == 0:
-                logger.info(f'Creating segments from {counter:,} out of {L:,} OSM link objects')
+                logger.info(f"Creating segments from {counter:,} out of {L:,} OSM link objects")
             vars["osm_id"] = osm_id
-            vars['link_type'] = 'default'
+            vars["link_type"] = "default"
             linknodes = link["nodes"]
             linktags = link["tags"]
 
@@ -182,8 +182,9 @@ class OSMBuilder(WorkerThread):
 
             vars["modes"] = mode_codes.get(linktags.get("highway"), not_found_tags)
 
-            vars['link_type'] = self.__link_type_quick_reference.get(vars['link_type'].lower(),
-                                                                     self.__repair_link_type(vars['link_type']))
+            vars["link_type"] = self.__link_type_quick_reference.get(
+                vars["link_type"].lower(), self.__repair_link_type(vars["link_type"])
+            )
 
             if len(vars["modes"]) > 0:
                 for i in range(segments):
@@ -215,13 +216,13 @@ class OSMBuilder(WorkerThread):
 
     def __update_table_structure(self):
         curr = self.conn.cursor()
-        curr.execute('pragma table_info(Links)')
+        curr.execute("pragma table_info(Links)")
         structure = curr.fetchall()
         has_fields = [x[1].lower() for x in structure]
-        fields = [field.lower() for field in self.get_link_fields()] + ['osm_id']
+        fields = [field.lower() for field in self.get_link_fields()] + ["osm_id"]
         for field in [f for f in fields if f not in has_fields]:
             ltype = self.get_link_field_type(field).upper()
-            curr.execute(f'Alter table Links add column {field} {ltype}')
+            curr.execute(f"Alter table Links add column {field} {ltype}")
         self.conn.commit()
 
     def __build_link_data(self, vars, intersections, i, linknodes, node_ids, fields):
@@ -239,9 +240,12 @@ class OSMBuilder(WorkerThread):
             node_ids[linknodes[jj]] = vars["b_node"]
             self.node_start += 1
 
-        vars["distance"] = sum([haversine(self.nodes[x]["lon"], self.nodes[x]["lat"],
-                                          self.nodes[y]["lon"], self.nodes[y]["lat"])
-                                for x, y in zip(all_nodes[1:], all_nodes[:-1])])
+        vars["distance"] = sum(
+            [
+                haversine(self.nodes[x]["lon"], self.nodes[x]["lat"], self.nodes[y]["lon"], self.nodes[y]["lat"])
+                for x, y in zip(all_nodes[1:], all_nodes[:-1])
+            ]
+        )
 
         geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
         geometry = "LINESTRING ({})".format(", ".join(geometry))
@@ -252,23 +256,23 @@ class OSMBuilder(WorkerThread):
 
     def __repair_link_type(self, link_type: str) -> str:
         original_link_type = link_type
-        link_type = ''.join([x for x in link_type if x in string.ascii_letters + '_']).lower()
+        link_type = "".join([x for x in link_type if x in string.ascii_letters + "_"]).lower()
 
-        split = link_type.split('_')
+        split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
-            if piece in ['link', 'segment', 'stretch']:
-                link_type = '_'.join(split[0:i + 1])
+            if piece in ["link", "segment", "stretch"]:
+                link_type = "_".join(split[0 : i + 1])
 
         if len(link_type) == 0:
-            link_type = 'empty'
+            link_type = "empty"
 
         if len(self.__model_link_type_ids) >= 51 and link_type not in self.__model_link_types:
-            link_type = 'aggregate_link_type'
+            link_type = "aggregate_link_type"
 
         if link_type in self.__model_link_types:
             lt = self.__link_types.get_by_name(link_type)
             if original_link_type not in lt.description:
-                lt.description += f', {original_link_type}'
+                lt.description += f", {original_link_type}"
                 lt.save()
             self.__link_type_quick_reference[original_link_type.lower()] = link_type
             return link_type
@@ -323,16 +327,16 @@ class OSMBuilder(WorkerThread):
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
-        if field_name[-3:].lower() in ['_ab', '_ba']:
+        if field_name[-3:].lower() in ["_ab", "_ba"]:
             field_name = field_name[:-3]
             for tp in fields["two-way"]:
                 if field_name in tp:
-                    return tp[field_name]['type']
+                    return tp[field_name]["type"]
         else:
 
             for tp in fields["one-way"]:
                 if field_name in tp:
-                    return tp[field_name]['type']
+                    return tp[field_name]["type"]
 
     @staticmethod
     def field_osm_source():
@@ -375,7 +379,7 @@ class OSMBuilder(WorkerThread):
 
         type_list = {k: "".join(set(v)) for k, v in type_list.items()}
 
-        return type_list, '{}'.format(notfound)
+        return type_list, "{}".format(notfound)
 
     @staticmethod
     def get_node_fields():

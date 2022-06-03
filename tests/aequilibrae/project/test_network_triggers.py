@@ -12,8 +12,8 @@ from shapely.geometry import LineString, Point
 
 class TestNetworkTriggers(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
-        self.proj_path = os.path.join(gettempdir(), f'aeq_{uuid.uuid4().hex}')
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+        self.proj_path = os.path.join(gettempdir(), f"aeq_{uuid.uuid4().hex}")
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
         self.siouxfalls.open(self.proj_path)
@@ -25,7 +25,7 @@ class TestNetworkTriggers(TestCase):
 
     def test_delete_links_delete_nodes(self):
         items = self.siouxfalls.network.count_nodes()
-        self.assertEqual(24, items, 'Wrong number of nodes found')
+        self.assertEqual(24, items, "Wrong number of nodes found")
         links = self.siouxfalls.network.links
         nodes = self.siouxfalls.network.nodes
 
@@ -39,15 +39,15 @@ class TestNetworkTriggers(TestCase):
             link.delete()
         # Since node 1 is no longer a centroid, we should have only 23 nodes in the network
         items = self.siouxfalls.network.count_nodes()
-        self.assertEqual(23, items, 'Wrong number of nodes found')
+        self.assertEqual(23, items, "Wrong number of nodes found")
 
     def test_add_regular_link(self):
         # Add a regular link to see if it fails when creating it
         # It happened at some point
         curr = self.siouxfalls.conn.cursor()
-        data = [123456, 'c', 'default', LineString([Point(0, 0), Point(1, 1)]).wkb]
+        data = [123456, "c", "default", LineString([Point(0, 0), Point(1, 1)]).wkb]
 
-        sql = 'insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));'
+        sql = "insert into links (link_id, modes, link_type, geometry) Values(?,?,?,GeomFromWKB(?, 4326));"
         curr.execute(sql, data)
         self.siouxfalls.conn.commit()
 
@@ -60,11 +60,11 @@ class TestNetworkTriggers(TestCase):
 
         data = [987654, 1, Point(0, 0).wkb]
 
-        sql = 'insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));'
+        sql = "insert into nodes (node_id, is_centroid, geometry) Values(?,?,GeomFromWKB(?, 4326));"
         curr.execute(sql, data)
         self.siouxfalls.conn.commit()
-        self.assertEqual(nodes + 1, network.count_nodes(), 'Failed to insert node')
+        self.assertEqual(nodes + 1, network.count_nodes(), "Failed to insert node")
 
-        curr.execute('Update nodes set is_centroid=0 where node_id=?', data[:1])
+        curr.execute("Update nodes set is_centroid=0 where node_id=?", data[:1])
         self.siouxfalls.conn.commit()
-        self.assertEqual(nodes, network.count_nodes(), 'Failed to delete node when changing centroid flag')
+        self.assertEqual(nodes, network.count_nodes(), "Failed to delete node when changing centroid flag")

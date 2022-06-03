@@ -44,7 +44,7 @@ class Zoning(BasicTable):
     def __init__(self, network):
         super().__init__()
         self.network = network
-        self.__table_type__ = 'zones'
+        self.__table_type__ = "zones"
         self.__fields = []
         if self.__has_zoning():
             self.__load()
@@ -54,7 +54,7 @@ class Zoning(BasicTable):
 
         Returns:
             *zone* (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
-            """
+        """
 
         if zone_id in self.__items:
             raise Exception(f"Zone ID {zone_id} already exists")
@@ -76,7 +76,7 @@ class Zoning(BasicTable):
             warn("zones table already exists. Nothing was done", Warning)
 
     def coverage(self) -> Polygon:
-        """ Returns a single polygon for the entire zoning coverage
+        """Returns a single polygon for the entire zoning coverage
 
         Returns:
             *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.

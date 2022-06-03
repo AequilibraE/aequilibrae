@@ -36,7 +36,7 @@ class Nodes(BasicTable):
 
     def __init__(self):
         super().__init__()
-        self.__table_type__ = 'nodes'
+        self.__table_type__ = "nodes"
         self.__all_nodes = []
         if self.sql == "":
             self.refresh_fields()
@@ -51,7 +51,7 @@ class Nodes(BasicTable):
 
         Returns:
             *node* (:obj:`Node`): Node object for requested node_id
-            """
+        """
 
         if node_id in self.__items:
             node = self.__items[node_id]
@@ -110,7 +110,7 @@ class Nodes(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """ Returns all nodes data as a Pandas dataFrame
+        """Returns all nodes data as a Pandas dataFrame
 
         Returns:
             *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry

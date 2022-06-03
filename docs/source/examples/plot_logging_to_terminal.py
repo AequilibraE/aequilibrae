@@ -37,5 +37,5 @@ project.close()
 from PIL import Image
 import matplotlib.pyplot as plt
 
-img = Image.open('plot_logging_to_terminal_image.png')
+img = Image.open("plot_logging_to_terminal_image.png")
 plt.imshow(img)

@@ -10,8 +10,8 @@ from ...data import gtfs_db_output
 class TestCreate_gtfsdb(TestCase):
     def setUp(self) -> None:
         spatialite_folder = dirname(dirname(dirname(dirname(os.path.abspath(__file__)))))
-        spatialite_folder = join(spatialite_folder, 'aequilibrae/project')
-        os.environ['PATH'] = f'{spatialite_folder};' + os.environ['PATH']
+        spatialite_folder = join(spatialite_folder, "aequilibrae/project")
+        os.environ["PATH"] = f"{spatialite_folder};" + os.environ["PATH"]
 
     def tearDown(self) -> None:
         if os.path.isfile(gtfs_db_output):

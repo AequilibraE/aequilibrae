@@ -7,3 +7,4 @@ flake8
 tables
 wheel
 openmatrix
+black

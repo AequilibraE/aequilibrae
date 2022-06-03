@@ -16,7 +16,7 @@ from aequilibrae.utils.create_example import create_example
 
 class TestNetwork_skimming(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
 
@@ -30,12 +30,12 @@ class TestNetwork_skimming(TestCase):
         try:
             rmtree(self.proj_dir)
         except Exception as e:
-            print(f'Failed to remove at {e.args}')
+            print(f"Failed to remove at {e.args}")
 
     def test_network_skimming(self):
 
         self.network.build_graphs()
-        graph = self.network.graphs['c']
+        graph = self.network.graphs["c"]
         graph.set_graph(cost_field="distance")
         graph.set_skimming("distance")
         graph.set_blocked_centroid_flows(False)
@@ -57,18 +57,18 @@ class TestNetwork_skimming(TestCase):
         if skm.report:
             self.fail("Skimming returned an error:" + str(skm.report))
 
-        fn = 'test_Skimming'
-        skm.save_to_project(fn, format='omx')
-        matrix_dir = join(self.proj_dir, 'matrices')
+        fn = "test_Skimming"
+        skm.save_to_project(fn, format="omx")
+        matrix_dir = join(self.proj_dir, "matrices")
 
-        if not isfile(join(matrix_dir, f'{fn}.omx')):
-            self.fail('Did not save project to project')
+        if not isfile(join(matrix_dir, f"{fn}.omx")):
+            self.fail("Did not save project to project")
 
         matrices = self.project.matrices
         mat = matrices.get_record(fn)
-        self.assertEqual(mat.name, fn, 'Matrix record name saved wrong')
-        self.assertEqual(mat.file_name, f'{fn}.omx', 'matrix file_name saved  wrong')
-        self.assertEqual(mat.cores, 1, 'matrix saved number of matrix cores wrong')
-        self.assertEqual(mat.procedure, 'Network skimming', 'Matrix saved wrong procedure name')
-        self.assertEqual(mat.procedure_id, skm.procedure_id, 'Procedure ID saved  wrong')
-        self.assertEqual(mat.timestamp, skm.procedure_date, 'Procedure ID saved  wrong')
+        self.assertEqual(mat.name, fn, "Matrix record name saved wrong")
+        self.assertEqual(mat.file_name, f"{fn}.omx", "matrix file_name saved  wrong")
+        self.assertEqual(mat.cores, 1, "matrix saved number of matrix cores wrong")
+        self.assertEqual(mat.procedure, "Network skimming", "Matrix saved wrong procedure name")
+        self.assertEqual(mat.procedure_id, skm.procedure_id, "Procedure ID saved  wrong")
+        self.assertEqual(mat.timestamp, skm.procedure_date, "Procedure ID saved  wrong")

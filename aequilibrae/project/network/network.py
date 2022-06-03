@@ -34,6 +34,7 @@ class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
+
     if pyqt:
         netsignal = SIGNAL(object)
 
@@ -116,13 +117,13 @@ class Network(WorkerThread):
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-            self,
-            west: float = None,
-            south: float = None,
-            east: float = None,
-            north: float = None,
-            place_name: str = None,
-            modes=["car", "transit", "bicycle", "walk"],
+        self,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
+        place_name: str = None,
+        modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -264,6 +265,7 @@ class Network(WorkerThread):
 
         """
         from aequilibrae.paths import Graph
+
         curr = self.conn.cursor()
 
         if fields is None:
@@ -353,7 +355,7 @@ class Network(WorkerThread):
         return poly
 
     def convex_hull(self) -> Polygon:
-        """ Queries the model for the convex hull of the entire network
+        """Queries the model for the convex hull of the entire network
 
         Returns:
             *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the model network.

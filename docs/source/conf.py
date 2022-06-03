@@ -57,13 +57,13 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx_autodoc_annotation",
-    'sphinx.ext.autosummary',
-    'sphinx_git',
+    "sphinx.ext.autosummary",
+    "sphinx_git",
 ]
 
 sphinx_gallery_conf = {
-    'examples_dirs': ['examples'],  # path to your example scripts
-    'gallery_dirs': ['_auto_examples'],  # path to where to save gallery generated output
+    "examples_dirs": ["examples"],  # path to your example scripts
+    "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -88,11 +88,11 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", '*.pyx']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-highlight_language = 'none'
+highlight_language = "none"
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -136,18 +136,18 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    'members': 'var1, var2',
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'private-members': False,
-    'undoc-members': True,
-    'exclude-members': '__weakref__',
-    'inherited-members': False,
-    'show-inheritance': False,
-    'autodoc_inherit_docstrings': False
+    "members": "var1, var2",
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "private-members": False,
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
+    "inherited-members": False,
+    "show-inheritance": False,
+    "autodoc_inherit_docstrings": False,
 }
 
-autodoc_member_order = 'groupwise'
+autodoc_member_order = "groupwise"
 
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 

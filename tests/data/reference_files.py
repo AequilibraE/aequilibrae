@@ -1,7 +1,7 @@
 import tempfile
 from os.path import dirname, abspath, join
 
-data_folder = join(dirname(dirname(abspath(__file__))), 'data')
+data_folder = join(dirname(dirname(abspath(__file__))), "data")
 
 # For the graph tests
 test_network = join(dirname(dirname(abspath(__file__))), "data", "Final_Network.shp")
@@ -31,4 +31,4 @@ siouxfalls_skims = join(dirname(dirname(abspath(__file__))), "data/SiouxFalls_pr
 #
 no_triggers_project = join(dirname(dirname(abspath(__file__))), "data/no_triggers_project")
 
-st_varent_network = join(dirname(abspath(__file__)), 'St_Varent_issue307.zip')
+st_varent_network = join(dirname(abspath(__file__)), "St_Varent_issue307.zip")

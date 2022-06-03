@@ -74,7 +74,7 @@ demand.computational_view(["matrix"])
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
+assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
@@ -330,7 +330,7 @@ demand.computational_view("matrix")
 assig = TrafficAssignment()
 
 # Creates the assignment class
-assigclass = TrafficClass(name='car', graph=graph, matrix=demand)
+assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
