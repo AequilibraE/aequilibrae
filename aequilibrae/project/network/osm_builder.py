@@ -88,13 +88,16 @@ class OSMBuilder(WorkerThread):
         for i, node in enumerate(n):
             nid = node.pop("id")
             _ = node.pop("type")
-            node['node_id'] = i + self.node_start
+            node["node_id"] = i + self.node_start
             self.nodes[nid] = node
-            self.node_df.append([node['node_id'], nid, node['lon'], node['lat']])
+            self.node_df.append([node["node_id"], nid, node["lon"], node["lat"]])
             self.__emit_all(["Value", i])
         del n
-        self.node_df = pd.DataFrame(self.node_df, columns=['A', 'B', 'C', 'D']).drop_duplicates(
-            subset=['C', 'D']).to_records(index=False)
+        self.node_df = (
+            pd.DataFrame(self.node_df, columns=["A", "B", "C", "D"])
+            .drop_duplicates(subset=["C", "D"])
+            .to_records(index=False)
+        )
 
         logger.info("Setting data structures for links")
         self.__emit_all(["text", "Setting data structures for links"])
@@ -128,7 +131,7 @@ class OSMBuilder(WorkerThread):
 
         logger.info("Adding network nodes")
         self.__emit_all(["text", "Adding network nodes"])
-        sql = 'insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))'
+        sql = "insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))"
         self.conn.executemany(sql, self.node_df)
         self.conn.commit()
         del self.node_df
@@ -194,7 +197,7 @@ class OSMBuilder(WorkerThread):
 
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
             self.links[osm_id] = []
-        sql = self.insert_qry.format(table, field_names, ','.join(['?'] * (len(all_attrs[0]) - 1)))
+        sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(all_attrs[0]) - 1)))
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
         try:
@@ -294,7 +297,7 @@ class OSMBuilder(WorkerThread):
         return link_type
 
     def __get_link_property(self, d2, val, linktags, v):
-        vald = linktags.get(f"{v['osm_source']}:{d2}", val)
+        vald = linktags.get(f'{v["osm_source"]}:{d2}', val)
         if vald is None:
             return vald
 
