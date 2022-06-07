@@ -4,5 +4,5 @@ target-version = ['py36', 'py37', 'py38']
 include = '\.pyi?$'
 
 [build-system]
-requires = ["numpy<1.22", "cython", "pyaml", "pyqt5", "requests", "scipy", "shapely", "pandas", "pyarrow"]
+requires = ["setuptools", "numpy<1.22", "cython", "pyaml", "pyqt5", "requests", "scipy", "shapely", "pandas", "pyarrow"]
 
