@@ -58,7 +58,9 @@ model_power.alpha = -0.2
 
 class TestGravityApplication(TestCase):
     def setUp(self):
-        self.proj = Parameters()
+        # GravityApplication requires an object that has a `parameters` attribute. `Parameters` fits
+        # this requirement, so that we don't need to create a full project
+        self.proj = Parameters() 
 
     def test_apply(self):
         args = {

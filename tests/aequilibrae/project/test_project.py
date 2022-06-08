@@ -4,7 +4,6 @@ import os
 from aequilibrae.project import Project
 from aequilibrae.project.database_connection import database_connection
 import uuid
-import pytest
 
 
 class TestProject(TestCase):

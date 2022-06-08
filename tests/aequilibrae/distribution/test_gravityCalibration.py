@@ -31,6 +31,8 @@ matrix.computational_view(["base_matrix"])
 
 class TestGravityCalibration(TestCase):
     def setUp(self):
+        # GravityCalibration requires an object that has a `parameters` attribute. `Parameters` fits
+        # this requirement, so that we don't need to create a full project
         self.proj = Parameters()
 
     def test_calibrate(self):
