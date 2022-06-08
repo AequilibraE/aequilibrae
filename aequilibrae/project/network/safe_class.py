@@ -1,7 +1,6 @@
 import shapely.wkb
 
 
-
 class SafeClass:
     _srid = 4326
 

@@ -1,5 +1,3 @@
-
-
 def clean(project):
     # Since we cannot decide the order of trigger execution in SQLITE, we make sure to remove any
     # extraneous nodes at a few key moments (i.e. opening and closing the model)

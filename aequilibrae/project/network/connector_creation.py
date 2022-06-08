@@ -14,7 +14,7 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    conn = network.project.connect() 
+    conn = network.project.connect()
     curr = conn.cursor()
 
     curr.execute("select count(*) from nodes where node_id=?", [zone_id])

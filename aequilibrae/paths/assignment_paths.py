@@ -24,7 +24,7 @@ class TrafficClassIdentifier(object):
 
 class AssignmentResultsTable(object):
     def __init__(self, table_name: str, project=None) -> None:
-        self.project = (project or get_active_project())
+        self.project = project or get_active_project()
         self.table_name = table_name
         self.assignment_results = self._read_assignment_results()
         self.table_name = self.assignment_results["table_name"].values[0]
