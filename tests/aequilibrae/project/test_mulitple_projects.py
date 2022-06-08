@@ -3,7 +3,6 @@ import tempfile
 import os
 from aequilibrae.context import get_active_project
 from aequilibrae.project import Project
-from aequilibrae.project.database_connection import database_connection
 import uuid
 
 

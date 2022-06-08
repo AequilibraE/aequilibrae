@@ -11,11 +11,11 @@ sys.dont_write_bytecode = True
 
 
 # TODO: Add tests for logging
-def StartsLogging(project_path=None):
+def StartsLogging(project=None):
     # CREATE THE LOGGER
-    if not project_path:
-        proj = get_active_project(must_exist=False)
-        project_path = proj.project_base_path if proj is not None else ""
+    project= project or get_active_project(must_exist=False)
+    project_path = project.project_base_path if project is not None else ""
+        
     p = Parameters(project_path)
     par = p.parameters
     if p.parameters is None:

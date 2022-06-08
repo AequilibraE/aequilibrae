@@ -57,7 +57,7 @@ class Modes:
     def __init__(self, net):
         self.__all_modes = []
         self.__items = {}
-        self.project_path = net.project.project_base_path
+        self.project = net.project
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
         self.__update_list_of_modes()
@@ -88,14 +88,14 @@ class Modes:
     @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Modes table fields and their metadata"""
-        return FieldEditor(self.project_path, "modes")
+        return FieldEditor(self.project, "modes")
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its **mode_id**"""
         self.__update_list_of_modes()
         if mode_id not in self.__all_modes:
             raise ValueError(f"Mode {mode_id} does not exist in the model")
-        return Mode(mode_id, self.project_path)
+        return Mode(mode_id, self.project)
 
     def get_by_name(self, mode: str) -> Mode:
         """Get a mode from the network by its **mode_name**"""
@@ -104,19 +104,19 @@ class Modes:
         found = self.curr.fetchone()
         if len(found) == 0:
             raise ValueError(f"Mode {mode} does not exist in the model")
-        return Mode(found[0], self.project_path)
+        return Mode(found[0], self.project)
 
     def all_modes(self) -> dict:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
         self.__update_list_of_modes()
-        return {x: Mode(x, self.project_path) for x in self.__all_modes}
+        return {x: Mode(x, self.project) for x in self.__all_modes}
 
     def new(self, mode_id: str) -> Mode:
         """Returns a new mode with *mode_id* that can be added to the model later"""
         if mode_id in self.__all_modes:
             raise ValueError("Mode already exists in the model. Creating a new one does not make sense")
 
-        return Mode(mode_id, self.project_path)
+        return Mode(mode_id, self.project)
 
     def __update_list_of_modes(self) -> None:
         self.curr.execute("select mode_id from 'modes'")

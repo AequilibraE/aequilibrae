@@ -3,7 +3,6 @@ import string
 from typing import List
 
 from aequilibrae import logger
-from aequilibrae.project.database_connection import database_connection
 
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
@@ -38,8 +37,8 @@ class FieldEditor:
 
     _alowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, project_path, table_name: str) -> None:
-        self.project_path = project_path
+    def __init__(self, project, table_name: str) -> None:
+        self.project = project
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -132,7 +131,7 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        conn = database_connection(self.project_path)
+        conn = self.project.connect()
         curr = conn.cursor()
         curr.execute(qry)
         dt = curr.fetchall()
@@ -140,7 +139,7 @@ class FieldEditor:
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        conn = database_connection(self.project_path)
+        conn = self.project.connect()
         if values is None:
             conn.execute(qry)
         else:

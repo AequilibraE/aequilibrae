@@ -28,7 +28,7 @@ class BasicTable:
     @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the zones table fields and their metadata"""
-        return FieldEditor(self.project.project_base_path, self.__table_type__)
+        return FieldEditor(self.project, self.__table_type__)
 
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""

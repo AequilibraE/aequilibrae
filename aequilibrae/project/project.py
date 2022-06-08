@@ -64,7 +64,7 @@ class Project:
         self.__set_logging_path()
         logger.info(f"Opened project on {self.project_base_path}")
         self.logger = logger
-        clean(self.project_base_path)
+        clean(self)
         self.activate()
 
     def new(self, project_path: str) -> None:
@@ -96,7 +96,7 @@ class Project:
             return
         try:
             self.conn.commit()
-            clean(self.project_base_path)
+            clean(self)
             self.conn.close()
             for obj in [self.parameters, self.network]:
                 del obj
@@ -175,7 +175,7 @@ class Project:
         p = self.project_parameters
         p.parameters["system"]["logging_directory"] = self.project_base_path
         p.write_back()
-        StartsLogging(self.project_base_path)
+        StartsLogging(self)
 
         # Create actual tables
         cursor = self.conn.cursor()

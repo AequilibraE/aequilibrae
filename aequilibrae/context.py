@@ -1,7 +1,3 @@
-import os
-
-ENVIRON_VAR = "AEQUILIBRAE_PROJECT_PATH"
-
 _current_project = None
 
 

@@ -31,14 +31,14 @@ class TestFieldEditor(TestCase):
 
     def test_building(self):
         for tab in ["modes", "links", "nodes", "link_types"]:
-            table = FieldEditor(self.proj.project_base_path, tab)
+            table = FieldEditor(self.proj, tab)
             qry = f'select count(*) from "attributes_documentation" where name_table="{tab}"'
             q = self.proj.conn.execute(qry).fetchone()[0]
             self.assertEqual(q, len(table._original_values), "Meta table populated with the wrong number of elements")
 
     def test_add(self):
         for tab in self.my_tables:
-            table = FieldEditor(self.proj.project_base_path, tab)
+            table = FieldEditor(self.proj, tab)
             qry = f'select count(*) from "attributes_documentation" where name_table="{tab}"'
             q = self.proj.conn.execute(qry).fetchone()[0]
             one = choice(list(table._original_values.keys()))
@@ -96,7 +96,7 @@ class TestFieldEditor(TestCase):
             fields = [x[1] for x in curr.fetchall() if x[1] == val2]
             self.assertEqual([val2], fields, "failed to add a new field")
 
-            table = FieldEditor(self.proj.project_base_path, table)
+            table = FieldEditor(self.proj, table)
             self.proj.conn.commit()
             curr = self.proj.conn.cursor()
             curr.execute(f'Select count(*) from "attributes_documentation" where attribute="{val}"')
@@ -111,26 +111,26 @@ class TestFieldEditor(TestCase):
 
     def test_save(self):
         for tab in ["modes", "links", "nodes", "link_types"]:
-            table = FieldEditor(self.proj.project_base_path, tab)
+            table = FieldEditor(self.proj, tab)
             random_val = self.randomword(30)
             if "alpha" in table._original_values.keys():
                 table.alpha = random_val
                 table.save()
-                table2 = FieldEditor(self.proj.project_base_path, tab)
+                table2 = FieldEditor(self.proj, tab)
 
                 self.assertEqual(table2.alpha, random_val, "Did not save values properly")
 
             if "link_id" in table._original_values.keys():
                 table.link_id = random_val
                 table.save()
-                table2 = FieldEditor(self.proj.project_base_path, tab)
+                table2 = FieldEditor(self.proj, tab)
 
                 self.assertEqual(table2.link_id, random_val, "Did not save values properly")
 
             if "node_id" in table._original_values.keys():
                 table.node_id = random_val
                 table.save()
-                table2 = FieldEditor(self.proj.project_base_path, tab)
+                table2 = FieldEditor(self.proj, tab)
 
                 self.assertEqual(table2.node_id, random_val, "Did not save values properly")
 
