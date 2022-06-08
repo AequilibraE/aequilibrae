@@ -5,19 +5,16 @@ from scipy.cluster.vq import kmeans2, whiten
 from scipy.spatial.distance import cdist
 import shapely.wkb
 from shapely.geometry import LineString
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
 
 INFINITE_CAPACITY = 99999
 
 
 def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link_types="", connectors=1):
-    project_path = network.project.project_base_path
-
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    conn = database_connection(project_path)
+    conn = network.project.connect() 
     curr = conn.cursor()
 
     curr.execute("select count(*) from nodes where node_id=?", [zone_id])

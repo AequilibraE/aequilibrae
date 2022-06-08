@@ -15,7 +15,6 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.project.database_connection import database_connection
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -35,7 +34,7 @@ class TrafficAssignment(object):
         fldr = 'D:/release/Sample models/sioux_falls_2020_02_15'
         proj_name = 'SiouxFalls.sqlite'
         dt_fldr = '0_tntp_data'
-        prj_fldr = '1project'
+        prj_fldr = '1_project'
 
         demand = AequilibraeMatrix()
         demand.load(join(fldr, dt_fldr, 'demand.omx'))
@@ -421,7 +420,7 @@ class TrafficAssignment(object):
         df.to_sql(table_name, conn)
         conn.close()
 
-        conn = database_connection(self.project.project_base_path)
+        conn = self.project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
         conn.execute(

@@ -58,7 +58,7 @@ class Project:
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
-        self.conn = database_connection(self.project_base_path)
+        self.conn = self.connect()
 
         self.__load_objects()
         self.__set_logging_path()
@@ -122,6 +122,9 @@ class Project:
         warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
         self.open(project_path)
 
+    def connect(self):
+        return database_connection(self.project_base_path)
+
     def activate(self):
         activate_project(self)
 
@@ -166,7 +169,7 @@ class Project:
         os.mkdir(self.project_base_path)
         shutil.copyfile(spatialite_database, self.path_to_file)
 
-        self.conn = database_connection(self.project_base_path)
+        self.conn = self.connect()
 
         # Write parameters to the project folder
         p = self.project_parameters

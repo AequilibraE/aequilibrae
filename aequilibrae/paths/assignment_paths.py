@@ -2,8 +2,6 @@ import os
 from typing import Dict, List
 import numpy as np
 import pandas as pd
-from aequilibrae import logger
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import get_active_project
 
 
@@ -26,7 +24,7 @@ class TrafficClassIdentifier(object):
 
 class AssignmentResultsTable(object):
     def __init__(self, table_name: str, project=None) -> None:
-        self.proj_dir = (project or get_active_project()).project_base_path
+        self.project = (project or get_active_project())
         self.table_name = table_name
         self.assignment_results = self._read_assignment_results()
         self.table_name = self.assignment_results["table_name"].values[0]
@@ -37,7 +35,7 @@ class AssignmentResultsTable(object):
         self.procedure_report = self._parse_procedure_report()
 
     def _read_assignment_results(self) -> pd.DataFrame:
-        conn = database_connection()
+        conn = self.project.connect()
         results_df = pd.read_sql("SELECT * FROM 'results'", conn)
         conn.close()
         res = results_df.loc[results_df.table_name == self.table_name]

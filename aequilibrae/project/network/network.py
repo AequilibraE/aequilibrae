@@ -12,7 +12,6 @@ from shapely.ops import unary_union
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
@@ -369,7 +368,7 @@ class Network(WorkerThread):
 
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
-        self.conn = database_connection()
+        self.conn = self.project.connect()
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]

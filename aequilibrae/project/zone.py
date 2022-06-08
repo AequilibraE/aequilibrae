@@ -3,7 +3,6 @@ from sqlite3 import Connection
 from warnings import warn
 from shapely.geometry import Point, MultiPolygon
 from .network.safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
 from .network.connector_creation import connector_creation
 
@@ -23,7 +22,7 @@ class Zone(SafeClass):
 
     def delete(self):
         """Removes the zone from the database"""
-        conn = database_connection(self._project.project_base_path)
+        conn = self._project.connect()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         conn.commit()
@@ -36,7 +35,7 @@ class Zone(SafeClass):
         if self.zone_id != self.__original__["zone_id"]:
             raise ValueError("One cannot change the zone_id")
 
-        conn = database_connection(self._project.project_base_path)
+        conn = self._project.connect()
         curr = conn.cursor()
 
         curr.execute(f'select count(*) from zones where zone_id="{self.zone_id}"')

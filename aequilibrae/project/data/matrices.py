@@ -5,7 +5,6 @@ from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.starts_logging import logger
-from aequilibrae.project.database_connection import database_connection
 
 
 class Matrices:
@@ -16,7 +15,7 @@ class Matrices:
         self.__items = {}
         self.__fields = []
 
-        self.conn = database_connection(project.project_base_path)
+        self.conn = project.connect()
         self.curr = self.conn.cursor()
         self.fldr = os.path.join(project.project_base_path, "matrices")
 

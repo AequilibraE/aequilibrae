@@ -1,6 +1,5 @@
 import shapely.wkb
 
-from aequilibrae.project.database_connection import database_connection
 
 
 class SafeClass:
@@ -38,4 +37,4 @@ class SafeClass:
         return data, sql
 
     def conn(self):
-        return database_connection(self._project.project_base_path)
+        return self._project.connect()

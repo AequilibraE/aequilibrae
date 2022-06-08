@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import Delaunay
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import get_active_project
 from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
 from aequilibrae.matrix import AequilibraeMatrix
@@ -31,7 +30,7 @@ class DelaunayAnalysis:
         if source not in ["zones", "network"]:
             raise ValueError("Source must be 'zones' or 'network'")
 
-        conn = database_connection(self.project.project_base_path)
+        conn = self.project.connect()
 
         tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type ='table'", conn)
         if DELAUNAY_TABLE in tables.name.values:
@@ -85,7 +84,7 @@ class DelaunayAnalysis:
         conn.close()
 
     def assign_matrix(self, matrix: AequilibraeMatrix, result_name: str):
-        conn = database_connection()
+        conn = self.project.connect()
 
         sql = f"select link_id, direction, a_node, b_node, distance, 1 capacity from {DELAUNAY_TABLE}"
 

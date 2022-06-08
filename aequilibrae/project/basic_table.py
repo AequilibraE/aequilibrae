@@ -1,7 +1,6 @@
 import shapely.wkb
 from shapely.geometry import Polygon
 
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.field_editor import FieldEditor
 
 
@@ -13,7 +12,7 @@ class BasicTable:
     def __init__(self, project):
         self.project = project
         self.__table_type__ = ""
-        self.conn = database_connection(project.project_base_path)
+        self.conn = project.connect()
         self._curr = self.conn.cursor()
 
     def extent(self) -> Polygon:
@@ -33,7 +32,7 @@ class BasicTable:
 
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
-        self.conn = database_connection(self.project.project_base_path)
+        self.conn = self.project.connect()
         self.__curr = self.conn.cursor()
 
     def __copy__(self):
