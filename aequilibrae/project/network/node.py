@@ -149,7 +149,13 @@ class Node(SafeClass):
             return
 
         connector_creation(
-            area, self.node_id, self.__srid__, mode_id, link_types, connectors, network=self._project.network
+            area,
+            self.node_id,
+            self.__srid__,
+            mode_id,
+            link_types=link_types,
+            connectors=connectors,
+            network=self._project.network,
         )
 
     def __setattr__(self, instance, value) -> None:
