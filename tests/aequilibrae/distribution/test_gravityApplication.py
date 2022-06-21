@@ -60,7 +60,7 @@ class TestGravityApplication(TestCase):
     def setUp(self):
         # GravityApplication requires an object that has a `parameters` attribute. `Parameters` fits
         # this requirement, so that we don't need to create a full project
-        self.proj = Parameters() 
+        self.proj = Parameters()
 
     def test_apply(self):
         args = {
