@@ -35,5 +35,5 @@ class SafeClass:
         sql = f'Insert into {self._table} ({",".join(up_keys)}) values({markers})'
         return data, sql
 
-    def conn(self):
+    def connect_db(self):
         return self._project.connect()

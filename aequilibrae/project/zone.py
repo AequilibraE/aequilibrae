@@ -26,6 +26,7 @@ class Zone(SafeClass):
         curr = conn.cursor()
         curr.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         conn.commit()
+        conn.close()
         self.__zoning._remove_zone(self.zone_id)
         del self
 

@@ -15,6 +15,13 @@ DELAUNAY_TABLE = "delaunay_network"
 
 class DelaunayAnalysis:
     def __init__(self, project=None):
+        """Start a Delaunay analysis
+
+        Args:
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
+        """
+
         self.project = project or get_active_project()
         self.procedure_id = uuid.uuid4().hex
 
@@ -22,9 +29,10 @@ class DelaunayAnalysis:
         """Creates a delaunay network based on the existing model
 
         Args:
-            *source* (:obj:`str`, `Optional`): Source of the centroids/zones. Defaults to *zones*, but can be *network*
-            *overwrite path* (:obj:`bool`, `Optional`): Whether we should overwrite am existing Delaunay Network.
-            Defaults to False
+            source (:obj:`str`, optional): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
+
+            overwrite path (:obj:`bool`, optional): Whether to should overwrite an existing Delaunay Network. Default ``False``
+
         """
 
         if source not in ["zones", "network"]:

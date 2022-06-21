@@ -8,14 +8,14 @@ class LinkType(SafeClass):
     __alowed_characters = string.ascii_letters + "_"
 
     def delete(self):
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM link_types where link_type_id="{self.link_type_id}"')
         conn.commit()
         del self
 
     def save(self):
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
 
         curr.execute(f'select count(*) from link_types where link_type_id="{self.link_type_id}"')

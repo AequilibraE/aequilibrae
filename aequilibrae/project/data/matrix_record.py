@@ -14,7 +14,7 @@ class MatrixRecord(SafeClass):
 
     def save(self):
         """Saves matrix record to the project database"""
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
 
         curr.execute("select count(*) from matrices where name=?", [self.name])
@@ -33,7 +33,7 @@ class MatrixRecord(SafeClass):
 
     def delete(self):
         """Deletes this matrix record and the underlying data from disk"""
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
         curr.execute("DELETE FROM matrices where name=?", [self.name])
         conn.commit()
@@ -63,14 +63,14 @@ class MatrixRecord(SafeClass):
     def __setattr__(self, instance, value) -> None:
         if instance == "name":
             value = str(value).lower()
-            conn = self.conn()
+            conn = self.connect_db()
             curr = conn.cursor()
             curr.execute("Select count(*) from matrices where LOWER(name)=?", [value])
             if sum(curr.fetchone()) > 0:
                 raise ValueError("Another matrix with this name already exists")
             conn.close()
         elif instance == "file_name":
-            conn = self.conn()
+            conn = self.connect_db()
             curr = conn.cursor()
             curr.execute("Select count(*) from matrices where LOWER(file_name)=?", [str(value).lower()])
             if sum(curr.fetchone()) > 0:

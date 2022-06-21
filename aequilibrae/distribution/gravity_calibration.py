@@ -61,6 +61,8 @@ class GravityCalibration:
 
             function (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
 
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
             parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
             nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True

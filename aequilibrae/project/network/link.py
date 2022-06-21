@@ -56,7 +56,7 @@ class Link(SafeClass):
 
     def delete(self):
         """Deletes link from database"""
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM links where link_id="{self.link_id}"')
         conn.commit()
@@ -64,7 +64,7 @@ class Link(SafeClass):
 
     def save(self):
         """Saves link to database"""
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
 
         if self.__new:

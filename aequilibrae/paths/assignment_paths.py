@@ -68,6 +68,9 @@ class AssignmentPaths(object):
         Instantiates the class
          Args:
             table_name (str): Name of the traffic assignment result table used to generate the required path files
+
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
         """
         project = project or get_active_project()
         self.proj_dir = project.project_base_path

@@ -44,7 +44,7 @@ class Node(SafeClass):
 
     def save(self):
         """Saves node to database"""
-        conn = self.conn()
+        conn = self.connect_db()
 
         if self.node_id != self.__original__["node_id"]:
             raise ValueError("One cannot change the node_id")
@@ -84,7 +84,7 @@ class Node(SafeClass):
             warn("This is already the node number")
             return
 
-        conn = self.conn()
+        conn = self.connect_db()
         curr = conn.cursor()
 
         curr.execute("BEGIN;")
