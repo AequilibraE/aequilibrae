@@ -16,7 +16,6 @@ from ...data import gmns_link, gmns_node, gmns_groups
 
 
 class TestNetwork(TestCase):
-
     def test_create_from_gmns(self):
 
         proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)

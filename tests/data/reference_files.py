@@ -36,4 +36,6 @@ st_varent_network = join(dirname(abspath(__file__)), "St_Varent_issue307.zip")
 # For GMNS tests
 gmns_link = join(dirname(dirname(abspath(__file__))), "data/arlington_signals_project/gmns_files", "link.csv")
 gmns_node = join(dirname(dirname(abspath(__file__))), "data/arlington_signals_project/gmns_files", "node.csv")
-gmns_groups = join(dirname(dirname(abspath(__file__))), "data/arlington_signals_project/gmns_files", "use_group_example.csv")
+gmns_groups = join(
+    dirname(dirname(abspath(__file__))), "data/arlington_signals_project/gmns_files", "use_group_example.csv"
+)
