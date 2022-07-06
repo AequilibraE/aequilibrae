@@ -216,6 +216,34 @@ Please also note that the network consistency triggers will NOT work before
 spatial indices have been created and/or if the editing is being done on a
 platform that does not support both RTree and Spatialite.
 
+.. _importing_from_gmns:
+
+Importing from files in GMNS format
+-----------------------------------
+
+This feature is still under development.
+Before importing a network from a source in GMNS format, it is imperative to know 
+in which spatial reference its geometries (links and nodes) were created. If the SRID
+is different than 4326, it must be passed as an input using the argument 'srid'.
+
+You can import a GMNS network as shown below:
+
+::
+  from aequilibrae.project import Project
+
+  p = Project()
+  p.new('path/to/project/new/folder')
+  p.network.create_from_gmns(link_file_path='path/to/link_file.csv', node_file_path='path/to/node_file.csv')
+  p.conn.close()
+
+**Important observations**
+
+In the AequilibraE nodes table, if a node is to be identified as a centroid, its 
+'is_centroid' field has to be set to 1. However, this is not part of the GMNS 
+specification. Thus, if you want a node to be identified as a centroid during the
+import process, in the GMNS node table you have to set the field 'node_type' equals
+to 'centroid'.
+
 .. _network_triggers_behaviour:
 
 Network consistency behaviour
