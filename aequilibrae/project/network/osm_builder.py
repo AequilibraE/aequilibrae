@@ -266,7 +266,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0: i + 1])
+                link_type = "_".join(split[0 : i + 1])
 
         if len(link_type) == 0:
             link_type = "empty"
