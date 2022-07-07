@@ -1,23 +1,20 @@
+from os import path
 import importlib.util as iutil
 import socket
 import sqlite3
 from datetime import datetime
-from os import environ, path
 from typing import List
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 
-from aequilibrae import Parameters
+from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.project.data import Matrices
-from aequilibrae.project.database_connection import ENVIRON_VAR
-from aequilibrae.project.database_connection import database_connection
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -97,8 +94,9 @@ class TrafficAssignment(object):
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
-    def __init__(self) -> None:
-        parameters = Parameters().parameters["assignment"]["equilibrium"]
+    def __init__(self, project=None) -> None:
+        project = project or get_active_project()
+        parameters = project.parameters["assignment"]["equilibrium"]
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = VDF()
@@ -119,6 +117,7 @@ class TrafficAssignment(object):
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
+        self.__dict__["project"] = project
 
     def __setattr__(self, instance, value) -> None:
 
@@ -417,13 +416,11 @@ class TrafficAssignment(object):
             keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
         """
         df = self.results()
-        conn = sqlite3.connect(path.join(environ[ENVIRON_VAR], "results_database.sqlite"))
-        if not keep_zero_flows:
-            df = df[df.PCE_tot > 0]
+        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
 
-        conn = database_connection()
+        conn = self.project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
         conn.execute(
@@ -578,7 +575,8 @@ class TrafficAssignment(object):
         if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
-        mats = Matrices()
+        mats = self.project.matrices
+
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls.__id__}.{mat_format}"
 

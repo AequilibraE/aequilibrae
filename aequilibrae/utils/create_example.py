@@ -21,7 +21,7 @@ def create_example(path: str, from_model="sioux_falls") -> Project:
     if not os.path.isfile(join(dirname(__file__), f"../reference_files/{from_model}.zip")):
         raise FileExistsError("Example not found")
 
-    os.mkdir(path)
+    os.makedirs(path, exist_ok=True)
     zipfile.ZipFile(join(dirname(__file__), f"../reference_files/{from_model}.zip")).extractall(path)
     proj = Project()
     proj.open(path)

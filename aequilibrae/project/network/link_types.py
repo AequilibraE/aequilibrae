@@ -58,10 +58,9 @@ class LinkTypes:
 
     """
 
-    __items = {}
-
     def __init__(self, net):
-        self.__all_types = []
+        self.__items = {}
+        self.project = net.project
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
 
@@ -72,7 +71,7 @@ class LinkTypes:
         self.__fields = [x for x in tl.fields]
         for lt in link_types_list:
             if lt["link_type_id"] not in self.__items:
-                self.__items[lt["link_type_id"]] = LinkType(lt)
+                self.__items[lt["link_type_id"]] = LinkType(lt, self.project)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
@@ -84,7 +83,7 @@ class LinkTypes:
 
         tp = {key: None for key in self.__fields}
         tp["link_type_id"] = link_type_id
-        lt = LinkType(tp)
+        lt = LinkType(tp, self.project)
         self.__items[link_type_id] = lt
         logger.warning("Link type has not yet been saved to the database. Do so explicitly")
         return lt
@@ -115,7 +114,7 @@ class LinkTypes:
 
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor("link_types")
+        return FieldEditor(self.project.project_base_path, "link_types")
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""

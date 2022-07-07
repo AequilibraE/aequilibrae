@@ -3,7 +3,6 @@ from sqlite3 import Connection
 from warnings import warn
 from shapely.geometry import Point, MultiPolygon
 from .network.safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae import logger
 from .network.connector_creation import connector_creation
 
@@ -14,7 +13,7 @@ class Zone(SafeClass):
     def __init__(self, dataset: dict, zoning):
         self.geometry = MultiPolygon()
         self.zone_id = -1
-        super().__init__(dataset)
+        super().__init__(dataset, zoning.project)
         self.__zoning = zoning
         self.conn = zoning.conn  # type: Connection
         self.__new = dataset["geometry"] is None
@@ -23,10 +22,11 @@ class Zone(SafeClass):
 
     def delete(self):
         """Removes the zone from the database"""
-        conn = database_connection()
+        conn = self._project.connect()
         curr = conn.cursor()
         curr.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         conn.commit()
+        conn.close()
         self.__zoning._remove_zone(self.zone_id)
         del self
 
@@ -36,7 +36,7 @@ class Zone(SafeClass):
         if self.zone_id != self.__original__["zone_id"]:
             raise ValueError("One cannot change the zone_id")
 
-        conn = database_connection()
+        conn = self._project.connect()
         curr = conn.cursor()
 
         curr.execute(f'select count(*) from zones where zone_id="{self.zone_id}"')
@@ -129,6 +129,7 @@ class Zone(SafeClass):
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
+            network=self._project.network,
         )
 
     def disconnect_mode(self, mode_id: str) -> None:

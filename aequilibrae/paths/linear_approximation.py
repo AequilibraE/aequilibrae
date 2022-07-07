@@ -10,7 +10,7 @@ from aequilibrae import logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.project.database_connection import ENVIRON_VAR
+from aequilibrae.context import get_active_project
 from ..utils import WorkerThread
 
 try:
@@ -47,8 +47,9 @@ class LinearApproximation(WorkerThread):
         equilibration = SIGNAL(object)
         assignment = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm) -> None:
+    def __init__(self, assig_spec, algorithm, project_path=None) -> None:
         WorkerThread.__init__(self, None)
+        self.project_path = project_path or get_active_project().project_base_path
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
@@ -325,8 +326,7 @@ class LinearApproximation(WorkerThread):
         self.step_direction_flow = np.sum(sd_flows, axis=0)
 
     def __maybe_create_path_file_directories(self):
-        pth = os.environ.get(ENVIRON_VAR)
-        path_base_dir = os.path.join(pth, "path_files", self.procedure_id)
+        path_base_dir = os.path.join(self.project_path, "path_files", self.procedure_id)
         for c in self.traffic_classes:
             if c._aon_results.save_path_file:
                 c._aon_results.path_file_dir = os.path.join(

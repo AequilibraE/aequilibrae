@@ -4,8 +4,9 @@ import shapely.wkb
 class SafeClass:
     _srid = 4326
 
-    def __init__(self, data_set: dict) -> None:
+    def __init__(self, data_set: dict, project) -> None:
         self.__original__ = {}
+        self._project = project
         self._table = ""
         self.__srid__ = 4326
         for k, v in data_set.items():
@@ -33,3 +34,6 @@ class SafeClass:
         data.extend([self.geometry.wkb, self.__srid__])
         sql = f'Insert into {self._table} ({",".join(up_keys)}) values({markers})'
         return data, sql
+
+    def connect_db(self):
+        return self._project.connect()

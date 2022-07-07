@@ -12,7 +12,6 @@ from shapely.ops import unary_union
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
@@ -50,10 +49,11 @@ class Network(WorkerThread):
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
+        self.project = project
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
-        self.links = Links()
-        self.nodes = Nodes()
+        self.links = Links(self)
+        self.nodes = Nodes(self)
 
     def skimmable_fields(self):
         """
@@ -232,7 +232,8 @@ class Network(WorkerThread):
         self.downloader.doWork()
 
         logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.source)
+        self.builder = OSMBuilder(self.downloader.json, self.source, project=self.project)
+
         if pyqt:
             self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
@@ -367,7 +368,7 @@ class Network(WorkerThread):
 
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
-        self.conn = database_connection()
+        self.conn = self.project.connect()
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]

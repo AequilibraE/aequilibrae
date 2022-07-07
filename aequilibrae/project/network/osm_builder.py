@@ -2,14 +2,16 @@ import gc
 import importlib.util as iutil
 import sqlite3
 import string
+import gc
 from typing import List
-
+import importlib.util as iutil
 import numpy as np
 import pandas as pd
-
+from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.context import get_active_project
+from .haversine import haversine
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.link_types import LinkTypes
 from .haversine import haversine
 from ..spatialite_connection import spatialite_connection
 from ...utils import WorkerThread
@@ -29,8 +31,9 @@ class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, osm_items: List, path: str, node_start=10000) -> None:
+    def __init__(self, osm_items: List, path: str, node_start=10000, project=None) -> None:
         WorkerThread.__init__(self, None)
+        self.project = project or get_active_project()
         self.osm_items = osm_items
         self.path = path
         self.conn = None
@@ -211,7 +214,7 @@ class OSMBuilder(WorkerThread):
         self.curr.close()
 
     def __worksetup(self):
-        self.__link_types = LinkTypes(self)
+        self.__link_types = self.project.network.link_types
         lts = self.__link_types.all_types()
         for lt_id, lt in lts.items():
             self.__model_link_types.append(lt.link_type)

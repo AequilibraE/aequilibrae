@@ -39,10 +39,9 @@ class Zoning(BasicTable):
 
     """
 
-    __items = {}
-
     def __init__(self, network):
-        super().__init__()
+        super().__init__(network.project)
+        self.__items = {}
         self.network = network
         self.__table_type__ = "zones"
         self.__fields = []

@@ -25,7 +25,6 @@ class TestLink(TestCase):
 
         self.links = self.network.links
         self.modes = self.network.modes
-        self.links = self.network.links
         self.lid = randint(1, 24)
         self.link = self.links.get(self.lid)
 

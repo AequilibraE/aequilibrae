@@ -6,8 +6,8 @@ import importlib.util as iutil
 import numpy as np
 import yaml
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.project.data import Matrices
 from aequilibrae.project.data.matrix_record import MatrixRecord
+from aequilibrae.context import get_active_project
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -60,7 +60,7 @@ class Ipf:
         fratar.output.export(path/to_aem/output.aem)
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, project=None, **kwargs):
         """
         Instantiates the Ipf problem
 
@@ -75,6 +75,8 @@ class Ipf:
 
             column_field (:obj:`str`): Field name that contains the data for the column totals
 
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
             parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
             nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
@@ -86,6 +88,7 @@ class Ipf:
 
             error (:obj:`str`): Error description
         """
+        self.project = project or get_active_project()
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
@@ -255,7 +258,7 @@ class Ipf:
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
 
-        mats = Matrices()
+        mats = self.project.matrices
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
