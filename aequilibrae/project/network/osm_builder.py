@@ -2,16 +2,15 @@ import gc
 import importlib.util as iutil
 import sqlite3
 import string
-import gc
 from typing import List
-import importlib.util as iutil
+
 import numpy as np
 import pandas as pd
-from aequilibrae.project.network.link_types import LinkTypes
-from aequilibrae.context import get_active_project
-from .haversine import haversine
+
 from aequilibrae import logger
+from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.network.link_types import LinkTypes
 from .haversine import haversine
 from ..spatialite_connection import spatialite_connection
 from ...utils import WorkerThread
@@ -267,7 +266,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0 : i + 1])
+                link_type = "_".join(split[0: i + 1])
 
         if len(link_type) == 0:
             link_type = "empty"
