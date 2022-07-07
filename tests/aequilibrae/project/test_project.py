@@ -23,15 +23,6 @@ class TestProject(TestCase):
             proj.open(temp_proj_folder)
         self.proj.open(self.temp_proj_folder)
 
-    def test_create_when_already_exists(self):
-        with self.assertRaises(Exception):
-            q = Project()
-            q.new(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-
-        with self.assertRaises(Exception):
-            q = Project()
-            q.open(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-
     def test_creation(self):
 
         curr = self.proj.conn.cursor()
@@ -55,5 +46,5 @@ class TestProject(TestCase):
         _ = database_connection()
 
         self.proj.close()
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(FileNotFoundError):
             _ = database_connection()

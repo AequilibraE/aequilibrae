@@ -3,19 +3,18 @@ from os.path import isfile, join
 import os
 from aequilibrae.starts_logging import logger
 from aequilibrae.project.network.safe_class import SafeClass
-from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
 
 class MatrixRecord(SafeClass):
-    def __init__(self, data_set: dict):
-        super().__init__(data_set)
+    def __init__(self, data_set: dict, project):
+        super().__init__(data_set, project)
         self._exists = True
-        self.fldr = join(os.environ.get(ENVIRON_VAR), "matrices")
+        self.fldr = join(project.project_base_path, "matrices")
 
     def save(self):
         """Saves matrix record to the project database"""
-        conn = database_connection()
+        conn = self.connect_db()
         curr = conn.cursor()
 
         curr.execute("select count(*) from matrices where name=?", [self.name])
@@ -34,7 +33,7 @@ class MatrixRecord(SafeClass):
 
     def delete(self):
         """Deletes this matrix record and the underlying data from disk"""
-        conn = database_connection()
+        conn = self.connect_db()
         curr = conn.cursor()
         curr.execute("DELETE FROM matrices where name=?", [self.name])
         conn.commit()
@@ -64,14 +63,14 @@ class MatrixRecord(SafeClass):
     def __setattr__(self, instance, value) -> None:
         if instance == "name":
             value = str(value).lower()
-            conn = database_connection()
+            conn = self.connect_db()
             curr = conn.cursor()
             curr.execute("Select count(*) from matrices where LOWER(name)=?", [value])
             if sum(curr.fetchone()) > 0:
                 raise ValueError("Another matrix with this name already exists")
             conn.close()
         elif instance == "file_name":
-            conn = database_connection()
+            conn = self.connect_db()
             curr = conn.cursor()
             curr.execute("Select count(*) from matrices where LOWER(file_name)=?", [str(value).lower()])
             if sum(curr.fetchone()) > 0:

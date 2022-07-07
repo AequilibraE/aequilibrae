@@ -8,10 +8,10 @@ import logging
 from uuid import uuid4
 from datetime import datetime
 import importlib.util as iutil
+from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.project.data import Matrices
 from aequilibrae import Parameters
 
 sys.dont_write_bytecode = True
@@ -102,7 +102,7 @@ class GravityApplication:
                 f.write(f'{line}\n')
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, project=None, **kwargs):
         """
         Instantiates the Ipf problem
 
@@ -119,6 +119,8 @@ class GravityApplication:
 
             column_field (:obj:`str`): Field name that contains the data for the column totals
 
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
             core_name (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
 
             parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
@@ -133,6 +135,7 @@ class GravityApplication:
             error (:obj:`str`): Error description
         """
 
+        self.project = project or get_active_project()
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
@@ -186,6 +189,7 @@ class GravityApplication:
 
         # And adjust with a fratar
         self.__ipf = Ipf(
+            project=self.project,
             matrix=self.output,
             rows=self.rows,
             columns=self.columns,
@@ -225,7 +229,7 @@ class GravityApplication:
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
 
-        mats = Matrices()
+        mats = self.project.matrices
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
@@ -234,7 +238,7 @@ class GravityApplication:
         record.save()
 
     def __get_parameters(self):
-        par = Parameters().parameters
+        par = self.project.parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para

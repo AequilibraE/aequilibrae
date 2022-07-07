@@ -1,17 +1,11 @@
 from unittest import TestCase
-import sqlite3
 from tempfile import gettempdir
 import os
 import uuid
 from shutil import copytree
-import platform
 from aequilibrae.project import Project
-from aequilibrae.project.network.network import Network
-from aequilibrae.parameters import Parameters
-from os.path import join, dirname
 from warnings import warn
 from random import random
-from aequilibrae.project.spatialite_connection import spatialite_connection
 from ...data import siouxfalls_project
 
 
