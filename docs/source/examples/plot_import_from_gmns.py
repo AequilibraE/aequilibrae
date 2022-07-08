@@ -16,6 +16,12 @@ from aequilibrae.project import Project
 import folium
 
 # %%
+# We load the example file from the GMNS GitHub repository
+link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/link.csv"
+node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/node.csv"
+use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/use_group.csv"
+
+# %%
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -23,16 +29,12 @@ project = Project()
 project.new(fldr)
 
 # %%
-# We load the example file from the GMNS GitHub repository
-link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/link.csv"
-node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/node.csv"
-use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/use_group.csv"
-
-# %%
 # As it is specified in that the geometries are in the coordinate system EPSG:32619,
 # which is different than the system supported by AequilibraE (EPSG:4326), we inform
 # the srid in the method call:
-project.network.create_from_gmns(link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619)
+project.network.create_from_gmns(
+    link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
+)
 
 # %%
 # Now, let's plot a map. This map can be compared with the images of the README.md

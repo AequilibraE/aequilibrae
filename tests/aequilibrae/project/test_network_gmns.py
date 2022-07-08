@@ -37,10 +37,10 @@ class TestNetwork(TestCase):
             return
 
         rand_lk = random.choice([x[0] for x in curr.execute("""select link_id from links""").fetchall()])
-        from_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, 'from_node_id'].item()
-        to_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, 'to_node_id'].item()
+        from_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "from_node_id"].item()
+        to_node = gmns_link_df.loc[gmns_link_df.link_id == rand_lk, "to_node_id"].item()
         a_node = curr.execute(f"""select a_node from links where link_id = {rand_lk}""").fetchone()[0]
         b_node = curr.execute(f"""select b_node from links where link_id = {rand_lk}""").fetchone()[0]
 
         if from_node != a_node or to_node != b_node:
-            self.fail('At least one link is disconnected from its start/end nodes')
+            self.fail("At least one link is disconnected from its start/end nodes")

@@ -1,21 +1,15 @@
 import importlib.util as iutil
 import math
-import re
-from re import A
 from sqlite3 import Connection as sqlc
-from tracemalloc import start
 from typing import Dict
-from unicodedata import decimal
 from warnings import warn
 
 import numpy as np
 import pandas as pd
-import string
 import shapely.wkb
 import shapely.wkt
-from shapely.geometry import Polygon, LineString, Point
+from shapely.geometry import Polygon
 from shapely.ops import unary_union
-from pyproj import Transformer
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
@@ -272,34 +266,8 @@ class Network(WorkerThread):
             *srid* (:obj:`int`, Optional): Spatial Reference ID in which the GMNS geometries were created
         """
 
-        gmns_builder = GMNSBuilder(self)
-        aeq_nodes_df, aeq_links_df, nodes_dict, links_dict = gmns_builder.doWork(link_file_path, node_file_path, use_group_path, geometry_path, srid)
-
-        nodes_fields_list = list(nodes_dict.keys())
-        nodes_fields_list.pop(nodes_fields_list.index("y_coord"))
-        nodes_fields_list = ["geometry" if x == "x_coord" else x for x in nodes_fields_list]
-
-        n_query = "insert into nodes(" + ", ".join(nodes_fields_list) + ")"
-        n_query += (
-            " values("
-            + ", ".join(["MakePoint(?,?, 4326)" if x == "geometry" else "?" for x in nodes_fields_list])
-            + ")"
-        )
-        n_params_list = aeq_nodes_df.to_records(index=False)
-
-        self.conn.executemany(n_query, n_params_list)
-        self.conn.commit()
-
-        l_query = "insert into links(" + ", ".join(list(links_dict.keys())) + ")"
-        l_query += (
-            " values("
-            + ", ".join(["GeomFromTEXT(?,4326)" if x == "geometry" else "?" for x in list(links_dict.keys())])
-            + ")"
-        )
-        l_params_list = aeq_links_df.to_records(index=False)
-
-        self.conn.executemany(l_query, l_params_list)
-        self.conn.commit()
+        gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
+        gmns_builder.doWork()
 
         logger.info("Network built successfully")
 

@@ -214,15 +214,15 @@ network:
       parent_node_id: integer
     link_fields:
       link_id: link_id
-      name: name
-      link_type: facility_type
-      modes: allowed_uses
       a_node: from_node_id
       b_node: to_node_id
-      direction: dir_flag
+      direction: directed
       speed: free_speed
       capacity: capacity
       lanes: lanes
+      name: name
+      link_type: facility_type
+      modes: allowed_uses
       geometry: geometry
     required_link_fields:
       - link_id
