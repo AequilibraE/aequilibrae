@@ -1,7 +1,7 @@
 import os
-import numpy as np
 from sqlite3 import Connection
 import sqlite3
+import numpy as np
 
 sqlite3.register_adapter(np.int64, int)
 sqlite3.register_adapter(np.int32, int)

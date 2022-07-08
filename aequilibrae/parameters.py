@@ -2,6 +2,7 @@ import os
 import yaml
 from warnings import warn
 from copy import deepcopy
+from aequilibrae.context import get_active_project
 
 
 class Parameters:
@@ -32,10 +33,12 @@ class Parameters:
     * temp directory
     """
 
-    def __init__(self):
+    def __init__(self, proj_path=None):
         """Loads parameters from file. The place is always the same. The root of the package"""
+        if not proj_path:
+            proj = get_active_project(must_exist=False)
+            proj_path = proj.project_base_path if proj is not None else ""
 
-        proj_path = os.environ.get("AEQUILIBRAE_PROJECT_PATH", "")
         default_path = os.path.dirname(os.path.realpath(__file__))
 
         self.file = os.path.join(proj_path, "parameters.yml")

@@ -5,19 +5,19 @@ from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.starts_logging import logger
-from aequilibrae.project.database_connection import database_connection, ENVIRON_VAR
 
 
 class Matrices:
     """Gateway into the matrices available/recorded in the model"""
 
-    __items = {}
-    __fields = []
+    def __init__(self, project):
+        self.project = project
+        self.__items = {}
+        self.__fields = []
 
-    def __init__(self):
-        self.conn = database_connection()
+        self.conn = project.connect()
         self.curr = self.conn.cursor()
-        self.fldr = os.path.join(os.environ.get(ENVIRON_VAR), "matrices")
+        self.fldr = os.path.join(project.project_base_path, "matrices")
 
         tl = TableLoader()
         matrices_list = tl.load_table(self.curr, "matrices")
@@ -31,12 +31,12 @@ class Matrices:
             if lt["name"] not in self.__items:
                 if isfile(join(self.fldr, lt["file_name"])):
                     lt["fldr"] = self.fldr
-                    self.__items[lt["name"].lower()] = MatrixRecord(lt)
+                    self.__items[lt["name"].lower()] = MatrixRecord(lt, project)
 
     def reload(self):
         """Discards all memory matrices in memory and loads recreate them"""
         self.__items.clear()
-        self.__init__()
+        self.__init__(self.project)
 
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
@@ -183,7 +183,7 @@ class Matrices:
         tp["name"] = name
         tp["file_name"] = file_name
         tp["cores"] = cores
-        mr = MatrixRecord(tp)
+        mr = MatrixRecord(tp, self.project)
         mr.save()
         self.__items[name.lower()] = mr
         logger.warning("Matrix Record has been saved to the database")

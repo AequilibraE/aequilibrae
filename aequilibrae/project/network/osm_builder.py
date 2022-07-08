@@ -1,15 +1,19 @@
+import gc
+import importlib.util as iutil
 import sqlite3
 import string
-import gc
 from typing import List
-import importlib.util as iutil
+
 import numpy as np
+import pandas as pd
+
+from aequilibrae import logger
+from aequilibrae.context import get_active_project
+from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.link_types import LinkTypes
 from .haversine import haversine
-from aequilibrae import logger
-from aequilibrae.parameters import Parameters
-from ...utils import WorkerThread
 from ..spatialite_connection import spatialite_connection
+from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -26,8 +30,9 @@ class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, osm_items: List, path: str, node_start=10000) -> None:
+    def __init__(self, osm_items: List, path: str, node_start=10000, project=None) -> None:
         WorkerThread.__init__(self, None)
+        self.project = project or get_active_project()
         self.osm_items = osm_items
         self.path = path
         self.conn = None
@@ -38,6 +43,7 @@ class OSMBuilder(WorkerThread):
         self.__model_link_type_ids = []
         self.__link_type_quick_reference = {}
         self.nodes = {}
+        self.node_df = []
         self.links = {}
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
 
@@ -80,12 +86,20 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Setting data structures for nodes"])
         self.__emit_all(["maxValue", len(n)])
 
+        self.node_df = []
         for i, node in enumerate(n):
             nid = node.pop("id")
             _ = node.pop("type")
+            node["node_id"] = i + self.node_start
             self.nodes[nid] = node
+            self.node_df.append([node["node_id"], nid, node["lon"], node["lat"]])
             self.__emit_all(["Value", i])
         del n
+        self.node_df = (
+            pd.DataFrame(self.node_df, columns=["A", "B", "C", "D"])
+            .drop_duplicates(subset=["C", "D"])
+            .to_records(index=False)
+        )
 
         logger.info("Setting data structures for links")
         self.__emit_all(["text", "Setting data structures for links"])
@@ -117,6 +131,13 @@ class OSMBuilder(WorkerThread):
         self.__update_table_structure()
         field_names = ",".join(fields)
 
+        logger.info("Adding network nodes")
+        self.__emit_all(["text", "Adding network nodes"])
+        sql = "insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))"
+        self.conn.executemany(sql, self.node_df)
+        self.conn.commit()
+        del self.node_df
+
         logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
         L = len(list(self.links.keys()))
@@ -125,12 +146,14 @@ class OSMBuilder(WorkerThread):
         counter = 0
         mode_codes, not_found_tags = self.modes_per_link_type()
         owf, twf = self.field_osm_source()
-
-        for osm_id, link in self.links.items():
+        all_attrs = []
+        all_osm_ids = list(self.links.keys())
+        for osm_id in all_osm_ids:
+            link = self.links.pop(osm_id)
             self.__emit_all(["Value", counter])
             counter += 1
             if counter % 1000 == 0:
-                logger.info(f"Inserting segments from {counter:,} out of {L:,} OSM link objects")
+                logger.info(f"Creating segments from {counter:,} out of {L:,} OSM link objects")
             vars["osm_id"] = osm_id
             vars["link_type"] = "default"
             linknodes = link["nodes"]
@@ -171,28 +194,26 @@ class OSMBuilder(WorkerThread):
             if len(vars["modes"]) > 0:
                 for i in range(segments):
                     attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
-                    sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(attributes) - 1)))
-                    try:
-                        self.curr.execute(sql, attributes)
-                        self.curr.execute("Select a_node, b_node from links where link_id=?", [vars["link_id"]])
-                        a, b = self.curr.fetchone()
-                        self.curr.executemany(
-                            "update nodes set osm_id=? where node_id=?",
-                            [[linknodes[intersections[i]], a], [linknodes[intersections[i + 1]], b]],
-                        )
-                    except Exception as e:
-                        data = list(vars.values())
-                        logger.error("error when inserting link {}. Error {}".format(data, e.args))
-                        logger.error(sql)
+                    all_attrs.append(attributes)
                     vars["link_id"] += 1
-                self.conn.commit()
+
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
             self.links[osm_id] = []
+        sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(all_attrs[0]) - 1)))
+        logger.info("Adding network links")
+        self.__emit_all(["text", "Adding network links"])
+        try:
+            self.curr.executemany(sql, all_attrs)
+        except Exception as e:
+            logger.error("error when inserting link {}. Error {}".format(all_attrs[0], e.args))
+            logger.error(sql)
+            raise e
+
         self.conn.commit()
         self.curr.close()
 
     def __worksetup(self):
-        self.__link_types = LinkTypes(self)
+        self.__link_types = self.project.network.link_types
         lts = self.__link_types.all_types()
         for lt_id, lt in lts.items():
             self.__model_link_types.append(lt.link_type)
@@ -278,7 +299,7 @@ class OSMBuilder(WorkerThread):
         return link_type
 
     def __get_link_property(self, d2, val, linktags, v):
-        vald = linktags.get(f"{v['osm_source']}:{d2}", val)
+        vald = linktags.get(f'{v["osm_source"]}:{d2}', val)
         if vald is None:
             return vald
 

@@ -1,7 +1,4 @@
-import sqlite3
 import string
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae import logger
 
 
 class Mode:
@@ -9,13 +6,14 @@ class Mode:
 
     __alowed_characters = string.ascii_letters + "_"
 
-    def __init__(self, mode_id: str) -> None:
+    def __init__(self, mode_id: str, project) -> None:
+        self.project = project
         if mode_id is None:
             raise ValueError("Mode IDs cannot be None")
 
         if len(mode_id) != 1 or mode_id not in string.ascii_letters:
             raise ValueError("Mode IDs must be a single ascii character")
-        conn = database_connection()
+        conn = self.project.connect()
         curr = conn.cursor()
 
         curr.execute("pragma table_info(modes)")
@@ -56,7 +54,7 @@ class Mode:
             if letter not in self.__alowed_characters:
                 raise ValueError('mode_name can only contain letters and "_"')
 
-        conn = database_connection()
+        conn = self.project.connect()
         curr = conn.cursor()
 
         curr.execute(f'select count(*) from modes where mode_id="{self.mode_id}"')
