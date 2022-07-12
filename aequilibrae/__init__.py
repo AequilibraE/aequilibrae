@@ -1,4 +1,8 @@
-from aequilibrae.starts_logging import logger, global_logger
+import tempfile
+import os
+import glob
+import sys
+from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
 from aequilibrae.log import Log
@@ -32,3 +36,20 @@ if compiled:
 
     from aequilibrae import paths
 name = "aequilibrae"
+
+
+def setup():
+    sys.dont_write_bytecode = True
+    cleaning()
+
+
+def cleaning():
+    p = tempfile.gettempdir() + "/aequilibrae_*"
+    for f in glob.glob(p):
+        try:
+            os.unlink(f)
+        except Exception as err:
+            global_logger.warning(err.__str__())
+
+
+setup()

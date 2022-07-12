@@ -14,7 +14,7 @@ from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database
-from aequilibrae.starts_logging import get_log_handler
+from aequilibrae.log import get_log_handler
 from .project_cleaning import clean
 from .project_creation import initialize_tables
 
@@ -122,10 +122,7 @@ class Project:
             *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
-        warnings.warn(
-            f"Function has been deprecated. Use my_project.open({project_path}) instead",
-            DeprecationWarning,
-        )
+        warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
         self.open(project_path)
 
     def connect(self):

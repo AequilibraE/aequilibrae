@@ -1,24 +1,54 @@
 import os
-import sys
 import tempfile
 import logging
 
-from aequilibrae.context import get_active_project
 from .parameters import Parameters
-import glob
-
-sys.dont_write_bytecode = True
 
 
-# TODO: Add tests for logging
-def StartsLogging():
+class Log:
+    """API entry point to the log file contents
+
+    ::
+
+        from aequilibrae import Project
+
+        p = Project()
+        p.open('path/to/project/folder')
+
+        log = p.log()
+
+        # We get all entries for the log file
+        entries = log.contents()
+
+        # Or clear everything (NO UN-DOs)
+        log.clear()
+    """
+
+    def __init__(self, project_base_path: str):
+        self.log_file_path = os.path.join(project_base_path, "aequilibrae.log")
+
+    def contents(self) -> list:
+        """Returns contents of log file
+
+        Return:
+            *log_contents* (:obj:`list`): List with all entries in the log file
+        """
+
+        with open(self.log_file_path, "r") as file:
+            return [x.strip() for x in file.readlines()]
+
+    def clear(self):
+        """Clears the log file. Use it wisely"""
+        with open(self.log_file_path, "w") as _:
+            pass
+
+
+def _setup_logger():
     # CREATE THE GLOBAL LOGGER
 
     par = Parameters._default
-    temp_folder = par["system"]["logging_directory"]
     do_log = par["system"]["logging"]
-    if not os.path.isdir(temp_folder):
-        temp_folder = tempfile.gettempdir()
+    temp_folder = tempfile.gettempdir()
 
     logger = logging.getLogger("aequilibrae")
     logger.setLevel(logging.DEBUG)
@@ -45,14 +75,4 @@ def get_log_handler(log_file: str, ensure_file_exists=True):
     return handler
 
 
-def cleaning():
-    p = tempfile.gettempdir() + "/aequilibrae_*"
-    for f in glob.glob(p):
-        try:
-            os.unlink(f)
-        except Exception as err:
-            global_logger.warning(err.__str__())
-
-
-global_logger = logger = StartsLogging()
-cleaning()
+global_logger = logger = _setup_logger()

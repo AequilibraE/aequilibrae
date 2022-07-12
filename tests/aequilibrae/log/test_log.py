@@ -9,8 +9,8 @@ import pytest
 
 from ...data import siouxfalls_project
 from aequilibrae.project import Project
-from aequilibrae import starts_logging
-from aequilibrae.starts_logging import StartsLogging
+from aequilibrae import log
+from aequilibrae.log import _setup_logger
 
 
 class TestLog(TestCase):
@@ -59,12 +59,12 @@ class TestStartsLogging:
         return handlers[0].baseFilename
 
     def test_logger_has_single_handler_named_aquilibrae(self):
-        StartsLogging()
-        logger = StartsLogging()
+        _setup_logger()
+        logger = _setup_logger()
         assert len(self.get_handlers(logger)) == 1
 
     def test_default_logger_handler(self):
-        logger = StartsLogging()
+        logger = _setup_logger()
         assert self.get_logger_file(logger).endswith("aequilibrae.log")
 
     def test_project_logger(self, create_project):
@@ -73,7 +73,7 @@ class TestStartsLogging:
 
     def test_activate_project_leaves_global_logger_in_tact(self, create_project):
         project = create_project()
-        assert self.get_logger_file(starts_logging.global_logger) != self.get_logger_file(project.logger)
+        assert self.get_logger_file(log.global_logger) != self.get_logger_file(project.logger)
 
     def test_multiple_projects_have_separate_logger(self, create_project):
         a = create_project()
