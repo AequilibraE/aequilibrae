@@ -1,11 +1,10 @@
 from os.path import join, dirname, realpath
 import sqlite3
 import string
-from warnings import warn
 import uuid
+from aequilibrae.context import get_logger
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
-from aequilibrae.starts_logging import logger
 
 
 class About:
@@ -22,10 +21,11 @@ class About:
 
     """
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, project):
         self.__characteristics = []
         self.__original = {}
-        self.__conn = conn
+        self.__conn = project.conn
+        self.logger = project.logger
         if self.__has_about():
             self.__load()
 
@@ -47,7 +47,7 @@ class About:
 
             self.__load()
         else:
-            warn("About table already exists. Nothing was done", Warning)
+            self.logger.warning("About table already exists. Nothing was done")
 
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""
@@ -97,7 +97,7 @@ class About:
             v = self.__dict__[k]
             if v != self.__original[k]:
                 curr.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
-                logger.info(f"Updated {k} on About_Table to {v}")
+                self.logger.info(f"Updated {k} on About_Table to {v}")
         self.__conn.commit()
 
     def __has_about(self):

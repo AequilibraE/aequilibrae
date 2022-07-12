@@ -18,13 +18,13 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-from aequilibrae import logger
 import logging
 import sys
 
 # We the project open, we can tell the logger to direct all messages to the terminal as well
+logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 

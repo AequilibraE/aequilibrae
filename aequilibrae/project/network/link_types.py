@@ -1,6 +1,5 @@
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.link_type import LinkType
-from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 
@@ -61,6 +60,7 @@ class LinkTypes:
     def __init__(self, net):
         self.__items = {}
         self.project = net.project
+        self.logger = net.project.logger
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
 
@@ -85,7 +85,7 @@ class LinkTypes:
         tp["link_type_id"] = link_type_id
         lt = LinkType(tp, self.project)
         self.__items[link_type_id] = lt
-        logger.warning("Link type has not yet been saved to the database. Do so explicitly")
+        self.logger.warning("Link type has not yet been saved to the database. Do so explicitly")
         return lt
 
     def delete(self, link_type_id: str) -> None:
@@ -96,9 +96,9 @@ class LinkTypes:
             del self.__items[link_type_id]
             self.conn.commit()
         except IntegrityError as e:
-            logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
+            self.logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
             raise e
-        logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
+        self.logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
 
     def get(self, link_type_id: str) -> LinkType:
         """Get a link_type from the network by its **link_type_id**"""

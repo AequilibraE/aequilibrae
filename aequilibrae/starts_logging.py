@@ -11,38 +11,38 @@ sys.dont_write_bytecode = True
 
 
 # TODO: Add tests for logging
-def StartsLogging(project=None):
-    # CREATE THE LOGGER
-    project = project or get_active_project(must_exist=False)
-    project_path = project.project_base_path if project is not None else ""
+def StartsLogging():
+    # CREATE THE GLOBAL LOGGER
 
-    p = Parameters(project_path)
-    par = p.parameters
-    if p.parameters is None:
-        par = p._default
+    par = Parameters._default
     temp_folder = par["system"]["logging_directory"]
     do_log = par["system"]["logging"]
     if not os.path.isdir(temp_folder):
         temp_folder = tempfile.gettempdir()
 
-    if do_log:
-        log_file = os.path.join(temp_folder, "aequilibrae.log")
-        if not os.path.isfile(log_file):
-            a = open(log_file, "w")
-            a.close()
-
     logger = logging.getLogger("aequilibrae")
     logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
 
-    if not len(logger.handlers):
-        if do_log:
-            ch = logging.FileHandler(log_file)
-        ch.setFormatter(formatter)
-        ch.name = "aequilibrae"
-        ch.setLevel(logging.DEBUG)
-        logger.addHandler(ch)
+    if not len(logger.handlers) and do_log:
+        log_file = os.path.join(temp_folder, "aequilibrae.log")
+        logger.addHandler(get_log_handler(log_file))
     return logger
+
+
+def get_log_handler(log_file: str, ensure_file_exists=True):
+    """return a log handler that writes to the given log_file"""
+    if os.path.exists(log_file) and not os.path.isfile(log_file):
+        raise FileExistsError(f"{log_file} is not a valid file")
+
+    if ensure_file_exists:
+        open(log_file, "a").close()
+
+    formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(formatter)
+    handler.name = "aequilibrae"
+    handler.setLevel(logging.DEBUG)
+    return handler
 
 
 def cleaning():
@@ -51,8 +51,8 @@ def cleaning():
         try:
             os.unlink(f)
         except Exception as err:
-            logger.warning(err.__str__())
+            global_logger.warning(err.__str__())
 
 
-logger = StartsLogging()
+global_logger = logger = StartsLogging()
 cleaning()

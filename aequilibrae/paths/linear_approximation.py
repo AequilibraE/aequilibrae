@@ -6,7 +6,7 @@ from typing import List, Dict
 
 import numpy as np
 
-from aequilibrae import logger
+from aequilibrae import global_logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
@@ -19,7 +19,7 @@ try:
     from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
     from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 import scipy
 
@@ -31,7 +31,7 @@ else:
     from scipy.optimize import root as root_scalar
 
     recent_scipy = False
-    logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
+    global_logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
@@ -47,9 +47,11 @@ class LinearApproximation(WorkerThread):
         equilibration = SIGNAL(object)
         assignment = SIGNAL(object)
 
-    def __init__(self, assig_spec, algorithm, project_path=None) -> None:
+    def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        self.project_path = project_path or get_active_project().project_base_path
+        project = project or get_active_project()
+        self.project_path = project.project_base_path
+        self.logger = project.logger
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
@@ -362,8 +364,8 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             c.graph.set_graph(self.time_field)
 
-        logger.info(f"{self.algorithm} Assignment STATS")
-        logger.info("Iteration, RelativeGap, stepsize")
+        self.logger.info(f"{self.algorithm} Assignment STATS")
+        self.logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):
             self.iteration_issue = []
             if pyqt:
@@ -450,7 +452,7 @@ class LinearApproximation(WorkerThread):
                 self.convergence_report["beta1"].append(self.betas[1])
                 self.convergence_report["beta2"].append(self.betas[2])
 
-            logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
+            self.logger.info(f"{self.iter},{self.rgap},{self.stepsize}")
             if converged:
                 self.steps_below += 1
                 if self.steps_below >= self.steps_below_needed_to_terminate:
@@ -471,8 +473,8 @@ class LinearApproximation(WorkerThread):
             c.results.total_flows()
 
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
-            logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
-        logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+            self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
+        self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         if pyqt:
             self.equilibration.emit(["rgap", self.rgap])
             self.equilibration.emit(["iterations", self.iter])
@@ -520,11 +522,11 @@ class LinearApproximation(WorkerThread):
                 min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
                 self.stepsize = min_res.root
                 if not min_res.converged:
-                    logger.warning("Descent direction stepsize finder has not converged")
+                    self.logger.warning("Descent direction stepsize finder has not converged")
             else:
                 min_res = root_scalar(derivative_of_objective, 1 / self.iter, xtol=x_tol)
                 if not min_res.success:
-                    logger.warning("Descent direction stepsize finder has not converged")
+                    self.logger.warning("Descent direction stepsize finder has not converged")
                 self.stepsize = min_res.x[0]
                 if self.stepsize <= 0.0 or self.stepsize >= 1.0:
                     raise ValueError("wrong root")
@@ -544,7 +546,7 @@ class LinearApproximation(WorkerThread):
                     tiny_step = 1e-2 / self.iter  # use a fraction of the MSA stepsize. We observe that using 1e-4
                     # works well in practice, however for a large number of iterations this might be too much so
                     # use this heuristic instead.
-                    logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
+                    self.logger.warning(f"# Alert: Adding {tiny_step} as step size to make it non-zero. {e.args}")
                     self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0

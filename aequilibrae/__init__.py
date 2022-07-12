@@ -1,4 +1,4 @@
-from aequilibrae.starts_logging import logger
+from aequilibrae.starts_logging import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
 from aequilibrae.log import Log
@@ -6,14 +6,13 @@ from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
-import warnings
 
 compiled = True
 try:
     from aequilibrae.paths.AoN import path_computation
 except Exception as e:
     compiled = False
-    warnings.warn(f"Failed to import compiled modules. {e.args}")
+    global_logger.warning(f"Failed to import compiled modules. {e.args}")
 
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
