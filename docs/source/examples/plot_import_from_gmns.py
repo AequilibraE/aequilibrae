@@ -33,17 +33,17 @@ project.new(fldr)
 # In this cell, we modify the AequilibraE parameters.yml file so it contains additional
 # fields to be read in the GMNS link and/or node tables.
 new_link_fields = {
-    'bridge': {'description': 'bridge flag', 'type': 'text'},
-    'tunnel': {'description': 'tunnel flag', 'type': 'text'}
+    "bridge": {"description": "bridge flag", "type": "text"},
+    "tunnel": {"description": "tunnel flag", "type": "text"},
 }
 new_node_fields = {
-    'port': {'description': 'port flag', 'type': 'text'},
-    'hospital': {'description': 'hoospital flag', 'type': 'text'}
+    "port": {"description": "port flag", "type": "text"},
+    "hospital": {"description": "hoospital flag", "type": "text"},
 }
 
 par = Parameters()
-par.parameters['network']['gmns']['other_link_fields'].update(new_link_fields)
-par.parameters['network']['gmns']['other_node_fields'].update(new_node_fields)
+par.parameters["network"]["gmns"]["other_link_fields"].update(new_link_fields)
+par.parameters["network"]["gmns"]["other_node_fields"].update(new_node_fields)
 par.write_back()
 
 # %%

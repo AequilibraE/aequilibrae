@@ -134,9 +134,7 @@ class GMNSBuilder(WorkerThread):
                 )
 
             if "toll" in self.link_df.columns.to_list():
-                [toll_ab[idx], toll_ba[idx]] = (
-                    [row["toll"], ""] if direction[idx] == 1 else [row["toll"], row["toll"]]
-                )
+                [toll_ab[idx], toll_ba[idx]] = [row["toll"], ""] if direction[idx] == 1 else [row["toll"], row["toll"]]
 
         return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba
 
@@ -380,7 +378,9 @@ class GMNSBuilder(WorkerThread):
         direction = self.get_aeq_direction()
 
         # Creating speeds, capacities and lanes lists based on direction list
-        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba = self.get_ab_lists(direction)
+        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba = self.get_ab_lists(
+            direction
+        )
 
         # Adding new fields to AequilibraE links table / Preparing it to receive information from GMNS table.
         l_fields = self.links.fields
@@ -399,7 +399,9 @@ class GMNSBuilder(WorkerThread):
         for fld in list(other_lfields.keys()):
             if fld in self.link_df.columns.to_list() and fld not in l_fields.all_fields():
                 l_fields.add(
-                    f"{fld}", description=f"{other_lfields[fld]['description']}", data_type=f"{other_lfields[fld]['type']}"
+                    f"{fld}",
+                    description=f"{other_lfields[fld]['description']}",
+                    data_type=f"{other_lfields[fld]['type']}",
                 )
                 if fld == "toll":
                     other_ldict.update({"toll_ab": toll_ab})
@@ -412,7 +414,9 @@ class GMNSBuilder(WorkerThread):
         all_fields = list(p.parameters["network"]["gmns"]["link_fields"].values()) + list(other_lfields.keys())
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file.")
+            print(
+                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            )
 
         # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
 
@@ -424,7 +428,9 @@ class GMNSBuilder(WorkerThread):
         for fld in list(other_nfields.keys()):
             if fld in self.node_df.columns.to_list() and fld not in l_fields.all_fields():
                 n_fields.add(
-                    f"{fld}", description=f"{other_nfields[fld]['description']}", data_type=f"{other_nfields[fld]['type']}"
+                    f"{fld}",
+                    description=f"{other_nfields[fld]['description']}",
+                    data_type=f"{other_nfields[fld]['type']}",
                 )
                 other_ndict.update({f"{fld}": self.node_df[fld]})
 
@@ -433,7 +439,9 @@ class GMNSBuilder(WorkerThread):
         all_fields = p.parameters["network"]["gmns"]["required_node_fields"] + list(other_nfields.keys())
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
         if missing_f != []:
-            print(f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file.")
+            print(
+                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            )
 
         # Getting information from some optinal GMNS fields
 
