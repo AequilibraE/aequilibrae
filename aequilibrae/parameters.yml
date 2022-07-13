@@ -202,16 +202,29 @@ network:
     critical_dist: 2
     node_fields:
       node_id: node_id
+    other_node_fields:
+      name:
+        description: Node name
+        type: text
+      z_coord:
+        description: Altitude in short length units
+        type: numeric
+      node_type:
+        description: What it represents
+        type: text
+      ctrl_type:
+        description: From GMNS ControlType_Set
+        type: text
+      zone_id:
+        description: TAZ or city, or census tract
+        type: integer
+      parent_node_id:
+        description: The parent of this node
+        type: integer
     required_node_fields:
       - node_id
       - x_coord
       - y_coord
-    other_node_fields:
-      z_coord: numeric
-      node_type: text
-      ctrl_type: text
-      zone_id: integer
-      parent_node_id: integer
     link_fields:
       link_id: link_id
       a_node: from_node_id
@@ -224,22 +237,45 @@ network:
       link_type: facility_type
       modes: allowed_uses
       geometry: geometry
+    other_link_fields:
+      dir_flag:
+        description: Shapepoints direction
+        type: integer
+      length:
+        description: GMNS length in long_length units
+        type: numeric
+      geometry_id:
+        description: Foreign key from geometry table
+        type: integer
+      parent_link_id:
+        description: The parent of this link
+        type: integer
+      grade:
+        description: Percent grade of the link
+        type: integer
+      bike_facility:
+        description: Type of bicycle accommodation
+        type: text
+      ped_facility:
+        description: Type of pedestrian accommodation
+        type: text
+      parking:
+        description: Type of parking
+        type: text
+      toll:
+        description: Toll in currency units
+        type: numeric
+      jurisdiction:
+        description: Owner/operator of the link
+        type: text
+      row_width:
+        description: Width of the entire right-of-way (both directions)
+        type: numeric
     required_link_fields:
       - link_id
       - from_node_id
       - to_node_id
       - directed
-    other_link_fields:
-      length: numeric
-      geometry_id: integer
-      parent_link_id: integer
-      grade: numeric
-      bike_facility: text
-      ped_facility: text
-      parking: text
-      toll: numeric
-      jurisdiction: text
-      row_width: numeric
 osm:
     overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"

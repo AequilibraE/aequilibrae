@@ -249,6 +249,11 @@ As of July 2022, it is possible to import the following files from a GMNS source
 You can find the specification for all these tables in the GMNS documentation, 
 `here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
 
+By default, the method *create_from_gmns()* read all required and optional fields
+specified in the GMNS link and node tables specification. If you need it to read 
+any additional fields as well, you have to modify the AequilibraE parameters as
+shown in the example (see Section 7.Workflows/Importing network from GMNS).
+
 .. note::
 
     **In the AequilibraE nodes table, if a node is to be identified as a centroid, its**

@@ -33,7 +33,10 @@ class GMNSBuilder(WorkerThread):
         self.gmns_l_fields = self.p.parameters["network"]["gmns"]["link_fields"]
         self.gmns_n_fields = self.p.parameters["network"]["gmns"]["node_fields"]
 
-    def transform_srid(self):
+    def transform_srid(self, srid):
+
+        if srid == 4326:
+            return
 
         transformer = Transformer.from_crs(f"epsg:{self.srid}", "epsg:4326", always_xy=True)
 
@@ -111,6 +114,8 @@ class GMNSBuilder(WorkerThread):
         capacity_ba = ["" for _ in range(len(self.link_df))]
         lanes_ab = ["" for _ in range(len(self.link_df))]
         lanes_ba = ["" for _ in range(len(self.link_df))]
+        toll_ab = ["" for _ in range(len(self.link_df))]
+        toll_ba = ["" for _ in range(len(self.link_df))]
 
         for idx, row in self.link_df.iterrows():
             if gmns_speed in self.link_df.columns.to_list():
@@ -128,7 +133,12 @@ class GMNSBuilder(WorkerThread):
                     [row[gmns_lanes], ""] if direction[idx] == 1 else [row[gmns_lanes], row[gmns_lanes]]
                 )
 
-        return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba
+            if "toll" in self.link_df.columns.to_list():
+                [toll_ab[idx], toll_ba[idx]] = (
+                    [row["toll"], ""] if direction[idx] == 1 else [row["toll"], row["toll"]]
+                )
+
+        return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba
 
     def save_types_to_aeq(self):
 
@@ -364,15 +374,21 @@ class GMNSBuilder(WorkerThread):
                 self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
 
         # Checking if it is needed to change the spatial reference system.
-        if self.srid != 4326:
-            self.transform_srid()
+        self.transform_srid(self.srid)
 
         # Creating direction list based on list of two-way links
         direction = self.get_aeq_direction()
 
+        # Creating speeds, capacities and lanes lists based on direction list
+        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba = self.get_ab_lists(direction)
+
         # Adding new fields to AequilibraE links table / Preparing it to receive information from GMNS table.
         l_fields = self.links.fields
         l_fields.add("notes", description="More information about the link", data_type="TEXT")
+
+        if "toll" in self.link_df.columns.to_list():
+            l_fields.add("toll_ab", description="Toll", data_type="NUMERIC")
+            l_fields.add("toll_ba", description="Toll", data_type="NUMERIC")
 
         if self.gmns_l_fields["lanes"] in self.link_df.columns.to_list():
             l_fields.add("lanes_ab", description="Lanes", data_type="NUMERIC")
@@ -383,11 +399,20 @@ class GMNSBuilder(WorkerThread):
         for fld in list(other_lfields.keys()):
             if fld in self.link_df.columns.to_list() and fld not in l_fields.all_fields():
                 l_fields.add(
-                    f"{fld}_gmns", description=f"{fld} field from GMNS link table", data_type=f"{other_lfields[fld]}"
+                    f"{fld}", description=f"{other_lfields[fld]['description']}", data_type=f"{other_lfields[fld]['type']}"
                 )
-                other_ldict.update({f"{fld}_gmns": self.link_df[fld]})
+                if fld == "toll":
+                    other_ldict.update({"toll_ab": toll_ab})
+                    other_ldict.update({"toll_ba": toll_ba})
+
+                other_ldict.update({f"{fld}": self.link_df[fld]})
 
         l_fields.save()
+
+        all_fields = list(p.parameters["network"]["gmns"]["link_fields"].values()) + list(other_lfields.keys())
+        missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
+        if missing_f != []:
+            print(f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file.")
 
         # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
 
@@ -399,14 +424,16 @@ class GMNSBuilder(WorkerThread):
         for fld in list(other_nfields.keys()):
             if fld in self.node_df.columns.to_list() and fld not in l_fields.all_fields():
                 n_fields.add(
-                    f"{fld}_gmns", description=f"{fld} field from GMNS node table", data_type=f"{other_nfields[fld]}"
+                    f"{fld}", description=f"{other_nfields[fld]['description']}", data_type=f"{other_nfields[fld]['type']}"
                 )
-                other_ndict.update({f"{fld}_gmns": self.node_df[fld]})
+                other_ndict.update({f"{fld}": self.node_df[fld]})
 
         n_fields.save()
 
-        # Creating speeds, capacities and lanes lists based on direction list
-        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba = self.get_ab_lists(direction)
+        all_fields = p.parameters["network"]["gmns"]["required_node_fields"] + list(other_nfields.keys())
+        missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
+        if missing_f != []:
+            print(f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file.")
 
         # Getting information from some optinal GMNS fields
 
