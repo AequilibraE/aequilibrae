@@ -272,6 +272,44 @@ class Network(WorkerThread):
 
         logger.info("Network built successfully")
 
+    def export_to_gmns(self):
+        """
+        Exports AequilibraE network to csv files in GMNS format.
+        """
+
+        p = Parameters()
+        gmns_par = p.parameters["network"]["gmns"]
+
+        l_fields = gmns_par["link_fields"]
+        other_lfields = gmns_par["other_link_fields"]
+
+        links_df = self.links.data
+        nodes_df = self.nodes.data
+
+        gmns_link = {}
+        for _, row in links_df.iterrows():
+            for col in list(links_df.columns):
+                if col in l_fields:
+                    gmns_link.update({f'{l_fields[col]}': row[col]})
+                elif col in other_lfields:
+                    gmns_link.update({f'{col}': row[col]})
+
+        gmns_node = {}
+        for _, row in nodes_df.iterrows():
+            for col in list(nodes_df.columns):
+                if col in l_fields:
+                    gmns_node.update({f'{l_fields[col]}': row[col]})
+                elif col in other_lfields:
+                    gmns_node.update({f'{col}': row[col]})
+
+        '''
+            -- The geometries from nodes table must be broken into their x and y coordinates
+            -- Na tabela de links: o campo de direção deverá ser ajustado e, se houver um link com direção 0,
+            este deverá ser dividido em dois links separados com from_node_id e to_node_id trocados.
+        '''
+
+        return
+
     def signal_handler(self, val):
         if pyqt:
             self.netsignal.emit(val)
