@@ -20,20 +20,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get install libsqlite3-mod-spatialite
-        sudo apt-get install -y libspatialite-dev
         pip3 install setuptools --upgrade
         pip install -r requirements.txt
         pip3 install pytest
-        pip3 install spatialite pysqlite3-binary
-        pip3 install pytest
-        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
-    - name: Compile library
+    - name: Install package
       run: |
-        cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        pip3 install -e .
 
     - name: Test
       run: |
