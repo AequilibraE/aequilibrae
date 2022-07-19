@@ -71,7 +71,7 @@ class TestStartsLogging:
         project = create_project()
         assert self.get_logger_file(project.logger).startswith(project.project_base_path)
 
-    def test_activate_project_leaves_global_logger_in_tact(self, create_project):
+    def test_activate_project_leaves_global_logger_intact(self, create_project):
         project = create_project()
         assert self.get_logger_file(log.global_logger) != self.get_logger_file(project.logger)
 

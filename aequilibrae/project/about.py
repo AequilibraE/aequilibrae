@@ -1,8 +1,6 @@
 from os.path import join, dirname, realpath
-import sqlite3
 import string
 import uuid
-from aequilibrae.context import get_logger
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
 
