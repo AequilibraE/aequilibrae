@@ -37,7 +37,7 @@ jobs:
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish wheels to PyPI
-      if: ${{ github.event_name == 'release'}}
+      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -45,6 +45,7 @@ jobs:
         twine upload dist/*-manylinux*.whl
 
     - name: Save wheels to AWS
+      if: ${{ (github.repository_owner == 'AequilibraE') }}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks
