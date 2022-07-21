@@ -7,6 +7,7 @@ class SafeClass:
     def __init__(self, data_set: dict, project) -> None:
         self.__original__ = {}
         self._project = project
+        self._logger = project.logger
         self._table = ""
         self.__srid__ = 4326
         for k, v in data_set.items():

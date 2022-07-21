@@ -4,7 +4,7 @@ import shutil
 import sqlite3
 import warnings
 
-from aequilibrae import logger
+from aequilibrae import global_logger
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.about import About
@@ -14,7 +14,7 @@ from aequilibrae.context import activate_project, get_active_project
 from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database
-from aequilibrae.starts_logging import StartsLogging
+from aequilibrae.log import get_log_handler
 from .project_cleaning import clean
 from .project_creation import initialize_tables
 
@@ -58,14 +58,14 @@ class Project:
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
+        self.__setup_logger()
+        self.activate()
+
         self.conn = self.connect()
 
         self.__load_objects()
-        self.__set_logging_path()
-        logger.info(f"Opened project on {self.project_base_path}")
-        self.logger = logger
+        global_logger.info(f"Opened project on {self.project_base_path}")
         clean(self)
-        self.activate()
 
     def new(self, project_path: str) -> None:
         """Creates a new project
@@ -79,20 +79,23 @@ class Project:
         self.source = self.path_to_file
 
         if os.path.isdir(project_path):
-            raise FileNotFoundError("Location already exists. Choose a different name or remove the existing directory")
+            raise FileExistsError("Location already exists. Choose a different name or remove the existing directory")
+
+        # We create the project folder and create the base file
+        os.mkdir(self.project_base_path)
+
+        self.__setup_logger()
         self.activate()
 
         self.__create_empty_project()
         self.__load_objects()
         self.about.create()
-        self.__set_logging_path()
-        self.logger = logger
-        logger.info(f"Created project on {self.project_base_path}")
+        global_logger.info(f"Created project on {self.project_base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""
         if not self.project_base_path:
-            warnings.warn("This Aequilibrae project is not opened")
+            global_logger.warning("This Aequilibrae project is not opened")
             return
         try:
             self.conn.commit()
@@ -105,9 +108,9 @@ class Project:
             del self.network.modes
 
         except (sqlite3.ProgrammingError, AttributeError):
-            warnings.warn(f"This project at {self.project_base_path} is already closed")
+            global_logger.warning(f"This project at {self.project_base_path} is already closed")
         else:
-            logger.info(f"Closed project on {self.project_base_path}")
+            global_logger.info(f"Closed project on {self.project_base_path}")
         finally:
             self.deactivate()
 
@@ -144,12 +147,12 @@ class Project:
             os.mkdir(matrix_folder)
 
         self.network = Network(self)
-        self.about = About(self.conn)
+        self.about = About(self)
         self.matrices = Matrices(self)
 
     @property
     def project_parameters(self) -> Parameters:
-        return Parameters(self.project_base_path)
+        return Parameters(self)
 
     @property
     def parameters(self) -> dict:
@@ -165,8 +168,6 @@ class Project:
 
     def __create_empty_project(self):
 
-        # We create the project folder and create the base file
-        os.mkdir(self.project_base_path)
         shutil.copyfile(spatialite_database, self.path_to_file)
 
         self.conn = self.connect()
@@ -175,31 +176,22 @@ class Project:
         p = self.project_parameters
         p.parameters["system"]["logging_directory"] = self.project_base_path
         p.write_back()
-        StartsLogging(self)
 
         # Create actual tables
         cursor = self.conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
-        initialize_tables(self.conn)
+        initialize_tables(self)
 
-    def __set_logging_path(self):
-        p = self.project_parameters
-        par = p.parameters
-        if p.parameters is None:
-            par = p._default
+    def __setup_logger(self):
+
+        self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
+        self.logger.propagate = False
+        self.logger.setLevel(logging.DEBUG)
+
+        par = self.parameters or self.project_parameters._default
         do_log = par["system"]["logging"]
-        for handler in logger.handlers:
-            if handler.name == "aequilibrae":
-                logger.removeHandler(handler)
+
         if do_log:
-            formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
             log_file = os.path.join(self.project_base_path, "aequilibrae.log")
-            if not os.path.isfile(log_file):
-                a = open(log_file, "w")
-                a.close()
-            ch = logging.FileHandler(log_file)
-            ch.name = "aequilibrae"
-            ch.setFormatter(formatter)
-            ch.setLevel(logging.DEBUG)
-            logger.addHandler(ch)
+            self.logger.addHandler(get_log_handler(log_file))
