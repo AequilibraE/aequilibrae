@@ -6,12 +6,12 @@ import numpy as np
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None

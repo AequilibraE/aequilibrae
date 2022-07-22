@@ -3,7 +3,6 @@ from copy import deepcopy
 import pandas as pd
 import shapely.wkb
 
-from aequilibrae import logger
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.link import Link
@@ -119,7 +118,7 @@ class Links(BasicTable):
             d = self._curr.rowcount
             self.conn.commit()
         if d:
-            logger.warning(f"Link {link_id} was successfully removed from the project database")
+            self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
             self.__existence_error(link_id)
 

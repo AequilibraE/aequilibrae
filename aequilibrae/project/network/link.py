@@ -1,6 +1,6 @@
+from typing import Union
 from .safe_class import SafeClass
 from aequilibrae.project.network.mode import Mode
-from aequilibrae import logger
 
 
 class Link(SafeClass):
@@ -96,7 +96,7 @@ class Link(SafeClass):
 
         self.__dict__["modes"] = modes
 
-    def add_mode(self, mode: [str, Mode]):
+    def add_mode(self, mode: Union[str, Mode]):
         """Adds a new mode to this link
 
         Raises a warning if mode is already allowed on the link, and fails if mode does not exist
@@ -107,12 +107,12 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id in self.modes:
-            logger.warning("Mode already active for this link")
+            self._logger.warning("Mode already active for this link")
             return
 
         self.__dict__["modes"] += mode_id
 
-    def drop_mode(self, mode: [str, Mode]):
+    def drop_mode(self, mode: Union[str, Mode]):
         """Removes a mode from this link
 
         Raises a warning if mode is already NOT allowed on the link, and fails if mode does not exist
@@ -124,7 +124,7 @@ class Link(SafeClass):
         mode_id = self.__validate(mode)
 
         if mode_id not in self.modes:
-            logger.warning("Mode already inactive for this link")
+            self._logger.warning("Mode already inactive for this link")
             return
 
         if len(self.modes) == 1:
@@ -144,7 +144,7 @@ class Link(SafeClass):
     def _exists(self):
         return self.__stil_exists
 
-    def __validate(self, mode: [str, Mode]) -> str:
+    def __validate(self, mode: Union[str, Mode]) -> str:
         if isinstance(mode, Mode):
             mode_id = mode.mode_id
         elif isinstance(mode, str):
@@ -173,7 +173,7 @@ class Link(SafeClass):
                     txts.append(f'"{key}"=?')
 
         if not data:
-            logger.warning(f"Nothing to update for link {self.link_id}")
+            self._logger.warning(f"Nothing to update for link {self.link_id}")
             return [], ""
 
         txts = ",".join(txts) + " where link_id=?"

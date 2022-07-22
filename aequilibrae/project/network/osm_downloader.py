@@ -9,12 +9,13 @@ detach them in order to use OSMNx as a dependency or submodule
 
 For the original work, please see https://github.com/gboeing/osmnx
 """
+import logging
 import time
 import re
 import requests
 from .osm_utils.osm_params import http_headers, memory
 from aequilibrae.parameters import Parameters
-from aequilibrae import logger
+from aequilibrae.context import get_logger
 import gc
 import importlib.util as iutil
 from ...utils import WorkerThread
@@ -33,8 +34,9 @@ class OSMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes):
+    def __init__(self, polygons, modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
+        self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)
         self.report = []
@@ -57,7 +59,7 @@ class OSMDownloader(WorkerThread):
             m = f"[maxsize: {memory}]"
         for counter, poly in enumerate(self.polygons):
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            logger.debug(msg)
+            self.logger.debug(msg)
             self.__emit_all(["Value", counter])
             self.__emit_all(["text", msg])
             west, south, east, north = poly
@@ -107,7 +109,7 @@ class OSMDownloader(WorkerThread):
             time.sleep(self.sleeptime)
         start_time = time.time()
         self.report.append(f'Posting to {url} with timeout={timeout}, "{data}"')
-        logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
+        self.logger.debug(f'Posting to {url} with timeout={timeout}, "{data}"')
         response = requests.post(url, data=data, timeout=timeout, headers=http_headers)
 
         # get the response size and the domain, log result
@@ -115,14 +117,14 @@ class OSMDownloader(WorkerThread):
         domain = re.findall(r"(?s)//(.*?)/", url)[0]
         msg = "Downloaded {:,.1f}KB from {} in {:,.2f} seconds".format(size_kb, domain, time.time() - start_time)
         self.report.append(msg)
-        logger.info(msg)
+        self.logger.info(msg)
 
         try:
             response_json = response.json()
             if "remark" in response_json:
                 msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
-                logger.info(msg)
+                self.logger.info(msg)
         except Exception:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
@@ -135,7 +137,7 @@ class OSMDownloader(WorkerThread):
                     domain, response.status_code, error_pause_duration
                 )
                 self.report.append(msg)
-                logger.info(msg)
+                self.logger.info(msg)
                 time.sleep(error_pause_duration)
                 response_json = self.overpass_request(data=data, pause_duration=pause_duration, timeout=timeout)
 

@@ -1,5 +1,4 @@
 from unittest import TestCase
-import sqlite3
 from tempfile import gettempdir
 import os
 import uuid
@@ -17,8 +16,8 @@ class TestNetworkTriggers(TestCase):
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
         self.siouxfalls.open(self.proj_path)
-        remove_triggers(self.siouxfalls.conn)
-        add_triggers(self.siouxfalls.conn)
+        remove_triggers(self.siouxfalls.conn, self.siouxfalls.logger)
+        add_triggers(self.siouxfalls.conn, self.siouxfalls.logger)
 
     def tearDown(self) -> None:
         self.siouxfalls.close()

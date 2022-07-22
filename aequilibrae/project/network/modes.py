@@ -1,8 +1,6 @@
 from sqlite3 import IntegrityError, Connection
-from typing import Dict
 from aequilibrae.project.network.mode import Mode
 from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae import logger
 
 
 class Modes:
@@ -58,6 +56,7 @@ class Modes:
         self.__all_modes = []
         self.__items = {}
         self.project = net.project
+        self.logger = net.logger
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
         self.__update_list_of_modes()
@@ -70,7 +69,7 @@ class Modes:
 
         self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
         self.conn.commit()
-        logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
+        self.logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
         mode.save()
         self.__update_list_of_modes()
 
@@ -80,9 +79,9 @@ class Modes:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
             self.conn.commit()
         except IntegrityError as e:
-            logger.error(f"Failed to remove mode {mode_id}. {e.args}")
+            self.logger.error(f"Failed to remove mode {mode_id}. {e.args}")
             raise e
-        logger.warning(f"Mode {mode_id} was successfully removed from the database")
+        self.logger.warning(f"Mode {mode_id} was successfully removed from the database")
         self.__update_list_of_modes()
 
     @property
