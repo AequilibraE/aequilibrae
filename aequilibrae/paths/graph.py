@@ -1,13 +1,11 @@
 from os.path import join
-import logging
 import pickle
 import uuid
 from datetime import datetime
-from warnings import warn
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
-from aequilibrae.starts_logging import logger
+from aequilibrae.context import get_logger
 from .__version__ import binary_version as VERSION
 
 
@@ -16,8 +14,8 @@ class Graph(object):
     Graph class
     """
 
-    def __init__(self):
-        self.logger = logging.getLogger("aequilibrae")
+    def __init__(self, logger=None):
+        self.logger = logger or get_logger()
         self.__integer_type = np.int64
         self.__float_type = np.float64
 
@@ -365,7 +363,7 @@ class Graph(object):
 
         nans = ", ".join([i for i in df.columns if df[i].isnull().any().any()])
         if nans:
-            logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
+            self.logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
         df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
         df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
@@ -384,7 +382,7 @@ class Graph(object):
         filter = self.network.link_id.isin(links)
         # We check is the list makes sense in order to warn the user
         if filter.sum() != len(set(links)):
-            warn("At least one link does not exist in the network and therefore cannot be excluded")
+            self.logger.warning("At least one link does not exist in the network and therefore cannot be excluded")
 
         self.network.loc[filter, "b_node"] = self.network.loc[filter, "a_node"]
 
@@ -393,7 +391,7 @@ class Graph(object):
             self.set_blocked_centroid_flows(self.block_centroid_flows)
         self.__id__ = uuid.uuid4().hex
 
-    def __build_column_names(self, all_titles: [str]) -> (list, list):
+    def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = [x for x in self.required_default_fields]
         types = [x for x in self.__required_default_types]
         for column in all_titles:
@@ -450,7 +448,7 @@ class Graph(object):
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:
                 self.cost = np.array(self.graph[cost_field].values, dtype=self.__float_type)
-                warn("Cost field with wrong type. Converting to float64")
+                self.logger.warning("Cost field with wrong type. Converting to float64")
         else:
             raise ValueError("cost_field not available in the graph:" + str(self.graph.columns))
 
@@ -505,7 +503,7 @@ class Graph(object):
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
         if self.num_zones == 0:
-            warn("No centroids in the model. Nothing to block")
+            self.logger.warning("No centroids in the model. Nothing to block")
             return
         self.block_centroid_flows = block_centroid_flows
 

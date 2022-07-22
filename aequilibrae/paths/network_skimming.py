@@ -8,12 +8,12 @@ from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils import WorkerThread
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None

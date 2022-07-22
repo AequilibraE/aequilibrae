@@ -3,12 +3,12 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import sum_axis1
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 """
 TO-DO:

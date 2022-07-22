@@ -1,11 +1,9 @@
 from math import pi, sqrt
-from warnings import warn
 import numpy as np
 from scipy.cluster.vq import kmeans2, whiten
 from scipy.spatial.distance import cdist
 import shapely.wkb
 from shapely.geometry import LineString
-from aequilibrae import logger
 
 INFINITE_CAPACITY = 99999
 
@@ -16,17 +14,17 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link
 
     conn = network.project.connect()
     curr = conn.cursor()
-
+    logger = network.project.logger
     curr.execute("select count(*) from nodes where node_id=?", [zone_id])
     if curr.fetchone() is None:
-        warn("This centroid does not exist. Please create it first")
+        logger.warning("This centroid does not exist. Please create it first")
         return
 
     proj_nodes = network.nodes
     node = proj_nodes.get(zone_id)
     curr.execute("select count(*) from links where a_node=? and instr(modes,?) > 0", [zone_id, mode_id])
     if curr.fetchone()[0] > 0:
-        warn("Mode is already connected")
+        logger.warning("Mode is already connected")
         return
 
     if len(link_types) > 0:
@@ -56,7 +54,9 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link
         msg = f"Could not find node inside zone {zone_id}. Search area was expanded until we found a suitable node"
         logger.warning(msg)
     if dt == []:
-        warn(f"FAILED! Could not find suitable nodes to connect within 5 times the diameter of zone {zone_id}.")
+        logger.warning(
+            f"FAILED! Could not find suitable nodes to connect within 5 times the diameter of zone {zone_id}."
+        )
         return
 
     coords = []
@@ -70,7 +70,9 @@ def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link
     if len(nodes) == 0:
         raise Exception("We could not find any candidate nodes that satisfied your criteria")
     elif len(nodes) < connectors:
-        warn(f"We have fewer possible nodes than required connectors for zone {zone_id}. Will connect all of them.")
+        logger.warning(
+            f"We have fewer possible nodes than required connectors for zone {zone_id}. Will connect all of them."
+        )
         num_connectors = len(nodes)
 
     if num_connectors == len(coords):

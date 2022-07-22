@@ -1,8 +1,6 @@
-from warnings import warn
 from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from .connector_creation import connector_creation
-from aequilibrae import logger
 
 
 class Node(SafeClass):
@@ -73,7 +71,7 @@ class Node(SafeClass):
     def renumber(self, new_id: int):
         """Renumbers the node in the network
 
-        Raises a warning if another node already exists with this node_id
+        Logs a warning if another node already exists with this node_id
 
         Args:
             *new_id* (:obj:`int`): New node_id
@@ -81,7 +79,7 @@ class Node(SafeClass):
 
         new_id = int(new_id)
         if new_id == self.node_id:
-            warn("This is already the node number")
+            self._logger.warning("This is already the node number")
             return
 
         conn = self.connect_db()
@@ -91,7 +89,7 @@ class Node(SafeClass):
         curr.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
         curr.execute("COMMIT;")
         conn.close()
-        logger.info(f"Node {self.node_id} was renumbered to {new_id}")
+        self._logger.info(f"Node {self.node_id} was renumbered to {new_id}")
         self.__dict__["node_id"] = new_id
         self.__original__["node_id"] = new_id
 
@@ -110,7 +108,7 @@ class Node(SafeClass):
                     txts.append(f'"{key}"=?')
 
         if not data:
-            logger.warning(f"Nothing to update for node {self.node_id}")
+            self._logger.warning(f"Nothing to update for node {self.node_id}")
             return [], ""
 
         txts = ",".join(txts) + " where node_id=?"
@@ -145,7 +143,7 @@ class Node(SafeClass):
                 *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
         """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
-            warn("Connecting a mode only makes sense for centroids and not for regular nodes")
+            self._logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")
             return
 
         connector_creation(

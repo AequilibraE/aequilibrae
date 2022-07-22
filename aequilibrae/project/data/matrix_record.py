@@ -1,7 +1,5 @@
 from os import unlink
 from os.path import isfile, join
-import os
-from aequilibrae.starts_logging import logger
 from aequilibrae.project.network.safe_class import SafeClass
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 
@@ -41,7 +39,7 @@ class MatrixRecord(SafeClass):
             try:
                 unlink(join(self.fldr, self.file_name))
             except Exception as e:
-                logger.error(f"Could not remove matrix from disk: {e.args}")
+                self._logger.error(f"Could not remove matrix from disk: {e.args}")
 
         conn.close()
         self._exists = False

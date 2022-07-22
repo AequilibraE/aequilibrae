@@ -7,7 +7,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from aequilibrae import logger
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.link_types import LinkTypes
@@ -33,6 +32,7 @@ class OSMBuilder(WorkerThread):
     def __init__(self, osm_items: List, path: str, node_start=10000, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.project = project or get_active_project()
+        self.logger = self.project.logger
         self.osm_items = osm_items
         self.path = path
         self.conn = None
@@ -64,7 +64,7 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def data_structures(self):
-        logger.info("Separating nodes and links")
+        self.logger.info("Separating nodes and links")
         self.__emit_all(["text", "Separating nodes and links"])
         self.__emit_all(["maxValue", len(self.osm_items)])
 
@@ -82,7 +82,7 @@ class OSMBuilder(WorkerThread):
             self.__emit_all(["Value", tot_items - i])
         gc.collect()
 
-        logger.info("Setting data structures for nodes")
+        self.logger.info("Setting data structures for nodes")
         self.__emit_all(["text", "Setting data structures for nodes"])
         self.__emit_all(["maxValue", len(n)])
 
@@ -101,7 +101,7 @@ class OSMBuilder(WorkerThread):
             .to_records(index=False)
         )
 
-        logger.info("Setting data structures for links")
+        self.logger.info("Setting data structures for links")
         self.__emit_all(["text", "Setting data structures for links"])
         self.__emit_all(["maxValue", len(alinks)])
 
@@ -114,7 +114,7 @@ class OSMBuilder(WorkerThread):
             self.__emit_all(["Value", i])
         del alinks
 
-        logger.info("Finalizing data structures")
+        self.logger.info("Finalizing data structures")
         self.__emit_all(["text", "Finalizing data structures"])
 
         node_count = self.unique_count(np.array(all_nodes))
@@ -131,14 +131,14 @@ class OSMBuilder(WorkerThread):
         self.__update_table_structure()
         field_names = ",".join(fields)
 
-        logger.info("Adding network nodes")
+        self.logger.info("Adding network nodes")
         self.__emit_all(["text", "Adding network nodes"])
         sql = "insert into nodes(node_id, is_centroid, osm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))"
         self.conn.executemany(sql, self.node_df)
         self.conn.commit()
         del self.node_df
 
-        logger.info("Adding network links")
+        self.logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
         L = len(list(self.links.keys()))
         self.__emit_all(["maxValue", L])
@@ -153,7 +153,7 @@ class OSMBuilder(WorkerThread):
             self.__emit_all(["Value", counter])
             counter += 1
             if counter % 1000 == 0:
-                logger.info(f"Creating segments from {counter:,} out of {L:,} OSM link objects")
+                self.logger.info(f"Creating segments from {counter:,} out of {L:,} OSM link objects")
             vars["osm_id"] = osm_id
             vars["link_type"] = "default"
             linknodes = link["nodes"]
@@ -200,13 +200,13 @@ class OSMBuilder(WorkerThread):
             self.__emit_all(["text", f"{counter:,} of {L:,} super links added"])
             self.links[osm_id] = []
         sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(all_attrs[0]) - 1)))
-        logger.info("Adding network links")
+        self.logger.info("Adding network links")
         self.__emit_all(["text", "Adding network links"])
         try:
             self.curr.executemany(sql, all_attrs)
         except Exception as e:
-            logger.error("error when inserting link {}. Error {}".format(all_attrs[0], e.args))
-            logger.error(sql)
+            self.logger.error("error when inserting link {}. Error {}".format(all_attrs[0], e.args))
+            self.logger.error(sql)
             raise e
 
         self.conn.commit()

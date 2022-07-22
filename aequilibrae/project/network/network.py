@@ -2,7 +2,6 @@ import importlib.util as iutil
 import math
 from sqlite3 import Connection as sqlc
 from typing import Dict
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -11,7 +10,6 @@ import shapely.wkt
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-from aequilibrae import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.haversine import haversine
@@ -53,6 +51,7 @@ class Network(WorkerThread):
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
+        self.logger = project.logger
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
         self.links = Links(self)
@@ -195,12 +194,11 @@ class Network(WorkerThread):
             west, south, east, north = bbox
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
-                warn(msg)
-                logger.warning(msg)
+                self.logger.warning(msg)
                 return
             for i in report:
                 if "PLACE FOUND" in i:
-                    logger.info(i)
+                    self.logger.info(i)
 
         # Need to compute the size of the bounding box to not exceed it too much
         height = haversine((east + west) / 2, south, (east + west) / 2, north)
@@ -227,21 +225,21 @@ class Network(WorkerThread):
                     ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
-        logger.info("Downloading data")
-        self.downloader = OSMDownloader(polygons, modes)
+        self.logger.info("Downloading data")
+        self.downloader = OSMDownloader(polygons, modes, logger=self.logger)
         if pyqt:
             self.downloader.downloading.connect(self.signal_handler)
 
         self.downloader.doWork()
 
-        logger.info("Building Network")
+        self.logger.info("Building Network")
         self.builder = OSMBuilder(self.downloader.json, self.source, project=self.project)
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
 
-        logger.info("Network built successfully")
+        self.logger.info("Network built successfully")
 
     def create_from_gmns(
         self,

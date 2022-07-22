@@ -1,30 +1,30 @@
+import logging
 import re
 from os.path import join, dirname, realpath
 from sqlite3 import Connection
-
-from aequilibrae import logger
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
 
-def initialize_tables(conn: Connection) -> None:
-    create_base_tables(conn)
-    add_triggers(conn)
+def initialize_tables(project) -> None:
+    conn, logger = project.conn, project.logger
+    create_base_tables(conn, logger)
+    add_triggers(conn, logger)
 
 
-def create_base_tables(conn: Connection) -> None:
+def create_base_tables(conn: Connection, logger: logging.Logger) -> None:
     spec_folder = join(dirname(realpath(__file__)), "database_specification", "tables")
     with open(join(spec_folder, "table_list.txt"), "r") as file_list:
         all_tables = file_list.readlines()
     all_tables = [x.rstrip() for x in all_tables]
     for f in all_tables:
         qry_file = join(spec_folder, f"{f}.sql")
-        run_queries_from_sql_file(conn, qry_file)
+        run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def add_triggers(conn: Connection) -> None:
+def add_triggers(conn: Connection, logger: logging.Logger) -> None:
     """Adds consistency triggers to the project"""
     spec_folder = join(dirname(realpath(__file__)), "database_specification", "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
@@ -32,10 +32,10 @@ def add_triggers(conn: Connection) -> None:
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
     for f in all_trigger_sets:
         qry_file = join(spec_folder, f"{f}.sql")
-        run_queries_from_sql_file(conn, qry_file)
+        run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def remove_triggers(conn: Connection) -> None:
+def remove_triggers(conn: Connection, logger: logging.Logger) -> None:
     spec_folder = join(dirname(realpath(__file__)), "database_specification", "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
@@ -65,7 +65,7 @@ def remove_triggers(conn: Connection) -> None:
         conn.commit()
 
 
-def run_queries_from_sql_file(conn: Connection, qry_file: str) -> None:
+def run_queries_from_sql_file(conn: Connection, logger: logging.Logger, qry_file: str) -> None:
     with open(qry_file, "r") as sql_file:
         query_list = sql_file.read()
 
