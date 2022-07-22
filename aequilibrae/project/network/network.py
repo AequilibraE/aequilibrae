@@ -268,7 +268,7 @@ class Network(WorkerThread):
         gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
         gmns_builder.doWork()
 
-        logger.info("Network built successfully")
+        self.logger.info("Network built successfully")
 
     def signal_handler(self, val):
         if pyqt:
