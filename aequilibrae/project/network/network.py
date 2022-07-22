@@ -269,7 +269,7 @@ class Network(WorkerThread):
         gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
         gmns_builder.doWork()
 
-        logger.info("Network built successfully")
+        self.logger.info("Network built successfully")
 
     def export_to_gmns(self, path: str):
         """
@@ -282,7 +282,7 @@ class Network(WorkerThread):
         gmns_exporter = GMNSExporter(self, path)
         gmns_exporter.doWork()
 
-        logger.info("Network exported successfully")
+        self.logger.info("Network exported successfully")
 
     def signal_handler(self, val):
         if pyqt:
