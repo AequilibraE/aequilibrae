@@ -1,5 +1,6 @@
 from unittest import TestCase
 from tempfile import gettempdir
+from shutil import copytree
 import os
 import uuid
 import pandas as pd
@@ -7,7 +8,7 @@ from aequilibrae.project import Project
 from aequilibrae.parameters import Parameters
 from warnings import warn
 import random
-from ...data import gmns_link, gmns_node, gmns_groups
+from ...data import gmns_link, gmns_node, gmns_groups, gmns_project
 
 
 class TestNetwork(TestCase):
@@ -51,3 +52,16 @@ class TestNetwork(TestCase):
 
         if from_node != a_node or to_node != b_node:
             self.fail("At least one link is disconnected from its start/end nodes")
+
+    def test_export_to_gmns(self):
+
+        output_path = os.path.join(gettempdir(), uuid.uuid4().hex)
+        if not os.path.exists(output_path):
+            os.mkdir(output_path)
+
+        self.temp_proj_folder = os.path.join(gettempdir(), uuid.uuid4().hex)
+        copytree(gmns_project, self.temp_proj_folder)
+        self.project = Project()
+        self.project.open(self.temp_proj_folder)
+
+        self.project.network.export_to_gmns(output_path)

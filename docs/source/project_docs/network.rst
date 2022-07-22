@@ -262,6 +262,39 @@ shown in the example (see Section 7.Workflows/Importing network from GMNS).
     **import process, in the GMNS node table you have to set the field 'node_type' equals**
     **to 'centroid'.**
 
+.. _exporting_to_gmns:
+
+Exporting AequilibraE model to GMNS format
+------------------------------------------
+
+After loading an existing AequilibraE project, you can export it to GMNS format as
+shown below:
+
+::
+  from aequilibrae.project import Project
+
+  p = Project()
+  p.load('path/to/project/new/folder')
+  p.network.export_to_gmns(path='path/to/output/folder')
+
+  p.conn.close()
+
+As of July 2022, it is possible to export an AequilibraE network to the following
+tables in GMNS format:
+
+* Link table
+* Node table
+
+.. note::
+
+    **When a node is identified as a centroid in the AequilibraE nodes table, this**
+    **information is transmitted to the GMNS node table by meaans of the field**
+    **'node_type', which is set to 'centroid' in this case. The 'node_type' field**
+    **is an optinal field listed in the GMNS node table specification.**
+
+You can find the GMNS specification
+`here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
+
 .. _network_triggers_behaviour:
 
 Network consistency behaviour

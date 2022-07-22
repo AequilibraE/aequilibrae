@@ -21,6 +21,7 @@ from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
+from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -272,43 +273,18 @@ class Network(WorkerThread):
 
         logger.info("Network built successfully")
 
-    def export_to_gmns(self):
+    def export_to_gmns(self, path: str):
         """
         Exports AequilibraE network to csv files in GMNS format.
+
+        Arg:
+            *path* (:obj:`str`): Output folder path.
         """
 
-        p = Parameters()
-        gmns_par = p.parameters["network"]["gmns"]
+        gmns_exporter = GMNSExporter(self, path)
+        gmns_exporter.doWork()
 
-        l_fields = gmns_par["link_fields"]
-        other_lfields = gmns_par["other_link_fields"]
-
-        links_df = self.links.data
-        nodes_df = self.nodes.data
-
-        gmns_link = {}
-        for _, row in links_df.iterrows():
-            for col in list(links_df.columns):
-                if col in l_fields:
-                    gmns_link.update({f'{l_fields[col]}': row[col]})
-                elif col in other_lfields:
-                    gmns_link.update({f'{col}': row[col]})
-
-        gmns_node = {}
-        for _, row in nodes_df.iterrows():
-            for col in list(nodes_df.columns):
-                if col in l_fields:
-                    gmns_node.update({f'{l_fields[col]}': row[col]})
-                elif col in other_lfields:
-                    gmns_node.update({f'{col}': row[col]})
-
-        '''
-            -- The geometries from nodes table must be broken into their x and y coordinates
-            -- Na tabela de links: o campo de direção deverá ser ajustado e, se houver um link com direção 0,
-            este deverá ser dividido em dois links separados com from_node_id e to_node_id trocados.
-        '''
-
-        return
+        logger.info("Network exported successfully")
 
     def signal_handler(self, val):
         if pyqt:

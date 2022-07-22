@@ -1,0 +1,306 @@
+assignment:
+  equilibrium:
+    maximum_iterations: 250
+    rgap: 0.0001
+distribution:
+  gravity:
+    max error: 0.0001
+    max iterations: 100
+    max trip length: -1
+  ipf:
+    balancing tolerance: 0.001
+    convergence level: 0.0001
+    max iterations: 5000
+network:
+  gmns:
+    critical_dist: 2
+    link_fields:
+      a_node: from_node_id
+      b_node: to_node_id
+      capacity: capacity
+      direction: directed
+      distance: length
+      geometry: geometry
+      lanes: lanes
+      link_id: link_id
+      link_type: facility_type
+      modes: allowed_uses
+      name: name
+      speed: free_speed
+    node_fields:
+      node_id: node_id
+    other_link_fields:
+      bike_facility:
+        description: Type of bicycle accommodation
+        type: text
+      bridge:
+        description: bridge flag
+        type: text
+      dir_flag:
+        description: Shapepoints direction
+        type: integer
+      geometry_id:
+        description: Foreign key from geometry table
+        type: integer
+      grade:
+        description: Percent grade of the link
+        type: integer
+      jurisdiction:
+        description: Owner/operator of the link
+        type: text
+      length:
+        description: GMNS length in long_length units
+        type: numeric
+      parent_link_id:
+        description: The parent of this link
+        type: integer
+      parking:
+        description: Type of parking
+        type: text
+      ped_facility:
+        description: Type of pedestrian accommodation
+        type: text
+      row_width:
+        description: Width of the entire right-of-way (both directions)
+        type: numeric
+      toll:
+        description: Toll in currency units
+        type: numeric
+      tunnel:
+        description: tunnel flag
+        type: text
+    other_node_fields:
+      ctrl_type:
+        description: From GMNS ControlType_Set
+        type: text
+      hospital:
+        description: hoospital flag
+        type: text
+      name:
+        description: Node name
+        type: text
+      node_type:
+        description: What it represents
+        type: text
+      parent_node_id:
+        description: The parent of this node
+        type: integer
+      port:
+        description: port flag
+        type: text
+      z_coord:
+        description: Altitude in short length units
+        type: numeric
+      zone_id:
+        description: TAZ or city, or census tract
+        type: integer
+    required_link_fields:
+    - link_id
+    - from_node_id
+    - to_node_id
+    - directed
+    required_node_fields:
+    - node_id
+    - x_coord
+    - y_coord
+  links:
+    fields:
+      one-way:
+      - link_id:
+          description: Link ID. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - a_node:
+          description: Node of origin of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - b_node:
+          description: Node of destinaiton of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - direction:
+          description: Direction of the link. THIS FIELD CANNOT BE CHANGED
+          type: integer
+      - distance:
+          description: Length in meters for the link. THIS FIELD CANNOT BE CHANGED
+          type: numeric
+      - modes:
+          description: Set of modes allowed in this link. THIS FIELD CANNOT BE CHANGED
+          type: text
+      - link_type:
+          description: Classification of link (local, arterial, etc). THIS FIELD CANNOT
+            BE CHANGED
+          osm_source: highway
+          type: varchar
+      - name:
+          description: name
+          osm_source: name
+          type: text
+      two-way:
+      - lanes:
+          description: lanes
+          osm_behaviour: divide
+          osm_source: lanes
+          type: integer
+      - capacity:
+          description: capacity
+          type: numeric
+      - speed:
+          description: speed
+          osm_behaviour: copy
+          osm_source: maxspeed
+          type: numeric
+    link_types:
+    - centroid_connector:
+        description: VIRTUAL centroid connectors only
+        lane_capacity: 10000
+        lanes: 10
+        link_type_id: z
+    - default:
+        description: Default link type. Due to lack of information
+        lane_capacity: 900
+        lanes: 2
+        link_type_id: y
+  modes:
+  - car:
+      description: All motorized vehicles
+      letter: c
+  - transit:
+      description: All links capable of supporting transit-vehicles
+      letter: t
+  - walk:
+      description: Linkes where walking is permitted
+      letter: w
+  - bicycle:
+      description: All Bicycles
+      letter: b
+  nodes:
+    fields:
+    - node_id:
+        description: node_id. THIS FIELD CANNOT BE CHANGED
+        type: integer
+    - is_centroid:
+        description: is_centroid
+        type: integer
+  osm:
+    all_link_types:
+    - secondary_link
+    - escalator
+    - trail
+    - cycleway
+    - path
+    - trunk_link
+    - secondary
+    - escape
+    - track
+    - road
+    - motorway_link
+    - primary
+    - corridor
+    - residential
+    - footway
+    - motorway
+    - primary_link
+    - unclassified
+    - bus_guideway
+    - tertiary_link
+    - living_street
+    - pedestrian
+    - bridleway
+    - elevator
+    - motor
+    - trunk
+    - tertiary
+    - service
+    - steps
+    - proposed
+    - raceway
+    - construction
+    - abandoned
+    - platform
+    - unclassified
+    modes:
+      bicycle:
+        link_types:
+        - cycleway
+        - corridor
+        - pedestrian
+        - path
+        - track
+        - trail
+        - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - motorway_link
+        - trunk_link
+        - primary_link
+        - secondary_link
+        - tertiary_link
+        - living_street
+        - service
+        - escape
+        - road
+        - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+        - cycleway
+        - footway
+        - steps
+        - corridor
+        - pedestrian
+        - elevator
+        - escalator
+        - path
+        - track
+        - trail
+        - bridleway
+        - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
+osm:
+  accept_language: en
+  max_attempts: 50
+  max_query_area_size: 2500000000
+  nominatim_endpoint: https://nominatim.openstreetmap.org/
+  overpass_endpoint: https://overpass.kumi.systems/api/interpreter
+  sleeptime: 2
+  timeout: 540
+system:
+  cpus: 0
+  default_directory: C:\
+  logging: true
+  logging_directory: C:\Users\DANILO~1\AppData\Local\Temp\12a8249652784320ab6fa98c95d56b27
+  spatialite_path: C:\mod_spatialite-NG-win-amd64
+  temp directory: /temp
