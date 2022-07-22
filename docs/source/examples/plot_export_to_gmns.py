@@ -21,7 +21,7 @@ import folium
 # We load the example project inside a temp folder
 fldr = os.path.join(gettempdir(), uuid4().hex)
 
-project = create_example(fldr,"arlington_signals")
+project = create_example(fldr, "arlington_signals")
 
 # %%
 # We export the network to csv files in GMNS format, that will be saved inside the project folder
@@ -35,8 +35,8 @@ project.network.export_to_gmns(path=output_fldr)
 # Now, let's plot a map. This map can be compared with the images of the README.md
 # file located in this example repository on GitHub:
 # https://github.com/zephyr-data-specs/GMNS/blob/development/Small_Network_Examples/Arlington_Signals/README.md
-links = pd.read_csv(os.path.join(output_fldr, 'link.csv'))
-nodes = pd.read_csv(os.path.join(output_fldr, 'node.csv'))
+links = pd.read_csv(os.path.join(output_fldr, "link.csv"))
+nodes = pd.read_csv(os.path.join(output_fldr, "node.csv"))
 
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")
