@@ -1,3 +1,4 @@
+import math
 import re
 import numpy as np
 import pandas as pd
@@ -353,6 +354,9 @@ class GMNSBuilder(WorkerThread):
             use_group = self.uses_df
             groups_dict = dict(zip(use_group.use_group, use_group.uses))
             for k, use in groups_dict.items():
+                groups_dict[k] = (
+                    pattern.sub(lambda x: "_" + char_replaces[x.group()], use).replace("+", "").replace("-", "_")
+                )
                 for group in list(groups_dict.keys()):
                     if group in use:
                         groups_dict[k] = use.replace(
@@ -378,8 +382,7 @@ class GMNSBuilder(WorkerThread):
             if mode in groups_dict.keys():
                 modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
                 desc_list = [
-                    use_group.loc[use_group.use_group == mode, "description"].item()
-                    + f". Groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
+                    f"GMNS use groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
                     for m in modes_gathered
                 ]
 
@@ -440,7 +443,9 @@ class GMNSBuilder(WorkerThread):
             link_end_boundary = link_points[-1]
 
             if link_start_boundary != (from_point_x, from_point_y):
-                start_to_from_dist = Point(link_start_boundary).distance(Point(from_point_x, from_point_y))
+                start_to_from_dist = (
+                    Point(link_start_boundary).distance(Point(from_point_x, from_point_y)) * math.pi * 6371000 / 180
+                )
 
                 link_points = (
                     [(from_point_x, from_point_y)] + link_points[1:]
@@ -455,7 +460,9 @@ class GMNSBuilder(WorkerThread):
                 )
 
             if link_end_boundary != (to_point_x, to_point_y):
-                end_to_to_dist = Point(link_end_boundary).distance(Point(to_point_x, to_point_y))
+                end_to_to_dist = (
+                    Point(link_end_boundary).distance(Point(to_point_x, to_point_y)) * math.pi * 6371000 / 180
+                )
 
                 link_points = (
                     link_points[:-1] + [(to_point_x, to_point_y)]

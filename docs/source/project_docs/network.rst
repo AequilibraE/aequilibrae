@@ -241,10 +241,10 @@ You can import a GMNS network as shown below:
 
 As of July 2022, it is possible to import the following files from a GMNS source:
 
-* Link table;
-* Node table;
-* Use group table;
-* Geometry table.
+* link table;
+* node table;
+* use_group table;
+* geometry table.
 
 You can find the specification for all these tables in the GMNS documentation, 
 `here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
