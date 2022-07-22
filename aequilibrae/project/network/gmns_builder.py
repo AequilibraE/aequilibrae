@@ -361,7 +361,7 @@ class GMNSBuilder(WorkerThread):
                             .replace("+", "")
                             .replace("-", "_"),
                         )
-                use_group.loc[use_group.use_group == k, 'uses'] = groups_dict[k]
+                use_group.loc[use_group.use_group == k, "uses"] = groups_dict[k]
         else:
             groups_dict = {}
 
@@ -378,7 +378,8 @@ class GMNSBuilder(WorkerThread):
             if mode in groups_dict.keys():
                 modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
                 desc_list = [
-                    use_group.loc[use_group.use_group == mode, "description"].item() + f". Groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
+                    use_group.loc[use_group.use_group == mode, "description"].item()
+                    + f". Groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
                     for m in modes_gathered
                 ]
 
