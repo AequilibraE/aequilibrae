@@ -107,3 +107,18 @@ class GMNSExporter(WorkerThread):
 
         links_df.to_csv(join(self.output_path, "link.csv"), index=False)
         nodes_df.to_csv(join(self.output_path, "node.csv"), index=False)
+
+        # Getting use definition table
+
+        fields_dict = self.gmns_par["use_definition"]["equivalency"]
+        cur = self.conn.execute(
+            "select mode_name, mode_id, description, pce, vot, persons_per_vehicle from modes"
+        ).fetchall()
+        modes_df = pd.DataFrame(
+            cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "persons_per_vehicle"]
+        )
+
+        modes_df = modes_df[["mode_name", "persons_per_vehicle", "pce", "description", "mode_id"]].rename(
+            columns={"mode_name": fields_dict["mode_name"]}
+        )
+        modes_df.to_csv(join(self.output_path, "use_definition.csv"), index=False)

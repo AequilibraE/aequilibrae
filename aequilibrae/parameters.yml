@@ -277,6 +277,26 @@ network:
       - from_node_id
       - to_node_id
       - directed
+    use_definition:
+      required_fields:
+        use:
+          description: Short name of the vehicle
+          type: text
+        persons_per_vehicle:
+          description: Average persons per vehicle. Used to compute person-based performance measures (0 for non-travel uses)
+          type: numeric
+        pce:
+          description: Passenger car equivalents, used for capacity calculations (0 for non-travel uses)
+          type: numeric
+      other_fields:
+        special_conditions:
+          description: Treatment of these special conditions may be needed in a future version of GMNS
+          type: text
+        description:
+          description: A longer description of the mode
+          type: text
+      equivalency:
+        mode_name: use
 osm:
     overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"

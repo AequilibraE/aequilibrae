@@ -1,0 +1,15 @@
+2022-07-22 17:05:42,241;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2022-07-22 17:05:42,340;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2022-07-22 17:05:42,438;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2022-07-22 17:05:42,535;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2022-07-22 17:05:43,072;INFO ; mode WALK(a) was added to the project
+2022-07-22 17:05:43,405;INFO ; mode BIKE(i) was added to the project
+2022-07-22 17:05:43,696;INFO ; mode sov(s) was added to the project
+2022-07-22 17:05:43,979;INFO ; mode hov_two(h) was added to the project
+2022-07-22 17:05:44,265;INFO ; mode hov_three(o) was added to the project
+2022-07-22 17:05:44,557;INFO ; mode truck(r) was added to the project
+2022-07-22 17:05:44,840;INFO ; mode bus(u) was added to the project
+2022-07-22 17:05:45,125;INFO ; mode walk_gmns(l) was added to the project
+2022-07-22 17:05:45,419;INFO ; mode bike(k) was added to the project
+2022-07-22 17:05:45,702;INFO ; mode unspecified_mode(n) was added to the project
+2022-07-22 17:05:46,010;INFO ; Network built successfully
