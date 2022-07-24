@@ -29,7 +29,7 @@ project = create_example(fldr)
 
 # %%
 # Get the Delaunay Lines generation class
-da = DelaunayAnalysis()
+da = DelaunayAnalysis(project)
 
 # Let's create the triangulation based on the zones, but we could create based on the network (centroids) too
 da.create_network("zones")
