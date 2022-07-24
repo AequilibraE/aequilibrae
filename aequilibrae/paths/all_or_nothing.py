@@ -6,12 +6,12 @@ import numpy as np
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -76,8 +76,9 @@ class allOrNothing(WorkerThread):
         pool.join()
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
-        assign_link_loads(self.results.link_loads, self.results.compact_link_loads,
-                          self.results.crosswalk, self.results.cores)
+        assign_link_loads(
+            self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
+        )
         if pyqt:
             self.assignment.emit(["finished_threaded_procedure", None])
 

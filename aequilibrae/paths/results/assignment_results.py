@@ -3,12 +3,12 @@ import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import sum_axis1
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 """
 TO-DO:
@@ -138,7 +138,7 @@ class AssignmentResults:
         self.reset()
 
     def total_flows(self) -> None:
-        """ Totals all link flows for this class into a single link load
+        """Totals all link flows for this class into a single link load
 
         Results are placed into *total_link_loads* class member
         """
@@ -212,7 +212,7 @@ class AssignmentResults:
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
-        """ Function to write to disk all outputs computed during assignment
+        """Function to write to disk all outputs computed during assignment
 
         Args:
             *file_name* (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']

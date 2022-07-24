@@ -28,16 +28,15 @@ class Nodes(BasicTable):
         all_nodes.save()
     """
 
-    __items = {}
-    __fields = []
-
     #: Query sql for retrieving nodes
     sql = ""
 
-    def __init__(self):
-        super().__init__()
-        self.__table_type__ = 'nodes'
-        self.__all_nodes = []
+    def __init__(self, net):
+        super().__init__(net.project)
+        self.__table_type__ = "nodes"
+        self.__items = {}
+        self.__fields = []
+
         if self.sql == "":
             self.refresh_fields()
 
@@ -51,7 +50,7 @@ class Nodes(BasicTable):
 
         Returns:
             *node* (:obj:`Node`): Node object for requested node_id
-            """
+        """
 
         if node_id in self.__items:
             node = self.__items[node_id]
@@ -67,7 +66,7 @@ class Nodes(BasicTable):
         data = self._curr.fetchone()
         if data:
             data = {key: val for key, val in zip(self.__fields, data)}
-            node = Node(data)
+            node = Node(data, self.project)
             self.__items[node.node_id] = node
             return node
 
@@ -100,7 +99,7 @@ class Nodes(BasicTable):
         data = {key: None for key in self.__fields}
         data["node_id"] = node_id
         data["is_centroid"] = 1
-        node = Node(data)
+        node = Node(data, self.project)
         self.__items[node_id] = node
         return node
 
@@ -110,7 +109,7 @@ class Nodes(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """ Returns all nodes data as a Pandas dataFrame
+        """Returns all nodes data as a Pandas dataFrame
 
         Returns:
             *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry

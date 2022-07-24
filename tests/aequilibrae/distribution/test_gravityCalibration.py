@@ -4,6 +4,7 @@ import numpy as np
 
 from aequilibrae.distribution import GravityCalibration
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 from ...data import siouxfalls_demand, siouxfalls_skims
 
 zones = 100
@@ -29,10 +30,15 @@ matrix.computational_view(["base_matrix"])
 
 
 class TestGravityCalibration(TestCase):
+    def setUp(self):
+        # GravityCalibration requires an object that has a `parameters` attribute. `Parameters` fits
+        # this requirement, so that we don't need to create a full project
+        self.proj = Parameters()
+
     def test_calibrate(self):
         args = {"impedance": impedance, "matrix": matrix, "function": "power", "nan_to_zero": False}
 
-        distributed_matrix = GravityCalibration(**args)
+        distributed_matrix = GravityCalibration(self.proj, **args)
         distributed_matrix.calibrate()
         if distributed_matrix.gap > 0.0001:
             self.fail("Calibration did not converge")
@@ -40,7 +46,7 @@ class TestGravityCalibration(TestCase):
     def test_calibrate_with_omx(self):
         imped = AequilibraeMatrix()
         imped.load(siouxfalls_skims)
-        imped.computational_view(['free_flow_time'])
+        imped.computational_view(["free_flow_time"])
 
         mat = AequilibraeMatrix()
         mat.load(siouxfalls_demand)
@@ -48,14 +54,14 @@ class TestGravityCalibration(TestCase):
 
         args = {"impedance": imped, "matrix": mat, "function": "power", "nan_to_zero": False}
 
-        distributed_matrix = GravityCalibration(**args)
+        distributed_matrix = GravityCalibration(self.proj, **args)
         distributed_matrix.calibrate()
         if distributed_matrix.gap > 0.0001:
             self.fail("Calibration did not converge")
 
         args = {"impedance": imped, "matrix": mat, "function": "power", "nan_to_zero": True}
 
-        distributed_matrix = GravityCalibration(**args)
+        distributed_matrix = GravityCalibration(self.proj, **args)
         distributed_matrix.calibrate()
         if distributed_matrix.gap > 0.0001:
             self.fail("Calibration did not converge")

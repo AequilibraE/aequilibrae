@@ -1,12 +1,10 @@
 from copy import deepcopy
 from os.path import join, realpath
-from warnings import warn
 
 import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-from aequilibrae import logger
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from .basic_table import BasicTable
@@ -39,12 +37,11 @@ class Zoning(BasicTable):
 
     """
 
-    __items = {}
-
     def __init__(self, network):
-        super().__init__()
+        super().__init__(network.project)
+        self.__items = {}
         self.network = network
-        self.__table_type__ = 'zones'
+        self.__table_type__ = "zones"
         self.__fields = []
         if self.__has_zoning():
             self.__load()
@@ -54,7 +51,7 @@ class Zoning(BasicTable):
 
         Returns:
             *zone* (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
-            """
+        """
 
         if zone_id in self.__items:
             raise Exception(f"Zone ID {zone_id} already exists")
@@ -62,7 +59,7 @@ class Zoning(BasicTable):
         data = {key: None for key in self.__fields}
         data["zone_id"] = zone_id
 
-        logger.info(f"Zone with id {zone_id} was created")
+        self.project.logger.info(f"Zone with id {zone_id} was created")
         return self.__create_return_zone(data)
 
     def create_zoning_layer(self):
@@ -73,10 +70,10 @@ class Zoning(BasicTable):
             run_queries_from_sql_file(self.conn, qry_file)
             self.__load()
         else:
-            warn("zones table already exists. Nothing was done", Warning)
+            self.project.warning("zones table already exists. Nothing was done", Warning)
 
     def coverage(self) -> Polygon:
-        """ Returns a single polygon for the entire zoning coverage
+        """Returns a single polygon for the entire zoning coverage
 
         Returns:
             *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.

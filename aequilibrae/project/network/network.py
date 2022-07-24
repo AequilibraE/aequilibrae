@@ -2,7 +2,6 @@ import importlib.util as iutil
 import math
 from sqlite3 import Connection as sqlc
 from typing import Dict
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -10,9 +9,7 @@ import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-from aequilibrae import logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.project.network import OSMDownloader
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
@@ -34,6 +31,7 @@ class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
+
     if pyqt:
         netsignal = SIGNAL(object)
 
@@ -49,10 +47,12 @@ class Network(WorkerThread):
         self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
+        self.project = project
+        self.logger = project.logger
         self.modes = Modes(self)
         self.link_types = LinkTypes(self)
-        self.links = Links()
-        self.nodes = Nodes()
+        self.links = Links(self)
+        self.nodes = Nodes(self)
 
     def skimmable_fields(self):
         """
@@ -116,13 +116,13 @@ class Network(WorkerThread):
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-            self,
-            west: float = None,
-            south: float = None,
-            east: float = None,
-            north: float = None,
-            place_name: str = None,
-            modes=["car", "transit", "bicycle", "walk"],
+        self,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
+        place_name: str = None,
+        modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -191,12 +191,11 @@ class Network(WorkerThread):
             west, south, east, north = bbox
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
-                warn(msg)
-                logger.warning(msg)
+                self.logger.warning(msg)
                 return
             for i in report:
                 if "PLACE FOUND" in i:
-                    logger.info(i)
+                    self.logger.info(i)
 
         # Need to compute the size of the bounding box to not exceed it too much
         height = haversine((east + west) / 2, south, (east + west) / 2, north)
@@ -223,20 +222,21 @@ class Network(WorkerThread):
                     ymax = min(90, south + (j + 1) * dy)
                     box = [xmin, ymin, xmax, ymax]
                     polygons.append(box)
-        logger.info("Downloading data")
-        self.downloader = OSMDownloader(polygons, modes)
+        self.logger.info("Downloading data")
+        self.downloader = OSMDownloader(polygons, modes, logger=self.logger)
         if pyqt:
             self.downloader.downloading.connect(self.signal_handler)
 
         self.downloader.doWork()
 
-        logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.source)
+        self.logger.info("Building Network")
+        self.builder = OSMBuilder(self.downloader.json, self.source, project=self.project)
+
         if pyqt:
             self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
 
-        logger.info("Network built successfully")
+        self.logger.info("Network built successfully")
 
     def signal_handler(self, val):
         if pyqt:
@@ -264,6 +264,7 @@ class Network(WorkerThread):
 
         """
         from aequilibrae.paths import Graph
+
         curr = self.conn.cursor()
 
         if fields is None:
@@ -353,7 +354,7 @@ class Network(WorkerThread):
         return poly
 
     def convex_hull(self) -> Polygon:
-        """ Queries the model for the convex hull of the entire network
+        """Queries the model for the convex hull of the entire network
 
         Returns:
             *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
@@ -365,7 +366,7 @@ class Network(WorkerThread):
 
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
-        self.conn = database_connection()
+        self.conn = self.project.connect()
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]

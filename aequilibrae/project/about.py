@@ -1,31 +1,29 @@
 from os.path import join, dirname, realpath
-import sqlite3
 import string
-from warnings import warn
 import uuid
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.paths import release_version
-from aequilibrae.starts_logging import logger
 
 
 class About:
     """Provides an interface for querying and editing the **about** table of an AequilibraE project
-        ::
+    ::
 
-            p = Project()
-            p.open('my/project/folder')
-            about = p.about
+        p = Project()
+        p.open('my/project/folder')
+        about = p.about
 
-            about.description = 'This is the example project. Do not use for forecast'
-            about.write_back()
+        about.description = 'This is the example project. Do not use for forecast'
+        about.write_back()
 
 
     """
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, project):
         self.__characteristics = []
         self.__original = {}
-        self.__conn = conn
+        self.__conn = project.conn
+        self.logger = project.logger
         if self.__has_about():
             self.__load()
 
@@ -33,7 +31,7 @@ class About:
         """Creates the 'about' table for project files that did not previously contain it"""
 
         if not self.__has_about():
-            qry_file = join(dirname(realpath(__file__)), 'database_specification', 'tables', 'about.sql')
+            qry_file = join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql")
             run_queries_from_sql_file(self.__conn, qry_file)
 
         cursor = self.__conn.cursor()
@@ -47,7 +45,7 @@ class About:
 
             self.__load()
         else:
-            warn('About table already exists. Nothing was done', Warning)
+            self.logger.warning("About table already exists. Nothing was done")
 
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""
@@ -57,23 +55,23 @@ class About:
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
 
-            Args:
-                *info_field* (:obj:`str`): Name of the desired information field to be added.  Has to be a valid
-                Python VARIABLE name (i.e. letter as first character, no spaces and no special characters)
+        Args:
+            *info_field* (:obj:`str`): Name of the desired information field to be added.  Has to be a valid
+            Python VARIABLE name (i.e. letter as first character, no spaces and no special characters)
 
-            ::
+        ::
 
-                p = Project()
-                p.open('my/project/folder')
-                p.about.add_info_field('my_super_relevant_field')
-                p.about.my_super_relevant_field = 'super relevant information'
-                p.about.write_back()
+            p = Project()
+            p.open('my/project/folder')
+            p.about.add_info_field('my_super_relevant_field')
+            p.about.my_super_relevant_field = 'super relevant information'
+            p.about.write_back()
         """
-        allowed = string.ascii_lowercase + '_'
+        allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
 
         if has_forbidden:
-            raise ValueError(f'{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _')
+            raise ValueError(f"{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _")
 
         sql = "INSERT INTO 'about' (infoname) VALUES(?)"
         curr = self.__conn.cursor()
@@ -85,25 +83,25 @@ class About:
     def write_back(self):
         """Saves the information parameters back to the project database
 
-            ::
+        ::
 
-                p = Project()
-                p.open('my/project/folder')
-                p.about.description = 'This is the example project. Do not use for forecast'
-                p.about.write_back()
+            p = Project()
+            p.open('my/project/folder')
+            p.about.description = 'This is the example project. Do not use for forecast'
+            p.about.write_back()
         """
         curr = self.__conn.cursor()
         for k in self.__characteristics:
             v = self.__dict__[k]
             if v != self.__original[k]:
                 curr.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
-                logger.info(f'Updated {k} on About_Table to {v}')
+                self.logger.info(f"Updated {k} on About_Table to {v}")
         self.__conn.commit()
 
     def __has_about(self):
         curr = self.__conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(['about' in x[0] for x in curr.fetchall()])
+        return any(["about" in x[0] for x in curr.fetchall()])
 
     def __load(self):
         self.__characteristics = []

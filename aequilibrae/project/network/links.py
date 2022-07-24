@@ -3,11 +3,8 @@ from copy import deepcopy
 import pandas as pd
 import shapely.wkb
 
-from aequilibrae import logger
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.link import Link
 from aequilibrae.project.table_loader import TableLoader
 
@@ -32,17 +29,17 @@ class Links(BasicTable):
         all_links.save()
     """
 
-    __items = {}
-    __all_links = []
-    __fields = []
     __max_id = -1
 
     #: Query sql for retrieving links
     sql = ""
 
-    def __init__(self):
-        super().__init__()
-        self.__table_type__ = 'links'
+    def __init__(self, net):
+        super().__init__(net.project)
+        self.__table_type__ = "links"
+        self.__fields = []
+        self.__items = {}
+
         if self.sql == "":
             self.refresh_fields()
 
@@ -56,7 +53,7 @@ class Links(BasicTable):
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
         link_id = int(link_id)
         if link_id in self.__items:
             link = self.__items[link_id]
@@ -71,15 +68,15 @@ class Links(BasicTable):
     def new(self) -> Link:
         """Creates a new link
 
-            Returns:
-                *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
-                """
+        Returns:
+            *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
+        """
 
         data = {key: None for key in self.__fields}
         data["direction"] = 0
         data["link_type"] = "default"
         data["link_id"] = self.__new_link_id()
-        return Link(data)
+        return Link(data, self.project)
         # return self.__create_return_link(data)
 
     def copy_link(self, link_id: int) -> Link:
@@ -92,7 +89,7 @@ class Links(BasicTable):
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
 
         data = self.__link_data(int(link_id))
         data["link_id"] = self.__new_link_id()
@@ -121,7 +118,7 @@ class Links(BasicTable):
             d = self._curr.rowcount
             self.conn.commit()
         if d:
-            logger.warning(f"Link {link_id} was successfully removed from the project database")
+            self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
             self.__existence_error(link_id)
 
@@ -136,7 +133,7 @@ class Links(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """ Returns all links data as a Pandas dataFrame
+        """Returns all links data as a Pandas dataFrame
 
         Returns:
             *table* (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
@@ -172,6 +169,6 @@ class Links(BasicTable):
         return self.__max_id
 
     def __create_return_link(self, data):
-        link = Link(data)
+        link = Link(data, self.project)
         self.__items[link.link_id] = link
         return link

@@ -19,7 +19,7 @@ class TestTrafficAssignmentPathFiles(TestCase):
 
         proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
         os.mkdir(proj_path)
-        zipfile.ZipFile(join(dirname(siouxfalls_project), 'sioux_falls_single_class.zip')).extractall(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
         self.project = Project()
         self.project.open(proj_path)
         self.project.network.build_graphs()

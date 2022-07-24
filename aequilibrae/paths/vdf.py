@@ -1,9 +1,9 @@
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import bpr, delta_bpr, bpr2, delta_bpr2, conical, delta_conical, inrets, delta_inrets
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 all_vdf_functions = ["bpr", "bpr2", "conical", "inrets"]
 
@@ -48,6 +48,5 @@ class VDF:
             raise AttributeError("This class only allows you to set the VDF to use")
 
     def functions_available(self) -> list:
-        """returns a list of all functions available
-        """
+        """returns a list of all functions available"""
         return all_vdf_functions

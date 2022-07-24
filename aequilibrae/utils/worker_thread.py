@@ -9,6 +9,7 @@ if pyqt:
     from PyQt5.QtCore import QThread
     from PyQt5.QtCore import pyqtSignal
 else:
+
     class QThread:
         def __init__(self, *arg):
             pass

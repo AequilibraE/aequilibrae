@@ -63,12 +63,34 @@ aequilibrae/paths/build/*
 docs/build/*
 docs/source/_generated/*
 docs/source/_auto_examples/*
+*.cpp 
 
 
 #Virtual environment
 .venv/
 
 # Test files
-tests/*.aem
-tests/*.csv
-tests/*.omx
+tests/**/*.aem
+tests/**/*.csv
+tests/**/*.omx
+
+#### Snippet from https://github.com/github/gitignore/blob/main/Python.gitignore
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+*.egg-info/
+*.egg
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+coverage.xml
+
+#### End snippet

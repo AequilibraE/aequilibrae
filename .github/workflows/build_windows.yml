@@ -7,7 +7,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8' , '3.9' ]
+        python-version: [ '3.7', '3.8', '3.9', '3.10' ]
         architecture: ['x64']
     steps:
     - uses: actions/checkout@v2
@@ -43,7 +43,7 @@ jobs:
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish
-      if: ${{ github.event_name == 'release'}}
+      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

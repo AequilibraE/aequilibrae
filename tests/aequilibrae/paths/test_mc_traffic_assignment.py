@@ -28,18 +28,18 @@ class TestMCTrafficAssignment(TestCase):
         self.moto_graph = self.project.network.graphs["M"]  # type: Graph
 
         for graph in [self.car_graph, self.truck_graph, self.moto_graph]:
-            graph.set_skimming(['free_flow_time'])
+            graph.set_skimming(["free_flow_time"])
             graph.set_graph("free_flow_time")
             graph.set_blocked_centroid_flows(False)
 
         self.car_matrix = self.project.matrices.get_matrix("demand_mc")
-        self.car_matrix.computational_view(['car'])
+        self.car_matrix.computational_view(["car"])
 
         self.truck_matrix = self.project.matrices.get_matrix("demand_mc")
-        self.truck_matrix.computational_view(['trucks'])
+        self.truck_matrix.computational_view(["trucks"])
 
         self.moto_matrix = self.project.matrices.get_matrix("demand_mc")
-        self.moto_matrix.computational_view(['motorcycle'])
+        self.moto_matrix.computational_view(["motorcycle"])
 
         self.assignment = TrafficAssignment()
         self.carclass = TrafficClass("car", self.car_graph, self.car_matrix)
@@ -69,7 +69,7 @@ class TestMCTrafficAssignment(TestCase):
         self.assignment.set_classes([self.carclass, self.truckclass, self.motoclass])
 
         for cls in self.assignment.classes:
-            cls.graph.set_skimming(['free_flow_time', 'distance'])
+            cls.graph.set_skimming(["free_flow_time", "distance"])
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})

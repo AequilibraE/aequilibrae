@@ -12,7 +12,7 @@ from ...data import siouxfalls_project
 
 class TestLinks(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.proj_dir)
@@ -28,7 +28,7 @@ class TestLinks(TestCase):
         try:
             rmtree(self.proj_dir)
         except Exception as e:
-            print(f'Failed to remove at {e.args}')
+            print(f"Failed to remove at {e.args}")
 
     def test_get(self):
         links = self.network.links
@@ -36,16 +36,16 @@ class TestLinks(TestCase):
             _ = links.get(123456)
 
         link = links.get(1)
-        self.assertEqual(link.capacity_ab, 25900.20064, 'Did not populate link correctly')
+        self.assertEqual(link.capacity_ab, 25900.20064, "Did not populate link correctly")
 
     def test_new(self):
         links = self.network.links
         new_link = links.new()
 
-        self.curr.execute('Select max(link_id) + 1 from Links')
+        self.curr.execute("Select max(link_id) + 1 from Links")
         id = self.curr.fetchone()[0]
-        self.assertEqual(new_link.link_id, id, 'Did not populate new link ID properly')
-        self.assertEqual(new_link.geometry, None, 'Did not populate new geometry properly')
+        self.assertEqual(new_link.link_id, id, "Did not populate new link ID properly")
+        self.assertEqual(new_link.geometry, None, "Did not populate new geometry properly")
 
     def test_copy_link(self):
         links = self.network.links
@@ -71,13 +71,13 @@ class TestLinks(TestCase):
 
         _ = links.get(10)
 
-        self.curr.execute('Select count(*) from Links')
+        self.curr.execute("Select count(*) from Links")
         tot = self.curr.fetchone()[0]
         links.delete(10)
         links.delete(11)
-        self.curr.execute('Select count(*) from Links')
+        self.curr.execute("Select count(*) from Links")
         tot2 = self.curr.fetchone()[0]
-        self.assertEqual(tot, tot2 + 2, 'Did not delete the link properly')
+        self.assertEqual(tot, tot2 + 2, "Did not delete the link properly")
 
         with self.assertRaises(ValueError):
             links.delete(123456)
@@ -90,13 +90,13 @@ class TestLinks(TestCase):
         f_editor = links.fields
 
         fields = sorted(f_editor.all_fields())
-        self.curr.execute('pragma table_info(links)')
+        self.curr.execute("pragma table_info(links)")
         dt = self.curr.fetchall()
 
-        actual_fields = set([x[1].replace('_ab', '').replace('_ba', '') for x in dt if x[1] != 'ogc_fid'])
+        actual_fields = set([x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"])
         actual_fields = sorted(list(actual_fields))
 
-        self.assertEqual(fields, actual_fields, 'Table editor is weird for table links')
+        self.assertEqual(fields, actual_fields, "Table editor is weird for table links")
 
     def test_refresh(self):
         links = self.network.links
@@ -107,11 +107,11 @@ class TestLinks(TestCase):
 
         link1.capacity_ba = val
         link1_again = links.get(1)
-        self.assertEqual(link1_again.capacity_ba, val, 'Did not preserve correctly')
+        self.assertEqual(link1_again.capacity_ba, val, "Did not preserve correctly")
 
         links.refresh()
         link1 = links.get(1)
-        self.assertEqual(link1.capacity_ba, original_value, 'Did not reset correctly')
+        self.assertEqual(link1.capacity_ba, original_value, "Did not reset correctly")
 
     def test_copy(self):
         nodes = self.network.nodes

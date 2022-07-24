@@ -2,9 +2,6 @@ import re
 import string
 from typing import List
 
-from aequilibrae import logger
-from aequilibrae.project.database_connection import database_connection
-
 ALLOWED_CHARACTERS = string.ascii_letters + "_0123456789"
 
 
@@ -38,7 +35,9 @@ class FieldEditor:
 
     _alowed_characters = ALLOWED_CHARACTERS
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self, project, table_name: str) -> None:
+        self.project = project
+        self.logger = project.logger
         self._table = table_name.lower()
         self._table_fields = []
         self._original_values = {}
@@ -97,7 +96,7 @@ class FieldEditor:
             new_val = self.__dict__[key]
             if new_val != val:
                 self.__run_query_commit(qry.format(new_val, key, self._table))
-                logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
+                self.logger.info(f"Metadata for field {key} on table {self._table} was updated to {new_val}")
 
     def all_fields(self) -> List[str]:
         """Returns the list of fields available in the database"""
@@ -131,7 +130,7 @@ class FieldEditor:
         self.__run_query_commit(qry, vals)
 
     def __run_query_fetch_all(self, qry: str):
-        conn = database_connection()
+        conn = self.project.connect()
         curr = conn.cursor()
         curr.execute(qry)
         dt = curr.fetchall()
@@ -139,7 +138,7 @@ class FieldEditor:
         return dt
 
     def __run_query_commit(self, qry: str, values=None) -> None:
-        conn = database_connection()
+        conn = self.project.connect()
         if values is None:
             conn.execute(qry)
         else:
