@@ -1,7 +1,7 @@
 import zipfile
 import os
 from os.path import dirname, join
-from aequilibrae import Project
+from aequilibrae.project import Project
 
 
 def create_example(path: str, from_model="sioux_falls") -> Project:
