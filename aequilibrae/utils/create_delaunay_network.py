@@ -1,28 +1,27 @@
 import sqlite3
 import uuid
-from os.path import join
 from itertools import combinations
-import pandas as pd
+from os.path import join
+
 import numpy as np
+import pandas as pd
 from scipy.spatial import Delaunay
 
-from aequilibrae.context import get_active_project
-from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths import Graph, TrafficClass, TrafficAssignment
 
 DELAUNAY_TABLE = "delaunay_network"
 
 
 class DelaunayAnalysis:
-    def __init__(self, project=None):
+    def __init__(self, project):
         """Start a Delaunay analysis
 
         Args:
-            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
-
+            project (:obj:`Project`): The Project to connect to
         """
 
-        self.project = project or get_active_project()
+        self.project = project
         self.procedure_id = uuid.uuid4().hex
 
     def create_network(self, source="zones", overwrite=False):
