@@ -16,14 +16,13 @@ class GMNSExporter(WorkerThread):
         self.output_path = path
 
         self.gmns_par = self.p.parameters["network"]["gmns"]
-        self.gmns_l_fields = self.gmns_par["link_fields"]
-        self.gmns_n_fields = self.gmns_par["node_fields"]
+        self.gmns_l = self.gmns_par["link"]
+        self.gmns_n = self.gmns_par["node"]
 
     def doWork(self):
 
-        gmns_par = self.gmns_par
-        l_fields = self.gmns_l_fields
-        n_fields = self.gmns_n_fields
+        l_equiv = self.gmns_l["equivalency"]
+        n_equiv = self.gmns_n["equivalency"]
 
         links_df = self.links.data
         nodes_df = self.nodes.data
@@ -72,8 +71,8 @@ class GMNSExporter(WorkerThread):
             links_df.rename(columns={"length": "length_aeq"}, inplace=True)
 
         for col in list(links_df.columns):
-            if col in l_fields:
-                links_df.rename(columns={f"{col}": f"{l_fields[col]}"}, inplace=True)
+            if col in l_equiv:
+                links_df.rename(columns={f"{col}": f"{l_equiv[col]}"}, inplace=True)
             elif col[-3:] in ["_ab", "_ba"]:
                 links_df.drop(col, axis=1, inplace=True)
 
@@ -81,8 +80,8 @@ class GMNSExporter(WorkerThread):
             nodes_df.loc[idx, "node_type"] = "centroid" if row.is_centroid == 1 else None
 
         for col in list(nodes_df.columns):
-            if col in n_fields:
-                nodes_df.rename(columns={f"{col}": f"{n_fields[col]}"}, inplace=True)
+            if col in n_equiv:
+                nodes_df.rename(columns={f"{col}": f"{n_equiv[col]}"}, inplace=True)
             elif col == "geometry":
                 nodes_df = nodes_df.assign(
                     x_coord=[nodes_df.geometry[idx].coords[0][0] for idx in list(nodes_df.index)]
@@ -93,13 +92,15 @@ class GMNSExporter(WorkerThread):
                 nodes_df.drop("geometry", axis=1, inplace=True)
 
         link_cols = list(links_df.columns)
-        link_cols = gmns_par["required_link_fields"] + [
-            c for c in link_cols if c not in gmns_par["required_link_fields"]
+        link_req = [k for k in self.gmns_l["fields"] if self.gmns_l["fields"][k]["required"]]
+        link_cols = link_req + [
+            c for c in link_cols if c not in link_req
         ]
 
         node_cols = list(nodes_df.columns)
-        node_cols = gmns_par["required_node_fields"] + [
-            c for c in node_cols if c not in gmns_par["required_node_fields"]
+        node_req = [k for k in self.gmns_n["fields"] if self.gmns_n["fields"][k]["required"]]
+        node_cols = node_req + [
+            c for c in node_cols if c not in node_req
         ]
 
         links_df = links_df[link_cols]

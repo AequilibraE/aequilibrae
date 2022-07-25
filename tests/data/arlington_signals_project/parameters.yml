@@ -14,118 +14,192 @@ distribution:
 network:
   gmns:
     critical_dist: 2
-    link_fields:
-      a_node: from_node_id
-      b_node: to_node_id
-      capacity: capacity
-      direction: directed
-      distance: length
-      geometry: geometry
-      lanes: lanes
-      link_id: link_id
-      link_type: facility_type
-      modes: allowed_uses
-      name: name
-      speed: free_speed
-    node_fields:
-      node_id: node_id
-    other_link_fields:
-      bike_facility:
-        description: Type of bicycle accommodation
-        type: text
-      bridge:
-        description: bridge flag
-        type: text
-      dir_flag:
-        description: Shapepoints direction
-        type: integer
-      geometry_id:
-        description: Foreign key from geometry table
-        type: integer
-      grade:
-        description: Percent grade of the link
-        type: integer
-      jurisdiction:
-        description: Owner/operator of the link
-        type: text
-      length:
-        description: GMNS length in long_length units
-        type: numeric
-      parent_link_id:
-        description: The parent of this link
-        type: integer
-      parking:
-        description: Type of parking
-        type: text
-      ped_facility:
-        description: Type of pedestrian accommodation
-        type: text
-      row_width:
-        description: Width of the entire right-of-way (both directions)
-        type: numeric
-      toll:
-        description: Toll in currency units
-        type: numeric
-      tunnel:
-        description: tunnel flag
-        type: text
-    other_node_fields:
-      ctrl_type:
-        description: From GMNS ControlType_Set
-        type: text
-      hospital:
-        description: hoospital flag
-        type: text
-      name:
-        description: Node name
-        type: text
-      node_type:
-        description: What it represents
-        type: text
-      parent_node_id:
-        description: The parent of this node
-        type: integer
-      port:
-        description: port flag
-        type: text
-      z_coord:
-        description: Altitude in short length units
-        type: numeric
-      zone_id:
-        description: TAZ or city, or census tract
-        type: integer
-    required_link_fields:
-    - link_id
-    - from_node_id
-    - to_node_id
-    - directed
-    required_node_fields:
-    - node_id
-    - x_coord
-    - y_coord
+    link:
+      equivalency:
+        a_node: from_node_id
+        b_node: to_node_id
+        capacity: capacity
+        direction: directed
+        geometry: geometry
+        lanes: lanes
+        link_id: link_id
+        link_type: facility_type
+        modes: allowed_uses
+        name: name
+        speed: free_speed
+      fields:
+        allowed_uses:
+          description: Set of allowed uses
+          required: false
+          type: text
+        bike_facility:
+          description: Type of bicycle accommodation
+          required: false
+          type: text
+        bridge:
+          description: bridge flag
+          required: false
+          type: text
+        capacity:
+          description: Capacity (veh / hr / lane)
+          required: false
+          type: numeric
+        dir_flag:
+          description: Shapepoints direction
+          required: false
+          type: integer
+        directed:
+          description: Whether the link is directed (travel only occurs from the from_node
+            to the to_node) or undirected.
+          required: true
+          type: integer
+        facility_type:
+          description: Facility type (e.g., freeway, arterial, etc.)
+          required: false
+          type: text
+        free_speed:
+          description: Free flow speed in long_length units per hour
+          required: false
+          type: numeric
+        from_node_id:
+          description: Foreign key (Nodes table)
+          required: true
+          type: integer
+        geometry:
+          description: Link geometry, in well-known text (WKT) format.
+          required: false
+          type: text
+        geometry_id:
+          description: Foreign key from geometry table
+          required: false
+          type: integer
+        grade:
+          description: Percent grade of the link
+          required: false
+          type: integer
+        jurisdiction:
+          description: Owner/operator of the link
+          required: false
+          type: text
+        lanes:
+          description: Number of lanes in the direction of travel
+          required: false
+          type: inetger
+        length:
+          description: GMNS length in long_length units
+          required: false
+          type: numeric
+        link_id:
+          description: Primary key
+          required: true
+          type: integer
+        name:
+          description: Name
+          required: false
+          type: text
+        parent_link_id:
+          description: The parent of this link
+          required: false
+          type: integer
+        parking:
+          description: Type of parking
+          required: false
+          type: text
+        ped_facility:
+          description: Type of pedestrian accommodation
+          required: false
+          type: text
+        row_width:
+          description: Width of the entire right-of-way (both directions)
+          required: false
+          type: numeric
+        to_node_id:
+          description: Foreign key (Nodes table)
+          required: true
+          type: integer
+        toll:
+          description: Toll in currency units
+          required: false
+          type: numeric
+        tunnel:
+          description: tunnel flag
+          required: false
+          type: text
+    node:
+      equivalency:
+        node_id: node_id
+      fields:
+        ctrl_type:
+          description: From GMNS ControlType_Set
+          required: false
+          type: text
+        hospital:
+          description: hoospital flag
+          required: false
+          type: text
+        name:
+          description: Node name
+          required: false
+          type: text
+        node_id:
+          description: Unique key
+          required: true
+          type: integer
+        node_type:
+          description: What it represents
+          required: false
+          type: text
+        parent_node_id:
+          description: The parent of this node
+          required: false
+          type: integer
+        port:
+          description: port flag
+          required: false
+          type: text
+        x_coord:
+          description: Coordinate system specified in GMNS config file
+          required: true
+          type: numeric
+        y_coord:
+          description: Coordinate system specified in GMNS config file
+          required: true
+          type: numeric
+        z_coord:
+          description: Altitude in short length units
+          required: false
+          type: numeric
+        zone_id:
+          description: TAZ or city, or census tract
+          required: false
+          type: integer
     use_definition:
       equivalency:
         mode_name: use
-      other_fields:
+      fields:
         description:
           description: A longer description of the mode
           type: text
+          required: false
         special_conditions:
           description: Treatment of these special conditions may be needed in a future
             version of GMNS
           type: text
-      required_fields:
+          required: false
         pce:
           description: Passenger car equivalents, used for capacity calculations (0
             for non-travel uses)
           type: numeric
+          required: true
         persons_per_vehicle:
           description: Average persons per vehicle. Used to compute person-based performance
             measures (0 for non-travel uses)
           type: numeric
+          required: true
         use:
           description: Short name of the vehicle
           type: text
+          required: true
   links:
     fields:
       one-way:
@@ -324,6 +398,6 @@ system:
   cpus: 0
   default_directory: C:\
   logging: true
-  logging_directory: C:\Users\DANILO~1\AppData\Local\Temp\1e7402a1f17e4a749e989041b26e09fa
+  logging_directory: C:\Users\DANILO~1\AppData\Local\Temp\3063b2b7e661498c8266582591da95f0
   spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp

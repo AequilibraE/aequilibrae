@@ -1,3 +1,4 @@
+import math
 import re
 import numpy as np
 import pandas as pd
@@ -30,8 +31,160 @@ class GMNSBuilder(WorkerThread):
         self.geom_df = pd.read_csv(geom_path) if geom_path is not None else geom_path
         self.srid = srid
 
-        self.gmns_l_fields = self.p.parameters["network"]["gmns"]["link_fields"]
-        self.gmns_n_fields = self.p.parameters["network"]["gmns"]["node_fields"]
+        self.l_equiv = self.p.parameters["network"]["gmns"]["link"]["equivalency"]
+        self.n_equiv = self.p.parameters["network"]["gmns"]["node"]["equivalency"]
+
+    def doWork(self):
+
+        p = self.p
+        gmns_n_fields = p.parameters["network"]["gmns"]["node"]["fields"]
+        gmns_l_fields = p.parameters["network"]["gmns"]["link"]["fields"]
+
+        # Checking if all required fields are in GMNS links and nodes files
+        for field in [x for x in gmns_n_fields if gmns_n_fields[x]["required"]]:
+            if field not in self.node_df.columns.to_list():
+                raise ValueError(f"In GMNS nodes file: field '{field}' required, but not found.")
+
+        for field in [x for x in gmns_l_fields if gmns_l_fields[x]["required"]]:
+            if field not in self.link_df.columns.to_list():
+                raise ValueError(f"In GMNS links file: field '{field}' required, but not found.")
+
+        gmns_geom = self.l_equiv["geometry"]
+        if gmns_geom not in self.link_df.columns.to_list():
+            if self.geom_df is None:
+                raise ValueError(
+                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS link table or in a separate file ('geometry_path' attribute)."
+                )
+            else:
+                self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
+
+        # Checking if it is needed to change the spatial reference system.
+        self.transform_srid(self.srid)
+
+        # Creating direction list based on list of two-way links
+        direction = self.get_aeq_direction()
+
+        # Creating speeds, capacities and lanes lists based on direction list
+        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba = self.get_ab_lists(
+            direction
+        )
+
+        # Adding new fields to AequilibraE links table / Preparing it to receive information from GMNS table.
+        l_fields = self.links.fields
+        l_fields.add("notes", description="More information about the link", data_type="TEXT")
+
+        if "toll" in self.link_df.columns.to_list():
+            l_fields.add("toll_ab", description="Toll", data_type="NUMERIC")
+            l_fields.add("toll_ba", description="Toll", data_type="NUMERIC")
+
+        if self.l_equiv["lanes"] in self.link_df.columns.to_list():
+            l_fields.add("lanes_ab", description="Lanes", data_type="NUMERIC")
+            l_fields.add("lanes_ba", description="Lanes", data_type="NUMERIC")
+
+        other_ldict = {}
+        other_lfields = [x for x in gmns_l_fields if not gmns_l_fields[x]["required"]]
+        for fld in other_lfields:
+            if fld in self.link_df.columns.to_list() and fld not in l_fields.all_fields():
+                l_fields.add(
+                    f"{fld}",
+                    description=f"{gmns_l_fields[fld]['description']}",
+                    data_type=f"{gmns_l_fields[fld]['type']}",
+                )
+                if fld == "toll":
+                    other_ldict.update({"toll_ab": toll_ab})
+                    other_ldict.update({"toll_ba": toll_ba})
+
+                other_ldict.update({f"{fld}": self.link_df[fld]})
+
+        l_fields.save()
+
+        all_fields = [k for k in gmns_l_fields]
+        missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
+        if missing_f != []:
+            print(
+                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            )
+
+        # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
+
+        n_fields = self.nodes.fields
+        n_fields.add("notes", description="More information about the node", data_type="TEXT")
+
+        other_ndict = {}
+        other_nfields = [x for x in gmns_n_fields if not gmns_n_fields[x]["required"]]
+        for fld in other_nfields:
+            if fld in self.node_df.columns.to_list() and fld not in l_fields.all_fields():
+                n_fields.add(
+                    f"{fld}",
+                    description=f"{gmns_n_fields[fld]['description']}",
+                    data_type=f"{gmns_n_fields[fld]['type']}",
+                )
+                other_ndict.update({f"{fld}": self.node_df[fld]})
+
+        n_fields.save()
+
+        all_fields = [k for k in gmns_n_fields]
+        missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
+        if missing_f != []:
+            print(
+                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
+            )
+
+        # Getting information from some optinal GMNS fields
+
+        gmns_name = self.l_equiv["name"]
+        name_list = (
+            self.link_df[gmns_name].to_list()
+            if gmns_name in self.link_df.columns.to_list()
+            else ["" for _ in range(len(self.link_df))]
+        )
+
+        # Creating link_type and modes list
+        link_types_list = self.save_types_to_aeq()
+        mode_ids_list = self.save_modes_to_aeq()
+
+        # Checking if the links boundaries coordinates match the "from" and "to" nodes coordinates
+        self.correct_geometries()
+
+        # Setting centroid equals 1 when informed in the 'node_type' node table field
+        centroid_flag = (
+            [1 if x == "centroid" else 0 for x in self.node_df["node_type"].to_list()]
+            if "node_type" in self.node_df.columns.to_list()
+            else 0
+        )
+
+        # Creating dataframes for adding nodes and links information to AequilibraE model
+
+        nodes_fields = {
+            "node_id": self.node_df[self.n_equiv["node_id"]],
+            "is_centroid": centroid_flag,
+            "x_coord": self.node_df.x_coord,
+            "y_coord": self.node_df.y_coord,
+            "notes": "from GMNS file",
+        }
+
+        links_fields = {
+            "link_id": self.link_df[self.l_equiv["link_id"]],
+            "a_node": self.link_df[self.l_equiv["a_node"]],
+            "b_node": self.link_df[self.l_equiv["b_node"]],
+            "direction": direction,
+            "modes": mode_ids_list,
+            "link_type": link_types_list,
+            "name": name_list,
+            "speed_ab": speed_ab,
+            "speed_ba": speed_ba,
+            "capacity_ab": capacity_ab,
+            "capacity_ba": capacity_ba,
+            "geometry": self.link_df.geometry,
+            "lanes_ab": lanes_ab,
+            "lanes_ba": lanes_ba,
+            "notes": "from GMNS file",
+        }
+
+        nodes_fields.update(other_ndict)
+        links_fields.update(other_ldict)
+
+        self.save_to_database(links_fields, nodes_fields)
 
     def transform_srid(self, srid):
 
@@ -58,9 +211,9 @@ class GMNSBuilder(WorkerThread):
 
     def get_aeq_direction(self):
 
-        gmns_dir = self.gmns_l_fields["direction"]
-        gmns_cap = self.gmns_l_fields["capacity"]
-        gmns_lanes = self.gmns_l_fields["lanes"]
+        gmns_dir = self.l_equiv["direction"]
+        gmns_cap = self.l_equiv["capacity"]
+        gmns_lanes = self.l_equiv["lanes"]
 
         # Creating a direction list containing information in the AequilibraE standard (0 value for two-way links)
         self.link_df[gmns_dir] = [0 if x not in [1, True] else 1 for x in list(self.link_df[gmns_dir])]
@@ -104,9 +257,9 @@ class GMNSBuilder(WorkerThread):
 
     def get_ab_lists(self, direction):
 
-        gmns_speed = self.gmns_l_fields["speed"]
-        gmns_cap = self.gmns_l_fields["capacity"]
-        gmns_lanes = self.gmns_l_fields["lanes"]
+        gmns_speed = self.l_equiv["speed"]
+        gmns_cap = self.l_equiv["capacity"]
+        gmns_lanes = self.l_equiv["lanes"]
 
         speed_ab = ["" for _ in range(len(self.link_df))]
         speed_ba = ["" for _ in range(len(self.link_df))]
@@ -140,7 +293,7 @@ class GMNSBuilder(WorkerThread):
 
     def save_types_to_aeq(self):
 
-        gmns_ltype = self.gmns_l_fields["link_type"]
+        gmns_ltype = self.l_equiv["link_type"]
 
         # Setting link_type = 'unclassified' if there is no information about it in the GMNS links table
         if gmns_ltype not in self.link_df.columns.to_list():
@@ -173,8 +326,7 @@ class GMNSBuilder(WorkerThread):
 
     def save_modes_to_aeq(self):
 
-        p = self.p
-        gmns_modes = self.gmns_l_fields["modes"]
+        gmns_modes = self.l_equiv["modes"]
 
         if gmns_modes in self.link_df.columns.to_list():
             modes_list = self.link_df[gmns_modes].to_list()
@@ -202,15 +354,31 @@ class GMNSBuilder(WorkerThread):
 
             use_group = self.uses_df
             groups_dict = dict(zip(use_group.use_group, use_group.uses))
+
             for k, use in groups_dict.items():
-                for group in list(groups_dict.keys()):
-                    if group in use:
-                        groups_dict[k] = use.replace(
+                grouped = True
+
+                while grouped:
+
+                    if re.search("|".join(list(groups_dict.keys())), use) is not None:
+                        group = re.search("|".join(list(groups_dict.keys())), use).group(0)
+                        use = use.replace(
                             group,
                             pattern.sub(lambda x: "_" + char_replaces[x.group()], groups_dict[group])
                             .replace("+", "")
                             .replace("-", "_"),
                         )
+                        groups_dict[k] = use
+
+                    else:
+                        groups_dict[k] = (
+                            pattern.sub(lambda x: "_" + char_replaces[x.group()], use)
+                            .replace("+", "")
+                            .replace("-", "_")
+                        )
+                        grouped = False
+
+                use_group.loc[use_group.use_group == k, "uses"] = groups_dict[k]
         else:
             groups_dict = {}
 
@@ -220,16 +388,16 @@ class GMNSBuilder(WorkerThread):
         ]
         mode_ids_list = [x for x in modes_list]
 
-        all_modes = list(self.modes.all_modes())
-        saved_modes = all_modes
+        saved_modes = list(self.modes.all_modes())
+        modes_df = pd.DataFrame(
+            self.conn.execute("select mode_name, mode_id from modes").fetchall(), columns=["name", "id"]
+        )
         for mode in list(dict.fromkeys(modes_list)):
 
             if mode in groups_dict.keys():
                 modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
                 desc_list = [
-                    use_group.loc[use_group.use_group == m, "description"].item()
-                    if m == mode
-                    else "Mode from GMNS use_group table"
+                    f"GMNS use groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
                     for m in modes_gathered
                 ]
 
@@ -243,20 +411,21 @@ class GMNSBuilder(WorkerThread):
 
             mode_to_add = ""
             for ind, m in enumerate(modes_gathered):
-                letters = m.lower() + m.upper() + string.ascii_letters
-                letters = "".join([lt for lt in letters if lt not in saved_modes and lt != "_"])
+                if m not in list(modes_df.name):
+                    letters = m.lower() + m.upper() + string.ascii_letters
+                    letters = "".join([lt for lt in letters if lt not in saved_modes and lt != "_"])
 
-                m = m if m not in [list(x.keys())[0] for x in p.parameters["network"]["modes"]] else m + "_gmns"
+                    modes = self.modes
+                    new_mode = modes.new(letters[0])
+                    new_mode.mode_name = m
+                    modes.add(new_mode)
+                    new_mode.description = desc_list[ind]
+                    new_mode.save()
 
-                modes = self.modes
-                new_mode = modes.new(letters[0])
-                new_mode.mode_name = m
-                modes.add(new_mode)
-                new_mode.description = desc_list[ind]
-                new_mode.save()
-
-                mode_to_add += letters[0]
-                saved_modes += [x for x in mode_to_add]
+                    mode_to_add += letters[0]
+                    saved_modes += [x for x in mode_to_add]
+                else:
+                    mode_to_add += modes_df.loc[modes_df.name == m, "id"].item()
 
             mode_ids_list = [mode_to_add if x == mode else x for x in mode_ids_list]
 
@@ -265,10 +434,10 @@ class GMNSBuilder(WorkerThread):
     def correct_geometries(self):
 
         p = self.p
-        gmns_lid = self.gmns_l_fields["link_id"]
-        gmns_a_node = self.gmns_l_fields["a_node"]
-        gmns_b_node = self.gmns_l_fields["b_node"]
-        gmns_nid = self.gmns_n_fields["node_id"]
+        gmns_lid = self.l_equiv["link_id"]
+        gmns_a_node = self.l_equiv["a_node"]
+        gmns_b_node = self.l_equiv["b_node"]
+        gmns_nid = self.n_equiv["node_id"]
         critical_dist = p.parameters["network"]["gmns"]["critical_dist"]
 
         for idx, row in self.link_df.iterrows():
@@ -290,7 +459,9 @@ class GMNSBuilder(WorkerThread):
             link_end_boundary = link_points[-1]
 
             if link_start_boundary != (from_point_x, from_point_y):
-                start_to_from_dist = Point(link_start_boundary).distance(Point(from_point_x, from_point_y))
+                start_to_from_dist = (
+                    Point(link_start_boundary).distance(Point(from_point_x, from_point_y)) * math.pi * 6371000 / 180
+                )
 
                 link_points = (
                     [(from_point_x, from_point_y)] + link_points[1:]
@@ -305,7 +476,9 @@ class GMNSBuilder(WorkerThread):
                 )
 
             if link_end_boundary != (to_point_x, to_point_y):
-                end_to_to_dist = Point(link_end_boundary).distance(Point(to_point_x, to_point_y))
+                end_to_to_dist = (
+                    Point(link_end_boundary).distance(Point(to_point_x, to_point_y)) * math.pi * 6371000 / 180
+                )
 
                 link_points = (
                     link_points[:-1] + [(to_point_x, to_point_y)]
@@ -348,153 +521,3 @@ class GMNSBuilder(WorkerThread):
 
         self.conn.executemany(l_query, l_params_list)
         self.conn.commit()
-
-    def doWork(self):
-
-        p = self.p
-
-        # Checking if all required fields are in GMNS links and nodes files
-        for field in p.parameters["network"]["gmns"]["required_node_fields"]:
-            if field not in self.node_df.columns.to_list():
-                raise ValueError(f"In GMNS nodes file: field '{field}' required, but not found.")
-
-        for field in p.parameters["network"]["gmns"]["required_link_fields"]:
-            if field not in self.link_df.columns.to_list():
-                raise ValueError(f"In GMNS links file: field '{field}' required, but not found.")
-
-        gmns_geom = self.gmns_l_fields["geometry"]
-        if gmns_geom not in self.link_df.columns.to_list():
-            if self.geom_df is None:
-                raise ValueError(
-                    "To create an aequilibrae links table, geometries information must be provided either in the GMNS link table or in a separate file ('geometry_path' attribute)."
-                )
-            else:
-                self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
-
-        # Checking if it is needed to change the spatial reference system.
-        self.transform_srid(self.srid)
-
-        # Creating direction list based on list of two-way links
-        direction = self.get_aeq_direction()
-
-        # Creating speeds, capacities and lanes lists based on direction list
-        speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba = self.get_ab_lists(
-            direction
-        )
-
-        # Adding new fields to AequilibraE links table / Preparing it to receive information from GMNS table.
-        l_fields = self.links.fields
-        l_fields.add("notes", description="More information about the link", data_type="TEXT")
-
-        if "toll" in self.link_df.columns.to_list():
-            l_fields.add("toll_ab", description="Toll", data_type="NUMERIC")
-            l_fields.add("toll_ba", description="Toll", data_type="NUMERIC")
-
-        if self.gmns_l_fields["lanes"] in self.link_df.columns.to_list():
-            l_fields.add("lanes_ab", description="Lanes", data_type="NUMERIC")
-            l_fields.add("lanes_ba", description="Lanes", data_type="NUMERIC")
-
-        other_ldict = {}
-        other_lfields = p.parameters["network"]["gmns"]["other_link_fields"]
-        for fld in list(other_lfields.keys()):
-            if fld in self.link_df.columns.to_list() and fld not in l_fields.all_fields():
-                l_fields.add(
-                    f"{fld}",
-                    description=f"{other_lfields[fld]['description']}",
-                    data_type=f"{other_lfields[fld]['type']}",
-                )
-                if fld == "toll":
-                    other_ldict.update({"toll_ab": toll_ab})
-                    other_ldict.update({"toll_ba": toll_ba})
-
-                other_ldict.update({f"{fld}": self.link_df[fld]})
-
-        l_fields.save()
-
-        all_fields = list(p.parameters["network"]["gmns"]["link_fields"].values()) + list(other_lfields.keys())
-        missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
-        if missing_f != []:
-            print(
-                f"Fields not imported from link table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
-            )
-
-        # Adding new fields to AequilibraE nodes table / Preparing it to receive information from GMNS table.
-
-        n_fields = self.nodes.fields
-        n_fields.add("notes", description="More information about the node", data_type="TEXT")
-
-        other_ndict = {}
-        other_nfields = p.parameters["network"]["gmns"]["other_node_fields"]
-        for fld in list(other_nfields.keys()):
-            if fld in self.node_df.columns.to_list() and fld not in l_fields.all_fields():
-                n_fields.add(
-                    f"{fld}",
-                    description=f"{other_nfields[fld]['description']}",
-                    data_type=f"{other_nfields[fld]['type']}",
-                )
-                other_ndict.update({f"{fld}": self.node_df[fld]})
-
-        n_fields.save()
-
-        all_fields = p.parameters["network"]["gmns"]["required_node_fields"] + list(other_nfields.keys())
-        missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
-        if missing_f != []:
-            print(
-                f"Fields not imported from node table: {'; '.join(missing_f)}. If you want them to be imported, please modify the parameters.yml file."
-            )
-
-        # Getting information from some optinal GMNS fields
-
-        gmns_name = self.gmns_l_fields["name"]
-        name_list = (
-            self.link_df[gmns_name].to_list()
-            if gmns_name in self.link_df.columns.to_list()
-            else ["" for _ in range(len(self.link_df))]
-        )
-
-        # Creating link_type and modes list
-        link_types_list = self.save_types_to_aeq()
-        mode_ids_list = self.save_modes_to_aeq()
-
-        # Checking if the links boundaries coordinates match the "from" and "to" nodes coordinates
-        self.correct_geometries()
-
-        # Setting centroid equals 1 when informed in the 'node_type' node table field
-        centroid_flag = (
-            [1 if x == "centroid" else 0 for x in self.node_df["node_type"].to_list()]
-            if "node_type" in self.node_df.columns.to_list()
-            else 0
-        )
-
-        # Creating dataframes for adding nodes and links information to AequilibraE model
-
-        nodes_fields = {
-            "node_id": self.node_df[self.gmns_n_fields["node_id"]],
-            "is_centroid": centroid_flag,
-            "x_coord": self.node_df.x_coord,
-            "y_coord": self.node_df.y_coord,
-            "notes": "from GMNS file",
-        }
-
-        links_fields = {
-            "link_id": self.link_df[self.gmns_l_fields["link_id"]],
-            "a_node": self.link_df[self.gmns_l_fields["a_node"]],
-            "b_node": self.link_df[self.gmns_l_fields["b_node"]],
-            "direction": direction,
-            "modes": mode_ids_list,
-            "link_type": link_types_list,
-            "name": name_list,
-            "speed_ab": speed_ab,
-            "speed_ba": speed_ba,
-            "capacity_ab": capacity_ab,
-            "capacity_ba": capacity_ba,
-            "geometry": self.link_df.geometry,
-            "lanes_ab": lanes_ab,
-            "lanes_ba": lanes_ba,
-            "notes": "from GMNS file",
-        }
-
-        nodes_fields.update(other_ndict)
-        links_fields.update(other_ldict)
-
-        self.save_to_database(links_fields, nodes_fields)
