@@ -252,7 +252,7 @@ You can find the specification for all these tables in the GMNS documentation,
 By default, the method *create_from_gmns()* read all required and optional fields
 specified in the GMNS link and node tables specification. If you need it to read 
 any additional fields as well, you have to modify the AequilibraE parameters as
-shown in the example (see Section 7.Workflows/Importing network from GMNS).
+shown in the :ref:`example <sphx_glr__auto_examples_plot_import_from_gmns.py>`.
 
 .. note::
 
