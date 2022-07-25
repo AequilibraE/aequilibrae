@@ -20,6 +20,7 @@ network:
         b_node: to_node_id
         capacity: capacity
         direction: directed
+        distance: length
         geometry: geometry
         lanes: lanes
         link_id: link_id
