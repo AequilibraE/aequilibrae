@@ -93,15 +93,11 @@ class GMNSExporter(WorkerThread):
 
         link_cols = list(links_df.columns)
         link_req = [k for k in self.gmns_l["fields"] if self.gmns_l["fields"][k]["required"]]
-        link_cols = link_req + [
-            c for c in link_cols if c not in link_req
-        ]
+        link_cols = link_req + [c for c in link_cols if c not in link_req]
 
         node_cols = list(nodes_df.columns)
         node_req = [k for k in self.gmns_n["fields"] if self.gmns_n["fields"][k]["required"]]
-        node_cols = node_req + [
-            c for c in node_cols if c not in node_req
-        ]
+        node_cols = node_req + [c for c in node_cols if c not in node_req]
 
         links_df = links_df[link_cols]
         nodes_df = nodes_df[node_cols]
