@@ -1,52 +1,29 @@
-from unittest import TestCase
-import tempfile
-import os
 from aequilibrae.context import get_active_project
-from aequilibrae.project import Project
-import uuid
+import pytest
 
 
-class TestMultipleProjects(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.proj = cls.new_project()
+class TestMultipleProjects:
+    @pytest.fixture(scope="session")
+    def project(self, create_empty_project_session):
+        return create_empty_project_session()
 
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls.proj.close()
+    def test_current_project_is_active_project(self, project):
+        assert project is get_active_project()
 
-    def setUp(self) -> None:
-        self.proj.activate()
+    def test_switch_project(self, create_empty_project):
+        proj2 = create_empty_project()
+        assert proj2 is get_active_project()
 
-    @staticmethod
-    def new_project():
-        proj = Project()
-        proj.new(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-        return proj
+    def test_reactivate_project(self, project, create_empty_project):
+        create_empty_project()
+        project.activate()
+        assert project is get_active_project()
 
-    def test_current_project_is_active_project(self):
-        self.assertEqual(self.proj, get_active_project())
-
-    def test_switch_project(self):
-        proj2 = self.new_project()
-        self.assertIs(proj2, get_active_project())
-
-    def test_reactivate_project(self):
-        self.new_project()
-        self.proj.activate()
-        self.assertIs(self.proj, get_active_project())
-
-    def test_raises_when_inactive(self):
-        self.proj.deactivate()
-        with self.assertRaises(FileNotFoundError):
+    def test_raises_when_inactive(self, project):
+        project.deactivate()
+        with pytest.raises(FileNotFoundError):
             get_active_project()
 
-    def test_close_project_deactivates(self):
-        proj = self.new_project()
-        proj.close()
-        self.assertFalse(get_active_project(must_exist=False))
-
-    def test_get_active_project_when_required(self):
-        self.proj.deactivate()
-        with self.assertRaises(FileNotFoundError):
-            get_active_project()
+    def test_close_project_deactivates(self, project):
+        project.close()
+        assert get_active_project(must_exist=False) is None
