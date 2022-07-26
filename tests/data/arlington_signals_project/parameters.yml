@@ -399,6 +399,6 @@ system:
   cpus: 0
   default_directory: C:\
   logging: true
-  logging_directory: C:\Users\DANILO~1\AppData\Local\Temp\b741d4eebc244c968e38d60178c97592
+  logging_directory: /temp/
   spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp
