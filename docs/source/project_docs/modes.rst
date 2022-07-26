@@ -9,8 +9,8 @@ and its main role is to support the creation of graphs directly from the SQLite
 project.
 
 The modes table has five fields, being the *mode_name*, *mode_id*, *description* 
-*pce*, *vot*, and *persons_per_vehicle*, where *mode_id* is a single letter that 
-is used to codify mode permissions in the network, as further discussed in 
+*pce*, *vot*, and *ppv* (persons per vehicle), where *mode_id* is a single letter 
+that is used to codify mode permissions in the network, as further discussed in 
 :ref:`network`.
 
 An example of what the contents of the mode table look like is below:
