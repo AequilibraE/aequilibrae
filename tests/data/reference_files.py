@@ -39,3 +39,4 @@ gmns_node = join(dirname(dirname(abspath(__file__))), "data/arlington_signals_pr
 gmns_groups = join(
     dirname(dirname(abspath(__file__))), "data/arlington_signals_project/gmns_files", "use_group_example.csv"
 )
+gmns_project = join(dirname(dirname(abspath(__file__))), "data/arlington_signals_project")

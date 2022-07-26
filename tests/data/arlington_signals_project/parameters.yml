@@ -20,6 +20,7 @@ network:
         b_node: to_node_id
         capacity: capacity
         direction: directed
+        distance: length
         geometry: geometry
         lanes: lanes
         link_id: link_id
@@ -173,6 +174,33 @@ network:
           description: TAZ or city, or census tract
           required: false
           type: integer
+    use_definition:
+      equivalency:
+        mode_name: use
+      fields:
+        description:
+          description: A longer description of the mode
+          required: false
+          type: text
+        pce:
+          description: Passenger car equivalents, used for capacity calculations (0
+            for non-travel uses)
+          required: true
+          type: numeric
+        persons_per_vehicle:
+          description: Average persons per vehicle. Used to compute person-based performance
+            measures (0 for non-travel uses)
+          required: true
+          type: numeric
+        special_conditions:
+          description: Treatment of these special conditions may be needed in a future
+            version of GMNS
+          required: false
+          type: text
+        use:
+          description: Short name of the vehicle
+          required: true
+          type: text
   links:
     fields:
       one-way:
@@ -371,6 +399,6 @@ system:
   cpus: 0
   default_directory: C:\
   logging: true
-  logging_directory: C:\Users\DANILO~1\AppData\Local\Temp\fdbfb1b0ae1e4c49b9d98803034e5472
+  logging_directory: /temp/
   spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp

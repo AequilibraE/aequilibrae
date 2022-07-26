@@ -19,6 +19,7 @@ from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
+from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -269,6 +270,19 @@ class Network(WorkerThread):
         gmns_builder.doWork()
 
         self.logger.info("Network built successfully")
+
+    def export_to_gmns(self, path: str):
+        """
+        Exports AequilibraE network to csv files in GMNS format.
+
+        Arg:
+            *path* (:obj:`str`): Output folder path.
+        """
+
+        gmns_exporter = GMNSExporter(self, path)
+        gmns_exporter.doWork()
+
+        self.logger.info("Network exported successfully")
 
     def signal_handler(self, val):
         if pyqt:

@@ -246,6 +246,7 @@ network:
         a_node: from_node_id
         b_node: to_node_id
         direction: directed
+        distance: length
         speed: free_speed
         capacity: capacity
         lanes: lanes
@@ -342,6 +343,30 @@ network:
           description: Width of the entire right-of-way (both directions)
           type: numeric
           required: false
+    use_definition:
+      fields:
+        use:
+          description: Short name of the vehicle
+          type: text
+          required: true
+        persons_per_vehicle:
+          description: Average persons per vehicle. Used to compute person-based performance measures (0 for non-travel uses)
+          type: numeric
+          required: true
+        pce:
+          description: Passenger car equivalents, used for capacity calculations (0 for non-travel uses)
+          type: numeric
+          required: true
+        special_conditions:
+          description: Treatment of these special conditions may be needed in a future version of GMNS
+          type: text
+          required: false
+        description:
+          description: A longer description of the mode
+          type: text
+          required: false
+      equivalency:
+        mode_name: use
 osm:
     overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"
