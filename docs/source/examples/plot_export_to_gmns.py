@@ -80,7 +80,7 @@ long, lat = curr.fetchone()
 # %%
 
 # We create the map
-map_gmns = folium.Map(location=[lat, long], zoom_start=14)
+map_gmns = folium.Map(location=[lat, long], zoom_start=17)
 
 # add all layers
 for layer in layers:
