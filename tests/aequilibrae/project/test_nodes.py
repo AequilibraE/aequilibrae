@@ -4,7 +4,7 @@ from copy import copy, deepcopy
 from random import randint, random
 from shutil import copytree, rmtree
 from tempfile import gettempdir
-from unittest import TestCase, TestLoader
+from unittest import TestCase, TestLoader as _TestLoader
 
 import shapely.wkb
 from shapely.geometry import Point
@@ -12,7 +12,7 @@ from shapely.geometry import Point
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
 
-TestLoader.sortTestMethodsUsing = None
+_TestLoader.sortTestMethodsUsing = None
 
 
 class TestNodes(TestCase):
