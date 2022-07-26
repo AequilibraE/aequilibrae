@@ -6,6 +6,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import shapely.wkb
+import shapely.wkt
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
@@ -17,6 +18,7 @@ from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.osm_builder import OSMBuilder
+from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -235,6 +237,36 @@ class Network(WorkerThread):
         if pyqt:
             self.builder.building.connect(self.signal_handler)
         self.builder.doWork()
+
+        self.logger.info("Network built successfully")
+
+    def create_from_gmns(
+        self,
+        link_file_path: str,
+        node_file_path: str,
+        use_group_path: str = None,
+        geometry_path: str = None,
+        srid: int = 4326,
+    ) -> None:
+        """
+        Creates AequilibraE model from links and nodes in GMNS format.
+
+        Args:
+            *link_file_path* (:obj:`str`): Path to a links csv file in GMNS format
+
+            *node_file_path* (:obj:`str`): Path to a nodes csv file in GMNS format
+
+            *use_group_path* (:obj:`str`, Optional): Path to a csv table containing groupings of uses. This helps AequilibraE
+            know when a GMNS use is actually a group of other GMNS uses
+
+            *geometry_path* (:obj:`str`, Optional): Path to a csv file containing geometry information for a line object, if not
+            specified in the link table
+
+            *srid* (:obj:`int`, Optional): Spatial Reference ID in which the GMNS geometries were created
+        """
+
+        gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
+        gmns_builder.doWork()
 
         self.logger.info("Network built successfully")
 
