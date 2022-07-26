@@ -288,7 +288,7 @@ tables in GMNS format:
 
 This list does not include the optional use_group table, which is an optional argument
 of the *create_from_gmns()* function, because AequilibraE models do not use mode groups 
-to specify their modes (not yet at least).
+to specify their modes.
 
 In addition to all GMNS required fileds for each of the three exported tables, some
 other fields are also added as riminder of where the features came from when looking 
