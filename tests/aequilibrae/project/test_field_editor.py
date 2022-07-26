@@ -1,16 +1,7 @@
-import os
-from uuid import uuid4
-from random import choice
-from shutil import copytree
-from os.path import join
-from tempfile import gettempdir
-from unittest import TestCase
-from aequilibrae.project.field_editor import FieldEditor, ALLOWED_CHARACTERS
-from aequilibrae import Project
-from ...data import siouxfalls_project
-import pytest
-
 from pathlib import Path
+
+import pytest
+from aequilibrae.project.field_editor import FieldEditor
 
 
 class TestFieldEditor:
@@ -24,6 +15,9 @@ class TestFieldEditor:
 
     @pytest.fixture
     def cleanup_database(self, project, database_backup):
+        """An optional fixture that can be used to revert the project's database in case the test
+        modifies it. This adds some extra overhead to the test (teardown)
+        """
         yield
         Path(project.project_base_path).joinpath("project_database.sqlite").write_bytes(database_backup)
 
@@ -43,12 +37,6 @@ class TestFieldEditor:
     def attribute_count(self, table, table_name):
         qry = f'select count(*) from "attributes_documentation" where name_table="{table_name}"'
         return table.project.conn.execute(qry).fetchone()[0]
-
-    def randomword(self, length):
-        val = "".join(choice(ALLOWED_CHARACTERS) for i in range(length))
-        if val[0] == "_" or val[-1] == "_":
-            return self.randomword(length)
-        return val
 
     def test_building(self, table, attribute_count):
         assert attribute_count == len(table._original_values), "Meta table populated with the wrong number of elements"
