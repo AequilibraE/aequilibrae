@@ -31,7 +31,8 @@ project.new(fldr)
 
 # %%
 # In this cell, we modify the AequilibraE parameters.yml file so it contains additional
-# fields to be read in the GMNS link and/or node tables.
+# fields to be read in the GMNS link and/or node tables. Remember to always keep the
+# "required" key set to False, since we are adding a non-required field.
 new_link_fields = {
     "bridge": {"description": "bridge flag", "type": "text", "required": False},
     "tunnel": {"description": "tunnel flag", "type": "text", "required": False},
