@@ -43,7 +43,7 @@ class TestFieldEditor:
 
     def test_error_when_adding_existing_attribute(self, table, field_name):
         with pytest.raises(ValueError, match="attribute_name already exists"):
-            table.add(field_name, self.randomword(30))
+            table.add(field_name, "some_value")
 
     @pytest.mark.parametrize(
         "attribute_name, error",
