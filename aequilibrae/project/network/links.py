@@ -1,16 +1,15 @@
-import os
 from copy import deepcopy
-import shapely.wkb
+
 import pandas as pd
-from aequilibrae.project.network.link import Link
-from aequilibrae import logger
-from aequilibrae.project.field_editor import FieldEditor
-from aequilibrae.project.table_loader import TableLoader
+import shapely.wkb
+
+from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
-from aequilibrae.project.database_connection import database_connection
+from aequilibrae.project.network.link import Link
+from aequilibrae.project.table_loader import TableLoader
 
 
-class Links:
+class Links(BasicTable):
     """
     Access to the API resources to manipulate the links table in the network
 
@@ -30,17 +29,17 @@ class Links:
         all_links.save()
     """
 
-    __items = {}
-    __all_links = []
-    __fields = []
     __max_id = -1
 
     #: Query sql for retrieving links
     sql = ""
 
-    def __init__(self):
-        self.conn = database_connection()
-        self.curr = self.conn.cursor()
+    def __init__(self, net):
+        super().__init__(net.project)
+        self.__table_type__ = "links"
+        self.__fields = []
+        self.__items = {}
+
         if self.sql == "":
             self.refresh_fields()
 
@@ -54,7 +53,7 @@ class Links:
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
         link_id = int(link_id)
         if link_id in self.__items:
             link = self.__items[link_id]
@@ -69,15 +68,15 @@ class Links:
     def new(self) -> Link:
         """Creates a new link
 
-            Returns:
-                *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
-                """
+        Returns:
+            *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
+        """
 
         data = {key: None for key in self.__fields}
         data["direction"] = 0
         data["link_type"] = "default"
         data["link_id"] = self.__new_link_id()
-        return Link(data)
+        return Link(data, self.project)
         # return self.__create_return_link(data)
 
     def copy_link(self, link_id: int) -> Link:
@@ -90,7 +89,7 @@ class Links:
 
         Returns:
             *link* (:obj:`Link`): Link object for requested link_id
-            """
+        """
 
         data = self.__link_data(int(link_id))
         data["link_id"] = self.__new_link_id()
@@ -115,30 +114,26 @@ class Links:
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            self.curr.execute("Delete from Links where link_id=?", [link_id])
-            d = self.curr.rowcount
+            self._curr.execute("Delete from Links where link_id=?", [link_id])
+            d = self._curr.rowcount
             self.conn.commit()
         if d:
-            logger.warning(f"Link {link_id} was successfully removed from the project database")
+            self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
             self.__existence_error(link_id)
 
-    def save(self):
-        for link in self.__items.values():  # type: Link
-            link.save()
-
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
-        self.curr.execute("select coalesce(max(link_id),0) from Links")
-        self.__max_id = self.curr.fetchone()[0]
+        self._curr.execute("select coalesce(max(link_id),0) from Links")
+        self.__max_id = self._curr.fetchone()[0]
         tl = TableLoader()
-        tl.load_structure(self.curr, "links")
+        tl.load_structure(self._curr, "links")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
     @property
     def data(self) -> pd.DataFrame:
-        """ Returns all links data as a Pandas dataFrame
+        """Returns all links data as a Pandas dataFrame
 
         Returns:
             *table* (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
@@ -152,20 +147,9 @@ class Links:
         for k in lst:
             del self.__items[k]
 
-    @staticmethod
-    def fields() -> FieldEditor:
-        """Returns a FieldEditor class instance to edit the Links table fields and their metadata
-
-        Returns:
-            *field_editor* (:obj:`FieldEditor`): A field editor configured for editing the Links table
-            """
-        return FieldEditor("links")
-
-    def __copy__(self):
-        raise Exception("Links object cannot be copied")
-
-    def __deepcopy__(self, memodict=None):
-        raise Exception("Links object cannot be copied")
+    def save(self):
+        for item in self.__items.values():
+            item.save()
 
     def __del__(self):
         self.__items.clear()
@@ -174,8 +158,8 @@ class Links:
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        self.curr.execute(f"{self.sql} where link_id=?", [link_id])
-        data = self.curr.fetchone()
+        self._curr.execute(f"{self.sql} where link_id=?", [link_id])
+        data = self._curr.fetchone()
         if data:
             return {key: val for key, val in zip(self.__fields, data)}
         raise ValueError("Link_id does not exist on the network")
@@ -185,6 +169,6 @@ class Links:
         return self.__max_id
 
     def __create_return_link(self, data):
-        link = Link(data)
+        link = Link(data, self.project)
         self.__items[link.link_id] = link
         return link

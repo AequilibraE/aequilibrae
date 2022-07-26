@@ -199,13 +199,13 @@ network:
           pedestrian: 'no'
         unknown_tags: true
 osm:
-    overpass_endpoint: "http://overpass-api.de/api"
+    overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"
     accept_language: "en"
     max_attempts: 50
     timeout: 540
     max_query_area_size: 2500000000
-    sleeptime: 10
+    sleeptime: 2
 
 system:
   cpus: 0

@@ -1,3 +1,4 @@
+import sqlite3
 from warnings import warn
 from math import sqrt
 from uuid import uuid4
@@ -14,7 +15,6 @@ from aequilibrae.utils.create_example import create_example
 
 
 class TestZone(TestCase):
-
     def setUp(self) -> None:
         self.temp_proj_folder = join(gettempdir(), uuid4().hex)
         copytree(siouxfalls_project, self.temp_proj_folder)
@@ -26,7 +26,7 @@ class TestZone(TestCase):
         try:
             rmtree(self.temp_proj_folder)
         except Exception as e:
-            warn(f'Error: {e.args}')
+            warn(f"Error: {e.args}")
 
     def test_delete(self):
         zones = self.proj.zoning
@@ -44,14 +44,14 @@ class TestZone(TestCase):
         zn.save()
 
         curr = self.proj.conn.cursor()
-        curr.execute('Select area from Zones where zone_id=2')
+        curr.execute("Select area from Zones where zone_id=2")
         self.assertEqual(curr.fetchone()[0], area, "Zone didn't save area properly")
 
         geo = Point(0, 0).buffer(1)
         zn.geometry = geo
         zn.save()
         curr = self.proj.conn.cursor()
-        curr.execute('Select asBinary(geometry) from Zones where zone_id=2')
+        curr.execute("Select asBinary(geometry) from Zones where zone_id=2")
         wkb = curr.fetchone()[0]
         self.assertEqual(shapely.wkb.loads(wkb), MultiPolygon([geo]), "Zone didn't save geometry properly")
 
@@ -60,14 +60,14 @@ class TestZone(TestCase):
         zn2.geometry = geo
         zn2.save()
         curr = self.proj.conn.cursor()
-        curr.execute('Select asBinary(geometry) from Zones where zone_id=1')
+        curr.execute("Select asBinary(geometry) from Zones where zone_id=1")
         wkb = curr.fetchone()[0]
         self.assertEqual(shapely.wkb.loads(wkb), geo, "Zone didn't save geometry properly")
 
     def __change_project(self):
         self.proj.close()
         self.proj = Project()
-        self.proj = create_example(join(gettempdir(), uuid4().hex), 'nauru')
+        self.proj = create_example(join(gettempdir(), uuid4().hex), "nauru")
         zones = 5
         network = self.proj.network
         nodes = network.nodes
@@ -81,8 +81,10 @@ class TestZone(TestCase):
 
         curr = self.proj.conn.cursor()
         b = extent.bounds
-        curr.execute('select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))',
-                     [extent.wkb, zone_side, Point(b[2], b[3]).wkb])
+        curr.execute(
+            "select st_asbinary(HexagonalGrid(GeomFromWKB(?), ?, 0, GeomFromWKB(?)))",
+            [extent.wkb, zone_side, Point(b[2], b[3]).wkb],
+        )
         grid = curr.fetchone()[0]
         grid = shapely.wkb.loads(grid)
 
@@ -120,6 +122,20 @@ class TestZone(TestCase):
         node2 = nodes.get(2)
         self.assertEqual(node2.geometry, Point(0, 0))
 
+        # Tests ne behaviour to deal with centroids that would fall exactly on top of existing nodes
+        point_that_should = zone1.geometry.centroid
+        self.__change_project()
+        zones = self.proj.zoning
+        network = self.proj.network
+        nd = network.nodes.get(1000)
+        nd.geometry = point_that_should
+        nd.save()
+
+        zone1 = zones.get(1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            zone1.add_centroid(None, robust=False)
+        zone1.add_centroid(None, robust=True)
+
     def test_connect_mode(self):
         self.__change_project()
         curr = self.proj.conn.cursor()
@@ -128,19 +144,19 @@ class TestZone(TestCase):
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
-        zone1.connect_mode('c')
+        zone1.connect_mode("c")
 
-        curr.execute('Select count(*) from links where a_node=?', [1])
-        self.assertIsNot(0, curr.fetchone()[0], 'failed to add connectors')
+        curr.execute("Select count(*) from links where a_node=?", [1])
+        self.assertIsNot(0, curr.fetchone()[0], "failed to add connectors")
 
-        zone1.connect_mode('t')
-        curr.execute('''Select count(*) from links where a_node=? and instr(modes,'t')>0''', [1])
-        self.assertIsNot(0, curr.fetchone()[0], 'failed to add connectors for mode t')
+        zone1.connect_mode("t")
+        curr.execute("""Select count(*) from links where a_node=? and instr(modes,'t')>0""", [1])
+        self.assertIsNot(0, curr.fetchone()[0], "failed to add connectors for mode t")
 
         # Cannot connect a centroid that does not exist
         with self.assertRaises(ValueError):
             zone2 = zones.get(2)
-            zone2.connect_mode('c')
+            zone2.connect_mode("c")
 
     def test_disconnect_mode(self):
         self.__change_project()
@@ -149,16 +165,16 @@ class TestZone(TestCase):
         zone1 = zones.get(1)
         zone1.add_centroid(None)
 
-        zone1.connect_mode('c')
-        zone1.connect_mode('w')
-        curr.execute('''select COUNT(*) from links where a_node=1''')
+        zone1.connect_mode("c")
+        zone1.connect_mode("w")
+        curr.execute("""select COUNT(*) from links where a_node=1""")
         tot = curr.fetchone()[0]
-        curr.execute('''Update links set modes = modes || 'w' where instr(modes,'w')=0''')
+        curr.execute("""Update links set modes = modes || 'w' where instr(modes,'w')=0""")
         self.proj.conn.commit()
-        zone1.disconnect_mode('w')
+        zone1.disconnect_mode("w")
 
-        curr.execute('''select COUNT(*) from links where a_node=1''')
-        self.assertIsNot(tot, curr.fetchone()[0], 'failed to delete links')
+        curr.execute("""select COUNT(*) from links where a_node=1""")
+        self.assertIsNot(tot, curr.fetchone()[0], "failed to delete links")
 
-        curr.execute('''Select count(*) from links where a_node=1 and instr(modes,'w')>0''')
-        self.assertEqual(curr.fetchone()[0], 0, 'Failed to remove mode from all connectors')
+        curr.execute("""Select count(*) from links where a_node=1 and instr(modes,'w')>0""")
+        self.assertEqual(curr.fetchone()[0], 0, "Failed to remove mode from all connectors")

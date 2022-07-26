@@ -23,15 +23,6 @@ class TestProject(TestCase):
             proj.open(temp_proj_folder)
         self.proj.open(self.temp_proj_folder)
 
-    def test_create_when_already_exists(self):
-        with self.assertRaises(Exception):
-            q = Project()
-            q.new(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-
-        with self.assertRaises(Exception):
-            q = Project()
-            q.open(os.path.join(tempfile.gettempdir(), uuid.uuid4().hex))
-
     def test_creation(self):
 
         curr = self.proj.conn.cursor()
@@ -39,7 +30,7 @@ class TestProject(TestCase):
         fields = curr.fetchall()
         fields = [x[1] for x in fields]
 
-        if 'distance' not in fields:
+        if "distance" not in fields:
             self.fail("Table LINKS was not created correctly")
 
         curr = self.proj.conn.cursor()
@@ -47,13 +38,13 @@ class TestProject(TestCase):
         nfields = curr.fetchall()
         nfields = [x[1] for x in nfields]
 
-        if 'is_centroid' not in nfields:
-            self.fail('Table NODES was not created correctly')
+        if "is_centroid" not in nfields:
+            self.fail("Table NODES was not created correctly")
 
     def test_close(self):
 
         _ = database_connection()
 
         self.proj.close()
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(FileNotFoundError):
             _ = database_connection()

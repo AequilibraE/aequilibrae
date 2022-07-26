@@ -24,6 +24,7 @@ if have_pyqt5 is None:
     pyqt = False
 else:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
+
     pyqt = True
 
 

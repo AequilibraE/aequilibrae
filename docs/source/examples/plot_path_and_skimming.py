@@ -18,13 +18,13 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-from aequilibrae import logger
 import logging
 import sys
 
 # We the project open, we can tell the logger to direct all messages to the terminal as well
+logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(name)s;%(levelname)s ; %(message)s")
+formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 
@@ -39,16 +39,16 @@ project.network.build_graphs()
 
 # %%
 # we grab the graph for cars
-graph = project.network.graphs['c']
+graph = project.network.graphs["c"]
 
 # we also see what graphs are available
 # project.network.graphs.keys()
 
 # let's say we want to minimize distance
-graph.set_graph('distance')
+graph.set_graph("distance")
 
 # And will skim time and distance while we are at it
-graph.set_skimming(['free_flow_time', 'distance'])
+graph.set_skimming(["free_flow_time", "distance"])
 
 # And we will allow paths to be compute going through other centroids/centroid connectors
 # required for the Sioux Falls network, as all nodes are centroids
@@ -98,14 +98,14 @@ links = project.network.links
 
 # We plot the entire network
 curr = project.conn.cursor()
-curr.execute('Select link_id from links;')
+curr.execute("Select link_id from links;")
 
 for lid in curr.fetchall():
     geo = links.get(lid[0]).geometry
-    plt.plot(*geo.xy, color='red')
+    plt.plot(*geo.xy, color="red")
 
 path_geometry = linemerge(links.get(lid).geometry for lid in res.path)
-plt.plot(*path_geometry.xy, color='blue', linestyle='dashed', linewidth=2)
+plt.plot(*path_geometry.xy, color="blue", linestyle="dashed", linewidth=2)
 plt.show()
 
 # %% md
@@ -143,12 +143,12 @@ skims.free_flow_time
 # %%
 
 # We can save it to the project if we want
-skm.save_to_project('base_skims')
+skm.save_to_project("base_skims")
 
 # We can also retrieve this skim record to write something to its description
 matrices = project.matrices
-mat_record = matrices.get_record('base_skims')
-mat_record.description = 'minimized FF travel time while also skimming distance for just a few nodes'
+mat_record = matrices.get_record("base_skims")
+mat_record.description = "minimized FF travel time while also skimming distance for just a few nodes"
 mat_record.save()
 
 # %%

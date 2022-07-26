@@ -1,20 +1,19 @@
 import sys
-from os.path import join, isfile
 import threading
 import importlib.util as iutil
 from uuid import uuid4
 from multiprocessing.dummy import Pool as ThreadPool
 from datetime import datetime
-from aequilibrae.project.data import Matrices
+from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils import WorkerThread
-from aequilibrae import logger
+from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -65,9 +64,9 @@ class NetworkSkimming(WorkerThread):
     if pyqt:
         skimming = pyqtSignal(object)
 
-    def __init__(self, graph, origins=None):
+    def __init__(self, graph, origins=None, project=None):
         WorkerThread.__init__(self, None)
-
+        self.project = project or get_active_project()
         self.origins = origins
         self.graph = graph
         self.results = SkimResults()
@@ -118,7 +117,7 @@ class NetworkSkimming(WorkerThread):
         """
 
         file_name = f"{name}.{format.lower()}"
-        mats = Matrices()
+        mats = self.project.matrices
         record = mats.new_record(name, file_name, self.results.skims)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date

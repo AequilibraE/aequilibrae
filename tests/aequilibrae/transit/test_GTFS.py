@@ -11,8 +11,8 @@ from ...data import gtfs_folder
 class TestGTFS(TestCase):
     def setUp(self) -> None:
         spatialite_folder = dirname(dirname(dirname(dirname(os.path.abspath(__file__)))))
-        spatialite_folder = join(spatialite_folder, 'aequilibrae/project')
-        os.environ['PATH'] = f'{spatialite_folder};' + os.environ['PATH']
+        spatialite_folder = join(spatialite_folder, "aequilibrae/project")
+        os.environ["PATH"] = f"{spatialite_folder};" + os.environ["PATH"]
 
         self.gtfs = GTFS()
         self.gtfs.source_folder = gtfs_folder

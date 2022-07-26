@@ -3,7 +3,6 @@ import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.starts_logging import logger
 
 
 class TrafficClass:
@@ -35,19 +34,17 @@ class TrafficClass:
             raise TypeError("Matrix's computational view need to be of type np.float64")
 
         self.graph = graph
+        self.logger = graph.logger
         self.matrix = matrix
         self.pce = 1.0
         self.vot = 1.0
         self.mode = graph.mode
         self.class_flow: np.array
         self.results = AssignmentResults()
-        self.results.prepare(self.graph, self.matrix)
         self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
-        self.results.reset()
         self._aon_results = AssignmentResults()
-        self._aon_results.prepare(self.graph, self.matrix)
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
@@ -73,11 +70,11 @@ class TrafficClass:
         self.fc_multiplier = float(multiplier)
         self.fixed_cost_field = field_name
         if np.any(np.isnan(self.graph.graph[field_name].values)):
-            logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
+            self.logger.warning(f"Cost field {field_name} has NaN values. Converted to zero")
 
         if self.graph.graph[field_name].min() < 0:
             msg = f"Cost field {field_name} has negative values. That is not allowed"
-            logger.error(msg)
+            self.logger.error(msg)
             raise ValueError(msg)
 
     def set_vot(self, value_of_time: float) -> None:
@@ -93,6 +90,7 @@ class TrafficClass:
 
         if key not in [
             "graph",
+            "logger",
             "matrix",
             "pce",
             "mode",

@@ -7,7 +7,7 @@ jobs:
     runs-on:  macos-latest
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8' , '3.9' ]
+        python-version: [ '3.7', '3.8', '3.9']
     steps:
     - uses: actions/checkout@v2
     - name: Set Python environment
@@ -34,7 +34,7 @@ jobs:
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish
-      if: ${{ github.event_name == 'release'}}
+      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -42,7 +42,7 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ github.event_name == 'release' && matrix.python-version == '3.8'}}
+      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') && (matrix.python-version == '3.9') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

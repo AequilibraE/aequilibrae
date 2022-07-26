@@ -1,17 +1,18 @@
-from unittest import TestCase
 import os
 import pathlib
-import sqlite3
-import uuid
-import string
 import random
+import sqlite3
+import string
+import uuid
 from random import choice
 from tempfile import gettempdir
+from unittest import TestCase
+
 import numpy as np
 import pandas as pd
+
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
 from aequilibrae.utils.create_example import create_example
-
 from ...data import siouxfalls_project
 
 
@@ -140,86 +141,6 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assertEqual(self.assignment.capacity_field, "capacity")
 
-    def test_set_save_path_files(self):
-        self.assignment.set_classes([self.assigclass])
-        # make sure default is false
-        for c in self.assignment.classes:
-            self.assertEqual(c._aon_results.save_path_file, False)
-        self.assignment.set_save_path_files(True)
-        for c in self.assignment.classes:
-            self.assertEqual(c._aon_results.save_path_file, True)
-
-        # reset for most assignment tests
-        self.assignment.set_save_path_files(False)
-        for c in self.assignment.classes:
-            self.assertEqual(c._aon_results.save_path_file, False)
-
-    def test_set_path_file_format(self):
-        self.assignment.set_classes([self.assigclass])
-        with self.assertRaises(Exception):
-            self.assignment.set_path_file_format("shiny_format")
-        self.assignment.set_path_file_format("parquet")
-        for c in self.assignment.classes:
-            self.assertEqual(c._aon_results.write_feather, False)
-        self.assignment.set_path_file_format("feather")
-        for c in self.assignment.classes:
-            self.assertEqual(c._aon_results.write_feather, True)
-
-    def test_save_path_files(self):
-        self.assignment.add_class(self.assigclass)
-        self.assignment.set_save_path_files(True)
-
-        self.assignment.set_vdf("BPR")
-        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
-        self.assignment.set_capacity_field("capacity")
-        self.assignment.set_time_field("free_flow_time")
-
-        self.assignment.max_iter = 2
-        self.assignment.set_algorithm("msa")
-        self.assignment.execute()
-
-        path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
-        self.assertTrue(path_file_dir.is_dir())
-
-        # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
-        # and therefore we compare the files directly, otherwise a translation from the simplified ids to link_ids
-        # would need to be performed.
-        # Reference files were generated on 12/6/21, any changes to the test project will need to be applied to the
-        # reference files. Also, the name given to the traffic class (see setUp above) has to be "car".
-        class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
-        reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
-
-        ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-        node_correspondence = pd.read_feather(path_file_dir / f"nodes_to_indeces_{class_id}.feather")
-        ref_node_correspondence.node_index = ref_node_correspondence.node_index.astype(node_correspondence.node_index.dtype)
-        self.assertTrue(node_correspondence.equals(ref_node_correspondence))
-
-        ref_correspondence = pd.read_feather(reference_path_file_dir / f"correspondence_{class_id}.feather")
-        correspondence = pd.read_feather(path_file_dir / f"correspondence_{class_id}.feather")
-        for col in correspondence.columns:
-            ref_correspondence[col] = ref_correspondence[col].astype(correspondence[col].dtype)
-        self.assertTrue(correspondence.equals(ref_correspondence))
-
-        path_class_id = f"path_{class_id}"
-        for i in range(1, self.assignment.max_iter + 1):
-            class_dir = path_file_dir / f"iter{i}" / path_class_id
-            ref_class_dir = reference_path_file_dir / f"iter{i}" / path_class_id
-            for o in self.assigclass.matrix.index:
-                o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
-                this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
-                ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
-                is_eq = this_o_path_file == ref_this_o_path_file
-                self.assertTrue(is_eq.all().all())
-
-                this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
-                ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
-                is_eq = this_o_index_file == ref_this_o_index_file
-                self.assertTrue(is_eq.all().all())
-
-        self.assignment.set_save_path_files(False)
-
     def test_execute_and_save_results(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
@@ -236,19 +157,16 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        with self.assertRaises(ValueError):
-            # We have no skimming setup
-            self.assignment.save_skims("my_skims", "all")
-
-        msa10 = self.assignment.assignment.rgap
+        msa10_rgap = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
-        self.assignment.max_iter = 50
+        self.assignment.max_iter = 500
+        self.assignment.rgap_target = 0.001
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
-        msa25 = self.assignment.assignment.rgap
+        msa25_rgap = self.assignment.assignment.rgap
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.98, correl)
@@ -256,14 +174,16 @@ class TestTrafficAssignment(TestCase):
         self.assignment.set_algorithm("frank-wolfe")
         self.assignment.execute()
 
-        fw25 = self.assignment.assignment.rgap
+        fw25_rgap = self.assignment.assignment.rgap
+        fw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.99, correl)
 
         self.assignment.set_algorithm("cfw")
         self.assignment.execute()
-        cfw25 = self.assignment.assignment.rgap
+        cfw25_rgap = self.assignment.assignment.rgap
+        cfw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.995, correl)
@@ -275,18 +195,23 @@ class TestTrafficAssignment(TestCase):
 
         self.assignment.set_algorithm("bfw")
         self.assignment.execute()
-        bfw25 = self.assignment.assignment.rgap
+        bfw25_rgap = self.assignment.assignment.rgap
+        bfw25_iters = self.assignment.assignment.iter
 
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume)[0, 1]
         self.assertLess(0.999, correl)
 
-        self.assertLess(msa25, msa10)
-        self.assertLess(fw25, msa25)
-        self.assertLess(cfw25, fw25)
-        self.assertLess(bfw25, cfw25)
+        self.assertLess(msa25_rgap, msa10_rgap)
+        # MSA and FW do not reach 1e-4 within 500 iterations, cfw and bfw do
+        self.assertLess(fw25_rgap, msa25_rgap)
+        self.assertLess(cfw25_rgap, self.assignment.rgap_target)
+        self.assertLess(bfw25_rgap, self.assignment.rgap_target)
+        # we expect bfw to converge quicker than cfw
+        self.assertLess(cfw25_iters, fw25_iters)
+        self.assertLess(bfw25_iters, cfw25_iters)
 
         self.assignment.save_results("save_to_database")
-        self.assignment.save_skims("my_skims", "all")
+        self.assignment.save_skims(matrix_name="all_skims", which_ones="all")
 
         with self.assertRaises(ValueError):
             self.assignment.save_results("save_to_database")

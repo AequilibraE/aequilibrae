@@ -73,13 +73,23 @@ To begin building the assignment it is easy:
 Volume Delay Function
 +++++++++++++++++++++
 
-For now, the only VDF functions available in AequilibraE are the BPR
+For now, the only VDF functions available in AequilibraE are the BPR,
 
 :math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
 
-and Spiess' conical
+BPR2 which double beta when traffic flow is over the link capacity,
+
+Spiess' conical,
 
 :math:`CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)`
+
+and French INRETS (alpha < 1)
+
+Before capacity
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- (\alpha *\frac{Volume_{i}}{Capacity_{i}})}{1.1-\frac{Volume_{i}}{Capacity_{i}}}`
+
+and after capacity
+:math:`CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- \alpha}{0.1} * (\frac{Volume_{i}}{Capacity_{i}})^2`
 
 More functions will be added as needed/requested/possible.
 
@@ -88,7 +98,7 @@ instantiating an assignment problem in AequilibraE, and it is as simple as:
 
 ::
 
-    assig.set_vdf('CONICAL')
+    assig.set_vdf('BPR')
 
 The implementation of the VDF functions in AequilibraE is written in Cython and
 fully multi-threaded, and therefore descent methods that may evaluate such

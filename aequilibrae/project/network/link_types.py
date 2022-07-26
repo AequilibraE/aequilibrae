@@ -1,6 +1,5 @@
 from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.link_type import LinkType
-from aequilibrae import logger
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
 
@@ -44,8 +43,8 @@ class LinkTypes:
         default_link_type.save()
 
         # We can also create a completely new link_type and add to the model
-        new_type = all_link_types.new('a')
-        new_type.link_type_name = 'Arterial'  # Only ASCII letters and *_* allowed
+        new_type = link_types.new('a')
+        new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed
         # other fields are not mandatory
 
         # We then save it to the database
@@ -57,21 +56,22 @@ class LinkTypes:
         new_type.save()
 
     """
-    __items = {}
 
     def __init__(self, net):
-        self.__all_types = []
+        self.__items = {}
+        self.project = net.project
+        self.logger = net.project.logger
         self.conn = net.conn  # type: Connection
         self.curr = net.conn.cursor()
 
         tl = TableLoader()
-        link_types_list = tl.load_table(self.curr, 'link_types')
-        existing_list = [lt['link_type_id'] for lt in link_types_list]
+        link_types_list = tl.load_table(self.curr, "link_types")
+        existing_list = [lt["link_type_id"] for lt in link_types_list]
 
         self.__fields = [x for x in tl.fields]
         for lt in link_types_list:
-            if lt['link_type_id'] not in self.__items:
-                self.__items[lt['link_type_id']] = LinkType(lt)
+            if lt["link_type_id"] not in self.__items:
+                self.__items[lt["link_type_id"]] = LinkType(lt, self.project)
 
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
@@ -79,13 +79,13 @@ class LinkTypes:
 
     def new(self, link_type_id: str) -> LinkType:
         if link_type_id in self.__items:
-            raise ValueError(f'Link Type ID ({link_type_id}) already exists in the model. It must be unique.')
+            raise ValueError(f"Link Type ID ({link_type_id}) already exists in the model. It must be unique.")
 
         tp = {key: None for key in self.__fields}
-        tp['link_type_id'] = link_type_id
-        lt = LinkType(tp)
+        tp["link_type_id"] = link_type_id
+        lt = LinkType(tp, self.project)
         self.__items[link_type_id] = lt
-        logger.warning('Link type has not yet been saved to the database. Do so explicitly')
+        self.logger.warning("Link type has not yet been saved to the database. Do so explicitly")
         return lt
 
     def delete(self, link_type_id: str) -> None:
@@ -96,14 +96,14 @@ class LinkTypes:
             del self.__items[link_type_id]
             self.conn.commit()
         except IntegrityError as e:
-            logger.error(f'Failed to remove link_type {link_type_id}. {e.args}')
+            self.logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
             raise e
-        logger.warning(f'Link type {link_type_id} was successfully removed from the project database')
+        self.logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
 
     def get(self, link_type_id: str) -> LinkType:
         """Get a link_type from the network by its **link_type_id**"""
         if link_type_id not in self.__items:
-            raise ValueError(f'Link type {link_type_id} does not exist in the model')
+            raise ValueError(f"Link type {link_type_id} does not exist in the model")
         return self.__items[link_type_id]
 
     def get_by_name(self, link_type: str) -> LinkType:
@@ -114,7 +114,7 @@ class LinkTypes:
 
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor('link_types')
+        return FieldEditor(self.project.project_base_path, "link_types")
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""
@@ -125,10 +125,10 @@ class LinkTypes:
             lt.save()
 
     def __copy__(self):
-        raise Exception('Link Types object cannot be copied')
+        raise Exception("Link Types object cannot be copied")
 
     def __deepcopy__(self, memodict=None):
-        raise Exception('Link Types object cannot be copied')
+        raise Exception("Link Types object cannot be copied")
 
     def __del__(self):
         self.__items.clear()

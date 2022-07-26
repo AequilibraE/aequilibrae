@@ -1,23 +1,17 @@
 from unittest import TestCase
-import sqlite3
 from tempfile import gettempdir
 import os
 import uuid
 from shutil import copytree
-import platform
 from aequilibrae.project import Project
-from aequilibrae.project.network.network import Network
-from aequilibrae.parameters import Parameters
-from os.path import join, dirname
 from warnings import warn
 from random import random
-from aequilibrae.project.spatialite_connection import spatialite_connection
 from ...data import siouxfalls_project
 
 
 class TestNetwork(TestCase):
     def setUp(self) -> None:
-        os.environ['PATH'] = os.path.join(gettempdir(), 'temp_data') + ';' + os.environ['PATH']
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
@@ -29,7 +23,7 @@ class TestNetwork(TestCase):
 
     def test_create_from_osm(self):
         thresh = 0.05
-        if os.environ.get('GITHUB_WORKFLOW', 'ERROR') == 'Code coverage':
+        if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage":
             thresh = 1.01
 
         if random() < thresh:
@@ -47,7 +41,7 @@ class TestNetwork(TestCase):
             osmids = curr.fetchone()[0]
 
             if osmids == 0:
-                warn('COULD NOT RETRIEVE DATA FROM OSM')
+                warn("COULD NOT RETRIEVE DATA FROM OSM")
                 return
 
             if osmids >= lks:
@@ -61,11 +55,11 @@ class TestNetwork(TestCase):
             self.project.close()
             self.siouxfalls.open(self.proj_path)
         else:
-            print('Skipped check to not load OSM servers')
+            print("Skipped check to not load OSM servers")
 
     def test_count_centroids(self):
         items = self.siouxfalls.network.count_centroids()
-        self.assertEqual(24, items, 'Wrong number of centroids found')
+        self.assertEqual(24, items, "Wrong number of centroids found")
 
         nodes = self.siouxfalls.network.nodes
         node = nodes.get(1)
@@ -73,12 +67,12 @@ class TestNetwork(TestCase):
         node.save()
 
         items = self.siouxfalls.network.count_centroids()
-        self.assertEqual(23, items, 'Wrong number of centroids found')
+        self.assertEqual(23, items, "Wrong number of centroids found")
 
     def test_count_links(self):
         items = self.siouxfalls.network.count_links()
-        self.assertEqual(76, items, 'Wrong number of links found')
+        self.assertEqual(76, items, "Wrong number of links found")
 
     def test_count_nodes(self):
         items = self.siouxfalls.network.count_nodes()
-        self.assertEqual(24, items, 'Wrong number of nodes found')
+        self.assertEqual(24, items, "Wrong number of nodes found")

@@ -8,10 +8,10 @@ import logging
 from uuid import uuid4
 from datetime import datetime
 import importlib.util as iutil
+from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.project.data import Matrices
 from aequilibrae import Parameters
 
 sys.dont_write_bytecode = True
@@ -102,7 +102,7 @@ class GravityApplication:
                 f.write(f'{line}\n')
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, project=None, **kwargs):
         """
         Instantiates the Ipf problem
 
@@ -119,6 +119,8 @@ class GravityApplication:
 
             column_field (:obj:`str`): Field name that contains the data for the column totals
 
+            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+
             core_name (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
 
             parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
@@ -133,6 +135,7 @@ class GravityApplication:
             error (:obj:`str`): Error description
         """
 
+        self.project = project or get_active_project()
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
@@ -152,8 +155,8 @@ class GravityApplication:
         self.output = None
         self.gap = np.inf
         self.logger = logging.getLogger("aequilibrae")
-        self.procedure_date = ''
-        self.procedure_id = ''
+        self.procedure_date = ""
+        self.procedure_id = ""
         self.__ipf = None  # type: Ipf
 
     def apply(self):
@@ -186,6 +189,7 @@ class GravityApplication:
 
         # And adjust with a fratar
         self.__ipf = Ipf(
+            project=self.project,
             matrix=self.output,
             rows=self.rows,
             columns=self.columns,
@@ -205,7 +209,7 @@ class GravityApplication:
         self.output = self.__ipf.output
         self.gap = self.__ipf.gap
 
-        self.report.extend(self.__ipf.report[1:] + ['', ''])
+        self.report.extend(self.__ipf.report[1:] + ["", ""])
         self.report.append("Total of matrix: " + "{:15,.4f}".format(float(np.nansum(self.output.matrix_view))))
         intrazonals = float(np.nansum(np.diagonal(self.output.matrix_view)))
         self.report.append("Intrazonal flow: " + "{:15,.4f}".format(intrazonals))
@@ -225,16 +229,16 @@ class GravityApplication:
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
 
-        mats = Matrices()
+        mats = self.project.matrices
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
-        record.procedure = 'Synthetic gravity trip distribution'
-        record.description = f'Synthetic gravity trip distribution. {self.model.function}'
+        record.procedure = "Synthetic gravity trip distribution"
+        record.description = f"Synthetic gravity trip distribution. {self.model.function}"
         record.save()
 
     def __get_parameters(self):
-        par = Parameters().parameters
+        par = self.project.parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para
@@ -312,13 +316,16 @@ class GravityApplication:
 
             elif self.model.function == "POWER":
                 # self.output.matrices[self.core_name][i, :] = (np.power(self.impedance.matrix_view[i, :, 0], - self.model.alpha) * p * a)[:]
-                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p
-                                                 * a)[:]
+                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p * a)[
+                    :
+                ]
             elif self.model.function == "GAMMA":
-                self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], self.model.alpha)
-                                                 * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
-                                                 * p
-                                                 * a)[:]
+                self.output.matrix_view[i, :] = (
+                    np.power(self.impedance.matrix_view[i, :], self.model.alpha)
+                    * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
+                    * p
+                    * a
+                )[:]
 
         # Deals with infinite and NaNs
         infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)

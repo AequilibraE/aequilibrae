@@ -9,7 +9,8 @@ from aequilibrae.paths.traffic_assignment import TrafficAssignment
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph
 from .__version__ import binary_version, release_name, minor_version, release_version
-from aequilibrae import logger
+from aequilibrae import global_logger
+
 
 try:
     from aequilibrae.paths.AoN import (
@@ -20,4 +21,4 @@ try:
         update_path_trace,
     )
 except ImportError as ie:
-    logger.warning(f"Could not import procedures from the binary. {ie.args}")
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")

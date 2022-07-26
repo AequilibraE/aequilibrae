@@ -120,13 +120,13 @@ class AequilibraeMatrix(object):
         self.computational_view(names)
 
     def create_empty(
-            self,
-            file_name: str = None,
-            zones: int = None,
-            matrix_names: List[str] = None,
-            data_type: np.dtype = np.float64,
-            index_names: List[str] = None,
-            compressed: bool = False,
+        self,
+        file_name: str = None,
+        zones: int = None,
+        matrix_names: List[str] = None,
+        data_type: np.dtype = np.float64,
+        index_names: List[str] = None,
+        compressed: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -248,13 +248,13 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-            self,
-            file_path: str,
-            omx_path: str,
-            cores: List[str] = None,
-            mappings: List[str] = None,
-            robust: bool = True,
-            compressed: bool = False,
+        self,
+        file_path: str,
+        omx_path: str,
+        cores: List[str] = None,
+        mappings: List[str] = None,
+        robust: bool = True,
+        compressed: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -356,6 +356,53 @@ class AequilibraeMatrix(object):
             self.index[:, 0] = np.arange(zones)
 
         self.indices.flush()
+
+    def create_from_trip_list(self, path_to_file: str, from_column: str, to_column: str, list_cores: List[str]) -> str:
+        """
+        Creates an AequilibraeMatrix from a trip list csv file
+        The output is saved in the same folder as the trip list file
+
+        Args:
+            *path_to_file* (:obj:`str`): Path for the trip list csv file
+
+            *from_column* (:obj:`str`): trip list file column containing the origin zones numbers
+
+            *from_column* (:obj:`str`): trip list file column containing the destination zones numbers
+
+            *list_cores* (:obj:`list`): list of core columns in the trip list file
+
+        """
+
+        # Loading file
+        trip_df = pd.read_csv(path_to_file)
+
+        # Creating zone indices
+        zones_list = sorted(list(set(list(trip_df[from_column].unique()) + list(trip_df[to_column].unique()))))
+        zones_df = pd.DataFrame({"zone": zones_list, "idx": list(np.arange(len(zones_list)))})
+
+        trip_df = trip_df.merge(
+            zones_df.rename(columns={"zone": from_column, "idx": from_column + "_idx"}), on=from_column, how="left"
+        ).merge(zones_df.rename(columns={"zone": to_column, "idx": to_column + "_idx"}), on=to_column, how="left")
+
+        new_mat = AequilibraeMatrix()
+        nb_of_zones = len(zones_list)
+        new_mat.create_empty(file_name=path_to_file[:-4] + ".aem", zones=nb_of_zones, matrix_names=list_cores)
+
+        for idx, core in enumerate(list_cores):
+            m = (
+                coo_matrix(
+                    (trip_df[core], (trip_df[from_column + "_idx"], trip_df[to_column + "_idx"])),
+                    shape=(nb_of_zones, nb_of_zones),
+                )
+                .toarray()
+                .astype(np.float64)
+            )
+            new_mat.matrix[new_mat.names[idx]][:, :] = m[:, :]
+
+        new_mat.save()
+
+        print(f"AequilibraE matrix saved at {path_to_file[:-4]}.aem")
+        return
 
     def __load_aem__(self):
         # GET File version
@@ -810,10 +857,10 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
 
     def copy(
-            self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
+        self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
     ) -> None:
         """
         Copies a list of cores (or all cores) from one matrix file to another one

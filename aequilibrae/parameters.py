@@ -1,7 +1,8 @@
 import os
 import yaml
-from warnings import warn
 from copy import deepcopy
+import logging
+from aequilibrae.context import get_active_project
 
 
 class Parameters:
@@ -32,25 +33,25 @@ class Parameters:
     * temp directory
     """
 
-    def __init__(self):
-        """ Loads parameters from file. The place is always the same. The root of the package"""
+    _default: dict
+    file_default: str
 
-        proj_path = os.environ.get('AEQUILIBRAE_PROJECT_PATH', '')
-        default_path = os.path.dirname(os.path.realpath(__file__))
+    def __init__(self, project=None):
+        """Loads parameters from file. The place is always the same. The root of the package"""
+        project = project or get_active_project(must_exist=False)
+        proj_path = project.project_base_path if project is not None else ""
 
         self.file = os.path.join(proj_path, "parameters.yml")
-        self.file_default = os.path.join(default_path, "parameters.yml")
-
-        with open(self.file_default, "r") as yml:
-            self._default = yaml.load(yml, Loader=yaml.SafeLoader)
 
         if os.path.isfile(self.file):
             with open(self.file, "r") as yml:
                 self.parameters = yaml.load(yml, Loader=yaml.SafeLoader)
         else:
+            if project is not None:
+                logger = logging.getLogger("aequilibrae")
+                logger.warning("No pre-existing parameter file exists for this project. Will use default")
+
             self.parameters = deepcopy(self._default)
-            if proj_path:
-                warn('No pre-existing parameter file exists for this project. Will use default')
 
     def write_back(self):
         """Writes the parameters back to file"""
@@ -61,3 +62,8 @@ class Parameters:
         """Restores parameters to generic default"""
         self.parameters = self._default
         self.write_back()
+
+
+Parameters.file_default = os.path.join(os.path.dirname(os.path.realpath(__file__)), "parameters.yml")
+with open(Parameters.file_default, "r") as yml:
+    Parameters._default = yaml.safe_load(yml)
