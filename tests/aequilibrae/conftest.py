@@ -11,19 +11,33 @@ from aequilibrae import Project
 
 from ..data import siouxfalls_project
 
+DEFAULT_PROJECT = siouxfalls_project
 
-@pytest.fixture
-def create_project(create_project_session):
-    projects = []
 
-    def _create_project(name=None, source_dir=siouxfalls_project):
-        project = create_project_session(name=name, source_dir=source_dir, teardown=False)
-        projects.append(project)
-        return project
+def project_factory_fixture(scope):
+    @pytest.fixture(scope=scope)
+    def create_project_fixture(tmp_path_factory):
+        base_dir = tmp_path_factory.mktemp(f"projects_{scope}")
+        projects = []
 
-    yield _create_project
-    for project in projects:
-        project.close()
+        def _create_project(name=None, source_dir=DEFAULT_PROJECT):
+            proj_dir = base_dir / (name or uuid.uuid4().hex)
+            copytree(source_dir, proj_dir)
+            project = Project()
+            project.open(str(proj_dir))
+            projects.append(project)
+            return project
+
+        yield _create_project
+
+        for project in projects:
+            project.close()
+
+    return create_project_fixture
+
+
+create_project = project_factory_fixture(scope="function")
+create_project_session = project_factory_fixture(scope="session")
 
 
 @pytest.fixture
@@ -32,26 +46,6 @@ def create_empty_project(_empty_project, create_project):
         return create_project(name=name, source_dir=_empty_project)
 
     return _create_empty_project
-
-
-@pytest.fixture(scope="session")
-def create_project_session(tmp_path_factory):
-    base_dir = tmp_path_factory.mktemp("projects")
-    projects = []
-
-    def _create_project(name=None, source_dir=siouxfalls_project, teardown=True):
-        proj_dir = base_dir / (name or uuid.uuid4().hex)
-        copytree(source_dir, proj_dir)
-        project = Project()
-        project.open(str(proj_dir))
-        if teardown:
-            projects.append(project)
-        return project
-
-    yield _create_project
-
-    for project in projects:
-        project.close()
 
 
 @pytest.fixture(scope="session")

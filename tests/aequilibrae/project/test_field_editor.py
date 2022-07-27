@@ -6,28 +6,28 @@ from aequilibrae.project.field_editor import FieldEditor
 
 class TestFieldEditor:
     @pytest.fixture(scope="session")
-    def project(self, create_empty_project_session):
+    def project_session(self, create_empty_project_session):
         return create_empty_project_session()
 
     @pytest.fixture(scope="session")
-    def database_backup(self, project):
-        return Path(project.project_base_path).joinpath("project_database.sqlite").read_bytes()
+    def database_backup(self, project_session):
+        return Path(project_session.project_base_path).joinpath("project_database.sqlite").read_bytes()
 
     @pytest.fixture
-    def cleanup_database(self, project, database_backup):
+    def cleanup_database(self, project_session, database_backup):
         """An optional fixture that can be used to revert the project's database in case the test
         modifies it. This adds some extra overhead to the test (teardown)
         """
         yield
-        Path(project.project_base_path).joinpath("project_database.sqlite").write_bytes(database_backup)
+        Path(project_session.project_base_path).joinpath("project_database.sqlite").write_bytes(database_backup)
 
     @pytest.fixture(params=["link_types", "links", "modes", "nodes"])
     def table_name(self, request):
         return request.param
 
     @pytest.fixture
-    def table(self, project, table_name):
-        return FieldEditor(project, table_name)
+    def table(self, project_session, table_name):
+        return FieldEditor(project_session, table_name)
 
     @pytest.fixture
     def field_name(self, table):
@@ -72,6 +72,9 @@ class TestFieldEditor:
         ).fetchone()[0]
         assert result == new_attribute
 
+    # Here we override the `table_name` fixture. This fixture is not directly used in the test but
+    # given as input for the `table` fixture, which we do consume here. This way we change the
+    # `table_name` parametrization from four cases to just two, but only for this test.
     @pytest.mark.parametrize(
         "table_name, attribute, description",
         [
@@ -90,9 +93,9 @@ class TestFieldEditor:
             ("nodes", "node_id"),
         ],
     )
-    def test_save(self, table_name, attribute, project, table):
+    def test_save(self, table_name, attribute, project_session, table):
         random_val = "some_value"
         setattr(table, attribute, random_val)
         table.save()
-        table2 = FieldEditor(project, table_name)
+        table2 = FieldEditor(project_session, table_name)
         assert getattr(table2, attribute) == random_val, "Did not save values properly"
