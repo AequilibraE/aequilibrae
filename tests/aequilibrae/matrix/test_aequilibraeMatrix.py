@@ -33,7 +33,7 @@ class TestAequilibraeMatrix(TestCase):
             "file_name": self.name_test,
             "zones": zones,
             "matrix_names": ["mat", "seed", "dist"],
-            "index_names": ["my indices"],
+            "index_names": ["my_indices"],
         }
 
         self.matrix = AequilibraeMatrix()
