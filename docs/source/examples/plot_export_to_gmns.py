@@ -21,7 +21,7 @@ import folium
 # We load the example project inside a temp folder
 fldr = os.path.join(gettempdir(), uuid4().hex)
 
-project = create_example(fldr, "arlington_signals")
+project = create_example(fldr)
 
 # %%
 # We export the network to csv files in GMNS format, that will be saved inside the project folder
@@ -80,7 +80,7 @@ long, lat = curr.fetchone()
 # %%
 
 # We create the map
-map_gmns = folium.Map(location=[lat, long], zoom_start=17)
+map_gmns = folium.Map(location=[lat, long], zoom_start=12)
 
 # add all layers
 for layer in layers:
