@@ -56,7 +56,7 @@ def create_empty_project_session(_empty_project, create_project_session):
     return _create_empty_project
 
 
-# This fixture creates a default empty structure on disk that can be used as the 
+# This fixture creates a default empty structure on disk that can be used as the
 # source folder for creating temporary empty projects
 @pytest.fixture(scope="session")
 def _empty_project(tmp_path_factory):
