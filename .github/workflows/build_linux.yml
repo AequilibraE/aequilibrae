@@ -5,6 +5,8 @@ on:  [pull_request, release]
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.9
@@ -37,7 +39,7 @@ jobs:
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish wheels to PyPI
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -45,7 +47,7 @@ jobs:
         twine upload dist/*-manylinux*.whl
 
     - name: Save wheels to AWS
-      if: ${{ (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (env.HAS_SECRETS == 'true') }}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks

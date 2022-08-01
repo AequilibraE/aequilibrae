@@ -5,6 +5,8 @@ on:  [pull_request, release]
 jobs:
   deploy:
     runs-on:  macos-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
@@ -34,7 +36,7 @@ jobs:
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -42,7 +44,7 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') && (matrix.python-version == '3.9') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') && (matrix.python-version == '3.9') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
