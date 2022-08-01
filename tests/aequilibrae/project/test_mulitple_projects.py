@@ -3,7 +3,7 @@ import pytest
 
 
 class TestMultipleProjects:
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="class")
     def project(self, create_empty_project_session):
         return create_empty_project_session()
 

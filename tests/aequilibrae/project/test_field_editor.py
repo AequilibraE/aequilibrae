@@ -5,11 +5,11 @@ from aequilibrae.project.field_editor import FieldEditor
 
 
 class TestFieldEditor:
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="class")
     def project_session(self, create_empty_project_session):
         return create_empty_project_session()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="class")
     def database_backup(self, project_session):
         return Path(project_session.project_base_path).joinpath("project_database.sqlite").read_bytes()
 
