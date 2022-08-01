@@ -1,50 +1,33 @@
-from unittest import TestCase
-import tempfile
-import os
 from aequilibrae.project import Project
 from aequilibrae.project.database_connection import database_connection
-import uuid
+import pytest
 
 
-class TestProject(TestCase):
-    def setUp(self) -> None:
-        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-        self.proj = Project()
-        self.proj.new(self.temp_proj_folder)
-
-    def tearDown(self) -> None:
-        self.proj.close()
-
-    def test_opening_wrong_folder(self):
-        temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-        self.proj.close()
-        with self.assertRaises(FileNotFoundError):
+class TestProject:
+    def test_opening_wrong_folder(self, tmp_path):
+        not_a_project = str(tmp_path)
+        with pytest.raises(FileNotFoundError):
             proj = Project()
-            proj.open(temp_proj_folder)
-        self.proj.open(self.temp_proj_folder)
+            proj.open(not_a_project)
 
-    def test_creation(self):
-
-        curr = self.proj.conn.cursor()
-        curr.execute("""PRAGMA table_info(links);""")
+    @pytest.mark.parametrize(
+        "table, exp_column",
+        [
+            ("links", "distance"),
+            ("nodes", "is_centroid"),
+        ],
+    )
+    def test_table_creation(self, table: str, exp_column: str, project: Project):
+        curr = project.conn.cursor()
+        curr.execute(f"PRAGMA table_info({table});")
         fields = curr.fetchall()
-        fields = [x[1] for x in fields]
+        fields = {x[1] for x in fields}
 
-        if "distance" not in fields:
-            self.fail("Table LINKS was not created correctly")
+        assert exp_column in fields, f"Table {table.upper()} was not created correctly"
 
-        curr = self.proj.conn.cursor()
-        curr.execute("""PRAGMA table_info(nodes);""")
-        nfields = curr.fetchall()
-        nfields = [x[1] for x in nfields]
+    def test_close(self, project):
+        database_connection()
 
-        if "is_centroid" not in nfields:
-            self.fail("Table NODES was not created correctly")
-
-    def test_close(self):
-
-        _ = database_connection()
-
-        self.proj.close()
-        with self.assertRaises(FileNotFoundError):
-            _ = database_connection()
+        project.close()
+        with pytest.raises(FileNotFoundError):
+            database_connection()
