@@ -7,6 +7,8 @@ on:
 jobs:
   testing:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [3.9]
@@ -32,7 +34,7 @@ jobs:
       run: |
         python3 -m pytest --cov=./ --cov-report=xml
     - name: Upload coverage to Codecov
-      if: ${{ (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (env.HAS_SECRETS == 'true') }}
       uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
