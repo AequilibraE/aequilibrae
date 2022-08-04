@@ -659,7 +659,7 @@ class AequilibraeMatrix(object):
             return self.__dict__[mat_name]
 
         if mat_name in self.names:
-            return self.get_matrix(mat_name)
+            return self.get_matrix(mat_name, copy=True)
 
         raise AttributeError("No such method or matrix core! --> " + str(mat_name))
 
@@ -689,8 +689,9 @@ class AequilibraeMatrix(object):
         else:
             self.matrices.flush()
             self.index.flush()
-        del self.matrices
-        del self.index
+
+        for attr in ("index", "indices", "matrix", "matrices"):
+            delattr(self, attr)
 
     def export(self, output_name: str, cores: List[str] = None):
         """
