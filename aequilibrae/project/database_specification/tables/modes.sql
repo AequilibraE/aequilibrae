@@ -26,4 +26,4 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','vot', 'Value-of-Time for traffic assignment of class');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','persons_per_vehicle', 'Average persons per vehicle. (0 for non-travel uses)');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('modes','ppv', 'Average persons per vehicle. (0 for non-travel uses)');
