@@ -11,6 +11,7 @@ import uuid
 from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example, no_index_omx, siouxfalls_skims
 import pandas as pd
+import pytest
 
 zones = 50
 
@@ -238,3 +239,37 @@ class TestAequilibraeMatrix(TestCase):
         b.save()
         b.computational_view(["mat", "seed", "dist"])
         b.save()
+
+
+def test_can_reuse_matrix_after_close(tmp_path):
+    kwargs = {
+        "file_name": tmp_path / "matrix.aem",
+        "zones": 1,
+        "matrix_names": ["mat"],
+        "index_names": ["index"],
+    }
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(**kwargs)
+    matrix.close()
+    try:
+        AequilibraeMatrix().create_empty(**kwargs)
+    except OSError:
+        pytest.fail("Should not raise OSError")
+
+
+def test_matrix_reference_doesnt_prevent_resource_cleanup(tmp_path):
+    kwargs = {
+        "file_name": tmp_path / "matrix.aem",
+        "zones": 1,
+        "matrix_names": ["mat"],
+        "index_names": ["index"],
+    }
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(**kwargs)
+    ref = matrix.mat
+    del matrix
+
+    try:
+        AequilibraeMatrix().create_empty(**kwargs)
+    except OSError:
+        pytest.fail("Should not raise OSError")
