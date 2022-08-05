@@ -2,7 +2,7 @@
 Importing network from GMNS
 ===========================
 
-In this example, we impoort a simple network in GMNS format.
+In this example, we import a simple network in GMNS format.
 The source files of this network is publicly available in the GMNS GitHub repository itself.
 Here's the repository: https://github.com/zephyr-data-specs/GMNS
 """

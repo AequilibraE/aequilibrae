@@ -58,8 +58,7 @@ class GMNSBuilder(WorkerThread):
             else:
                 self.link_df = self.link_df.merge(self.geom_df, on="geometry_id", how="left")
 
-        # Checking if it is needed to change the spatial reference system.
-        self.transform_srid(self.srid)
+        self.maybe_transform_srid(self.srid)
 
         # Creating direction list based on list of two-way links
         direction = self.get_aeq_direction()
@@ -186,7 +185,7 @@ class GMNSBuilder(WorkerThread):
 
         self.save_to_database(links_fields, nodes_fields)
 
-    def transform_srid(self, srid):
+    def maybe_transform_srid(self, srid):
 
         if srid == 4326:
             return
