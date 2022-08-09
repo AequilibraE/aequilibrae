@@ -8,7 +8,7 @@ from aequilibrae.project import Project
 from aequilibrae.parameters import Parameters
 from warnings import warn
 import random
-from ...data import gmns_link, gmns_node, gmns_groups, gmns_project
+from ...data import siouxfalls_project
 
 
 class TestNetwork(TestCase):
@@ -17,6 +17,10 @@ class TestNetwork(TestCase):
         proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
         self.project = Project()
         self.project.new(proj_path)
+
+        link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/link.csv"
+        node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/node.csv"
+        use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/use_group.csv"
 
         new_link_fields = {
             "bridge": {"description": "bridge flag", "type": "text", "required": False},
@@ -31,10 +35,12 @@ class TestNetwork(TestCase):
         par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
         par.write_back()
 
-        self.project.network.create_from_gmns(gmns_link, gmns_node, gmns_groups, srid=32619)
+        self.project.network.create_from_gmns(
+            link_file_path=link_file, node_file_path=node_file, use_group_path=use_group_file, srid=32619
+        )
 
-        gmns_node_df = pd.read_csv(gmns_node)
-        gmns_link_df = pd.read_csv(gmns_link)
+        gmns_node_df = pd.read_csv(node_file)
+        gmns_link_df = pd.read_csv(link_file)
 
         curr = self.project.conn.cursor()
         curr.execute("""select count(*) from nodes""")
@@ -60,7 +66,7 @@ class TestNetwork(TestCase):
             os.mkdir(output_path)
 
         self.temp_proj_folder = os.path.join(gettempdir(), uuid.uuid4().hex)
-        copytree(gmns_project, self.temp_proj_folder)
+        copytree(siouxfalls_project, self.temp_proj_folder)
         self.project = Project()
         self.project.open(self.temp_proj_folder)
 
