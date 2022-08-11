@@ -266,7 +266,6 @@ def test_matrix_reference_doesnt_prevent_resource_cleanup(tmp_path):
     }
     matrix = AequilibraeMatrix()
     matrix.create_empty(**kwargs)
-    ref = matrix.mat
     del matrix
 
     try:
