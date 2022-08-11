@@ -8,9 +8,10 @@ The **modes** table exists to list all the modes available in the model's networ
 and its main role is to support the creation of graphs directly from the SQLite
 project.
 
-The modes table has three fields, being the *mode_name*, *description* and
-*mode_id*, where *mode_id* is a single letter that is used to codify mode
-permissions in the network, as further discussed in :ref:`network`.
+The modes table has five fields, being the *mode_name*, *mode_id*, *description* 
+*pce*, *vot*, and *ppv* (persons per vehicle), where *mode_id* is a single letter 
+that is used to codify mode permissions in the network, as further discussed in 
+:ref:`network`.
 
 An example of what the contents of the mode table look like is below:
 
@@ -23,7 +24,7 @@ Consistency triggers
 --------------------
 As it happens with the links and nodes table (:ref:`network_triggers_behaviour`),
 the modes table is kept consistent with the links table through the use of
-database triggers
+database triggers.
 
 .. _changing_modes_for_link:
 
