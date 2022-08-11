@@ -16,7 +16,7 @@ args = {"file_name": name_test, "zones": zones, "matrix_names": ["impedance"]}
 
 impedance = AequilibraeMatrix()
 impedance.create_empty(**args)
-impedance.impedance[:, :] = np.random.rand(zones, zones)[:, :] * 1000
+impedance.matrix["impedance"][:, :] = np.random.rand(zones, zones)[:, :] * 1000
 impedance.index[:] = np.arange(impedance.zones) + 100
 impedance.computational_view(["impedance"])
 
@@ -24,7 +24,7 @@ args["matrix_names"] = ["base_matrix"]
 args["file_name"] = AequilibraeMatrix().random_name()
 matrix = AequilibraeMatrix()
 matrix.create_empty(**args)
-matrix.base_matrix[:, :] = np.random.rand(zones, zones)[:, :] * 1000
+matrix.matrix["base_matrix"][:, :] = np.random.rand(zones, zones)[:, :] * 1000
 matrix.index[:] = np.arange(matrix.zones) + 100
 matrix.computational_view(["base_matrix"])
 

@@ -1,13 +1,12 @@
-from unittest import TestCase
-from unittest.mock import Mock
-from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
-from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
-import numpy as np
-import tempfile
 import os
-from aequilibrae.parameters import Parameters
+import tempfile
+from unittest import TestCase
 
-from aequilibrae.project.project import Project
+import numpy as np
+
+from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
+from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 
 zones = 10
 
@@ -38,7 +37,7 @@ matrix = AequilibraeMatrix()
 matrix.create_empty(**args)
 
 # randoms = np.random.randint(5, size=(2, 4))
-matrix.impedance[:, :] = np.random.rand(zones, zones)[:, :]
+matrix.matrix["impedance"][:, :] = np.random.rand(zones, zones)[:, :]
 matrix.index[:] = np.arange(matrix.zones) + 100
 matrix.computational_view(["impedance"])
 

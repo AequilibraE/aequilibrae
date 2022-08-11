@@ -181,7 +181,7 @@ class GravityCalibration:
             cm = self.__apply_gravity()
 
             for i in self.gravity.report:
-                self.report.append("       " + i)
+                self.report.append(f"       {i}")
             self.report.append("Error: " + "{:.2E}".format(float(np.nansum(abs((bm / bm1) - 1)))))
             self.report.append("")
 
@@ -190,11 +190,9 @@ class GravityCalibration:
             self.itera += 1
 
         if self.itera == self.max_iter:
-            self.report.append(
-                "DID NOT CONVERGE. Stopped in  " + str(self.itera) + "  with a global error of " + str(self.gap)
-            )
+            self.report.append(f"DID NOT CONVERGE. Stopped in {self.itera} with a global error of {self.gap}")
         else:
-            self.report.append("Converged in " + str(self.itera) + "  iterations to a global error of " + str(self.gap))
+            self.report.append(f"Converged in {self.itera} iterations to a global error of {self.gap}")
         s = perf_counter() - t
         m, s1 = divmod(s, 60)
         s -= m * 60
@@ -218,15 +216,15 @@ class GravityCalibration:
         mats = [(self.matrix, "Observed matrix"), (self.impedance, "Impedance matrix")]
         for matrix, title in mats:
             if matrix.matrix_view is None:
-                raise ValueError(title + " needs to be set for computation")
+                raise ValueError(f"{title} needs to be set for computation")
             else:
                 if len(matrix.matrix_view.shape[:]) > 2:
-                    raise ValueError(title + "' computational view needs to be set for a single matrix core")
+                    raise ValueError(f"{title} computational view needs to be set for a single matrix core")
 
             if np.nansum(matrix.matrix_view.data) == 0:
-                raise ValueError(title + "has only zero values")
+                raise ValueError(f"{title} has only zero values")
             if np.nanmin(matrix.matrix_view.data) < 0:
-                raise ValueError(title + "has negative values")
+                raise ValueError(f"{title} has negative values")
 
         # Augment parameters if we happen to have only passed one
         default_parameters = self.__get_parameters()
