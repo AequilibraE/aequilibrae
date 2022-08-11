@@ -248,13 +248,13 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-        self,
-        file_path: str,
-        omx_path: str,
-        cores: List[str] = None,
-        mappings: List[str] = None,
-        robust: bool = True,
-        compressed: bool = False,
+            self,
+            file_path: str,
+            omx_path: str,
+            cores: List[str] = None,
+            mappings: List[str] = None,
+            robust: bool = True,
+            compressed: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -858,10 +858,10 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
 
     def copy(
-        self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
+            self, output_name: str = None, cores: List[str] = None, names: List[str] = None, compress: bool = None
     ) -> None:
         """
         Copies a list of cores (or all cores) from one matrix file to another one
@@ -956,7 +956,8 @@ class AequilibraeMatrix(object):
 
                 output.indices[:] = self.indices[:]
                 for i, c in enumerate(cores):
-                    output.matrices[:, :, i] = self.matrices[:, :, self.names.index(c)]
+                    output.matrix[output.names[i]][:, :] = self.matrix[c][:, :]
+
                 if self.view_names is not None:
                     view_names = [names[self.view_names.index(nm)] for nm in self.view_names]
                     output.computational_view(view_names)

@@ -1,17 +1,19 @@
 import datetime
 import os
 import random
+import uuid
 from os.path import join
 from shutil import copyfile
-import openmatrix as omx
-from unittest import TestCase
 from tempfile import gettempdir
+from unittest import TestCase
+
 import numpy as np
-import uuid
-from aequilibrae.matrix import AequilibraeMatrix
-from ...data import omx_example, no_index_omx, siouxfalls_skims
+import openmatrix as omx
 import pandas as pd
 import pytest
+
+from aequilibrae.matrix import AequilibraeMatrix
+from ...data import omx_example, no_index_omx, siouxfalls_skims
 
 zones = 50
 
@@ -41,8 +43,8 @@ class TestAequilibraeMatrix(TestCase):
         self.matrix.create_empty(**args)
 
         self.matrix.index[:] = np.arange(self.matrix.zones) + 100
-        self.matrix.mat[:, :] = np.random.rand(self.matrix.zones, self.matrix.zones)[:, :]
-        self.matrix.mat[:, :] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
+        self.matrix.matrix["mat"][:, :] = np.random.rand(self.matrix.zones, self.matrix.zones)[:, :]
+        self.matrix.matrix["mat"][:, :] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
         self.matrix.setName("Test matrix - " + str(random.randint(1, 10)))
         self.matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         self.new_matrix = self.matrix
@@ -75,7 +77,7 @@ class TestAequilibraeMatrix(TestCase):
             self.fail("Computational view returns the wrong number of matrices")
 
         self.new_matrix.computational_view(["mat"])
-        self.new_matrix.matrix_view[:, :] = np.arange(zones**2).reshape(zones, zones)
+        self.new_matrix.matrix_view[:, :] = np.arange(zones ** 2).reshape(zones, zones)
         if np.sum(self.new_matrix.mat) != np.sum(self.new_matrix.matrix_view):
             self.fail("Assigning to matrix view did not work")
         self.new_matrix.setName("Test matrix - " + str(random.randint(1, 10)))
@@ -141,7 +143,7 @@ class TestAequilibraeMatrix(TestCase):
         m = self.new_matrix.mat.sum() - self.new_matrix.mat[1, 1]
         self.new_matrix.computational_view(["mat", "seed"])
         self.new_matrix.nan_to_num()
-        self.new_matrix.mat[1, 1] = np.nan
+        self.new_matrix.matrix["mat"][1, 1] = np.nan
         self.new_matrix.computational_view(["mat"])
         self.new_matrix.nan_to_num()
 
