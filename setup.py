@@ -26,7 +26,8 @@ pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
     "aequilibrae.paths": ["parameters.pxi"],
     "aequilibrae": ["parameters.yml"],
-    "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
+    "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*",
+                            "database_specification/transit/*.*"],
 }
 loose_modules = ["__version__", "parameters"]
 
