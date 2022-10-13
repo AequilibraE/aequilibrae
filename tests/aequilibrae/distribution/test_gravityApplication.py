@@ -38,7 +38,7 @@ matrix = AequilibraeMatrix()
 matrix.create_empty(**args)
 
 # randoms = np.random.randint(5, size=(2, 4))
-matrix.impedance[:, :] = np.random.rand(zones, zones)[:, :]
+matrix.matrices[:, :, 0] = np.random.rand(zones, zones)[:, :]
 matrix.index[:] = np.arange(matrix.zones) + 100
 matrix.computational_view(["impedance"])
 
