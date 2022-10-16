@@ -41,8 +41,8 @@ class TestAequilibraeMatrix(TestCase):
         self.matrix.create_empty(**args)
 
         self.matrix.index[:] = np.arange(self.matrix.zones) + 100
-        self.matrix.mat[:, :] = np.random.rand(self.matrix.zones, self.matrix.zones)[:, :]
-        self.matrix.mat[:, :] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
+        self.matrix.matrices[:, :, 0] = np.random.rand(self.matrix.zones, self.matrix.zones)
+        self.matrix.matrices[:, :, 0] = self.matrix.mat * (1000 / np.sum(self.matrix.mat))
         self.matrix.setName("Test matrix - " + str(random.randint(1, 10)))
         self.matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         self.new_matrix = self.matrix
@@ -141,7 +141,7 @@ class TestAequilibraeMatrix(TestCase):
         m = self.new_matrix.mat.sum() - self.new_matrix.mat[1, 1]
         self.new_matrix.computational_view(["mat", "seed"])
         self.new_matrix.nan_to_num()
-        self.new_matrix.mat[1, 1] = np.nan
+        self.new_matrix.matrices[1, 1, 0] = np.nan
         self.new_matrix.computational_view(["mat"])
         self.new_matrix.nan_to_num()
 
