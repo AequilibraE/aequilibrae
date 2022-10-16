@@ -42,7 +42,7 @@ class TestAequilibraeMatrix(TestCase):
 
         self.matrix.index[:] = np.arange(self.matrix.zones) + 100
         self.matrix.matrices[:, :, 0] = np.random.rand(self.matrix.zones, self.matrix.zones)
-        self.matrix.matrices[:, :, 0] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
+        self.matrix.matrices[:, :, 0] = self.matrix.mat * (1000 / np.sum(self.matrix.mat))
         self.matrix.setName("Test matrix - " + str(random.randint(1, 10)))
         self.matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         self.new_matrix = self.matrix
