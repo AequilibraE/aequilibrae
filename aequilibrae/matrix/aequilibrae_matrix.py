@@ -1021,8 +1021,7 @@ class AequilibraeMatrix(object):
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
         if np.issubdtype(self.dtype, np.floating) and self.matrix_view is not None:
-            for m in self.view_names:
-                self.matrix[m][:, :] = np.nan_to_num(self.matrix[m])[:, :]
+            self.matrices[:, :, :] = np.nan_to_num(self.matrices[:, :, :])
 
     def __vector(self, axis: int):
         if self.view_names is None:
