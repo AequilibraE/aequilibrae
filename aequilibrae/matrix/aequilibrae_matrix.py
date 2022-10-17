@@ -121,14 +121,14 @@ class AequilibraeMatrix(object):
         self.computational_view(names)
 
     def create_empty(
-            self,
-            file_name: str = None,
-            zones: int = None,
-            matrix_names: List[str] = None,
-            data_type: np.dtype = np.float64,
-            index_names: List[str] = None,
-            compressed: bool = False,
-            memory_only: bool = False
+        self,
+        file_name: str = None,
+        zones: int = None,
+        matrix_names: List[str] = None,
+        data_type: np.dtype = np.float64,
+        index_names: List[str] = None,
+        compressed: bool = False,
+        memory_only: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -250,15 +250,14 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-            self,
-            file_path: str,
-            omx_path: str,
-            cores: List[str] = None,
-            mappings: List[str] = None,
-            robust: bool = True,
-            compressed: bool = False,
-            memory_only: bool = False,
-
+        self,
+        file_path: str,
+        omx_path: str,
+        cores: List[str] = None,
+        mappings: List[str] = None,
+        robust: bool = True,
+        compressed: bool = False,
+        memory_only: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -346,8 +345,14 @@ class AequilibraeMatrix(object):
             core_names = [x for x in do_cores]
             idx_names = [x for x in do_idx]
 
-        self.create_empty(file_name=file_path, zones=zones, matrix_names=core_names, index_names=idx_names,
-                          compressed=compressed, memory_only=memory_only)
+        self.create_empty(
+            file_name=file_path,
+            zones=zones,
+            matrix_names=core_names,
+            index_names=idx_names,
+            compressed=compressed,
+            memory_only=memory_only,
+        )
 
         # Copy all cores
         for ncore, core in zip(core_names, do_cores):
@@ -562,17 +567,20 @@ class AequilibraeMatrix(object):
 
             # matrix name
             np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[
-                0] = self.name
+                0
+            ] = self.name
 
             # matrix description
             offset = 18 + MATRIX_NAME_MAX_LENGTH
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset, mode="r+",
-                      shape=1)[0] = self.description
+            np.memmap(
+                self.file_path, dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH), offset=offset, mode="r+", shape=1
+            )[0] = self.description
 
             # core names
             offset += MATRIX_DESCRIPTION_MAX_LENGTH
-            fp = np.memmap(self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+",
-                           shape=self.cores)
+            fp = np.memmap(
+                self.file_path, dtype="S" + str(CORE_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.cores
+            )
 
             for i, v in enumerate(self.names):
                 fp[i] = v
@@ -581,8 +589,9 @@ class AequilibraeMatrix(object):
 
             # Index names
             offset += CORE_NAME_MAX_LENGTH * self.cores
-            fp = np.memmap(self.file_path, dtype="S" + str(INDEX_NAME_MAX_LENGTH), offset=offset, mode="r+",
-                           shape=self.num_indices)
+            fp = np.memmap(
+                self.file_path, dtype="S" + str(INDEX_NAME_MAX_LENGTH), offset=offset, mode="r+", shape=self.num_indices
+            )
 
             for i, v in enumerate(self.index_names):
                 fp[i] = v
@@ -594,8 +603,9 @@ class AequilibraeMatrix(object):
             self.indices = np.zeros((self.zones, self.num_indices))
         else:
             offset += self.num_indices * INDEX_NAME_MAX_LENGTH
-            self.indices = np.memmap(self.file_path, dtype="uint64", offset=offset, mode="r+",
-                                     shape=(self.zones, self.num_indices))
+            self.indices = np.memmap(
+                self.file_path, dtype="uint64", offset=offset, mode="r+", shape=(self.zones, self.num_indices)
+            )
             self.indices.fill(0)
             self.__flush(self.indices)
         self.set_index(self.index_names[0])
@@ -862,10 +872,16 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
 
-    def copy(self, output_name: str = None, cores: List[str] = None, names: List[str] = None,
-             compress: bool = None, memory_only: bool = False):
+    def copy(
+        self,
+        output_name: str = None,
+        cores: List[str] = None,
+        names: List[str] = None,
+        compress: bool = None,
+        memory_only: bool = False,
+    ):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
 
@@ -911,8 +927,13 @@ class AequilibraeMatrix(object):
         orig_mat_view = self.view_names or self.names
 
         output = AequilibraeMatrix()
-        output.create_empty(file_name=output_name, zones=self.zones, matrix_names=mnames, memory_only=memory_only,
-                            index_names=self.index_names)
+        output.create_empty(
+            file_name=output_name,
+            zones=self.zones,
+            matrix_names=mnames,
+            memory_only=memory_only,
+            index_names=self.index_names,
+        )
 
         for i, core in enumerate(mcores):
             self.computational_view([core])

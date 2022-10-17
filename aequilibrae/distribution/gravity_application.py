@@ -171,8 +171,9 @@ class GravityApplication:
         t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
-        self.output = self.impedance.copy(self.output_name, cores=self.impedance.view_names, names=[self.core_name],
-                                          memory_only=True)
+        self.output = self.impedance.copy(
+            self.output_name, cores=self.impedance.view_names, names=[self.core_name], memory_only=True
+        )
         self.output.computational_view([self.core_name])
         if self.nan_as_zero:
             self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
