@@ -92,7 +92,7 @@ class Ipf:
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
-        self.matrix = kwargs.get("matrix", None) # type: AequilibraeMatrix
+        self.matrix = kwargs.get("matrix", None)  # type: AequilibraeMatrix
 
         # NaN as zero
         self.nan_as_zero = kwargs.get("nan_as_zero", True)
