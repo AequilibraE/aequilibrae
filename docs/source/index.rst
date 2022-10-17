@@ -81,6 +81,7 @@ documentation for all versions since 0.5.3.
 * `0.7.2 <https://aequilibrae.com/python/V.0.7.2/>`_
 * `0.7.3 <https://aequilibrae.com/python/V.0.7.3/>`_
 * `0.7.4 <https://aequilibrae.com/python/V.0.7.4/>`_
+* `0.7.5 <https://aequilibrae.com/python/V.0.7.5/>`_
 
 * `Develop Branch (upcoming version) <https://aequilibrae.com/python/develop/>`_
 This documentation correspond to software version:
