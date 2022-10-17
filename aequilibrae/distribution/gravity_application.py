@@ -334,4 +334,4 @@ class GravityApplication:
         infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)
         non_inf = np.ones_like(self.output.matrix_view[:, :]) - infinite
         self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * non_inf
-        np.nan_to_num(self.output.matrix_view[:, :])
+        self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
