@@ -121,14 +121,14 @@ class AequilibraeMatrix(object):
         self.computational_view(names)
 
     def create_empty(
-            self,
-            file_name: str = None,
-            zones: int = None,
-            matrix_names: List[str] = None,
-            data_type: np.dtype = np.float64,
-            index_names: List[str] = None,
-            compressed: bool = False,
-            memory_only: bool = False,
+        self,
+        file_name: str = None,
+        zones: int = None,
+        matrix_names: List[str] = None,
+        data_type: np.dtype = np.float64,
+        index_names: List[str] = None,
+        compressed: bool = False,
+        memory_only: bool = False,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -250,14 +250,14 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-            self,
-            file_path: str,
-            omx_path: str,
-            cores: List[str] = None,
-            mappings: List[str] = None,
-            robust: bool = True,
-            compressed: bool = False,
-            memory_only: bool = False,
+        self,
+        file_path: str,
+        omx_path: str,
+        cores: List[str] = None,
+        mappings: List[str] = None,
+        robust: bool = True,
+        compressed: bool = False,
+        memory_only: bool = False,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -872,15 +872,15 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
 
     def copy(
-            self,
-            output_name: str = None,
-            cores: List[str] = None,
-            names: List[str] = None,
-            compress: bool = None,
-            memory_only: bool = False,
+        self,
+        output_name: str = None,
+        cores: List[str] = None,
+        names: List[str] = None,
+        compress: bool = None,
+        memory_only: bool = False,
     ):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
