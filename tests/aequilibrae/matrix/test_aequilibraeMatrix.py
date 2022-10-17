@@ -116,6 +116,16 @@ class TestAequilibraeMatrix(TestCase):
         matrix_copy.close()
         del matrix_copy
 
+    def test_copy_memory_only(self):
+        # test in-memory matrix_procedures copy
+
+        matrix_copy = self.new_matrix.copy(self.copy_matrix_name, cores=["mat"], memory_only=True)
+
+        for orig, new_arr in [[matrix_copy.mat, self.new_matrix.mat], [matrix_copy.index, self.new_matrix.index]]:
+            if not np.array_equal(orig, new_arr):
+                self.fail("Matrix copy was not perfect")
+        matrix_copy.close()
+
     def test_export_to_csv(self):
         self.new_matrix.export(self.csv_export_name)
         df = pd.read_csv(self.csv_export_name)

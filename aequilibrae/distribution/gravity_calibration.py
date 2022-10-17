@@ -81,13 +81,13 @@ class GravityCalibration:
         self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
-        self.matrix = kwargs.get("matrix")
-        self.impedance = kwargs.get("impedance")
+        self.matrix = kwargs.get("matrix")  # type: AequilibraeMatrix
+        self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
         deterrence_function = str(kwargs.get("function", "")).upper()
 
         if self.nan_as_zero:
-            self.matrix = self.matrix.copy()
-            self.impedance = self.impedance.copy()
+            self.matrix = self.matrix.copy(memory_only=True)
+            self.impedance = self.impedance.copy(memory_only=True)
 
         self.result_matrix = None
         self.rows = None
@@ -235,7 +235,7 @@ class GravityCalibration:
         # Prepare the data for computation
         self.comput_core = self.matrix.view_names[0]
 
-        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"])
+        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"], memory_only=True)
 
         self.rows = AequilibraeData()
         self.rows.create_empty(entries=self.matrix.zones, field_names=["rows"], memory_mode=True)
