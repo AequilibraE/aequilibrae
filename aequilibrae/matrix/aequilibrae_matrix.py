@@ -922,7 +922,7 @@ class AequilibraeMatrix(object):
         mnames = names or mcores
 
         if len(mcores) != len(mnames):
-            raise ValueError("Mas have same number of cores to copy and output names")
+            raise ValueError("Must have same number of cores to copy and output names")
 
         orig_mat_view = self.view_names or self.names
 
