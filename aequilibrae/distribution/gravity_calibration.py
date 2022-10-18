@@ -81,13 +81,13 @@ class GravityCalibration:
         self.parameters = kwargs.get("parameters", self.__get_parameters())
 
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
-        self.matrix = kwargs.get("matrix")
-        self.impedance = kwargs.get("impedance")
+        self.matrix = kwargs.get("matrix")  # type: AequilibraeMatrix
+        self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
         deterrence_function = str(kwargs.get("function", "")).upper()
 
         if self.nan_as_zero:
-            self.matrix = self.matrix.copy()
-            self.impedance = self.impedance.copy()
+            self.matrix = self.matrix.copy(memory_only=True)
+            self.impedance = self.impedance.copy(memory_only=True)
 
         self.result_matrix = None
         self.rows = None
@@ -218,15 +218,13 @@ class GravityCalibration:
         mats = [(self.matrix, "Observed matrix"), (self.impedance, "Impedance matrix")]
         for matrix, title in mats:
             if matrix.matrix_view is None:
-                raise ValueError(title + " needs to be set for computation")
-            else:
-                if len(matrix.matrix_view.shape[:]) > 2:
-                    raise ValueError(title + "' computational view needs to be set for a single matrix core")
-
+                raise ValueError(f"{title} needs to be set for computation")
+            if matrix.matrix_view.ndim > 2:
+                raise ValueError(f"{title} computational view needs to be set for a single matrix core")
             if np.nansum(matrix.matrix_view.data) == 0:
-                raise ValueError(title + "has only zero values")
+                raise ValueError(f"{title} has only zero values")
             if np.nanmin(matrix.matrix_view.data) < 0:
-                raise ValueError(title + "has negative values")
+                raise ValueError(f"{title} has negative values")
 
         # Augment parameters if we happen to have only passed one
         default_parameters = self.__get_parameters()
@@ -237,7 +235,7 @@ class GravityCalibration:
         # Prepare the data for computation
         self.comput_core = self.matrix.view_names[0]
 
-        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"])
+        self.result_matrix = self.matrix.copy(cores=[self.comput_core], names=["gravity"], memory_only=True)
 
         self.rows = AequilibraeData()
         self.rows.create_empty(entries=self.matrix.zones, field_names=["rows"], memory_mode=True)
