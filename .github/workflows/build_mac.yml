@@ -29,7 +29,7 @@ jobs:
 
     - name: Stores artifacts along with the workflow result
       if: ${{ github.event_name == 'push'}}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: library
         path: dist/*.whl
