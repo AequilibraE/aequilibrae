@@ -368,13 +368,13 @@ network:
       equivalency:
         mode_name: use
 osm:
-    overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
+    overpass_endpoint: "https://lz4.overpass-api.de/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"
     accept_language: "en"
     max_attempts: 50
     timeout: 540
     max_query_area_size: 2500000000
-    sleeptime: 2
+    sleeptime: 5
 
 system:
   cpus: 0
