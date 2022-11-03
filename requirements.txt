@@ -7,5 +7,5 @@ pyshp
 requests
 shapely >= 1.7.0
 pandas
-pyarrow
+pyarrow<10.0.0
 pyproj
