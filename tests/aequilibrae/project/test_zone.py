@@ -88,7 +88,7 @@ class TestZone(TestCase):
         grid = curr.fetchone()[0]
         grid = shapely.wkb.loads(grid)
 
-        grid = [p for p in grid if p.intersects(geo)]
+        grid = [p for p in grid.geoms if p.intersects(geo)]
 
         zoning = self.proj.zoning
         for i, zone_geo in enumerate(grid):

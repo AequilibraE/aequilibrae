@@ -5,10 +5,12 @@ on:  [pull_request, release]
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python 3.9
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.9
     - name: Install packages
@@ -18,7 +20,7 @@ jobs:
         python -m pip install --upgrade cffi setuptools twine
 
     - name: Build manylinux Python wheels
-      uses: RalfG/python-wheels-manylinux-build@v0.3.3-manylinux2014_x86_64
+      uses: RalfG/python-wheels-manylinux-build@v0.5.0
       with:
         python-versions: 'cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310'
         pip-wheel-args: '--no-deps'
@@ -30,14 +32,14 @@ jobs:
 
     - name: Stores artifacts along with the workflow result
       if: ${{ github.event_name == 'push'}}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: library
         path: dist/*.whl
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish wheels to PyPI
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -45,7 +47,7 @@ jobs:
         twine upload dist/*-manylinux*.whl
 
     - name: Save wheels to AWS
-      if: ${{ (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (env.HAS_SECRETS == 'true') }}
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read --follow-symlinks

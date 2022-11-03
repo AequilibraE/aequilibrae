@@ -1,18 +1,19 @@
-import sys
-import numpy as np
-import os
-import tempfile
-from time import perf_counter
 import glob
-import logging
-from uuid import uuid4
-from datetime import datetime
 import importlib.util as iutil
+import logging
+import os
+import sys
+import tempfile
+from datetime import datetime
+from time import perf_counter
+from uuid import uuid4
+
+import numpy as np
+
 from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae import Parameters
 
 sys.dont_write_bytecode = True
 
@@ -147,12 +148,12 @@ class GravityApplication:
         self.columns = kwargs.get("columns")
         self.column_field = kwargs.get("column_field", None)
 
-        self.impedance = kwargs.get("impedance")
+        self.impedance = kwargs.get("impedance")  # type: AequilibraeMatrix
         self.model = kwargs.get("model")  # type: SyntheticGravityModel
         self.core_name = kwargs.get("output_core", "gravity")
         self.output_name = AequilibraeMatrix().random_name()
         self.nan_as_zero = kwargs.get("nan_as_zero", False)
-        self.output = None
+        self.output = None  # type: AequilibraeMatrix
         self.gap = np.inf
         self.logger = logging.getLogger("aequilibrae")
         self.procedure_date = ""
@@ -170,7 +171,9 @@ class GravityApplication:
         t = perf_counter()
         max_cost = self.parameters["max trip length"]
         # We create the output
-        self.output = self.impedance.copy(self.output_name, cores=self.impedance.view_names, names=[self.core_name])
+        self.output = self.impedance.copy(
+            self.output_name, cores=self.impedance.view_names, names=[self.core_name], memory_only=True
+        )
         self.output.computational_view([self.core_name])
         if self.nan_as_zero:
             self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
@@ -331,4 +334,4 @@ class GravityApplication:
         infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)
         non_inf = np.ones_like(self.output.matrix_view[:, :]) - infinite
         self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * non_inf
-        np.nan_to_num(self.output.matrix_view[:, :])
+        self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]

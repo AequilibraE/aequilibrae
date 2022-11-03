@@ -1,33 +1,16 @@
-import uuid
-import os
-import tempfile
-from unittest import TestCase
 from aequilibrae.context import activate_project
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.project import Project
+import pytest
 
 
-class TestDatabaseConnection(TestCase):
-    def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(tempfile.gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+class TestDatabaseConnection:
+    def test_cannot_connect_when_no_active_project(self):
         activate_project(None)
+        with pytest.raises(FileNotFoundError):
+            database_connection()
 
-    def test_database_connection(self):
-        # Errors when project does not exist
-        with self.assertRaises(FileNotFoundError):
-            _ = database_connection()
-
-    def test_connection_with_new_project(self):
-        temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-        proj = Project()
-        proj.new(temp_proj_folder)
-        proj.close()
-
-        proj = Project()
-        proj.open(temp_proj_folder)
-        conn = database_connection()
+    def test_connection_with_new_project(self, project):
+        conn = database_connection(project.project_base_path)
         cursor = conn.cursor()
         cursor.execute("select count(*) from links")
-
-        self.assertEqual(cursor.fetchone()[0], 0, "Returned more links thant it should have")
-        proj.close()
+        assert cursor.fetchone()[0] == 0, "Returned more links thant it should have"

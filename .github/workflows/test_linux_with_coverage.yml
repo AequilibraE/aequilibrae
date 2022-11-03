@@ -7,11 +7,13 @@ on:
 jobs:
   testing:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [3.9]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Install dependencies
       run: |
         sudo apt-get install libsqlite3-mod-spatialite
@@ -32,8 +34,8 @@ jobs:
       run: |
         python3 -m pytest --cov=./ --cov-report=xml
     - name: Upload coverage to Codecov
-      if: ${{ (github.repository_owner == 'AequilibraE') }}
-      uses: codecov/codecov-action@v1
+      if: ${{ (env.HAS_SECRETS == 'true') }}
+      uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml

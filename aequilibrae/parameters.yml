@@ -198,14 +198,183 @@ network:
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true
+  gmns:
+    critical_dist: 2
+    node:
+      equivalency:
+        node_id: node_id
+      fields:
+        node_id:
+          description: Unique key
+          type: integer
+          required: true
+        name:
+          description: Node name
+          type: text
+          required: false
+        x_coord:
+          description: Coordinate system specified in GMNS config file
+          type: numeric
+          required: true
+        y_coord:
+          description: Coordinate system specified in GMNS config file
+          type: numeric
+          required: true
+        z_coord:
+          description: Altitude in short length units
+          type: numeric
+          required: false
+        node_type:
+          description: What it represents
+          type: text
+          required: false
+        ctrl_type:
+          description: From GMNS ControlType_Set
+          type: text
+          required: false
+        zone_id:
+          description: TAZ or city, or census tract
+          type: integer
+          required: false
+        parent_node_id:
+          description: The parent of this node
+          type: integer
+          required: false
+    link:
+      equivalency:
+        link_id: link_id
+        a_node: from_node_id
+        b_node: to_node_id
+        direction: directed
+        distance: length
+        speed: free_speed
+        capacity: capacity
+        lanes: lanes
+        name: name
+        link_type: facility_type
+        modes: allowed_uses
+        geometry: geometry
+      fields:
+        link_id:
+          description: Primary key
+          type: integer
+          required: true
+        name:
+          description: Name
+          type: text
+          required: false
+        from_node_id:
+          description: Foreign key (Nodes table)
+          type: integer
+          required: true
+        to_node_id:
+          description: Foreign key (Nodes table)
+          type: integer
+          required: true
+        directed:
+          description: Whether the link is directed (travel only occurs from the from_node to the to_node) or undirected.
+          type: integer
+          required: true
+        dir_flag:
+          description: Shapepoints direction
+          type: integer
+          required: false
+        length:
+          description: GMNS length in long_length units
+          type: numeric
+          required: false
+        geometry_id:
+          description: Foreign key from geometry table
+          type: integer
+          required: false
+        geometry:
+          description: Link geometry, in well-known text (WKT) format.
+          type: text
+          required: false
+        parent_link_id:
+          description: The parent of this link
+          type: integer
+          required: false
+        grade:
+          description: Percent grade of the link
+          type: integer
+          required: false
+        facility_type:
+          description: Facility type (e.g., freeway, arterial, etc.)
+          type: text
+          required: false
+        capacity:
+          description: Capacity (veh / hr / lane)
+          type: numeric
+          required: false
+        free_speed:
+          description: Free flow speed in long_length units per hour
+          type: numeric
+          required: false
+        lanes:
+          description: Number of lanes in the direction of travel
+          type: inetger
+          required: false
+        bike_facility:
+          description: Type of bicycle accommodation
+          type: text
+          required: false
+        ped_facility:
+          description: Type of pedestrian accommodation
+          type: text
+          required: false
+        parking:
+          description: Type of parking
+          type: text
+          required: false
+        allowed_uses:
+          description: Set of allowed uses
+          type: text
+          required: false
+        toll:
+          description: Toll in currency units
+          type: numeric
+          required: false
+        jurisdiction:
+          description: Owner/operator of the link
+          type: text
+          required: false
+        row_width:
+          description: Width of the entire right-of-way (both directions)
+          type: numeric
+          required: false
+    use_definition:
+      fields:
+        use:
+          description: Short name of the vehicle
+          type: text
+          required: true
+        persons_per_vehicle:
+          description: Average persons per vehicle. Used to compute person-based performance measures (0 for non-travel uses)
+          type: numeric
+          required: true
+        pce:
+          description: Passenger car equivalents, used for capacity calculations (0 for non-travel uses)
+          type: numeric
+          required: true
+        special_conditions:
+          description: Treatment of these special conditions may be needed in a future version of GMNS
+          type: text
+          required: false
+        description:
+          description: A longer description of the mode
+          type: text
+          required: false
+      equivalency:
+        mode_name: use
 osm:
-    overpass_endpoint: "https://overpass.kumi.systems/api/interpreter"
+    overpass_endpoint: "https://lz4.overpass-api.de/api/interpreter"
     nominatim_endpoint: "https://nominatim.openstreetmap.org/"
     accept_language: "en"
     max_attempts: 50
     timeout: 540
     max_query_area_size: 2500000000
-    sleeptime: 2
+    sleeptime: 5
 
 system:
   cpus: 0

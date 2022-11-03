@@ -8,3 +8,4 @@ requests
 shapely >= 1.7.0
 pandas
 pyarrow
+pyproj
