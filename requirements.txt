@@ -1,4 +1,4 @@
-numpy>=1.22
+numpy>=1.18.0,<1.22
 scipy
 pyaml
 PyQt5
@@ -7,5 +7,5 @@ pyshp
 requests
 shapely >= 1.7.0
 pandas
-pyarrow
+pyarrow<10.0.0
 pyproj
