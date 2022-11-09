@@ -23,7 +23,7 @@ ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=inclu
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
 if "WINDOWS" not in platform.platform().upper():
-    ext_module.extra_compile_args.append("-std=c++11")
+    ext_module.extra_compile_args.append("-std=c++17")
 
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
