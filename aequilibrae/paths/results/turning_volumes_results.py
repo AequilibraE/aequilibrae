@@ -1,10 +1,12 @@
-from typing import Union, Literal
-
-import numpy as np
-import pandas as pd
 import re
 from pathlib import Path
+from typing import Literal
+from typing import Optional
+from typing import Union
+
+import numpy as np
 import openmatrix as omx
+import pandas as pd
 
 
 # TODO: deal with multiple iterations
@@ -16,7 +18,8 @@ def calculate_turning_volumes(
         turns_df: pd.DataFrame,
         demand_matrix: Union[omx, dict[int, int]],
         mode_id: str,
-        class_name: str
+        class_name: str,
+        iterations: Optional[list] = None
 ) -> pd.DataFrame:
     """
 
@@ -26,14 +29,16 @@ def calculate_turning_volumes(
     :param demand_matrix: {'matrix': matrix, "mapping": matrix_mapping}
     :param mode_id:
     :param class_name:
+    :param iterations: Subset of iterations to use. If None uses all available
     :return: dataframe containing the turning volumes
     """
-    paths_folder = project_dir / "path_files" / procedure_id
+    procedure_dir = project_dir / "path_files" / procedure_id
     node_to_index_df = read_path_aux_file(project_dir, procedure_id, "node_to_index", mode_id, class_name)
     correspondence_df = read_path_aux_file(project_dir, procedure_id, "correspondence", mode_id, class_name)
 
     # only reads iteration 1
-    formatted_paths = format_paths(read_paths_from_folder(paths_folder, mode_id, class_name, 1))
+    formatted_paths = format_paths(
+        read_paths_for_iterations(procedure_dir, mode_id, class_name, iterations))
 
     formatted_turns = format_turns(turns_df, formatted_paths, node_to_index_df, correspondence_df)
     turns_demand = get_turns_demand(formatted_turns, demand_matrix)
@@ -57,18 +62,22 @@ def read_path_aux_file(
         raise ValueError(f"Don't know what to do with {file_type}. Expected values are node_to_index or correspondence")
 
 
-def read_all_iterations_paths(project_dir: Path, procedure_id: str, mode_id: str, class_name: str) -> pd.DataFrame:
-    procedure_folder = project_dir / "path_files" / procedure_id
+def read_paths_for_iterations(procedure_dir: Path, mode_id: str, class_name: str,
+                              iterations: Optional[list[int]] = None) -> pd.DataFrame:
     iter_folder_regex = re.compile("iter([0-9]+)$")
     paths_list = []
-    for iter_folder in procedure_folder.glob("iter*"):
+    for iter_folder in procedure_dir.glob("iter*"):
         match_iter_folder = re.match(iter_folder_regex, str(iter_folder.stem))
         if (not iter_folder.is_dir()) | (match_iter_folder is None):
             continue
+
         iteration = int(match_iter_folder.groups(0)[0])
-        paths_folder = procedure_folder / f"iter{iteration}" / f"path_c{mode_id}_{class_name}"
+        if (iterations is not None) & iteration not in iterations:
+            continue
+
+        paths_folder = procedure_dir / f"iter{iteration}" / f"path_c{mode_id}_{class_name}"
         read_paths_from_folder(paths_folder, mode_id, class_name, iteration)
-    return format_paths(pd.concat(paths_list))
+    return pd.concat(paths_list)
 
 
 def read_paths_from_folder(paths_dir: Path, mode_id: str, class_name: str, iteration: int) -> pd.DataFrame:
