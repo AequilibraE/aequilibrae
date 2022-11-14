@@ -1,7 +1,7 @@
 import importlib.util as iutil
 import os
 import platform
-from os.path import dirname, join
+from os.path import dirname, join, isfile
 
 import numpy as np
 from Cython.Distutils import build_ext
@@ -25,8 +25,13 @@ ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=inclu
 if "WINDOWS" not in platform.platform().upper():
     ext_module.extra_compile_args.append("-std=c++17")
 
-with open("requirements.txt", "r") as fl:
-    install_requirements = [x.strip() for x in fl.readlines()]
+reqs = ["numpy>=1.18.0,<1.22", "scipy", "pyaml", "cython", "pyshp", "requests", "shapely >= 1.7.0", "pandas", "pyproj"]
+
+if isfile("requirements.txt"):
+    # We just make sure to keep the requirements sync'ed with the setup file
+    with open("requirements.txt", "r") as fl:
+        install_requirements = [x.strip() for x in fl.readlines()]
+    assert sorted(install_requirements) == sorted(reqs)
 
 pkgs = [pkg for pkg in find_packages()]
 
@@ -43,7 +48,7 @@ if __name__ == "__main__":
         name="aequilibrae",
         version=release_version,
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
-        install_requires=install_requirements,
+        install_requires=reqs,
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
