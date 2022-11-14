@@ -4,7 +4,5 @@ pytest
 pytest-cov
 coveralls
 flake8
-tables
 wheel
-openmatrix
 black
