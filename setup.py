@@ -1,24 +1,32 @@
-import sys
+import importlib.util as iutil
 import os
 import platform
+from os.path import dirname, join
+
 import numpy as np
-import pyarrow as pa
-from setuptools import setup, find_packages
-from setuptools import Extension
 from Cython.Distutils import build_ext
+from setuptools import Extension
+from setuptools import setup, find_packages
+
 from aequilibrae.paths.__version__ import release_version
 
-sys.dont_write_bytecode = True
+spec = iutil.find_spec("pyarrow")
 
-here = os.path.dirname(os.path.realpath(__file__))
-whole_path = os.path.join(here, "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension(
-    "aequilibrae.paths.AoN", [whole_path], include_dirs=[np.get_include(), pa.get_include()], language="c++"
-)
+include_dirs = [np.get_include()]
+if spec is not None:
+    import pyarrow as pa
+
+    include_dirs.append(pa.get_include())
+
+whole_path = join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")
+ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=include_dirs, language="c++")
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
 if "WINDOWS" not in platform.platform().upper():
-    ext_module.extra_compile_args.append("-std=c++11")
+    ext_module.extra_compile_args.append("-std=c++17")
+
+with open("requirements.txt", "r") as fl:
+    install_requirements = [x.strip() for x in fl.readlines()]
 
 pkgs = [pkg for pkg in find_packages()]
 
@@ -35,7 +43,7 @@ if __name__ == "__main__":
         name="aequilibrae",
         version=release_version,
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
-        install_requires=["numpy", "pyaml", "pandas", "requests", "shapely", "scipy", "pyarrow"],
+        install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
@@ -51,6 +59,7 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=[ext_module],
