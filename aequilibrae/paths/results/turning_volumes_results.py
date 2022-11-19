@@ -3,9 +3,10 @@ from pathlib import Path
 from typing import Literal
 from typing import Optional
 
-import numpy as np
-import openmatrix as omx
 import pandas as pd
+
+from aequilibrae import AequilibraeMatrix
+from aequilibrae import TrafficClass
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["network mode", "class_name", "iteration", "a", "b", "c"]
 TURNING_VOLUME_COLUMNS = TURNING_VOLUME_GROUPING_COLUMNS + ['demand']
@@ -18,13 +19,11 @@ TURNING_VOLUME_OD_COLUMNS = ["network mode", "class_name", "iteration", "a", "b"
 # TODO: add save turning movements to assignment
 class TurningVolumesResults:
 
-    # TODO: deal with multiclass
     def __init__(
             self,
             class_name: str,
             mode_id: str,
-            matrix: omx,
-            matrix_mapping: dict[int, int],
+            matrix: AequilibraeMatrix,
             project_dir: Path,
             procedure_id: str,
             iterations: Optional[list[int]] = None,
@@ -32,11 +31,23 @@ class TurningVolumesResults:
         self.class_name = class_name
         self.mode_id = mode_id
         self.matrix = matrix
-        self.matrix_mapping = matrix_mapping
         self.project_dir = project_dir
         self.procedure_id = procedure_id
         self.iterations = iterations
         self.procedure_dir = project_dir / "path_files" / procedure_id
+
+    def from_traffic_class(
+            self,
+            traffic_class: TrafficClass,
+            project_dir: Path,
+            procedure_id: str,
+            iterations: Optional[list[int]] = None,
+    ):
+        class_name = traffic_class.__id__
+        mode_id = traffic_class.mode
+        matrix = traffic_class.matrix
+
+        return TurningVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iterations)
 
     def calculate_turning_volumes(self, turns_df: pd.DataFrame) -> pd.DataFrame:
         """
