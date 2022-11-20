@@ -49,11 +49,12 @@ class TurningVolumesResults:
 
         return TurningVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iterations)
 
-    def calculate_turning_volumes(self, turns_df: pd.DataFrame) -> pd.DataFrame:
+    def calculate_turning_volumes(self, turns_df: pd.DataFrame, betas: list[float]) -> pd.DataFrame:
         """
 
         :param turns_df: Dataframe containing turns' abc nodes required fields: [a, b, c]
         :return: dataframe containing the turning volumes
+        :param betas: parameters to aggregate volumes by iteration
         """
         node_to_index_df = self.read_path_aux_file("node_to_index")
         correspondence_df = self.read_path_aux_file("correspondence")
@@ -63,8 +64,8 @@ class TurningVolumesResults:
 
         formatted_turns = self.format_turns(turns_df, formatted_paths, node_to_index_df, correspondence_df)
         turns_demand = self.get_turns_demand(formatted_turns)
-
-        return self.get_turns_movements(turns_demand)
+        turn_volumes_by_iteration = self.get_turns_movements(turns_demand)
+        return self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
 
     def read_path_aux_file(self, file_type: Literal["node_to_index", "correspondence"]) -> pd.DataFrame:
 
@@ -175,3 +176,20 @@ class TurningVolumesResults:
 
     def get_turns_movements(self, turns_demand: pd.DataFrame) -> pd.DataFrame:
         return turns_demand[TURNING_VOLUME_COLUMNS].groupby(TURNING_VOLUME_GROUPING_COLUMNS, as_index=False).sum()
+
+    def calculate_volume(self, df: pd.DataFrame, betas: pd.Series) -> pd.Series:
+        volume = df['demand']
+        iterations = df["iteration"].max()
+        for it in range(1, iterations + 1):
+            min_idx = max(0, it - betas.size)
+            max_idx = min_idx + min(it, betas.size)
+            window = range(min_idx, max_idx)
+            volume.iloc[it - 1] = (volume.iloc[window] * betas[0:min(it, betas.size)].values).sum()
+        return volume
+
+    def aggregate_iteration_volumes(self, turns_volumes: pd.DataFrame, betas: list[float]) -> pd.DataFrame:
+        grouping_cols = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col != 'iteration']
+        result = turns_volumes.groupby(grouping_cols).apply(lambda x: self.calculate_volume(x, pd.Series(betas)))
+        idx_results = result.reset_index(level=list(range(0, len(grouping_cols))))
+        turns_volumes['volume'] = idx_results["demand"]
+        return turns_volumes.groupby(grouping_cols).last()
