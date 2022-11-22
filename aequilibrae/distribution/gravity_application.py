@@ -15,8 +15,6 @@ from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 
-sys.dont_write_bytecode = True
-
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 
@@ -320,15 +318,15 @@ class GravityApplication:
             elif self.model.function == "POWER":
                 # self.output.matrices[self.core_name][i, :] = (np.power(self.impedance.matrix_view[i, :, 0], - self.model.alpha) * p * a)[:]
                 self.output.matrix_view[i, :] = (np.power(self.impedance.matrix_view[i, :], -self.model.alpha) * p * a)[
-                    :
-                ]
+                                                :
+                                                ]
             elif self.model.function == "GAMMA":
                 self.output.matrix_view[i, :] = (
-                    np.power(self.impedance.matrix_view[i, :], self.model.alpha)
-                    * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
-                    * p
-                    * a
-                )[:]
+                                                        np.power(self.impedance.matrix_view[i, :], self.model.alpha)
+                                                        * np.exp(-self.model.beta * self.impedance.matrix_view[i, :])
+                                                        * p
+                                                        * a
+                                                )[:]
 
         # Deals with infinite and NaNs
         infinite = np.isinf(self.output.matrix_view[:, :]).astype(int)
