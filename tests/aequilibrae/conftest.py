@@ -8,11 +8,12 @@ from shutil import copytree
 import pytest
 
 from aequilibrae import Project
+from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 
 from ..data import siouxfalls_project
 
 DEFAULT_PROJECT = siouxfalls_project
-
+ensure_spatialite_binaries()
 
 def project_factory_fixture(scope):
     @pytest.fixture(scope=scope)
