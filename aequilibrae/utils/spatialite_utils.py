@@ -12,6 +12,7 @@ from aequilibrae.utils.db_utils import has_table, safe_connect
 
 inside_qgis = False
 
+
 def is_windows():
     return os.name == "nt"
 

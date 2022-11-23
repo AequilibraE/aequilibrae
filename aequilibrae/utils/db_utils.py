@@ -7,7 +7,6 @@ from typing import Union
 import pandas as pd
 
 
-
 def list_tables_in_db(conn: Connection):
     sql = "SELECT name FROM sqlite_master WHERE type ='table'"
     table_list = sorted([x[0].lower() for x in conn.execute(sql).fetchall() if "idx_" not in x[0].lower()])
@@ -65,6 +64,7 @@ def read_sql(sql, filepath, **kwargs):
 def has_table(conn, table_name):
     sql = f"SELECT name FROM sqlite_master WHERE type='table' AND name like '{table_name}';"
     return len(conn.execute(sql).fetchall()) > 0
+
 
 @dataclass
 class ColumnDef:
