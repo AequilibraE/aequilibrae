@@ -1,13 +1,8 @@
-import sys
 import platform
+
 import numpy as np
 import pyarrow as pa
-import Cython.Compiler.Options
-from Cython.Distutils import build_ext
 from Cython.Build import cythonize
-import shutil
-
-# Cython.Compiler.Options.annotate = True
 
 try:
     from setuptools import setup
@@ -16,13 +11,11 @@ except ImportError:
     from distutils.core import setup
     from distutils.extension import Extension
 
-# sys.dont_write_bytecode = True
-
 if "WINDOWS" in platform.platform().upper():
     ext_modules = [
         Extension(
             "AoN",
-            ["aequilibrae/paths/AoN.pyx"],
+            ["AoN.pyx"],
             extra_compile_args=["/openmp"],
             extra_link_args=["/openmp"],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
