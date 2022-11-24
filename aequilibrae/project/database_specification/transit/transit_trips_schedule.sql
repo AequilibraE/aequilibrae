@@ -10,11 +10,11 @@
 --@ The time_source field indicates whether the stop timing came from the GTFS
 --@ feed (**0**) or from any pre-processing (i.e. stop_time_de-duplication) (**1**).
 
-CREATE TABLE IF NOT EXISTS transit_trips_schedule (
+CREATE TABLE IF NOT EXISTS trips_schedule (
 	trip_id	  INTEGER  NOT NULL,
 	seq  	  INTEGER  NOT NULL,
 	arrival	  INTEGER  NOT NULL,
 	departure INTEGER  NOT NULL,
-	PRIMARY KEY(trip_id,"index"),
-	FOREIGN KEY(trip_id) REFERENCES transit_trips(trip_id) deferrable initially deferred
+	PRIMARY KEY(trip_id,"seq"),
+	FOREIGN KEY(trip_id) REFERENCES trips(trip_id) deferrable initially deferred
 );

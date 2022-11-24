@@ -2,13 +2,13 @@
 --@ table includes only those routes for which that are active services for the
 --@ for which services have been imported. Descriptive information, as well as
 --@ capacity is included in this table, although the latter can be overwritten
---@ if information is provided in the transit_routes or transit_trips tables.
+--@ if information is provided in the routes or trips tables.
 --@
 --@ The routes can be traced back to the agency directly through the encoding of
 --@ their trip_id, as explained in the documentation for the agencies
 --@ table.
 
-CREATE TABLE IF NOT EXISTS transit_routes (
+CREATE TABLE IF NOT EXISTS routes (
 	route_id        INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT ,
 	pattern_id      INTEGER  NOT NULL,
 	route	        TEXT     NOT NULL,
@@ -22,6 +22,6 @@ CREATE TABLE IF NOT EXISTS transit_routes (
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
 );
 
-select AddGeometryColumn( 'transit_routes', 'geo', SRID_PARAMETER, 'LINESTRING', 'XY');
+select AddGeometryColumn( 'routes', 'geometry', SRID_PARAMETER, 'LINESTRING', 'XY');
 
-select CreateSpatialIndex( 'transit_routes' , 'geo' );
+select CreateSpatialIndex( 'routes' , 'geometry' );

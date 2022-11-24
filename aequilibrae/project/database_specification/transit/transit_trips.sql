@@ -1,4 +1,4 @@
---@ The Transit_Trips table holds the complete list of all transit services
+--@ The trips table holds the complete list of all transit services
 --@ operating, for which one can override the information on capacity
 --@ coming from route/pattern. There is also information on whether the
 --@ vehicle is articulated or if it has multiple cars (applicable to rail), but
@@ -9,10 +9,10 @@
 --@ documentation for the agencies table.
 --@
 
-CREATE TABLE IF NOT EXISTS transit_trips (
+CREATE TABLE IF NOT EXISTS trips (
 	trip_id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 	trip            TEXT,
 	dir	            INTEGER NOT NULL,
 	pattern_id      INTEGER NOT NULL,
-	FOREIGN KEY(pattern_id) REFERENCES transit_routes(pattern_id) deferrable initially deferred
+	FOREIGN KEY(pattern_id) REFERENCES routes(pattern_id) deferrable initially deferred
 );

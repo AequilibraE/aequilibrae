@@ -12,7 +12,7 @@
 --@ straight-line distance the stop was moved.
 
 
-CREATE TABLE IF NOT EXISTS transit_stops (
+CREATE TABLE IF NOT EXISTS stops (
 	stop_id	          INTEGER PRIMARY KEY AUTOINCREMENT ,
 	stop	          TEXT    NOT NULL ,
 	agency_id         INTEGER NOT NULL,
@@ -22,15 +22,15 @@ CREATE TABLE IF NOT EXISTS transit_stops (
 	parent_station    TEXT,
 	description	      TEXT,
 	street	          TEXT,
-	transit_zone_id   INTEGER,
+	fare_zone_id   INTEGER,
 	route_type        INTEGER NOT NULL DEFAULT -1,
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
-	FOREIGN KEY("transit_zone_id") REFERENCES transit_zones("transit_zone_id")
+	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
 );
 
 
-create INDEX IF NOT EXISTS transit_stops_stop_id ON transit_stops (stop_id);
+create INDEX IF NOT EXISTS stops_stop_id ON stops (stop_id);
 
-select AddGeometryColumn( 'transit_stops', 'geo', SRID_PARAMETER, 'POINT', 'XY', 1);
+select AddGeometryColumn( 'stops', 'geometry', SRID_PARAMETER, 'POINT', 'XY', 1);
 
-select CreateSpatialIndex( 'transit_stops' , 'geo' );
+select CreateSpatialIndex( 'stops' , 'geometry' );

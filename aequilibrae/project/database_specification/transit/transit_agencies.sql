@@ -7,9 +7,7 @@
 --@ Encoding of ids for transit agencies, routes, patterns and trips follows a
 --@ strict encoding that allow one to trace back each element to its parent
 --@ (Agency->Route->Pattern->Trip).
---@ This encoding follows the following pattern: AARRRPPTTT. Since this IDs
---@ are always integer, those corresponding to agencies 1 through 9 will omit
---@ the first 0 in the ID pattern shown above.
+--@ This encoding follows the following pattern: AARRRPPTTT.
 --@
 
 create TABLE IF NOT EXISTS agencies (
