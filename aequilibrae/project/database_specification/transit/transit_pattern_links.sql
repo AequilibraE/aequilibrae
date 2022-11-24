@@ -1,8 +1,8 @@
---@ The pattern_links table holds the information on the sequence of
+--@ The route_links table holds the information on the sequence of
 --@ of transit links that are traversed by each transit pattern
 --@
 
-CREATE TABLE IF NOT EXISTS pattern_links (
+CREATE TABLE IF NOT EXISTS route_links (
 	pattern_id              INTEGER    NOT NULL,
 	seq  	                INTEGER    NOT NULL,
 	transit_link            INTEGER    NOT NULL,
@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS pattern_links (
 	FOREIGN KEY(to_stop)    REFERENCES "stops"(stop_id) deferrable initially deferred
 );
 
-create UNIQUE INDEX IF NOT EXISTS pattern_links_stop_id ON pattern_links (pattern_id, transit_link);
+create UNIQUE INDEX IF NOT EXISTS route_links_stop_id ON route_links (pattern_id, transit_link);
