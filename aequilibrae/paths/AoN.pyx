@@ -1,17 +1,3 @@
-""" -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
- Name:       Core path computation algorithms
- Purpose:    Implement shortest path and network loading routines
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Arthur E.
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
- Created:    15/09/2013
- Updated:    24/04/2018
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------"""
 import os
 
 # cython: language_level=3

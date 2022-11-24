@@ -15,9 +15,9 @@ jobs:
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python 3.9
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: 3.9
     - name: Install dependencies
@@ -25,6 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install wheel openmatrix
         pip install -r requirements.txt
+        pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
         python -m pip install sphinx-gallery --user
         sudo apt-get install libsqlite3-mod-spatialite

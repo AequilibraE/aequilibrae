@@ -11,9 +11,9 @@ jobs:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set Python environment
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
@@ -22,6 +22,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
         pip install -r requirements.txt
+        pip install -r requirements_additional.txt
 
     - name: Build
       run: |
@@ -29,7 +30,7 @@ jobs:
 
     - name: Stores artifacts along with the workflow result
       if: ${{ github.event_name == 'push'}}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: library
         path: dist/*.whl

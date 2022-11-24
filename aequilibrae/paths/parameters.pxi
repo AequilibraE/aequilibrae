@@ -15,6 +15,6 @@ cdef ITYPE_t NULL_IDX = 18446744073709551615
 cdef double INFINITE = 1.79769313e+308
 
 VERSION = 0.7
-MINOR_VRSN = 4
-binary_version = "0.7.4"
+MINOR_VRSN = 6
+binary_version = "0.7.6b"
 release_name = "Queluz"
