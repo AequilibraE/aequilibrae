@@ -40,7 +40,7 @@ pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
-    "aequilibrae.paths": ["parameters.pxi"],
+    "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
 }
