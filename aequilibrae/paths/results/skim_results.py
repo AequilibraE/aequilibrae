@@ -89,7 +89,7 @@ class SkimResults:
             if cores == 0:
                 self.cores = mp.cpu_count()
             elif cores > 0:
-                cores = max(mp.cpu_count(), cores)
+                cores = min(mp.cpu_count(), cores)
                 if self.cores != cores:
                     self.cores = cores
         else:
