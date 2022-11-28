@@ -441,9 +441,9 @@ class Graph(object):
         """
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
-            self.compact_cost = np.zeros(self.compact_graph.id.max() + 1, self.__float_type)
+            self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
             df = self.__graph_groupby.sum()[[cost_field]].reset_index()
-            self.compact_cost[df.index.values[:-1]] = df[cost_field].values[:-1]
+            self.compact_cost[df.index.values] = df[cost_field].values
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:
@@ -475,10 +475,10 @@ class Graph(object):
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
+        self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
         df = self.__graph_groupby.sum()[skim_fields].reset_index()
         for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values[:-1], i] = df[skm].values[:-1].astype(self.__float_type)
+            self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
