@@ -40,9 +40,9 @@ pkg_data = {
     "aequilibrae.paths": ["parameters.pxi"],
     "aequilibrae": ["parameters.yml"],
     "aequilibrae.project": [
-        "database_specification/tables/*.*",
-        "database_specification/triggers/*.*",
-        "database_specification/transit/*.*",
+        "database_specification/network/tables/*.*",
+        "database_specification/network/triggers/*.*",
+        "database_specification/transit/tables/*.*",
     ],
 }
 loose_modules = ["__version__", "parameters"]
