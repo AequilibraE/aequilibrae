@@ -15,8 +15,6 @@ from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 
-sys.dont_write_bytecode = True
-
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 

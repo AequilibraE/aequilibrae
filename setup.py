@@ -19,7 +19,13 @@ if spec is not None:
     include_dirs.append(pa.get_include())
 
 whole_path = join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension("aequilibrae.paths.AoN", [whole_path], include_dirs=include_dirs, language="c++")
+ext_module = Extension(
+    "aequilibrae.paths.AoN",
+    [whole_path],
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
 if "WINDOWS" not in platform.platform().upper():
@@ -37,7 +43,7 @@ pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
-    "aequilibrae.paths": ["parameters.pxi"],
+    "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae": ["parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
