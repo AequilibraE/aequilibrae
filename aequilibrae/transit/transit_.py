@@ -229,9 +229,6 @@ class Transit(WorkerThread):
             description=description,
             default_capacities=self.default_capacities,
         )
-        if not qgis:
-            gtfs.signal = self.transit
-            gtfs.gtfs_data.signal = self.transit
         return gtfs
 
     def set_capacity_by_route_type(self, route_type: int, seated: int, total: int, design=None):
