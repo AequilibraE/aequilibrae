@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS routes (
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
 );
 
-select AddGeometryColumn( 'routes', 'geometry', SRID_PARAMETER, 'LINESTRING', 'XY');
+--#
+select AddGeometryColumn( 'routes', 'geometry', 4326, 'LINESTRING', 'XY');
 
+--#
 select CreateSpatialIndex( 'routes' , 'geometry' );

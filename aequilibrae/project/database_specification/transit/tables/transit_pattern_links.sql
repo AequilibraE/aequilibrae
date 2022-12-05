@@ -14,4 +14,5 @@ CREATE TABLE IF NOT EXISTS route_links (
 	FOREIGN KEY(to_stop)    REFERENCES "stops"(stop_id) deferrable initially deferred
 );
 
+--#
 create UNIQUE INDEX IF NOT EXISTS route_links_stop_id ON route_links (pattern_id, transit_link);
