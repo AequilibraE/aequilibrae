@@ -9,8 +9,8 @@
 --@ table.
 
 CREATE TABLE IF NOT EXISTS routes (
-	route_id        INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT ,
-	pattern_id      INTEGER  NOT NULL,
+	route_id        INTEGER  NOT NULL,
+	pattern_id      INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
 	route	        TEXT     NOT NULL,
 	agency_id	    INTEGER  NOT NULL,
 	shortname       TEXT,
