@@ -14,11 +14,8 @@ class Transit:
 
         Args:
             *agency* (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
-
             *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-
             *day* (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
-
             *description* (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
         Return:
