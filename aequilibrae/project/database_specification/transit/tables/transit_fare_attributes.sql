@@ -15,4 +15,5 @@ create TABLE IF NOT EXISTS fare_attributes (
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
 );
 
+--#
 CREATE UNIQUE INDEX IF NOT EXISTS fare_transfer_uniqueness ON fare_attributes (fare_id, transfer);
