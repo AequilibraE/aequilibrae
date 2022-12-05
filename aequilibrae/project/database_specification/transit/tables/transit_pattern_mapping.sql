@@ -8,11 +8,13 @@ CREATE TABLE IF NOT EXISTS pattern_mapping (
 	seq         INTEGER NOT NULL,
 	link	    INTEGER NOT NULL,
 	dir	        INTEGER NOT NULL,
-	PRIMARY KEY(pattern_id,"index"),
+	PRIMARY KEY(pattern_id,"seq"),
 	FOREIGN KEY(pattern_id) REFERENCES routes(pattern_id) deferrable initially deferred,
 	FOREIGN KEY(link) REFERENCES Link(link) deferrable initially deferred
 );
 
-SELECT AddGeometryColumn( 'pattern_mapping', 'geometry', SRID_PARAMETER, 'LINESTRING', 'XY');
+--#
+SELECT AddGeometryColumn( 'pattern_mapping', 'geometry', 4326, 'LINESTRING', 'XY');
 
+--#
 SELECT CreateSpatialIndex( 'pattern_mapping' , 'geometry' );

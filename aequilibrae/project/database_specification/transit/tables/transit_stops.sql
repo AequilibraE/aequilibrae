@@ -28,9 +28,11 @@ CREATE TABLE IF NOT EXISTS stops (
 	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
 );
 
-
+--#
 create INDEX IF NOT EXISTS stops_stop_id ON stops (stop_id);
 
-select AddGeometryColumn( 'stops', 'geometry', SRID_PARAMETER, 'POINT', 'XY', 1);
+--#
+select AddGeometryColumn( 'stops', 'geometry', 4326, 'POINT', 'XY', 1);
 
+--#
 select CreateSpatialIndex( 'stops' , 'geometry' );

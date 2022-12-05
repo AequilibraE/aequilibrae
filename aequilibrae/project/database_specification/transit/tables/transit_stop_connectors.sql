@@ -14,10 +14,14 @@ CREATE TABLE IF NOT EXISTS stop_connectors (
 	traversal_time INTEGER  NOT NULL,
 	penalty_cost   INTEGER  NOT NULL);
 
-SELECT AddGeometryColumn('stop_connectors', 'geometry', SRID_PARAMETER, 'LINESTRING', 'XY', 1);
+--#
+SELECT AddGeometryColumn('stop_connectors', 'geometry', 4326, 'LINESTRING', 'XY', 1);
 
+--#
 SELECT CreateSpatialIndex('stop_connectors' , 'geometry');
 
+--#
 CREATE INDEX IF NOT EXISTS stop_connectors_id_from ON stop_connectors (id_from);
 
+--#
 CREATE INDEX IF NOT EXISTS stop_connectors_id_to ON stop_connectors (id_to);
