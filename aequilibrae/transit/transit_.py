@@ -204,7 +204,6 @@ class Transit(WorkerThread):
                     else:
                         logger.error(f'Table "{table}" does not exist in the network')
 
-        self.__purge_added_connections(conn)
         conn.close()
 
     def new_gtfs(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
@@ -302,19 +301,6 @@ class Transit(WorkerThread):
         """
         delete_pattern(pattern_id)
 
-    def fix_connections_table(self):
-        """Adds connections that do not exist"""
-        with supply_database_connection() as conn:
-            data_tables = DataTableStorage()
-            connections = data_tables.get_table("Connection", conn)
-            map_matching = data_tables.get_table("Transit_Pattern_Mapping", conn).reset_index()
-            bus_pat_sql = """SELECT pattern_id from Transit_Patterns tp
-                             INNER JOIN transit_routes tr ON tp.route_id=tr.route_id
-                             WHERE tr.type=3"""
-            patterns = pd.read_sql(bus_pat_sql, conn)
-            map_matching = map_matching[map_matching.pattern_id.isin(patterns.pattern_id)]
-            fix_connections_table(connections, map_matching, conn)
-
     def export_gtfs(self, output_folder: str):
         """Exports transit system to GTFS output
 
@@ -324,23 +310,3 @@ class Transit(WorkerThread):
         rs = RouteSystem(self.network.path_to_file)
         rs.load_route_system()
         rs.write_GTFS(output_folder)
-
-    def set_progress_bar(self, progress_bar: bool):
-        """Controls display of progress bars in Python
-
-        Args:
-            *progress_bar* (:obj:`bool`): Removes progress bars from Python when set to False
-        """
-        self.transit.deactivate = not progress_bar
-
-    def __purge_added_connections(self, conn):
-        nodes_qry = "SELECT distinct(node) from Turn_Overrides where notes='required_by_pt_map_matching'"
-        nodes = [x[0] for x in conn.execute(nodes_qry).fetchall()]
-        conn.execute("Delete from Turn_Overrides where notes='required_by_pt_map_matching'")
-
-        for n in nodes:
-            intersec = Intersection(data_tables=DataTableStorage(), conn=conn)
-            intersec.load(n)
-            intersec.rebuild_intersection()
-
-        conn.commit()
