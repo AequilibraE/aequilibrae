@@ -317,7 +317,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for counter, (stop_id, stop) in enumerate(self.select_stops.items()):  # type: Stop
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
-                stop.taz = self.geotool.get_zone(stop.geo)
+                # TODO: Create code that gets the zone for a stop
+                # stop.taz = self.geotool.get_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
                 self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
 
