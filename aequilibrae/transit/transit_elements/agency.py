@@ -1,9 +1,9 @@
 from contextlib import closing
 from sqlite3 import Connection
 
-from polarislib.network.constants import constants, WALK_AGENCY_ID
-from polarislib.network.database_connection import supply_database_connection
-from polarislib.network.transit.transit_elements.basic_element import BasicPTElement
+from aequilibrae.transit.constants import constants, WALK_AGENCY_ID
+from aequilibrae.transit.functions.transit_connection import transit_connection
+from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
 class Agency(BasicPTElement):
@@ -28,14 +28,14 @@ class Agency(BasicPTElement):
         """Saves route to the database"""
 
         data = [self.agency_id, self.agency, self.feed_date, self.service_date, self.description]
-        sql = """insert into Transit_Agencies (agency_id, agency, feed_date, service_date, description)
+        sql = """insert into agencies (agency_id, agency, feed_date, service_date, description)
                  values (?, ?, ?, ?, ?);"""
         conn.execute(sql, data)
         conn.commit()
 
     def __get_agency_id(self):
-        with closing(supply_database_connection(dont_raise=True)) as conn:
-            sql = "Select coalesce(max(distinct(agency_id)), 0) from Transit_Agencies where agency_id<?;"
+        with closing(transit_connection()) as conn:
+            sql = "Select coalesce(max(distinct(agency_id)), 0) from agencies where agency_id<?;"
             data = [x[0] for x in conn.execute(sql, [WALK_AGENCY_ID])]
 
         c = constants()

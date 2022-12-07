@@ -2,7 +2,7 @@ from sqlite3 import Connection
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
 
-from polarislib.network.constants import constants, TRANSIT_LINK_RANGE
+from aequilibrae.transit.constants import constants, TRANSIT_LINK_RANGE
 
 
 class Link:
@@ -63,14 +63,14 @@ class Link:
         data = [
             self.transit_link,
             self.pattern_id,
-            self.from_node,
-            self.to_node,
+            self.from_stop,
+            self.to_stop,
             self.length,
             self.type,
             self.geo.wkb,
             self.srid,
         ]
-        sql = """insert into Transit_Links(transit_link, pattern_id, from_node, to_node, "length", "type", geo)
+        sql = """insert into route_links (transit_link, pattern_id, from_stop, to_stop, "length", "type", geo)
                                             values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
         conn.execute(sql, data)
         if commit:

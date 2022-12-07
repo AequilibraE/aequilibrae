@@ -7,8 +7,9 @@ import shapely.wkb
 from shapely.geometry import LineString, Polygon
 from shapely.ops import substring
 
-import polarislib.network
-from polarislib.network.starts_logging import logger
+# import polarislib.network
+from aequilibrae.log import logger
+from aequilibrae.transit.functions.get_srid import get_srid
 from .basic_element import BasicPTElement
 from .link import Link
 from .mode_correspondence import mode_correspondence
@@ -89,6 +90,7 @@ class Pattern(BasicPTElement):
         self.seated_capacity = None
         self.design_capacity = None
         self.total_capacity = None
+        self.__srid = get_srid()
         self.__geotool = geotool  # type: polarislib.network.Geo
         self.__logger = None
         if self.__geotool:
@@ -134,17 +136,17 @@ class Pattern(BasicPTElement):
             self.design_capacity,
             self.total_capacity,
             geo,
-            self.__geotool.srid,
+            self.srid,
         ]
 
-        sql = """insert into Transit_Patterns (pattern_id, pattern, route_id, matching_quality, seated_capacity,
-                        design_capacity, total_capacity, geo) values (?, ?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-        conn.execute(sql, data)
+        # sql = """insert into Transit_Patterns (pattern_id, pattern, route_id, matching_quality, seated_capacity,
+        #                 design_capacity, total_capacity, geo) values (?, ?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
+        # conn.execute(sql, data)
 
         if self.pattern_mapping and self.shape:
-            sqlgeo = """insert into Transit_Pattern_Mapping(pattern_id, "index", link, dir, stop_id, offset, geo)
+            sqlgeo = """insert into pattern_mapping (pattern_id, "index", link, dir, stop_id, offset, geo)
                         values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-            sql = """insert into Transit_Pattern_Mapping (pattern_id, "index", link, dir, stop_id, offset)
+            sql = """insert into pattern_mapping (pattern_id, "index", link, dir, stop_id, offset)
                                                   values (?, ?, ?, ?, ?, ?);"""
 
             for record in self.pattern_mapping:
@@ -153,7 +155,7 @@ class Pattern(BasicPTElement):
                 else:
                     geo = shapely.wkb.loads(record[-1])
                     if isinstance(geo, LineString):
-                        conn.execute(sqlgeo, record + [self.__geotool.srid])
+                        conn.execute(sqlgeo, record + [self.__srid])
                     else:
                         conn.execute(sql, record[:-1])
         data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]

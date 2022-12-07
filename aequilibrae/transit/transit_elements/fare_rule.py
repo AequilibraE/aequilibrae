@@ -1,6 +1,6 @@
 from sqlite3 import Connection
 
-from polarislib.network.starts_logging import logger
+from aequilibrae.log import logger
 
 
 class FareRule:
@@ -49,7 +49,7 @@ class FareRule:
             logger.warning(f"Transit Fare rule with data {data} was not added")
             return
 
-        sql = "insert into Transit_Fare_Rules(fare_id, route_id, origin, destination, contains) values (?, ?, ?, ?, ?);"
+        sql = "insert into fare_rules (fare_id, route_id, origin, destination, contains) values (?, ?, ?, ?, ?);"
         conn.execute(sql, data)
         conn.commit()
 

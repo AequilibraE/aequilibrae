@@ -1,5 +1,5 @@
 from typing import List
-from polarislib.network.transit.date_tools import format_date, create_days_between, day_of_week
+from aequilibrae.transit.date_tools import format_date, create_days_between, day_of_week
 
 
 class Service:

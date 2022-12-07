@@ -1,11 +1,12 @@
 import sqlite3
+from aequilibrae.transit.functions.data import get_table
 
-from polarislib.network.data import DataTableStorage
-from polarislib.network.transit.transit_elements import Route
+# from polarislib.network.data import DataTableStorage
+from aequilibrae.transit.transit_elements import Route
 
 
 def read_routes(conn: sqlite3.Connection):
-    data = DataTableStorage().get_table("transit_routes", conn).reset_index()
+    data = get_table("transit_routes", conn).reset_index()
 
     data.drop(columns=["seated_capacity", "design_capacity", "total_capacity", "number_of_cars", "geo"], inplace=True)
     data.rename(

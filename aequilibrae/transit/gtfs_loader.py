@@ -11,20 +11,18 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import LineString
 
-from polarislib.network.constants import AGENCY_MULTIPLIER
-from polarislib.network.database_connection import get_srid
-from polarislib.network.transit.column_order import column_order
-from polarislib.network.transit.date_tools import to_seconds, create_days_between, format_date
-from polarislib.network.transit.parse_csv import parse_csv
-from polarislib.network.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
-from polarislib.utils.signals import SIGNAL
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER
+from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.column_order import column_order
+from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.parse_csv import parse_csv
+from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
 
 
 class GTFSReader:
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
-    logger = logging.getLogger("polaris")
-    signal = SIGNAL(object)
+    logger = logging.getLogger("GTFS Reader")
 
     def __init__(self):
         self.__capacities__ = {}
@@ -76,14 +74,14 @@ class GTFSReader:
         self.__mt = f"Reading GTFS for {ag_id}"
 
         self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
-        self.signal.emit(["start", "master", 6, self.__mt, self.__mt])
+        # self.signal.emit(["start", "master", 6, self.__mt, self.__mt])
 
         self.__load_date()
 
-        self.finished()
+        # self.finished()
 
-    def finished(self):
-        self.signal.emit(["finished_static_gtfs_procedure"])
+    # def finished(self):
+    #     self.signal.emit(["finished_static_gtfs_procedure"])
 
     def __load_date(self):
         self.logger.debug("Starting __load_date")
@@ -108,11 +106,11 @@ class GTFSReader:
         self.logger.info("Starting deconflict_stop_times")
 
         # loop over all routes and trips
-        msg_txt = f"Interpolating stop times for {self.agency.agency}"
-        self.signal.emit(["start", "secondary", len(self.trips), msg_txt, self.__mt])
+        # msg_txt = f"Interpolating stop times for {self.agency.agency}"
+        # self.signal.emit(["start", "secondary", len(self.trips), msg_txt, self.__mt])
         total_fast = 0
         for prog_counter, route in enumerate(self.trips):
-            self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for trip in self.trips[route]:  # type: Trip
                 self.logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
@@ -253,14 +251,14 @@ class GTFSReader:
 
         all_shape_ids = np.unique(shapes["shape_id"]).tolist()
         msg_txt = f"Load shapes - {self.agency.agency}"
-        self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
+        # self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
 
         self.data_arrays[shapestxt] = shapes
         lons, lats = self.transformer.transform(shapes[:]["shape_pt_lat"], shapes[:]["shape_pt_lon"])
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
         for i, shape_id in enumerate(all_shape_ids):
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString([x for x in zip(items["shape_pt_lon"], items["shape_pt_lat"])])
@@ -279,7 +277,7 @@ class GTFSReader:
         self.data_arrays[tripstxt] = trips_array
 
         msg_txt = f"Load trips - {self.agency.agency}"
-        self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
+        # self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
         #           We need to do several consistency checks for this table
         # If trip IDs are unique
         if np.unique(trips_array["trip_id"]).shape[0] < trips_array.shape[0]:
@@ -304,7 +302,7 @@ class GTFSReader:
         self.trips = {str(x): [] for x in np.unique(trips_array["route_id"])}
 
         for i, line in enumerate(trips_array):
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -430,12 +428,12 @@ class GTFSReader:
         df = df.merge(stop_list, on="stop")
         df.sort_values(["trip_id", "stop_sequence"], inplace=True)
         df = df.assign(source_time=0)  # Means that the stop time came from the original data
-        self.signal.emit(["start", "secondary", df.trip_id.unique().shape[0], msg_txt, self.__mt])
+        # self.signal.emit(["start", "secondary", df.trip_id.unique().shape[0], msg_txt, self.__mt])
         for trip_id, data in [[trip_id, x] for trip_id, x in df.groupby(df["trip_id"])]:
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
             counter += data.shape[0]
-            self.signal.emit(["update", "secondary", counter, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", counter, msg_txt, self.__mt])
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -458,9 +456,9 @@ class GTFSReader:
         stops[:]["stop_lon"][:] = lons[:]
 
         msg_txt = f"Load stops - {self.agency.agency}"
-        self.signal.emit(["start", "secondary", stops.shape[0], msg_txt, self.__mt])
+        # self.signal.emit(["start", "secondary", stops.shape[0], msg_txt, self.__mt])
         for i, line in enumerate(stops):
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             s = Stop(self.agency.agency_id)
             s.populate(line, stops.dtype.names)
             s.agency = self.agency.agency
@@ -483,7 +481,7 @@ class GTFSReader:
             self.__fail("There are repeated route IDs in routes.txt")
 
         msg_txt = f"Load Routes - {self.agency.agency}"
-        self.signal.emit(["start", "secondary", len(routes), msg_txt, self.__mt])
+        # self.signal.emit(["start", "secondary", len(routes), msg_txt, self.__mt])
 
         cap = self.__capacities__.get("other", [None, None, None])
         routes = pd.DataFrame(routes)
@@ -492,7 +490,7 @@ class GTFSReader:
             routes.loc[routes.route_type == route_type, ["seated_capacity", "design_capacity", "total_capacity"]] = cap
 
         for i, line in routes.iterrows():
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r

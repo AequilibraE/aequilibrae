@@ -3,7 +3,7 @@ import os
 import shutil
 import sqlite3
 import warnings
-from os.path import join
+# from os.path import join
 
 from aequilibrae import global_logger
 from aequilibrae.log import Log
@@ -91,6 +91,7 @@ class Project:
         self.activate()
 
         self.__create_empty_network()
+        self.__create_empty_transit()
         self.__load_objects()
         self.about.create()
         global_logger.info(f"Created project on {self.project_base_path}")
@@ -129,7 +130,7 @@ class Project:
         self.open(project_path)
 
     def connect(self):
-        return database_connection(self.project_base_path)
+        return database_connection("network", self.project_base_path)
 
     def activate(self):
         activate_project(self)
@@ -187,7 +188,7 @@ class Project:
         initialize_tables(self, "network")
 
     def __create_empty_transit(self):
-        shutil.copyfile(spatialite_database, join(self.project_base_path, "public_transport.sqlite"))
+        shutil.copyfile(spatialite_database, os.path.join(self.project_base_path, "public_transport.sqlite"))
         self.transit = Transit(self)
         initialize_tables(self, "transit")
 

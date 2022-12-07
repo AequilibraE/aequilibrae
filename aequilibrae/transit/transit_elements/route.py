@@ -1,7 +1,7 @@
 from sqlite3 import Connection
 from shapely.geometry import MultiLineString
-from polarislib.network.constants import constants, ROUTE_ID_MULTIPLIER, AGENCY_MULTIPLIER
-from polarislib.network.transit.transit_elements.basic_element import BasicPTElement
+from aequilibrae.transit.constants import constants, ROUTE_ID_MULTIPLIER, AGENCY_MULTIPLIER
+from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
 class Route(BasicPTElement):
@@ -43,7 +43,7 @@ class Route(BasicPTElement):
         self.shape: MultiLineString
         self.srid = -1
         self.number_of_cars = 0
-        self.__sql = """insert into Transit_Routes (route_id, route, agency_id, shortname, longname, description,
+        self.__sql = """insert into routes (route_id, route, agency_id, shortname, longname, description,
                                                     "type", seated_capacity, design_capacity, total_capacity,
                                                      number_of_cars{}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
         self.sql = self.__sql

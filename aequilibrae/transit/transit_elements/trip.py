@@ -2,9 +2,9 @@ from sqlite3 import Connection
 
 from shapely.geometry import LineString
 
-from polarislib.network.constants import constants, TRIP_ID_MULTIPLIER
-from polarislib.network.starts_logging import logger
-from polarislib.network.transit.transit_elements.basic_element import BasicPTElement
+from aequilibrae.transit.constants import constants, TRIP_ID_MULTIPLIER
+from aequilibrae.log import logger
+from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
 class Trip(BasicPTElement):
@@ -72,7 +72,7 @@ class Trip(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit trip to the database"""
         logger.debug(f"Saving {self.trip_id}/{self.trip} for pattern {self.pattern_id}")
-        sql = """insert into Transit_Trips (trip_id, trip,"dir", pattern_id, seated_capacity, design_capacity,
+        sql = """insert into trips (trip_id, trip, "dir", pattern_id, seated_capacity, design_capacity,
                                              total_capacity, is_artic) values (?, ?, ?, ?, ?, ?, ?, ?);"""
         data = [
             self.trip_id,
@@ -86,7 +86,7 @@ class Trip(BasicPTElement):
         ]
         conn.execute(sql, data)
 
-        sql = """insert into Transit_Trips_Schedule(trip_id, "index", arrival, departure, time_source)
+        sql = """insert into trips_schedule (trip_id, "index", arrival, departure, time_source)
                                             values (?, ?, ?, ?, ?)"""
         data = []
         for i, (arr, dep, st) in enumerate(zip(self.arrivals, self.departures, self.source_time)):

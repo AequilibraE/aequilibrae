@@ -1,13 +1,14 @@
 import sqlite3
 
 import shapely.wkb
+from aequilibrae.transit.functions.data import get_table
 
-from polarislib.network.data import DataTableStorage
-from polarislib.network.transit.transit_elements import Stop
+# from polarislib.network.data import DataTableStorage
+from aequilibrae.transit.transit_elements import Stop
 
 
 def read_stops(conn: sqlite3.Connection, transformer):
-    data = DataTableStorage().get_table("transit_stops", conn).reset_index()
+    data = get_table("transit_stops", conn).reset_index()
     data = data[data.agency_id > 1]
     data.geo = data.geo.apply(shapely.wkb.loads)
     if transformer:

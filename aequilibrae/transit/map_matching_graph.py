@@ -5,6 +5,7 @@ from copy import deepcopy
 from os.path import isfile, join
 from tempfile import gettempdir
 from typing import Dict
+import importlib.util as iutil
 
 import numpy as np
 import pandas as pd
@@ -13,12 +14,17 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.ops import substring
 
-from polarislib.network.constants import DRIVING_SIDE
-from polarislib.network.database_connection import supply_database_connection
-from polarislib.network.tools.geo_index import GeoIndex
-from polarislib.network.transit.transit_elements import mode_correspondence
-from polarislib.network.utils.geo_functions import compute_line_bearing
-from polarislib.utils.signals import SIGNAL
+
+from aequilibrae.transit.constants import DRIVING_SIDE
+from aequilibrae.transit.functions.transit_connection import transit_connection
+# from polarislib.network.tools.geo_index import GeoIndex
+from aequilibrae.transit.transit_elements import mode_correspondence
+# from polarislib.network.utils.geo_functions import compute_line_bearing
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
@@ -27,7 +33,8 @@ CONNECTOR_SPEED = 1
 class MMGraph:
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
-    signal = SIGNAL(object)
+    if pyqt:
+        signal = pyqtSignal(object)
 
     def __init__(self, lib_gtfs, mtmm):
         self.geotool = lib_gtfs.geotool
@@ -64,7 +71,7 @@ class MMGraph:
         self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
         modename = self.geotool._mode_name(self.__mode)
 
-        with closing(supply_database_connection(dont_raise=True)) as conn:
+        with closing(transit_connection()) as conn:
             added1 = " " if self.__mode == "RAIL" else "AND lanes_ab>0"
             added2 = " " if self.__mode == "RAIL" else "AND lanes_ba>0"
             get_qry = f"""Select link link_id, node_a a_node, node_b b_node, max(fspd_ab, fspd_ba) speed,
@@ -123,20 +130,20 @@ class MMGraph:
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
         # Build initial index
-        self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
-        self._idx = GeoIndex()
+        # self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
+        self._idx = GeoIndex()  # index dos links da rede? 
         for counter, (ind, record) in enumerate(self.df.iterrows()):
-            self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
+            # self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
+        # self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
+            # self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
             stop.___map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.___map_matching_id__[self.mode_id])
@@ -215,12 +222,12 @@ class MMGraph:
             break_point = link_geo.interpolate(proj_point)
             connector_geo = LineString([stop.geo, break_point])
 
-            if connector_geo.length > 0:
-                p = break_point if proj_point > 0 else last
-                az_link = compute_line_bearing((first.x, first.y), (p.x, p.y))
-                az_connector = compute_line_bearing((stop.geo.x, stop.geo.y), (break_point.x, break_point.y))
-                if (az_link - az_connector) * DRIVING_SIDE < 0:
-                    wrong_side = 1  # We are on the WRONG side
+            # if connector_geo.length > 0:
+            #     p = break_point if proj_point > 0 else last
+            #     az_link = compute_line_bearing((first.x, first.y), (p.x, p.y))
+            #     az_connector = compute_line_bearing((stop.geo.x, stop.geo.y), (break_point.x, break_point.y))
+            #     if (az_link - az_connector) * DRIVING_SIDE < 0:
+            #         wrong_side = 1  # We are on the WRONG side
 
             if proj_point <= 1.0:  # If within one meter of the end of the link, let's go with the existing node
                 break_point = first
@@ -309,5 +316,5 @@ class MMGraph:
         g.set_blocked_centroid_flows(True)
         return g
 
-    def finished(self):
-        self.signal.emit(["finished_building_mm_graph_procedure"])
+    # def finished(self):
+    #     self.signal.emit(["finished_building_mm_graph_procedure"])

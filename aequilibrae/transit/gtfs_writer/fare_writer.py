@@ -3,11 +3,12 @@ from os.path import join
 
 import pandas as pd
 
-from polarislib.network.data import DataTableStorage
+# from polarislib.network.data import DataTableStorage
+from aequilibrae.transit.functions.data import get_table
 
 
 def write_fares(folder_path: str, conn):
-    fattr = DataTableStorage().get_table("Transit_Fare_Attributes", conn).reset_index()
+    fattr = get_table("Transit_Fare_Attributes", conn).reset_index()
     fattr.rename(columns={"currency": "currency_type", "transfer": "transfers"}, inplace=True)
     fattr.transfer_duration = fattr.transfer_duration.astype(int)
 
@@ -15,7 +16,7 @@ def write_fares(folder_path: str, conn):
 
     fattr[headers].to_csv(join(folder_path, "fare_attributes.txt"), quoting=csv.QUOTE_NONNUMERIC, index=False)
 
-    frls = DataTableStorage().get_table("Transit_Fare_Rules", conn).reset_index()
+    frls = get_table("Transit_Fare_Rules", conn).reset_index()
     frls.rename(columns={fld: f"{fld}_id" for fld in frls.columns if "id" not in fld}, inplace=True)
     frls = frls[["fare_id", "route_id", "origin_id", "destination_id", "contains_id"]]
 

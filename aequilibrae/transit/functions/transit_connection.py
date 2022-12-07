@@ -1,8 +1,8 @@
 import os
 import sqlite3
 import importlib.util as iutil
-from aequilibrae.project.spatialite_connection import spatialite_connection
 from aequilibrae.context import get_active_project
+from aequilibrae.project.spatialite_connection import spatialite_connection
 
 spec = iutil.find_spec("qgis")
 inside_qgis = spec is not None
@@ -10,10 +10,9 @@ if inside_qgis:
     import qgis
 
 
-def database_connection(table_type: str, project_path=None) -> sqlite3.Connection:
+def transit_connection(project_path=None) -> sqlite3.Connection:
     project_path = project_path or get_active_project().project_base_path
-    file_name = os.path.join(project_path, "project_database.sqlite") if table_type == "network" else os.path.join(
-        project_path, "public_transport.sqlite")
+    file_name = os.path.join(project_path, "public_transport.sqlite")
     if not os.path.exists(file_name):
         raise FileExistsError
     if inside_qgis:
