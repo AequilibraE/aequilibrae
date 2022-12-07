@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Point
 
-from polarislib.network.transit.transit_elements import Pattern
+from aequilibrae.transit.transit_elements import Pattern
 
 
 def write_shapes(patterns: List[Pattern], folder_path: str):

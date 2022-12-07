@@ -4,11 +4,11 @@ import pandas as pd
 
 from polarislib.utils.database.db_utils import run_sql_file
 from polarislib.network.database_connection import supply_database_connection, get_srid
-from polarislib.network.starts_logging import logger
-from polarislib.network.transit.lib_gtfs import GTFSRouteSystemBuilder
-from polarislib.network.utils.worker_thread import WorkerThread
-from polarislib.utils.signals import SIGNAL
-from polarislib.utils.signals import qgis
+from aequilibrae.log import logger
+from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
+from aequilibrae.utils.worker_thread import WorkerThread
+# from polarislib.utils.signals import SIGNAL
+# from polarislib.utils.signals import qgis
 from . import RouteSystem
 from .functions import fix_connections_table
 from .functions.del_pattern import delete_pattern
@@ -108,7 +108,7 @@ class Transit(WorkerThread):
         print(f"Total run time for this script: {timedelta(seconds=perf_counter() - t)}")
     """
 
-    transit = SIGNAL(object)
+    # transit = SIGNAL(object)
     default_capacities = {
         0: [150, 300, 300],  # Tram, Streetcar, Light rail
         1: [280, 560, 560],  # Subway/metro

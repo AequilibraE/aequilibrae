@@ -28,7 +28,7 @@ def create_base_tables(conn: Connection, logger: logging.Logger, table_type: str
 
 def add_triggers(conn: Connection, logger: logging.Logger, table_type: str) -> None:
     """Adds consistency triggers to the project"""
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", table_type,"triggers")
+    spec_folder = join(dirname(realpath(__file__)), "database_specification", table_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]

@@ -1,14 +1,15 @@
 import sqlite3
 
 import pandas as pd
+from aequilibrae.transit.functions.data import get_table
 
-from polarislib.network.data import DataTableStorage
+# from polarislib.network.data import DataTableStorage
 
 
 def read_stop_times(conn: sqlite3.Connection):
-    tpm = DataTableStorage().get_table("Transit_Pattern_Links", conn)
-    tts = DataTableStorage().get_table("Transit_Trips_Schedule", conn).reset_index()
-    tl = DataTableStorage().get_table("Transit_Links", conn).reset_index()
+    tpm = get_table("Transit_Pattern_Links", conn)
+    tts = get_table("Transit_Trips_Schedule", conn).reset_index()
+    tl = get_table("Transit_Links", conn).reset_index()
     trps = pd.read_sql("select pattern_id, trip_id from Transit_Trips", conn)
     tl.drop(columns=["pattern_id", "length", "geo", "type"], inplace=True)
 

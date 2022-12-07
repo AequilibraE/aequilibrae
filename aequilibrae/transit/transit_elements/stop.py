@@ -3,8 +3,8 @@ from typing import Dict, Any, Optional
 
 from shapely.geometry import Point
 
-from polarislib.network.constants import constants, AGENCY_MULTIPLIER
-from polarislib.network.transit.transit_elements.basic_element import BasicPTElement
+from aequilibrae.transit.constants import constants, AGENCY_MULTIPLIER
+from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
 class Stop(BasicPTElement):
@@ -91,7 +91,7 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into TRANSIT_STOPS (stop_id, stop, agency_id, link, dir, offset, setback, X, Y, Z, name,
+        sql = """insert into stops (stop_id, stop, agency_id, link, dir, offset, setback, X, Y, Z, name,
                                             parent_station, description, street, zone, transit_zone_id, has_parking,
                                             route_type, moved_by_matching, geo)
                                             values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""

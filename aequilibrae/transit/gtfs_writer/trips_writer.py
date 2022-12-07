@@ -5,7 +5,7 @@ from typing import List
 
 import pandas as pd
 
-from polarislib.network.transit.transit_elements import Trip
+from aequilibrae.transit.transit_elements import Trip
 
 
 def write_trips(trips: List[Trip], folder_path: str, conn: sqlite3.Connection):

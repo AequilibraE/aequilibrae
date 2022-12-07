@@ -4,7 +4,7 @@ from typing import List
 
 import pandas as pd
 
-from polarislib.network.transit.transit_elements import Route
+from aequilibrae.transit.transit_elements import Route
 
 
 def write_routes(routes: List[Route], folder_path: str):

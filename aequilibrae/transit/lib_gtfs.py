@@ -1,22 +1,29 @@
 from contextlib import closing
 from copy import deepcopy
 from typing import Dict, List
+import importlib.util as iutil
 
 import pandas as pd
 import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
+from aequilibrae.transit.functions.transit_connection import transit_connection
 
-from polarislib.network.constants import constants, PATTERN_ID_MULTIPLIER
-from polarislib.network.database_connection import supply_database_connection, get_srid
-from polarislib.network.transit.transit_elements import Link, Pattern
-from polarislib.network.transit.transit_elements import Route, Stop, Trip, mode_correspondence
-from polarislib.utils.signals import SIGNAL
+from aequilibrae.transit.constants import constants, PATTERN_ID_MULTIPLIER
+from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.log import logger
+from aequilibrae.transit.transit_elements import Link, Pattern
+from aequilibrae.transit.transit_elements import Route, Stop, Trip, mode_correspondence
 from .functions import PathStorage
 from .functions.create_raw import create_raw_shapes
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 from ..utils.worker_thread import WorkerThread
+
+spec = iutil.find_spec("PyQt5")
+pyqt = spec is not None
+if pyqt:
+    from PyQt5.QtCore import pyqtSignal
 
 
 class GTFSRouteSystemBuilder(WorkerThread):
@@ -24,7 +31,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     ::
 
-        from polarislib.network import Network
+        from aequilibrae import Network
 
         network_path = 'D:/Argonne/GTFS/CHICAGO/chicago2018-Supply.sqlite'
         GTFS_path = 'D:/Argonne/GTFS/CHICAGO/METRA/2019-10-04.zip'
@@ -60,14 +67,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         feed.execute_import()
     """
 
-    signal = SIGNAL(object)
+    if pyqt:
+        signal = pyqtSignal(object)
 
     def __init__(self, network, agency_identifier, file_path, day="", description="", default_capacities={}):
         """Instantiates a transit class for the network
 
         Args:
 
-            *polaris network* (:obj:`Network`): Supply model to which this GTFS will be imported
+            *local network* (:obj:`Network`): Supply model to which this GTFS will be imported
             *agency_identifier* (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
             *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
             *day* (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
@@ -76,10 +84,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         WorkerThread.__init__(self, None)
 
         self.__network = network
-        self.geotool = network.geotools
+        # self.geotool = network.geotools
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = network.logger
+        self.logger = logger
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()
@@ -88,8 +96,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.trip_by_service = {}
         self.patterns = {}  # type: Dict[Pattern]
         self.graphs = {}
-        self.srid = network.srid
-        self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
+        # self.srid = network.srid
+        # self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
@@ -169,10 +177,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any([not isinstance(item, int) for item in route_types]):
             raise TypeError("All route types must be integers")
 
-        mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
-        self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
+        # mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
+        # self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
         for i, pat in enumerate(self.select_patterns.values()):
-            self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
+            # self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
@@ -262,7 +270,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
         self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
-        self.signal.emit(["start", "master", 4 + self.__do_raw_shapes__, self.__mt])
+        # self.signal.emit(["start", "master", 4 + self.__do_raw_shapes__, self.__mt])
 
         self.save_to_disk()
 
@@ -278,49 +286,49 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__do_raw_shapes__:
             self.create_raw_shapes()
 
-        with closing(supply_database_connection(dont_raise=True)) as conn:
-            st = f"Importing routes for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
+        with closing(transit_connection()) as conn:
+            # st = f"Importing routes for {self.gtfs_data.agency.agency}"
+            # self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
             for counter, (route_id, route) in enumerate(self.select_routes.items()):  # type: Route
                 route.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            st = f"Importing patterns for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), st, self.__mt])
+            # st = f"Importing patterns for {self.gtfs_data.agency.agency}"
+            # self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), st, self.__mt])
             for counter, (pid, pattern) in enumerate(self.select_patterns.items()):  # type: Pattern
                 pattern.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
-            st = f"Importing trips for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
+            # st = f"Importing trips for {self.gtfs_data.agency.agency}"
+            # self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
             for counter, trip in enumerate(self.select_trips):  # type: Trip
                 trip.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            st = f"Importing links for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
+            # st = f"Importing links for {self.gtfs_data.agency.agency}"
+            # self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
             for counter, (pair, link) in enumerate(self.select_links.items()):  # type: Link
                 link.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.__outside_zones = 0
             zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
-            st = f"Importing stops for {self.gtfs_data.agency.agency}"
-            self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
+            # st = f"Importing stops for {self.gtfs_data.agency.agency}"
+            # self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
             for counter, (stop_id, stop) in enumerate(self.select_stops.items()):  # type: Stop
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
-                # TODO: Create code that gets the zone for a stop
+                # TODO: Create code that gets the zone for a stop - são as zonas dos bins TAZs
                 # stop.taz = self.geotool.get_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
 
             conn.commit()
             # Fare data
@@ -347,7 +355,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.logger.debug("Starting __build_data")
         self.__get_routes_by_date()
 
-        # construct the Polaris trip and pattern tables from the list of GTFS sources
+        # construct trip and pattern tables from the list of GTFS sources
         self.select_stops.clear()
         self.select_links.clear()
         self.select_patterns.clear()
@@ -356,10 +364,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = constants()
-        msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
-        self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
+        # msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
+        # self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
+            # self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -367,7 +375,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for pat_hash in sorted(list(set(all_pats))):
                 c.pattern_lookup[pat_hash] = cntr
 
-                # We can go back to proper bit coding when we can get 64 bit read in Polaris
                 cntr += ((all_pats.count(pat_hash) // 100) + 1) * PATTERN_ID_MULTIPLIER
 
             self.select_trips.extend(new_trips)
@@ -380,8 +387,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 if trip.pattern_id in self.select_patterns:
                     continue
 
-                pat = self.__build_new_pattern(route, route_id, trip)
-                patterns.append(pat)
+                # pat = self.__build_new_pattern(route, route_id, trip)
+                # patterns.append(pat)
 
             route.shape = self.__build_route_shape(patterns)
 

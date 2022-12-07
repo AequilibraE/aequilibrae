@@ -2,18 +2,18 @@ import logging
 from contextlib import closing
 from sqlite3 import Cursor
 
-from polarislib.network.constants import AGENCY_MULTIPLIER
-from polarislib.network.database_connection import supply_database_connection, get_srid
-from polarislib.network.transit.transit_elements import Pattern
-from polarislib.utils.database.db_utils import list_tables_in_db
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER
+from aequilibrae.transit.functions.db_utils import list_tables_in_db
+from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.transit.functions.transit_connection import transit_connection
 
 
 def create_raw_shapes(agency_id: int, select_patterns):
-    logger = logging.getLogger("polaris")
-    logger.info(f"Creating transit raw shapes for agency ID: {agency_id}")
+    # logger = logging.getLogger("aequilibrae")
+    # logger.info(f"Creating transit raw shapes for agency ID: {agency_id}")
     srid = get_srid()
 
-    with closing(supply_database_connection(dont_raise=True)) as conn:
+    with closing(transit_connection()) as conn:
         table_list = list_tables_in_db(conn)
         if "transit_raw_shapes" not in table_list:
             conn.execute('CREATE TABLE IF NOT EXISTS "TRANSIT_RAW_SHAPES" ("pattern_id"	TEXT, "route_id" TEXT);')
@@ -31,4 +31,4 @@ def create_raw_shapes(agency_id: int, select_patterns):
             else:
                 conn.execute(sql, [pat.pattern_id, pat.route_id, pat._stop_based_shape.wkb, srid])
         conn.commit()
-        logger.info("   Finished creating raw shapes")
+        # logger.info("   Finished creating raw shapes")

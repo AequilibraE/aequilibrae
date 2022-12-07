@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from polarislib.network.transit.transit_elements import Stop
+from aequilibrae.transit.transit_elements import Stop
 
 
 def write_stops(stops: List[Stop], folder_path: str):

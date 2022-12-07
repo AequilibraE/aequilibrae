@@ -1,5 +1,5 @@
 from sqlite3 import Connection
-from polarislib.network.constants import constants, AGENCY_MULTIPLIER
+from aequilibrae.transit.constants import constants, AGENCY_MULTIPLIER
 
 
 class Fare:
@@ -55,8 +55,8 @@ class Fare:
             self.transfer,
             self.transfer_duration,
         ]
-        sql = """insert into Transit_Fare_Attributes(fare_id, fare, agency_id, price, currency, payment_method,
-                                                     transfer,transfer_duration) values (?, ?, ?, ?, ?, ?, ?, ?);"""
+        sql = """insert into fare_attributes (fare_id, fare, agency_id, price, currency, payment_method,
+                                                     transfer, transfer_duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
         conn.execute(sql, data)
         conn.commit()
 

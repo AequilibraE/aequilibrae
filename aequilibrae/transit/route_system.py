@@ -2,26 +2,23 @@ import os
 import sqlite3
 import zipfile
 from os.path import join
-from pathlib import Path
 
 import pandas as pd
 from pyproj import Transformer
 
-from polarislib.network.tools.geo import Geo
-from polarislib.network.data import DataTableStorage
-from polarislib.network.database_connection import get_srid
-from polarislib.network.starts_logging import logger
-from polarislib.network.transit.gtfs_writer import write_routes, write_agencies, write_fares
-from polarislib.network.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes
-from polarislib.network.transit.route_system_reader import read_agencies, read_patterns
-from polarislib.network.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
-from polarislib.utils.database.spatialite_utils import connect_spatialite
+# from aequilibrae.tools.geo import Geo
+from aequilibrae.transit.functions.get_srid import get_srid
+from aequilibrae.log import logger
+from aequilibrae.transit.gtfs_writer import write_routes, write_agencies, write_fares
+from aequilibrae.transit.gtfs_writer import write_stops, write_trips, write_stop_times, write_shapes
+from aequilibrae.transit.route_system_reader import read_agencies, read_patterns
+from aequilibrae.transit.route_system_reader import read_stop_times, read_stops, read_trips, read_routes
+from aequilibrae.project.database_connection import database_connection
 
 
 class RouteSystem:
     def __init__(self, database_path):
         self.__database_path = database_path
-        self.dts = DataTableStorage()
         self.__conn: sqlite3.Connection = None
 
         self.agencies = []
@@ -65,14 +62,14 @@ class RouteSystem:
 
     @property
     def conn(self) -> sqlite3.Connection:
-        self.__conn = self.__conn or connect_spatialite(Path(self.__database_path))
+        self.__conn = self.__conn or database_connection(join(self.__database_path, "public_transport.sqlite"))
         return self.__conn
 
     def write_GTFS(self, path_to_folder: str):
         """ """
-        timezone = self._timezone()
+        # timezone = self._timezone()
 
-        write_agencies(self.agencies, path_to_folder, timezone)
+        write_agencies(self.agencies, path_to_folder)
         write_stops(self.stops, path_to_folder)
         write_routes(self.routes, path_to_folder)
         write_shapes(self.patterns, path_to_folder)
@@ -82,16 +79,16 @@ class RouteSystem:
         write_fares(path_to_folder, self.conn)
         self._zip_feed(path_to_folder)
 
-    def _timezone(self, allow_error=True):
-        geotool = Geo()
-        geotool.conn = self.conn
-        try:
-            return geotool.get_timezone()
-        except Exception as e:
-            logger.error("Could not retrieve the correct time zone for GTFS exporter. Using Chicago instead")
-            if not allow_error:
-                raise e
-            return "America/Chicago"
+    # def _timezone(self, allow_error=True):
+    #     geotool = Geo()
+    #     geotool.conn = self.conn
+    #     try:
+    #         return geotool.get_timezone()
+    #     except Exception as e:
+    #         logger.error("Could not retrieve the correct time zone for GTFS exporter. Using Chicago instead")
+    #         if not allow_error:
+    #             raise e
+    #     return "America/Chicago"
 
     def _zip_feed(self, path_to_folder: str):
         filename = join(path_to_folder, "polaris_gtfs.zip")

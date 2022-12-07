@@ -1,13 +1,27 @@
-from os.path import join
+from os.path import dirname, isfile, join, realpath
 
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
+from aequilibrae.log import logger
 
 
 class Transit:
+    default_capacities = {
+        0: [150, 300, 300],  # Tram, Streetcar, Light rail
+        1: [280, 560, 560],  # Subway/metro
+        2: [700, 700, 700],  # Rail
+        3: [30, 60, 60],  # Bus
+        4: [400, 800, 800],  # Ferry
+        5: [20, 40, 40],  # Cable tram
+        11: [30, 60, 60],  # Trolleybus
+        12: [50, 100, 100],  # Monorail
+        "other": [30, 60, 60],
+    }  # Any other mode that is not default GTFS
+
     def __init__(self, project):
-        self.conn = database_connection(join(project.project_base_path, "public_transport.sqlite"))
-        self.project_base_path = project.project_base_path
+        self.conn = database_connection("transit", project.project_base_path)
+        self.project_base_path = project.project_base_path  # instead of network
+        self.logger = logger
 
     def new_gtfs(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
         """Returns a GTFSRouteSystemBuilder object compatible with the project

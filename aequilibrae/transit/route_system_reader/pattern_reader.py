@@ -3,14 +3,14 @@ import sqlite3
 import shapely.wkb
 import shapely.wkt
 from shapely.ops import transform
+from aequilibrae.transit.functions.data import get_table
 
-from polarislib.network.data import DataTableStorage
-from polarislib.network.transit.transit_elements import Pattern
+from aequilibrae.transit.transit_elements import Pattern
 
 
 def read_patterns(conn: sqlite3.Connection, transformer):
     patterns = []
-    data = DataTableStorage().get_table("transit_patterns", conn).reset_index()
+    data = get_table("transit_patterns", conn).reset_index()
     if not data.shape[0]:
         return
     data.geo = data.geo.apply(shapely.wkb.loads)
