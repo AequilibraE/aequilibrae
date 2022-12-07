@@ -23,7 +23,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport isnan
+from libc.math cimport isnan, INFINITY
 
 include 'parameters.pxi'
 from libc.stdlib cimport abort, malloc, free
@@ -195,7 +195,7 @@ cdef void skim_single_path(long origin,
     # sets all skims to infinity
     for i in range(nodes):
         for j in range(skims):
-            node_skims[i, j] = INFINITE
+            node_skims[i, j] = INFINITY
 
     # Zeroes the intrazonal cost
     for j in range(skims):
@@ -232,7 +232,7 @@ cpdef void skim_multiple_fields(long origin,
     # sets all skims to infinity
     for i in range(nodes):
         for j in range(skims):
-            node_skims[i, j] = INFINITE
+            node_skims[i, j] = INFINITY
 
     # Zeroes the intrazonal cost
     for j in range(skims):
