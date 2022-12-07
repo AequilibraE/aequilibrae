@@ -1,8 +1,6 @@
-from os.path import dirname, isfile, join, realpath
-
+from aequilibrae.log import logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
-from aequilibrae.log import logger
 
 
 class Transit:

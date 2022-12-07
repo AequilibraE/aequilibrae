@@ -30,7 +30,6 @@ if compiled:
     from aequilibrae.paths.graph import Graph
     from aequilibrae.paths.assignment_paths import AssignmentPaths
     from aequilibrae.project import Project
-    from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
     from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
     from aequilibrae.paths import release_version as __version__
 
