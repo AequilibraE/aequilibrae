@@ -287,29 +287,29 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.create_raw_shapes()
 
         with closing(transit_connection()) as conn:
-            # st = f"Importing routes for {self.gtfs_data.agency.agency}"
+            st = f"Importing routes for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
             for counter, (route_id, route) in enumerate(self.select_routes.items()):  # type: Route
                 route.save_to_database(conn, commit=False)
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            # st = f"Importing patterns for {self.gtfs_data.agency.agency}"
+            st = f"Importing patterns for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), st, self.__mt])
-            for counter, (pid, pattern) in enumerate(self.select_patterns.items()):  # type: Pattern
-                pattern.save_to_database(conn, commit=False)
+            # for counter, (pid, pattern) in enumerate(self.select_patterns.items()):  # type: Pattern
+                # pattern.save_to_database(conn, commit=False)
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
-            conn.commit()
+            # conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
-            # st = f"Importing trips for {self.gtfs_data.agency.agency}"
+            st = f"Importing trips for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
             for counter, trip in enumerate(self.select_trips):  # type: Trip
                 trip.save_to_database(conn, commit=False)
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            # st = f"Importing links for {self.gtfs_data.agency.agency}"
+            st = f"Importing links for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
             for counter, (pair, link) in enumerate(self.select_links.items()):  # type: Link
                 link.save_to_database(conn, commit=False)
@@ -320,7 +320,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
-            # st = f"Importing stops for {self.gtfs_data.agency.agency}"
+            st = f"Importing stops for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
             for counter, (stop_id, stop) in enumerate(self.select_stops.items()):  # type: Stop
                 if stop.zone in zone_ids:
@@ -329,8 +329,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 # stop.taz = self.geotool.get_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
-
             conn.commit()
+
             # Fare data
             for fare in self.gtfs_data.fare_attributes.values():
                 fare.save_to_database(conn)
@@ -340,7 +340,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
             if zones:
-                sql = "Insert into Transit_Zones(transit_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
                 conn.executemany(sql, zones)
             conn.commit()
 
@@ -360,6 +360,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_links.clear()
         self.select_patterns.clear()
 
+        # Skips by now
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
@@ -387,14 +388,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 if trip.pattern_id in self.select_patterns:
                     continue
 
-                # pat = self.__build_new_pattern(route, route_id, trip)
-                # patterns.append(pat)
+                pat = self.__build_new_pattern(route, route_id, trip)
+                patterns.append(pat)
 
             route.shape = self.__build_route_shape(patterns)
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
-        p = Pattern(self.geotool, route.route_id, self)
+        p = Pattern(route.route_id, self)
         p.pattern_hash = trip.pattern_hash
         p.pattern_id = trip.pattern_id
         p.route = trip.route
@@ -419,11 +420,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
             link = Link(self.srid)
             link.pattern_id = trip.pattern_id
             link.get_link_id()
-            fnode = trip.stops[i - 1]
-            tnode = trip.stops[i]
-            link.from_node = fnode
-            link.to_node = tnode
-            link.build_geo(self.gtfs_data.stops[fnode].geo, self.gtfs_data.stops[tnode].geo, pgeo, prev_end)
+            fstop = trip.stops[i - 1]
+            tstop = trip.stops[i]
+            link.from_stop = fstop
+            link.to_stop = tstop
+            link.build_geo(self.gtfs_data.stops[fstop].geo, self.gtfs_data.stops[tstop].geo, pgeo, prev_end)
             prev_end = Point(list(link.geo.coords)[-1])
             link.type = int(route.route_type)
             p.links.append(link.transit_link)
@@ -455,13 +456,14 @@ class GTFSRouteSystemBuilder(WorkerThread):
         for route_id, route in self.gtfs_data.routes.items():
             if route_id not in self.gtfs_data.trips:
                 continue
-            for trip in self.gtfs_data.trips[route_id]:
-                service = trip.service_id
-                if service not in self.gtfs_data.services.keys():
-                    continue
-                if self.day in self.gtfs_data.services[service].dates:
-                    routes[route_id] = route
-                    break
+            for value in self.gtfs_data.trips[route_id].values():
+                for trip in value:
+                    service = trip.service_id
+                    if service not in self.gtfs_data.services.keys():
+                        continue
+                    if self.day in self.gtfs_data.services[service].dates:
+                        routes[route_id] = route
+                        break
         if not routes:
             self.logger.warning("NO ROUTES OPERATING FOR THIS DATE")
 
@@ -473,7 +475,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def _get_trips_by_date_and_route(self, route_id: int, service_date: str) -> list:
         trips = [
             trip
-            for trip in self.gtfs_data.trips[route_id]
+            for element in self.gtfs_data.trips["1"] for trip in self.gtfs_data.trips[route_id][element]
             if service_date in self.gtfs_data.services[trip.service_id].dates
         ]
         return sorted(trips)

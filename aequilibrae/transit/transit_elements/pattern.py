@@ -76,7 +76,7 @@ class Pattern(BasicPTElement):
         * network_candidates (:obj:`List[int]`): List of link IDs likely to be part of the route (populated by **find_network_links()**)
     """
 
-    def __init__(self, geotool, route_id, gtfs_feed) -> None:
+    def __init__(self, route_id, gtfs_feed) -> None:
         """
         Args:
 
@@ -91,10 +91,10 @@ class Pattern(BasicPTElement):
         self.design_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
-        self.__geotool = geotool  # type: polarislib.network.Geo
+        # self.__geotool = geotool  # type: polarislib.network.Geo
         self.__logger = None
-        if self.__geotool:
-            self.__logger = self.__geotool.logger
+        # if self.__geotool:
+        #     self.__logger = self.__geotool.logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -130,23 +130,26 @@ class Pattern(BasicPTElement):
         data = [
             self.pattern_id,
             self.pattern_hash,
+            self.route,
+            self.route_type,
             self.route_id,
-            self.__match_quality,
+            self.agency_id,
+            # self.__match_quality,
             self.seated_capacity,
             self.design_capacity,
             self.total_capacity,
             geo,
-            self.srid,
+            self.__srid,
         ]
 
-        # sql = """insert into Transit_Patterns (pattern_id, pattern, route_id, matching_quality, seated_capacity,
-        #                 design_capacity, total_capacity, geo) values (?, ?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-        # conn.execute(sql, data)
+        sql = """insert into routes (pattern_id, pattern, route, route_type, route_id, seated_capacity,
+                        design_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
+        conn.execute(sql, data)
 
         if self.pattern_mapping and self.shape:
-            sqlgeo = """insert into pattern_mapping (pattern_id, "index", link, dir, stop_id, offset, geo)
+            sqlgeo = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset, geo)
                         values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-            sql = """insert into pattern_mapping (pattern_id, "index", link, dir, stop_id, offset)
+            sql = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset)
                                                   values (?, ?, ?, ?, ?, ?);"""
 
             for record in self.pattern_mapping:
@@ -158,10 +161,10 @@ class Pattern(BasicPTElement):
                         conn.execute(sqlgeo, record + [self.__srid])
                     else:
                         conn.execute(sql, record[:-1])
-        data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]
-        conn.executemany('insert into Transit_Pattern_Links(pattern_id, "index", transit_link) values (?,?,?)', data)
-        if commit:
-            conn.commit()
+        # data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]
+        # conn.executemany('insert into Transit_Pattern_Links(pattern_id, "index", transit_link) values (?,?,?)', data)
+        # if commit:
+        #     conn.commit()
 
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""

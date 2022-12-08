@@ -44,7 +44,7 @@ class Route(BasicPTElement):
         self.srid = -1
         self.number_of_cars = 0
         self.__sql = """insert into routes (route_id, route, agency_id, shortname, longname, description,
-                                                    "type", seated_capacity, design_capacity, total_capacity,
+                                                    route_type, seated_capacity, design_capacity, total_capacity,
                                                      number_of_cars{}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
         self.sql = self.__sql
         self.__get_route_id()
@@ -85,7 +85,7 @@ class Route(BasicPTElement):
             shape = ""
             geo_fld = ""
         else:
-            geo_fld = ",geo "
+            geo_fld = ", geometry "
             shape = ", ST_Multi(GeomFromWKB(?, ?))"
             data.extend([self.shape.wkb, self.srid])
         self.sql = self.__sql.format(geo_fld, shape)

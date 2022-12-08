@@ -31,7 +31,7 @@ class GTFSReader:
         self.agency = Agency()
         self.services = {}
         self.routes: Dict[int, Route] = dict()
-        self.trips: Dict[int, List[Route]] = dict()
+        self.trips: Dict[int, Dict[Route]] = dict()
         self.stops: Dict[int, Stop] = dict()
         self.stop_times = {}
         self.shapes = {}
@@ -78,10 +78,11 @@ class GTFSReader:
 
         self.__load_date()
 
-        # self.finished()
+        self.finished()
 
-    # def finished(self):
-    #     self.signal.emit(["finished_static_gtfs_procedure"])
+    def finished(self):
+        # self.signal.emit(["finished_static_gtfs_procedure"])
+        pass
 
     def __load_date(self):
         self.logger.debug("Starting __load_date")
@@ -112,75 +113,76 @@ class GTFSReader:
         for prog_counter, route in enumerate(self.trips):
             # self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
-            for trip in self.trips[route]:  # type: Trip
-                self.logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                stop_times = self.stop_times[trip.trip]
-                if stop_times.shape[0] != len(trip.stops):
-                    self.logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
+            for pattern in self.trips[route]:  # type: Trip
+                for trip in self.trips[route][pattern]:
+                    self.logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                    stop_times = self.stop_times[trip.trip]
+                    if stop_times.shape[0] != len(trip.stops):
+                        self.logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
 
-                if not stop_times.arrival_time.is_monotonic_increasing:
-                    stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
-                    stop_times.arrival_time.fillna(method="ffill", inplace=True)
-                diffs = np.diff(stop_times.arrival_time.values)
+                    if not stop_times.arrival_time.is_monotonic_increasing:
+                        stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
+                        stop_times.arrival_time.fillna(method="ffill", inplace=True)
+                    diffs = np.diff(stop_times.arrival_time.values)
 
-                stop_geos = [self.stops[x].geo for x in trip.stops]
-                distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:])])
+                    stop_geos = [self.stops[x].geo for x in trip.stops]
+                    distances = np.array([x.distance(y) for x, y in zip(stop_geos[:-1], stop_geos[1:])])
 
-                times = np.copy(stop_times.arrival_time.values)
-                source_time = np.zeros_like(stop_times.arrival_time.values)
+                    times = np.copy(stop_times.arrival_time.values)
+                    source_time = np.zeros_like(stop_times.arrival_time.values)
 
-                if times[-1] == times[-2]:
-                    self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                    self.logger.info("    Had conflicting stop times in its end")
-                    # We shift the last stop by one second if the stop time is equal to the previous stop
-                    times[-1] += 1
-                    source_time[-1] = 1
-                    diffs = np.diff(times)
+                    if times[-1] == times[-2]:
+                        self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                        self.logger.info("    Had conflicting stop times in its end")
+                        # We shift the last stop by one second if the stop time is equal to the previous stop
+                        times[-1] += 1
+                        source_time[-1] = 1
+                        diffs = np.diff(times)
 
-                to_override = np.argwhere(diffs == 0)[:, 0] + 1
-                if to_override.shape[0] > 0:
-                    self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
-                    self.logger.info("     Had consecutive stops with the same timestamp")
-                    for i in to_override:
-                        source_time[i] = 1
-                        times[i:] += 1
-                    diffs = np.diff(times)
+                    to_override = np.argwhere(diffs == 0)[:, 0] + 1
+                    if to_override.shape[0] > 0:
+                        self.logger.info(f"De-conflicting stops for route/trip {route}/{trip.trip}")
+                        self.logger.info("     Had consecutive stops with the same timestamp")
+                        for i in to_override:
+                            source_time[i] = 1
+                            times[i:] += 1
+                        diffs = np.diff(times)
 
-                if max_speeds.shape[0] > 0:
-                    speeds = distances / diffs
-                    df = pd.DataFrame(
-                        {
-                            "speed": speeds,
-                            "max_speed": max_speeds.speed.max(),
-                            "dist": distances,
-                            "elapsed_time": diffs,
-                            "add_time": np.zeros(diffs.shape[0], dtype=int),
-                            "source_time": source_time[1:],
-                        }
-                    )
+                    if max_speeds.shape[0] > 0:
+                        speeds = distances / diffs
+                        df = pd.DataFrame(
+                            {
+                                "speed": speeds,
+                                "max_speed": max_speeds.speed.max(),
+                                "dist": distances,
+                                "elapsed_time": diffs,
+                                "add_time": np.zeros(diffs.shape[0], dtype=int),
+                                "source_time": source_time[1:],
+                            }
+                        )
 
-                    for _, rec in max_speeds.iterrows():
-                        df.loc[(df.dist >= rec.min_distance) & ((df.dist < rec.max_distance)), "max_speed"] = rec.speed
+                        for _, rec in max_speeds.iterrows():
+                            df.loc[(df.dist >= rec.min_distance) & ((df.dist < rec.max_distance)), "max_speed"] = rec.speed
 
-                    to_fix = df[df.max_speed < df.speed].index.values
-                    if to_fix.shape[0] > 0:
-                        self.logger.debug(f"     Trip {trip.trip} had {to_fix.shape[0]} segments too fast")
-                        total_fast += to_fix.shape[0]
-                        df.loc[to_fix[0] :, "source_time"] = 2
-                        for i in to_fix:
-                            df.loc[i:, "add_time"] += (df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)).astype(
-                                int
-                            )
+                        to_fix = df[df.max_speed < df.speed].index.values
+                        if to_fix.shape[0] > 0:
+                            self.logger.debug(f"     Trip {trip.trip} had {to_fix.shape[0]} segments too fast")
+                            total_fast += to_fix.shape[0]
+                            df.loc[to_fix[0] :, "source_time"] = 2
+                            for i in to_fix:
+                                df.loc[i:, "add_time"] += (df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)).astype(
+                                    int
+                                )
 
-                        source_time[1:] = df.source_time[:]
-                        times[1:] += df.add_time[:].astype(int)
+                            source_time[1:] = df.source_time[:]
+                            times[1:] += df.add_time[:].astype(int)
 
-                assert min(times[1:] - times[:-1]) > 0
-                stop_times.arrival_time.values[:] = times[:].astype(int)
-                stop_times.departure_time.values[:] = times[:].astype(int)
-                stop_times.source_time.values[:] = source_time[:].astype(int)
-                trip.arrivals = stop_times.arrival_time.values
-                trip.departures = stop_times.departure_time.values
+                    assert min(times[1:] - times[:-1]) > 0
+                    stop_times.arrival_time.values[:] = times[:].astype(int)
+                    stop_times.departure_time.values[:] = times[:].astype(int)
+                    stop_times.source_time.values[:] = source_time[:].astype(int)
+                    trip.arrivals = stop_times.arrival_time.values
+                    trip.departures = stop_times.departure_time.values
 
         if total_fast:
             self.logger.warning(f"There were a total of {total_fast} segments that were too fast and were corrected")
@@ -250,7 +252,7 @@ class GTFSReader:
             shapes = parse_csv(file, column_order[shapestxt])
 
         all_shape_ids = np.unique(shapes["shape_id"]).tolist()
-        msg_txt = f"Load shapes - {self.agency.agency}"
+        # msg_txt = f"Load shapes - {self.agency.agency}"
         # self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
 
         self.data_arrays[shapestxt] = shapes
@@ -276,7 +278,7 @@ class GTFSReader:
             trips_array = parse_csv(file, column_order[tripstxt])
         self.data_arrays[tripstxt] = trips_array
 
-        msg_txt = f"Load trips - {self.agency.agency}"
+        # msg_txt = f"Load trips - {self.agency.agency}"
         # self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
         #           We need to do several consistency checks for this table
         # If trip IDs are unique
@@ -299,7 +301,7 @@ class GTFSReader:
             diff = ",".join([str(x) for x in diff.tolist()])
             self.__fail(f"There are service IDs in trips.txt that are absent in the calendar -> {diff}")
 
-        self.trips = {str(x): [] for x in np.unique(trips_array["route_id"])}
+        self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
         for i, line in enumerate(trips_array):
             # self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
@@ -336,8 +338,11 @@ class GTFSReader:
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
                 trip.shape = self.shapes.get(trip.shape)
-                self.trips[trip.route] = self.trips.get(trip.route, [])
-                self.trips[trip.route].append(trip)
+                self.trips[trip.route] = self.trips.get(trip.route, {})
+                self.trips[trip.route][trip.pattern_hash] = self.trips[trip.route].get(trip.pattern_hash, [])
+                self.trips[trip.route][trip.pattern_hash].append(trip)
+                # self.trips[trip.route] = self.trips.get(trip.route, [])
+                # self.trips[trip.route].append(trip)
 
     def __load_frequencies(self):
         self.logger.debug("Starting __load_frequencies")
@@ -389,7 +394,7 @@ class GTFSReader:
         with self.zip_archive.open(stoptimestxt, "r") as file:
             stoptimes = parse_csv(file, column_order[stoptimestxt])
         self.data_arrays[stoptimestxt] = stoptimes
-        msg_txt = f"Load stop times - {self.agency.agency}"
+        # msg_txt = f"Load stop times - {self.agency.agency}"
 
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
