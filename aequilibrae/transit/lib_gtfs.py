@@ -294,13 +294,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            st = f"Importing patterns for {self.gtfs_data.agency.agency}"
-            # self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), st, self.__mt])
-            # for counter, (pid, pattern) in enumerate(self.select_patterns.items()):  # type: Pattern
-                # pattern.save_to_database(conn, commit=False)
-                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
-            # conn.commit()
-
             self.gtfs_data.agency.save_to_database(conn)
             st = f"Importing trips for {self.gtfs_data.agency.agency}"
             # self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
@@ -475,7 +468,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def _get_trips_by_date_and_route(self, route_id: int, service_date: str) -> list:
         trips = [
             trip
-            for element in self.gtfs_data.trips["1"] for trip in self.gtfs_data.trips[route_id][element]
+            for element in self.gtfs_data.trips[route_id] for trip in self.gtfs_data.trips[route_id][element]
             if service_date in self.gtfs_data.services[trip.service_id].dates
         ]
         return sorted(trips)
