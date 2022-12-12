@@ -47,6 +47,6 @@ class Transit:
     def __check_connection(self, project):
         transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
         if not os.path.exists(transit_file):
-            raise FileNotFoundError("Public Transport model does not exist. Check your path and try again.")
+            raise FileNotFoundError("Public Transport model does not exist. Create a new one or change your path.")
 
         return database_connection("transit", project.project_base_path)

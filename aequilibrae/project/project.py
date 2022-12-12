@@ -57,7 +57,6 @@ class Project:
         file_name = os.path.join(project_path, "project_database.sqlite")
         if not os.path.isfile(file_name):
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
@@ -189,7 +188,7 @@ class Project:
 
     def create_empty_transit(self):
         """Creates the public transport database"""
-        if not os.path.exists(os.path.join(self.project_base_path, "public_transport.sqlite")):
+        if os.path.exists(os.path.join(self.project_base_path, "public_transport.sqlite")):
             raise FileExistsError("Public Transport database already exists.")
 
         shutil.copyfile(spatialite_database, os.path.join(self.project_base_path, "public_transport.sqlite"))
