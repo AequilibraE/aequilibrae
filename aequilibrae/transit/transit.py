@@ -1,3 +1,4 @@
+import os
 from aequilibrae.log import logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
@@ -14,10 +15,10 @@ class Transit:
         11: [30, 60, 60],  # Trolleybus
         12: [50, 100, 100],  # Monorail
         "other": [30, 60, 60],
-    }  # Any other mode that is not default GTFS
+    }
 
     def __init__(self, project):
-        self.conn = database_connection("transit", project.project_base_path)
+        self.conn = self.__check_connection(project)
         self.project_base_path = project.project_base_path  # instead of network
         self.logger = logger
 
@@ -42,3 +43,10 @@ class Transit:
             default_capacities=self.default_capacities,
         )
         return gtfs
+
+    def __check_connection(self, project):
+        transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
+        if not os.path.exists(transit_file):
+            raise FileNotFoundError("Public Transport model does not exist. Check your path and try again.")
+
+        return database_connection("transit", project.project_base_path)

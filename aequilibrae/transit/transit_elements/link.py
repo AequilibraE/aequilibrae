@@ -6,7 +6,7 @@ from aequilibrae.transit.constants import constants, TRANSIT_LINK_RANGE
 
 
 class Link:
-    """Transit link element to feed into Transit_links
+    """Transit link element.
 
     :Database class members:
 

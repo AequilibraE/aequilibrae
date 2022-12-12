@@ -1,7 +1,3 @@
---@ The route_links table holds the information on the sequence of
---@ of transit links that are traversed by each transit pattern
---@
-
 CREATE TABLE IF NOT EXISTS route_links (
 	pattern_id              INTEGER    NOT NULL,
 --  seq  	                INTEGER,

@@ -7,7 +7,6 @@ import shapely.wkb
 from shapely.geometry import LineString, Polygon
 from shapely.ops import substring
 
-# import polarislib.network
 from aequilibrae.log import logger
 from aequilibrae.transit.functions.get_srid import get_srid
 from .basic_element import BasicPTElement
@@ -19,44 +18,6 @@ DEAD_END_RUN = 40
 
 class Pattern(BasicPTElement):
     """Represents a stop pattern for a particular route, as defined in GTFS
-
-    After loading a GTFS feed for a particular date, one can retrieve each
-    pattern for analysis.  For example:
-
-    ::
-
-        from polarislib.network import Network
-        from os.path import join
-
-        root = 'D:/Argonne/GTFS/DETROIT'
-
-        n = Network()
-        n.open(join(root, 'detroit-Supply.sqlite'))
-        source = n.transit.new_gtfs(file_path=join(root, 'DDOT', '2020-06-23.zip'),
-                              description='Detroit Department of Transportation',
-                              agency_id='DDOT')
-
-        source.load_date('2020-06-23')
-
-        # We can access one pattern with its ID
-        pat = source.select_patterns['D-d1079f93748abfdf57e28413874d3f54']
-
-        # Or loop through all
-        for pattern_id, pattern in source.select_patterns.items():
-            # map_matching each one of them, for example
-            pattern.map_match()
-
-        # We can retrieve the issue in path finding we have for a pattern with
-
-        #The pair of links between which there was an issue computing a path
-        pair = pattern.get_error('culprit')
-
-        # The reconstructed route until the point an issue was found
-        pth = pattern.get_error('partial_path')
-
-        # Once map_matching is complete (or re-done), one can update it in the database
-        pattern.update_shape(n.conn)
-
 
     :Database class members:
 
@@ -87,14 +48,17 @@ class Pattern(BasicPTElement):
         self.pattern_id = -1
         self.route_id = route_id
         self.route = ""
+        self.agency_id = None
+        self.longname = ""
+        self.shortname = ""
+        self.description = ""
+        self.number_of_cars = 0
         self.seated_capacity = None
         self.design_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
         # self.__geotool = geotool  # type: polarislib.network.Geo
         self.__logger = None
-        # if self.__geotool:
-        #     self.__logger = self.__geotool.logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -128,43 +92,26 @@ class Pattern(BasicPTElement):
 
         # path = '|'.join([str(int(x)) for x in self.full_path])
         data = [
+            self.route_id,
             self.pattern_id,
             self.pattern_hash,
             self.route,
             self.route_type,
-            self.route_id,
             self.agency_id,
-            # self.__match_quality,
+            self.shortname,
+            self.longname,
+            self.description,
             self.seated_capacity,
             self.design_capacity,
             self.total_capacity,
+            self.number_of_cars,
             geo,
             self.__srid,
         ]
 
-        sql = """insert into routes (pattern_id, pattern, route, route_type, route_id, seated_capacity,
-                        design_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
+        sql = """insert into routes (route_id, pattern_id, pattern, route, route_type, agency_id, shortname, longname, description, seated_capacity,
+                        design_capacity, total_capacity, number_of_cars, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
-
-        if self.pattern_mapping and self.shape:
-            sqlgeo = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset, geo)
-                        values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-            sql = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset)
-                                                  values (?, ?, ?, ?, ?, ?);"""
-
-            for record in self.pattern_mapping:
-                if record[-1] is None:
-                    conn.execute(sql, record[:-1])
-                else:
-                    geo = shapely.wkb.loads(record[-1])
-                    if isinstance(geo, LineString):
-                        conn.execute(sqlgeo, record + [self.__srid])
-                    else:
-                        conn.execute(sql, record[:-1])
-        # data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]
-        # conn.executemany('insert into Transit_Pattern_Links(pattern_id, "index", transit_link) values (?,?,?)', data)
-        # if commit:
-        #     conn.commit()
 
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
