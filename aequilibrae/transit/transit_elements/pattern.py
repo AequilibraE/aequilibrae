@@ -6,6 +6,7 @@ import pandas as pd
 import shapely.wkb
 from shapely.geometry import LineString, Polygon
 from shapely.ops import substring
+from rtree import index
 
 from aequilibrae.log import logger
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -57,8 +58,8 @@ class Pattern(BasicPTElement):
         self.design_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
-        # self.__geotool = geotool  # type: polarislib.network.Geo
-        self.__logger = None
+        self.__geotool = gtfs_feed.geotool
+        self.__logger = logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -90,7 +91,6 @@ class Pattern(BasicPTElement):
         shp = self.best_shape()
         geo = None if shp is None else shp.wkb
 
-        # path = '|'.join([str(int(x)) for x in self.full_path])
         data = [
             self.route_id,
             self.pattern_id,
@@ -113,6 +113,26 @@ class Pattern(BasicPTElement):
                         design_capacity, total_capacity, number_of_cars, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
 
+        if self.pattern_mapping and self.shape:
+            sqlgeo = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset, geo)
+                        values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
+            sql = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset)
+                                                  values (?, ?, ?, ?, ?, ?);"""
+
+            for record in self.pattern_mapping:
+                if record[-1] is None:
+                    conn.execute(sql, record[:-1])
+                else:
+                    geo = shapely.wkb.loads(record[-1])
+                    if isinstance(geo, LineString):
+                        conn.execute(sqlgeo, record + [self.__srid])
+                    else:
+                        conn.execute(sql, record[:-1])
+        # data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]
+        # conn.executemany('insert into Transit_Pattern_Links(pattern_id, "index", transit_link) values (?,?,?)', data)
+        # if commit:
+        #     conn.commit()
+
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
         shp = self._stop_based_shape if self.raw_shape is None else self.raw_shape
@@ -133,10 +153,10 @@ class Pattern(BasicPTElement):
         We do not consider links that are in perfect sequence, as we found that it introduces severe issues when
         stops are close to intersections without clear upsides.
 
-         When issues are found, we remove the stops in the immediate vicinity of the issue and attempt new
-         path finding. The First and last stops/corresponding links are always kept.
+        When issues are found, we remove the stops in the immediate vicinity of the issue and attempt new
+        path finding. The First and last stops/corresponding links are always kept.
 
-         If an error was found, (record for it will show in the log), it is stored within the object.
+        If an error was found, (record for it will show in the log), it is stored within the object.
 
         """
         if self.__map_matched:
@@ -165,7 +185,9 @@ class Pattern(BasicPTElement):
         logger.info(f"Map-matched pattern {self.pattern_id}")
 
     def __graph_discount(self, connected_stops):
-        link_idx = self.__geotool.get_mode_link_index(mode_correspondence[self.route_type])
+        # TODO: Este aqui vai dar erro quando for chamado
+        # Isso aqui tem relação com índices espaciais...
+        # link_idx = self.__geotool.get_mode_link_index(mode_correspondence[self.route_type])
         links = set()
         for stop in connected_stops:
             links.update(list(link_idx.nearest(stop.geo, 3)))

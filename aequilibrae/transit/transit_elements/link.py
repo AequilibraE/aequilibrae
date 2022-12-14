@@ -1,6 +1,7 @@
 from sqlite3 import Connection
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
+from aequilibrae.project.network.haversine import haversine
 
 from aequilibrae.transit.constants import constants, TRANSIT_LINK_RANGE
 
@@ -44,7 +45,7 @@ class Link:
         self.__dict__[key] = value
         self.__dict__["key"] = f"{self.from_stop}##{self.to_stop}##{self.pattern_id}"
         if self.geo is not None:
-            self.__dict__["length"] = self.geo.length
+            self.__dict__["length"] = haversine(*self.geo.bounds)
 
     def build_geo(self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point):
         geo = LineString([from_point, to_point])

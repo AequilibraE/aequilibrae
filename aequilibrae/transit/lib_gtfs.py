@@ -45,7 +45,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         WorkerThread.__init__(self, None)
 
         self.__network = network
-        self.geotools = get_active_project(False).zoning
+        self.geotool = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
         self.logger = logger
@@ -250,7 +250,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             self.gtfs_data.agency.save_to_database(conn)
 
-            # if pyqt: 
+            # if pyqt:
             #     st = f"Importing trips for {self.gtfs_data.agency.agency}"
             #     self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
             for counter, trip in enumerate(self.select_trips):
@@ -276,8 +276,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for counter, (stop_id, stop) in enumerate(self.select_stops.items()):  # type: Stop
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
-                if len(self.geotools.all_zones()) > 0:
-                    stop.taz = self.geotools.get_closest_zone(stop.geo)
+                if len(self.geotool.zoning.all_zones()) > 0:
+                    stop.taz = self.geotool.zoning.get_closest_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
                 # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
