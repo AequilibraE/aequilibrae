@@ -33,13 +33,13 @@ class TestTransitPattern(TestCase):
     def test_save_to_database(self):
         self.pat.save_to_database(self.network)
 
-    # def test_best_shape(self):
-    #     shp = self.pat.best_shape()
-    #     self.assertEqual(shp, self.pat._stop_based_shape, "Returned the wrong shape")
+    def test_best_shape(self):
+        shp = self.pat.best_shape()
+        self.assertEqual(shp, self.pat._stop_based_shape, "Returned the wrong shape")
 
-    # def test_get_error(self):
-    #     self.assertEqual(self.pat.get_error(), None, "Resulted a map-matching error when should have returned none")
+    def test_get_error(self):
+        self.assertEqual(self.pat.get_error(), None, "Resulted a map-matching error when should have returned none")
 
-    # def test_map_match(self):
-    #     self.pat.map_match()
-    #     self.pat.save_to_database(self.conn)
+    def test_map_match(self):
+        self.pat.map_match()
+        self.pat.save_to_database(self.network)
