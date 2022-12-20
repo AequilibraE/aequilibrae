@@ -136,11 +136,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any([not isinstance(item, int) for item in route_types]):
             raise TypeError("All route types must be integers")
 
-        # if pyqt:
-        #     mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
-            # self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
+        if pyqt:
+            mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
+            self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
         for i, pat in enumerate(self.select_patterns.values()):
-            # if pyqt: self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
+            if pyqt: self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
@@ -221,9 +221,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             return
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
-        # if pyqt:
-        #     self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
-        #     self.signal.emit(["start", "master", 4 + self.__do_raw_shapes__, self.__mt])
+        if pyqt:
+            self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
+            self.signal.emit(["start", "master", 4 + self.__do_raw_shapes__, self.__mt])
 
         self.save_to_disk()
 
@@ -240,46 +240,46 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.create_raw_shapes()
 
         with closing(transit_connection()) as conn:
-            # if pyqt:
-            #     st = f"Importing routes for {self.gtfs_data.agency.agency}"
-            #     self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
-            for counter, (pattern_id, pattern) in enumerate(self.select_patterns.items()):
+            if pyqt:
+                st = f"Importing routes for {self.gtfs_data.agency.agency}"
+                self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
+            for counter, (_, pattern) in enumerate(self.select_patterns.items()):
                 pattern.save_to_database(conn, commit=False)
-                # if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
 
-            # if pyqt:
-            #     st = f"Importing trips for {self.gtfs_data.agency.agency}"
-            #     self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
+            if pyqt:
+                st = f"Importing trips for {self.gtfs_data.agency.agency}"
+                self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
             for counter, trip in enumerate(self.select_trips):
                 trip.save_to_database(conn, commit=False)
-                # if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
-            # if pyqt:
-            #     st = f"Importing links for {self.gtfs_data.agency.agency}"
-            #     self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
+            if pyqt:
+                st = f"Importing links for {self.gtfs_data.agency.agency}"
+                self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
             for counter, (pair, link) in enumerate(self.select_links.items()):
                 link.save_to_database(conn, commit=False)
-                # if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.__outside_zones = 0
             zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
-            # if pyqt:
-            #     st = f"Importing stops for {self.gtfs_data.agency.agency}"
-            #     self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
-            for counter, (stop_id, stop) in enumerate(self.select_stops.items()):  # type: Stop
+            if pyqt:
+                st = f"Importing stops for {self.gtfs_data.agency.agency}"
+                self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
+            for counter, (_, stop) in enumerate(self.select_stops.items()):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
                 if len(self.geotool.zoning.all_zones()) > 0:
                     stop.taz = self.geotool.zoning.get_closest_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
-                # self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             for fare in self.gtfs_data.fare_attributes.values():
@@ -299,9 +299,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.logger.warning(msg)
 
     def finished(self):
-        # if pyqt:
-        #     self.signal.emit(["finished_static_gtfs_procedure"])
-        pass
+        if pyqt:
+            self.signal.emit(["finished_static_gtfs_procedure"])
 
     def __build_data(self):
         self.logger.debug("Starting __build_data")
@@ -315,11 +314,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = constants()
-        # if pyqt:
-        #     msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
-        #     self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
+        if pyqt:
+            msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
+            self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            # if pyqt: self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
+            if pyqt: self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]

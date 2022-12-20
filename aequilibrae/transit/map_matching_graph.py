@@ -126,25 +126,25 @@ class MMGraph:
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
         # Build initial index
-        # if pyqt: self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
+        if pyqt: self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
         self._idx = GeoIndex()
-        for counter, (ind, record) in enumerate(self.df.iterrows()):
-            # if pyqt: self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
+        for counter, (_, record) in enumerate(self.df.iterrows()):
+            if pyqt: self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        # if pyqt: self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
+        if pyqt: self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            # if pyqt: self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
+            if pyqt: self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
             stop.___map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.___map_matching_id__[self.mode_id])
             self.max_node_id += 1
-            self.connect_node(stop)  # TODO
+            self.connect_node(stop)
         self.df = pd.concat([pd.DataFrame(rec).transpose() for rec in self.__all_links.values()])
 
         self.df = self.df[self.df.to_remove == 0]
