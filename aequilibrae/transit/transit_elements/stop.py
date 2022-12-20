@@ -91,10 +91,10 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into stops (stop_id, stop, agency_id, link, dir, offset, setback, X, Y, Z, name,
+        sql = """insert into stops (stop_id, stop, agency_id, X, Y, Z, name,
                                             parent_station, description, street, zone, fare_zone_id, has_parking,
                                             route_type, moved_by_matching, geometry)
-                                            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+                                            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)
@@ -107,10 +107,6 @@ class Stop(BasicPTElement):
             self.stop_id,
             self.stop,
             self.agency_id,
-            self.link,
-            self.dir,
-            self.offset,
-            self.setback,
             self.stop_lon,
             self.stop_lat,
             0,

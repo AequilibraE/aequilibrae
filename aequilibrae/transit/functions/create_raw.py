@@ -16,15 +16,15 @@ def create_raw_shapes(agency_id: int, select_patterns):
     with closing(transit_connection()) as conn:
         table_list = list_tables_in_db(conn)
         if "transit_raw_shapes" not in table_list:
-            conn.execute('CREATE TABLE IF NOT EXISTS "TRANSIT_RAW_SHAPES" ("pattern_id"	TEXT, "route_id" TEXT);')
-            conn.execute(f'SELECT AddGeometryColumn( "TRANSIT_RAW_SHAPES", "geo", {srid}, "LINESTRING", "XY");')
+            conn.execute('CREATE TABLE IF NOT EXISTS "transit_raw_shapes" ("pattern_id"	TEXT, "route_id" TEXT);')
+            conn.execute(f'SELECT AddGeometryColumn( "transit_raw_shapes", "geo", {srid}, "LINESTRING", "XY");')
             conn.execute('SELECT CreateSpatialIndex("Link" , "geo");')
         else:
             bottom = agency_id * AGENCY_MULTIPLIER
             top = bottom + AGENCY_MULTIPLIER
-            conn.execute("Delete from TRANSIT_RAW_SHAPES where pattern_id>=? and pattern_id<?", [bottom, top])
+            conn.execute("Delete from transit_raw_shapes where pattern_id>=? and pattern_id<?", [bottom, top])
         conn.commit()
-        sql = "INSERT into Transit_raw_shapes(pattern_id, route_id, geo) VALUES(?,?, GeomFromWKB(?, ?));"
+        sql = "INSERT into transit_raw_shapes(pattern_id, route_id, geo) VALUES(?,?, GeomFromWKB(?, ?));"
         for pat in select_patterns.values():  # type: Pattern
             if pat.raw_shape:
                 conn.execute(sql, [pat.pattern_id, pat.route_id, pat.raw_shape.wkb, srid])

@@ -39,5 +39,5 @@ class Agency(BasicPTElement):
             data = [x[0] for x in conn.execute(sql, [WALK_AGENCY_ID])]
 
         c = constants()
-        c.agencies["agencies"] = max(c.agencies.get("agencies", 1) + 1, data[0] + 1)
+        c.agencies["agencies"] = max(c.agencies.get("agencies", 1), data[0])
         return c.agencies["agencies"]
