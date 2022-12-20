@@ -2,6 +2,7 @@ import hashlib
 import logging
 from contextlib import closing
 from copy import deepcopy
+import math
 from os.path import isfile, join
 from tempfile import gettempdir
 from typing import Dict
@@ -17,7 +18,6 @@ from shapely.ops import substring
 from aequilibrae.log import logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import DRIVING_SIDE
-# from aequilibrae.transit.functions.transit_connection import transit_connection
 from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.transit_elements import mode_correspondence
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
@@ -144,7 +144,7 @@ class MMGraph:
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.___map_matching_id__[self.mode_id])
             self.max_node_id += 1
-            self.connect_node(stop)
+            self.connect_node(stop)  # TODO
         self.df = pd.concat([pd.DataFrame(rec).transpose() for rec in self.__all_links.values()])
 
         self.df = self.df[self.df.to_remove == 0]
@@ -191,7 +191,7 @@ class MMGraph:
         distances = []
         for lid in list_nearest:
             lgeo = self.__all_links[lid].geo
-            distances.append(stop.geo.distance(lgeo))
+            distances.append(stop.geo.distance(lgeo) * math.pi * 6371000 / 180)
 
         # Sort by distance to the stop
         nearest = pd.DataFrame({"dist": distances, "link_id": list_nearest}).sort_values(by="dist")
@@ -215,10 +215,11 @@ class MMGraph:
                 last = link_geo.boundary.geoms[1]
 
             proj_point = link_geo.project(stop.geo)
+            # corr_proj_point = proj_point * math.pi * 6371000 / 180
             break_point = link_geo.interpolate(proj_point)
             connector_geo = LineString([stop.geo, break_point])
 
-            if connector_geo.length > 0:
+            if (connector_geo.length * math.pi * 6371000 / 180) > 0:
                 p = break_point if proj_point > 0 else last
                 az_link = compute_line_bearing((first.x, first.y), (p.x, p.y))
                 az_connector = compute_line_bearing((stop.geo.x, stop.geo.y), (break_point.x, break_point.y))
@@ -228,7 +229,7 @@ class MMGraph:
             if proj_point <= 1.0:  # If within one meter of the end of the link, let's go with the existing node
                 break_point = first
                 intersec_node = link.a_node
-            elif proj_point >= link_geo.length - 1.0:
+            elif proj_point >= (link_geo.length * math.pi * 6371000 / 180) - 1.0:
                 break_point = last
                 intersec_node = link.b_node
             else:
@@ -244,7 +245,7 @@ class MMGraph:
                 fp.to_remove = 0
                 fp.geo = substring(link_geo, 0, proj_point)
                 fp.wkt = fp.geo.wkt
-                fp.distance = fp.geo.length
+                fp.distance = fp.geo.length * math.pi * 6371000 / 180
                 self._idx.insert(fp.link_id, fp.geo)
                 self.max_link_id += 1
                 self.__all_links[fp.link_id] = fp
@@ -255,7 +256,7 @@ class MMGraph:
                 lp.a_node = intersec_node
                 lp.geo = substring(link_geo, proj_point, link_geo.length)
                 lp.wkt = lp.geo.wkt
-                lp.distance = lp.geo.length
+                lp.distance = lp.geo.length * math.pi * 6371000 / 180
                 lp.to_remove = 0
                 self._idx.insert(lp.link_id, lp.geo)
                 self.max_link_id += 1
@@ -273,7 +274,7 @@ class MMGraph:
             connector.to_remove = 0
             connector.geo = connector_geo
             connector.wkt = connector_geo.wkt
-            connector.distance = connector_geo.length
+            connector.distance = connector_geo.length * math.pi * 6371000 / 180
             connector.is_connector = 1  # We make sure that the closest connector cannot be turned off
             connector.closest = is_closest
             self.max_link_id += 1
