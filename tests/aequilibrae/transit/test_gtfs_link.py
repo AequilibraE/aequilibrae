@@ -61,5 +61,7 @@ class TestLink(TestCase):
 
         new_link.save_to_database(self.network)
 
-        from_stop, to_stop, dist = self.network.execute('Select from_stop, to_stop, "length" from route_links where from_stop=?', [fstop]).fetchone()
+        from_stop, to_stop, dist = self.network.execute(
+            'Select from_stop, to_stop, "length" from route_links where from_stop=?', [fstop]
+        ).fetchone()
         self.assertEqual([from_stop, to_stop, dist], [fstop, tstop, geo.length], "Saving link to the database failed")

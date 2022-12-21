@@ -78,9 +78,7 @@ class TestStop(TestCase):
         s.save_to_database(self.network)
 
         curr = self.network.cursor()
-        curr.execute(
-            "Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]]
-        )
+        curr.execute("Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]])
         result = [x for x in curr.fetchone()]
         expected = [s.agency_id, link, direc, self.data["stop_desc"], self.data["stop_street"]]
         self.assertEqual(result, expected, "Saving Stop to the database failed")

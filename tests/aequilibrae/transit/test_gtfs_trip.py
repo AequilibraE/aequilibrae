@@ -67,6 +67,8 @@ class TestTrip(TestCase):
         result = self.network.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
         self.assertEqual(result, patid, "Saving trip to trips failed")
 
-        records, counter = self.network.execute('Select count(*), max("seq") from trips_schedule where trip_id=?', [r.trip_id]).fetchone()
+        records, counter = self.network.execute(
+            'Select count(*), max("seq") from trips_schedule where trip_id=?', [r.trip_id]
+        ).fetchone()
         self.assertEqual(records, len(times), "Saving trip to trips_schedule failed")
         self.assertEqual(counter, max(times), "Saving trip to trips_schedule failed")
