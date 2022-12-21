@@ -19,19 +19,18 @@ class TestLibGTFS(unittest.TestCase):
         self.file_path = os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/2020-04-01.zip")
         self.network = transit_connection(self.fldr)
 
-        self.system_builder = GTFSRouteSystemBuilder(network=self.network, agency_identifier="Capital Metro", file_path=self.file_path)
+        self.system_builder = GTFSRouteSystemBuilder(
+            network=self.network, agency_identifier="Capital Metro", file_path=self.file_path
+        )
 
     def tearDown(self) -> None:
         self.prj.close()
 
     def test_set_capacities(self):
         self.system_builder.set_capacities({0: [150, 300, 300], 3: [42, 56, 56]})
-        self.assertEqual(self.system_builder.gtfs_data.__dict__['__capacities__'], {0: [150, 300, 300], 3: [42, 56, 56]})
-
-    @unittest.skip
-    def test_set_maximum_speeds(self):
-        speed_df = pd.DataFrame([[3, 348, 603, 40]])
-        self.system_builder.set_maximum_speeds(max_speeds=speed_df)
+        self.assertEqual(
+            self.system_builder.gtfs_data.__dict__["__capacities__"], {0: [150, 300, 300], 3: [42, 56, 56]}
+        )
 
     def test_dates_available(self):
         dates = self.system_builder.dates_available()
@@ -55,9 +54,13 @@ class TestLibGTFS(unittest.TestCase):
         self.assertEqual(str(exception_context.exception), "All route types must be integers")
 
     @unittest.skip
+    # Vai dar erro por hora pq não temos rede com links/nós
     def test_map_match(self):
         self.system_builder.set_allow_map_match(True)
         self.system_builder.map_match()
+
+        self.assertTrue("t" in self.system_builder.graphs.keys())
+        self.assertGreater(len(self.network.execute("SELECT * FROM pattern_mapping;")), 1)
 
     def test_set_agency_identifier(self):
         self.assertNotEqual(self.system_builder.gtfs_data.agency.agency, "CTA")
@@ -70,18 +73,17 @@ class TestLibGTFS(unittest.TestCase):
         self.assertEqual(self.system_builder.gtfs_data.feed_date, "2020-04-01")
 
     def test_set_description(self):
-        self.system_builder.set_description('CTA2019 fixed by John Doe after strong coffee')
-        self.assertEqual(self.system_builder.description, 'CTA2019 fixed by John Doe after strong coffee')
+        self.system_builder.set_description("CTA2019 fixed by John Doe after strong coffee")
+        self.assertEqual(self.system_builder.description, "CTA2019 fixed by John Doe after strong coffee")
 
     def test_set_date(self):
         self.system_builder.set_date("2020-04-13")
         self.assertEqual(self.system_builder.__target_date__, "2020-04-13")
 
-    @unittest.skip
     def test_load_date(self):
         self.system_builder.load_date("2020-04-13")
         self.assertEqual(self.system_builder.gtfs_data.agency.service_date, "2020-04-13")
-        self.assertTrue("t" in self.system_builder.graphs.keys())
+        self.assertTrue("1" in self.system_builder.select_routes.keys())
 
     def test_load_date_srid_exception(self):
         self.system_builder.srid = None
@@ -101,19 +103,26 @@ class TestLibGTFS(unittest.TestCase):
         self.assertTrue(self.system_builder.__do_raw_shapes__)
 
     def test_create_raw_shapes(self):
-        pass
+        self.system_builder.load_date("2020-04-01")
+        self.system_builder.create_raw_shapes()
 
-    def test_doWork(self):
-        pass
+        all_tables = [
+            x[0] for x in self.network.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()
+        ]
+        self.assertTrue("raw_shapes" in all_tables)
 
-    def test_execute_import(self):
-        pass
+        self.assertEqual(
+            self.network.execute("SELECT * FROM raw_shapes;").fetchone()[:2], ("10001001000", "10001000000")
+        )
 
     def test_save_to_disk(self):
-        pass
 
-    def test_finished(self):
-        pass
+        self.system_builder.load_date("2020-04-01")
+        self.system_builder.save_to_disk()
+
+        self.assertEqual(len(self.network.execute("SELECT * FROM route_links").fetchall()), 75)
+        self.assertEqual(len(self.network.execute("SELECT * FROM trips;").fetchall()), 10)
+        self.assertEqual(len(self.network.execute("SELECT * FROM routes;").fetchall()), 1)
 
 
 if __name__ == "__name__":

@@ -2,9 +2,10 @@ from collections import OrderedDict
 
 
 class PathStorage:
-    """This class is designed to store path-computation objects to take advantage of the fact that AequilibraE
-     preserves the entire shortest path tree when computing a path between two nodes and can re-trace the
-     same tree for a path from the same origin to a different destination.
+    """
+    This class is designed to store path-computation objects to take advantage of the fact that AequilibraE
+    preserves the entire shortest path tree when computing a path between two nodes and can re-trace the
+    same tree for a path from the same origin to a different destination.
 
     Tests on existing models (in 2022) shows that caching these path objects in memory reduces the number of
     path computations during map-matching in 50 to 65%.

@@ -140,7 +140,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
             self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Map-matching", mt])
         for i, pat in enumerate(self.select_patterns.values()):
-            if pyqt: self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", i + 1, "Map-matching", mt])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
@@ -245,7 +246,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
             for counter, (_, pattern) in enumerate(self.select_patterns.items()):
                 pattern.save_to_database(conn, commit=False)
-                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt:
+                    self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.gtfs_data.agency.save_to_database(conn)
@@ -255,15 +257,17 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 self.signal.emit(["start", "secondary", len(self.select_trips), st, self.__mt])
             for counter, trip in enumerate(self.select_trips):
                 trip.save_to_database(conn, commit=False)
-                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt:
+                    self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             if pyqt:
                 st = f"Importing links for {self.gtfs_data.agency.agency}"
                 self.signal.emit(["start", "secondary", len(self.select_links.keys()), st, self.__mt])
-            for counter, (pair, link) in enumerate(self.select_links.items()):
+            for counter, (_, link) in enumerate(self.select_links.items()):
                 link.save_to_database(conn, commit=False)
-                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt:
+                    self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             self.__outside_zones = 0
@@ -279,7 +283,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 if len(self.geotool.zoning.all_zones()) > 0:
                     stop.taz = self.geotool.zoning.get_closest_zone(stop.geo)
                 stop.save_to_database(conn, commit=False)
-                if pyqt: self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
+                if pyqt:
+                    self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
             for fare in self.gtfs_data.fare_attributes.values():
@@ -318,7 +323,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
             msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
             self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            if pyqt: self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", counter + 1, msg_txt, self.__mt])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -434,7 +440,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def _get_trips_by_date_and_route(self, route_id: int, service_date: str) -> list:
         trips = [
             trip
-            for element in self.gtfs_data.trips[route_id] for trip in self.gtfs_data.trips[route_id][element]
+            for element in self.gtfs_data.trips[route_id]
+            for trip in self.gtfs_data.trips[route_id][element]
             if service_date in self.gtfs_data.services[trip.service_id].dates
         ]
         return sorted(trips)

@@ -197,7 +197,11 @@ class Pattern(BasicPTElement):
             links.update(list(link_idx.nearest(stop.geo, 3)))
         buffer = self.best_shape().buffer(40)  # type: Polygon
 
-        return [lnk for lnk in links if buffer.contains(self.__geolinks.loc[self.__geolinks.link_id == lnk].geometry.values[0])]
+        return [
+            lnk
+            for lnk in links
+            if buffer.contains(self.__geolinks.loc[self.__geolinks.link_id == lnk].geometry.values[0])
+        ]
 
     def __map_matching_complete_path_building(self):
         mode_ = mode_correspondence[self.route_type]
@@ -402,7 +406,15 @@ class Pattern(BasicPTElement):
 
         # We make sure we don't have projections going beyond the length we will accumulate
         # This is only required because of numerical precision issues
-        tot_broken_length = sum([self.__geolinks.loc[self.__geolinks.link_id == abs(x)].geometry.values[0].length * math.pi * 6371000 / 180 for x in self.full_path])
+        tot_broken_length = sum(
+            [
+                self.__geolinks.loc[self.__geolinks.link_id == abs(x)].geometry.values[0].length
+                * math.pi
+                * 6371000
+                / 180
+                for x in self.full_path
+            ]
+        )
         distances = [min(x, tot_broken_length) for x in distances]
         pid = self.pattern_id
         stop_pos = 0
@@ -417,7 +429,7 @@ class Pattern(BasicPTElement):
                 dt = [pid, index, link_id, direc, None, None, link_geo.wkb]
                 self.pattern_mapping.append(dt)
                 index += 1
-                cum_dist += (link_geo.length * math.pi * 6371000 / 180)
+                cum_dist += link_geo.length * math.pi * 6371000 / 180
                 continue
 
             start_point = cum_dist
@@ -435,7 +447,7 @@ class Pattern(BasicPTElement):
                     break
                 start_point = milepost
 
-            cum_dist += (link_geo.length * math.pi * 6371000 / 180)
+            cum_dist += link_geo.length * math.pi * 6371000 / 180
 
             if start_point != end_point:
                 wkb = substring(self.shape, start_point, end_point).wkb

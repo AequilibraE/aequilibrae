@@ -18,6 +18,7 @@ from aequilibrae.transit.column_order import column_order
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
+from aequilibrae.utils.worker_thread import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -25,7 +26,7 @@ if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
 
-class GTFSReader():
+class GTFSReader(WorkerThread):
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
     if pyqt:
@@ -34,7 +35,7 @@ class GTFSReader():
     logger = logging.getLogger("GTFS Reader")
 
     def __init__(self):
-
+        WorkerThread.__init__(self, None)
         self.__capacities__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
@@ -83,8 +84,8 @@ class GTFSReader():
         ag_id = self.agency.agency
         self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
 
+        self.__mt = f"Reading GTFS for {ag_id}"
         if pyqt:
-            self.__mt = f"Reading GTFS for {ag_id}"
             self.signal.emit(["start", "master", 6, self.__mt, self.__mt])
 
         self.__load_date()
@@ -122,14 +123,17 @@ class GTFSReader():
             self.signal.emit(["start", "secondary", len(self.trips), msg_txt, self.__mt])
         total_fast = 0
         for prog_counter, route in enumerate(self.trips):
-            if pyqt: self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
                     self.logger.debug(f"De-conflicting stops for route/trip {route}/{trip.trip}")
                     stop_times = self.stop_times[trip.trip]
                     if stop_times.shape[0] != len(trip.stops):
-                        self.logger.error(f"Trip {trip.trip_id} has a different number of stop_times than actual stops.")
+                        self.logger.error(
+                            f"Trip {trip.trip_id} has a different number of stop_times than actual stops."
+                        )
 
                     if not stop_times.arrival_time.is_monotonic_increasing:
                         stop_times.loc[stop_times.arrival_time == 0, "arrival_time"] = np.nan
@@ -172,7 +176,9 @@ class GTFSReader():
                         )
 
                         for _, rec in max_speeds.iterrows():
-                            df.loc[(df.dist >= rec.min_distance) & ((df.dist < rec.max_distance)), "max_speed"] = rec.speed
+                            df.loc[
+                                (df.dist >= rec.min_distance) & ((df.dist < rec.max_distance)), "max_speed"
+                            ] = rec.speed
 
                         to_fix = df[df.max_speed < df.speed].index.values
                         if to_fix.shape[0] > 0:
@@ -180,9 +186,9 @@ class GTFSReader():
                             total_fast += to_fix.shape[0]
                             df.loc[to_fix[0] :, "source_time"] = 2
                             for i in to_fix:
-                                df.loc[i:, "add_time"] += (df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)).astype(
-                                    int
-                                )
+                                df.loc[i:, "add_time"] += (
+                                    df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
+                                ).astype(int)
 
                             source_time[1:] = df.source_time[:]
                             times[1:] += df.add_time[:].astype(int)
@@ -268,7 +274,8 @@ class GTFSReader():
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
         for i, shape_id in enumerate(all_shape_ids):
-            if pyqt: self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString([x for x in zip(items["shape_pt_lon"], items["shape_pt_lat"])])
@@ -308,7 +315,8 @@ class GTFSReader():
         self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
         for i, line in enumerate(trips_array):
-            if pyqt: self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -394,7 +402,8 @@ class GTFSReader():
         with self.zip_archive.open(stoptimestxt, "r") as file:
             stoptimes = parse_csv(file, column_order[stoptimestxt])
         self.data_arrays[stoptimestxt] = stoptimes
-        if pyqt: msg_txt = f"Load stop times - {self.agency.agency}"
+        if pyqt:
+            msg_txt = f"Load stop times - {self.agency.agency}"
 
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
@@ -431,12 +440,14 @@ class GTFSReader():
         df = df.merge(stop_list, on="stop")
         df.sort_values(["trip_id", "stop_sequence"], inplace=True)
         df = df.assign(source_time=0)
-        if pyqt: self.signal.emit(["start", "secondary", df.trip_id.unique().shape[0], msg_txt, self.__mt])
+        if pyqt:
+            self.signal.emit(["start", "secondary", df.trip_id.unique().shape[0], msg_txt, self.__mt])
         for trip_id, data in [[trip_id, x] for trip_id, x in df.groupby(df["trip_id"])]:
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
             counter += data.shape[0]
-            if pyqt: self.signal.emit(["update", "secondary", counter, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", counter, msg_txt, self.__mt])
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -459,7 +470,8 @@ class GTFSReader():
             msg_txt = f"Load stops - {self.agency.agency}"
             self.signal.emit(["start", "secondary", stops.shape[0], msg_txt, self.__mt])
         for i, line in enumerate(stops):
-            if pyqt: self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             s = Stop(self.agency.agency_id)
             s.populate(line, stops.dtype.names)
             s.agency = self.agency.agency
@@ -491,7 +503,8 @@ class GTFSReader():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "design_capacity", "total_capacity"]] = cap
 
         for i, line in routes.iterrows():
-            if pyqt: self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            if pyqt:
+                self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r

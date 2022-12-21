@@ -11,6 +11,11 @@ if inside_qgis:
 
 
 def transit_connection(project_path=None) -> sqlite3.Connection:
+    """
+    Connects transit database.
+    Args:
+         *project_path*(:obj:`str`): path to the project.
+    """
     project_path = project_path or get_active_project().project_base_path
     file_name = os.path.join(project_path, "public_transport.sqlite")
     if not os.path.exists(file_name):
