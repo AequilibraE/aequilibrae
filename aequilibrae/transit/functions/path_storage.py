@@ -19,7 +19,7 @@ class PathStorage:
         self.storage = OrderedDict()
         self.uses = 0
         self.total_paths = 0
-        self.threshold = 10000
+        self.threshold = 1000
 
     def add_graph(self, graph, mode_id):
         if mode_id in self.graphs:

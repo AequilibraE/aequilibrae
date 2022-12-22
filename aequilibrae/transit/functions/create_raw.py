@@ -9,7 +9,7 @@ from aequilibrae.transit.functions.transit_connection import transit_connection
 
 def create_raw_shapes(agency_id: int, select_patterns):
     """
-    Adds all shapes provided in the GTFS feeds.
+    Adds all shapes provided in the GTFS feed.
 
     Args:
         *agency_id* (:obj:`int`): agency_id number
