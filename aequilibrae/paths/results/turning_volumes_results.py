@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 
 from aequilibrae import AequilibraeMatrix
@@ -15,7 +16,6 @@ TURNING_VOLUME_OD_COLUMNS = ["network mode", "class_name", "iteration", "a", "b"
                              "origin", "destination"]
 
 
-# TODO: deal with multiple iterations
 # TODO: add save turning movements to assignment
 class TurningVolumesResults:
 
@@ -31,6 +31,7 @@ class TurningVolumesResults:
         self.class_name = class_name
         self.mode_id = mode_id
         self.matrix = matrix
+        self.matrix_mapping = matrix.matrix_hash
         self.project_dir = project_dir
         self.procedure_id = procedure_id
         self.iterations = iterations
@@ -46,7 +47,6 @@ class TurningVolumesResults:
         class_name = traffic_class.__id__
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
-
         return TurningVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iterations)
 
     def calculate_turning_volumes(self, turns_df: pd.DataFrame, betas: list[float]) -> pd.DataFrame:
@@ -59,13 +59,17 @@ class TurningVolumesResults:
         node_to_index_df = self.read_path_aux_file("node_to_index")
         correspondence_df = self.read_path_aux_file("correspondence")
 
-        # only reads iteration 1
         formatted_paths = self.format_paths(self.read_paths_for_iterations())
 
         formatted_turns = self.format_turns(turns_df, formatted_paths, node_to_index_df, correspondence_df)
-        turns_demand = self.get_turns_demand(formatted_turns)
-        turn_volumes_by_iteration = self.get_turns_movements(turns_demand)
-        return self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
+        turning_movement_list = []
+        for matrix_name in self.matrix.view_names:
+            turns_demand = self.get_turns_demand(matrix_name, formatted_turns)
+            turn_volumes_by_iteration = self.get_turns_movements(turns_demand)
+            turning_movements = self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
+            turning_movements["matrix_name"] = matrix_name
+            turning_movement_list.append(turning_movements)
+        return pd.concat(turning_movement_list)
 
     def read_path_aux_file(self, file_type: Literal["node_to_index", "correspondence"]) -> pd.DataFrame:
 
@@ -122,8 +126,8 @@ class TurningVolumesResults:
         all_paths[["network mode", 'class_name', "iteration"]] = [self.mode_id, self.class_name, iteration]
         return all_paths
 
-    def get_turns_demand(self, turns_df: pd.DataFrame) -> pd.DataFrame:
-        turns_df["demand"] = turns_df.apply(self.get_o_d_demand, axis=1)
+    def get_turns_demand(self, matrix_values:np.array, turns_df: pd.DataFrame) -> pd.DataFrame:
+        turns_df["demand"] = turns_df.apply(self.get_o_d_demand, arguments=matrix_values, axis=1)
         return turns_df
 
     def format_turns(self, turns_df: pd.DataFrame, formatted_paths: pd.DataFrame, node_to_index_df: pd.DataFrame,
@@ -132,8 +136,8 @@ class TurningVolumesResults:
         turns_w_links = self.get_turn_links(turns_indices, correspondence_df)
         return self.get_turns_ods(turns_w_links, formatted_paths, node_to_index_df)
 
-    def get_o_d_demand(self, row: pd.Series) -> float:
-        return self.matrix[self.matrix_mapping[row["origin"]], self.matrix_mapping[row["destination"]]]
+    def get_o_d_demand(self, row: pd.Series, matrix_values: np.array) -> float:
+        return matrix_values[self.matrix_mapping[row["origin"]], self.matrix_mapping[row["destination"]]]
 
     def format_paths(self, paths: pd.DataFrame) -> pd.DataFrame:
         paths.rename(columns={"data": "id"}, inplace=True)
