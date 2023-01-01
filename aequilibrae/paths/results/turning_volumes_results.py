@@ -16,7 +16,6 @@ TURNING_VOLUME_OD_COLUMNS = ["network mode", "class_name", "iteration", "a", "b"
                              "origin", "destination"]
 
 
-# TODO: add save turning movements to assignment
 class TurningVolumesResults:
 
     def __init__(
