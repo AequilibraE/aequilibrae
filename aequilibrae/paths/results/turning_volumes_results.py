@@ -5,6 +5,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+
 from aequilibrae import AequilibraeMatrix
 from aequilibrae import TrafficClass
 
@@ -36,20 +37,28 @@ class TurningVolumesResults:
         self.procedure_id = procedure_id
         self.procedure_dir = project_dir / "path_files" / procedure_id
         self.iteration = self.get_iteration(iteration)
-        self.blend_iterations = blend_iterations
-        self.test = None
+        self.blend_iterations = False if self.iteration == 1 else blend_iterations
 
     @staticmethod
     def from_traffic_class(
             traffic_class: TrafficClass,
             project_dir: Path,
             procedure_id: str,
-            iterations: Optional[list[int]] = None,
+            iteration: Optional[list[int]] = None,
+            blend_iterations: bool = True,
     ):
         class_name = traffic_class.__id__
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
-        return TurningVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iterations)
+        return TurningVolumesResults(
+            class_name,
+            mode_id,
+            matrix,
+            project_dir,
+            procedure_id,
+            iteration,
+            blend_iterations
+        )
 
     def calculate_turning_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
@@ -69,7 +78,6 @@ class TurningVolumesResults:
             turns_demand = self.get_turns_demand(matrix_name, self.matrix.get_matrix(matrix_name), formatted_turns)
             turn_volumes_by_iteration = self.get_turns_movements(turns_demand)
             turning_movements = self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
-            print(turning_movements)
             turning_movement_list.append(turning_movements)
         return pd.concat(turning_movement_list)
 
@@ -233,6 +241,9 @@ class TurningVolumesResults:
         return volume
 
     def aggregate_iteration_volumes(self, turns_volumes: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
+        if not self.blend_iterations:
+            return turns_volumes.rename(columns={'demand': "volume"})
+
         grouping_cols = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col != 'iteration']
         result = turns_volumes.groupby(grouping_cols, as_index=False).apply(lambda x: self.calculate_volume(x, betas))
         return result.melt(
