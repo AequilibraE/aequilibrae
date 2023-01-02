@@ -89,7 +89,7 @@ class Pattern(BasicPTElement):
         self.shape_length = -1
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
-        """Saves the pattern to the *Transit_Patterns* table"""
+        """Saves the pattern to the *routes* table"""
 
         shp = self.best_shape()
         geo = None if shp is None else shp.wkb
@@ -131,10 +131,6 @@ class Pattern(BasicPTElement):
                         conn.execute(sqlgeo, record + [self.__srid])
                     else:
                         conn.execute(sql, record[:-1])
-        # data = [[self.pattern_id, counter, link] for counter, link in enumerate(self.links)]
-        # conn.executemany('insert into Transit_Pattern_Links(pattern_id, "index", transit_link) values (?,?,?)', data)
-        # if commit:
-        #     conn.commit()
 
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
