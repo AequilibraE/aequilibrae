@@ -12,9 +12,7 @@ class TestTransitPattern(TestCase):
     def setUp(self) -> None:
         self.fldr = os.path.join(gettempdir(), uuid4().hex)
         shutil.copytree(
-            src=os.path.join(
-                os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/AustinProject"
-            ),
+            src=os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/AustinProject"),
             dst=self.fldr,
         )
         self.prj = Project()

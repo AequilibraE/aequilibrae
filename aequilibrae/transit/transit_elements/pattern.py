@@ -7,7 +7,6 @@ import pandas as pd
 import shapely.wkb
 from shapely.geometry import LineString, Polygon
 from shapely.ops import substring
-from rtree import index
 
 from aequilibrae.log import logger
 from aequilibrae.transit.functions.get_srid import get_srid

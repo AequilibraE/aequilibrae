@@ -46,7 +46,7 @@ class TestLink(TestCase):
         geo = LineString([(0, 0), (3, 4)])
 
         new_link.geo = geo
-        self.assertEqual(round(new_link.length * 180 / pi / 6371000), 5, "Length not computed properly") 
+        self.assertEqual(round(new_link.length * 180 / pi / 6371000), 5, "Length not computed properly")
 
     def test_save_to_database(self):
         route_type = randint(0, 13)
@@ -65,4 +65,8 @@ class TestLink(TestCase):
         from_stop, to_stop, dist = self.network.execute(
             'Select from_stop, to_stop, "length" from route_links where from_stop=?', [fstop]
         ).fetchone()
-        self.assertEqual([from_stop, to_stop, round(dist * 180 / pi / 6371000)], [fstop, tstop, geo.length], "Saving link to the database failed")
+        self.assertEqual(
+            [from_stop, to_stop, round(dist * 180 / pi / 6371000)],
+            [fstop, tstop, geo.length],
+            "Saving link to the database failed",
+        )

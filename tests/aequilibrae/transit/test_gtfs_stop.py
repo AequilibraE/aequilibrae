@@ -76,7 +76,9 @@ class TestStop(TestCase):
         self.network.execute(sql_tl, [tlink_id, randint(1, 1000000000), s.stop_id, s.stop_id + 1])
         s.save_to_database(self.network, commit=True)
 
-        qry = self.network.execute("Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]]).fetchone()
+        qry = self.network.execute(
+            "Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]]
+        ).fetchone()
         result = [x for x in qry]
         expected = [s.agency_id, link, direc, self.data["stop_desc"], self.data["stop_street"]]
         self.assertEqual(result, expected, "Saving Stop to the database failed")
