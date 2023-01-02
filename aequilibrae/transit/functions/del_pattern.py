@@ -1,4 +1,4 @@
-from aequilibrae.transit.functions.transit_connection import transit_connection
+from aequilibrae.project.database_connection import database_connection
 
 
 def delete_pattern(pattern_id: int):
@@ -16,7 +16,7 @@ def delete_pattern(pattern_id: int):
         "DELETE from pattern_mapping where pattern_id=?",
     ]
 
-    conn = transit_connection()
+    conn = database_connection("transit")
     for sql in sqls:
         conn.execute(sql, [pattern_id])
     conn.commit()

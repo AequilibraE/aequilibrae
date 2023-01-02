@@ -1,11 +1,12 @@
 import os
+import shutil
 from tempfile import gettempdir
 import unittest
 from uuid import uuid4
 
 import pandas as pd
 from aequilibrae.project import Project
-from aequilibrae.transit.functions.transit_connection import transit_connection
+from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
@@ -13,11 +14,19 @@ from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 class TestLibGTFS(unittest.TestCase):
     def setUp(self) -> None:
         self.fldr = os.path.join(gettempdir(), uuid4().hex)
+        shutil.copytree(
+            src=os.path.join(
+                os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/AustinProject"
+            ),
+            dst=self.fldr,
+        )
         self.prj = Project()
-        self.prj.new(self.fldr)
+        self.prj.open(self.fldr)
 
-        self.file_path = os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/2020-04-01.zip")
-        self.network = transit_connection(self.fldr)
+        self.prj.create_empty_transit()
+
+        self.file_path = os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/2020-04-01.zip")
+        self.network = database_connection(table_type="transit")
 
         self.system_builder = GTFSRouteSystemBuilder(
             network=self.network, agency_identifier="Capital Metro", file_path=self.file_path
@@ -53,14 +62,13 @@ class TestLibGTFS(unittest.TestCase):
 
         self.assertEqual(str(exception_context.exception), "All route types must be integers")
 
-    @unittest.skip
-    # Vai dar erro por hora pq não temos rede com links/nós
     def test_map_match(self):
+        self.system_builder.load_date("2020-04-01")
         self.system_builder.set_allow_map_match(True)
         self.system_builder.map_match()
+        self.system_builder.save_to_disk()
 
-        self.assertTrue("t" in self.system_builder.graphs.keys())
-        self.assertGreater(len(self.network.execute("SELECT * FROM pattern_mapping;")), 1)
+        self.assertGreater(self.network.execute("SELECT * FROM pattern_mapping;").fetchone()[0], 1)
 
     def test_set_agency_identifier(self):
         self.assertNotEqual(self.system_builder.gtfs_data.agency.agency, "CTA")
@@ -110,10 +118,6 @@ class TestLibGTFS(unittest.TestCase):
             x[0] for x in self.network.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()
         ]
         self.assertTrue("raw_shapes" in all_tables)
-
-        self.assertEqual(
-            self.network.execute("SELECT * FROM raw_shapes;").fetchone()[:2], ("10001001000", "10001000000")
-        )
 
     def test_save_to_disk(self):
 

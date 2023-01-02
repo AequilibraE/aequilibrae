@@ -4,7 +4,7 @@ from contextlib import closing
 from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.functions.db_utils import list_tables_in_db
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.functions.transit_connection import transit_connection
+from aequilibrae.project.database_connection import database_connection
 
 
 def create_raw_shapes(agency_id: int, select_patterns):
@@ -20,7 +20,7 @@ def create_raw_shapes(agency_id: int, select_patterns):
     logger.info(f"Creating transit raw shapes for agency ID: {agency_id}")
     srid = get_srid()
 
-    with closing(transit_connection()) as conn:
+    with closing(database_connection("transit")) as conn:
         table_list = list_tables_in_db(conn)
         if "raw_shapes" not in table_list:
             conn.execute('CREATE TABLE IF NOT EXISTS "raw_shapes" ("pattern_id"	TEXT, "route_id" TEXT);')

@@ -3,8 +3,8 @@ from random import randint, choice
 from tempfile import gettempdir
 from unittest import TestCase
 from uuid import uuid4
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.functions.transit_connection import transit_connection
 
 from aequilibrae.transit.transit_elements import Trip
 from aequilibrae.utils.create_example import create_example
@@ -17,7 +17,7 @@ class TestTrip(TestCase):
         self.prj = create_example(self.fldr, "nauru")
         self.prj.create_empty_transit()
 
-        self.network = transit_connection(self.fldr)
+        self.network = database_connection(table_type="transit")
         self.srid = get_srid()
 
         self.data = {

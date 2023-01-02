@@ -3,21 +3,22 @@ from random import randint, choice, uniform
 from tempfile import gettempdir
 from unittest import TestCase
 from uuid import uuid4
+from aequilibrae.project import Project
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.functions.transit_connection import transit_connection
 
 from aequilibrae.transit.transit_elements import Stop
-from aequilibrae.utils.create_example import create_example
+
 from tests.aequilibrae.transit.random_word import randomword
 
 
 class TestStop(TestCase):
     def setUp(self) -> None:
         self.fldr = os.path.join(gettempdir(), uuid4().hex)
-        self.prj = create_example(self.fldr, "nauru")
-        self.prj.create_empty_transit()
+        self.prj = Project()
+        self.prj.new(self.fldr)
 
-        self.network = transit_connection(self.fldr)
+        self.network = database_connection(table_type="transit")
         self.srid = get_srid()
 
         self.data = {
@@ -37,7 +38,7 @@ class TestStop(TestCase):
         }
 
     def tearDown(self) -> None:
-        self.network.close()
+        self.prj.close()
 
     def test__populate(self):
         s = Stop(1)
@@ -60,7 +61,6 @@ class TestStop(TestCase):
 
     def test_save_to_database(self):
         tlink_id = randint(10000, 200000044)
-        curr = self.network.cursor()
         s = Stop(1)
         s.populate(tuple(self.data.values()), list(self.data.keys()))
         s.link = link = randint(1, 30000)
@@ -73,12 +73,10 @@ class TestStop(TestCase):
         sql_tl = """Insert into route_links ("transit_link", "pattern_id", "from_stop", "to_stop", "length", "type")
                   VALUES(?, ?, ?, ?, 5, -1)"""
 
-        curr.execute(sql_tl, [tlink_id, randint(1, 1000000000), s.stop_id, s.stop_id + 1])
-        self.network.commit()
-        s.save_to_database(self.network)
+        self.network.execute(sql_tl, [tlink_id, randint(1, 1000000000), s.stop_id, s.stop_id + 1])
+        s.save_to_database(self.network, commit=True)
 
-        curr = self.network.cursor()
-        curr.execute("Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]])
-        result = [x for x in curr.fetchone()]
+        qry = self.network.execute("Select agency_id, link, dir, description, street from stops where stop=?", [self.data["stop_id"]]).fetchone()
+        result = [x for x in qry]
         expected = [s.agency_id, link, direc, self.data["stop_desc"], self.data["stop_street"]]
         self.assertEqual(result, expected, "Saving Stop to the database failed")

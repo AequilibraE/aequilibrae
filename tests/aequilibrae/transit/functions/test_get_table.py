@@ -6,9 +6,9 @@ from uuid import uuid4
 import pandas as pd
 
 from aequilibrae.project import Project
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.data import get_table
 from aequilibrae.transit.functions.db_utils import list_tables_in_db
-from aequilibrae.transit.functions.transit_connection import transit_connection
 
 
 class TestDBUtils(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestDBUtils(unittest.TestCase):
         self.prj = Project()
         self.prj.new(self.fldr)
 
-        self.conn = transit_connection(self.fldr)
+        self.conn = database_connection(table_type="transit")
 
     def tearDown(self) -> None:
         self.prj.close()
