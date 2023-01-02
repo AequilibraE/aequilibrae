@@ -1,3 +1,0 @@
-﻿service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
-FULLW,1,1,1,1,1,0,0,20151222,20161231
-WESA,0,0,0,0,0,1,0,20151222,20151231

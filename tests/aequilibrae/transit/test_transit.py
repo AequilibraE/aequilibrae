@@ -16,7 +16,7 @@ class TestTransit(unittest.TestCase):
     def test_new_gtfs(self):
         data = Transit(self.prj)
         transit = data.new_gtfs(
-            agency="", file_path=os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/2020-04-01.zip")
+            agency="", file_path=os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/2020-04-01.zip")
         )
 
         self.assertEqual(str(type(transit)), "<class 'aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder'>")

@@ -6,8 +6,8 @@ from uuid import uuid4
 
 from numpy import array
 from shapely.geometry import MultiLineString
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.transit.functions.transit_connection import transit_connection
 
 from aequilibrae.transit.transit_elements import Route
 from aequilibrae.utils.create_example import create_example
@@ -20,7 +20,7 @@ class TestRoute(TestCase):
         self.prj = create_example(self.fldr, "nauru")
         self.prj.create_empty_transit()
 
-        self.network = transit_connection(self.fldr)
+        self.network = database_connection("transit")
 
         self.data = {
             "route_id": randomword(randint(0, 40)),

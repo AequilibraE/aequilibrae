@@ -15,9 +15,9 @@ class TestGTFSReader(TestCase):
         self.prj = Project()
         self.prj.new(self.fldr)
 
-        self.gtfs_fldr = join(abspath(dirname("tests")), "tests/data/2020-04-01.zip")
+        self.gtfs_fldr = join(abspath(dirname("tests")), "tests/data/gtfs/2020-04-01.zip")
 
-        self.cap = pd.read_csv(join(abspath(dirname("tests")), "tests/data/transit_max_speeds.csv"))
+        self.cap = pd.read_csv(join(abspath(dirname("tests")), "tests/data/gtfs/transit_max_speeds.csv"))
 
         self.gtfs_loader = GTFSReader()
 

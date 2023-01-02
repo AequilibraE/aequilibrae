@@ -1,9 +1,0 @@
-﻿fare_id,route_id,origin_id,destination_id,contains_id
-Adult Bus,1415,1,,
-Adult Bus,1463,1,,
-Adult Bus,1514,1,,
-Adult Bus,1553,1,,
-Adult Bus,1600,1,,
-Adult Bus,1649,1,,
-Adult Bus,1706,1,,
-Adult Bus,1825,1,,
