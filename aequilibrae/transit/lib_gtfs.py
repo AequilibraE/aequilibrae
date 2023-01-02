@@ -7,7 +7,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 from aequilibrae.context import get_active_project
-from aequilibrae.transit.functions.transit_connection import transit_connection
+from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit.constants import constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -213,6 +213,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.finished()
 
     def execute_import(self):
+        """Import trans"""
         self.logger.debug("Starting execute_import")
 
         if self.__target_date__ is not None:
@@ -240,7 +241,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__do_raw_shapes__:
             self.create_raw_shapes()
 
-        with closing(transit_connection()) as conn:
+        with closing(database_connection("transit")) as conn:
             if pyqt:
                 st = f"Importing routes for {self.gtfs_data.agency.agency}"
                 self.signal.emit(["start", "secondary", len(self.select_routes.keys()), st, self.__mt])
