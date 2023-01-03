@@ -227,7 +227,7 @@ class TurnVolumesResults:
         if self.blend_iterations:
             iteration_idx = pd.DataFrame(pd.Series(range(1, self.iteration + 1)), columns=["iteration"])
         else:
-            iteration_idx = pd.DataFrame(self.iteration, columns=["iteration"])
+            iteration_idx = pd.DataFrame(data=self.iteration, columns=["iteration"], index=[0])
 
         iteration_idx["dummy"] = 1
 
