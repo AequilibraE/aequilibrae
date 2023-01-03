@@ -16,7 +16,7 @@ TURNING_VOLUME_OD_COLUMNS = ["network mode", "class_name", "iteration", "a", "b"
                              "origin", "destination"]
 
 
-class TurningVolumesResults:
+class TurnVolumesResults:
 
     def __init__(
             self,
@@ -49,7 +49,7 @@ class TurningVolumesResults:
         class_name = traffic_class.__id__
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
-        return TurningVolumesResults(
+        return TurnVolumesResults(
             class_name,
             mode_id,
             matrix,
@@ -59,7 +59,7 @@ class TurningVolumesResults:
             blend_iterations
         )
 
-    def calculate_turning_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
+    def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
 
         :param turns_df: Dataframe containing turns' abc nodes required fields: [a, b, c]
@@ -72,13 +72,13 @@ class TurningVolumesResults:
         formatted_paths = self.format_paths(self.read_paths_for_iterations())
 
         formatted_turns = self.format_turns(turns_df, formatted_paths, node_to_index_df, correspondence_df)
-        turning_movement_list = []
+        turn_volume_list = []
         for matrix_name in self.matrix.view_names:
             turns_demand = self.get_turns_demand(matrix_name, self.matrix.get_matrix(matrix_name), formatted_turns)
-            turn_volumes_by_iteration = self.get_turns_movements(turns_demand)
-            turning_movements = self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
-            turning_movement_list.append(turning_movements)
-        return pd.concat(turning_movement_list)
+            turn_volumes_by_iteration = self.get_turn_volumes(turns_demand)
+            turn_volumes = self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
+            turn_volume_list.append(turn_volumes)
+        return pd.concat(turn_volume_list)
 
     def read_path_aux_file(self, file_type: Literal["node_to_index", "correspondence"]) -> pd.DataFrame:
 
@@ -205,7 +205,7 @@ class TurningVolumesResults:
         turns_w_od.rename(columns={"index_origin": "origin", "index_destination": "destination"}, inplace=True)
         return turns_w_od[TURNING_VOLUME_OD_COLUMNS]
 
-    def get_turns_movements(self, turns_demand: pd.DataFrame) -> pd.DataFrame:
+    def get_turn_volumes(self, turns_demand: pd.DataFrame) -> pd.DataFrame:
         agg_turns_demand = turns_demand[TURNING_VOLUME_COLUMNS].groupby(
             TURNING_VOLUME_GROUPING_COLUMNS,
             as_index=False

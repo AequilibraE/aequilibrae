@@ -15,7 +15,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.results.turning_volumes_results import TurningVolumesResults
+from aequilibrae.paths.results.turning_volumes_results import TurnVolumesResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.vdf import all_vdf_functions
@@ -510,7 +510,7 @@ class TrafficAssignment(object):
 
         return df
 
-    def save_turn_volumes(
+    def save_turning_volumes(
             self,
             table_name: str,
             turns_df: pd.DataFrame,
@@ -530,7 +530,7 @@ class TrafficAssignment(object):
             iteration: (:obj:`int`): Desired iteration.
             blend_iterations: (:obj:`bool`): whether or not to blend iterations.
         """
-        df = self.turning_movements(turns_df, classes, iteration, blend_iterations)
+        df = self.turning_volumes(turns_df, classes, iteration, blend_iterations)
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
@@ -545,7 +545,7 @@ class TrafficAssignment(object):
         conn.commit()
         conn.close()
 
-    def turning_movements(
+    def turning_volumes(
             self,
             turns_df: pd.DataFrame,
             classes: Optional[list[str]] = None,
@@ -562,14 +562,14 @@ class TrafficAssignment(object):
             classes = self.classes
 
         for tc in classes:
-            tc_turns = TurningVolumesResults.from_traffic_class(
+            tc_turns = TurnVolumesResults.from_traffic_class(
                 tc,
                 Path(self.project.project_base_path),
                 self.procedure_id,
                 iteration=iteration,
                 blend_iterations=blend_iterations
             )
-            ta_turn_vol_list.append(tc_turns.calculate_turning_volumes(turns_df, betas_df))
+            ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 
         return pd.concat(ta_turn_vol_list)
 
