@@ -75,9 +75,8 @@ class TurnVolumesResults:
         turn_volume_list = []
         for matrix_name in self.matrix.view_names:
             turns_demand = self.get_turns_demand(matrix_name, self.matrix.get_matrix(matrix_name), formatted_turns)
-            turn_volumes_by_iteration = self.get_turn_volumes(turns_demand)
-            turn_volumes = self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas)
-            turn_volume_list.append(turn_volumes)
+            turn_volumes_by_iteration = self.get_turn_volumes(turns_demand, turns_df)
+            turn_volume_list.append(self.aggregate_iteration_volumes(turn_volumes_by_iteration, betas))
         return pd.concat(turn_volume_list)
 
     def read_path_aux_file(self, file_type: Literal["node_to_index", "correspondence"]) -> pd.DataFrame:
@@ -205,29 +204,46 @@ class TurnVolumesResults:
         turns_w_od.rename(columns={"index_origin": "origin", "index_destination": "destination"}, inplace=True)
         return turns_w_od[TURNING_VOLUME_OD_COLUMNS]
 
-    def get_turn_volumes(self, turns_demand: pd.DataFrame) -> pd.DataFrame:
+    def get_turn_volumes(self, turns_demand: pd.DataFrame, turn_df: pd.DataFrame) -> pd.DataFrame:
         agg_turns_demand = turns_demand[TURNING_VOLUME_COLUMNS].groupby(
             TURNING_VOLUME_GROUPING_COLUMNS,
             as_index=False
         ).sum()
-        if self.blend_iterations:
-            iteration_idx = pd.Series(range(1, self.iteration + 1))
-        else:
-            iteration_idx = [self.iteration]
 
-        full_index = pd.MultiIndex.from_product(
-            [
-                iteration_idx if col == "iteration" else agg_turns_demand[col].drop_duplicates()
-                for col in TURNING_VOLUME_GROUPING_COLUMNS
-            ],
-            names=TURNING_VOLUME_GROUPING_COLUMNS
-        )
+        full_index = self.get_full_index(agg_turns_demand, turn_df)
+
         agg_turns_demand.set_index(TURNING_VOLUME_GROUPING_COLUMNS, inplace=True)
 
         return agg_turns_demand.reindex(full_index, fill_value=0).reset_index()
 
-    def calculate_volume(self, df: pd.DataFrame, betas: pd.DataFrame) -> pd.Series:
+    def get_full_index(self, agg_turns_demand: pd.DataFrame, turn_df: pd.DataFrame) -> pd.MultiIndex:
+        # Create the index to fill in missing iterations
+        # the first part of the index comes from the aggregated turning volumes
+        col_names = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col not in ["a", "b", "c", "iteration"]]
+        idx_df = agg_turns_demand[col_names].drop_duplicates()
+        idx_df["dummy"] = 1
 
+        # the iteration comes from a range if blending, otherwise from a single value
+        if self.blend_iterations:
+            iteration_idx = pd.DataFrame(pd.Series(range(1, self.iteration + 1)), columns=["iteration"])
+        else:
+            iteration_idx = pd.DataFrame(self.iteration, columns=["iteration"])
+
+        iteration_idx["dummy"] = 1
+
+        # abc nodes come from the input turn df
+        dummy_turns = turn_df.copy()
+        dummy_turns["dummy"] = 1
+
+        return idx_df.merge(
+            dummy_turns, on="dummy", how="outer"
+        ).merge(
+            iteration_idx, on="dummy", how="outer"
+        ).set_index(TURNING_VOLUME_GROUPING_COLUMNS).index
+
+    def calculate_volume(self, df: pd.DataFrame, betas: pd.DataFrame) -> pd.Series:
+        # have to loop through the rows to update volumes for each iteration to calculate the vol fractions.
+        # cannot be done with pandas rolling, as it doesn't take in account updated values within the window.
         volume = df.set_index("iteration")['demand']
         iterations = df["iteration"].max()
 

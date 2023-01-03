@@ -15,7 +15,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.results.turning_volumes_results import TurnVolumesResults
+from aequilibrae.paths.results.turn_volumes_results import TurnVolumesResults
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.vdf import all_vdf_functions
