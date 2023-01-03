@@ -35,6 +35,7 @@ class TestAequilibraeMatrix(TestCase):
             "zones": zones,
             "matrix_names": ["mat", "seed", "dist"],
             "index_names": ["my_indices"],
+            "memory_only": False
         }
 
         self.matrix = AequilibraeMatrix()
