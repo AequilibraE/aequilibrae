@@ -1,8 +1,3 @@
---@ All transit fares for transit agencies in the model are included on this
---@ table. It includes the agency ID is applies to, as well as price and
---@ transfer criteria, which are crucial for proper consideration for trip
---@ routing.
-
 create TABLE IF NOT EXISTS fare_attributes (
 	fare_id           INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 	fare              TEXT    NOT NULL,

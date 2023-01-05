@@ -4,8 +4,7 @@ transit_routes
 transit_fare_rules
 transit_pattern_links
 transit_pattern_mapping
-transit_stop_connectors
-transit_stop_connectors
+transit_stops
 transit_trips
 transit_trips_schedule
 transit_zones

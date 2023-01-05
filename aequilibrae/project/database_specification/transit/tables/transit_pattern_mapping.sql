@@ -8,9 +8,12 @@ CREATE TABLE IF NOT EXISTS pattern_mapping (
 	seq         INTEGER NOT NULL,
 	link	    INTEGER NOT NULL,
 	dir	        INTEGER NOT NULL,
-	PRIMARY KEY(pattern_id,"seq"),
-	FOREIGN KEY(pattern_id) REFERENCES routes(pattern_id) deferrable initially deferred,
-	FOREIGN KEY(link) REFERENCES Link(link) deferrable initially deferred
+	stop_id		INTEGER,
+	"offset"    REAL,
+	-- PRIMARY KEY(pattern_id, "seq"),
+	FOREIGN KEY (stop_id) REFERENCES stops(stop_id),
+	FOREIGN KEY(pattern_id) REFERENCES routes(pattern_id) deferrable initially deferred
+	-- FOREIGN KEY(link) REFERENCES routes_links(link) deferrable initially deferred
 );
 
 --#

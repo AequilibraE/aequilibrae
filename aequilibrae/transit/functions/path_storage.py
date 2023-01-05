@@ -2,15 +2,15 @@ from collections import OrderedDict
 
 
 class PathStorage:
-    """This class is designed to store path-computation objects to take advantage of the fact that AequilibraE
-     preserves the entire shortest path tree when computing a path between two nodes and can re-trace the
-     same tree for a path from the same origin to a different destination.
-
-    Tests on existing models (in 2022) shows that caching these path objects in memory reduces the number of
-    path computations during map-matching in 50 to 65%.
+    """
+    This class is designed to store path-computation objects to take advantage of the fact that AequilibraE
+    preserves the entire shortest path tree when computing a path between two nodes and can re-trace the
+    same tree for a path from the same origin to a different destination.
 
     Since this caching in memory can take too much memory, the **threshold** parameter exists to limit the number
     of path objects kept in memory.
+
+    If you have a large amount of memory in your system, you can set the threshold class variable accordingly.
     """
 
     def __init__(self):
@@ -18,7 +18,7 @@ class PathStorage:
         self.storage = OrderedDict()
         self.uses = 0
         self.total_paths = 0
-        self.threshold = 10000
+        self.threshold = 50
 
     def add_graph(self, graph, mode_id):
         if mode_id in self.graphs:

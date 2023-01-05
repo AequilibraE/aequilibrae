@@ -1,18 +1,19 @@
 from sqlite3 import Connection
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
+from aequilibrae.project.network.haversine import haversine
 
 from aequilibrae.transit.constants import constants, TRANSIT_LINK_RANGE
 
 
 class Link:
-    """Transit link element to feed into Transit_links
+    """Transit link element.
 
     :Database class members:
 
         * transit_link (:obj:`int`): ID of the transit link (updated when inserted in the database)
-        * from_node (:obj:`str`): Origin of the transit connection
-        * to_node (:obj:`str`): Destination of the transit connection
+        * from_stop (:obj:`str`): Origin of the transit connection
+        * to_stop (:obj:`str`): Destination of the transit connection
         * pair (:obj:`str`): Identifier of the stop pair as FROM_ID##TO_ID. For identification only
         * geo (:obj:`LineString`): Geometry of the transit link as direct connection between stops
         * length (:obj:`float`): Link length measured directly from the geometry object
@@ -26,14 +27,14 @@ class Link:
             *srid* (:obj:`int`): srid of our working database
         """
 
-        self.__dict__["from_node"] = ""
-        self.__dict__["to_node"] = ""
+        self.__dict__["from_stop"] = ""
+        self.__dict__["to_stop"] = ""
         self.__dict__["pattern_id"] = -1
         self.__dict__["geo"] = None
         self.transit_link = -1
         self.pattern_id = -1
-        self.from_node = ""
-        self.to_node = ""
+        self.from_stop = ""
+        self.to_stop = ""
         self.key = "##"
         self.geo = None  # type: LineString
         self.length = -1
@@ -42,9 +43,9 @@ class Link:
 
     def __setattr__(self, key, value):
         self.__dict__[key] = value
-        self.__dict__["key"] = f"{self.from_node}##{self.to_node}##{self.pattern_id}"
+        self.__dict__["key"] = f"{self.from_stop}##{self.to_stop}##{self.pattern_id}"
         if self.geo is not None:
-            self.__dict__["length"] = self.geo.length
+            self.__dict__["length"] = haversine(*self.geo.bounds)
 
     def build_geo(self, from_point: Point, to_point: Point, gtfs_shape: LineString, previous_end: Point):
         geo = LineString([from_point, to_point])
@@ -70,7 +71,7 @@ class Link:
             self.geo.wkb,
             self.srid,
         ]
-        sql = """insert into route_links (transit_link, pattern_id, from_stop, to_stop, "length", "type", geo)
+        sql = """insert into route_links (transit_link, pattern_id, from_stop, to_stop, length, type, geometry)
                                             values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
         conn.execute(sql, data)
         if commit:

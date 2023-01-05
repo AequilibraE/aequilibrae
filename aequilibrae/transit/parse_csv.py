@@ -5,9 +5,6 @@ import copy
 from numpy.lib.recfunctions import append_fields
 
 
-# Copied frm AequilibraE
-
-
 def parse_csv(file_name: str, column_order=[]):
     tot = []
     if isinstance(file_name, str):

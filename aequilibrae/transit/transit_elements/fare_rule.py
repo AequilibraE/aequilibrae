@@ -36,7 +36,6 @@ class FareRule:
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")
 
-            # We convert route_id into route, as the the GTFS header for it is not maintained in our database
             key = "fare" if key == "fare_id" else key
             key = "route" if key == "route_id" else key
             self.__dict__[key] = value
