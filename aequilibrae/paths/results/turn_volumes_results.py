@@ -241,26 +241,46 @@ class TurnVolumesResults:
             iteration_idx, on="dummy", how="outer"
         ).set_index(TURNING_VOLUME_GROUPING_COLUMNS).index
 
-    def calculate_volume(self, df: pd.DataFrame, betas: pd.DataFrame) -> pd.Series:
+    def calculate_volume(self, df: pd.DataFrame, ta_report: pd.DataFrame) -> pd.Series:
         # have to loop through the rows to update volumes for each iteration to calculate the vol fractions.
         # cannot be done with pandas rolling, as it doesn't take in account updated values within the window.
-        volume = df.set_index("iteration")['demand']
+        aon_volume = df.set_index("iteration")["demand"].sort_index()
         iterations = df["iteration"].max()
 
-        for it in range(1, iterations + 1):
-            betas_for_it = pd.Series(betas.loc[it]).sort_index(ascending=False)
-            min_idx = max(0, it - betas_for_it.size) + 1
-            max_idx = min_idx + min(it, betas_for_it.size)
-            window = range(min_idx, max_idx)
-            volume.loc[it] = (volume.loc[window] * betas_for_it[0:min(it, betas_for_it.size)].values).sum()
-        return volume
+        if "beta0" not in ta_report.columns:
+            # if betas are not in the report, create dummy betas, where beta0 is 1
+            ta_report["beta0"] = 1
+            ta_report[["beta1", "beta2"]] = 0
 
-    def aggregate_iteration_volumes(self, turns_volumes: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
+        # initialise blended volumes with first iteration equal to AoN volume.
+        blended_volumes = pd.Series(data=0, index=aon_volume.index)
+        blended_volumes.loc[1] = aon_volume.loc[1]
+
+        # calculate the new volumes using betas
+        for it in range(2, iterations + 1):
+            betas_for_it = pd.Series(ta_report.loc[it, ["beta0", "beta1", "beta2"]]).sort_index(ascending=True)
+            alpha_for_it = ta_report.at[it, "alpha"]
+            if (betas_for_it != -1).any():
+                # only calculate the new volume if betas are all not -1
+                min_idx = max(0, it - betas_for_it.size) + 1
+                max_idx = min_idx + min(it, betas_for_it.size)
+                window = range(min_idx, max_idx)
+                it_volume = (aon_volume.loc[window] * betas_for_it[0:min(it, betas_for_it.size)].values).sum()
+            else:
+                it_volume = aon_volume.loc[it]
+
+            blended_volumes.loc[it] = (it_volume * alpha_for_it) + (blended_volumes.loc[it - 1] * (1 - alpha_for_it))
+
+        return blended_volumes
+
+    def aggregate_iteration_volumes(self, turns_volumes: pd.DataFrame, ta_report: pd.DataFrame) -> pd.DataFrame:
         if not self.blend_iterations:
             return turns_volumes.rename(columns={'demand': "volume"})
 
         grouping_cols = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col != 'iteration']
-        result = turns_volumes.groupby(grouping_cols, as_index=False).apply(lambda x: self.calculate_volume(x, betas))
+        result = turns_volumes.groupby(grouping_cols, as_index=False).apply(
+            lambda x: self.calculate_volume(x, ta_report)
+        )
         return result.melt(
             id_vars=grouping_cols, value_vars=result.columns, var_name="iteration", value_name="volume"
         ).reset_index().groupby(grouping_cols, as_index=False, sort=True).last().drop(columns="index")
