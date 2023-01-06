@@ -102,7 +102,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data._set_maximum_speeds(dict_speeds)
 
     def dates_available(self) -> list:
-        """Returns a list of all dates available for this feed
+        """Returns a list of all dates available for this feed.
 
         Returns:
             *feed dates* (:obj:`list`): list of all dates available for this feed
@@ -213,7 +213,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.finished()
 
     def execute_import(self):
-        """Import trans"""
         self.logger.debug("Starting execute_import")
 
         if self.__target_date__ is not None:
@@ -275,6 +274,19 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
+
+            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            if zones:
+                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+                conn.executemany(sql, zones)
+            conn.commit()
+
+            for fare in self.gtfs_data.fare_attributes.values():
+                fare.save_to_database(conn)
+
+            for fare_rule in self.gtfs_data.fare_rules:
+                fare_rule.save_to_database(conn)
+
             if pyqt:
                 st = f"Importing stops for {self.gtfs_data.agency.agency}"
                 self.signal.emit(["start", "secondary", len(self.select_stops.keys()), st, self.__mt])
@@ -286,18 +298,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 stop.save_to_database(conn, commit=False)
                 if pyqt:
                     self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
-            conn.commit()
-
-            for fare in self.gtfs_data.fare_attributes.values():
-                fare.save_to_database(conn)
-
-            for fare_rule in self.gtfs_data.fare_rules:
-                fare_rule.save_to_database(conn)
-
-            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
-            if zones:
-                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
-                conn.executemany(sql, zones)
             conn.commit()
 
         if self.__outside_zones:
@@ -354,7 +354,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
         p = Pattern(route.route_id, self)
-        p.pattern_hash = trip.pattern_hash
         p.pattern_id = trip.pattern_id
         p.route = trip.route
         p.route_type = int(route.route_type)
@@ -364,9 +363,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
-        p.number_of_cars = route.number_of_cars
         p.seated_capacity = route.seated_capacity
-        p.design_capacity = route.design_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:
             if stop_id not in self.select_stops:
@@ -385,6 +382,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         for i in range(1, len(trip.stops)):
             link = Link(self.srid)
             link.pattern_id = trip.pattern_id
+            link.seq = i - 1
             link.get_link_id()
             fstop = trip.stops[i - 1]
             tstop = trip.stops[i]

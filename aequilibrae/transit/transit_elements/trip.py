@@ -10,8 +10,6 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Trip(BasicPTElement):
     """Transit trips read from trips.txt
 
-    :GTFS class members:
-
     * trip (:obj:`str`): Trip ID as read from the GTFS feed
     * route (:obj:`str`): Route ID as read from the GTFS feed
     * service_id (:obj:`str`): Service ID as read from the GTFS feed
@@ -23,7 +21,6 @@ class Trip(BasicPTElement):
     * wheelchair_accessible (:obj:`int`): Wheelchair accessibility flag as read from the GTFS feed
     * shape_id (:obj:`str`): Shape ID as read from the GTFS feed
 
-    :Processing class members:
     * trip_id (:obj:`int`): Unique trip_id as it will go into the database
     * route_id (:obj:`int`): Unique Route ID as will be available in the routes table
     * pattern_id (:obj:`int`): Unique Pattern ID for this route/stop-pattern as it will go into the database
@@ -58,7 +55,6 @@ class Trip(BasicPTElement):
         self.seated_capacity = None
         self.design_capacity = None
         self.total_capacity = None
-        self.is_artic = 0
         self.source_time = []
 
     def _populate(self, record: tuple, headers: list) -> None:
@@ -70,27 +66,17 @@ class Trip(BasicPTElement):
             self.__dict__[key] = value
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
-        """Saves Transit trip to the database"""
+        """Saves trips to the database"""
         logger.debug(f"Saving {self.trip_id}/{self.trip} for pattern {self.pattern_id}")
-        sql = """insert into trips (trip_id, trip, dir, pattern_id, seated_capacity, design_capacity,
-                                             total_capacity, is_artic) values (?, ?, ?, ?, ?, ?, ?, ?);"""
-        data = [
-            self.trip_id,
-            self.trip,
-            int(self.direction_id),
-            self.pattern_id,
-            self.seated_capacity,
-            self.design_capacity,
-            self.total_capacity,
-            self.is_artic,
-        ]
+        sql = """insert into trips (trip_id, trip, dir, pattern_id) values (?, ?, ?, ?);"""
+        data = [self.trip_id, self.trip, int(self.direction_id), self.pattern_id]
         conn.execute(sql, data)
 
-        sql = """insert into trips_schedule (trip_id, seq, arrival, departure, time_source)
-                                            values (?, ?, ?, ?, ?)"""
+        sql = """insert into trips_schedule (trip_id, seq, arrival, departure)
+                                            values (?, ?, ?, ?)"""
         data = []
-        for i, (arr, dep, st) in enumerate(zip(self.arrivals, self.departures, self.source_time)):
-            data.append([self.trip_id, i, arr, dep, st])
+        for i, (arr, dep) in enumerate(zip(self.arrivals, self.departures)):
+            data.append([self.trip_id, i, arr, dep])
         conn.executemany(sql, data)
         if commit:
             conn.commit()

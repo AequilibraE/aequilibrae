@@ -1,17 +1,26 @@
-from unittest import TestCase
+import pytest
 from random import randint
 from datetime import datetime, timedelta
 from aequilibrae.transit.transit_elements import Service
 from tests.aequilibrae.transit.random_word import randomword
 
 
-class TestService(TestCase):
-    def setUp(self) -> None:
-
+class TestService:
+    @pytest.fixture
+    def today(self):
         tdy = datetime.today()
-        past = tdy - timedelta(days=randint(1, 100))
+        today = tdy
+        return today
 
-        self.data = {
+    @pytest.fixture
+    def past(self, today):
+        past = today - timedelta(days=randint(1, 100))
+        past = past
+        return past
+
+    @pytest.fixture
+    def data_dict(self, past, today):
+        return {
             "service_id": randomword(randint(0, 40)),
             "monday": 1,
             "tuesday": 1,
@@ -21,34 +30,31 @@ class TestService(TestCase):
             "saturday": 1,
             "sunday": 1,
             "start_date": f"{past.year}{past.month:02d}{past.day:02d}",
-            "end_date": f"{tdy.year}{tdy.month:02d}{tdy.day:02d}",
+            "end_date": f"{today.year}{today.month:02d}{today.day:02d}",
         }
 
-        self.today = tdy
-        self.past = past
-
-    def test__populate(self):
+    def test__populate(self, data_dict, today, past):
         s = Service()
 
-        s._populate(tuple(self.data.values()), list(self.data.keys()))
+        s._populate(tuple(data_dict.values()), list(data_dict.keys()))
         for key, val in s.__dict__.items():
-            if key in self.data:
-                self.assertEqual(val, self.data[key], "Service population with record failed")
+            if key in data_dict:
+                assert val == data_dict[key], "Service population with record failed"
 
-        time_span = (self.today - self.past).days + 1  # n + 1 intervals
+        time_span = (today - past).days + 1  # n + 1 intervals
 
-        self.assertEqual(time_span, len(s.dates), "Returned the wrong dates for service")
+        assert time_span == len(s.dates), "Returned the wrong dates for service"
 
         # Test with no weekdays available
-        for key, val in self.data.items():
+        for key, val in data_dict.items():
             if val == 1:
-                self.data[key] = 0
+                data_dict[key] = 0
 
         s = Service()
-        s._populate(tuple(self.data.values()), list(self.data.keys()))
-        self.assertEqual(0, len(s.dates), "Returned too many dates for service")
+        s._populate(tuple(data_dict.values()), list(data_dict.keys()))
+        assert 0 == len(s.dates), "Returned too many dates for service"
 
-        self.data[randomword(randint(1, 15))] = randomword(randint(1, 20))
+        data_dict[randomword(randint(1, 15))] = randomword(randint(1, 20))
         s = Service()
-        with self.assertRaises(KeyError):
-            s._populate(tuple(self.data.values()), list(self.data.keys()))
+        with pytest.raises(KeyError):
+            s._populate(tuple(data_dict.values()), list(data_dict.keys()))

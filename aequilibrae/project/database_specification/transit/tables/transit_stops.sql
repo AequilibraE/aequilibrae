@@ -4,21 +4,14 @@ CREATE TABLE IF NOT EXISTS stops (
 	agency_id         INTEGER NOT NULL,
 	link	          INTEGER,
 	dir	              INTEGER,
-	"offset"		  INTEGER,
-	setback			  INTEGER,
-	X			  	  REAL,
-	Y			  	  REAL,
-	Z			  	  REAL,
 	name	          TEXT,
 	parent_station    TEXT,
 	description	      TEXT,
 	street	          TEXT,
-	taz				  INTEGER,
-	zone			  TEXT,
-	has_parking       INTEGER,
+	fare_zone_id   INTEGER,
 	route_type        INTEGER NOT NULL DEFAULT -1,
-	moved_by_matching INTEGER,
-	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id)
+	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
+	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
 );
 
 --#

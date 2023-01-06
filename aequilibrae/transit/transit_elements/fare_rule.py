@@ -6,8 +6,6 @@ from aequilibrae.log import logger
 class FareRule:
     """Transit Fare
 
-    :Database class members:
-
     * fare_id (:obj:`int`): Fare Id to which this rule applies
     * fare (:obj:`str`): Name of the fare rule
     * route (:obj:`str`): Route ID as in GTFS to which this fare rule applies
@@ -32,6 +30,7 @@ class FareRule:
         self.destination_id = -1
 
     def populate(self, record: tuple, headers: list) -> None:
+        """Adds fare information."""
         for key, value in zip(headers, record):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")

@@ -7,10 +7,16 @@ class TestDatabaseConnection:
     def test_cannot_connect_when_no_active_project(self):
         activate_project(None)
         with pytest.raises(FileNotFoundError):
-            database_connection()
+            database_connection("network")
 
     def test_connection_with_new_project(self, project):
-        conn = database_connection(project.project_base_path)
+        conn = database_connection(table_type="network", project_path=project.project_base_path)
         cursor = conn.cursor()
         cursor.execute("select count(*) from links")
         assert cursor.fetchone()[0] == 0, "Returned more links thant it should have"
+
+    def test_connection_with_transit(self, project):
+        conn = database_connection(table_type="transit", project_path=project.project_base_path)
+        cursor = conn.cursor()
+        cursor.execute("select count(*) from routes")
+        assert cursor.fetchone()[0] == 0, "Returned more routes thant it should have"

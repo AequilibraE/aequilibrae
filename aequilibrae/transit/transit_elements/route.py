@@ -7,8 +7,6 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Route(BasicPTElement):
     """Transit route element to feed into Transit_routes
 
-    :Database class members:
-
     * route_id (:obj:`str`): ID of this route, starting with the agency prefix ID
     * route_short_name (:obj:`str`): Short name as found in the GTFS feed
     * route_long_name (:obj:`str`): Long name as found in the GTFS feed
@@ -45,9 +43,9 @@ class Route(BasicPTElement):
         self.shape: MultiLineString
         self.srid = -1
         self.number_of_cars = 0
-        self.__sql = """insert into routes (route_id, pattern_id, pattern, route, agency_id, shortname, longname, description,
-                                                    route_type, seated_capacity, design_capacity, total_capacity,
-                                                     number_of_cars{}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
+        self.__sql = """insert into routes (route_id, pattern_id, route, agency_id, shortname, longname, description,
+                                            route_type, seated_capacity, total_capacity{})
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?{});"""
         self.sql = self.__sql
         self.__get_route_id()
 
@@ -73,7 +71,6 @@ class Route(BasicPTElement):
         data = [
             self.route_id,
             self.pattern_id,
-            self.pattern,
             self.route,
             self.agency_id,
             self.route_short_name,
@@ -81,9 +78,7 @@ class Route(BasicPTElement):
             self.route_desc,
             int(self.route_type),
             self.seated_capacity,
-            self.design_capacity,
             self.total_capacity,
-            self.number_of_cars,
         ]
         if self.shape is None:
             shape = ""

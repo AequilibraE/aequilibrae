@@ -59,7 +59,7 @@ class MMGraph(WorkerThread):
         self.df = pd.DataFrame([])
         self.logger = logger
 
-    def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=50):
+    def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
         Args:
@@ -207,7 +207,7 @@ class MMGraph(WorkerThread):
             wrong_side = 0
             link = self.__all_links[link_id]
 
-            link_geo = link.geo
+            link_geo = link.geo  # Linestring
 
             # We disregard links beyond the threshold, but maintain the closest link to ensure connectivity
 
@@ -219,21 +219,22 @@ class MMGraph(WorkerThread):
                 last = link_geo.boundary.geoms[1]
 
             proj_point = link_geo.project(stop.geo)
-            # corr_proj_point = proj_point * math.pi * 6371000 / 180
+            corr_proj = proj_point * math.pi * 6371000 / 180
             break_point = link_geo.interpolate(proj_point)
             connector_geo = LineString([stop.geo, break_point])
+            conn_length = connector_geo.length * math.pi * 6371000 / 180
 
-            if (connector_geo.length * math.pi * 6371000 / 180) > 0:
-                p = break_point if proj_point > 0 else last
+            if conn_length > 0:
+                p = break_point if corr_proj > 0 else last
                 az_link = compute_line_bearing((first.x, first.y), (p.x, p.y))
                 az_connector = compute_line_bearing((stop.geo.x, stop.geo.y), (break_point.x, break_point.y))
                 if (az_link - az_connector) * DRIVING_SIDE < 0:
                     wrong_side = 1  # We are on the WRONG side
 
-            if proj_point <= 1.0:  # If within one meter of the end of the link, let's go with the existing node
+            if corr_proj <= 1.0:  # If within one meter of the end of the link, let's go with the existing node
                 break_point = first
                 intersec_node = link.a_node
-            elif proj_point >= (link_geo.length * math.pi * 6371000 / 180) - 1.0:
+            elif corr_proj >= (link_geo.length * math.pi * 6371000 / 180) - 1.0:
                 break_point = last
                 intersec_node = link.b_node
             else:
