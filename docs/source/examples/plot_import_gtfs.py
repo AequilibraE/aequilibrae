@@ -29,15 +29,18 @@ project = create_example(fldr, "coquimbo")
 
 """As Coquimbo example already has a complete GTFS model, we shall remove its transit file for the sake of this example."""
 # %%
-os.remove(os.path.join(fldr,"public_transport.sqlite"))
+os.remove(os.path.join(fldr, "public_transport.sqlite"))
 
-# Now we recreate an empty transit file. 
+# Now we recreate an empty transit file.
 project.create_empty_transit()
 
 """Let's download the GTFS feed."""
 # %%
 dest_path = os.path.join(fldr, "coquimbo.zip")
-urllib.request.urlretrieve("http://datos.gob.cl/dataset/c77c9a50-6dd1-449d-b5ab-947ec0139b31/resource/a4edcf07-0657-456d-bbbc-54b2aec1de8d/download/coquimbo10feb16.zip", dest_path)
+urllib.request.urlretrieve(
+    "http://datos.gob.cl/dataset/c77c9a50-6dd1-449d-b5ab-947ec0139b31/resource/a4edcf07-0657-456d-bbbc-54b2aec1de8d/download/coquimbo10feb16.zip",
+    dest_path,
+)
 
 """
 Now we create our Transit object and import the GTFS feed into our model.
@@ -82,13 +85,15 @@ Now we will plot the route we just imported into our model!
 """
 cnx = database_connection("transit")
 
-links = pd.read_sql('SELECT seq, dir, stop_id, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;', con=cnx)
+links = pd.read_sql(
+    "SELECT seq, dir, stop_id, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx
+)
 
-stops_query = '''SELECT stops.stop_id, X, Y
+stops_query = """SELECT stops.stop_id, X, Y
                 FROM stops
                 JOIN pattern_mapping
                 ON stops.stop_id = pattern_mapping.stop_id
-                WHERE pattern_id = 10019001000;'''
+                WHERE pattern_id = 10019001000;"""
 stops = pd.read_sql(stops_query, con=cnx)
 
 # %%
@@ -103,9 +108,9 @@ for i, row in links.iterrows():
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
-    _ = folium.vector_layers.PolyLine(
-        points, popup=f"<b>link_id: {row.seq}</b>", color="gray", weight=2
-    ).add_to(gtfs_links)
+    _ = folium.vector_layers.PolyLine(points, popup=f"<b>link_id: {row.seq}</b>", color="gray", weight=2).add_to(
+        gtfs_links
+    )
 
 for i, row in stops.iterrows():
     point = (row.Y, row.X)

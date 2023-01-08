@@ -170,7 +170,22 @@ class TestTransitTables:
     @pytest.mark.parametrize(
         "table, exp_column",
         [
-            ("routes", ["pattern_id", "route_id", "route", "agency_id", "shortname", "longname", "description", "route_type", "seated_capacity", "total_capacity", "geometry"]),
+            (
+                "routes",
+                [
+                    "pattern_id",
+                    "route_id",
+                    "route",
+                    "agency_id",
+                    "shortname",
+                    "longname",
+                    "description",
+                    "route_type",
+                    "seated_capacity",
+                    "total_capacity",
+                    "geometry",
+                ],
+            ),
         ],
     )
     def test_create_routes_table(self, table: str, exp_column: list, project: Project):

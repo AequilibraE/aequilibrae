@@ -12,8 +12,11 @@ if inside_qgis:
 
 def database_connection(table_type: str, project_path=None) -> sqlite3.Connection:
     project_path = project_path or get_active_project().project_base_path
-    file_name = os.path.join(project_path, "project_database.sqlite") if table_type == "network" else os.path.join(
-        project_path, "public_transport.sqlite")
+    file_name = (
+        os.path.join(project_path, "project_database.sqlite")
+        if table_type == "network"
+        else os.path.join(project_path, "public_transport.sqlite")
+    )
     if not os.path.exists(file_name):
         raise FileExistsError
     if inside_qgis:

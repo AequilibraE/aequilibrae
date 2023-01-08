@@ -35,8 +35,7 @@ class GeoIndex:
         return {f.id(): loads(f.geometry().asWkb().data()) for f in layer.getFeatures()}
 
     def insert(
-            self, feature_id: int,
-            geometry: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon, MultiLineString]
+        self, feature_id: int, geometry: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon, MultiLineString]
     ) -> None:
         """Inserts a valid shapely geometry in the index
 
