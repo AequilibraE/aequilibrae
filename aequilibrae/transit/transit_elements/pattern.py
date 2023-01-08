@@ -19,32 +19,15 @@ DEAD_END_RUN = 40
 
 
 class Pattern(BasicPTElement):
-    """Represents a stop pattern for a particular route, as defined in GTFS
-
-    :Database class members:
-
-        * pattern_id (:obj:`str`): Pattern ID as saved to the database
-        * route_id (:obj:`str`): Route ID as saved to the database
-        * seated_capacity (:obj:`int`): Vehicle seated capacity as saved to the database
-        * design_capacity (:obj:`int`): Vehicle design capacity as saved to the database
-        * total_capacity (:obj:`int`): Vehicle total capacity as saved to the database
-        * shape (:obj:`LineString`): Route shape as saved to the database (populated by **map_match()**)
-
-    :Other class members:
-
-        * raw_shape (:obj:`LineString`): Route shape as retrieved from GTFS
-        * route_type (:obj:`int`): GTFS route type
-        * full_path (:obj:`List[int]`): Sequence list of links forming the path (negative for BA direction)
-        * stops (:obj:`List[Stop]`): List of object stops in order of traversal by the route
-        * network_candidates (:obj:`List[int]`): List of link IDs likely to be part of the route (populated by **find_network_links()**)
+    """
+    Represents a stop pattern for a particular route, as defined in GTFS.
     """
 
     def __init__(self, route_id, gtfs_feed) -> None:
         """
         Args:
-
             *pattern_id* (:obj:`str`): Pre-computed ID for this pattern
-            *geotool* (:obj:`Geo`): Suite of geographic utilities. For internal use only
+            *geotool* (:obj:`Geo`): Suite of geographic utilities.
         """
         self.pattern_hash = ""
         self.pattern_id = -1
@@ -54,9 +37,7 @@ class Pattern(BasicPTElement):
         self.longname = ""
         self.shortname = ""
         self.description = ""
-        self.number_of_cars = 0
         self.seated_capacity = None
-        self.design_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
         self.__geotool = gtfs_feed.geotool
@@ -88,38 +69,35 @@ class Pattern(BasicPTElement):
         self.shape_length = -1
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
-        """Saves the pattern to the *routes* table"""
+        """Saves the pattern to the routes table"""
 
         shp = self.best_shape()
         geo = None if shp is None else shp.wkb
 
         data = [
-            self.route_id,
             self.pattern_id,
-            self.pattern_hash,
+            self.route_id,
             self.route,
-            self.route_type,
             self.agency_id,
             self.shortname,
             self.longname,
             self.description,
+            self.route_type,
             self.seated_capacity,
-            self.design_capacity,
             self.total_capacity,
-            self.number_of_cars,
             geo,
             self.__srid,
         ]
 
-        sql = """insert into routes (route_id, pattern_id, pattern, route, route_type, agency_id, shortname, longname, description, seated_capacity,
-                        design_capacity, total_capacity, number_of_cars, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
+        sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, seated_capacity,
+                         total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
 
         if self.pattern_mapping and self.shape:
-            sqlgeo = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset, geometry)
-                        values (?, ?, ?, ?, ?, ?, GeomFromWKB(?, ?));"""
-            sql = """insert into pattern_mapping (pattern_id, seq, link, dir, stop_id, offset)
-                                                  values (?, ?, ?, ?, ?, ?);"""
+            sqlgeo = """insert into pattern_mapping (pattern_id, seq, link, dir, geometry)
+                        values (?, ?, ?, ?, GeomFromWKB(?, ?));"""
+            sql = """insert into pattern_mapping (pattern_id, seq, link, dir)
+                                                  values (?, ?, ?, ?);"""
 
             for record in self.pattern_mapping:
                 if record[-1] is None:
@@ -138,7 +116,7 @@ class Pattern(BasicPTElement):
         return shp
 
     def map_match(self):
-        """Map matches the route into the network, considering its appropriate shape
+        """Map matches the route into the network, considering its appropriate shape.
 
         Part of the map-matching process is to find the network links corresponding the pattern's
         raw shape, so that method will be called in case it has not been called before.
@@ -374,15 +352,15 @@ class Pattern(BasicPTElement):
         # We find what is the position along routes that we have for each stop and make sure they are always growing
         self.pattern_mapping = []
         segments = [LineString([pt1, pt2]) for pt1, pt2 in zip(self.shape.coords, self.shape.coords[1:])]
-        seg_len = [seg.length * math.pi * 6371000 / 180 for seg in segments]
+        seg_len = [seg.length for seg in segments]
         distances = []
 
         min_idx_so_far = 0
         for i, stop in enumerate(self.stops):
-            d = [round(stop.geo.distance(line) * math.pi * 6371000 / 180, 1) for line in segments]
+            d = [round(stop.geo.distance(line), 1) for line in segments]
             idx = d[min_idx_so_far:].index(min(d[min_idx_so_far:])) + min_idx_so_far
             idx = idx if i > 0 else 0
-            projection = (segments[idx].project(stop.geo) * math.pi * 637100 / 180) + sum(seg_len[:idx])
+            projection = segments[idx].project(stop.geo) + sum(seg_len[:idx])
             distances.append(projection)
             min_idx_so_far = idx
 
@@ -396,19 +374,12 @@ class Pattern(BasicPTElement):
                             It was fixed, but it should be checked."""
             )
 
-        # len_shape_bounds = self.shape.length * math.pi * 6371000 / 180
         distances[-1] = distances[-1] if self.shape.length > distances[-1] else self.shape.length - 0.00001
 
         # We make sure we don't have projections going beyond the length we will accumulate
         # This is only required because of numerical precision issues
         tot_broken_length = sum(
-            [
-                self.__geolinks.loc[self.__geolinks.link_id == abs(x)].geometry.values[0].length
-                * math.pi
-                * 6371000
-                / 180
-                for x in self.full_path
-            ]
+            [self.__geolinks.loc[self.__geolinks.link_id == abs(x)].geometry.values[0].length for x in self.full_path]
         )
         distances = [min(x, tot_broken_length) for x in distances]
         pid = self.pattern_id
@@ -419,21 +390,21 @@ class Pattern(BasicPTElement):
             direc = self.fpath_dir[link_pos]
             link_geo = self.__geolinks.loc[self.__geolinks.link_id == link_id].geometry.values[0]
             link_geo = link_geo if direc == 0 else LineString(link_geo.coords[::-1])
-            if distances[stop_pos] > cum_dist + (link_geo.length * math.pi * 637100 / 180):
+            if distances[stop_pos] > cum_dist + link_geo.length:
                 # If we have no stops falling right in this link
-                dt = [pid, index, link_id, direc, None, None, link_geo.wkb]
+                dt = [pid, index, link_id, direc, link_geo.wkb]
                 self.pattern_mapping.append(dt)
                 index += 1
-                cum_dist += link_geo.length * math.pi * 6371000 / 180
+                cum_dist += link_geo.length
                 continue
 
             start_point = cum_dist
-            end_point = cum_dist + (link_geo.length * math.pi * 6371000 / 180)
-            while cum_dist + (link_geo.length * math.pi * 6371000 / 180) >= distances[stop_pos]:
-                milepost = distances[stop_pos] / math.pi / 6371000 * 180
+            end_point = cum_dist + link_geo.length
+            while cum_dist + link_geo.length >= distances[stop_pos]:
+                milepost = distances[stop_pos]
                 wkb = None if stop_pos == 0 else substring(self.shape, start_point, milepost).wkb
                 stop = self.stops[stop_pos]
-                dt = [pid, index, link_id, direc, stop.stop_id, milepost - cum_dist, wkb]
+                dt = [pid, index, link_id, direc, wkb]
                 self.pattern_mapping.append(dt)
                 index += 1
 
@@ -442,11 +413,11 @@ class Pattern(BasicPTElement):
                     break
                 start_point = milepost
 
-            cum_dist += link_geo.length * math.pi * 6371000 / 180
+            cum_dist += link_geo.length
 
             if start_point != end_point:
                 wkb = substring(self.shape, start_point, end_point).wkb
-                self.pattern_mapping.append([pid, index, link_id, direc, None, None, wkb])
+                self.pattern_mapping.append([pid, index, link_id, direc, wkb])
                 index += 1
 
             if stop_pos >= len(distances):
@@ -454,6 +425,6 @@ class Pattern(BasicPTElement):
         self.__compute_match_quality()
 
     def __compute_match_quality(self):
-        dispersion = [self.shape.distance(stop.geo) * math.pi * 6371000 / 180 for stop in self.stops]
+        dispersion = [(self.shape.distance(stop.geo) * math.pi * 6371000 / 180) for stop in self.stops]
         dispersion = sum([x * x for x in dispersion]) / len(self.stops)
         self.__match_quality = dispersion

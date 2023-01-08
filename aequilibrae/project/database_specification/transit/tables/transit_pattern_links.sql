@@ -1,11 +1,10 @@
 CREATE TABLE IF NOT EXISTS route_links (
-	pattern_id              INTEGER    NOT NULL,
---  seq  	                INTEGER,
 	transit_link            INTEGER    NOT NULL,
+	pattern_id              INTEGER    NOT NULL,
+	seq  	                INTEGER    NOT NULL,
 	from_stop               INTEGER    NOT NULL,
 	to_stop                 INTEGER    NOT NULL,
-	length					REAL 	   NOT NULL,
-	type 					INTEGER	   NOT NULL,
+	distance                INTEGER    NOT NULL,
 	FOREIGN KEY(pattern_id) REFERENCES "routes"(pattern_id) deferrable initially deferred,
 	FOREIGN KEY(from_stop)  REFERENCES "stops"(stop_id) deferrable initially deferred
 	FOREIGN KEY(to_stop)    REFERENCES "stops"(stop_id) deferrable initially deferred

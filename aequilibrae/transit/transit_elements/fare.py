@@ -5,8 +5,6 @@ from aequilibrae.transit.constants import constants, AGENCY_MULTIPLIER
 class Fare:
     """Transit Fare
 
-    :Database class members:
-
     * fare_id (:obj:`int`): ID of the fare as in the network model
     * fare (:obj:`str`): ID of the fare as in GTFS
     * agency (:obj:`str`): Corresponding agency as inputed during import
@@ -30,6 +28,7 @@ class Fare:
         self.__get_fare_id()
 
     def populate(self, record: tuple, headers: list) -> None:
+        """Adds fare information."""
         for key, value in zip(headers, record):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Routes.txt is unknown field for that file on GTFS")

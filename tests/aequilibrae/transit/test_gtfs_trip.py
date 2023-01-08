@@ -1,26 +1,16 @@
-import os
 from random import randint, choice
-from tempfile import gettempdir
-from unittest import TestCase
-from uuid import uuid4
+import pytest
+from aequilibrae.project import Project
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.functions.get_srid import get_srid
 
 from aequilibrae.transit.transit_elements import Trip
-from aequilibrae.utils.create_example import create_example
 from tests.aequilibrae.transit.random_word import randomword
 
 
-class TestTrip(TestCase):
-    def setUp(self) -> None:
-        self.fldr = os.path.join(gettempdir(), uuid4().hex)
-        self.prj = create_example(self.fldr, "nauru")
-        self.prj.create_empty_transit()
-
-        self.network = database_connection(table_type="transit")
-        self.srid = get_srid()
-
-        self.data = {
+class TestTrip:
+    @pytest.fixture
+    def data(self):
+        return {
             "route_id": randomword(randint(0, 40)),
             "service_id": randomword(randint(0, 40)),
             "trip_id": randomword(randint(0, 40)),
@@ -29,32 +19,32 @@ class TestTrip(TestCase):
             "block_id": randomword(randint(0, 5)),
             "shape_id": randomword(randint(0, 5)),
             "direction_id": choice([0, 1]),
-            "wheelchair_accessible": choice([0, 1]),
             "bikes_allowed": choice([0, 1]),
         }
 
-    def tearDown(self) -> None:
-        self.network.close()
+    @pytest.fixture
+    def network(self, project: Project):
+        return database_connection("transit")
 
-    def test_populate(self):
+    def test_populate(self, data):
         s = Trip()
 
-        s._populate(tuple(self.data.values()), list(self.data.keys()))
-        self.data["route"] = self.data.pop("route_id")
-        self.data["trip"] = self.data.pop("trip_id")
+        s._populate(tuple(data.values()), list(data.keys()))
+        data["route"] = data.pop("route_id")
+        data["trip"] = data.pop("trip_id")
         for key, val in s.__dict__.items():
-            if key in self.data:
-                self.assertEqual(val, self.data[key], "StopTime population with record failed")
+            if key in data:
+                assert val == data[key], "StopTime population with record failed"
 
-        self.data[randomword(randint(1, 30))] = randomword(randint(1, 30))
+        data[randomword(randint(1, 30))] = randomword(randint(1, 30))
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             s = Trip()
-            s._populate(tuple(self.data.values()), list(self.data.keys()))
+            s._populate(tuple(data.values()), list(data.keys()))
 
-    def test_save_to_database(self):
+    def test_save_to_database(self, data, network):
         r = Trip()
-        r._populate(tuple(self.data.values()), list(self.data.keys()))
+        r._populate(tuple(data.values()), list(data.keys()))
         times = [r for r in range(randint(5, 15))]
         patid = randint(15, 2500000)
 
@@ -62,13 +52,13 @@ class TestTrip(TestCase):
         r.departures = [r for r in times]
         r.pattern_id = patid
         r.source_time = [0] * len(times)
-        r.save_to_database(self.network)
+        r.save_to_database(network)
 
-        result = self.network.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
-        self.assertEqual(result, patid, "Saving trip to trips failed")
+        result = network.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
+        assert result == patid, "Saving trip to trips failed"
 
-        records, counter = self.network.execute(
+        records, counter = network.execute(
             'Select count(*), max("seq") from trips_schedule where trip_id=?', [r.trip_id]
         ).fetchone()
-        self.assertEqual(records, len(times), "Saving trip to trips_schedule failed")
-        self.assertEqual(counter, max(times), "Saving trip to trips_schedule failed")
+        assert records == len(times), "Saving trip to trips_schedule failed"
+        assert counter == max(times), "Saving trip to trips_schedule failed"

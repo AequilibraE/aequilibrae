@@ -8,40 +8,7 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
 class Stop(BasicPTElement):
-    """Transit stop as read from the GTFS feed
-
-    :GTFS class members:
-
-    * stop (:obj:`str`): Stop corresponds to stop_id as read from the GTFS feed prefixed with the agency ID prefix
-    * stop_code (:obj:`str`): Stop code as read from the GTFS feed
-    * stop_name (:obj:`str`): Stop name as read from the GTFS feed
-    * stop_desc (:obj:`str`): Stop description as read from the GTFS feed
-    * stop_lat (:obj:`float`): Stop latitude as read from the GTFS feed
-    * stop_lon (:obj:`float`): Stop longitude as read from the GTFS feed
-    * stop_street (:obj:`str`): Stop street as read from the GTFS feed
-    * zone_id (:obj:`str`): Transit Zone ID as read from the GTFS feed
-    * stop_url (:obj:`str`): Stop URL as read from the GTFS feed
-    * location_type (:obj:`int`): Stop location type as read from the GTFS feed
-    * parent_station (:obj:`str`): Stop parent station as read from the GTFS feed
-    * stop_timezone (:obj:`str`): Stop Time Zone as read from the GTFS feed
-    * wheelchair_boarding (:obj:`int`): Stop wheelchair boarding flag as read from the GTFS feed
-
-    :Processing class members:
-
-    * stop_id (:obj:`int`): Stop ID is a integer that will be used as the unique identifier for the stop in the database
-    * stop (:obj:`str`): Stop ID as read from the GTFS feed prefixed with the agency ID prefix
-    * taz (:obj:`str`): Model Zone number (geo-tagged)
-    * agency (:obj:`str`): Agency name
-    * link (:obj:`int`): Network link associated with this stop (geo-tagged)
-    * dir (:obj:`str`): Stop direction
-    * offset (:obj:`str`): Stop offset (distance along its corresponding link it is projected to)
-    * setback (:obj:`str`): Stop setback
-    * has_parking (:obj:`int`): Flag to identify if stop has parking available
-    * srid (:obj:`int`): Database SRID
-    * geo (:obj:`Point`): Point object corresponding to the provided Latitude/Longitude
-    * route_type (:obj:`int`): Route type of the routes associated with this stop
-
-    """
+    """Transit stop as read from the GTFS feed"""
 
     def __init__(self, agency_id: int):
         self.stop_id = -1
@@ -58,7 +25,6 @@ class Stop(BasicPTElement):
         self.location_type = 0
         self.parent_station = ""
         self.stop_timezone = ""
-        self.wheelchair_boarding = 0
 
         # Not part of GTFS
         self.taz = None
@@ -66,9 +32,6 @@ class Stop(BasicPTElement):
         self.agency_id = agency_id
         self.link = None
         self.dir = None
-        self.offset = None
-        self.setback = None
-        self.has_parking = 0
         self.srid = -1
         self.geo: Optional[Point] = None
         self.route_type: Optional[int] = None
@@ -91,10 +54,9 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into stops (stop_id, stop, agency_id, link, dir, offset, setback, X, Y, Z, name,
-                                    parent_station, description, street, taz, has_parking,
-                                    route_type, moved_by_matching, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+        sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
+                                    parent_station, description, street, fare_zone_id, route_type, geometry)
+                 values (?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)
@@ -109,19 +71,12 @@ class Stop(BasicPTElement):
             self.agency_id,
             self.link,
             self.dir,
-            self.offset,
-            self.setback,
-            self.stop_lon,
-            self.stop_lat,
-            0,
             self.stop_name,
             self.parent_station,
             self.stop_desc,
             self.stop_street,
             self.zone_id,
-            self.has_parking,
             int(self.route_type),
-            self.__moved_map_matching__,
             self.geo.wkb,
             self.srid,
         ]

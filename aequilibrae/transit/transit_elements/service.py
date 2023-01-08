@@ -5,8 +5,6 @@ from aequilibrae.transit.date_tools import format_date, create_days_between, day
 class Service:
     """Transit service built with data from calendar.txt and calendar_dates.txt from GTFS
 
-    :Database class members:
-
     * service_id (:obj:`str`):
     * monday (:obj:`int`): Flag if the route runs on mondays (1 for **True**, 0 for **False**)
     * tuesday (:obj:`int`): Flag if the route runs on tuesdays (1 for **True**, 0 for **False**)

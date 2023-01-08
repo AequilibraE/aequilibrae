@@ -9,8 +9,6 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Agency(BasicPTElement):
     """Transit Agency to load into the database
 
-    :Database class members:
-
     * agency_id (:obj:`int`): ID for the transit agency
     * agency (:obj:`str`): Name of the transit agency
     * feed_date (:obj:`str`): Date for the transit feed using in the import

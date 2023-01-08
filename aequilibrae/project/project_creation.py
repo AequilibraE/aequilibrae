@@ -9,11 +9,9 @@ protected_fields = ["ogc_fid", "geometry"]
 
 
 def initialize_tables(project, table_type: str) -> None:
-    if table_type == "network":
-        create_base_tables(project.conn, project.logger, table_type)
-        add_triggers(project.conn, project.logger, table_type)
-    else:
-        create_base_tables(project.transit.conn, project.logger, table_type)
+    cnx = project.conn if table_type == "network" else project.transit.conn
+    create_base_tables(cnx, project.logger, table_type)
+    add_triggers(cnx, project.logger, table_type)
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, table_type: str) -> None:

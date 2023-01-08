@@ -81,6 +81,11 @@ class GTFSReader(WorkerThread):
         self.__max_speeds__ = max_speeds
 
     def load_data(self, service_date: str):
+        """Loads the data for a respective service date.
+
+        Args.:
+             *service_date*(:obj:`str`): service date. e.g. "2020-04-01".
+        """
         ag_id = self.agency.agency
         self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
 
