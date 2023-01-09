@@ -10,23 +10,37 @@ from aequilibrae import AequilibraeMatrix
 from aequilibrae import TrafficClass
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["matrix_name", "network mode", "class_name", "iteration", "a", "b", "c"]
-TURNING_VOLUME_COLUMNS = TURNING_VOLUME_GROUPING_COLUMNS + ['demand']
-TURNING_VOLUME_OD_COLUMNS = ["network mode", "class_name", "iteration", "a", "b", "c", "id", "id_next", "link_id",
-                             "direction", "link_id_next", "direction_next", "origin_idx", "destination_idx",
-                             "origin", "destination"]
+TURNING_VOLUME_COLUMNS = TURNING_VOLUME_GROUPING_COLUMNS + ["demand"]
+TURNING_VOLUME_OD_COLUMNS = [
+    "network mode",
+    "class_name",
+    "iteration",
+    "a",
+    "b",
+    "c",
+    "id",
+    "id_next",
+    "link_id",
+    "direction",
+    "link_id_next",
+    "direction_next",
+    "origin_idx",
+    "destination_idx",
+    "origin",
+    "destination",
+]
 
 
 class TurnVolumesResults:
-
     def __init__(
-            self,
-            class_name: str,
-            mode_id: str,
-            matrix: AequilibraeMatrix,
-            project_dir: Path,
-            procedure_id: str,
-            iteration: Optional[int] = None,
-            blend_iterations: bool = True,
+        self,
+        class_name: str,
+        mode_id: str,
+        matrix: AequilibraeMatrix,
+        project_dir: Path,
+        procedure_id: str,
+        iteration: Optional[int] = None,
+        blend_iterations: bool = True,
     ):
         self.class_name = class_name
         self.mode_id = mode_id
@@ -40,24 +54,16 @@ class TurnVolumesResults:
 
     @staticmethod
     def from_traffic_class(
-            traffic_class: TrafficClass,
-            project_dir: Path,
-            procedure_id: str,
-            iteration: Optional[list[int]] = None,
-            blend_iterations: bool = True,
+        traffic_class: TrafficClass,
+        project_dir: Path,
+        procedure_id: str,
+        iteration: Optional[list[int]] = None,
+        blend_iterations: bool = True,
     ):
         class_name = traffic_class.__id__
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
-        return TurnVolumesResults(
-            class_name,
-            mode_id,
-            matrix,
-            project_dir,
-            procedure_id,
-            iteration,
-            blend_iterations
-        )
+        return TurnVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iteration, blend_iterations)
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
@@ -119,8 +125,11 @@ class TurnVolumesResults:
     def read_paths_from_folder(self, paths_dir: Path, iteration: int) -> pd.DataFrame:
         path_file_regex = re.compile("^o([0-9]+).feather$")
 
-        files = {int(re.match(path_file_regex, p_file.name).groups()[0]): p_file for p_file in
-                 paths_dir.glob("*.feather") if re.match(path_file_regex, p_file.name) is not None}
+        files = {
+            int(re.match(path_file_regex, p_file.name).groups()[0]): p_file
+            for p_file in paths_dir.glob("*.feather")
+            if re.match(path_file_regex, p_file.name) is not None
+        }
         path_list = []
         for origin in files.keys():
             o_paths_df = pd.read_feather(paths_dir / f"o{origin}.feather")
@@ -142,7 +151,7 @@ class TurnVolumesResults:
             path_list.append(o_paths_df)
 
         all_paths = pd.concat(path_list)
-        all_paths[["network mode", 'class_name', "iteration"]] = [self.mode_id, self.class_name, iteration]
+        all_paths[["network mode", "class_name", "iteration"]] = [self.mode_id, self.class_name, iteration]
         return all_paths
 
     def get_turns_demand(self, matrix_name: str, matrix_values: np.array, turns_df: pd.DataFrame) -> pd.DataFrame:
@@ -151,8 +160,11 @@ class TurnVolumesResults:
         return turns_df
 
     def format_turns(
-            self, turns_df: pd.DataFrame, formatted_paths: pd.DataFrame, node_to_index_df: pd.DataFrame,
-            correspondence_df: pd.DataFrame
+        self,
+        turns_df: pd.DataFrame,
+        formatted_paths: pd.DataFrame,
+        node_to_index_df: pd.DataFrame,
+        correspondence_df: pd.DataFrame,
     ) -> pd.DataFrame:
         turns_indices = self.get_turn_indices(turns_df, node_to_index_df)
         turns_w_links = self.get_turn_links(turns_indices, correspondence_df)
@@ -188,27 +200,29 @@ class TurnVolumesResults:
                 left_on=["b_index", "c_index"],
                 right_on=["a_node", "b_node"],
                 suffixes=(None, "_next"),
-            ).drop(columns=["a_index", "b_index", "c_index", "b_node", "a_node", "a_node_next", "b_node_next"])
+            )
+            .drop(columns=["a_index", "b_index", "c_index", "b_node", "a_node", "a_node_next", "b_node_next"])
         )
 
     def get_turns_ods(
-            self, turns_w_links: pd.DataFrame, formatted_paths: pd.DataFrame,
-            node_to_index_df
+        self, turns_w_links: pd.DataFrame, formatted_paths: pd.DataFrame, node_to_index_df
     ) -> pd.DataFrame:
         index_to_node = node_to_index_df.reset_index()
         turns_w_od_idx = formatted_paths.merge(turns_w_links, on=["id", "id_next"])
         turns_w_od = turns_w_od_idx.merge(index_to_node, left_on="origin_idx", right_on="node_index", how="left").merge(
-            index_to_node, left_on="destination_idx", right_on="node_index", how="left",
-            suffixes=("_origin", "_destination")
+            index_to_node,
+            left_on="destination_idx",
+            right_on="node_index",
+            how="left",
+            suffixes=("_origin", "_destination"),
         )
         turns_w_od.rename(columns={"index_origin": "origin", "index_destination": "destination"}, inplace=True)
         return turns_w_od[TURNING_VOLUME_OD_COLUMNS]
 
     def get_turn_volumes(self, turns_demand: pd.DataFrame, turn_df: pd.DataFrame) -> pd.DataFrame:
-        agg_turns_demand = turns_demand[TURNING_VOLUME_COLUMNS].groupby(
-            TURNING_VOLUME_GROUPING_COLUMNS,
-            as_index=False
-        ).sum()
+        agg_turns_demand = (
+            turns_demand[TURNING_VOLUME_COLUMNS].groupby(TURNING_VOLUME_GROUPING_COLUMNS, as_index=False).sum()
+        )
 
         full_index = self.get_full_index(agg_turns_demand, turn_df)
 
@@ -235,11 +249,12 @@ class TurnVolumesResults:
         dummy_turns = turn_df.copy()
         dummy_turns["dummy"] = 1
 
-        return idx_df.merge(
-            dummy_turns, on="dummy", how="outer"
-        ).merge(
-            iteration_idx, on="dummy", how="outer"
-        ).set_index(TURNING_VOLUME_GROUPING_COLUMNS).index
+        return (
+            idx_df.merge(dummy_turns, on="dummy", how="outer")
+            .merge(iteration_idx, on="dummy", how="outer")
+            .set_index(TURNING_VOLUME_GROUPING_COLUMNS)
+            .index
+        )
 
     def calculate_volume(self, df: pd.DataFrame, ta_report: pd.DataFrame) -> pd.Series:
         # have to loop through the rows to update volumes for each iteration to calculate the vol fractions.
@@ -265,7 +280,7 @@ class TurnVolumesResults:
                 min_idx = max(0, it - betas_for_it.size) + 1
                 max_idx = min_idx + min(it, betas_for_it.size)
                 window = range(min_idx, max_idx)
-                it_volume = (aon_volume.loc[window] * betas_for_it[0:min(it, betas_for_it.size)].values).sum()
+                it_volume = (aon_volume.loc[window] * betas_for_it[0 : min(it, betas_for_it.size)].values).sum()
             else:
                 it_volume = aon_volume.loc[it]
 
@@ -275,12 +290,16 @@ class TurnVolumesResults:
 
     def aggregate_iteration_volumes(self, turns_volumes: pd.DataFrame, ta_report: pd.DataFrame) -> pd.DataFrame:
         if not self.blend_iterations:
-            return turns_volumes.rename(columns={'demand': "volume"})
+            return turns_volumes.rename(columns={"demand": "volume"})
 
-        grouping_cols = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col != 'iteration']
+        grouping_cols = [col for col in TURNING_VOLUME_GROUPING_COLUMNS if col != "iteration"]
         result = turns_volumes.groupby(grouping_cols, as_index=False).apply(
             lambda x: self.calculate_volume(x, ta_report)
         )
-        return result.melt(
-            id_vars=grouping_cols, value_vars=result.columns, var_name="iteration", value_name="volume"
-        ).reset_index().groupby(grouping_cols, as_index=False, sort=True).last().drop(columns="index")
+        return (
+            result.melt(id_vars=grouping_cols, value_vars=result.columns, var_name="iteration", value_name="volume")
+            .reset_index()
+            .groupby(grouping_cols, as_index=False, sort=True)
+            .last()
+            .drop(columns="index")
+        )
