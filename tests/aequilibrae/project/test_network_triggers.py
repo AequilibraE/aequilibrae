@@ -16,8 +16,8 @@ class TestNetworkTriggers(TestCase):
         copytree(siouxfalls_project, self.proj_path)
         self.siouxfalls = Project()
         self.siouxfalls.open(self.proj_path)
-        remove_triggers(self.siouxfalls.conn, self.siouxfalls.logger)
-        add_triggers(self.siouxfalls.conn, self.siouxfalls.logger)
+        remove_triggers(self.siouxfalls.conn, self.siouxfalls.logger, table_type="network")
+        add_triggers(self.siouxfalls.conn, self.siouxfalls.logger, table_type="network")
 
     def tearDown(self) -> None:
         self.siouxfalls.close()
