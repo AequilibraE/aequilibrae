@@ -19,8 +19,6 @@ def pat(path):
     if os.path.isfile(os.path.join(path, "public_transport.sqlite")):
         os.remove(os.path.join(path, "public_transport.sqlite"))
 
-    prj.create_empty_transit()
-
     gtfs_fldr = os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/gtfs_coquimbo.zip")
 
     data = Transit(prj)
@@ -33,7 +31,7 @@ def pat(path):
 
 
 @pytest.fixture
-def network(path):
+def network(pat):
     return database_connection(table_type="transit")
 
 

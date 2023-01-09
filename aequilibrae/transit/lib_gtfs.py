@@ -14,7 +14,6 @@ from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
 from .functions import PathStorage
-from .functions.create_raw import create_raw_shapes
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 from ..utils.worker_thread import WorkerThread
@@ -62,7 +61,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
         self.__default_capacities = default_capacities
-        self.__do_raw_shapes__ = False
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -198,15 +196,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__build_data()
         self.gtfs_data.agency.service_date = self.day
 
-    def set_do_raw_shapes(self, do_shapes: bool):
-        """Sets the raw shapes importer to True for execution by the importer"""
-        self.__do_raw_shapes__ = do_shapes
-
-    def create_raw_shapes(self):
-        """Adds all shapes provided in the GTFS feeds"""
-        create_raw_shapes(self.gtfs_data.agency.agency_id, self.select_patterns)
-        self.__do_raw_shapes__ = False
-
     def doWork(self):
         """Alias for execute_import"""
         self.execute_import()
@@ -224,7 +213,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
         if pyqt:
             self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
-            self.signal.emit(["start", "master", 4 + self.__do_raw_shapes__, self.__mt])
+            self.signal.emit(["start", "master", self.day, self.__mt])
 
         self.save_to_disk()
 
@@ -236,9 +225,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     def save_to_disk(self):
         """Saves all transit elements built in memory to disk"""
-
-        if self.__do_raw_shapes__:
-            self.create_raw_shapes()
 
         with closing(database_connection("transit")) as conn:
             if pyqt:

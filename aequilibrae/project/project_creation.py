@@ -2,6 +2,7 @@ import logging
 import re
 from os.path import join, dirname, realpath
 from sqlite3 import Connection
+from aequilibrae.project.database_connection import database_connection
 
 req_link_flds = ["link_id", "a_node", "b_node", "direction", "distance", "modes", "link_type"]
 req_node_flds = ["node_id", "is_centroid"]
@@ -9,7 +10,8 @@ protected_fields = ["ogc_fid", "geometry"]
 
 
 def initialize_tables(project, table_type: str) -> None:
-    cnx = project.conn if table_type == "network" else project.transit.conn
+    # cnx = project.conn if table_type == "network" else project.transit.conn
+    cnx = database_connection(table_type)
     create_base_tables(cnx, project.logger, table_type)
     add_triggers(cnx, project.logger, table_type)
 

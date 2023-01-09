@@ -1,10 +1,9 @@
 from os.path import join, dirname, abspath
-from tempfile import gettempdir
 import pytest
-from uuid import uuid4
 
 import pandas as pd
 from aequilibrae.project import Project
+from aequilibrae.transit import Transit
 
 from aequilibrae.transit.gtfs_loader import GTFSReader
 
@@ -12,6 +11,7 @@ from aequilibrae.transit.gtfs_loader import GTFSReader
 class TestGTFSReader:
     @pytest.fixture
     def gtfs_loader(self, project: Project):
+        Transit(project)
         return GTFSReader()
 
     @pytest.fixture

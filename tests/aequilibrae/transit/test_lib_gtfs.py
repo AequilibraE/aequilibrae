@@ -2,6 +2,7 @@ import os
 import pytest
 from uuid import uuid4
 
+from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.database_connection import database_connection
 
@@ -20,14 +21,14 @@ def create_project(create_path):
     if os.path.isfile(os.path.join(create_path, "public_transport.sqlite")):
         os.remove(os.path.join(create_path, "public_transport.sqlite"))
 
-    prj.create_empty_transit()
     yield prj
     prj.close()
 
 
 @pytest.fixture
-def network(create_project, create_path):
-    return database_connection("transit", create_path)
+def network(create_project):
+    Transit(create_project)
+    return database_connection("transit")
 
 
 @pytest.fixture
@@ -112,19 +113,6 @@ def test_load_date_srid_exception(system_builder):
 def test_load_date_not_available_date_exception(system_builder):
     with pytest.raises(ValueError):
         system_builder.load_date("2020-06-01")
-
-
-def test_set_do_raw_shapes(system_builder):
-    system_builder.set_do_raw_shapes(True)
-    assert system_builder.__do_raw_shapes__ is True
-
-
-def test_create_raw_shapes(network, system_builder):
-    system_builder.load_date("2016-04-13")
-    system_builder.create_raw_shapes()
-
-    all_tables = [x[0] for x in network.execute("SELECT name FROM sqlite_master WHERE type ='table'").fetchall()]
-    assert "raw_shapes" in all_tables
 
 
 def test_save_to_disk(network, system_builder):

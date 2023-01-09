@@ -354,7 +354,6 @@ class GTFSReader(WorkerThread):
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
                 trip.shape = self.shapes.get(trip.shape)
-                trip.design_capacity = self.routes[trip.route].design_capacity
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
@@ -503,9 +502,9 @@ class GTFSReader(WorkerThread):
 
         cap = self.__capacities__.get("other", [None, None, None])
         routes = pd.DataFrame(routes)
-        routes = routes.assign(seated_capacity=cap[0], design_capacity=cap[1], total_capacity=cap[2], srid=self.srid)
+        routes = routes.assign(seated_capacity=cap[0], total_capacity=cap[1], srid=self.srid)
         for route_type, cap in self.__capacities__.items():
-            routes.loc[routes.route_type == route_type, ["seated_capacity", "design_capacity", "total_capacity"]] = cap
+            routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
 
         for i, line in routes.iterrows():
             if pyqt:

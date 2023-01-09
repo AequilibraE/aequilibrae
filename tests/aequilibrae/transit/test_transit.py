@@ -6,8 +6,20 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
 
-def test_new_gtfs(project: Project):
-    data = Transit(project)
+@pytest.fixture
+def create_project(tmp_path):
+    path = tmp_path / uuid4().hex
+    prj = create_example(path, "coquimbo")
+
+    if os.path.isfile(os.path.join(path, "public_transport.sqlite")):
+        os.remove(os.path.join(path, "public_transport.sqlite"))
+
+    yield prj
+    prj.close()
+
+
+def test_new_gtfs(create_project):
+    data = Transit(create_project)
     transit = data.new_gtfs(
         agency="",
         file_path=os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/gtfs_coquimbo.zip"),
@@ -16,22 +28,7 @@ def test_new_gtfs(project: Project):
     assert str(type(transit)) == "<class 'aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder'>"
 
 
-def test__check_connection(tmp_path):
-    path = tmp_path / uuid4().hex
-    example = create_example(path)
+def test___create_transit_database(create_project):
+    data = Transit(create_project)
 
-    with pytest.raises(FileNotFoundError):
-        Transit(example)
-
-
-def test_create_empty_transit_exception(project: Project):
-    with pytest.raises(FileExistsError):
-        project.create_empty_transit()
-
-
-def test_create_empty_transit(tmp_path):
-    path = tmp_path / uuid4().hex
-    example = create_example(path, "nauru")
-    example.create_empty_transit()
-
-    assert os.path.isfile(os.path.join(path, "public_transport.sqlite")) is True
+    assert os.path.isfile(os.path.join(data.project_base_path, "public_transport.sqlite")) is True

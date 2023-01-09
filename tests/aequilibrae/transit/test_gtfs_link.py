@@ -4,7 +4,7 @@ from random import randint
 import pytest
 
 from shapely.geometry import LineString
-from aequilibrae.project import Project
+from aequilibrae.transit import Transit
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 
@@ -16,6 +16,10 @@ class TestLink:
     @pytest.fixture
     def srid(self):
         return get_srid()
+
+    @pytest.fixture
+    def project(self, create_project):
+        return create_project()
 
     def test_build_object(self, srid):
         new_link = Link(srid)
@@ -39,7 +43,10 @@ class TestLink:
         new_link.geo = geo
         assert new_link.length == pytest.approx(5 * pi * 6371000 / 180), "Length not computed properly"
 
-    def test_save_to_database(self, srid, project: Project):
+    def test_save_to_database(self, srid, project):
+
+        Transit(project)
+
         network = database_connection(table_type="transit")
 
         route_type = randint(0, 13)

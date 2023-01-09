@@ -2,6 +2,7 @@ from random import randint, choice, uniform
 from shapely.geometry import LineString
 import pytest
 from aequilibrae.project import Project
+from aequilibrae.transit import Transit
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 
@@ -48,6 +49,7 @@ def test__populate(data):
 
 
 def test_save_to_database(data, project: Project):
+    Transit(project)
     network = database_connection("transit")
 
     line = LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb

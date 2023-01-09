@@ -1,3 +1,4 @@
+from aequilibrae.transit import Transit
 from aequilibrae.context import activate_project
 from aequilibrae.project.database_connection import database_connection
 import pytest
@@ -16,6 +17,7 @@ class TestDatabaseConnection:
         assert cursor.fetchone()[0] == 0, "Returned more links thant it should have"
 
     def test_connection_with_transit(self, project):
+        Transit(project)
         conn = database_connection(table_type="transit", project_path=project.project_base_path)
         cursor = conn.cursor()
         cursor.execute("select count(*) from routes")

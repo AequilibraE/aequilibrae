@@ -31,9 +31,6 @@ project = create_example(fldr, "coquimbo")
 # %%
 os.remove(os.path.join(fldr, "public_transport.sqlite"))
 
-# Now we recreate an empty transit file.
-project.create_empty_transit()
-
 """Let's download the GTFS feed."""
 # %%
 dest_path = os.path.join(fldr, "coquimbo.zip")
@@ -61,12 +58,14 @@ transit.load_date("2016-04-13")
 
 """
 To be less time consuming, we will edit the existing routes and patterns. 
-We'll consider only one route and its respective pattern.
+We'll consider two patterns associated with a single route.
 If you are interested and have more time, please feel free to skip this cell and move on to map-matching.
 """
 # %%
-transit.select_routes = {"216676": transit.select_routes["216676"]}
-transit.select_patterns = {10027001000: transit.select_patterns[10027001000]}
+transit.select_patterns = {
+    10023001000: transit.select_patterns[10023001000],
+    10023002000: transit.select_patterns[10023002000],
+}
 
 """
 Now we execute the map matching to find the real paths.
@@ -89,12 +88,7 @@ links = pd.read_sql(
     "SELECT seq, dir, stop_id, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx
 )
 
-stops_query = """SELECT stops.stop_id, X, Y
-                FROM stops
-                JOIN pattern_mapping
-                ON stops.stop_id = pattern_mapping.stop_id
-                WHERE pattern_id = 10019001000;"""
-stops = pd.read_sql(stops_query, con=cnx)
+stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=cnx)
 
 # %%
 gtfs_links = folium.FeatureGroup("links")
@@ -108,7 +102,7 @@ for i, row in links.iterrows():
     # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
-    _ = folium.vector_layers.PolyLine(points, popup=f"<b>link_id: {row.seq}</b>", color="gray", weight=2).add_to(
+    _ = folium.vector_layers.PolyLine(points, popup=f"<b>link_id: {row.seq}</b>", color="red", weight=2).add_to(
         gtfs_links
     )
 
@@ -127,7 +121,7 @@ for i, row in stops.iterrows():
 
 # %%
 # We create the map
-map_osm = folium.Map(location=[-29.902540, -71.235287], zoom_start=13)
+map_osm = folium.Map(location=[-29.9633719, -71.3242825], zoom_start=13)
 
 # add all layers
 for layer in layers:

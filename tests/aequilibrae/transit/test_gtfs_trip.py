@@ -1,6 +1,7 @@
 from random import randint, choice
 import pytest
 from aequilibrae.project import Project
+from aequilibrae.transit import Transit
 from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit.transit_elements import Trip
@@ -24,6 +25,7 @@ class TestTrip:
 
     @pytest.fixture
     def network(self, project: Project):
+        Transit(project)
         return database_connection("transit")
 
     def test_populate(self, data):

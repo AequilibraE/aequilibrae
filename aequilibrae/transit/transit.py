@@ -1,6 +1,10 @@
 import os
+import shutil
+
 from aequilibrae.log import logger
-from aequilibrae.project.database_connection import database_connection
+
+from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
 
@@ -18,9 +22,16 @@ class Transit:
     }
 
     def __init__(self, project):
-        self.conn = self.__check_connection(project)
-        self.project_base_path = project.project_base_path  # instead of network
+        """
+        Args.:
+             *project* (:obj:``):
+        """
+
+        self.project_base_path = project.project_base_path
         self.logger = logger
+        self.__transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
+
+        self.create_transit_database()
 
     def new_gtfs(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
         """Returns a GTFSRouteSystemBuilder object compatible with the project
@@ -44,9 +55,8 @@ class Transit:
         )
         return gtfs
 
-    def __check_connection(self, project):
-        transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
-        if not os.path.exists(transit_file):
-            raise FileNotFoundError("Public Transport model does not exist. Create a new one or change your path.")
-
-        return database_connection("transit", project.project_base_path)
+    def create_transit_database(self):
+        """Creates the public transport database"""
+        if not os.path.exists(self.__transit_file):
+            shutil.copyfile(spatialite_database, self.__transit_file)
+            initialize_tables(self, "transit")

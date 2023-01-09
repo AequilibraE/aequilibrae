@@ -4,6 +4,7 @@ import pytest
 from numpy import array
 from shapely.geometry import MultiLineString
 from aequilibrae.project import Project
+from aequilibrae.transit import Transit
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 
@@ -44,6 +45,7 @@ class TestRoute:
 
     def test_save_to_database(self, data_dict, project: Project):
         data = data_dict
+        Transit(project)
         network = database_connection("transit")
 
         r = Route(1)

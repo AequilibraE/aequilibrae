@@ -91,7 +91,6 @@ class Project:
         self.activate()
 
         self.__create_empty_network()
-        self.create_empty_transit()
         self.__load_objects()
         self.about.create()
         global_logger.info(f"Created project on {self.project_base_path}")
@@ -186,15 +185,6 @@ class Project:
         cursor.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
         initialize_tables(self, "network")
-
-    def create_empty_transit(self):
-        """Creates the public transport database"""
-        if os.path.exists(os.path.join(self.project_base_path, "public_transport.sqlite")):
-            raise FileExistsError("Public Transport database already exists.")
-
-        shutil.copyfile(spatialite_database, os.path.join(self.project_base_path, "public_transport.sqlite"))
-        self.transit = Transit(self)
-        initialize_tables(self, "transit")
 
     def __setup_logger(self):
 

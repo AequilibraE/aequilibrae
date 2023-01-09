@@ -18,7 +18,6 @@ class Route(BasicPTElement):
     * route_sort_order (:obj:`int`): Route rendering order as found in the GTFS feed
     * agency_id (:obj:`str`): Agency ID
     * seated_capacity (:obj:`float`): Vehicle seated capacity for this route
-    * design_capacity (:obj:`float`): Vehicle design capacity for this route
     * total_capacity (:obj:`float`): Total vehicle capacity for this route"""
 
     def __init__(self, agency_id):
@@ -38,7 +37,6 @@ class Route(BasicPTElement):
         self.pattern_id = 0
         self.pattern = ""
         self.seated_capacity = 0
-        self.design_capacity = 0
         self.total_capacity = 0
         self.shape: MultiLineString
         self.srid = -1
