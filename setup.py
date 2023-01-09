@@ -31,7 +31,18 @@ ext_module = Extension(
 if "WINDOWS" not in platform.platform().upper():
     ext_module.extra_compile_args.append("-std=c++17")
 
-reqs = ["numpy>=1.18.0,<1.22", "scipy", "pyaml", "cython", "pyshp", "requests", "shapely >= 1.7.0", "pandas", "pyproj"]
+reqs = [
+    "numpy>=1.18.0,<1.22",
+    "scipy",
+    "pyaml",
+    "cython",
+    "pyshp",
+    "requests",
+    "shapely >= 1.7.0",
+    "pandas",
+    "pyproj",
+    "rtree",
+]
 
 if isfile("requirements.txt"):
     # We just make sure to keep the requirements sync'ed with the setup file
@@ -42,13 +53,14 @@ if isfile("requirements.txt"):
 pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
-    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
+    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae": ["parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
         "database_specification/transit/tables/*.*",
+        "database_specification/transit/triggers/*.*",
     ],
 }
 loose_modules = ["__version__", "parameters"]
