@@ -1,9 +1,7 @@
 import os
-import shutil
 import pytest
 from uuid import uuid4
 
-import pandas as pd
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.project.database_connection import database_connection
 
@@ -44,8 +42,8 @@ def system_builder(network, gtfs_file):
 
 
 def test_set_capacities(system_builder):
-    system_builder.set_capacities({0: [150, 300, 300], 3: [42, 56, 56]})
-    assert system_builder.gtfs_data.__dict__["__capacities__"] == {0: [150, 300, 300], 3: [42, 56, 56]}
+    system_builder.set_capacities({0: [150, 300], 3: [42, 56]})
+    assert system_builder.gtfs_data.__dict__["__capacities__"] == {0: [150, 300], 3: [42, 56]}
 
 
 def test_dates_available(system_builder):

@@ -85,8 +85,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         Args:
             *capacities* (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
-                                        of 3 items for values for capacities: seated, design and total
-                                        i.e. -> "{0: [150, 300, 300],...}"
+                                        of 3 items for values for capacities: seated and total
+                                        i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
 

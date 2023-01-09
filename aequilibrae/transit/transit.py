@@ -6,15 +6,15 @@ from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 
 class Transit:
     default_capacities = {
-        0: [150, 300, 300],  # Tram, Streetcar, Light rail
-        1: [280, 560, 560],  # Subway/metro
-        2: [700, 700, 700],  # Rail
-        3: [30, 60, 60],  # Bus
-        4: [400, 800, 800],  # Ferry
-        5: [20, 40, 40],  # Cable tram
-        11: [30, 60, 60],  # Trolleybus
-        12: [50, 100, 100],  # Monorail
-        "other": [30, 60, 60],
+        0: [150, 300],  # Tram, Streetcar, Light rail
+        1: [280, 560],  # Subway/metro
+        2: [700, 700],  # Rail
+        3: [30, 60],  # Bus
+        4: [400, 800],  # Ferry
+        5: [20, 40],  # Cable tram
+        11: [30, 60],  # Trolleybus
+        12: [50, 100],  # Monorail
+        "other": [30, 60],
     }
 
     def __init__(self, project):
