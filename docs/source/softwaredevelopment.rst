@@ -85,7 +85,7 @@ Imports
 ~~~~~~~
 
 * Imports should be one per line.
-* Imports should be grouped into standard library, third-party, and intra-library imports (`ctrl+shit+o`
+* Imports should be grouped into standard library, third-party, and intra-library imports (`ctrl+alt+o`
   does it automatically on PyCharm).
 * Imports of NumPy should follow the following convention:
 
