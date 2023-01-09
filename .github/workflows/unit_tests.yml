@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-20.04]
 
       max-parallel: 20
     steps:
@@ -49,7 +49,7 @@ jobs:
         pip install -r tests/requirements_tests.txt
 
     - name: Download spatialite on Linux
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-20.04'
       run: |
         sudo apt-get install libsqlite3-mod-spatialite
         sudo apt-get install -y libspatialite-dev
