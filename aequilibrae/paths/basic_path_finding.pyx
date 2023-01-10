@@ -13,7 +13,7 @@
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
-Original Algorithm for Shortest path (Dijkstra with a Fibonacci heap) was written by Jake Vanderplas <vanderplas@astro.washington.edu> under license: BSD, (C) 2012
+Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <pacullfrancois@gmail.com> under license: MIT, (C) 2022
 """
 
 """
@@ -256,9 +256,8 @@ cpdef void skim_multiple_fields(long origin,
 
 # ###########################################################################################################################
 #############################################################################################################################
-#Original Dijkstra implementation by Jake Vanderplas, taken from SciPy V0.11
-#The old Pyrex syntax for loops was replaced with Python syntax
-#Old Numpy Buffers were replaces with latest memory views interface to allow for the release of the GIL
+# Original Dijkstra implementation by François Pacull, taken from https://github.com/Edsger-dev/priority_queues
+# Old Numpy Buffers were replaces with latest memory views interface to allow for the release of the GIL
 # Path tracking arrays and skim arrays were also added to it
 #############################################################################################################################
 # ###########################################################################################################################
