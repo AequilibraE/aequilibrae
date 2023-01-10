@@ -14,7 +14,7 @@
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
 Original Algorithm for Shortest path (Dijkstra with a Fibonacci heap) was written by Jake Vanderplas <vanderplas@astro.washington.edu> under license: BSD, (C) 2012
- """
+"""
 
 """
 TODO:
@@ -252,7 +252,6 @@ cpdef void skim_multiple_fields(long origin,
     for i in range(zones):
         for j in range(skims):
             final_skims[i, j] = node_skims[i, j]
-
 
 # ###########################################################################################################################
 #############################################################################################################################

@@ -612,7 +612,7 @@ class TrafficAssignment(object):
                 "file_name": working_name,
                 "zones": self.classes[0].graph.centroids.shape[0],
                 "matrix_names": names,
-                "memory_only": False
+                "memory_only": False,
             }
 
             # Create the matrix to manipulate
