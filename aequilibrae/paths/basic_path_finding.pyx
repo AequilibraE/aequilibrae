@@ -13,7 +13,7 @@
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
-Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <pacullfrancois@gmail.com> under license: MIT, (C) 2022
+Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
 """
