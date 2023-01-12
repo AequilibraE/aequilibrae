@@ -71,4 +71,7 @@ jobs:
       run: python setup.py sdist bdist_wheel
 
     - name: Runs test
+      if: matrix.os == 'windows-latest'
+      env:
+        PYTEST_DEBUG_TEMPROOT: "C:/temp"
       run: python -m pytest
