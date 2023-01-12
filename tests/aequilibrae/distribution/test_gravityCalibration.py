@@ -46,10 +46,6 @@ class TestGravityCalibration(TestCase):
             self.fail("Calibration did not converge")
 
     def test_calibrate_with_omx(self):
-        # GravityCalibration requires an object that has a `parameters` attribute. `Parameters` fits
-        # this requirement, so that we don't need to create a full project
-        self.par = Parameters()
-
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
         copytree(siouxfalls_project, self.proj_dir)
         self.proj = Project()
@@ -59,7 +55,6 @@ class TestGravityCalibration(TestCase):
         mats = self.proj.matrices
         mats.update_database()
 
-        print(mats.list())
         imped = mats.get_matrix("omx")
         imped.computational_view(["free_flow_time"])
 
