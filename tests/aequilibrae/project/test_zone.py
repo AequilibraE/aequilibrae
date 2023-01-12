@@ -178,3 +178,9 @@ class TestZone(TestCase):
 
         curr.execute("""Select count(*) from links where a_node=1 and instr(modes,'w')>0""")
         self.assertEqual(curr.fetchone()[0], 0, "Failed to remove mode from all connectors")
+
+    def test_get_closest_zone(self):
+        pt_in = Point(-96.7533, 43.5289)
+        pt_out = Point(-96.6833, 43.6188)
+        self.assertEqual(self.proj.zoning.get_closest_zone(pt_in), 3)
+        self.assertEqual(self.proj.zoning.get_closest_zone(pt_out), 2)

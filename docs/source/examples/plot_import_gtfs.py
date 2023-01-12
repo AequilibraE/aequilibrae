@@ -27,7 +27,10 @@ fldr = os.path.join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr, "coquimbo")
 
-"""As Coquimbo example already has a complete GTFS model, we shall remove its transit file for the sake of this example."""
+"""
+As Coquimbo example already has a complete GTFS model, we shall remove its public transport  
+database for the sake of this example.
+"""
 # %%
 os.remove(os.path.join(fldr, "public_transport.sqlite"))
 
@@ -41,6 +44,7 @@ urllib.request.urlretrieve(
 
 """
 Now we create our Transit object and import the GTFS feed into our model.
+This will automatically create a new public transport database.
 """
 # %%
 data = Transit(project)
@@ -85,7 +89,7 @@ Now we will plot the route we just imported into our model!
 cnx = database_connection("transit")
 
 links = pd.read_sql(
-    "SELECT seq, dir, stop_id, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx
+    "SELECT seq, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx
 )
 
 stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=cnx)
@@ -99,7 +103,6 @@ layers = [gtfs_links, gtfs_stops]
 for i, row in links.iterrows():
     points = row.geom.replace("LINESTRING", "").replace("(", "").replace(")", "").split(", ")
     points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-    # we need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
     _ = folium.vector_layers.PolyLine(points, popup=f"<b>link_id: {row.seq}</b>", color="red", weight=2).add_to(

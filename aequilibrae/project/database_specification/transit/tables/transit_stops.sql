@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS stops (
 	description       TEXT,
 	street            TEXT,
 	fare_zone_id      INTEGER,
+	transit_zone      TEXT,
 	route_type        INTEGER  NOT NULL DEFAULT -1,
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
 	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")

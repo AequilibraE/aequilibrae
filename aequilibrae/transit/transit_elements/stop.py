@@ -55,8 +55,8 @@ class Stop(BasicPTElement):
         """Saves Transit Stop to the database"""
 
         sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
-                                    parent_station, description, street, fare_zone_id, route_type, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+                                    parent_station, description, street, fare_zone_id, transit_zone, route_type, geometry)
+                 values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)
@@ -76,6 +76,7 @@ class Stop(BasicPTElement):
             self.stop_desc,
             self.stop_street,
             self.zone_id,
+            self.taz,
             int(self.route_type),
             self.geo.wkb,
             self.srid,

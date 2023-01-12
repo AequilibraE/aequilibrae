@@ -279,13 +279,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for counter, (_, stop) in enumerate(self.select_stops.items()):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
-                if len(self.geotool.zoning.all_zones()) > 0:
-                    stop.taz = self.geotool.zoning.get_closest_zone(stop.geo)
+                closest_zone = self.geotool.zoning.get_closest_zone(stop.geo)
+                if stop.geo.within(self.geotool.zoning.get(closest_zone).geometry):
+                    stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
                 if pyqt:
                     self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
 
+        self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"
             self.logger.warning(msg)

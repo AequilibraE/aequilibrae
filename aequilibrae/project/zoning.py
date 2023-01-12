@@ -113,14 +113,13 @@ class Zoning(BasicTable):
         """
 
         nearest = self.__geo_index.nearest(geometry, 10)
-        dists = []
+        dists = {}
         for zone_id in nearest:
             geo = self.__items[zone_id].geometry
             if geo.contains(geometry):
                 return zone_id
-            dists.append(geo.distance(geometry))
-        zone_id = min(dists)
-        return nearest[dists.index(zone_id)]
+            dists[geo.distance(geometry)] = zone_id
+        return dists[min(dists.keys())]
 
     def refresh_geo_index(self):
         self.__geo_index.reset()
