@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   linting:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - name: Set Python environment
@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
-        os: [windows-2019, ubuntu-20.04]
+        os: [windows-latest, ubuntu-latest]
 
       max-parallel: 20
     steps:
@@ -49,7 +49,7 @@ jobs:
         pip install -r tests/requirements_tests.txt
 
     - name: Download spatialite on Linux
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
@@ -58,7 +58,7 @@ jobs:
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Download spatialite on Windows
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-latest'
       run:  python tests/setup_windows_spatialite.py
 
     - name: Compile library
