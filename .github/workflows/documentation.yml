@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
     env:
@@ -22,14 +22,16 @@ jobs:
         python-version: 3.9
     - name: Install dependencies
       run: |
+        sudo apt update
+        sudo apt upgrade
         python -m pip install --upgrade pip
         pip install wheel openmatrix
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
         python -m pip install sphinx-gallery --user
-        sudo apt-get install libsqlite3-mod-spatialite
-        sudo apt-get install -y libspatialite-dev
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Check history of versions
