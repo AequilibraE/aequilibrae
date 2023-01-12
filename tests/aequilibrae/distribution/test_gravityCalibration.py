@@ -35,7 +35,6 @@ matrix.computational_view(["base_matrix"])
 
 
 class TestGravityCalibration(TestCase):
-
     def test_calibrate(self):
         par = Parameters()
 
