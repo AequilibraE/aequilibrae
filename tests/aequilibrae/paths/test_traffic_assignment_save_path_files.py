@@ -110,10 +110,8 @@ class TestTrafficAssignmentPathFiles(TestCase):
                 o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
                 this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
                 ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
-                is_eq = this_o_path_file == ref_this_o_path_file
-                self.assertTrue(is_eq.all().all())
+                pd.testing.assert_frame_equal(ref_this_o_path_file, this_o_path_file)
 
                 this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
                 ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
-                is_eq = this_o_index_file == ref_this_o_index_file
-                self.assertTrue(is_eq.all().all())
+                pd.testing.assert_frame_equal(ref_this_o_index_file, this_o_index_file)

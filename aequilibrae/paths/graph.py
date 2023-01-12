@@ -126,7 +126,7 @@ class Graph(object):
 
         # We generate IDs that we KNOW will be constant across modes
         self.graph.sort_values(by=["link_id", "direction"], inplace=True)
-        self.graph.loc[:, "__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
+        self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
         self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
 
         self.num_links = self.graph.shape[0]
@@ -351,7 +351,7 @@ class Graph(object):
         df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
-        df.loc[:, "id"] = np.arange(df.shape[0])
+        df["id"] = np.arange(df.shape[0])
         fs = np.empty(num_nodes + 1, dtype=self.__integer_type)
         fs.fill(-1)
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
@@ -368,7 +368,7 @@ class Graph(object):
         df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
         df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
         df.loc[:, "link_id"] = df.link_id.values.astype(self.__integer_type)
-        df.loc[:, "direction"] = df.direction.values.astype(np.int8)
+        df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df
 

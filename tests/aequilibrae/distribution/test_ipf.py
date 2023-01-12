@@ -1,14 +1,14 @@
-from unittest import TestCase
 import os
-from shutil import copytree
 import uuid
+from shutil import copytree
 from tempfile import gettempdir
+from unittest import TestCase
+
 import numpy as np
 
 from aequilibrae import Project
 from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeData
-
 from ...data import siouxfalls_project
 
 
