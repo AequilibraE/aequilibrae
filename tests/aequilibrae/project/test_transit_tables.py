@@ -148,6 +148,7 @@ def test_create_trips_schedule_table(table: str, exp_column: list, create_projec
                 "description",
                 "street",
                 "fare_zone_id",
+                "transit_zone",
                 "route_type",
                 "geometry",
             ],

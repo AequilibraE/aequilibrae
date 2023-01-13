@@ -64,6 +64,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
+        self.__has_taz = 1 if len(self.geotool.zoning.all_zones()) > 0 else 0
         self.path_store = PathStorage()
 
         if file_path is not None:
@@ -279,10 +280,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for counter, (_, stop) in enumerate(self.select_stops.items()):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
-                closest_zone = self.geotool.zoning.get_closest_zone(stop.geo)
-                if stop.geo.within(self.geotool.zoning.get(closest_zone).geometry):
-                    stop.taz = closest_zone
-                stop.save_to_database(conn, commit=False)
+                if self.__has_taz:
+                    closest_zone = self.geotool.zoning.get_closest_zone(stop.geo)
+                    if stop.geo.within(self.geotool.zoning.get(closest_zone).geometry):
+                        stop.taz = closest_zone
+                    stop.save_to_database(conn, commit=False)
                 if pyqt:
                     self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()
