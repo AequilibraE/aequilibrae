@@ -18,11 +18,11 @@ class MultiThreadedNetworkSkimming:
     def prepare(self, graph, results):
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
-        self.predecessors = np.zeros((results.nodes, results.cores), dtype=itype)
-        self.temporary_skims = np.zeros((results.nodes, results.num_skims, results.cores), dtype=ftype)
-        self.reached_first = np.zeros((results.nodes, results.cores), dtype=itype)
-        self.connectors = np.zeros((results.nodes, results.cores), dtype=itype)
-        self.temp_b_nodes = np.zeros((graph.compact_graph.b_node.values.shape[0], results.cores), dtype=itype)
+        self.predecessors = np.zeros((results.cores, results.nodes), dtype=itype)
+        self.temporary_skims = np.zeros((results.cores, results.nodes, results.num_skims), dtype=ftype)
+        self.reached_first = np.zeros((results.cores, results.nodes), dtype=itype)
+        self.connectors = np.zeros((results.cores, results.nodes), dtype=itype)
+        self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.values.shape[0]), dtype=itype)
 
         for i in range(results.cores):
-            self.temp_b_nodes[:, i] = graph.compact_graph.b_node.values[:]
+            self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]

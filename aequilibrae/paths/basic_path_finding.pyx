@@ -13,8 +13,8 @@
  Copyright:   (c) AequilibraE authors
  Licence:     See LICENSE.TXT
  -----------------------------------------------------------------------------------------------------------
-Original Algorithm for Shortest path (Dijkstra with a Fibonacci heap) was written by Jake Vanderplas <vanderplas@astro.washington.edu> under license: BSD, (C) 2012
- """
+Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
+"""
 
 """
 TODO:
@@ -23,10 +23,11 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport isnan
+from libc.math cimport isnan, INFINITY
 
-include 'parameters.pxi'
-from libc.stdlib cimport abort, malloc, free
+from libc.stdlib cimport malloc, free
+
+include 'pq_4ary_heap.pyx'
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -195,7 +196,7 @@ cdef void skim_single_path(long origin,
     # sets all skims to infinity
     for i in range(nodes):
         for j in range(skims):
-            node_skims[i, j] = INFINITE
+            node_skims[i, j] = INFINITY
 
     # Zeroes the intrazonal cost
     for j in range(skims):
@@ -232,7 +233,7 @@ cpdef void skim_multiple_fields(long origin,
     # sets all skims to infinity
     for i in range(nodes):
         for j in range(skims):
-            node_skims[i, j] = INFINITE
+            node_skims[i, j] = INFINITY
 
     # Zeroes the intrazonal cost
     for j in range(skims):
@@ -253,12 +254,10 @@ cpdef void skim_multiple_fields(long origin,
         for j in range(skims):
             final_skims[i, j] = node_skims[i, j]
 
-
 # ###########################################################################################################################
 #############################################################################################################################
-#Original Dijkstra implementation by Jake Vanderplas, taken from SciPy V0.11
-#The old Pyrex syntax for loops was replaced with Python syntax
-#Old Numpy Buffers were replaces with latest memory views interface to allow for the release of the GIL
+# Original Dijkstra implementation by François Pacull, taken from https://github.com/Edsger-dev/priority_queues
+# Old Numpy Buffers were replaces with latest memory views interface to allow for the release of the GIL
 # Path tracking arrays and skim arrays were also added to it
 #############################################################################################################################
 # ###########################################################################################################################
@@ -278,262 +277,49 @@ cpdef int path_finding(long origin,
     cdef unsigned int N = graph_costs.shape[0]
     cdef unsigned int M = pred.shape[0]
 
-    cdef long i, k, j_source, j_current
-    cdef ITYPE_t found = 0
-    cdef long j
-    cdef DTYPE_t weight
 
-    cdef FibonacciHeap heap
-    cdef FibonacciNode *v
-    cdef FibonacciNode *current_node
-    cdef FibonacciNode *nodes = <FibonacciNode*> malloc(N * sizeof(FibonacciNode))
+    cdef:
+        size_t tail_vert_idx, head_vert_idx, idx  # indices
+        DTYPE_t tail_vert_val, head_vert_val  # vertex travel times
+        PriorityQueue pqueue  # binary heap
+        ElementState vert_state  # vertex state
+        size_t origin_vert = <size_t>origin
+        ITYPE_t found = 0
 
     for i in range(M):
         pred[i] = -1
         connectors[i] = -1
         reached_first[i] = -1
 
-    j_source = origin
-    for k in range(N):
-        initialize_node(&nodes[k], k)
+    # initialization of the heap elements
+    # all nodes have INFINITY key and NOT_IN_HEAP state
+    init_heap(&pqueue, <size_t>N)
 
-    heap.min_node = NULL
-    insert_node(&heap, &nodes[j_source])
+    # the key is set to zero for the origin vertex,
+    # which is inserted into the heap
+    insert(&pqueue, origin_vert, 0.0)
 
-    while heap.min_node:
-        v = remove_min(&heap)
-        reached_first[found] = v.index
+    # main loop
+    while pqueue.size > 0:
+        tail_vert_idx = extract_min(&pqueue)
+        tail_vert_val = pqueue.Elements[tail_vert_idx].key
+        reached_first[found] = tail_vert_idx
         found += 1
-        v.state = 1
 
-        for j in range(graph_fs[v.index],graph_fs[v.index + 1]):
-            j_current = csr_indices[j]
-            current_node = &nodes[j_current]
+        # loop on outgoing edges
+        for idx in range(<size_t>graph_fs[tail_vert_idx], <size_t>graph_fs[tail_vert_idx + 1]):
+            head_vert_idx = <size_t>csr_indices[idx]
+            vert_state = pqueue.Elements[head_vert_idx].state
+            if vert_state != SCANNED:
+                head_vert_val = tail_vert_val + graph_costs[idx]
+                if vert_state == NOT_IN_HEAP:
+                    insert(&pqueue, head_vert_idx, head_vert_val)
+                    pred[head_vert_idx] = tail_vert_idx
+                    connectors[head_vert_idx] = ids[idx]
+                elif pqueue.Elements[head_vert_idx].key > head_vert_val:
+                    decrease_key(&pqueue, head_vert_idx, head_vert_val)
+                    pred[head_vert_idx] = tail_vert_idx
+                    connectors[head_vert_idx] = ids[idx]
 
-            if current_node.state != 1:
-                weight = graph_costs[j]
-                if current_node.state == 2:
-                    current_node.state = 3
-                    current_node.val = v.val + weight
-                    insert_node(&heap, current_node)
-                    pred[j_current] = v.index
-                    connectors[j_current] = ids[j]
-
-                elif current_node.val > v.val + weight:
-                    decrease_val(&heap, current_node, v.val + weight)
-                    pred[j_current] = v.index
-                    #The link that took us to such node
-                    connectors[j_current] = ids[j]
-
-    free(nodes)
-    return found -1
-
-######################################################################
-# FibonacciNode structure
-#  This structure and the operations on it are the nodes of the
-#  Fibonacci heap.
-
-#cdef enum FibonacciState:
-#    SCANNED=1
-#    NOT_IN_HEAP=2
-#    IN_HEAP=3
-
-cdef struct FibonacciNode:
-    ITYPE_t index
-    unsigned int rank
-    #FibonacciState state
-    unsigned int state
-    DTYPE_t val
-    FibonacciNode* parent
-    FibonacciNode* left_sibling
-    FibonacciNode* right_sibling
-    FibonacciNode* children
-
-cdef void initialize_node(FibonacciNode* node,
-                          unsigned int index,
-                          double val=0) nogil:
-    # Assumptions: - node is a valid pointer
-    #              - node is not currently part of a heap
-    node.index = index
-    node.val = val
-    node.rank = 0
-    node.state = 2
-    node.parent = NULL
-    node.left_sibling = NULL
-    node.right_sibling = NULL
-    node.children = NULL
-
-cdef FibonacciNode* rightmost_sibling(FibonacciNode* node) nogil:
-    # Assumptions: - node is a valid pointer
-    cdef FibonacciNode* temp = node
-    while(temp.right_sibling):
-        temp = temp.right_sibling
-    return temp
-
-cdef FibonacciNode* leftmost_sibling(FibonacciNode* node) nogil:
-    # Assumptions: - node is a valid pointer
-    cdef FibonacciNode* temp = node
-    while(temp.left_sibling):
-        temp = temp.left_sibling
-    return temp
-
-cdef void add_child(FibonacciNode* node, FibonacciNode* new_child) nogil:
-    # Assumptions: - node is a valid pointer
-    #              - new_child is a valid pointer
-    #              - new_child is not the sibling or child of another node
-    new_child.parent = node
-
-    if node.children:
-        add_sibling(node.children, new_child)
-    else:
-        node.children = new_child
-        new_child.right_sibling = NULL
-        new_child.left_sibling = NULL
-        node.rank = 1
-
-cdef void add_sibling(FibonacciNode* node, FibonacciNode* new_sibling) nogil:
-    # Assumptions: - node is a valid pointer
-    #              - new_sibling is a valid pointer
-    #              - new_sibling is not the child or sibling of another node
-    cdef FibonacciNode* temp = rightmost_sibling(node)
-    temp.right_sibling = new_sibling
-    new_sibling.left_sibling = temp
-    new_sibling.right_sibling = NULL
-    new_sibling.parent = node.parent
-    if new_sibling.parent:
-        new_sibling.parent.rank += 1
-
-cdef void remove(FibonacciNode* node) nogil:
-    # Assumptions: - node is a valid pointer
-    if node.parent:
-        node.parent.rank -= 1
-        if node.left_sibling:
-            node.parent.children = node.left_sibling
-        elif node.right_sibling:
-            node.parent.children = node.right_sibling
-        else:
-            node.parent.children = NULL
-
-    if node.left_sibling:
-        node.left_sibling.right_sibling = node.right_sibling
-    if node.right_sibling:
-        node.right_sibling.left_sibling = node.left_sibling
-
-    node.left_sibling = NULL
-    node.right_sibling = NULL
-    node.parent = NULL
-
-
-######################################################################
-# FibonacciHeap structure
-#  This structure and operations on it use the FibonacciNode
-#  routines to implement a Fibonacci heap
-
-ctypedef FibonacciNode* pFibonacciNode
-
-cdef struct FibonacciHeap:
-    FibonacciNode* min_node
-    pFibonacciNode[100] roots_by_rank  # maximum number of nodes is ~2^100.
-
-cdef void insert_node(FibonacciHeap* heap,
-                      FibonacciNode* node) nogil:
-    # Assumptions: - heap is a valid pointer
-    #              - node is a valid pointer
-    #              - node is not the child or sibling of another node
-    if heap.min_node:
-        add_sibling(heap.min_node, node)
-        if node.val < heap.min_node.val:
-            heap.min_node = node
-    else:
-        heap.min_node = node
-
-cdef void decrease_val(FibonacciHeap* heap,
-                       FibonacciNode* node,
-                       DTYPE_t newval) nogil:
-    # Assumptions: - heap is a valid pointer
-    #              - newval <= node.val
-    #              - node is a valid pointer
-    #              - node is not the child or sibling of another node
-    #              - node is in the heap
-    node.val = newval
-    if node.parent and (node.parent.val >= newval):
-        remove(node)
-        insert_node(heap, node)
-    elif heap.min_node.val > node.val:
-        heap.min_node = node
-
-cdef void link(FibonacciHeap* heap, FibonacciNode* node) nogil:
-    # Assumptions: - heap is a valid pointer
-    #              - node is a valid pointer
-    #              - node is already within heap
-
-    cdef FibonacciNode *linknode
-    cdef FibonacciNode *parent
-    cdef FibonacciNode *child
-
-    if heap.roots_by_rank[node.rank] == NULL:
-        heap.roots_by_rank[node.rank] = node
-    else:
-        linknode = heap.roots_by_rank[node.rank]
-        heap.roots_by_rank[node.rank] = NULL
-
-        if node.val < linknode.val or node == heap.min_node:
-            remove(linknode)
-            add_child(node, linknode)
-            link(heap, node)
-        else:
-            remove(node)
-            add_child(linknode, node)
-            link(heap, linknode)
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False) # turn of bounds-checking for entire function
-cdef FibonacciNode* remove_min(FibonacciHeap* heap) nogil:
-    # Assumptions: - heap is a valid pointer
-    #              - heap.min_node is a valid pointer
-    cdef FibonacciNode *temp
-    cdef FibonacciNode *temp_right
-    cdef FibonacciNode *out
-    cdef unsigned int i
-
-    # make all min_node children into root nodes
-    if heap.min_node.children:
-        temp = leftmost_sibling(heap.min_node.children)
-        temp_right = NULL
-
-        while temp:
-            temp_right = temp.right_sibling
-            remove(temp)
-            add_sibling(heap.min_node, temp)
-            temp = temp_right
-
-        heap.min_node.children = NULL
-
-    # choose a root node other than min_node
-    temp = leftmost_sibling(heap.min_node)
-    if temp == heap.min_node:
-        if heap.min_node.right_sibling:
-            temp = heap.min_node.right_sibling
-        else:
-            out = heap.min_node
-            heap.min_node = NULL
-            return out
-
-    # remove min_node, and point heap to the new min
-    out = heap.min_node
-    remove(heap.min_node)
-    heap.min_node = temp
-
-    # re-link the heap
-    for i in range(100):
-        heap.roots_by_rank[i] = NULL
-
-    while temp:
-        if temp.val < heap.min_node.val:
-            heap.min_node = temp
-        temp_right = temp.right_sibling
-        link(heap, temp)
-        temp = temp_right
-
-    return out
+    free_heap(&pqueue)
+    return found - 1

@@ -85,7 +85,7 @@ class AequilibraeMatrix(object):
         self.description = ""
         self.current_index = None
         self.__omx = False
-        self.__memory_only = False
+        self.__memory_only = True
         self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
 
@@ -128,7 +128,7 @@ class AequilibraeMatrix(object):
         data_type: np.dtype = np.float64,
         index_names: List[str] = None,
         compressed: bool = False,
-        memory_only: bool = False,
+        memory_only: bool = True,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -257,7 +257,7 @@ class AequilibraeMatrix(object):
         mappings: List[str] = None,
         robust: bool = True,
         compressed: bool = False,
-        memory_only: bool = False,
+        memory_only: bool = True,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -759,7 +759,7 @@ class AequilibraeMatrix(object):
             cores = self.names
 
         if file_extension == ".AEM":
-            self.copy(output_name=output_name, cores=cores)
+            self.copy(output_name=output_name, cores=cores, memory_only=False)
 
         elif file_extension == ".OMX":
             omx_export = omx.open_file(output_name, "w")
@@ -880,7 +880,7 @@ class AequilibraeMatrix(object):
         cores: List[str] = None,
         names: List[str] = None,
         compress: bool = None,
-        memory_only: bool = False,
+        memory_only: bool = True,
     ):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
