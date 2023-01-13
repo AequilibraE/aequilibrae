@@ -9,14 +9,11 @@ from tempfile import gettempdir
 from typing import Optional
 from zipfile import ZipFile
 from aequilibrae.utils.db_utils import has_table, safe_connect
-
-inside_qgis = False
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 
 def is_windows():
     return os.name == "nt"
-
-
 def is_not_windows():
     return os.name != "nt"
 
