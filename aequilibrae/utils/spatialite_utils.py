@@ -4,12 +4,21 @@ import shutil
 import urllib
 from os.path import join, basename
 from pathlib import Path
-from sqlite3 import Connection
+from sqlite3 import Connection, register_adapter
 from tempfile import gettempdir
 from typing import Optional
 from zipfile import ZipFile
 from aequilibrae.utils.db_utils import has_table, safe_connect
 from aequilibrae.utils.qgis_utils import inside_qgis
+
+import numpy as np
+
+# Setup adapaters so that we can read/write numpy types directly to DB
+register_adapter(np.int64, int)
+register_adapter(np.int32, int)
+register_adapter(np.float32, float)
+register_adapter(np.float64, float)
+register_adapter(np.object0, str)
 
 
 def is_windows():
@@ -50,8 +59,10 @@ def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
     if not _dll_already_exists(directory):
         _download_and_extract_spatialite(directory)
 
-    if directory not in os.environ["PATH"] or "PROJ_LIB" not in os.environ:
+    # Update path and proj_lib env vars
+    if directory not in os.environ["PATH"]:
         os.environ["PATH"] = directory + os.pathsep + os.environ["PATH"]
+    if "PROJ_LIB" not in os.environ:
         os.environ["PROJ_LIB"] = directory
 
     # We need to have the proj.db file in place.
