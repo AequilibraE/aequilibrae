@@ -2,16 +2,19 @@ import logging
 import os
 import shutil
 import urllib
+import warnings
 from os.path import join, basename
 from pathlib import Path
 from sqlite3 import Connection, register_adapter
 from tempfile import gettempdir
 from typing import Optional
 from zipfile import ZipFile
-from aequilibrae.utils.db_utils import has_table, safe_connect
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 import numpy as np
+
+from aequilibrae.log import global_logger
+from aequilibrae.utils.db_utils import has_table, safe_connect
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 # Setup adapaters so that we can read/write numpy types directly to DB
 register_adapter(np.int64, int)
@@ -65,15 +68,20 @@ def ensure_spatialite_binaries(directory: Optional[os.PathLike] = None) -> None:
     if "PROJ_LIB" not in os.environ:
         os.environ["PROJ_LIB"] = directory
 
-    # We need to have the proj.db file in place.
-    # The easiest one on Windows is in the public user. On Linux it should not be necessary
-    # See why: https://www.gaia-gis.it/fossil/libspatialite/wiki?name=PROJ.6
-    projdb_dir = "C:/Users/Public/spatialite/proj"
-    Path(projdb_dir).mkdir(parents=True, exist_ok=True)
-    if os.path.isfile(join(projdb_dir, "proj.db")):
-        return
+    try:
+        # We need to have the proj.db file in place.
+        # The easiest one on Windows is in the public user. On Linux it should not be necessary
+        # See why: https://www.gaia-gis.it/fossil/libspatialite/wiki?name=PROJ.6
+        projdb_dir = "C:/Users/Public/spatialite/proj"
+        Path(projdb_dir).mkdir(parents=True, exist_ok=True)
+        if os.path.isfile(join(projdb_dir, "proj.db")):
+            return
 
-    shutil.copyfile(join(directory, "proj.db"), join(projdb_dir, "proj.db"))
+        shutil.copyfile(join(directory, "proj.db"), join(projdb_dir, "proj.db"))
+    except Exception as e:
+        msg = f"Could not put the proj.db file in the expected place. {e.args}"
+        warnings.warn(msg)
+        global_logger.warning(msg)
 
 
 def _dll_already_exists(d: os.PathLike) -> bool:
