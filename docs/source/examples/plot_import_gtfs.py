@@ -88,9 +88,7 @@ Now we will plot the route we just imported into our model!
 """
 cnx = database_connection("transit")
 
-links = pd.read_sql(
-    "SELECT seq, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx
-)
+links = pd.read_sql("SELECT seq, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx)
 
 stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=cnx)
 
