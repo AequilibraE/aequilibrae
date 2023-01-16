@@ -10,8 +10,8 @@ import pandas as pd
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .haversine import haversine
-from ..spatialite_connection import spatialite_connection
 from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
@@ -52,11 +52,7 @@ class OSMBuilder(WorkerThread):
             self.building.emit(*args)
 
     def doWork(self):
-        if isqgis:
-            self.conn = qgis.utils.spatialite_connect(self.path)
-        else:
-            conn = sqlite3.connect(self.path)
-            self.conn = spatialite_connection(conn)
+        self.conn = connect_spatialite(self.path)
         self.curr = self.conn.cursor()
         self.__worksetup()
         node_count = self.data_structures()
