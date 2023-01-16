@@ -42,7 +42,17 @@ class TestSelectLink(TestCase):
 
         self.assignclass.set_select_links([(9, 1), (6, 1)])
 
-        self.assigment.set_classes([self.assignclass])
+        self.assignment.set_classes([self.assignclass])
+
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+
+        self.assignment.max_iter = 2
+        self.assignment.set_algorithm("msa")
 
         self.assignment.execute()
 
