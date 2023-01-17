@@ -56,6 +56,7 @@ class TestSelectLink(TestCase):
 
         self.assignment.execute()
 
+        print(self.car_graph.compact_graph)
         self.assertTrue(False)
         self.assertTrue(self.assignclass._sl_results is not None)
         # _sl_results.matricies == {(9, 1): AequilibraeMatrix(), (6, 1): AequilibraeMatrix()}

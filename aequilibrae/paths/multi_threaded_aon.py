@@ -36,5 +36,4 @@ class MultiThreadedAoN:
         self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.shape[0]), dtype=itype)
         for i in range(results.cores):
             self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]
-        self.select_link_mask = np.zeros((results.compact_nodes, results.compact_nodes), dtype=itype)
-        print("results.compact_nodes:", results.compact_nodes)
+        self.select_link_mask = results.select_link

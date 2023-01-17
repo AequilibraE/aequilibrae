@@ -40,7 +40,7 @@ class AssignmentResults:
         self.classes = {"number": 1, "names": ["flow"]}
 
         self.selected_links = []
-        self.select_links = AequilibraeMatrix()
+        self.select_link = AequilibraeMatrix()
 
         self.nodes = -1
         self.zones = -1
@@ -102,6 +102,22 @@ class AssignmentResults:
             self.__graph_ids = graph.graph.__supernet_id__.values
             self.__redim()
             self.__graph_id__ = graph.__id__
+
+        print("preparing assignment results select links:", self.selected_links)
+        if self.selected_links:
+            direction = {1: "ab", -1: "ba"}
+            self.select_link = AequilibraeMatrix()
+            names = [f"sl_{link_id}_{direction[link_dir]}" for link_id, link_dir in self.selected_links]
+            self.select_link.create_empty(
+                memory_only=True,
+                zones=matrix.zones,
+                matrix_names=names,
+                index_names=matrix.index_names
+            )
+            self.select_link.indices[:, :] = matrix.indices[:, :]
+            for name in names:
+                self.select_link.matrix[name] = \
+                    np.zeros((graph.compact_num_nodes, graph.compact_num_nodes), dtype=graph.default_types("int"))
 
     def reset(self) -> None:
         """

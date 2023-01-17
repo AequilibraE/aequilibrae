@@ -74,6 +74,7 @@ def one_to_all(origin, matrix, graph, result,
     # views from the result object
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
 
+    print("Hello")
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
     cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
@@ -83,6 +84,7 @@ def one_to_all(origin, matrix, graph, result,
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
     cdef long long [:] select_link_mask = aux_result.select_link_mask[origin - 1 , :]
 
+    print("writing into array")
     with nogil:
         select_link_mask[2] = 5
     # path saving file paths
@@ -158,6 +160,7 @@ def one_to_all(origin, matrix, graph, result,
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
+    print(result.selected_links)
     if result.selected_links:
         print("searching for:", result.selected_links)
         # TODO: iterate through the destinations
