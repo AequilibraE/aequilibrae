@@ -105,35 +105,27 @@ cdef return_an_int_view(input):
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void perform_select_link_analysis(long origin,
-                                        int classes,
-                                        double[:, :] demand,
+cdef void perform_select_link_analysis(long origin,
+                                        int [:] selected_links,
+                                        double[:] demand,
                                         long long [:] pred,
                                         long long [:] conn,
-                                        long long [:] aux_link_flows,
-                                        double [:, :] critical_array,
-                                        int query_type) nogil:
+                                        double [:, :] sl_mask) nogil:
+
     cdef unsigned int t_origin
     cdef ITYPE_t c, j, i, p, l
     cdef unsigned int dests = demand.shape[0]
-    cdef unsigned int q = critical_array.shape[0]
-
+    cdef long predecessor
     """ TODO:
     FIX THE SELECT LINK ANALYSIS FOR MULTIPLE CLASSES"""
-    l = 0
     for j in range(dests):
-        if demand[j, l] > 0:
-            p = pred[j]
-            j = i
-            while p >= 0:
-                c = conn[j]
-                aux_link_flows[c] = 1
-                j = p
-                p = pred[j]
-        if query_type == 1: # Either one of the links in the query
-            for i in range(q):
-                if aux_link_flows[i] == 1:
-                    critical_array
+        while predecessor != origin:
+            predecessor = pred[predecessor]
+            connection = conn[predecessor]
+
+        for i in range(selected_links.shape[0]):
+            lid = selected_links[i]
+            sl_mask[origin, j] = demand[j]
 
 
 @cython.wraparound(False)
