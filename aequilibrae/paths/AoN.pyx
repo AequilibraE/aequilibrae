@@ -17,7 +17,9 @@ include 'path_file_saving.pyx'
 from .__version__ import binary_version as VERSION_COMPILED
 
 # TODO: pass in the selected links
-def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
+def one_to_all(origin, matrix, graph, result,
+               aux_result, curr_thread):
+    # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
     cdef int critical_queries = 0
     cdef int path_file = 0
