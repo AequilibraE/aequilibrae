@@ -350,14 +350,10 @@ class LinearApproximation(WorkerThread):
             c._aon_results.prepare(c.graph, c.matrix)
             c.results.reset()
 
-            c._aon_results.selected_links = c.selected_links
-
-            # for link, direction in c.selected_links:
-            #     tmp = c.graph.compact_graph.loc[(c.graph.compact_graph["id"] == link) & c.graph.compact_graph["direction"] == direction]["link_id"]
-                # c._aon_results.selected_links.append()
-                # print(tmp)
-
-
+            # Prep for select link
+            # mapping of traffic class to the respective link_set to temp output matrix
+            for link_set in c.selected_links:
+                c._aon_results._selected_links[link_set] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("int"))
 
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
@@ -398,9 +394,11 @@ class LinearApproximation(WorkerThread):
                 c._aon_results.total_flows()
 
                 if c.selected_links:
+                    for name in c._aon_results.select_link.names:
+                        c._aon_results.select_link.matrix[name] = aon.aux_res.select_link_mask
                     pass
                 aon_flows.append(c._aon_results.total_link_loads)
-                print(c._aon_results.select_link.matrix.values())
+                # print(c._aon_results.select_link.matrix.values())
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 

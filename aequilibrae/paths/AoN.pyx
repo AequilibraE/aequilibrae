@@ -160,9 +160,9 @@ def one_to_all(origin, matrix, graph, result,
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
-    print(result.selected_links)
-    if result.selected_links:
-        print("searching for:", result.selected_links)
+    if result._selected_links:
+        for link_set, output_matrix in result._selected_links.items():
+            print("searching for:", link_set, output_matrix.shape)
         # TODO: iterate through the destinations
         # for each destination walk the minimum spanning tree back to the origin checking if
         # any link we find is part our of selected links, if so write out to the mask and move to the next destination

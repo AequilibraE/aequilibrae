@@ -40,7 +40,10 @@ class TestSelectLink(TestCase):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
 
-        self.assignclass.set_select_links([(9, 1), (6, 1)])
+        self.assignclass.set_select_links(
+            [[(9, 1), (6, 1)],
+             [(3, 1)]]
+        )
 
         self.assignment.set_classes([self.assignclass])
 
