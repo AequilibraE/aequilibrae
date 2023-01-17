@@ -39,6 +39,9 @@ class AssignmentResults:
 
         self.classes = {"number": 1, "names": ["flow"]}
 
+        self.selected_links = []
+        self.select_links = AequilibraeMatrix()
+
         self.nodes = -1
         self.zones = -1
         self.links = -1

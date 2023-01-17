@@ -350,6 +350,7 @@ class LinearApproximation(WorkerThread):
             c._aon_results.prepare(c.graph, c.matrix)
             c.results.reset()
 
+            c._aon_results.selected_links = c.selected_links
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
@@ -387,7 +388,16 @@ class LinearApproximation(WorkerThread):
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
+
+                if c.selected_links:
+                    sl = c._aon_results.select_links
+                    sl.create_empty(file_name=sl.random_name(), matrix_names=["select link"])
+                    sl.matrix = {}
+                    sl.matrix["select link"] = aon.aux_res.select_link_mask  # FIXME: Not entirely should this is the correct
+                    # way to write into the aeq matrix
+
                 aon_flows.append(c._aon_results.total_link_loads)
+                print(aon.aux_res.select_link_mask)
 
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 

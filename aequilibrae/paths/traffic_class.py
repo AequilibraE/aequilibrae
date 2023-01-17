@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
@@ -45,6 +45,7 @@ class TrafficClass:
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self._aon_results = AssignmentResults()
+        self.selected_links = []
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
@@ -86,6 +87,9 @@ class TrafficClass:
 
         self.vot = float(value_of_time)
 
+    def set_select_links(self, links: List[int]):
+        self.selected_links = links
+
     def __setattr__(self, key, value):
 
         if key not in [
@@ -102,6 +106,7 @@ class TrafficClass:
             "fixed_cost",
             "fc_multiplier",
             "fixed_cost_field",
+            "selected_links",
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
