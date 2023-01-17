@@ -110,12 +110,25 @@ cdef void perform_select_link_analysis(long origin,
                                         double[:] demand,
                                         long long [:] pred,
                                         long long [:] conn,
-                                        double [:, :] sl_mask) nogil:
+                                        double [:, :] sl_od_loading,
+                                        double [:, :] sl_link_loading) nogil:
+# origin: Origin of the path
+# demand: Demand matrix of size Origins x Destinations. Stores the loading on the given pair
+# pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
+# conn: Stores the link connecting the given index to its next?/previous node
+# sl_od_loading: Origin x Destination size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
+# sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
+# NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
+# selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
 
     cdef unsigned int t_origin
     cdef ITYPE_t c, j, i, p, l
     cdef unsigned int dests = demand.shape[0]
     cdef long predecessor
+    cdef flows_prior
+    cdef flows_current
+
+
     """ TODO:
     FIX THE SELECT LINK ANALYSIS FOR MULTIPLE CLASSES"""
     for j in range(dests):
@@ -125,7 +138,8 @@ cdef void perform_select_link_analysis(long origin,
 
         for i in range(selected_links.shape[0]):
             lid = selected_links[i]
-            sl_mask[origin, j] = demand[j]
+            if flows_prior != flows_current:
+                sl_mask[origin, j] = demand[j]
 
 
 @cython.wraparound(False)
