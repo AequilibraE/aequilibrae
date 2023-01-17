@@ -23,6 +23,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
+cimport numpy as cnp
 from libc.math cimport isnan, INFINITY
 
 from libc.stdlib cimport malloc, free
@@ -111,36 +112,43 @@ cdef void perform_select_link_analysis(long origin,
                                         long long [:] pred,
                                         long long [:] conn,
                                         double [:, :] sl_od_loading,
-                                        double [:, :] sl_link_loading) nogil:
+                                        double [:, :] sl_link_loading,
+                                       double [:] tmp_flow) nogil:
 # origin: Origin of the path
 # demand: Demand matrix of size Origins x Destinations. Stores the loading on the given pair
 # pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
 # conn: Stores the link connecting the given index to its next?/previous node
 # sl_od_loading: Origin x Destination size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
 # sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
+#Dimension: num_links by 1
 # NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
 # selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
-
+#tmp flow: array of zeros as long as the number of links in compressed graph
     cdef unsigned int t_origin
     cdef ITYPE_t c, j, i, p, l
     cdef unsigned int dests = demand.shape[0]
     cdef long predecessor
-    cdef flows_prior
-    cdef flows_current
-
-
     """ TODO:
     FIX THE SELECT LINK ANALYSIS FOR MULTIPLE CLASSES"""
     for j in range(dests):
+        #Walk paths back to origin, execute network loading on the way
+        #reset the path loading
+        for i in range(tmp_flow.shape[0]):
+            tmp_flow[i] = 0
         while predecessor != origin:
             predecessor = pred[predecessor]
             connection = conn[predecessor]
+            tmp_flow[connection] += demand[j]
 
         for i in range(selected_links.shape[0]):
             lid = selected_links[i]
-            if flows_prior != flows_current:
-                sl_mask[origin, j] = demand[j]
-
+            if tmp_flow[lid] != 0:
+                sl_od_loading[origin, j] = demand[j]
+                for link in range(sl_link_loading.shape[0]):
+                    sl_link_loading[link] += tmp_flow[link]
+                #once at least one link in the set is shown to be in the current destination, the load along that path is added.
+                #There is no need to check the remaining links - this would add extra demand that isn't there
+                break
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
