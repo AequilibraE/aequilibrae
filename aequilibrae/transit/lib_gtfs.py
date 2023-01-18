@@ -284,7 +284,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                     closest_zone = self.geotool.zoning.get_closest_zone(stop.geo)
                     if stop.geo.within(self.geotool.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
-                    stop.save_to_database(conn, commit=False)
+                stop.save_to_database(conn, commit=False)
                 if pyqt:
                     self.signal.emit(["update", "secondary", counter + 1, st, self.__mt])
             conn.commit()

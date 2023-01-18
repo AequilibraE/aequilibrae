@@ -10,10 +10,10 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # %%
 ## Imports
 from uuid import uuid4
-import os
+from os import remove
+from os.path import dirname, join
 from tempfile import gettempdir
 
-import urllib
 import folium
 import pandas as pd
 from aequilibrae.project.database_connection import database_connection
@@ -23,7 +23,7 @@ from aequilibrae.utils.create_example import create_example
 
 """Let's create an empty project on an arbitrary folder."""
 # %%
-fldr = os.path.join(gettempdir(), uuid4().hex)
+fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr, "coquimbo")
 
@@ -32,15 +32,12 @@ As Coquimbo example already has a complete GTFS model, we shall remove its publi
 database for the sake of this example.
 """
 # %%
-os.remove(os.path.join(fldr, "public_transport.sqlite"))
+remove(join(fldr, "public_transport.sqlite"))
 
-"""Let's download the GTFS feed."""
+"""Let's import the GTFS feed."""
 # %%
-dest_path = os.path.join(fldr, "coquimbo.zip")
-urllib.request.urlretrieve(
-    "http://datos.gob.cl/dataset/c77c9a50-6dd1-449d-b5ab-947ec0139b31/resource/a4edcf07-0657-456d-bbbc-54b2aec1de8d/download/coquimbo10feb16.zip",
-    dest_path,
-)
+
+dest_path = join(dirname(dirname(dirname("tests"))), "tests/data/gtfs/gtfs_coquimbo.zip")
 
 """
 Now we create our Transit object and import the GTFS feed into our model.
@@ -59,17 +56,6 @@ It should take approximately 2 minutes to load the data.
 """
 # %%
 transit.load_date("2016-04-13")
-
-"""
-To be less time consuming, we will edit the existing routes and patterns. 
-We'll consider two patterns associated with a single route.
-If you are interested and have more time, please feel free to skip this cell and move on to map-matching.
-"""
-# %%
-transit.select_patterns = {
-    10023001000: transit.select_patterns[10023001000],
-    10023002000: transit.select_patterns[10023002000],
-}
 
 """
 Now we execute the map matching to find the real paths.
