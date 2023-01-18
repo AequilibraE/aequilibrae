@@ -107,7 +107,7 @@ cdef return_an_int_view(input):
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef void perform_select_link_analysis(long origin,
-                                        int [:] selected_links,
+                                        long long [:] selected_links,
                                         double[:, :] demand,
                                         long long [:] pred,
                                         long long [:] conn,
@@ -127,7 +127,7 @@ cdef void perform_select_link_analysis(long origin,
 #tmp flow: array of zeros as long as the number of links in compressed graph
     cdef:
         unsigned int i, j, k, idx, dests = demand.shape[0]
-        long predecessor, connection, lid, link
+        long long predecessor, connection, lid, link
 
     for j in range(dests):
         #Walk paths back to origin, execute network loading on the way
