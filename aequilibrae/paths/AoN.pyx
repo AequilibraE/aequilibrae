@@ -99,6 +99,17 @@ def one_to_all(origin, matrix, graph, result,
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
+    if result._selected_links:
+        for link in result._selected_links.keys():
+            cdef int [:] selected_links_view = np.array(link, dtype=graph.default_types("int"))
+            #TODO: FIX, update views
+            cdef double[:] sl_od_loading_view = result._selected_links[link][0][origin, :, :]
+            cdef double [:] sl_link_loading_view = result._selected_links[link][1][origin, :, :]
+            cdef double[:] tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))
+            with nogil:
+                perform_select_link_analysis(origin, selected_links_view, demand_view, predecessors_view, conn_view,
+                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
+
 
 
     #Now we do all procedures with NO GIL

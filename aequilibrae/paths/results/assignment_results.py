@@ -115,7 +115,9 @@ class AssignmentResults:
             )
             # self.select_link.indices[:, :] = matrix.indices[:, :]
             for name in self._selected_link_names:  # maps name to output matrix
-                self.select_link.matrix[name] = np.zeros((graph.compact_num_nodes, graph.compact_num_nodes), dtype=graph.default_types("float"))
+                #TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
+                self.select_link.matrix[name] = np.zeros((graph.compact_num_nodes, graph.compact_num_nodes,
+                                                          matrix.shape()[2]), dtype=graph.default_types("float"))
 
     def reset(self) -> None:
         """

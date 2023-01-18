@@ -21,6 +21,7 @@ class MultiThreadedAoN:
         self.selected_links = {}
 
     # In case we want to do by hand, we can prepare each method individually
+    #TODO: reset with zeros instead of reallocating
     def prepare(self, graph, results):
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
