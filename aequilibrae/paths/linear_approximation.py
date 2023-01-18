@@ -350,13 +350,18 @@ class LinearApproximation(WorkerThread):
             # c._aon_results._selected_links = c._selected_links  # maps name to link_set
             c._aon_results._selected_link_names = list(c._selected_links.keys())
             for link_set in c._selected_links.values():  # maps link_set to temp matrix
-                c._aon_results._selected_links[link_set] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("float"))
+                c._aon_results._selected_links_od[link_set] = \
+                    np.zeros((c.graph.compact_num_nodes,
+                              c.graph.compact_num_nodes,
+                              c.results.classes["number"]),
+                             dtype=c.graph.default_types("float"))  # temp matrix for OD paris
+                c._aon_results._selected_links_loading[link_set] = \
+                    np.zeros((c.graph.compact_num_links, c.results.classes["number"]))  # temp matrix for link loading
 
             # Sizes the temporary objects used for the results
             c.results.prepare(c.graph, c.matrix)
             c._aon_results.prepare(c.graph, c.matrix)
             c.results.reset()
-
 
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
@@ -432,10 +437,18 @@ class LinearApproximation(WorkerThread):
                     if c._selected_links:
                         for name, link_set in c._selected_links.items():
                             print("doing linear comb for:", name)
+                            linear_combination_skims(
+                                c._aon_results.select_link_od.matrix[name],  # ouput matrix
+                                c._aon_results._selected_links_od[link_set],  # matrix 1
+                                c._aon_results.select_link_od.matrix[name],  # matrix 2 (previous iteration)
+                                self.stepsize,  # stepsize
+                                self.cores,  # core count
+                            )
+
                             linear_combination(
-                                c._aon_results.select_link.matrix[name],  # ouput matrix
-                                c._aon_results._selected_links[link_set],  # matrix 1
-                                c._aon_results.select_link.matrix[name],  # matrix 2 (previous iteration)
+                                c._aon_results.select_link_loading.matrix[name],  # ouput matrix
+                                c._aon_results._selected_links_loading[link_set],  # matrix 1
+                                c._aon_results.select_link_loading.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
                             )
