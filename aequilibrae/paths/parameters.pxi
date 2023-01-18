@@ -12,7 +12,7 @@ cdef DTYPE_t DTYPE_EPS = 1E-15
 # NULL_IDX is the index used in predecessor matrices to store a non-path
 cdef ITYPE_t NULL_IDX = 18446744073709551615
 
-VERSION = 0.7
-MINOR_VRSN = 7
-binary_version = "0.7.7"
-release_name = "Queluz"
+VERSION = 0.8
+MINOR_VRSN = 0
+binary_version = "0.8.0"
+release_name = "Rio de Janeiro"

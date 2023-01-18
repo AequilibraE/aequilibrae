@@ -364,5 +364,4 @@ system:
   driving side: right
   logging: true
   logging_directory: /temp/
-  spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp
