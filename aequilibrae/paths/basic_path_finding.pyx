@@ -127,7 +127,7 @@ cdef void perform_select_link_analysis(long origin,
 #tmp flow: array of zeros as long as the number of links in compressed graph
     cdef:
         unsigned int i, j, k, idx, dests = demand.shape[0]
-        long predecessor, lid, link
+        long predecessor, connection, lid, link
 
     for j in range(dests):
         #Walk paths back to origin, execute network loading on the way
@@ -145,7 +145,7 @@ cdef void perform_select_link_analysis(long origin,
         for k in range(classes):
             for i in range(selected_links.shape[0]):
                 lid = selected_links[i]
-                #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes, flow loop
+                #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
                 if tmp_flow[lid, k] != 0:
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):

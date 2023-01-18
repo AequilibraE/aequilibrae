@@ -48,9 +48,11 @@ def one_to_all(origin, matrix, graph, result,
 
     # In order to release the GIL for this procedure, we create all the
     # memory views we will need
-    cdef double [:, :] demand_view = matrix.matrix_view[origin_index, :, :]
     classes = matrix.matrix_view.shape[2]
+    cdef double [:, :] demand_view = matrix.matrix_view[origin_index, :, :]
+    print("matrix view is: ", matrix.matrix_view.shape)
 
+    print("classes are: ", classes)
     # views from the graph
     cdef long long [:] graph_fs_view = graph.compact_fs
     cdef double [:] g_view = graph.compact_cost
@@ -99,19 +101,6 @@ def one_to_all(origin, matrix, graph, result,
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
-    if result._selected_links:
-        for link in result._selected_links.keys():
-            cdef int [:] selected_links_view = np.array(link, dtype=graph.default_types("int"))
-            #TODO: FIX, update views
-            cdef double[:] sl_od_loading_view = result._selected_links[link][0][origin, :, :]
-            cdef double [:] sl_link_loading_view = result._selected_links[link][1][origin, :, :]
-            cdef double[:] tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))
-            with nogil:
-                perform_select_link_analysis(origin, selected_links_view, demand_view, predecessors_view, conn_view,
-                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
-
-
-
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -154,6 +143,7 @@ def one_to_all(origin, matrix, graph, result,
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
+
         if block_flows_through_centroids: # Re-blocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
@@ -162,6 +152,20 @@ def one_to_all(origin, matrix, graph, result,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
+    if result._selected_links:
+        for link in result._selected_links_loading.keys():
+            links = np.array(link, dtype=graph.default_types("int"))
+            cdef int [:] selected_links_view = links[:]
+            #TODO: FIX, update views
+            cdef double[:, :] sl_od_loading_view = result.select_link_od.matrix[link][origin, :, :]
+            cdef double [:, :] sl_link_loading_view = result.select_link_loading[link][:, :]
+            #TODO: don't need to initialise the temp view each iteration, make it smarter
+            cdef double[:, :] tmp_flow_view = np.zeros((classes, graph.compact_num_links), dtype=graph.default_types("float"))
+            with nogil:
+                perform_select_link_analysis(origin, selected_links_view, demand_view, predecessors_view, conn_view,
+                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
+
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
