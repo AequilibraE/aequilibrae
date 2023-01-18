@@ -345,15 +345,16 @@ class LinearApproximation(WorkerThread):
         # We build the fixed cost field
 
         for c in self.traffic_classes:
+            # Prep for select link
+            # mapping of traffic class to the respective link_set to temp output matrix
+            for name in c.selected_links.keys():
+                c._aon_results._selected_links[name] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("float"))
+
             # Sizes the temporary objects used for the results
             c.results.prepare(c.graph, c.matrix)
             c._aon_results.prepare(c.graph, c.matrix)
             c.results.reset()
 
-            # Prep for select link
-            # mapping of traffic class to the respective link_set to temp output matrix
-            for link_set in c.selected_links:
-                c._aon_results._selected_links[link_set] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("int"))
 
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
@@ -393,10 +394,6 @@ class LinearApproximation(WorkerThread):
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
 
-                if c.selected_links:
-                    for name in c._aon_results.select_link.names:
-                        c._aon_results.select_link.matrix[name] = aon.aux_res.select_link_mask
-                    pass
                 aon_flows.append(c._aon_results.total_link_loads)
                 # print(c._aon_results.select_link.matrix.values())
 
@@ -429,6 +426,18 @@ class LinearApproximation(WorkerThread):
                             self.stepsize,
                             self.cores,
                         )
+
+                    if c.selected_links:
+                        for name in c.selected_links.keys():
+                            print("doing linear comb for:", name)
+                            linear_combination(
+                                c._aon_results.select_link.matrix[name],  # ouput matrix
+                                c._aon_results._selected_links[name],  # matrix 1
+                                c._aon_results.select_link.matrix[name],  # matrix 2 (previous iteration)
+                                self.stepsize,  # stepsize
+                                self.cores,  # core count
+                            )
+
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 

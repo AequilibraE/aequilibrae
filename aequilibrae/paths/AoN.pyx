@@ -74,7 +74,6 @@ def one_to_all(origin, matrix, graph, result,
     # views from the result object
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
 
-    print("Hello")
     # views from the aux-result object
     cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
     cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
@@ -82,11 +81,10 @@ def one_to_all(origin, matrix, graph, result,
     cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
     cdef double [:, :] node_load_view = aux_result.temp_node_loads[curr_thread, :, :]
     cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
-    cdef long long [:] select_link_mask = aux_result.select_link_mask[origin - 1 , :]
+    # cdef long long [:] select_link_mask = aux_result.select_link_mask[origin - 1 , :]
 
-    print("writing into array")
-    with nogil:
-        select_link_mask[2] = 5
+    # with nogil:
+    #     select_link_mask[2] = 5
     # path saving file paths
     cdef string path_file_base
     cdef string path_index_file_base
@@ -160,9 +158,9 @@ def one_to_all(origin, matrix, graph, result,
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
-    if result._selected_links:
-        for link_set, output_matrix in result._selected_links.items():
-            print("searching for:", link_set, output_matrix.shape)
+    # if result._selected_links:
+    #     for link_set, output_matrix in result._selected_links.items():
+    #         print("searching for:", link_set, output_matrix.shape)
         # TODO: iterate through the destinations
         # for each destination walk the minimum spanning tree back to the origin checking if
         # any link we find is part our of selected links, if so write out to the mask and move to the next destination

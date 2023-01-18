@@ -45,7 +45,7 @@ class TrafficClass:
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self._aon_results = AssignmentResults()
-        self.selected_links = []
+        self.selected_links = {}
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
@@ -93,7 +93,8 @@ class TrafficClass:
 
         Args:
             links (:obj:`Link[Link[Tuple[int, int]]]`): Link IDs and directions to be used in select link analysis"""
-        self.selected_links = []
+        self.selected_links = {}
+        direction = {1: "ab", -1: "ba"}
         for link_set in links:
             link_ids = []
             for link, dir in link_set:
@@ -101,7 +102,7 @@ class TrafficClass:
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
                 link_ids.append(self.graph.compact_graph[query].values[0][0])
-            self.selected_links.append(tuple(link_ids))
+            self.selected_links[f"sl_{link}_{direction[dir]}"] = tuple(link_ids)
 
     def __setattr__(self, key, value):
 

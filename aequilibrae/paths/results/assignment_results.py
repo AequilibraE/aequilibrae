@@ -103,18 +103,19 @@ class AssignmentResults:
             self.__redim()
             self.__graph_id__ = graph.__id__
 
-        print("preparing assignment results select links:", self._selected_links)
+        print("preparing assignment results select links:", self._selected_links.keys())
         if self._selected_links:
-            direction = {1: "ab", -1: "ba"}
             self.select_link = AequilibraeMatrix()
-            names = [f"sl_{link_id}_{direction[link_dir]}" for link_id, link_dir in self._selected_links]
+            names = list(self._selected_links.keys())
             self.select_link.create_empty(
                 memory_only=True,
                 zones=matrix.zones,
                 matrix_names=names,
                 index_names=matrix.index_names
             )
-            self.select_link.indices[:, :] = matrix.indices[:, :]
+            # self.select_link.indices[:, :] = matrix.indices[:, :]
+            for name in names:
+                self.select_link.matrix[name] = np.zeros((graph.compact_num_nodes, graph.compact_num_nodes), dtype=graph.default_types("float"))
 
     def reset(self) -> None:
         """
