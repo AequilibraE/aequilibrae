@@ -18,7 +18,7 @@ class MultiThreadedAoN:
         #  holds the b_nodes in case of flows through centroid connectors are blocked
         self.temp_b_nodes = np.array([])
 
-        self.select_link_mask = np.array([])
+        self.selected_links = {}
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph, results):
@@ -36,4 +36,4 @@ class MultiThreadedAoN:
         self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.shape[0]), dtype=itype)
         for i in range(results.cores):
             self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]
-        self.select_link_mask = np.zeros((graph.compact_num_nodes, graph.compact_num_nodes), dtype=itype)
+        self.selected_links = results._selected_links  # maps link_set to temp output matrix

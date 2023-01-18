@@ -347,8 +347,10 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # Prep for select link
             # mapping of traffic class to the respective link_set to temp output matrix
-            for name in c.selected_links.keys():
-                c._aon_results._selected_links[name] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("float"))
+            # c._aon_results._selected_links = c._selected_links  # maps name to link_set
+            c._aon_results._selected_link_names = list(c._selected_links.keys())
+            for link_set in c._selected_links.values():  # maps link_set to temp matrix
+                c._aon_results._selected_links[link_set] = np.zeros((c.graph.compact_num_nodes, c.graph.compact_num_nodes), dtype=c.graph.default_types("float"))
 
             # Sizes the temporary objects used for the results
             c.results.prepare(c.graph, c.matrix)
@@ -427,12 +429,12 @@ class LinearApproximation(WorkerThread):
                             self.cores,
                         )
 
-                    if c.selected_links:
-                        for name in c.selected_links.keys():
+                    if c._selected_links:
+                        for name, link_set in c._selected_links.items():
                             print("doing linear comb for:", name)
                             linear_combination(
                                 c._aon_results.select_link.matrix[name],  # ouput matrix
-                                c._aon_results._selected_links[name],  # matrix 1
+                                c._aon_results._selected_links[link_set],  # matrix 1
                                 c._aon_results.select_link.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count

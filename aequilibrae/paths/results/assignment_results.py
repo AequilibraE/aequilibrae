@@ -39,6 +39,7 @@ class AssignmentResults:
 
         self.classes = {"number": 1, "names": ["flow"]}
 
+        self._selected_link_names = []
         self._selected_links = {}
         self.select_link = AequilibraeMatrix()
 
@@ -103,18 +104,17 @@ class AssignmentResults:
             self.__redim()
             self.__graph_id__ = graph.__id__
 
-        print("preparing assignment results select links:", self._selected_links.keys())
+        print("preparing assignment results select links:", self._selected_link_names, self._selected_links.keys())
         if self._selected_links:
             self.select_link = AequilibraeMatrix()
-            names = list(self._selected_links.keys())
             self.select_link.create_empty(
                 memory_only=True,
                 zones=matrix.zones,
-                matrix_names=names,
+                matrix_names=self._selected_link_names,
                 index_names=matrix.index_names
             )
             # self.select_link.indices[:, :] = matrix.indices[:, :]
-            for name in names:
+            for name in self._selected_link_names:  # maps name to output matrix
                 self.select_link.matrix[name] = np.zeros((graph.compact_num_nodes, graph.compact_num_nodes), dtype=graph.default_types("float"))
 
     def reset(self) -> None:
