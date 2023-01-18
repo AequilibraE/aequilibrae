@@ -11,7 +11,7 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 ## Imports
 from uuid import uuid4
 from os import remove
-from os.path import dirname, join
+from os.path import join
 from tempfile import gettempdir
 
 import folium
@@ -37,7 +37,7 @@ remove(join(fldr, "public_transport.sqlite"))
 """Let's import the GTFS feed."""
 # %%
 
-dest_path = join(dirname(dirname(dirname("tests"))), "tests/data/gtfs/gtfs_coquimbo.zip")
+dest_path = join(fldr, "gtfs_coquimbo.zip")
 
 """
 Now we create our Transit object and import the GTFS feed into our model.

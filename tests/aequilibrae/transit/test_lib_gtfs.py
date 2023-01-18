@@ -32,8 +32,8 @@ def network(create_project):
 
 
 @pytest.fixture
-def gtfs_file():
-    return os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/gtfs_coquimbo.zip")
+def gtfs_file(create_path):
+    return os.path.join(create_path, "gtfs_coquimbo.zip")
 
 
 @pytest.fixture

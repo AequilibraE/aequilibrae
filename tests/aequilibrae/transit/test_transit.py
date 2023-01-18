@@ -7,8 +7,12 @@ from aequilibrae.utils.create_example import create_example
 
 
 @pytest.fixture
-def create_project(tmp_path):
-    path = tmp_path / uuid4().hex
+def path(tmp_path):
+    return tmp_path / uuid4().hex
+
+
+@pytest.fixture
+def create_project(path):
     prj = create_example(path, "coquimbo")
 
     if os.path.isfile(os.path.join(path, "public_transport.sqlite")):
@@ -18,11 +22,11 @@ def create_project(tmp_path):
     prj.close()
 
 
-def test_new_gtfs(create_project):
+def test_new_gtfs(create_project, path):
     data = Transit(create_project)
     transit = data.new_gtfs(
         agency="",
-        file_path=os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/gtfs_coquimbo.zip"),
+        file_path=os.path.join(path, "gtfs_coquimbo.zip"),
     )
 
     assert str(type(transit)) == "<class 'aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder'>"

@@ -18,7 +18,7 @@ def pat(path):
     if os.path.isfile(os.path.join(path, "public_transport.sqlite")):
         os.remove(os.path.join(path, "public_transport.sqlite"))
 
-    gtfs_fldr = os.path.join(os.path.abspath(os.path.dirname("tests")), "tests/data/gtfs/gtfs_coquimbo.zip")
+    gtfs_fldr = os.path.join(path, "gtfs_coquimbo.zip")
 
     data = Transit(prj)
     transit = data.new_gtfs(agency="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_fldr, description="")
