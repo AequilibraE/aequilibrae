@@ -101,7 +101,7 @@ class TrafficClass:
                 query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                link_ids.append(self.graph.compact_graph[query].values[0][0])
+                link_ids.append(self.graph.compact_graph[query]["id"].values[0])
             self._selected_links[f"sl_{link}_{direction[dir]}"] = tuple(link_ids)
 
     def __setattr__(self, key, value):
