@@ -24,6 +24,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 """
 cimport cython
 from libc.math cimport isnan, INFINITY
+from libc.stdio cimport printf
 
 from libc.stdlib cimport malloc, free
 
@@ -107,7 +108,7 @@ cdef return_an_int_view(input):
 @cython.boundscheck(False)
 cdef void perform_select_link_analysis(long origin,
                                         long long [:] selected_links,
-                                        double[:, :] demand,
+                                        double [:, :] demand,
                                         long long [:] pred,
                                         long long [:] conn,
                                         double [:, :] sl_od_loading,
@@ -124,33 +125,47 @@ cdef void perform_select_link_analysis(long origin,
 # NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
 # selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
 #tmp flow: array of zeros as long as the number of links in compressed graph
+
     cdef:
         unsigned int i, j, k, idx, dests = demand.shape[0]
         long long predecessor, connection, lid, link
 
     for j in range(dests):
+        printf(<char*> "\ndestination is: %i", j)
         #Walk paths back to origin, execute network loading on the way
         #reset the path loading along the path
         for i in range(pred.shape[0]):
             #TODO: check if memset is faster than rewalking path
             for k in range(classes):
-                tmp_flow[pred[i], k] = 0
+                tmp_flow[k, pred[i]] = 0
+        # printf(<char *> "\ntemp flow reset")
         predecessor = j
         while predecessor != origin:
             connection = conn[predecessor]
             predecessor = pred[predecessor]
+            # printf(<char *> "\nloading classes for node %i", predecessor)
             for k in range(classes):
-                tmp_flow[connection, k] += demand[j, k]
+                tmp_flow[k, connection] += demand[j, k]
+                # printf(<char *> "\ndemand at point is %f", demand[j, k])
+
         for k in range(classes):
+            printf(<char *> "\niterating class: %i, from total number, %i",k, classes)
             for i in range(selected_links.shape[0]):
                 lid = selected_links[i]
+                # printf(<char *> "\nchecking select link interaction for index: %i, link: %i",i, lid )
                 #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
-                if tmp_flow[lid, k] != 0:
+                if tmp_flow[k, lid] != 0:
+                    printf(<char *> "\ninteraction detected for destination %i", j)
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
                         link = conn[idx]
+                        if lid == link:
+                            printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
+                                   tmp_flow[k, link])
+                        else:
+                            printf(<char *> "\nloading link %i, and class, %i, with value: %f", link, k, tmp_flow[k, link])
                         #sl_link_loading.shape[0]):
-                        sl_link_loading[link, k] += tmp_flow[link, k]
+                        sl_link_loading[link, k] += tmp_flow[k, link]
                     break
                 #once at least one link in the set is shown to be in the current destination, the load along that path is added.
                 #There is no need to check the remaining links - this would add extra demand that isn't there
