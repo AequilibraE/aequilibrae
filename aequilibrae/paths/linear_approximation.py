@@ -391,6 +391,7 @@ class LinearApproximation(WorkerThread):
 
             for c in self.traffic_classes:  # type: TrafficClass
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
+
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
@@ -398,9 +399,10 @@ class LinearApproximation(WorkerThread):
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
                 aon.execute()
+                # a =[x for x in c._aon_results._selected_links_od.values()]
+                # print(a[0].shape, "shape of first matrix")
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
-
                 aon_flows.append(c._aon_results.total_link_loads)
                 # print(c._aon_results.select_link.matrix.values())
 

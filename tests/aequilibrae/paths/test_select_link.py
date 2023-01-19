@@ -6,7 +6,7 @@ from os.path import join, dirname
 from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
-
+import numpy as np
 import pandas as pd
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
@@ -58,8 +58,10 @@ class TestSelectLink(TestCase):
         self.assignment.set_algorithm("msa")
 
         self.assignment.execute()
-
-        print(self.car_graph.compact_graph)
+        for key, val in self.assignclass._aon_results.select_link_od.matrix.items():
+            print(key, "shape: ", val.shape, " owns this matrix: ")
+            print(val)
+        print(self.assignclass.matrix.matrix_view)
         self.assertTrue(False)
         self.assertTrue(self.assignclass._sl_results is not None)
         # _sl_results.matricies == {(9, 1): AequilibraeMatrix(), (6, 1): AequilibraeMatrix()}
