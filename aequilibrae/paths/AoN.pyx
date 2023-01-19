@@ -162,12 +162,13 @@ def one_to_all(origin, matrix, graph, result,
             sl_od_loading_view = result._selected_links_od[link][origin_index, :, :]
             sl_link_loading_view = result._selected_links_loading[link][:, :]
             #TODO: don't need to initialise the temp view each iteration, make it smarter
-            tmp_flow_view = np.zeros((classes, graph.compact_num_links), dtype=graph.default_types("float"))[:, :]
+            tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))[:, :]
             with nogil:
                 perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
                                              sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
-            # print("Post SL, matrix is: ")
-            # print(result._selected_links_od[link])
+            if origin_index == 1:
+                print("Post SL linkl, link is:", link, " matrix is:\n", result._selected_links_od[link][:, :, 0])
+                print("Post SL link loading, link is:", link, " matrix is:\n", result._selected_links_loading[link][:, 0])
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
