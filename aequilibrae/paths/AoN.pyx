@@ -2,7 +2,6 @@
 import os
 
 cimport numpy as np
-import numpy as pnp
 from libcpp cimport bool
 
 # include 'parameters.pxi'
@@ -155,43 +154,23 @@ def one_to_all(origin, matrix, graph, result,
         long long [:] selected_links_view
         double[:, :] sl_od_loading_view
         double [:, :] sl_link_loading_view
-        double[:, :] tmp_flow_view = pnp.zeros((classes, graph.compact_num_links), dtype=graph.default_types("float"))[:, :]
+        double[:, :] tmp_flow_view
+        long long[:] link_list
     if result._selected_links_od:
-        #result._selected_links_od.values()[0][0,0,0]=2
-
-        for link in result._selected_links_loading.keys():
-        #     print("working", link, graph.default_types("int"))
-        #     # links = pnp.array(link, dtype=graph.default_types("int"))
-        #     # print("still") #links)
-        #     # links = pnp.array()
-        #     # selected_links_view = links[:]
-        #     #TODO: FIX, update views
-        #     print('fling')
+        for link in list(result._selected_links_loading.keys()):
+            link_list = np.asarray(link, dtype=graph.default_types("int"))[:]
             sl_od_loading_view = result._selected_links_od[link][origin_index, :, :]
-        #     print("od loaded")
-        #     sl_link_loading_view = result.selected_links_loading[link][:, :]
-        #     #TODO: don't need to initialise the temp view each iteration, make it smarter
-        #     print("link loaded")
-        #     tmp_flow_view = result.select_link_loading[link][:, :]
-        #     print(result.result.select_link_od.matrix[link].shape, "python arr, temp view loaded")
-        #     # with nogil:
-        #     #     perform_select_link_analysis(origin_index, selected_links_view, demand_view, predecessors_view, conn_view,
-        #     #                                  sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
-            play_the_player(sl_od_loading_view)
+            sl_link_loading_view = result._selected_links_loading[link][:, :]
+            #TODO: don't need to initialise the temp view each iteration, make it smarter
+            tmp_flow_view = np.zeros((classes, graph.compact_num_links), dtype=graph.default_types("float"))[:, :]
+            with nogil:
+                perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
+                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
+
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
 
-    if result._selected_links:
-        print(result._selected_link_names, result._selected_links.keys())
-        # TODO: iterate through the destinations
-        # for each destination walk the minimum spanning tree back to the origin checking if
-        # any link we find is part our of selected links, if so write out to the mask and move to the next destination
-
     return origin
-
-cdef void play_the_player(double[:, :] matrix):
-    matrix[0, 0] = 5
-
 
 def path_computation(origin, destination, graph, results):
     # type: (int, int, Graph, PathResults) -> (None)
