@@ -105,35 +105,56 @@ cdef return_an_int_view(input):
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void perform_select_link_analysis(long origin,
-                                        int classes,
+cdef void perform_select_link_analysis(long origin,
+                                        long long [:] selected_links,
                                         double[:, :] demand,
                                         long long [:] pred,
                                         long long [:] conn,
-                                        long long [:] aux_link_flows,
-                                        double [:, :] critical_array,
-                                        int query_type) nogil:
-    cdef unsigned int t_origin
-    cdef ITYPE_t c, j, i, p, l
-    cdef unsigned int dests = demand.shape[0]
-    cdef unsigned int q = critical_array.shape[0]
+                                        double [:, :] sl_od_loading,
+                                        double [:, :] sl_link_loading,
+                                       double [:, :] tmp_flow,
+                                       long classes) nogil:
+# origin: Origin of the path
+# demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
+# pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
+# conn: Stores the link connecting the given index to its next?/previous node
+# sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
+# sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
+#Dimension: num_links by 1
+# NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
+# selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
+#tmp flow: array of zeros as long as the number of links in compressed graph
+    cdef:
+        unsigned int i, j, k, idx, dests = demand.shape[0]
+        long long predecessor, connection, lid, link
 
-    """ TODO:
-    FIX THE SELECT LINK ANALYSIS FOR MULTIPLE CLASSES"""
-    l = 0
     for j in range(dests):
-        if demand[j, l] > 0:
-            p = pred[j]
-            j = i
-            while p >= 0:
-                c = conn[j]
-                aux_link_flows[c] = 1
-                j = p
-                p = pred[j]
-        if query_type == 1: # Either one of the links in the query
-            for i in range(q):
-                if aux_link_flows[i] == 1:
-                    critical_array
+        #Walk paths back to origin, execute network loading on the way
+        #reset the path loading along the path
+        for i in range(pred.shape[0]):
+            #TODO: check if memset is faster than rewalking path
+            for k in range(classes):
+                tmp_flow[pred[i], k] = 0
+        predecessor = j
+        while predecessor != origin:
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
+            for k in range(classes):
+                tmp_flow[connection, k] += demand[j, k]
+        for k in range(classes):
+            for i in range(selected_links.shape[0]):
+                lid = selected_links[i]
+                #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
+                if tmp_flow[lid, k] != 0:
+                    sl_od_loading[j, k] = demand[j, k]
+                    for idx in range(conn.shape[0]):
+                        link = conn[idx]
+                        #sl_link_loading.shape[0]):
+                        sl_link_loading[link, k] += tmp_flow[link, k]
+                    break
+                #once at least one link in the set is shown to be in the current destination, the load along that path is added.
+                #There is no need to check the remaining links - this would add extra demand that isn't there
+            #todo: test break is in correct locaton
 
 
 @cython.wraparound(False)

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List, Tuple
 import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
@@ -45,6 +45,7 @@ class TrafficClass:
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self._aon_results = AssignmentResults()
+        self._selected_links = {}  # maps human name to link_set
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
@@ -86,6 +87,23 @@ class TrafficClass:
 
         self.vot = float(value_of_time)
 
+    def set_select_links(self, links: List[List[Tuple[int, int]]]):
+        """Set the selected links. Checks if the links and directions are valid. Translates link_id and
+        direction into unique link id used in compact graph.
+
+        Args:
+            links (:obj:`Link[Link[Tuple[int, int]]]`): Link IDs and directions to be used in select link analysis"""
+        self._selected_links = {}
+        direction = {1: "ab", -1: "ba"}
+        for link_set in links:
+            link_ids = []
+            for link, dir in link_set:
+                query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
+                if not query.any():
+                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+                link_ids.append(self.graph.compact_graph[query].values[0][0])
+            self._selected_links[f"sl_{link}_{direction[dir]}"] = tuple(link_ids)
+
     def __setattr__(self, key, value):
 
         if key not in [
@@ -102,6 +120,7 @@ class TrafficClass:
             "fixed_cost",
             "fc_multiplier",
             "fixed_cost_field",
+            "_selected_links",
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
