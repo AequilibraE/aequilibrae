@@ -149,21 +149,21 @@ cdef void perform_select_link_analysis(long origin,
                 # printf(<char *> "\ndemand at point is %f", demand[j, k])
 
         for k in range(classes):
-            printf(<char *> "\niterating class: %i, from total number, %i",k, classes)
+            # printf(<char *> "\niterating class: %i, from total number, %i",k, classes)
             for i in range(selected_links.shape[0]):
                 lid = selected_links[i]
                 # printf(<char *> "\nchecking select link interaction for index: %i, link: %i",i, lid )
                 #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
                 if tmp_flow[k, lid] != 0:
-                    printf(<char *> "\ninteraction detected for destination %i", j)
+                    # printf(<char *> "\ninteraction detected for destination %i", j)
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
                         link = conn[idx]
-                        if lid == link:
-                            printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
-                                   tmp_flow[k, link])
-                        else:
-                            printf(<char *> "\nloading link %i, and class, %i, with value: %f", link, k, tmp_flow[k, link])
+                        # if lid == link:
+                            # printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
+                            #        tmp_flow[k, link])
+                        # else:
+                            # printf(<char *> "\nloading link %i, and class, %i, with value: %f", link, k, tmp_flow[k, link])
                         #sl_link_loading.shape[0]):
                         sl_link_loading[link, k] += tmp_flow[k, link]
                     break

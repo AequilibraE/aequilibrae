@@ -158,7 +158,6 @@ def one_to_all(origin, matrix, graph, result,
         long long[:] link_list
     if result._selected_links_od:
         for link in list(result._selected_links_loading.keys()):
-            print(matrix.matrix_view[origin_index, :, :])
             link_list = np.asarray(link, dtype=graph.default_types("int"))[:]
             sl_od_loading_view = result._selected_links_od[link][origin_index, :, :]
             sl_link_loading_view = result._selected_links_loading[link][:, :]
@@ -167,8 +166,8 @@ def one_to_all(origin, matrix, graph, result,
             with nogil:
                 perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
                                              sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
-            print("Post SL, matrix is: ")
-            print(result._selected_links_od[link])
+            # print("Post SL, matrix is: ")
+            # print(result._selected_links_od[link])
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
