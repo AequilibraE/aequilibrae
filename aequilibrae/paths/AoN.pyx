@@ -1,6 +1,6 @@
+# cython: language_level=3
 import os
 
-# cython: language_level=3
 cimport numpy as np
 from libcpp cimport bool
 
@@ -57,7 +57,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     if skims > 0:
         gskim = graph.compact_skims
-        tskim = aux_result.temporary_skims[:, :, curr_thread]
+        tskim = aux_result.temporary_skims[curr_thread, :, :]
         fskm = result.skims.matrix_view[origin_index, :, :]
     else:
         gskim = np.zeros((1,1))
@@ -72,12 +72,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
-    cdef long long [:] reached_first_view = aux_result.reached_first[:, curr_thread]
-    cdef long long [:] conn_view = aux_result.connectors[:, curr_thread]
-    cdef double [:, :] link_loads_view = aux_result.temp_link_loads[:, :, curr_thread]
-    cdef double [:, :] node_load_view = aux_result.temp_node_loads[:, :, curr_thread]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
+    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
+    cdef double [:, :] node_load_view = aux_result.temp_node_loads[curr_thread, :, :]
+    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
     cdef string path_file_base
@@ -356,11 +356,11 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
-    cdef long long [:] reached_first_view = aux_result.reached_first[:, curr_thread]
-    cdef long long [:] conn_view = aux_result.connectors[:, curr_thread]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[:, :, curr_thread]
+    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
     #Now we do all procedures with NO GIL
     with nogil:

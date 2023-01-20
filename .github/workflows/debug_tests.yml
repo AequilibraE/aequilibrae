@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
 
   testing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container: python:3.7
     steps:
     - uses: actions/checkout@v3
