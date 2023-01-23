@@ -14,7 +14,7 @@ WALK_AGENCY_ID = 1
 DRIVING_SIDE = 1
 
 
-class constants:
+class Constants:
     agencies: Dict[str, Any] = dict()
     srid: Dict[int, int] = dict()
     routes: Dict[int, int] = dict()
