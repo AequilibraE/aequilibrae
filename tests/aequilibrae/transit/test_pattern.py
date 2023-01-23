@@ -1,43 +1,25 @@
 import pytest
 import os
-from uuid import uuid4
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit import Transit
 
 
 @pytest.fixture
-def path(tmp_path):
-    return tmp_path / uuid4().hex
+def pat(create_path, create_gtfs_project):
 
+    gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
 
-@pytest.fixture
-def pat(path):
-    prj = create_example(path, "coquimbo")
-
-    if os.path.isfile(os.path.join(path, "public_transport.sqlite")):
-        os.remove(os.path.join(path, "public_transport.sqlite"))
-
-    gtfs_fldr = os.path.join(path, "gtfs_coquimbo.zip")
-
-    data = Transit(prj)
-    transit = data.new_gtfs(agency="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_fldr, description="")
+    transit = create_gtfs_project.new_gtfs_builder(
+        agency="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_fldr, description=""
+    )
     transit.load_date("2016-04-13")
 
     patterns = transit.select_patterns
     yield [x for x in patterns.values()][0]
-    prj.close()
 
 
-@pytest.fixture
-def network(pat):
-    return database_connection(db_type="transit")
+def test_save_to_database(pat, transit_conn):
+    pat.save_to_database(transit_conn)
 
-
-def test_save_to_database(pat, network):
-    pat.save_to_database(network)
-
-    routes = network.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
+    routes = transit_conn.execute("SELECT COUNT(*) FROM routes;").fetchone()[0]
     assert routes == 1
 
 
@@ -50,9 +32,9 @@ def test_get_error(pat):
     assert pat.get_error() is None, "Resulted a map-matching error when should have returned none"
 
 
-def test_map_match(pat, network):
+def test_map_match(pat, transit_conn):
     pat.map_match()
-    pat.save_to_database(network)
+    pat.save_to_database(transit_conn)
 
-    pattern_map = network.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
+    pattern_map = transit_conn.execute("SELECT COUNT(*) FROM pattern_mapping;").fetchone()[0]
     assert pattern_map > 0

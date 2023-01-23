@@ -1,35 +1,18 @@
-from uuid import uuid4
 import pandas as pd
-import pytest
 
-from aequilibrae.transit import Transit
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.utils.get_table import get_table
 from aequilibrae.utils.list_tables_in_db import list_tables_in_db
-from aequilibrae.utils.create_example import create_example
 
 
-@pytest.fixture
-def create_project(tmp_path):
-    path = tmp_path / uuid4().hex
-    project = create_example(path)
-    Transit(project).create_transit_database()
+def test_get_table(transit_conn):
 
-    yield project
-    project.close()
-
-
-def test_get_table(create_project):
-    conn = database_connection(db_type="transit")
-
-    tables = get_table("routes", conn)
+    tables = get_table("routes", transit_conn)
 
     assert type(tables) == pd.DataFrame
 
 
-def test_list_tables_in_db(create_project):
-    conn = database_connection(db_type="transit")
+def test_list_tables_in_db(transit_conn):
 
-    list_table = list_tables_in_db(conn)
+    list_table = list_tables_in_db(transit_conn)
 
     assert len(list_table) >= 5

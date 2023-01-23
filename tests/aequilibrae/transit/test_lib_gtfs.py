@@ -1,34 +1,7 @@
 import os
 import pytest
-from uuid import uuid4
-
-from aequilibrae.transit import Transit
-from aequilibrae.utils.create_example import create_example
-from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
-
-
-@pytest.fixture
-def create_path(tmp_path):
-    return tmp_path / uuid4().hex
-
-
-@pytest.fixture
-def create_project(create_path):
-    prj = create_example(create_path, "coquimbo")
-
-    if os.path.isfile(os.path.join(create_path, "public_transport.sqlite")):
-        os.remove(os.path.join(create_path, "public_transport.sqlite"))
-
-    yield prj
-    prj.close()
-
-
-@pytest.fixture
-def network(create_project):
-    Transit(create_project)
-    return database_connection("transit")
 
 
 @pytest.fixture
@@ -37,9 +10,11 @@ def gtfs_file(create_path):
 
 
 @pytest.fixture
-def system_builder(network, gtfs_file):
+def system_builder(transit_conn, gtfs_file):
 
-    yield GTFSRouteSystemBuilder(network=network, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file)
+    yield GTFSRouteSystemBuilder(
+        network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
+    )
 
 
 def test_set_capacities(system_builder):
@@ -68,13 +43,13 @@ def test_map_match_int_exception(system_builder):
         system_builder.map_match(route_types=[3.5])
 
 
-def test_map_match(network, system_builder):
+def test_map_match(transit_conn, system_builder):
     system_builder.load_date("2016-04-13")
     system_builder.set_allow_map_match(True)
     system_builder.map_match()
     system_builder.save_to_disk()
 
-    assert network.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
+    assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
 
 
 def test_set_agency_identifier(system_builder):
@@ -115,11 +90,11 @@ def test_load_date_not_available_date_exception(system_builder):
         system_builder.load_date("2020-06-01")
 
 
-def test_save_to_disk(network, system_builder):
+def test_save_to_disk(transit_conn, system_builder):
 
     system_builder.load_date("2016-04-13")
     system_builder.save_to_disk()
 
-    assert len(network.execute("SELECT * FROM route_links").fetchall()) == 78
-    assert len(network.execute("SELECT * FROM trips;").fetchall()) == 360
-    assert len(network.execute("SELECT * FROM routes;").fetchall()) == 2
+    assert len(transit_conn.execute("SELECT * FROM route_links").fetchall()) == 78
+    assert len(transit_conn.execute("SELECT * FROM trips;").fetchall()) == 360
+    assert len(transit_conn.execute("SELECT * FROM routes;").fetchall()) == 2

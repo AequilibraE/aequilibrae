@@ -1,8 +1,5 @@
 from random import randint, choice
 import pytest
-from aequilibrae.project import Project
-from aequilibrae.transit import Transit
-from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit.transit_elements import Trip
 from tests.aequilibrae.transit.random_word import randomword
@@ -23,11 +20,6 @@ class TestTrip:
             "bikes_allowed": choice([0, 1]),
         }
 
-    @pytest.fixture
-    def network(self, project: Project):
-        Transit(project)
-        return database_connection("transit")
-
     def test_populate(self, data):
         s = Trip()
 
@@ -44,7 +36,7 @@ class TestTrip:
             s = Trip()
             s._populate(tuple(data.values()), list(data.keys()))
 
-    def test_save_to_database(self, data, network):
+    def test_save_to_database(self, data, transit_conn):
         r = Trip()
         r._populate(tuple(data.values()), list(data.keys()))
         times = [r for r in range(randint(5, 15))]
@@ -54,12 +46,12 @@ class TestTrip:
         r.departures = [r for r in times]
         r.pattern_id = patid
         r.source_time = [0] * len(times)
-        r.save_to_database(network)
+        r.save_to_database(transit_conn)
 
-        result = network.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
+        result = transit_conn.execute("Select pattern_id from trips where trip_id=?", [r.trip_id]).fetchone()[0]
         assert result == patid, "Saving trip to trips failed"
 
-        records, counter = network.execute(
+        records, counter = transit_conn.execute(
             'Select count(*), max("seq") from trips_schedule where trip_id=?', [r.trip_id]
         ).fetchone()
         assert records == len(times), "Saving trip to trips_schedule failed"
