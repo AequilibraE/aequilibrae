@@ -2,7 +2,7 @@ from sqlite3 import Connection
 
 from shapely.geometry import LineString
 
-from aequilibrae.transit.constants import constants, TRIP_ID_MULTIPLIER
+from aequilibrae.transit.constants import Constants, TRIP_ID_MULTIPLIER
 from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
@@ -81,7 +81,7 @@ class Trip(BasicPTElement):
             conn.commit()
 
     def get_trip_id(self):
-        c = constants()
+        c = Constants()
         self.trip_id = c.trips.get(self.pattern_id, self.pattern_id) + TRIP_ID_MULTIPLIER
         c.trips[self.pattern_id] = self.trip_id
 

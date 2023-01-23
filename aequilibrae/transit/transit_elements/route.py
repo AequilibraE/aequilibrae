@@ -1,6 +1,6 @@
 from sqlite3 import Connection
 from shapely.geometry import MultiLineString
-from aequilibrae.transit.constants import constants, ROUTE_ID_MULTIPLIER, AGENCY_MULTIPLIER
+from aequilibrae.transit.constants import Constants, ROUTE_ID_MULTIPLIER, AGENCY_MULTIPLIER
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -89,7 +89,7 @@ class Route(BasicPTElement):
         return data
 
     def __get_route_id(self):
-        c = constants()
+        c = Constants()
         val = c.routes.get(self.agency_id, AGENCY_MULTIPLIER * self.agency_id)
         c.routes[self.agency_id] = val + ROUTE_ID_MULTIPLIER
         self.route_id = c.routes[self.agency_id]

@@ -1,5 +1,5 @@
 from sqlite3 import Connection
-from aequilibrae.transit.constants import constants, AGENCY_MULTIPLIER
+from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
 
 
 class Fare:
@@ -60,6 +60,6 @@ class Fare:
         conn.commit()
 
     def __get_fare_id(self):
-        c = constants()
+        c = Constants()
         self.fare_id = 1 + c.fares.get(self.agency_id, AGENCY_MULTIPLIER * self.agency_id)
         c.fares[self.agency_id] = self.fare_id

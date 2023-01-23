@@ -9,7 +9,7 @@ from shapely.geometry import Point, MultiLineString
 from aequilibrae.context import get_active_project
 from aequilibrae.project.database_connection import database_connection
 
-from aequilibrae.transit.constants import constants, PATTERN_ID_MULTIPLIER
+from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
@@ -309,7 +309,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
-        c = constants()
+        c = Constants()
         if pyqt:
             msg_txt = f"Building data for {self.gtfs_data.agency.agency}"
             self.signal.emit(["start", "secondary", len(self.select_routes), msg_txt, self.__mt])

@@ -2,7 +2,7 @@ from contextlib import closing
 from sqlite3 import Connection
 
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.constants import constants, WALK_AGENCY_ID
+from aequilibrae.transit.constants import Constants, WALK_AGENCY_ID
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -36,6 +36,6 @@ class Agency(BasicPTElement):
             sql = "Select coalesce(max(distinct(agency_id)), 0) from agencies where agency_id<?;"
             data = [x[0] for x in conn.execute(sql, [WALK_AGENCY_ID])]
 
-        c = constants()
+        c = Constants()
         c.agencies["agencies"] = max(c.agencies.get("agencies", 1), data[0])
         return c.agencies["agencies"]

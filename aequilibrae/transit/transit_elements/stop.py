@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 
 from shapely.geometry import Point
 
-from aequilibrae.transit.constants import constants, AGENCY_MULTIPLIER
+from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -83,7 +83,7 @@ class Stop(BasicPTElement):
         ]
 
     def get_node_id(self):
-        c = constants()
+        c = Constants()
 
         val = 1 + c.stops.get(self.agency_id, AGENCY_MULTIPLIER * self.agency_id)
         c.stops[self.agency_id] = val

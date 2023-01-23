@@ -3,7 +3,7 @@ from sqlite3 import Connection
 from shapely.geometry import LineString, Point
 from shapely.ops import substring
 
-from aequilibrae.transit.constants import constants, TRANSIT_LINK_RANGE
+from aequilibrae.transit.constants import Constants, TRANSIT_LINK_RANGE
 
 
 class Link:
@@ -78,6 +78,6 @@ class Link:
             conn.commit()
 
     def get_link_id(self):
-        c = constants()
+        c = Constants()
         self.transit_link = c.transit_links.get(1, TRANSIT_LINK_RANGE) + 1
         c.transit_links[1] = self.transit_link
