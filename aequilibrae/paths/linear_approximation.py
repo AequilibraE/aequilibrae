@@ -411,6 +411,19 @@ class LinearApproximation(WorkerThread):
                     c.results.total_flows()
                     if c.results.num_skims > 0:
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
+
+                    if c._selected_links:
+                        for name, link_set in c._selected_links.items():
+                            copy_three_dimensions(
+                                c._aon_results.select_link_od.matrix[name],  # ouput matrix
+                                c._aon_results._selected_links_od[link_set],  # matrix 1
+                                self.cores,  # core count
+                            )
+                            copy_two_dimensions(
+                                c._aon_results.select_link_loading.matrix[name],  # ouput matrix
+                                c._aon_results._selected_links_loading[link_set],  # matrix 1
+                                self.cores,  # core count
+                            )
                     flows.append(c.results.total_link_loads)
 
             else:
