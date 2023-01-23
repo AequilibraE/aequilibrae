@@ -31,7 +31,7 @@ def pat(path):
 
 @pytest.fixture
 def network(pat):
-    return database_connection(table_type="transit")
+    return database_connection(db_type="transit")
 
 
 def test_save_to_database(pat, network):

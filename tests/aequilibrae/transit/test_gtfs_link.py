@@ -47,7 +47,7 @@ class TestLink:
 
         Transit(project)
 
-        network = database_connection(table_type="transit")
+        network = database_connection(db_type="transit")
 
         route_type = randint(0, 13)
         fstop = randomword(randint(3, 15))

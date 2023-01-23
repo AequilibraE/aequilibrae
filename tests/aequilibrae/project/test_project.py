@@ -26,8 +26,8 @@ class TestProject:
         assert exp_column in fields, f"Table {table.upper()} was not created correctly"
 
     def test_close(self, project):
-        database_connection(table_type="network")
+        database_connection(db_type="network")
 
         project.close()
         with pytest.raises(FileNotFoundError):
-            database_connection(table_type="network")
+            database_connection(db_type="network")

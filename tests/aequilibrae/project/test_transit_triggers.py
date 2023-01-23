@@ -10,7 +10,7 @@ class TestTransitTriggers:
     def test_link_insert(self, project: Project):
         Transit(project)
 
-        cnx = database_connection(table_type="transit")
+        cnx = database_connection(db_type="transit")
 
         data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
         cnx.execute(
@@ -27,7 +27,7 @@ class TestTransitTriggers:
     def test_geometry_update(self, project: Project):
         Transit(project)
 
-        cnx = database_connection(table_type="transit")
+        cnx = database_connection(db_type="transit")
 
         data = [10001001000, 3, 20000001, 5, 6, 0, LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb]
         cnx.execute(

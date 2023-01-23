@@ -16,7 +16,7 @@ def create_project(project: Project):
     ],
 )
 def test_create_agencies_table(table: str, exp_column: list, create_project):
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -44,7 +44,7 @@ def test_create_agencies_table(table: str, exp_column: list, create_project):
 )
 def test_create_fare_attributes_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -60,7 +60,7 @@ def test_create_fare_attributes_table(table: str, exp_column: list, create_proje
 )
 def test_create_fare_rules_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -76,7 +76,7 @@ def test_create_fare_rules_table(table: str, exp_column: list, create_project):
 )
 def test_create_route_links_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -92,7 +92,7 @@ def test_create_route_links_table(table: str, exp_column: list, create_project):
 )
 def test_create_fare_zones_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -108,7 +108,7 @@ def test_create_fare_zones_table(table: str, exp_column: list, create_project):
 )
 def test_create_trips_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -124,7 +124,7 @@ def test_create_trips_table(table: str, exp_column: list, create_project):
 )
 def test_create_trips_schedule_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -157,7 +157,7 @@ def test_create_trips_schedule_table(table: str, exp_column: list, create_projec
 )
 def test_create_stops_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -173,7 +173,7 @@ def test_create_stops_table(table: str, exp_column: list, create_project):
 )
 def test_create_pattern_mapping_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -204,7 +204,7 @@ def test_create_pattern_mapping_table(table: str, exp_column: list, create_proje
 )
 def test_create_routes_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]
@@ -220,7 +220,7 @@ def test_create_routes_table(table: str, exp_column: list, create_project):
 )
 def test_create_stop_connectors_table(table: str, exp_column: list, create_project):
 
-    curr = database_connection(table_type="transit").cursor()
+    curr = database_connection(db_type="transit").cursor()
     curr.execute(f"PRAGMA table_info({table});")
     fields = curr.fetchall()
     fields = [x[1] for x in fields]

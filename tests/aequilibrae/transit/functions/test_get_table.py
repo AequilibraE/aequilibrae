@@ -20,7 +20,7 @@ def create_project(tmp_path):
 
 
 def test_get_table(create_project):
-    conn = database_connection(table_type="transit")
+    conn = database_connection(db_type="transit")
 
     tables = get_table("routes", conn)
 
@@ -28,7 +28,7 @@ def test_get_table(create_project):
 
 
 def test_list_tables_in_db(create_project):
-    conn = database_connection(table_type="transit")
+    conn = database_connection(db_type="transit")
 
     list_table = list_tables_in_db(conn)
 

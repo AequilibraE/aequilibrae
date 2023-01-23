@@ -9,14 +9,14 @@ req_node_flds = ["node_id", "is_centroid"]
 protected_fields = ["ogc_fid", "geometry"]
 
 
-def initialize_tables(project, table_type: str) -> None:
-    cnx = database_connection(table_type)
-    create_base_tables(cnx, project.logger, table_type)
-    add_triggers(cnx, project.logger, table_type)
+def initialize_tables(project, db_type: str) -> None:
+    cnx = database_connection(db_type)
+    create_base_tables(cnx, project.logger, db_type)
+    add_triggers(cnx, project.logger, db_type)
 
 
-def create_base_tables(conn: Connection, logger: logging.Logger, table_type: str) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", table_type, "tables")
+def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "tables")
     with open(join(spec_folder, "table_list.txt"), "r") as file_list:
         all_tables = file_list.readlines()
     all_tables = [x.rstrip() for x in all_tables]
@@ -25,9 +25,9 @@ def create_base_tables(conn: Connection, logger: logging.Logger, table_type: str
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def add_triggers(conn: Connection, logger: logging.Logger, table_type: str) -> None:
+def add_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
     """Adds consistency triggers to the project"""
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", table_type, "triggers")
+    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
     all_trigger_sets = [x.rstrip() for x in all_trigger_sets]
@@ -36,8 +36,8 @@ def add_triggers(conn: Connection, logger: logging.Logger, table_type: str) -> N
         run_queries_from_sql_file(conn, logger, qry_file)
 
 
-def remove_triggers(conn: Connection, logger: logging.Logger, table_type: str) -> None:
-    spec_folder = join(dirname(realpath(__file__)), "database_specification", table_type, "triggers")
+def remove_triggers(conn: Connection, logger: logging.Logger, db_type: str) -> None:
+    spec_folder = join(dirname(realpath(__file__)), "database_specification", db_type, "triggers")
     with open(join(spec_folder, "triggers_list.txt"), "r") as file_list:
         all_trigger_sets = file_list.readlines()
 
