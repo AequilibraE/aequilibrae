@@ -50,8 +50,9 @@ class TestSelectLink(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
 
-        od_mask = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, 3)
+        od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, 3)
         print(od_mask)
+        print(link_loading)
         self.assertTrue(False)
         self.assignment.max_iter = 2
         self.assignment.set_algorithm("msa")
@@ -80,7 +81,7 @@ def create_od_mask(demand, graph, sl):
                 res.compute_path(origin, dest)
             # print(res.path_nodes)
             if res.path_nodes is not None:
-                b.append(list(res.path_nodes))
+                b.append(list(res.path_nodes)) #+[dest])
         a.append(b)
     # print(a)
     node_pair = graph.graph.iloc[sl-1]["a_node"]+1, graph.graph.iloc[sl-1]["b_node"]+1
@@ -99,4 +100,21 @@ def create_od_mask(demand, graph, sl):
         for dest in range(24):
             if mask.get((origin, dest)):
                 sl_od[origin, dest] = demand[origin, dest]
-    return sl_od
+
+    #make link loading
+    loading = np.zeros((77, 1))
+    # print(graph.graph)
+    # print((graph.graph["a_node"] == 0))
+    # print((graph.graph["b_node"] == 1))
+    # print((graph.graph["a_node"] == 0) & (graph.graph["b_node"] == 1))
+    print(graph.graph)
+    for orig, dest in mask.keys():
+        path = a[orig][dest]
+        print(path)
+        for i in range(len(path)-1):
+            print(i, len(path))
+            print("current node", path[i], path[i+1])
+            link = graph.graph[(graph.graph["a_node"] == path[i]-1) & (graph.graph["b_node"] == path[i+1]-1)]["link_id"].values[0]
+            print("link ", link)
+            loading[link] += demand[orig, dest]
+    return sl_od, loading
