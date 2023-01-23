@@ -4,8 +4,6 @@ import shutil
 import sqlite3
 import warnings
 
-# from os.path import join
-
 from aequilibrae import global_logger
 from aequilibrae.log import Log
 from aequilibrae.parameters import Parameters
