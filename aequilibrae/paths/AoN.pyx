@@ -16,7 +16,9 @@ include 'path_file_saving.pyx'
 
 from .__version__ import binary_version as VERSION_COMPILED
 
-def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
+def one_to_all(origin, matrix, graph, result,
+               aux_result, curr_thread):
+    # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
     cdef int critical_queries = 0
     cdef int path_file = 0
@@ -148,6 +150,25 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+    cdef:
+        long long [:] selected_links_view
+        double[:, :] sl_od_loading_view
+        double [:, :] sl_link_loading_view
+        double[:, :] tmp_flow_view
+        long long[:] link_list
+    if result._selected_links_od:
+        for link in list(result._selected_links_loading.keys()):
+            link_list = np.asarray(link, dtype=graph.default_types("int"))[:]
+            sl_od_loading_view = result._selected_links_od[link][origin_index, :, :]
+            sl_link_loading_view = result._selected_links_loading[link][:, :]
+            #TODO: don't need to initialise the temp view each iteration, make it smarter
+            tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))[:, :]
+            with nogil:
+                perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
+                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
+            # if origin_index == 1:
+                # print("Post SL linkl, link is:", link, " matrix is:\n", result._selected_links_od[link][:, :, 0])
+                # print("Post SL link loading, link is:", link, " matrix is:\n", result._selected_links_loading[link][:, 0])
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
