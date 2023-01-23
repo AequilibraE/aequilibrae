@@ -38,86 +38,44 @@ class TestSelectLink(TestCase):
     def test_select_link_results(self):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-
         self.assignclass.set_select_links([[(9, 1), (6, 1)], [(3, 1)]])
-        print(self.assignclass.graph.graph)
         self.assignment.set_classes([self.assignclass])
-
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
-
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
         self.assignment.set_cores(1)
         self.assignment.execute()
 
         for key in self.assignclass._aon_results._selected_links_od.keys():
-            # print(key)
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            for i in range(self.assignclass._aon_results._selected_links_od[key][:, :, 0].shape[0]):
-                match = np.allclose(self.assignclass._aon_results._selected_links_od[key][i, :, 0], od_mask[i, :])
-                if not match:
-                    print("od matrix for origin (1-based): ", i+1, "should be: \n",
-                          od_mask[i, :]
-                          )
-                    print("but is:\n", self.assignclass._aon_results._selected_links_od[(key)][i, :, 0])
-
-        # print("cython sl matrix: ",self.assignclass._aon_results._selected_links_od[(2,)][:,:,0])
-        #     print(f"od for {key}:", self.assignclass._aon_results._selected_links_od[key][:,:,0])
             self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][:,:,0], od_mask), True, "OD SL matrix for: " +str(key) + " does not match")
             self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
-        # _sl_results.matricies == {(9, 1): AequilibraeMatrix(), (6, 1): AequilibraeMatrix()}
+
 
     def test_equals_demand_one_origin(self):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
 
         self.assignclass.set_select_links([[(1, 1), (4, 1), (3, 1), (2,1)]])
-        print(self.assignclass.graph.graph)
         self.assignment.set_classes([self.assignclass])
-
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
-
-        # print("regular: ", od_mask[1,:], "\n\n")
-        # print(link_loading)
-        # self.assertTrue(False)
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
         self.assignment.set_cores(1)
         self.assignment.execute()
         for key in self.assignclass._aon_results._selected_links_od.keys():
-            print(key)
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            for i in range(self.assignclass._aon_results._selected_links_od[key][:, :, 0].shape[0]):
-                match = np.allclose(self.assignclass._aon_results._selected_links_od[key][i, :, 0], self.assignclass.matrix.matrix_view[i, :, 0])
-                if not match:
-                    print("od matrix for origin (1-based): ", i + 1, "should be: \n",
-                          self.assignclass.matrix.matrix_view[i, :, 0]
-                          )
-                    print("but is:\n", self.assignclass._aon_results._selected_links_od[key][i, :, 0])
-            match = (self.assignclass._aon_results._selected_links_loading[key] == link_loading).all()
-            if not match:
-                print("link loads ought be: ")
-                print(link_loading[:,0])
-                print("but is: ")
-                print(self.assignclass._aon_results._selected_links_loading[key][:,0])
-            # print(self.assignclass._aon_results._selected_links_od[key][:, 0])
-            # print("cython sl matrix: ",self.assignclass._aon_results._selected_links_od[(2,)][:,:,0])
-            #     print(f"od for {key}:", self.assignclass._aon_results._selected_links_od[key][:,:,0])
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][0,:],self.assignclass.matrix.matrix_view[0,:]), True,
+            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][0,:], self.assignclass.matrix.matrix_view[0,:]), True,
                               "OD SL matrix for: " + str(key) + " does not match")
-
             self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
-            # self.assertEquals(self.assignclass._aon_results._selected_links_loading[key].allclose(link_loading), True, "Link loading SL matrix for: " + str(key) + " does not match")
 
     def test_single_demand(self):
         self.assignment = TrafficAssignment()
@@ -125,40 +83,22 @@ class TestSelectLink(TestCase):
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-
         self.assignclass.set_select_links([[(39, 1), (66, 1)], [(73, 1)]])
-        print(self.assignclass.graph.graph)
         self.assignment.set_classes([self.assignclass])
-
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
         self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
-
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
         self.assignment.set_cores(1)
         self.assignment.execute()
-
         for key in self.assignclass._aon_results._selected_links_od.keys():
-            # print(key)
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            for i in range(self.assignclass._aon_results._selected_links_od[key][:, :, 0].shape[0]):
-                match = np.allclose(self.assignclass._aon_results._selected_links_od[key][i, :, 0], self.assignclass.matrix.matrix_view[i, :, 0])
-                if not match:
-                    print("od matrix for origin (1-based): ", i+1, "should be: \n",
-                          od_mask[i, :]
-                          )
-                    print("but is:\n", self.assignclass._aon_results._selected_links_od[key][i, :, 0])
-
-        # print("cython sl matrix: ",self.assignclass._aon_results._selected_links_od[(2,)][:,:,0])
-        #     print(f"od for {key}:", self.assignclass._aon_results._selected_links_od[key][:,:,0])
             self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][:,:,0], od_mask), True, "OD SL matrix for: " +str(key) + " does not match")
             self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
 
-        pass
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
@@ -172,7 +112,6 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     for origin in range(1, 25):
         b=[]
         for dest in range(1, 25):
-            # print(dest)
             if origin == dest:
                 pass
             else:
@@ -201,16 +140,12 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
         for dest in range(24):
             if mask.get((origin, dest)):
                 sl_od[origin, dest] = demand[origin, dest]
-    # print(sl_od)
 
     #make link loading
     loading = np.zeros((76, 1))
     for orig, dest in mask.keys():
         path = a[orig][dest]
         for i in range(len(path)-1):
-            # print(i, len(path))
-            # print("current node", path[i], path[i+1])
             link = graph.graph[(graph.graph["a_node"] == path[i]-1) & (graph.graph["b_node"] == path[i+1]-1)]["link_id"].values[0]-1
-            # print("link ", link)
             loading[link] += demand[orig, dest]
     return sl_od, loading

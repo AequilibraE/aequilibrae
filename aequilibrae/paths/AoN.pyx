@@ -166,9 +166,6 @@ def one_to_all(origin, matrix, graph, result,
             with nogil:
                 perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
                                              sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
-            # if origin_index == 1:
-                # print("Post SL linkl, link is:", link, " matrix is:\n", result._selected_links_od[link][:, :, 0])
-                # print("Post SL link loading, link is:", link, " matrix is:\n", result._selected_links_loading[link][:, 0])
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)

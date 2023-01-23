@@ -447,7 +447,6 @@ class LinearApproximation(WorkerThread):
 
                     if c._selected_links:
                         for name, link_set in c._selected_links.items():
-                            print("doing linear comb for:", name)
                             linear_combination_skims(
                                 c._aon_results.select_link_od.matrix[name],  # ouput matrix
                                 c._aon_results._selected_links_od[link_set],  # matrix 1

@@ -103,9 +103,9 @@ cdef return_an_int_view(input):
     return critical_links_view
 
 
-# @cython.wraparound(False)
-# @cython.embedsignature(True)
-# @cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
 cdef void perform_select_link_analysis(long origin,
                                         long long [:] selected_links,
                                         double [:, :] demand,
@@ -132,8 +132,6 @@ cdef void perform_select_link_analysis(long origin,
         int i, j, k, idx, dests = demand.shape[0]
         long long predecessor, connection, lid, link
     for j in range(dests):
-        #Walk paths back to origin, execute network loading on the way
-        #reset the path loading along the path
         for i in range(conn.shape[0]):
             #TODO: check if memset is faster than rewalking path
             if conn[i] != -1:
@@ -142,40 +140,25 @@ cdef void perform_select_link_analysis(long origin,
         predecessor = j
         connection = conn[predecessor]
         predecessor = pred[predecessor]
-        # printf(<char*> "\n origin %li, node is: %lli\n", predecessor)
-        # printf(<char *> "\nloading classes for node %i", predecessor)
         while predecessor >= 0:
-            # printf("current predecessor is: %lli\n", predecessor)
             for k in range(classes):
                 tmp_flow[connection, k] = demand[j, k]
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-                # printf(<char *> "\ndemand at point is %f", demand[j, k])
 
         for k in range(classes):
-            # printf(<char *> "\niterating class: %i, from total number, %i",k, classes)
             for i in range(selected_links.shape[0]):
                 lid = selected_links[i]
-                # printf(<char *> "\nchecking select link interaction for index: %i, link: %i",i, lid )
                 #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
                 if tmp_flow[lid, k] != 0:
-                    # printf(<char *> "\ninteraction detected for destination %i", j)
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
                         if conn[idx] != -1:
                             link = conn[idx]
-                        # if lid == link:
-                            # printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
-                            #        tmp_flow[k, link])
-                        # else:
-                            # printf(<char *> "\nloading link %i, and class, %i, with value: %f", link, k, tmp_flow[k, link])
-                        #sl_link_loading.shape[0]):
                             sl_link_loading[link, k] += tmp_flow[link, k]
                     break
                 #once at least one link in the set is shown to be in the current destination, the load along that path is added.
                 #There is no need to check the remaining links - this would add extra demand that isn't there
-            #todo: test break is in correct locaton
-
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
