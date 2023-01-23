@@ -103,9 +103,9 @@ cdef return_an_int_view(input):
     return critical_links_view
 
 
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
+# @cython.wraparound(False)
+# @cython.embedsignature(True)
+# @cython.boundscheck(False)
 cdef void perform_select_link_analysis(long origin,
                                         long long [:] selected_links,
                                         double [:, :] demand,
@@ -118,7 +118,9 @@ cdef void perform_select_link_analysis(long origin,
 # origin: Origin of the path
 # demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
 # pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
-# conn: Stores the link connecting the given index to its next?/previous node
+# conn: Stores the link connecting the given index (predecessor) to its next node
+#e.g: in sioux falls, for origin 0, the node 1's predecessor is 0. Referencing conn[1] will return the link 0 (link 1)
+# conn gives the link that connects the current predecressor to its predecessor
 # sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
 # sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
 #Dimension: num_links by 1
@@ -127,7 +129,7 @@ cdef void perform_select_link_analysis(long origin,
 #tmp flow: array of zeros as long as the number of links in compressed graph
 
     cdef:
-        unsigned int i, j, k, idx, dests = demand.shape[0]
+        int i, j, k, idx, dests = demand.shape[0]
         long long predecessor, connection, lid, link
 
     for j in range(dests):
@@ -135,15 +137,20 @@ cdef void perform_select_link_analysis(long origin,
         #reset the path loading along the path
         for i in range(2, conn.shape[0]):
             #TODO: check if memset is faster than rewalking path
-            for k in range(classes):
-                tmp_flow[conn[i], k] = 0
+            if conn[i] != -1:
+                for k in range(classes):
+                    tmp_flow[conn[i], k] = 0
         predecessor = j
-        while predecessor != origin:
-            connection = conn[predecessor]
-            predecessor = pred[predecessor]
-            # printf(<char *> "\nloading classes for node %i", predecessor)
+        connection = conn[predecessor]
+        predecessor = pred[predecessor]
+        # printf(<char*> "\n origin %li, node is: %lli\n", predecessor)
+        # printf(<char *> "\nloading classes for node %i", predecessor)
+        while predecessor >= 0:
+            # printf("current predecessor is: %lli\n", predecessor)
             for k in range(classes):
                 tmp_flow[connection, k] += demand[j, k]
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
                 # printf(<char *> "\ndemand at point is %f", demand[j, k])
 
         for k in range(classes):
@@ -156,14 +163,15 @@ cdef void perform_select_link_analysis(long origin,
                     # printf(<char *> "\ninteraction detected for destination %i", j)
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
-                        link = conn[idx]
+                        if idx != -1:
+                            link = conn[idx]
                         # if lid == link:
                             # printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
                             #        tmp_flow[k, link])
                         # else:
                             # printf(<char *> "\nloading link %i, and class, %i, with value: %f", link, k, tmp_flow[k, link])
                         #sl_link_loading.shape[0]):
-                        sl_link_loading[link, k] += tmp_flow[link, k]
+                            sl_link_loading[link, k] += tmp_flow[link, k]
                     break
                 #once at least one link in the set is shown to be in the current destination, the load along that path is added.
                 #There is no need to check the remaining links - this would add extra demand that isn't there

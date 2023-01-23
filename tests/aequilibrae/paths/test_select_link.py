@@ -50,16 +50,26 @@ class TestSelectLink(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
 
-        od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, 3)
-        print(od_mask)
-        print(link_loading)
-        self.assertTrue(False)
-        self.assignment.max_iter = 2
+        # print("regular: ", od_mask[1,:], "\n\n")
+        # print(link_loading)
+        # self.assertTrue(False)
+        self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
         self.assignment.set_cores(1)
         self.assignment.execute()
+        od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, (8,5))
+        for i in range(self.assignclass._aon_results._selected_links_od[(8,5)][:,:,0].shape[0]):
+            if not (self.assignclass._aon_results._selected_links_od[(8,5)][i,:,0] == od_mask[i,:]).all()
+                print("od matrix for origin: ", i, "is : ", self.assignclass._aon_results._selected_links_od[(8,5)][i,:,0])
+                print("od matrix for origin: ", i, "is : ", od_mask[i,:])
         self.assertTrue(False)
-        self.assertTrue(self.assignclass._sl_results is not None)
+        for key in self.assignclass._aon_results._selected_links_od.keys():
+            print(key)
+            od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
+        # print("cython sl matrix: ",self.assignclass._aon_results._selected_links_od[(2,)][:,:,0])
+            print(f"od for {key}:", self.assignclass._aon_results._selected_links_od[key][:,:,0])
+            self.assertEquals((self.assignclass._aon_results._selected_links_od[key][:,:,0] == od_mask).all(), True, "OD SL matrix for: " +str(key) + " does not match")
+            self.assertEquals((self.assignclass._aon_results._selected_links_loading[key] == link_loading).all(), True, "Link loading SL matrix for: " +str(key) + " does not match")
         # _sl_results.matricies == {(9, 1): AequilibraeMatrix(), (6, 1): AequilibraeMatrix()}
 
 
@@ -84,15 +94,21 @@ def create_od_mask(demand, graph, sl):
                 b.append(list(res.path_nodes)) #+[dest])
         a.append(b)
     # print(a)
-    node_pair = graph.graph.iloc[sl-1]["a_node"]+1, graph.graph.iloc[sl-1]["b_node"]+1
-    print(node_pair)
+    sl_links = []
+    print("select link key is: ", sl)
+    for i in range(len(sl)):
+        node_pair = graph.graph.iloc[sl[i]]["a_node"]+1, graph.graph.iloc[sl[i]]["b_node"]+1
+        print(f"node pair for: {sl[i]} is {node_pair}")
+        sl_links.append(node_pair)
+    print(sl_links)
     mask = dict()
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):
             for k in range(len(path)):
                 if origin == dest:
                     pass
-                elif path[k] == node_pair[1] and path[k-1] == node_pair[0]:
+                elif (path[k-1], path[k]) in sl_links:
+                    # print(f"{path[k-1], path[k]} is in selected links")
                     mask[(origin, dest)] = True
     print(mask)
     sl_od = np.zeros((24, 24))
@@ -100,21 +116,22 @@ def create_od_mask(demand, graph, sl):
         for dest in range(24):
             if mask.get((origin, dest)):
                 sl_od[origin, dest] = demand[origin, dest]
+    print(sl_od)
 
     #make link loading
-    loading = np.zeros((77, 1))
+    loading = np.zeros((76, 1))
     # print(graph.graph)
     # print((graph.graph["a_node"] == 0))
     # print((graph.graph["b_node"] == 1))
     # print((graph.graph["a_node"] == 0) & (graph.graph["b_node"] == 1))
-    print(graph.graph)
+    # print(graph.graph)
     for orig, dest in mask.keys():
         path = a[orig][dest]
-        print(path)
+
         for i in range(len(path)-1):
-            print(i, len(path))
-            print("current node", path[i], path[i+1])
-            link = graph.graph[(graph.graph["a_node"] == path[i]-1) & (graph.graph["b_node"] == path[i+1]-1)]["link_id"].values[0]
-            print("link ", link)
+            # print(i, len(path))
+            # print("current node", path[i], path[i+1])
+            link = graph.graph[(graph.graph["a_node"] == path[i]-1) & (graph.graph["b_node"] == path[i+1]-1)]["link_id"].values[0]-1
+            # print("link ", link)
             loading[link] += demand[orig, dest]
     return sl_od, loading
