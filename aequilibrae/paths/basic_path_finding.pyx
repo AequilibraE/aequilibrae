@@ -131,11 +131,10 @@ cdef void perform_select_link_analysis(long origin,
     cdef:
         int i, j, k, idx, dests = demand.shape[0]
         long long predecessor, connection, lid, link
-
     for j in range(dests):
         #Walk paths back to origin, execute network loading on the way
         #reset the path loading along the path
-        for i in range(2, conn.shape[0]):
+        for i in range(conn.shape[0]):
             #TODO: check if memset is faster than rewalking path
             if conn[i] != -1:
                 for k in range(classes):
@@ -148,7 +147,7 @@ cdef void perform_select_link_analysis(long origin,
         while predecessor >= 0:
             # printf("current predecessor is: %lli\n", predecessor)
             for k in range(classes):
-                tmp_flow[connection, k] += demand[j, k]
+                tmp_flow[connection, k] = demand[j, k]
             connection = conn[predecessor]
             predecessor = pred[predecessor]
                 # printf(<char *> "\ndemand at point is %f", demand[j, k])
@@ -163,7 +162,7 @@ cdef void perform_select_link_analysis(long origin,
                     # printf(<char *> "\ninteraction detected for destination %i", j)
                     sl_od_loading[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
-                        if idx != -1:
+                        if conn[idx] != -1:
                             link = conn[idx]
                         # if lid == link:
                             # printf(<char *> "\nselected link, %i, current class, %i, demand loading %f", link, k,
