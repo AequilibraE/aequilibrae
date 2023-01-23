@@ -3,7 +3,7 @@ import sqlite3
 import shapely.wkb
 import shapely.wkt
 from shapely.ops import transform
-from aequilibrae.transit.functions.data import get_table
+from aequilibrae.utils.get_table import get_table
 
 from aequilibrae.transit.transit_elements import Pattern
 

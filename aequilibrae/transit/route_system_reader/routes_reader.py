@@ -1,5 +1,5 @@
 import sqlite3
-from aequilibrae.transit.functions.data import get_table
+from aequilibrae.utils.get_table import get_table
 
 # from polarislib.network.data import DataTableStorage
 from aequilibrae.transit.transit_elements import Route

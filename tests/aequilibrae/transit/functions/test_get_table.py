@@ -4,8 +4,8 @@ import pytest
 
 from aequilibrae.transit import Transit
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.functions.data import get_table
-from aequilibrae.transit.functions.db_utils import list_tables_in_db
+from aequilibrae.utils.get_table import get_table
+from aequilibrae.utils.list_tables_in_db import list_tables_in_db
 from aequilibrae.utils.create_example import create_example
 
 

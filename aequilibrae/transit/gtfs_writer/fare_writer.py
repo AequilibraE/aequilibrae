@@ -4,7 +4,7 @@ from os.path import join
 import pandas as pd
 
 # from polarislib.network.data import DataTableStorage
-from aequilibrae.transit.functions.data import get_table
+from aequilibrae.utils.get_table import get_table
 
 
 def write_fares(folder_path: str, conn):

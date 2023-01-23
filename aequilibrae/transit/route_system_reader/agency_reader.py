@@ -1,7 +1,7 @@
 import sqlite3
 
 # from aequilibrae.data import DataTableStorage
-from aequilibrae.transit.functions.data import get_table
+from aequilibrae.utils.get_table import get_table
 from aequilibrae.transit.transit_elements import Agency
 
 
