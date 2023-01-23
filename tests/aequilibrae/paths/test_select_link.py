@@ -52,15 +52,22 @@ class TestSelectLink(TestCase):
 
         for key in self.assignclass._aon_results._selected_links_od.keys():
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][:,:,0], od_mask), True, "OD SL matrix for: " +str(key) + " does not match")
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
-
+            self.assertEquals(
+                np.allclose(self.assignclass._aon_results._selected_links_od[key][:, :, 0], od_mask),
+                True,
+                "OD SL matrix for: " + str(key) + " does not match",
+            )
+            self.assertEquals(
+                np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading),
+                True,
+                "Link loading SL matrix for: " + str(key) + " does not match",
+            )
 
     def test_equals_demand_one_origin(self):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
 
-        self.assignclass.set_select_links([[(1, 1), (4, 1), (3, 1), (2,1)]])
+        self.assignclass.set_select_links([[(1, 1), (4, 1), (3, 1), (2, 1)]])
         self.assignment.set_classes([self.assignclass])
         self.assignment.set_vdf("BPR")
         self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -73,13 +80,23 @@ class TestSelectLink(TestCase):
         self.assignment.execute()
         for key in self.assignclass._aon_results._selected_links_od.keys():
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][0,:], self.assignclass.matrix.matrix_view[0,:]), True,
-                              "OD SL matrix for: " + str(key) + " does not match")
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
+            self.assertEquals(
+                np.allclose(
+                    self.assignclass._aon_results._selected_links_od[key][0, :],
+                    self.assignclass.matrix.matrix_view[0, :],
+                ),
+                True,
+                "OD SL matrix for: " + str(key) + " does not match",
+            )
+            self.assertEquals(
+                np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading),
+                True,
+                "Link loading SL matrix for: " + str(key) + " does not match",
+            )
 
     def test_single_demand(self):
         self.assignment = TrafficAssignment()
-        custom_demand = np.zeros((24,24,1))
+        custom_demand = np.zeros((24, 24, 1))
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
@@ -96,9 +113,16 @@ class TestSelectLink(TestCase):
         self.assignment.execute()
         for key in self.assignclass._aon_results._selected_links_od.keys():
             od_mask, link_loading = create_od_mask(self.assignclass.matrix.matrix_view, self.assignclass.graph, key)
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_od[key][:,:,0], od_mask), True, "OD SL matrix for: " +str(key) + " does not match")
-            self.assertEquals(np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading), True, "Link loading SL matrix for: " +str(key) + " does not match")
-
+            self.assertEquals(
+                np.allclose(self.assignclass._aon_results._selected_links_od[key][:, :, 0], od_mask),
+                True,
+                "OD SL matrix for: " + str(key) + " does not match",
+            )
+            self.assertEquals(
+                np.allclose(self.assignclass._aon_results._selected_links_loading[key], link_loading),
+                True,
+                "Link loading SL matrix for: " + str(key) + " does not match",
+            )
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
@@ -110,7 +134,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     a = []
     # compute a path from node 8 to 13
     for origin in range(1, 25):
-        b=[]
+        b = []
         for dest in range(1, 25):
             if origin == dest:
                 pass
@@ -124,7 +148,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
         a.append(b)
     sl_links = []
     for i in range(len(sl)):
-        node_pair = graph.graph.iloc[sl[i]]["a_node"]+1, graph.graph.iloc[sl[i]]["b_node"]+1
+        node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
         sl_links.append(node_pair)
     mask = dict()
     for origin, val in enumerate(a):
@@ -132,7 +156,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
             for k in range(1, len(path)):
                 if origin == dest:
                     pass
-                elif (path[k-1], path[k]) in sl_links:
+                elif (path[k - 1], path[k]) in sl_links:
 
                     mask[(origin, dest)] = True
     sl_od = np.zeros((24, 24))
@@ -141,11 +165,16 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
             if mask.get((origin, dest)):
                 sl_od[origin, dest] = demand[origin, dest]
 
-    #make link loading
+    # make link loading
     loading = np.zeros((76, 1))
     for orig, dest in mask.keys():
         path = a[orig][dest]
-        for i in range(len(path)-1):
-            link = graph.graph[(graph.graph["a_node"] == path[i]-1) & (graph.graph["b_node"] == path[i+1]-1)]["link_id"].values[0]-1
+        for i in range(len(path) - 1):
+            link = (
+                graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
+                    "link_id"
+                ].values[0]
+                - 1
+            )
             loading[link] += demand[orig, dest]
     return sl_od, loading
