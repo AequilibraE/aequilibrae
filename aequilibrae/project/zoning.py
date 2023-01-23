@@ -100,7 +100,7 @@ class Zoning(BasicTable):
             item.save()
 
     def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
-        """Returns the zone in which a certain geometry is located.
+        """Returns the zone in which the given geometry is located.
 
             If the geometry is not fully enclosed by any zone, the zone closest to
             the geometry is returned
