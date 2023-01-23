@@ -105,17 +105,11 @@ class GTFSReader(WorkerThread):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
         self.__load_routes_table()
-
         self.__load_stops_table()
-
         self.__load_stop_times()
-
         self.__load_trips_table()
-
         self.__deconflict_stop_times()
-
         self.__load_shapes_table()
-
         self.__load_fare_data()
 
         self.zip_archive.close()
