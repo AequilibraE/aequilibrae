@@ -29,6 +29,18 @@ class TestSelectLink(TestCase):
         self.matrix = self.project.matrices.get_matrix("demand_omx")
         self.matrix.computational_view()
 
+        self.assignment = TrafficAssignment()
+        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
+        self.assignment.set_classes([self.assignclass])
+        self.assignment.set_vdf("BPR")
+        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        self.assignment.set_capacity_field("capacity")
+        self.assignment.set_time_field("free_flow_time")
+        self.assignment.max_iter = 1
+        self.assignment.set_algorithm("msa")
+        self.assignment.set_cores(1)
+
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
     def tearDown(self) -> None:
@@ -36,92 +48,63 @@ class TestSelectLink(TestCase):
         self.project.close()
 
     def test_select_link_results(self):
-        self.assignment = TrafficAssignment()
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignclass.set_select_links([[(9, 1), (6, 1)], [(3, 1)]])
-        self.assignment.set_classes([self.assignclass])
-        self.assignment.set_vdf("BPR")
-        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-        self.assignment.set_capacity_field("capacity")
-        self.assignment.set_time_field("free_flow_time")
-        self.assignment.max_iter = 1
-        self.assignment.set_algorithm("msa")
-        self.assignment.set_cores(1)
+
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )
 
     def test_equals_demand_one_origin(self):
-        self.assignment = TrafficAssignment()
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-
         self.assignclass.set_select_links([[(1, 1), (4, 1), (3, 1), (2, 1)]])
-        self.assignment.set_classes([self.assignclass])
-        self.assignment.set_vdf("BPR")
-        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-        self.assignment.set_capacity_field("capacity")
-        self.assignment.set_time_field("free_flow_time")
-        self.assignment.max_iter = 1
-        self.assignment.set_algorithm("msa")
-        self.assignment.set_cores(1)
+
         self.assignment.execute()
 
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )
 
     def test_single_demand(self):
-        self.assignment = TrafficAssignment()
         custom_demand = np.zeros((24, 24, 1))
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
-        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
+        self.assignclass.matrix = self.matrix
+
         self.assignclass.set_select_links([[(39, 1), (66, 1), (73, 1)]])
-        self.assignment.set_classes([self.assignclass])
-        self.assignment.set_vdf("BPR")
-        self.assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-        self.assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
-        self.assignment.set_capacity_field("capacity")
-        self.assignment.set_time_field("free_flow_time")
-        self.assignment.max_iter = 1
-        self.assignment.set_algorithm("msa")
-        self.assignment.set_cores(1)
+
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
-            self.assertEquals(
+            self.assertEqual(
                 np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
