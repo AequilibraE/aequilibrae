@@ -48,8 +48,12 @@ class TestSelectLink(TestCase):
         self.project.close()
 
     def test_select_link_results(self):
+        """
+        Tests whether the Select Link feature works as wanted.
+        Uses two examples: 2 links in one select link, and a single Selected Link
+        Checks both the OD Matrix and Link Loading
+        """
         self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)]})
-
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
@@ -67,6 +71,11 @@ class TestSelectLink(TestCase):
             )
 
     def test_equals_demand_one_origin(self):
+        """
+        Test to ensure the Select Link functionality behaves as required.
+        Tests to make sure the OD matrix works when all links surrounding one origin are selected
+        Confirms the Link Loading is done correctly in this case
+        """
         self.assignclass.set_select_links({"1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
 
         self.assignment.execute()
@@ -87,6 +96,10 @@ class TestSelectLink(TestCase):
             )
 
     def test_single_demand(self):
+        """
+        Tests the functionality of Select Link when given a custom demand matrix, where only 1 OD pair has demand on it
+        Confirms the OD matrix behaves, and the Link Loading is just on the path of this OD pair
+        """
         custom_demand = np.zeros((24, 24, 1))
         custom_demand[0, 23, 0] = 1000
         self.matrix.matrix_view = custom_demand
@@ -111,10 +124,21 @@ class TestSelectLink(TestCase):
             )
 
     def test_duplicate_links(self):
+        """
+        Tests to make sure the user api correctly filters out duplicate links in the compressed graph
+        """
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
-        self.assignclass.set_select_links([[(1, 1), (1, 1)]])
-        print(self.assignclass._selected_links)
+        self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
+        self.assertEquals(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
+
+    def test_link_out_of_bounds(self):
+        """
+        Test to confirm the user api correctly identifies when an input node is invalid for the current graph
+        """
+        self.assignment = TrafficAssignment()
+        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
+        self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
     res = PathResults()

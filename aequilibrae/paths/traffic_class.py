@@ -97,11 +97,22 @@ class TrafficClass:
         for name, link_set in links.items():
             link_ids = []
             for link, dir in link_set:
+                duplicate_link = False
                 query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                link_ids.append(self.graph.compact_graph[query]["id"].values[0])
-            self._selected_links[name] = tuple(link_ids)
+                # Check for duplicate compressed link ids in the current link set
+                comp_id = self.graph.compact_graph[query]["id"].values[0]
+                for val in link_ids:
+                    if val == comp_id:
+                        print(
+                            f"Two input links map to the same compressed link in the network"
+                            f", removing superfluous link {link}_{dir}")
+                        duplicate_link = True
+                        break
+                if not duplicate_link:
+                    link_ids.append(comp_id)
+            self._selected_links[name] = tuple(set(link_ids))
 
     def __setattr__(self, key, value):
 
