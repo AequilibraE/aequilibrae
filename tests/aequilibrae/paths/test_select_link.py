@@ -110,6 +110,11 @@ class TestSelectLink(TestCase):
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )
 
+    def test_duplicate_links(self):
+        self.assignment = TrafficAssignment()
+        self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
+        self.assignclass.set_select_links([[(1, 1), (1, 1)]])
+        print(self.assignclass._selected_links)
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
     res = PathResults()
