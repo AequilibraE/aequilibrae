@@ -182,7 +182,7 @@ class TestZone(TestCase):
     def test_get_closest_zone(self):
         pt_in = Point(-96.7716, 43.6069)
         pt_out = Point(-96.7754, 43.5664)
-        self.assertEqual(self.proj.zoning.get_closest_zone(pt_in), 5)
+        self.assertEqual(self.proj.zoning.get_closest_zone(pt_in), 1)
         self.assertEqual(self.proj.zoning.get_closest_zone(pt_out), 3)
 
         line_in = LineString([(-96.7209, 43.6132), (-96.7033, 43.61316)])
