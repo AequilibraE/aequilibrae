@@ -48,7 +48,7 @@ class TestSelectLink(TestCase):
         self.project.close()
 
     def test_select_link_results(self):
-        self.assignclass.set_select_links([[(9, 1), (6, 1)], [(3, 1)]])
+        self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)]})
 
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
@@ -67,7 +67,7 @@ class TestSelectLink(TestCase):
             )
 
     def test_equals_demand_one_origin(self):
-        self.assignclass.set_select_links([[(1, 1), (4, 1), (3, 1), (2, 1)]])
+        self.assignclass.set_select_links({"1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
 
         self.assignment.execute()
 
@@ -92,7 +92,7 @@ class TestSelectLink(TestCase):
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
 
-        self.assignclass.set_select_links([[(39, 1), (66, 1), (73, 1)]])
+        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
 
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():

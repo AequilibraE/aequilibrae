@@ -1,4 +1,4 @@
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Dict
 import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
@@ -87,22 +87,21 @@ class TrafficClass:
 
         self.vot = float(value_of_time)
 
-    def set_select_links(self, links: List[List[Tuple[int, int]]]):
+    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
         """Set the selected links. Checks if the links and directions are valid. Translates link_id and
         direction into unique link id used in compact graph.
 
         Args:
             links (:obj:`Link[Link[Tuple[int, int]]]`): Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
-        direction = {1: "ab", -1: "ba"}
-        for link_set in links:
+        for name, link_set in links.items():
             link_ids = []
             for link, dir in link_set:
                 query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
                 link_ids.append(self.graph.compact_graph[query]["id"].values[0])
-            self._selected_links[f"sl_{link}_{direction[dir]}"] = tuple(link_ids)
+            self._selected_links[name] = tuple(link_ids)
 
     def __setattr__(self, key, value):
 
