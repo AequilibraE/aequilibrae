@@ -350,14 +350,6 @@ class LinearApproximation(WorkerThread):
             # c._aon_results._selected_links = c._selected_links  # maps name to link_set
             c._aon_results._selected_links = c._selected_links
             c.results._selected_links = c._selected_links
-            # for link_set in c._selected_links.values():  # maps link_set to temp matrix
-            #     c._aon_results.select_link_od.matrix[link_set] = np.zeros(
-            #         (c.graph.compact_num_nodes, c.graph.compact_num_nodes, c.results.classes["number"]),
-            #         dtype=c.graph.default_types("float"),
-            #     )  # temp matrix for OD paris
-            #     c._aon_results.select_link_loading.matrix[link_set] = np.zeros(
-            #         (c.graph.compact_num_links, c.results.classes["number"])
-            #     )  # temp matrix for link loading
 
             # Sizes the temporary objects used for the results
             c.results.prepare(c.graph, c.matrix)

@@ -140,6 +140,7 @@ class TestSelectLink(TestCase):
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
 
+
 def create_od_mask(demand: np.array, graph: Graph, sl):
     res = PathResults()
     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
