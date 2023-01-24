@@ -3,7 +3,7 @@ import numpy as np
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results import AssignmentResults
-
+import warnings
 
 class TrafficClass:
     """Traffic class for equilibrium traffic assignment
@@ -92,27 +92,27 @@ class TrafficClass:
         direction into unique link id used in compact graph.
 
         Args:
-            links (:obj:`Link[Link[Tuple[int, int]]]`): Link IDs and directions to be used in select link analysis"""
+            links (:obj:`Dict[str, List[Tuple[int, int]]]`): name of link set and
+             Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
         for name, link_set in links.items():
-            link_ids = []
+            link_ids = set()
             for link, dir in link_set:
-                duplicate_link = False
                 query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
                 # Check for duplicate compressed link ids in the current link set
                 comp_id = self.graph.compact_graph[query]["id"].values[0]
-                for val in link_ids:
-                    if val == comp_id:
-                        print(
-                            f"Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link}_{dir}")
-                        duplicate_link = True
-                        break
-                if not duplicate_link:
-                    link_ids.append(comp_id)
-            self._selected_links[name] = tuple(set(link_ids))
+                if comp_id in link_ids:
+                    warnings.warn(
+                        "Two input links map to the same compressed link in the network"
+                        f", removing superfluous link {link}_{dir}"
+                    )
+                else:
+                    link_ids.add(comp_id)
+            self._selected_links[name] = tuple(link_ids)
+
+
 
     def __setattr__(self, key, value):
 
