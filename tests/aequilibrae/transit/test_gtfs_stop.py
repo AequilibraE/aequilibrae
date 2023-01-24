@@ -29,8 +29,7 @@ def data():
 
 
 def test__populate(data):
-    s = Stop(1)
-    s.populate(tuple(data.values()), list(data.keys()))
+    s = Stop(1, tuple(data.values()), list(data.keys()))
     xy = (s.geo.x, s.geo.y)
     assert xy == (data["stop_lon"], data["stop_lat"]), "Stop built geo wrongly"
     data["stop"] = data["stop_id"]
@@ -43,32 +42,27 @@ def test__populate(data):
 
     new_data = {key: val for key, val in data.items()}
     new_data[randomword(randint(1, 15))] = randomword(randint(1, 20))
-    s = Stop(1)
     with pytest.raises(KeyError):
-        s.populate(tuple(new_data.values()), list(new_data.keys()))
+        s = Stop(1, tuple(new_data.values()), list(new_data.keys()))
 
 
-def test_save_to_database(data, project: Project):
-    Transit(project)
-    network = database_connection("transit")
-
+def test_save_to_database(data, transit_conn):
     line = LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb
     tlink_id = randint(10000, 200000044)
-    s = Stop(1)
-    s.populate(tuple(data.values()), list(data.keys()))
+    s = Stop(1, tuple(data.values()), list(data.keys()))
     s.link = link = randint(1, 30000)
     s.dir = direc = choice((0, 1))
     s.agency = randint(5, 100000)
     s.route_type = randint(0, 13)
     s.srid = get_srid()
     s.get_node_id()
-    s.save_to_database(network, commit=True)
+    s.save_to_database(transit_conn, commit=True)
 
     sql_tl = """Insert into route_links ("transit_link", "pattern_id", "seq", "from_stop", "to_stop", "distance", "geometry")
                 VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"""
-    network.execute(sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line])
+    transit_conn.execute(sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line])
 
-    qry = network.execute(
+    qry = transit_conn.execute(
         "Select agency_id, link, dir, description, street from stops where stop=?", [data["stop_id"]]
     ).fetchone()
     result = [x for x in qry]

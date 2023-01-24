@@ -5,17 +5,17 @@ from typing import Union, List
 from shapely.geometry import Point, Polygon, LineString, MultiPoint, MultiPolygon, MultiLineString
 from shapely.wkb import loads
 
-complete = iutil.find_spec("rtree") is not None
+rtree_avail = iutil.find_spec("rtree") is not None
 qgis = iutil.find_spec("qgis") is not None
-if complete:
-    from rtree.index import Index as Index
-
-    env = "Python"
-elif qgis:
+if qgis:
     from qgis.core import QgsSpatialIndex as Index
     from qgis.core import QgsGeometry, QgsFeature
 
     env = "QGIS"
+elif rtree_avail:
+    from rtree.index import Index as Index
+
+    env = "Python"
 else:
     env = "NOT AVAILABLE"
 

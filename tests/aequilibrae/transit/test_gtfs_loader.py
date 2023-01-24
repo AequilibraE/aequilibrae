@@ -1,9 +1,7 @@
 from os.path import join, dirname, abspath
-from uuid import uuid4
 import pytest
 
 import pandas as pd
-from aequilibrae.project import Project
 from aequilibrae.transit import Transit
 
 from aequilibrae.transit.gtfs_loader import GTFSReader
@@ -11,15 +9,7 @@ from aequilibrae.utils.create_example import create_example
 
 
 @pytest.fixture
-def create_path(tmp_path):
-    return tmp_path / uuid4().hex
-
-
-@pytest.fixture
-def gtfs_loader(create_path):
-    prj = create_example(create_path, "coquimbo")
-
-    Transit(prj)
+def gtfs_loader(create_gtfs_project):
     return GTFSReader()
 
 

@@ -3,9 +3,6 @@ import pytest
 
 from numpy import array
 from shapely.geometry import MultiLineString
-from aequilibrae.project import Project
-from aequilibrae.transit import Transit
-from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.functions.get_srid import get_srid
 
 from aequilibrae.transit.transit_elements import Route
@@ -43,17 +40,15 @@ class TestRoute:
         with pytest.raises(KeyError):
             new_r.populate(tuple(data.values()), list(data.keys()))
 
-    def test_save_to_database(self, data_dict, project: Project):
+    def test_save_to_database(self, data_dict, transit_conn):
         data = data_dict
-        Transit(project)
-        network = database_connection("transit")
 
         r = Route(1)
         r.srid = get_srid()
         r.populate(tuple(data.values()), list(data.keys()))
         r.shape = MultiLineString([array(((0.0, 0.0), (1.0, 2.0)))])
-        r.save_to_database(network)
-        curr = network.cursor()
+        r.save_to_database(transit_conn)
+        curr = transit_conn.cursor()
         curr.execute(
             "Select agency_id, shortname, longname, description, route_type from routes where route=?",
             [data["route_id"]],

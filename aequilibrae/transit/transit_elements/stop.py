@@ -1,3 +1,4 @@
+import dataclasses
 from sqlite3 import Connection
 from typing import Dict, Any, Optional
 
@@ -7,10 +8,11 @@ from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
+@dataclasses.dataclass
 class Stop(BasicPTElement):
     """Transit stop as read from the GTFS feed"""
 
-    def __init__(self, agency_id: int):
+    def __init__(self, agency_id: int, record: tuple, headers: list):
         self.stop_id = -1
         self.stop = ""
         self.stop_code = ""
@@ -38,7 +40,6 @@ class Stop(BasicPTElement):
         self.___map_matching_id__: Dict[Any, Any] = dict()
         self.__moved_map_matching__ = 0
 
-    def populate(self, record: tuple, headers: list) -> None:
         for key, value in zip(headers, record):
             if key not in self.__dict__.keys():
                 raise KeyError(f"{key} field in Stops.txt is unknown field for that file on GTFS")

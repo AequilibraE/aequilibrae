@@ -1,5 +1,4 @@
 from os.path import isfile, join
-from aequilibrae.transit import Transit
 
 
 def test_new_gtfs_builder(create_gtfs_project, create_path):
