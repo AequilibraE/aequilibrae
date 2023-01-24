@@ -60,12 +60,12 @@ class TestSelectLink(TestCase):
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
+                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
+                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )
@@ -85,12 +85,12 @@ class TestSelectLink(TestCase):
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
+                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
+                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )
@@ -113,12 +113,12 @@ class TestSelectLink(TestCase):
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_od.matrix[key][:, :, 0], od_mask),
+                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
                 True,
                 "OD SL matrix for: " + str(key) + " does not match",
             )
             self.assertEqual(
-                np.allclose(self.assignclass._aon_results.select_link_loading.matrix[key], link_loading),
+                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
                 True,
                 "Link loading SL matrix for: " + str(key) + " does not match",
             )

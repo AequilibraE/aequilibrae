@@ -156,11 +156,11 @@ def one_to_all(origin, matrix, graph, result,
         double [:, :] sl_link_loading_view
         double[:, :] tmp_flow_view
         long long[:] link_list
-    if result._selected_links_od:
-        for link in list(result._selected_links_loading.keys()):
-            link_list = np.asarray(link, dtype=graph.default_types("int"))[:]
-            sl_od_loading_view = result._selected_links_od[link][origin_index, :, :]
-            sl_link_loading_view = result._selected_links_loading[link][:, :]
+    if result._selected_links:
+        for name, link_set in result._selected_links.items():
+            link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
+            sl_od_loading_view = result.select_link_od.matrix[name][origin_index, :, :]
+            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
             #TODO: don't need to initialise the temp view each iteration, make it smarter
             tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))[:, :]
             with nogil:

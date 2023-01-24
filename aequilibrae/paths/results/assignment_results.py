@@ -39,9 +39,7 @@ class AssignmentResults:
 
         self.classes = {"number": 1, "names": ["flow"]}
 
-        self._selected_link_names = []
-        self._selected_links_od = {}
-        self._selected_links_loading = {}
+        self._selected_links = {}
         self.select_link_od = AequilibraeMatrix()
         self.select_link_loading = AequilibraeMatrix()
 
@@ -106,12 +104,12 @@ class AssignmentResults:
             self.__redim()
             self.__graph_id__ = graph.__id__
 
-        if self._selected_links_od:
+        if self._selected_links:
             self.select_link_od = AequilibraeMatrix()
             self.select_link_od.create_empty(
                 memory_only=True,
                 zones=matrix.zones,
-                matrix_names=self._selected_link_names,
+                matrix_names=list(self._selected_links.keys()),
                 index_names=matrix.index_names,
             )
 
@@ -119,11 +117,11 @@ class AssignmentResults:
             self.select_link_loading.create_empty(
                 memory_only=True,
                 zones=matrix.zones,
-                matrix_names=self._selected_link_names,
+                matrix_names=list(self._selected_links.keys()),
                 index_names=matrix.index_names,
             )
 
-            for name in self._selected_link_names:  # maps name to output matrix
+            for name in self._selected_links.keys():  # maps name to output matrix
                 # TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
                 self.select_link_od.matrix[name] = np.zeros(
                     (graph.compact_num_nodes, graph.compact_num_nodes, self.classes["number"]),
