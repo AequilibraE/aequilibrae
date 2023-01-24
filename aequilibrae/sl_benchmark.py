@@ -8,11 +8,12 @@ import sys
 import timeit
 import pandas as pd
 import warnings
-from aequilibrae import Project
+from aequilibrae import Project, TrafficAssignment, TrafficClass, AequilibraeMatrix
+import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
-def aequilibrae_init(proj_path: str, cost: str, cores: int = 0):
+def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     """
     Prepare the graph for skimming the network for `cost`
     """
@@ -23,63 +24,43 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0):
 
     proj.network.build_graphs([cost])
     graph = proj.network.graphs["c"]
-    graph.prepare_graph(graph.centroids)
+    # graph.prepare_graph(graph.centroids)
     # let's say we want to minimize the cost
-    graph.set_graph(cost)
-
+    # graph.set_graph(cost)
+    # print(graph.graph.head())
+    # print(graph.graph.columns)
+    # print(graph.compact_graph.head())
     # And will skim the cost while we are at it
-    graph.set_skimming(cost)
+    # graph.set_skimming(cost)
+    print('laoding')
+    matrix = proj.matrices.get_matrix("AM_omx")
+    # print(matrix)
+    print("loaded")
+    matrix.computational_view()
+    # print(matrix.matrix_view)
+    # matrix.matrix_view = np.zeros((1790, 1790, 1))
+    # matrix = AequilibraeMatrix()
+    # matrix.create_empty(zones=graph.num_zones, matrix_names=["dummy"])
+    #
+    assignment = TrafficAssignment()
+    car = TrafficClass("car", graph, matrix)
+    assignment.set_classes([car])
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    # assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+    print(graph.graph.columns)
+    assignment.set_capacity_field("distance")
+    assignment.set_time_field("distance")
+    assignment.max_iter = 10
+    assignment.set_algorithm("msa")
+    assignment.set_cores(1)
+    algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
     # And we will allow paths to be compute going through other centroids/centroid connectors
     # required for the Sioux Falls network, as all nodes are centroids
     # BE CAREFUL WITH THIS SETTING
     graph.set_blocked_centroid_flows(False)
-    return graph
-
-def aequilibrae_init(data):
-    """
-    Prepare the graph for skimming the network for `cost`
-    """
-    graph = data["graph"]
-    cost = data["cost"]
-    cores = data["cores"]
-    graph.prepare_graph(graph.centroids)
-    # let's say we want to minimize the cost
-    graph.set_graph(cost)
-
-    # And will skim the cost while we are at it
-    graph.set_skimming(cost)
-
-    # And we will allow paths to be compute going through other centroids/centroid connectors
-    # required for the Sioux Falls network, as all nodes are centroids
-    # BE CAREFUL WITH THIS SETTING
-    graph.set_blocked_centroid_flows(False)
-    return (graph, cores)
-
-
-def aequilibrae_testing(graph, cost: str, iters: int = 2, repeats: int = 5):
-    graph = aequilibrae_init(graph, cost)
-    t = timeit.Timer(lambda: aequilibrae_compute_skim(graph))
-    times = t.repeat(repeat=repeats, number=iters)
-    return times
-
-
-
-
-
-def run_bench(lib, project_name, init, func, data):
-    print(f"Running {lib} on {project_name} with {data['cores']} core(s)...")
-    stuff = init(data)
-    t = timeit.Timer(lambda: func(*stuff))
-    df = pd.DataFrame({"runtime": [x / data["iters"] for x in t.repeat(repeat=data["repeats"], number=data["iters"])]})
-    df["library"] = lib
-    df["project_name"] = project_name
-    df["cores"] = data['cores']
-    df["computer"] = gethostname()
-    if data["details"]:
-        df["details"] = data["details"]
-    return df
-
+    return graph, matrix, assignment, car
 
 def main():
     projects = ["Arkansas"]
@@ -102,54 +83,65 @@ def main():
     #                     help="libraries to benchmark")
     parser.add_argument("-p", "--projects", nargs='+', dest="projects",
                         default=projects, help="projects to benchmark using")
-    parser.add_argument("--cost", dest="cost", default='free_flow_time',
+    parser.add_argument("--cost", dest="cost", default='distance',
                         help="cost column to skim for")
     # parser.add_argument('--details', dest='details')
     parser.set_defaults(feature=True)
 
     args = vars(parser.parse_args())
 
-    libraries = args['libraries']
+    # libraries = args['libraries']
     output_path = args["output"]
     cores = args["cores"]
     print(f"Now benchmarking {libraries} on the {args['projects']} model(s).")
     print(f"Running with {args['iters']} iterations, {args['repeats']}",
           f"times, for a total of {args['iters'] * args['repeats']} samples.")
+
+    select_links = [None, {"test": [(24, 1), (79146, 1), (61, 1), (68, 1)]}]
+
     with warnings.catch_warnings():
         # pandas future warnings are really annoying FIXME
         warnings.simplefilter(action="ignore", category=FutureWarning)
-
+        # proj_path: str, cost: str, select_links, cores: int = 0,
         # Benchmark time
         results = []
         proj_series = []
-        for project_name in args["projects"]:
-            args["graph"], args["nodes"], args["geo"] = project_init(f"{args['path']}/{project_name}", args["cost"])
-            proj_series.append(pd.DataFrame({
-                "num_links": [args["graph"].compact_num_links],
-                "num_nodes": [args["graph"].compact_num_nodes],
-                "num_zones": [args["graph"].num_zones],
-                "num_centroids": [len(args["graph"].centroids)]
-            }, index=[project_name]))
+        project_name = args["projects"][0]
+        graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}",
+                                                                  args["cost"], args["cores"])
+        for link in select_links:
+            for project_name in args["projects"]:
+                print("select links is ", link)
+                if link is not None:
+                    car.set_select_links(link)
+                print("BENCHING ")
+            # args["graph"], args["nodes"], args["geo"] = project_init(f"{args['path']}/{project_name}", args["cost"])
+            # proj_series.append(pd.DataFrame({
+            #     "num_links": [args["graph"].compact_num_links],
+            #     "num_nodes": [args["graph"].compact_num_nodes],
+            #     "num_zones": [args["graph"].num_zones],
+            #     "num_centroids": [len(args["graph"].centroids)]
+            # }, index=[project_name]))
 
-            for core_count in (range(cores[0], cores[1] + 1) if len(cores) == 2 else cores):
-                args["cores"] = core_count
-
-                if "aequilibrae" in libraries:
-                    from aeq_testing import aequilibrae_init, aequilibrae_compute_skim
-                    results.append(run_bench("aequilibrae", project_name, aequilibrae_init,
-                                             aequilibrae_compute_skim, args))
+            # for core_count in (range(cores[0], cores[1] + 1) if len(cores) == 2 else cores):
+            #     args["cores"] = core_count
+                t = timeit.Timer(lambda: assignment.execute)
+                times = t.repeat(repeat=args["repeats"], number=args["iters"])
+                results.append(("SL" if link is not None else "BASE", sum(times)/5))
 
 
-                print("-" * 30)
-
-        results = pd.concat(results)
-        summary = results.groupby(["project_name", "library", "cores"]).agg(
-            average=("runtime", "mean"), min=("runtime", "min"), max=("runtime", "max")
-        )
-        time = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
-        print(time)
-        print(summary)
-        results.to_csv(os.path.join(output_path, f"{time}_table.csv"))
+            # print("-" * 30)
+        print(results)
+        print("BASE/SL", results[0][1]/results[1][1])
+        #
+        # results = pd.concat(results)
+        # summary = results.groupby(["project_name", "library", "cores"]).agg(
+        #     average=("runtime", "mean"), min=("runtime", "min"), max=("runtime", "max")
+        # )
+        # time = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
+        # print(time)
+        # print(summary)
+        # results.to_csv(os.path.join(output_path, f"{time}_table.csv"))
 
         # proj_summary = pd.concat(proj_series)
         # proj_summary.to_csv(os.path.join(output_path, f"{time}_project_summary.csv"))

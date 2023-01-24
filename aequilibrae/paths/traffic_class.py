@@ -98,11 +98,11 @@ class TrafficClass:
         for name, link_set in links.items():
             link_ids = set()
             for link, dir in link_set:
-                query = (self.graph.compact_graph["link_id"] == link) & (self.graph.compact_graph["direction"] == dir)
+                query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
                 if not query.any():
                     raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
                 # Check for duplicate compressed link ids in the current link set
-                comp_id = self.graph.compact_graph[query]["id"].values[0]
+                comp_id = self.graph.graph[query]["__compressed_id__"].values[0]
                 if comp_id in link_ids:
                     warnings.warn(
                         "Two input links map to the same compressed link in the network"
