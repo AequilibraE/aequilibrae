@@ -10,9 +10,9 @@ protected_fields = ["ogc_fid", "geometry"]
 
 
 def initialize_tables(project, db_type: str) -> None:
-    cnx = database_connection(db_type)
-    create_base_tables(cnx, project.logger, db_type)
-    add_triggers(cnx, project.logger, db_type)
+    conn = database_connection(db_type)
+    create_base_tables(conn, project.logger, db_type)
+    add_triggers(conn, project.logger, db_type)
 
 
 def create_base_tables(conn: Connection, logger: logging.Logger, db_type: str) -> None:

@@ -46,7 +46,7 @@ This will automatically create a new public transport database.
 # %%
 data = Transit(project)
 
-transit = data.new_gtfs(agency="LISANCO", file_path=dest_path)
+transit = data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
 
 """
 To load the data, we must chose one date. We're going to continue with 2016-04-13, but feel free 
@@ -72,11 +72,11 @@ transit.save_to_disk()
 """
 Now we will plot the route we just imported into our model!
 """
-cnx = database_connection("transit")
+conn = database_connection("transit")
 
-links = pd.read_sql("SELECT seq, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=cnx)
+links = pd.read_sql("SELECT seq, ST_AsText(geometry) geom FROM pattern_mapping WHERE geom IS NOT NULL;", con=conn)
 
-stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=cnx)
+stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=conn)
 
 # %%
 gtfs_links = folium.FeatureGroup("links")
