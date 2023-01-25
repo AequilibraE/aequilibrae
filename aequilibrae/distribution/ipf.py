@@ -222,8 +222,9 @@ class Ipf:
             self.gap = conv_criteria + 1
 
             seed = np.array(self.output.matrix_view[:, :], copy=True)
-            iter, self.gap = ipf_core(seed, rows, columns, max_iterations=max_iter, tolerance=conv_criteria,
-                                      cores=self.cpus)
+            iter, self.gap = ipf_core(
+                seed, rows, columns, max_iterations=max_iter, tolerance=conv_criteria, cores=self.cpus
+            )
             self.output.matrix_view[:, :] = seed[:, :]
 
             self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
