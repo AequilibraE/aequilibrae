@@ -27,17 +27,15 @@ ext_mod_aon = Extension(
 )
 
 ext_mod_ipf = Extension(
-    "aequilibrae.distribution.core_ipf",
+    "aequilibrae.distribution.ipf_core",
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
-    language="c++",
 )
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
 if "WINDOWS" not in platform.platform().upper():
     ext_mod_aon.extra_compile_args.append("-std=c++17")
-    ext_mod_ipf.extra_compile_args.append("-std=c++17")
 
 reqs = ["numpy>=1.18.0,<1.22", "scipy", "pyaml", "cython", "pyshp", "requests", "shapely >= 1.7.0", "pandas", "pyproj"]
 
@@ -52,6 +50,7 @@ pkgs = [pkg for pkg in find_packages()]
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
+    "aequilibrae.distribution": ["*.pyx"],
     "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
 }

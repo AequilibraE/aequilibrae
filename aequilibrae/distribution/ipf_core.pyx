@@ -8,7 +8,7 @@ from libc.stdlib cimport malloc, free
 
 
 
-def core_ipf(seed_matrix, target_productions, target_attractions, max_iterations=200, tolerance=0.001, cores = 0):
+def ipf_core(seed_matrix, target_productions, target_attractions, max_iterations=200, tolerance=0.001, cores = 0):
 
     cdef int max_iter = max_iterations
     cdef double toler = tolerance
