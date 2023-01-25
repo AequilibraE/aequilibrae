@@ -96,7 +96,8 @@ class TrafficClass:
              Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
         for name, link_set in links.items():
-            link_ids = set()
+            link_ids = []
+            # link_ids = set()
             for link, dir in link_set:
                 query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
                 if not query.any():
@@ -109,9 +110,10 @@ class TrafficClass:
                         f", removing superfluous link {link}_{dir}"
                     )
                 else:
-                    link_ids.add(comp_id)
-            self._selected_links[name] = tuple(link_ids)
-
+                    link_ids.append(comp_id)
+                    # link_ids.add(comp_id)
+            self._selected_links[name] = np.array(link_ids,  dtype=self.graph.default_types("int"))
+            # self._selected_links[name] = tuple(link_ids)#np.array(link_ids, dtype=self.graph.default_types("int"))
 
 
     def __setattr__(self, key, value):

@@ -17,6 +17,8 @@ class MultiThreadedAoN:
         self.temp_node_loads = np.array([])
         #  holds the b_nodes in case of flows through centroid connectors are blocked
         self.temp_b_nodes = np.array([])
+        # Temporary array which stores whether a link is accessed in a path for Select Link Analysis functionality
+        self.tmp_flow = np.array([])
 
     # In case we want to do by hand, we can prepare each method individually
     # TODO: reset with zeros instead of reallocating
@@ -24,6 +26,8 @@ class MultiThreadedAoN:
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
+        if results._selected_links is not None:
+            self.tmp_flow = np.empty((results.cores, graph.compact_num_links), dtype=int)
         if results.num_skims > 0:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:

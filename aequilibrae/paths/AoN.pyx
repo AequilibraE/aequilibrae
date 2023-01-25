@@ -152,17 +152,22 @@ def one_to_all(origin, matrix, graph, result,
                                     original_b_nodes_view)
     cdef:
         long long [:] selected_links_view
-        double[:, :] sl_od_loading_view
+        double [:, :] sl_od_loading_view
         double [:, :] sl_link_loading_view
-        double[:, :] tmp_flow_view
+        int [:] tmp_flow_view
         long long[:] link_list
+
+        #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
     if result._selected_links:
+        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
+        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
+        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
         for name, link_set in result._selected_links.items():
-            link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
+            link_list = link_set[:]
+            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
             sl_od_loading_view = result.select_link_od.matrix[name][origin_index, :, :]
             sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
             #TODO: don't need to initialise the temp view each iteration, make it smarter
-            tmp_flow_view = np.zeros((graph.compact_num_links, classes), dtype=graph.default_types("float"))[:, :]
             with nogil:
                 perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
                                              sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)

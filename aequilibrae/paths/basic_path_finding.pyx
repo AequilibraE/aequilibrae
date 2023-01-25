@@ -11,7 +11,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 cimport cython
 from libc.math cimport isnan, INFINITY
 from libc.stdio cimport printf
-
+from libc.string cimport memset
 from libc.stdlib cimport malloc, free
 
 include 'pq_4ary_heap.pyx'
@@ -99,7 +99,7 @@ cdef void perform_select_link_analysis(long origin,
                                         long long [:] conn,
                                         double [:, :] sl_od_matrix,
                                         double [:, :] sl_link_loading,
-                                       double [:, :] tmp_flow,
+                                       int [:] tmp_flow,
                                        long classes) nogil:
 # origin: Origin of the path
 # demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
@@ -113,43 +113,60 @@ cdef void perform_select_link_analysis(long origin,
 # NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
 # selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
 #tmp flow: array of zeros as long as the number of links in compressed graph
-
     cdef:
-        int i, j, k, idx, dests = demand.shape[0]
-        long long predecessor, connection, lid, link, tot
+        int i, j, k, idx, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        long long predecessor, connection, lid, link
+        double tot
     for j in range(dests):
         tot = 0
-        for k in range(classes):
+        k = 0
+        while tot == 0 and k < classes:
             tot += demand[j, k]
+            k += 1
         if tot == 0:
             continue
-        for i in range(conn.shape[0]):
-            #TODO: check if memset is faster than rewalking path
-            if conn[i] != -1:
-                for k in range(classes):
-                    tmp_flow[conn[i], k] = 0
+        # for k in range(classes):
+        #     tot += demand[j, k]
+        # if tot == 0:
+        #     continue
+        memset(&tmp_flow[0], 0, xshape * sizeof(int))
+        # for i in range(conn.shape[0]):
+        #     #TODO: check if memset is faster than rewalking path
+        #     if conn[i] != -1:
+        #         for k in range(classes):
+        #             tmp_flow[conn[i], k] = 0
         predecessor = j
         connection = conn[predecessor]
         predecessor = pred[predecessor]
         while predecessor >= 0:
-            for k in range(classes):
-                tmp_flow[connection, k] = demand[j, k]
+            tmp_flow[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-
-        for k in range(classes):
-            for i in range(selected_links.shape[0]):
-                lid = selected_links[i]
-                #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
-                if tmp_flow[lid, k] != 0:
+        # for k in range(classes):
+        for i in range(selected_links.shape[0]):
+            lid = selected_links[i]
+            #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
+            if tmp_flow[lid] != 0:
+                for k in range(classes):
+                    # sl_od_loading[j, :] = demand[j, :]
                     sl_od_matrix[j, k] = demand[j, k]
-                    for idx in range(conn.shape[0]):
-                        if conn[idx] != -1:
-                            link = conn[idx]
-                            sl_link_loading[link, k] += tmp_flow[link, k]
-                    break
+                predecessor = j
+                connection = conn[predecessor]
+                predecessor = pred[predecessor]
+                while predecessor >= 0:
+                    for k in range(classes):
+                        sl_link_loading[connection, k] += demand[j, k]
+                    connection = conn[predecessor]
+                    predecessor = pred[predecessor]
+                break
                 #once at least one link in the set is shown to be in the current destination, the load along that path is added.
                 #There is no need to check the remaining links - this would add extra demand that isn't there
+
+                # for idx in range(conn.shape[0]):
+                #     if conn[idx] != -1:
+                #         link = conn[idx]
+                #         sl_link_loading[link, :] += demand[j, :]
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
