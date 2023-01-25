@@ -29,8 +29,8 @@ class TestService:
             "friday": 1,
             "saturday": 1,
             "sunday": 1,
-            "start_date": f"{past.year}{past.month:02d}{past.day:02d}",
-            "end_date": f"{today.year}{today.month:02d}{today.day:02d}",
+            "start_date": past,
+            "end_date": today,
         }
 
     def test__populate(self, data_dict, today, past):

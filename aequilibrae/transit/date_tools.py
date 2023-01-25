@@ -38,20 +38,18 @@ def to_time_string(value: Union[int, None]) -> Union[str, None]:
     return str(timedelta(seconds=value))
 
 
-def one_day_before(date):
-    start_seconds = time.mktime(time.strptime(date, "%Y-%m-%d")) + 12 * 60 * 60
+def one_day_before(date_object):
+    start_seconds = date_object.timestamp() + 12 * 60 * 60
     return time.strftime("%Y-%m-%d", time.localtime(start_seconds - 24 * 60 * 60))
 
 
 def create_days_between(range_start_date, range_end_date):
-    start = datetime.strptime(range_start_date, "%Y-%m-%d")
-    end = datetime.strptime(range_end_date, "%Y-%m-%d")
-    numdays = (end - start).days + 1
-    return [(start + timedelta(days=x)).strftime("%Y-%m-%d") for x in range(numdays)]
+    numdays = (range_end_date - range_start_date).days + 1
+    return [(range_start_date + timedelta(days=x)).strftime("%Y-%m-%d") for x in range(numdays)]
 
 
-def day_of_week(date_string: str):
-    return time.strptime(date_string, "%Y-%m-%d").tm_wday
+def day_of_week(date: str):
+    return datetime.fromisoformat(date).weekday()
 
 
 def format_date(date: str) -> str:

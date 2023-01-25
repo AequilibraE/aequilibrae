@@ -1,3 +1,4 @@
+from datetime import datetime
 import hashlib
 import logging
 import zipfile
@@ -504,13 +505,15 @@ class GTFSReader(WorkerThread):
         caltxt = "calendar.txt"
         with self.zip_archive.open(caltxt, "r") as file:
             calendar = parse_csv(file, column_order[caltxt])
+        calendar["start_date"] = [datetime.fromisoformat(format_date(i)) for i in calendar["start_date"]]
+        calendar["end_date"] = [datetime.fromisoformat(format_date(i)) for i in calendar["end_date"]]
         self.data_arrays[caltxt] = calendar
         if np.unique(calendar["service_id"]).shape[0] < calendar.shape[0]:
             self.__fail("There are repeated service IDs in calendar.txt")
 
         min_date = min(calendar["start_date"].tolist())
         max_date = max(calendar["end_date"].tolist())
-        self.feed_dates = create_days_between(format_date(min_date), format_date(max_date))
+        self.feed_dates = create_days_between(min_date, max_date)
 
         for line in calendar:
             service = Service()

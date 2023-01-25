@@ -46,36 +46,33 @@ class TestDateTools:
         assert t == (49 * 3600 + 5 * 60 + 6), "to_seconds failed to return right values"
 
     def test_one_day_before(self):
-        t = one_day_before("2020-01-01")
+        t = one_day_before(datetime.fromisoformat("2020-01-01"))
         assert t == "2019-12-31"
 
-        t = one_day_before("2020-03-01")
+        t = one_day_before(datetime.fromisoformat("2020-03-01"))
         assert t == "2020-02-29"
 
-        t = one_day_before("2020-02-29")
+        t = one_day_before(datetime.fromisoformat("2020-02-29"))
         assert t == "2020-02-28"
 
         with pytest.raises(ValueError):
-            _ = one_day_before("2020-13-01")
+            _ = one_day_before(datetime.fromisoformat("2020-13-01"))
 
         with pytest.raises(TypeError):
-            _ = one_day_before(123456)
+            _ = one_day_before(datetime.fromisoformat(123456))
 
     def test_create_days_between(self):
         tdy = datetime.today()
         days = randint(1, 100)
         past = tdy - timedelta(days=days)
 
-        old = f"{past.year}-{past.month:02d}-{past.day:02d}"
-        today = f"{tdy.year}-{tdy.month:02d}-{tdy.day:02d}"
-
-        interval = create_days_between(old, today)
+        interval = create_days_between(past, tdy)
         assert len(interval) == days + 1, "create_days_between returned wrong value"
 
-        interval = create_days_between(today, old)
+        interval = create_days_between(tdy, past)
         assert len(interval) == 0, "create_days_between returned wrong value"
 
-        interval = create_days_between(today, today)
+        interval = create_days_between(tdy, tdy)
         assert len(interval) == 1, "create_days_between returned wrong value"
 
     def test_day_of_week(self):

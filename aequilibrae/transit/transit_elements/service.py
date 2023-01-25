@@ -1,5 +1,5 @@
 from typing import List
-from aequilibrae.transit.date_tools import format_date, create_days_between, day_of_week
+from aequilibrae.transit.date_tools import create_days_between, day_of_week
 
 
 class Service:
@@ -44,7 +44,7 @@ class Service:
             raise ValueError(f"Service {self.service_id} has start date after end date")
 
         days = [self.monday, self.tuesday, self.wednesday, self.thursday, self.friday, self.saturday, self.sunday]
-        dates = create_days_between(format_date(self.start_date), format_date(self.end_date))
+        dates = create_days_between(self.start_date, self.end_date)
 
         for date in dates:
             if days[day_of_week(date)]:
