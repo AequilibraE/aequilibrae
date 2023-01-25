@@ -35,8 +35,9 @@ jobs:
       run: |
         cd aequilibrae/paths
         python setup_assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        cd ../distribution
+        python setup_ipf.py build_ext --inplace
+        cd ../..
 
     - name: Build
       run: python setup.py sdist bdist_wheel

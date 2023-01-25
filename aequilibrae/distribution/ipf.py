@@ -8,6 +8,7 @@ import yaml
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.context import get_active_project
+from .ipf_core import ipf_core
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -88,6 +89,7 @@ class Ipf:
 
             error (:obj:`str`): Error description
         """
+        self.cpus = 0
         self.project = project or get_active_project()
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
@@ -219,33 +221,10 @@ class Ipf:
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
 
-            iter = 0
-            while self.gap > conv_criteria and iter < max_iter:
-                iter += 1
-                # computes factors for zones
-                marg_rows = self.__tot_rows(self.output.matrix_view[:, :])
-                row_factor = self.__factor(marg_rows, rows)
-                # applies factor
-                self.output.matrix_view[:, :] = np.transpose(
-                    np.transpose(self.output.matrix_view[:, :]) * np.transpose(row_factor)
-                )[:, :]
+            iter, self.gap = ipf_core(self.output.matrix_view[:, :], rows, columns, max_iterations=max_iter,
+                                      tolerance=conv_criteria, cores=self.cpus)
 
-                # computes factors for columns
-                marg_cols = self.__tot_columns(self.output.matrix_view[:, :])
-                column_factor = self.__factor(marg_cols, columns)
-
-                # applies factor
-                self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
-
-                # increments iterarions and computes errors
-                self.gap = max(
-                    abs(1 - np.min(row_factor)),
-                    abs(np.max(row_factor) - 1),
-                    abs(1 - np.min(column_factor)),
-                    abs(np.max(column_factor) - 1),
-                )
-
-                self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
+            self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
@@ -281,4 +260,6 @@ class Ipf:
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)
+
+        self.cpus = int(path["system"]["cpus"])
         return path["distribution"][model]
