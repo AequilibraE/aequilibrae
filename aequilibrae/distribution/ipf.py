@@ -8,7 +8,7 @@ import yaml
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.context import get_active_project
-from .ipf_core import ipf_core
+from aequilibrae.distribution.ipf_core import core_ipf
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -222,7 +222,7 @@ class Ipf:
             self.gap = conv_criteria + 1
 
             seed = np.array(self.output.matrix_view[:, :], copy=True)
-            iter, self.gap = ipf_core(
+            iter, self.gap = core_ipf(
                 seed, rows, columns, max_iterations=max_iter, tolerance=conv_criteria, cores=self.cpus
             )
             self.output.matrix_view[:, :] = seed[:, :]

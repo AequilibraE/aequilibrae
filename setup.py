@@ -81,5 +81,5 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.10",
         ],
         cmdclass={"build_ext": build_ext},
-        ext_modules=[ext_mod_aon, ext_mod_aon],
+        ext_modules=[ext_mod_aon, ext_mod_ipf],
     )
