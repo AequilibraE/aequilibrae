@@ -1,18 +1,4 @@
 """
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
- Name:       Core path computation algorithms, accessible only at Cython/C Level
- Purpose:    Supports the implementation shortest path and network loading routines
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camrgo
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
- Created:    15/09/2013
- Updated:    24/04/2018
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
 Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
@@ -111,7 +97,7 @@ cdef void perform_select_link_analysis(long origin,
                                         double [:, :] demand,
                                         long long [:] pred,
                                         long long [:] conn,
-                                        double [:, :] sl_od_loading,
+                                        double [:, :] sl_od_matrix,
                                         double [:, :] sl_link_loading,
                                        double [:, :] tmp_flow,
                                        long classes) nogil:
@@ -120,7 +106,7 @@ cdef void perform_select_link_analysis(long origin,
 # pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
 # conn: Stores the link connecting the given index (predecessor) to its next node
 #e.g: in sioux falls, for origin 0, the node 1's predecessor is 0. Referencing conn[1] will return the link 0 (link 1)
-# conn gives the link that connects the current predecressor to its predecessor
+# conn gives the link that connects the current predecessor to its predecessor
 # sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
 # sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
 #Dimension: num_links by 1
@@ -130,8 +116,13 @@ cdef void perform_select_link_analysis(long origin,
 
     cdef:
         int i, j, k, idx, dests = demand.shape[0]
-        long long predecessor, connection, lid, link
+        long long predecessor, connection, lid, link, tot
     for j in range(dests):
+        tot = 0
+        for k in range(classes):
+            tot += demand[j, k]
+        if tot == 0:
+            continue
         for i in range(conn.shape[0]):
             #TODO: check if memset is faster than rewalking path
             if conn[i] != -1:
@@ -151,7 +142,7 @@ cdef void perform_select_link_analysis(long origin,
                 lid = selected_links[i]
                 #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
                 if tmp_flow[lid, k] != 0:
-                    sl_od_loading[j, k] = demand[j, k]
+                    sl_od_matrix[j, k] = demand[j, k]
                     for idx in range(conn.shape[0]):
                         if conn[idx] != -1:
                             link = conn[idx]
