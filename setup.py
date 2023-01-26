@@ -31,6 +31,7 @@ ext_mod_ipf = Extension(
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
+    language="c++",
 )
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos

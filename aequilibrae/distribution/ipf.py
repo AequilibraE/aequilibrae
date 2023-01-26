@@ -1,14 +1,21 @@
+import importlib.util as iutil
 import os
+from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
-from datetime import datetime
-import importlib.util as iutil
+
 import numpy as np
 import yaml
+
+from aequilibrae import global_logger
+from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.project.data.matrix_record import MatrixRecord
-from aequilibrae.context import get_active_project
-from aequilibrae.distribution.ipf_core import ipf_core
+
+try:
+    from aequilibrae.distribution.ipf_core import ipf_core
+except ImportError as ie:
+    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
