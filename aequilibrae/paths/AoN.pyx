@@ -151,7 +151,7 @@ def one_to_all(origin, matrix, graph, result,
                                     b_nodes_view,
                                     original_b_nodes_view)
     cdef:
-        long long [:] selected_links_view
+        # long long [:] selected_links_view
         double [:, :] sl_od_loading_view
         double [:, :] sl_link_loading_view
         int [:] tmp_flow_view
@@ -169,8 +169,12 @@ def one_to_all(origin, matrix, graph, result,
             sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
             #TODO: don't need to initialise the temp view each iteration, make it smarter
             with nogil:
-                perform_select_link_analysis(origin_index, link_list, demand_view, predecessors_view, conn_view,
-                                             sl_od_loading_view, sl_link_loading_view, tmp_flow_view, classes)
+                perform_select_link_analysis(origin_index,
+                                             link_list, demand_view, predecessors_view, conn_view,
+                                             sl_od_loading_view,
+                                             sl_link_loading_view,
+                                             tmp_flow_view,
+                 classes)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
