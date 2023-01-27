@@ -59,15 +59,15 @@ class TestSelectLink(TestCase):
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
-                True,
-                "OD SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
+                od_mask,
+                err_msg="OD SL matrix for: " + str(key) + " does not match"
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
-                True,
-                "Link loading SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_loading.matrix[key],
+                link_loading,
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
             )
 
     def test_equals_demand_one_origin(self):
@@ -84,15 +84,15 @@ class TestSelectLink(TestCase):
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
-                True,
-                "OD SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
+                od_mask,
+                err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
-                True,
-                "Link loading SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_loading.matrix[key],
+                link_loading,
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
             )
 
     def test_single_demand(self):
@@ -112,15 +112,15 @@ class TestSelectLink(TestCase):
             od_mask, link_loading = create_od_mask(
                 self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_od.matrix[key][:, :, 0], od_mask),
-                True,
-                "OD SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
+                od_mask,
+                err_msg="OD SL matrix for: " + str(key) + " does not match"
             )
-            self.assertEqual(
-                np.allclose(self.assignclass.results.select_link_loading.matrix[key], link_loading),
-                True,
-                "Link loading SL matrix for: " + str(key) + " does not match",
+            np.testing.assert_almost_equal(
+                self.assignclass.results.select_link_loading.matrix[key],
+                link_loading,
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
             )
 
     def test_duplicate_links(self):
