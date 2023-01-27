@@ -88,6 +88,56 @@ cdef return_an_int_view(input):
     cdef int [:] critical_links_view = input
     return critical_links_view
 
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void sl_network_loading(
+        long long [:] selected_links,
+                                        double [:, :] demand,
+                                        long long [:] pred,
+                                        long long [:] conn,
+                                        double [:, :] link_loads,
+                                        double [:, :] sl_od_matrix,
+                                        double [:, :] sl_link_loading,
+                                       unsigned char [:] tmp_flow,
+                                       long classes
+        ) nogil:
+
+    #Two purposes: SL loading, regular loading
+    #Execute regular loading,keeping track of SL links
+    cdef:
+        int i, j, k, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        long long predecessor, connection, lid, link
+    # # printf(<char *> "\nentering SL")
+    for j in range(dests):
+    #     printf(<char*> "\n Calculating for %i out of %i", j, dests-1)
+        memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
+        connection = conn[j]
+        predecessor = pred[j]
+        while predecessor >= 0:
+            for k in range(classes):
+                link_loads[connection, k] += demand[j, k]
+            tmp_flow[connection] = 1
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
+        # for row in range(selected_links.shape[0]):
+        #     for i in range(selected_links[row].shape[0]):
+            for i in range(selected_links.shape[0]):
+                lid = selected_links[i]
+                if tmp_flow[lid] != 0:
+                    for k in range(classes):
+                        sl_od_matrix[j, k] = demand[j, k]
+                    connection = conn[j]
+                    predecessor = pred[j]
+                    while predecessor >= 0:
+                        for k in range(classes):
+                            sl_link_loading[connection, k] += demand[j, k]
+                        connection = conn[predecessor]
+                        predecessor = pred[predecessor]
+                    break
+    # printf(<char *> "\nLeaving SL")
+    pass
+
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

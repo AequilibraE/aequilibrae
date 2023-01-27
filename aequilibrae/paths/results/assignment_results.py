@@ -123,10 +123,15 @@ class AssignmentResults:
 
             for name in self._selected_links.keys():  # maps name to output matrix
                 # TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
-                self.select_link_od.matrix[name] = np.zeros(
-                    (graph.compact_num_nodes, graph.compact_num_nodes, self.classes["number"]),
-                    dtype=graph.default_types("float"),
-                )
+                self.select_link_od.matrix[name] =np.zeros(
+                    (graph.num_zones, graph.num_zones, self.classes["number"]),
+                    dtype=graph.default_types("float"))
+                #np.zeros(
+
+                #     (graph.compact_num_nodes, graph.compact_num_nodes, self.classes["number"]),
+                #     dtype=graph.default_types("float"),
+                # )
+
                 self.select_link_loading.matrix[name] = np.zeros((graph.compact_num_links, self.classes["number"]))
 
     def reset(self) -> None:

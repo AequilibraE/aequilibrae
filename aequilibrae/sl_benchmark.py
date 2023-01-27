@@ -21,8 +21,9 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     proj.open(proj_path)
     # curr.execute("select st_x(geometry), st_y(geometry) from nodes")
     # geo = np.array(curr.fetchall())
-
-    proj.network.build_graphs([cost])
+    print(proj.matrices.list())
+    #ARKANSAS SPECIFIC
+    proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
     graph = proj.network.graphs["c"]
     # graph.prepare_graph(graph.centroids)
     # let's say we want to minimize the cost
@@ -32,12 +33,13 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     # print(graph.compact_graph.head())
     # And will skim the cost while we are at it
     # graph.set_skimming(cost)
+    # raise Exception()
     print('laoding')
-    matrix = proj.matrices.get_matrix("AM_omx")
-    # print(matrix)
+    matrix = proj.matrices.get_matrix("demand_omx")
+    print(matrix)
     print("loaded")
     matrix.computational_view()
-    # print(matrix.matrix_view)
+    print(matrix.matrix_view)
     # matrix.matrix_view = np.zeros((1790, 1790, 1))
     # matrix = AequilibraeMatrix()
     # matrix.create_empty(zones=graph.num_zones, matrix_names=["dummy"])
@@ -49,9 +51,9 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
     # assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
     print(graph.graph.columns)
-    assignment.set_capacity_field("distance")
+    assignment.set_capacity_field("capacity")
     assignment.set_time_field("distance")
-    assignment.max_iter = 10
+    assignment.max_iter = 1
     assignment.set_algorithm("msa")
     assignment.set_cores(1)
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
@@ -96,8 +98,12 @@ def main():
     print(f"Now benchmarking {libraries} on the {args['projects']} model(s).")
     print(f"Running with {args['iters']} iterations, {args['repeats']}",
           f"times, for a total of {args['iters'] * args['repeats']} samples.")
+    # Arkansas links
+    # select_links = [None, {"test": [(24, 1), (79146, 1), (61, 1), (68, 1)]}]
+    # Chicago links
+    select_links = [None,
+                    {"test": [(2, 1), (7, 1), (1, 1), (6, 1)]}]
 
-    select_links = [None, {"test": [(24, 1), (79146, 1), (61, 1), (68, 1)]}]
 
     with warnings.catch_warnings():
         # pandas future warnings are really annoying FIXME
@@ -125,9 +131,9 @@ def main():
 
             # for core_count in (range(cores[0], cores[1] + 1) if len(cores) == 2 else cores):
             #     args["cores"] = core_count
-                t = timeit.Timer(lambda: assignment.execute)
-                times = t.repeat(repeat=args["repeats"], number=args["iters"])
-                results.append(("SL" if link is not None else "BASE", sum(times)/5))
+                t = timeit.Timer(lambda: assignment.execute())
+                times = t.repeat(repeat=3, number=args["iters"])
+                results.append(("SL" if link is not None else "BASE", min(times)))
 
 
             # print("-" * 30)

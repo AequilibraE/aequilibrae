@@ -98,6 +98,13 @@ def one_to_all(origin, matrix, graph, result,
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
+    cdef:
+        # long long [:] selected_links_view
+        double [:, :] sl_od_matrix_view
+        double [:, :] sl_link_loading_view
+        unsigned char [:] tmp_flow_view
+        long long[:] link_list
+
 
 
     #Now we do all procedures with NO GIL
@@ -118,17 +125,47 @@ def one_to_all(origin, matrix, graph, result,
                          ids_graph_view,
                          conn_view,
                          reached_first_view)
-
-        network_loading(classes,
-                        demand_view,
-                        predecessors_view,
-                        conn_view,
-                        link_loads_view,
-                        no_path_view,
-                        reached_first_view,
-                        node_load_view,
-                        w)
-
+    #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
+    #TODO: Write a test to confirm SL_NETWORK LOADING IS CORRECT
+    if result._selected_links:
+        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
+        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
+        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
+        for name, link_set in result._selected_links.items():
+            link_list = link_set[:]
+            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
+            sl_od_matrix_view = result.select_link_od.matrix[name][origin_index, :, :]
+            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
+            #TODO: propogate changes to the link_list variable
+            with nogil:
+                # perform_select_link_analysis(origin_index,
+                #                              link_list, demand_view, predecessors_view, conn_view,
+                #                              sl_od_matrix_view,
+                #                              sl_link_loading_view,
+                #                              tmp_flow_view,
+                #  classes)
+                sl_network_loading(link_list,
+                                   demand_view,
+                                   predecessors_view,
+                                   conn_view,
+                                   link_loads_view,
+                                   sl_od_matrix_view,
+                                   sl_link_loading_view,
+                                   tmp_flow_view,
+                                   classes
+                                   )
+    else:
+        with nogil:
+            network_loading(classes,
+                            demand_view,
+                            predecessors_view,
+                            conn_view,
+                            link_loads_view,
+                            no_path_view,
+                            reached_first_view,
+                            node_load_view,
+                            w)
+    with nogil:
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
@@ -150,35 +187,17 @@ def one_to_all(origin, matrix, graph, result,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
-    cdef:
-        # long long [:] selected_links_view
-        double [:, :] sl_od_loading_view
-        double [:, :] sl_link_loading_view
-        unsigned char [:] tmp_flow_view
-        long long[:] link_list
 
-        #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
-    if result._selected_links:
-        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
-        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
-        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
-        for name, link_set in result._selected_links.items():
-            link_list = link_set[:]
-            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
-            sl_od_loading_view = result.select_link_od.matrix[name][origin_index, :, :]
-            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
-            #TODO: don't need to initialise the temp view each iteration, make it smarter
-            with nogil:
-                perform_select_link_analysis(origin_index,
-                                             link_list, demand_view, predecessors_view, conn_view,
-                                             sl_od_loading_view,
-                                             sl_link_loading_view,
-                                             tmp_flow_view,
-                 classes)
+        # perform_select_link_analysis(origin_index,
+        #                              link_list, demand_view, predecessors_view, conn_view,
+        #                              sl_od_loading_view,
+        #                              sl_link_loading_view,
+        #                              tmp_flow_view,
+        #  classes)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
-
+    # print("DEMAND SHAPE: ", matrix.matrix_view[origin_index, :, :].shape)
     return origin
 
 def path_computation(origin, destination, graph, results):
