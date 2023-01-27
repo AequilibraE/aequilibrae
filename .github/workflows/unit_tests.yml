@@ -61,6 +61,14 @@ jobs:
       if: matrix.os == 'windows-latest'
       run:  python tests/setup_windows_spatialite.py
 
+    - name: Compile library
+      run: |
+        cd aequilibrae/paths
+        python setup_assignment.py build_ext --inplace
+        cd ../distribution
+        python setup_ipf.py build_ext --inplace
+        cd ../..
+
     - name: Build
       run: python setup.py sdist bdist_wheel
 
