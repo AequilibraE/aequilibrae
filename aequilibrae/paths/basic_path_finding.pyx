@@ -99,8 +99,8 @@ cdef void perform_select_link_analysis(long origin,
                                         long long [:] conn,
                                         double [:, :] sl_od_matrix,
                                         double [:, :] sl_link_loading,
-                                       int [:] tmp_flow,
-                                       long classes) nogil:
+                                        unsigned char [:] tmp_flow,
+                                        long classes) nogil:
 # origin: Origin of the path
 # demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
 # pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
@@ -129,7 +129,7 @@ cdef void perform_select_link_analysis(long origin,
         #     tot += demand[j, k]
         # if tot == 0:
         #     continue
-        memset(&tmp_flow[0], 0, xshape * sizeof(int))
+        memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
         # for i in range(conn.shape[0]):
         #     #TODO: check if memset is faster than rewalking path
         #     if conn[i] != -1:

@@ -26,8 +26,8 @@ class MultiThreadedAoN:
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
-        if results._selected_links is not None:
-            self.tmp_flow = np.empty((results.cores, graph.compact_num_links), dtype=int)
+        if results._selected_links:
+            self.tmp_flow = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
         if results.num_skims > 0:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:

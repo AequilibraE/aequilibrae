@@ -154,7 +154,7 @@ def one_to_all(origin, matrix, graph, result,
         # long long [:] selected_links_view
         double [:, :] sl_od_loading_view
         double [:, :] sl_link_loading_view
-        int [:] tmp_flow_view
+        unsigned char [:] tmp_flow_view
         long long[:] link_list
 
         #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
