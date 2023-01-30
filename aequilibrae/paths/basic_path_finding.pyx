@@ -106,7 +106,7 @@ cdef void sl_network_loading(
     #Two purposes: SL loading, regular loading
     #Execute regular loading,keeping track of SL links
     cdef:
-        int i, j, k, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        long long i, j, k, dests = demand.shape[0], xshape = tmp_flow.shape[0]
         long long predecessor, connection, lid, link
     # # printf(<char *> "\nentering SL")
     for j in range(dests):
@@ -135,8 +135,6 @@ cdef void sl_network_loading(
                         connection = conn[predecessor]
                         predecessor = pred[predecessor]
                     break
-    # printf(<char *> "\nLeaving SL")
-    pass
 
 
 @cython.wraparound(False)
@@ -151,21 +149,23 @@ cdef void perform_select_link_analysis(long origin,
                                         double [:, :] sl_link_loading,
                                         unsigned char [:] tmp_flow,
                                         long classes) nogil:
-# origin: Origin of the path
-# demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
-# pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
-# conn: Stores the link connecting the given index (predecessor) to its next node
-#e.g: in sioux falls, for origin 0, the node 1's predecessor is 0. Referencing conn[1] will return the link 0 (link 1)
-# conn gives the link that connects the current predecessor to its predecessor
-# sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
-# sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
-#Dimension: num_links by 1
-# NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
-# selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
-#tmp flow: array of zeros as long as the number of links in compressed graph
+    """
+    origin: Origin of the path
+    demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
+    pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
+    conn: Stores the link connecting the given index (predecessor) to its next node
+    e.g: in sioux falls, for origin 0, the node 1's predecessor is 0. Referencing conn[1] will return the link 0 (link 1)
+    conn gives the link that connects the current predecessor to its predecessor
+    sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
+    sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
+    Dimension: num_links by 1
+    NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
+    selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
+    tmp flow: array of zeros as long as the number of links in compressed graph
+    """
     cdef:
-        int i, j, k, idx, dests = demand.shape[0], xshape = tmp_flow.shape[0]
-        long long predecessor, connection, lid, link
+        long long i, j, k, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        long long predecessor, connection, lid
         double tot
     for j in range(dests):
         tot = 0
@@ -175,48 +175,30 @@ cdef void perform_select_link_analysis(long origin,
             k += 1
         if tot == 0:
             continue
-        # for k in range(classes):
-        #     tot += demand[j, k]
-        # if tot == 0:
-        #     continue
+
         memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
-        # for i in range(conn.shape[0]):
-        #     #TODO: check if memset is faster than rewalking path
-        #     if conn[i] != -1:
-        #         for k in range(classes):
-        #             tmp_flow[conn[i], k] = 0
-        predecessor = j
-        connection = conn[predecessor]
-        predecessor = pred[predecessor]
+        connection = conn[j]
+        predecessor = pred[j]
         while predecessor >= 0:
             tmp_flow[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-        # for k in range(classes):
+
         for i in range(selected_links.shape[0]):
             lid = selected_links[i]
-            #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
             if tmp_flow[lid] != 0:
                 for k in range(classes):
-                    # sl_od_loading[j, :] = demand[j, :]
                     sl_od_matrix[j, k] = demand[j, k]
-                predecessor = j
-                connection = conn[predecessor]
-                predecessor = pred[predecessor]
+                connection = conn[j]
+                predecessor = pred[j]
                 while predecessor >= 0:
                     for k in range(classes):
                         sl_link_loading[connection, k] += demand[j, k]
                     connection = conn[predecessor]
                     predecessor = pred[predecessor]
                 break
-                #once at least one link in the set is shown to be in the current destination, the load along that path is added.
-                #There is no need to check the remaining links - this would add extra demand that isn't there
-
-                # for idx in range(conn.shape[0]):
-                #     if conn[idx] != -1:
-                #         link = conn[idx]
-                #         sl_link_loading[link, :] += demand[j, :]
-
+                # once at least one link in the set is shown to be in the current destination, the load along that path is added.
+                # There is no need to check the remaining links - this would add extra demand that isn't there
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
