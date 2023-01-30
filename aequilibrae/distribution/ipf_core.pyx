@@ -139,7 +139,7 @@ cpdef void _total_prods(double[:, :] flows,
     cdef long long I = flows.shape[0]
     cdef long long J = flows.shape[1]
 
-    # Computes factors
+    # Calculate the row totals (prods) from the flows
     for i in prange(I, num_threads=cpus):
         prod_tot[i] = 0
         if prod_tgt[i] == 0:
