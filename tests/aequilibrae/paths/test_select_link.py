@@ -123,6 +123,17 @@ class TestSelectLink(TestCase):
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match"
             )
 
+    def test_select_link_network_loading(self):
+        self.assignment.execute()
+        non_sl_loads = self.assignclass.results.get_load_results()
+
+        self.setUp()
+        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignment.execute()
+        sl_loads = self.assignclass.results.get_load_results()
+
+        np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
+
     def test_duplicate_links(self):
         """
         Tests to make sure the user api correctly filters out duplicate links in the compressed graph
