@@ -47,13 +47,13 @@ class TestSelectLink(TestCase):
         self.matrix.close()
         self.project.close()
 
-    def test_select_link_results(self):
+    def test_multiple_link_sets(self):
         """
         Tests whether the Select Link feature works as wanted.
         Uses two examples: 2 links in one select link, and a single Selected Link
         Checks both the OD Matrix and Link Loading
         """
-        self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)]})
+        self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "5 for fun": [(5, 1)]})
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(

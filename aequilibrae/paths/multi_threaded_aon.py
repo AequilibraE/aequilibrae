@@ -19,15 +19,28 @@ class MultiThreadedAoN:
         self.temp_b_nodes = np.array([])
         # Temporary array which stores whether a link is accessed in a path for Select Link Analysis functionality
         self.tmp_flow = np.array([])
+        # Stores all selected link sets in one array
+        self.select_links = np.array([])
+        # Stores all select link OD matrices
+        self.sl_od_matrix = np.array([])
+        # Stores all link loading matrices
+        self.sl_link_loading = np.array([])
+        #Maps the names of the SL link sets to array indices
+        self.sl_idx = {}
 
     # In case we want to do by hand, we can prepare each method individually
-    # TODO: reset with zeros instead of reallocating
+
     def prepare(self, graph, results):
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         if results._selected_links:
             self.tmp_flow = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
+            #Sets up array with every set of selected links
+            self.select_links = results.select_links
+            self.sl_od_matrix = results.sl_od_matrix
+            self.sl_link_loading = results.sl_link_loading
+
         if results.num_skims > 0:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:

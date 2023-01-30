@@ -121,18 +121,36 @@ class AssignmentResults:
                 index_names=matrix.index_names,
             )
 
-            for name in self._selected_links.keys():  # maps name to output matrix
-                # TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
-                self.select_link_od.matrix[name] =np.zeros(
-                    (graph.num_zones, graph.num_zones, self.classes["number"]),
-                    dtype=graph.default_types("float"))
-                #np.zeros(
+            # Sets up array with every set of selected links
+            self.select_links = np.full((len(self._selected_links),
+                                         max([len(x) for x in self._selected_links.values()])), -1,
+                                        dtype=graph.default_types("int"))
+            self.sl_od_matrix = np.zeros((len(self._selected_links), graph.num_zones, graph.num_zones,
+                                          self.classes["number"]), dtype=graph.default_types("float"))
+            self.sl_link_loading = np.zeros((len(self._selected_links), graph.compact_num_links,
+                                             self.classes["number"]), dtype=graph.default_types("float"))
 
-                #     (graph.compact_num_nodes, graph.compact_num_nodes, self.classes["number"]),
-                #     dtype=graph.default_types("float"),
-                # )
+            sl_idx = {}
+            for i, val in enumerate(self._selected_links.items()):
+                name, arr = val
+                sl_idx[name] = i
+                # Filling the array with
+                self.select_links[i][:len(arr)] = arr
+                self.select_link_od.matrix[name] = self.sl_od_matrix[i]
+                self.select_link_loading.matrix[name] = self.sl_link_loading[i]
 
-                self.select_link_loading.matrix[name] = np.zeros((graph.compact_num_links, self.classes["number"]))
+            # Overwrites previous arrays on assignment results level with the index to access that array in the
+            # Cython friendly 2-d matrix
+            self._selected_links = sl_idx
+
+
+            # for name in self._selected_links.keys():  # maps name to output matrix
+            #     # TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
+            #     self.select_link_od.matrix[name] =np.zeros(
+            #         (graph.num_zones, graph.num_zones, self.classes["number"]),
+            #         dtype=graph.default_types("float"))
+            #
+            #     self.select_link_loading.matrix[name] = np.zeros((graph.compact_num_links, self.classes["number"]))
 
     def reset(self) -> None:
         """

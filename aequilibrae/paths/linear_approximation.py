@@ -406,15 +406,15 @@ class LinearApproximation(WorkerThread):
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
 
                     if c._selected_links:
-                        for name in c._selected_links.keys():
+                        for name, idx in c._aon_results._selected_links.items():
                             copy_three_dimensions(
                                 c.results.select_link_od.matrix[name],  # ouput matrix
-                                c._aon_results.select_link_od.matrix[name],  # matrix 1
+                                c._aon_results.sl_od_matrix[idx, :, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
                                 c.results.select_link_loading.matrix[name],  # ouput matrix
-                                c._aon_results.select_link_loading.matrix[name],  # matrix 1
+                                c._aon_results.sl_link_loading[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
                     flows.append(c.results.total_link_loads)
@@ -439,18 +439,18 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name in c._selected_links.keys():
+                        for name, idx in c._selected_links.items():
                             linear_combination_skims(
-                                c.results.select_link_od.matrix[name],  # ouput matrix
-                                c._aon_results.select_link_od.matrix[name],  # matrix 1
+                                c.results.select_link_od.matrix[name],  # output matrix
+                                c._aon_results.sl_od_matrix[idx],  # matrix 1
                                 c.results.select_link_od.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
                             )
 
                             linear_combination(
-                                c.results.select_link_loading.matrix[name],  # ouput matrix
-                                c._aon_results.select_link_loading.matrix[name],  # matrix 1
+                                c.results.select_link_loading.matrix[name],  # output matrix
+                                c._aon_results.sl_link_loading[idx],  # matrix 1
                                 c.results.select_link_loading.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count

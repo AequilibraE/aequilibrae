@@ -143,21 +143,22 @@ cdef return_an_int_view(input):
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef void sl_network_loading(
-    long long [:] selected_links,
+    long long [:, :] selected_links,
     double [:, :] demand,
     long long [:] pred,
     long long [:] conn,
     double [:, :] link_loads,
-    double [:, :] sl_od_matrix,
-    double [:, :] sl_link_loading,
+    double [:, :, :] sl_od_matrix,
+    double [:, :, :] sl_link_loading,
     unsigned char [:] tmp_flow,
     long classes) nogil:
 
     #Two purposes: SL loading, regular loading
     #Execute regular loading,keeping track of SL links
     cdef:
-        int i, j, k, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        int i, j, k, l, dests = demand.shape[0], xshape = tmp_flow.shape[0]
         long long predecessor, connection, lid, link
+        bint found
     # # printf(<char *> "\nentering SL")
     for j in range(dests):
     #     printf(<char*> "\n Calculating for %i out of %i", j, dests-1)
@@ -170,33 +171,46 @@ cdef void sl_network_loading(
             tmp_flow[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-        # for row in range(selected_links.shape[0]):
-        #     for i in range(selected_links[row].shape[0]):
+
         for i in range(selected_links.shape[0]):
-            lid = selected_links[i]
-            if tmp_flow[lid] != 0:
+            #Scanning to find any SL links
+            found = 0
+            l = 0
+            while l < selected_links.shape[1] and found == 0:
+                #Checks to see if the current set of selected links has finished
+                #NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                #There is either a serious bug, or the program has reached the end of a set of links in SL.
+                #This lets us early exit from the loop without needing to iterate through the rest of the array
+                #Which just has placeholder values
+                if selected_links[i][l] == -1:
+                    break
+                if tmp_flow[selected_links[i][l]] != 0:
+                    found = 1
+                l += 1
+
+            if found == 1:
                 for k in range(classes):
-                    sl_od_matrix[j, k] = demand[j, k]
+                    sl_od_matrix[i, j, k] = demand[j, k]
                 connection = conn[j]
                 predecessor = pred[j]
                 while predecessor >= 0:
                     for k in range(classes):
-                        sl_link_loading[connection, k] += demand[j, k]
+                        sl_link_loading[i, connection, k] += demand[j, k]
                     connection = conn[predecessor]
                     predecessor = pred[predecessor]
-                break
+
 
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef void perform_select_link_analysis(long origin,
-                                        long long [:] selected_links,
+                                        long long [:, :] selected_links,
                                         double [:, :] demand,
                                         long long [:] pred,
                                         long long [:] conn,
-                                        double [:, :] sl_od_matrix,
-                                        double [:, :] sl_link_loading,
+                                        double [:, :, :] sl_od_matrix,
+                                        double [:, :, :] sl_link_loading,
                                         unsigned char [:] tmp_flow,
                                         long classes) nogil:
 # origin: Origin of the path
@@ -212,9 +226,11 @@ cdef void perform_select_link_analysis(long origin,
 # selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
 #tmp flow: array of zeros as long as the number of links in compressed graph
     cdef:
-        int i, j, k, idx, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        int i, j, k, l, dests = demand.shape[0], xshape = tmp_flow.shape[0]
         long long predecessor, connection, lid, link
         double tot
+        bint found
+
     for j in range(dests):
         tot = 0
         k = 0
@@ -223,16 +239,7 @@ cdef void perform_select_link_analysis(long origin,
             k += 1
         if tot == 0:
             continue
-        # for k in range(classes):
-        #     tot += demand[j, k]
-        # if tot == 0:
-        #     continue
         memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
-        # for i in range(conn.shape[0]):
-        #     #TODO: check if memset is faster than rewalking path
-        #     if conn[i] != -1:
-        #         for k in range(classes):
-        #             tmp_flow[conn[i], k] = 0
         predecessor = j
         connection = conn[predecessor]
         predecessor = pred[predecessor]
@@ -240,31 +247,32 @@ cdef void perform_select_link_analysis(long origin,
             tmp_flow[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-        # for k in range(classes):
+
         for i in range(selected_links.shape[0]):
-            lid = selected_links[i]
-            #TODO: CONFIRM BEHAVIOUR OF CLASSES, swap the classes
-            if tmp_flow[lid] != 0:
+            #Scanning to find any SL links
+            found = 0
+            l = 0
+            while l < selected_links.shape[1] and found == 0:
+                #Checks to see if the current set of selected links has finished
+                #NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                #There is either a serious bug, or the program has reached the end of a set of links in SL.
+                #This lets us early exit from the loop without needing to iterate through the rest of the array
+                #Which just has placeholder values
+                if selected_links[i][l] == -1:
+                    break
+                if tmp_flow[selected_links[i][l]] != 0:
+                    found = 1
+                l += 1
+            if found == 1:
                 for k in range(classes):
-                    # sl_od_loading[j, :] = demand[j, :]
-                    sl_od_matrix[j, k] = demand[j, k]
-                predecessor = j
-                connection = conn[predecessor]
-                predecessor = pred[predecessor]
+                    sl_od_matrix[i, j, k] = demand[j, k]
+                connection = conn[j]
+                predecessor = pred[j]
                 while predecessor >= 0:
                     for k in range(classes):
-                        sl_link_loading[connection, k] += demand[j, k]
+                        sl_link_loading[i, connection, k] += demand[j, k]
                     connection = conn[predecessor]
                     predecessor = pred[predecessor]
-                break
-                #once at least one link in the set is shown to be in the current destination, the load along that path is added.
-                #There is no need to check the remaining links - this would add extra demand that isn't there
-
-                # for idx in range(conn.shape[0]):
-                #     if conn[idx] != -1:
-                #         link = conn[idx]
-                #         sl_link_loading[link, :] += demand[j, :]
-
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

@@ -94,12 +94,20 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
+
+    #CDEF FOR UNCOMBINED SL
+    # cdef:
+    #     # long long [:] selected_links_view
+    #     double [:, :] sl_od_matrix_view
+    #     double [:, :] sl_link_loading_view
+    #     unsigned char [:] tmp_flow_view
+    #     long long[:] link_list
     cdef:
         # long long [:] selected_links_view
-        double [:, :] sl_od_matrix_view
-        double [:, :] sl_link_loading_view
+        double [:, :, :] sl_od_matrix_view
+        double [:, :, :] sl_link_loading_view
         unsigned char [:] tmp_flow_view
-        long long[:] link_list
+        long long[:, :] link_list
 
 
 
@@ -147,32 +155,28 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
     #TODO: Write a test to confirm SL_NETWORK LOADING IS CORRECT
+    #TODO: Consider Pointer approach instead
     if result._selected_links:
         tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
-        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
-        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
-        for name, link_set in result._selected_links.items():
-            link_list = link_set[:]
-            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
-            sl_od_matrix_view = result.select_link_od.matrix[name][origin_index, :, :]
-            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
-            #TODO: propogate changes to the link_list variable
-            with nogil:
-                # perform_select_link_analysis(origin_index,
-                #                              link_list, demand_view, predecessors_view, conn_view,
-                #                              sl_od_matrix_view,
-                #                              sl_link_loading_view,
-                #                              tmp_flow_view,
-                #  classes)
-                sl_network_loading(link_list,
-                                   demand_view,
-                                   predecessors_view,
-                                   conn_view,
-                                   link_loads_view,
-                                   sl_od_matrix_view,
-                                   sl_link_loading_view,
-                                   tmp_flow_view,
-                                   classes)
+        sl_od_matrix_view = aux_result.sl_od_matrix[:, origin_index, :, :]
+        sl_link_loading_view = aux_result.sl_link_loading[:, :, :]
+        link_list = aux_result.select_links[:, :]
+        with nogil:
+        #         perform_select_link_analysis(origin_index,
+        #                                      link_list, demand_view, predecessors_view, conn_view,
+        #                                      sl_od_matrix_view,
+        #                                      sl_link_loading_view,
+        #                                      tmp_flow_view,
+        #          classes)
+            sl_network_loading(link_list,
+                               demand_view,
+                               predecessors_view,
+                               conn_view,
+                               link_loads_view,
+                               sl_od_matrix_view,
+                               sl_link_loading_view,
+                               tmp_flow_view,
+                               classes)
     else:
         with nogil:
             network_loading(classes,
