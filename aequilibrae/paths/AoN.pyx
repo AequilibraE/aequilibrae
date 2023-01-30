@@ -123,6 +123,15 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                          conn_view,
                          reached_first_view)
 
+        if block_flows_through_centroids: # Re-blocks the centroid if that is the case
+            b = 1
+            blocking_centroid_flows(b,
+                                    origin_index,
+                                    zones,
+                                    graph_fs_view,
+                                    b_nodes_view,
+                                    original_b_nodes_view)
+
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
@@ -136,42 +145,45 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
-        network_loading(classes,
-                        demand_view,
-                        predecessors_view,
-                        conn_view,
-                        link_loads_view,
-                        no_path_view,
-                        reached_first_view,
-                        node_load_view,
-                        w)
-
-        if block_flows_through_centroids: # Re-blocks the centroid if that is the case
-            b = 1
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
-
+    #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
+    #TODO: Write a test to confirm SL_NETWORK LOADING IS CORRECT
     if result._selected_links:
         tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
+        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
+        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
         for name, link_set in result._selected_links.items():
             link_list = link_set[:]
+            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
             sl_od_matrix_view = result.select_link_od.matrix[name][origin_index, :, :]
             sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
-
+            #TODO: propogate changes to the link_list variable
             with nogil:
-                perform_select_link_analysis(origin_index,
-                                             link_list,
-                                             demand_view,
-                                             predecessors_view,
-                                             conn_view,
-                                             sl_od_matrix_view,
-                                             sl_link_loading_view,
-                                             tmp_flow_view,
-                                             classes)
+                # perform_select_link_analysis(origin_index,
+                #                              link_list, demand_view, predecessors_view, conn_view,
+                #                              sl_od_matrix_view,
+                #                              sl_link_loading_view,
+                #                              tmp_flow_view,
+                #  classes)
+                sl_network_loading(link_list,
+                                   demand_view,
+                                   predecessors_view,
+                                   conn_view,
+                                   link_loads_view,
+                                   sl_od_matrix_view,
+                                   sl_link_loading_view,
+                                   tmp_flow_view,
+                                   classes)
+    else:
+        with nogil:
+            network_loading(classes,
+                            demand_view,
+                            predecessors_view,
+                            conn_view,
+                            link_loads_view,
+                            no_path_view,
+                            reached_first_view,
+                            node_load_view,
+                            w)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
