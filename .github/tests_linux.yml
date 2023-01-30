@@ -33,8 +33,9 @@ jobs:
       run: |
         cd aequilibrae/paths
         python3 setup_assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        cd ../distribution
+        python3 setup_ipf.py build_ext --inplace
+        cd ../..
 
     - name: Test
       run: |
