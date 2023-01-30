@@ -16,14 +16,10 @@ include 'path_file_saving.pyx'
 
 from .__version__ import binary_version as VERSION_COMPILED
 
-def one_to_all(origin, matrix, graph, result,
-               aux_result, curr_thread):
+def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
-    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
-    cdef int critical_queries = 0
-    cdef int path_file = 0
+    cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
     cdef int skims
-    cdef int link_extract_queries, query_type
 
     # Origin index is the index of the matrix we are assigning
     # this is used as index for the skim matrices
@@ -117,6 +113,7 @@ def one_to_all(origin, matrix, graph, result,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
         w = path_finding(origin_index,
                          g_view,
                          b_nodes_view,
@@ -125,47 +122,7 @@ def one_to_all(origin, matrix, graph, result,
                          ids_graph_view,
                          conn_view,
                          reached_first_view)
-    #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
-    #TODO: Write a test to confirm SL_NETWORK LOADING IS CORRECT
-    if result._selected_links:
-        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
-        # print(np.zeros(graph.compact_num_links, dtype=graph.default_types("int")).shape)
-        # tmp_flow_view = np.empty(graph.compact_num_links, dtype=int)[:]
-        for name, link_set in result._selected_links.items():
-            link_list = link_set[:]
-            # link_list = np.asarray(link_set, dtype=graph.default_types("int"))[:]
-            sl_od_matrix_view = result.select_link_od.matrix[name][origin_index, :, :]
-            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
-            #TODO: propogate changes to the link_list variable
-            with nogil:
-                # perform_select_link_analysis(origin_index,
-                #                              link_list, demand_view, predecessors_view, conn_view,
-                #                              sl_od_matrix_view,
-                #                              sl_link_loading_view,
-                #                              tmp_flow_view,
-                #  classes)
-                sl_network_loading(link_list,
-                                   demand_view,
-                                   predecessors_view,
-                                   conn_view,
-                                   link_loads_view,
-                                   sl_od_matrix_view,
-                                   sl_link_loading_view,
-                                   tmp_flow_view,
-                                   classes
-                                   )
-    else:
-        with nogil:
-            network_loading(classes,
-                            demand_view,
-                            predecessors_view,
-                            conn_view,
-                            link_loads_view,
-                            no_path_view,
-                            reached_first_view,
-                            node_load_view,
-                            w)
-    with nogil:
+
         if skims > 0:
             skim_single_path(origin_index,
                      nodes,
@@ -179,6 +136,16 @@ def one_to_all(origin, matrix, graph, result,
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
+        network_loading(classes,
+                        demand_view,
+                        predecessors_view,
+                        conn_view,
+                        link_loads_view,
+                        no_path_view,
+                        reached_first_view,
+                        node_load_view,
+                        w)
+
         if block_flows_through_centroids: # Re-blocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
@@ -188,16 +155,26 @@ def one_to_all(origin, matrix, graph, result,
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        # perform_select_link_analysis(origin_index,
-        #                              link_list, demand_view, predecessors_view, conn_view,
-        #                              sl_od_loading_view,
-        #                              sl_link_loading_view,
-        #                              tmp_flow_view,
-        #  classes)
+    if result._selected_links:
+        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
+        for name, link_set in result._selected_links.items():
+            link_list = link_set[:]
+            sl_od_matrix_view = result.select_link_od.matrix[name][origin_index, :, :]
+            sl_link_loading_view = result.select_link_loading.matrix[name][:, :]
+
+            with nogil:
+                perform_select_link_analysis(origin_index,
+                                             link_list,
+                                             demand_view,
+                                             predecessors_view,
+                                             conn_view,
+                                             sl_od_matrix_view,
+                                             sl_link_loading_view,
+                                             tmp_flow_view,
+                                             classes)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
-    # print("DEMAND SHAPE: ", matrix.matrix_view[origin_index, :, :].shape)
     return origin
 
 def path_computation(origin, destination, graph, results):
