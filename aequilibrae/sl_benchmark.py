@@ -55,7 +55,7 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     assignment.set_time_field("distance")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
-    assignment.set_cores(1)
+    assignment.set_cores(0)
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
     # And we will allow paths to be compute going through other centroids/centroid connectors
@@ -63,6 +63,109 @@ def aequilibrae_init(proj_path: str, cost: str, cores: int = 0, ):
     # BE CAREFUL WITH THIS SETTING
     graph.set_blocked_centroid_flows(False)
     return graph, matrix, assignment, car
+
+def arkansas():
+    # from os.path import joinfrom
+    from aequilibrae import Project
+    from aequilibrae.paths import TrafficAssignment, TrafficClass
+    # import logging import sys
+    import numpy as np
+    from aequilibrae import logger
+    print('ark')
+    pth = r"C:\Users\61435\Desktop\aequilibrae_performance_tests\models\Arkansas"
+    proj = Project()
+    proj.open(pth)
+    net = proj.network
+    curr = proj.conn.cursor()
+    proj_matrices = proj.matrices
+    modes = net.modes
+    nodes = net.nodes  # These centroids are not in the matrices, so we turn them off
+    for n in [4701, 4702, 4703]:
+        nd = nodes.get(n)
+        nd.is_centroid = 0
+        nd.save()
+    net.build_graphs(modes=['T'])
+    truckGraph = net.graphs['T']
+    net.build_graphs(modes=['c'])
+    carGraph = net.graphs['c']
+    # Link exclusions (equivalent to selections when creating TransCAD .net
+    curr.execute("select link_id from links where exclusionset IN ('TruckOnly', 'HOV2', 'HOV3')")
+    exclude_from_passenger = [x[0] for x in curr.fetchall()]
+    curr.execute("select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')")
+    exclude_from_truck = [x[0] for x in curr.fetchall()]
+    graph = truckGraph
+    set1 = graph.network[
+        (graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
+    set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
+    exclude_from_passenger.extend(set1 + set2)
+    exclude_from_truck.extend(set1 + set2)
+    truckGraph.exclude_links(exclude_from_truck)
+    carGraph.exclude_links(exclude_from_passenger)
+    # And turn them back into centroids to not alter the model
+    for n in [4701, 4702, 4703]:
+        nd = nodes.get(n)
+        nd.is_centroid = 1
+        nd.save()
+    # Default parameters for BPR and tolls
+    for graph in [carGraph, truckGraph]:
+        graph.graph.alpha.fillna(0.15, inplace=True)
+        graph.graph.beta.fillna(4.0, inplace=True)
+        graph.graph.hov1tollcost.fillna(0, inplace=True)
+        graph.graph.mttollcost.fillna(0, inplace=True)
+        graph.graph.httollcost.fillna(0, inplace=True)
+        # Sets capacities and travel times for links without any
+        for period in ['am']: #'pm', 'md', 'nt']:
+            graph.graph.loc[graph.graph.a_node == graph.graph.b_node, f"{period}_assncap_10"] = 1.0
+            graph.graph.loc[
+                graph.graph.a_node == graph.graph.b_node, f"tt_{period}_10"] = 0.001  # Assigns all periods
+    for period in ['am']: #, 'md', 'pm', 'nt']:
+        logger.info(f'\n\n Assigning {period.upper()}')
+        proj_matrices = proj.matrices
+        carDemand = proj_matrices.get_matrix(f'{period.upper()}_omx')
+        carDemand.computational_view()#'AUTO')
+        lightTruckDemand = proj_matrices.get_matrix(f'{period.upper()}_omx')
+        lightTruckDemand.computational_view('COMMTRK')
+        lightTruckDemand.matrix_view = np.array(lightTruckDemand.matrix_view, np.float64)
+        heavyTruckDemand = proj_matrices.get_matrix(f'{period.upper()}_omx')
+        heavyTruckDemand.computational_view('HTRK')
+        heavyTruckDemand.matrix_view = np.array(heavyTruckDemand.matrix_view, np.float64)
+        assig = TrafficAssignment()
+        assig.procedure_id = f'{period}_baseline'
+        carClass = TrafficClass('car', carGraph, carDemand)
+        carClass.set_pce(1)
+        carClass.set_vot(0.2)
+        carClass.set_fixed_cost('hov1tollcost')
+        # The link exclusions for commercial trucks are actually the same as the ones for passenger cars, and not heavy trucks
+        lightTruckClass = TrafficClass('light_truck', carGraph, lightTruckDemand)
+        lightTruckClass.set_pce(1.5)
+        lightTruckClass.set_vot(0.5)
+        lightTruckClass.set_fixed_cost("mttollcost")
+
+        heavyTruckClass = TrafficClass('heavy_truck', truckGraph, heavyTruckDemand)
+        heavyTruckClass.set_pce(2.5)
+        heavyTruckClass.set_vot(1.0)
+        heavyTruckClass.set_fixed_cost("httollcost")
+        # The first thing to do is to add at list of traffic classes to be assigned
+        assig.set_classes([heavyTruckClass, carClass, lightTruckClass])
+        assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+        assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
+        assig.set_time_field(f"tt_{period}_10")
+        assig.set_capacity_field(
+            f"{period}_assncap_10")  # The capacity and free flow travel times as they exist in the graph    # And the algorithm we want to use to assign    # NT is not converging properly (it is too loose, so even MSA converges incredibly fast)
+        if period == 'nt':
+            assig.set_algorithm('msa')
+            assig.max_iter = 50
+            assig.rgap_target = 0.000001
+        else:
+            assig.set_algorithm('bfw')
+            assig.max_iter = 50
+            assig.rgap_target = 0.00001
+    return assig, carClass
+    assig.execute()  # we then execute the assignment
+    assig.save_results(f'assign_{period}_gen_cost_path_file')
+    proj.close()
+
+
 
 def main():
     projects = ["Arkansas"]
@@ -99,10 +202,11 @@ def main():
     print(f"Running with {args['iters']} iterations, {args['repeats']}",
           f"times, for a total of {args['iters'] * args['repeats']} samples.")
     # Arkansas links
-    # select_links = [None, {"test": [(24, 1), (79146, 1), (61, 1), (68, 1)]}]
+    select_links = [None, {"test": [(24, 1), (79146, 1)], "test 2": [(61, 1), (68, 1)]}]
     # Chicago links
-    select_links = [None,
-                    {"test": [(2, 1), (7, 1), (1, 1), (6, 1)]}]
+    # select_links = [None,
+    #                 {"test": [(2, 1), (7, 1), (1, 1), (6, 1)],
+    #                 "set 2": [(1, 1), (3, 1)]}]
 
 
     with warnings.catch_warnings():
@@ -113,8 +217,9 @@ def main():
         results = []
         proj_series = []
         project_name = args["projects"][0]
-        graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}",
-                                                                  args["cost"], args["cores"])
+        # graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}",
+        #                                                           args["cost"], args["cores"])
+        assignment, car = arkansas()
         for link in select_links:
             for project_name in args["projects"]:
                 print("select links is ", link)
@@ -138,7 +243,7 @@ def main():
 
             # print("-" * 30)
         print(results)
-        print("BASE/SL", results[0][1]/results[1][1])
+        print("BASE/SL", (results[1][1] - results[0][1])/results[1][1]*100)
         #
         # results = pd.concat(results)
         # summary = results.groupby(["project_name", "library", "cores"]).agg(
