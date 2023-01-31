@@ -25,7 +25,7 @@ class MultiThreadedAoN:
         self.sl_od_matrix = np.array([])
         # Stores all link loading matrices
         self.sl_link_loading = np.array([])
-        #Maps the names of the SL link sets to array indices
+        # Maps the names of the SL link sets to array indices
         self.sl_idx = {}
 
     # In case we want to do by hand, we can prepare each method individually
@@ -36,7 +36,7 @@ class MultiThreadedAoN:
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         if results._selected_links:
             self.tmp_flow = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
-            #Copying the select link matrices from results
+            # Copying the select link matrices from results
             self.select_links = results.select_links
             self.sl_od_matrix = results.sl_od_matrix
             self.sl_link_loading = results.sl_link_loading
