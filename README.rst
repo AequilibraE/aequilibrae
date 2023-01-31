@@ -73,8 +73,6 @@ As AequilibraE's focus is to provide resources that are not yet available in the
 Python ecosystem, some important tools for transportation model won't be part of AequilibraE any time soon. Examples
 of this are:
 
-    * Transit Assignment - `FastTrips <http://fast-trips.mtc.ca.gov>`_
-
     * Discrete choice models - `BIOEGEME <http://biogeme.epfl.ch>`_ , `LARCH <http://larch.newman.me>`_
 
     * Activity-Based models - `ActivitySim <http://www.activitysim.org/>`_
