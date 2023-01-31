@@ -62,12 +62,12 @@ class TestSelectLink(TestCase):
             np.testing.assert_allclose(
                 self.assignclass.results.select_link_od.matrix[key][:, :, 0],
                 od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match"
+                err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
             np.testing.assert_allclose(
                 self.assignclass.results.select_link_loading.matrix[key],
                 link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
 
     def test_equals_demand_one_origin(self):
@@ -92,7 +92,7 @@ class TestSelectLink(TestCase):
             np.testing.assert_allclose(
                 self.assignclass.results.select_link_loading.matrix[key],
                 link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
 
     def test_single_demand(self):
@@ -115,12 +115,12 @@ class TestSelectLink(TestCase):
             np.testing.assert_allclose(
                 self.assignclass.results.select_link_od.matrix[key][:, :, 0],
                 od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match"
+                err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
             np.testing.assert_allclose(
                 self.assignclass.results.select_link_loading.matrix[key],
                 link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match"
+                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
 
     def test_select_link_network_loading(self):
