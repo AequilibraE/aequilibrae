@@ -120,8 +120,9 @@ class AssignmentResults:
                 matrix_names=list(self._selected_links.keys()),
                 index_names=matrix.index_names,
             )
-
-            # Sets up array with every set of selected links
+            # Combine each set of selected links into one large matrix that can be parsed into Cython
+            # Each row corresponds a link set, and the equivalent rows in sl_od_matrix and sl_link_loading
+            # Correspond to that set
             self.select_links = np.full((len(self._selected_links),
                                          max([len(x) for x in self._selected_links.values()])), -1,
                                         dtype=graph.default_types("int"))
@@ -134,23 +135,16 @@ class AssignmentResults:
             for i, val in enumerate(self._selected_links.items()):
                 name, arr = val
                 sl_idx[name] = i
-                # Filling the array with
+                # Filling select_links array with linksets. Note the default value is -1, which is used as a placeholder
+                # It also denotes when the given row has no more selected links, since Cython cannot handle
+                # Multidimensional arrays where each row has different lengths
                 self.select_links[i][:len(arr)] = arr
+                #Correctly sets the dimensions for the final output matrices
                 self.select_link_od.matrix[name] = self.sl_od_matrix[i]
                 self.select_link_loading.matrix[name] = self.sl_link_loading[i]
 
-            # Overwrites previous arrays on assignment results level with the index to access that array in the
-            # Cython friendly 2-d matrix
+            # Overwrites previous arrays on assignment results level with the index to access that array in Cython
             self._selected_links = sl_idx
-
-
-            # for name in self._selected_links.keys():  # maps name to output matrix
-            #     # TODO: fix dimensions, method for memory copy, duplicate zeros, check for duplicate id's
-            #     self.select_link_od.matrix[name] =np.zeros(
-            #         (graph.num_zones, graph.num_zones, self.classes["number"]),
-            #         dtype=graph.default_types("float"))
-            #
-            #     self.select_link_loading.matrix[name] = np.zeros((graph.compact_num_links, self.classes["number"]))
 
     def reset(self) -> None:
         """

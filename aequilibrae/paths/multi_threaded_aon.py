@@ -36,7 +36,7 @@ class MultiThreadedAoN:
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
         if results._selected_links:
             self.tmp_flow = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
-            #Sets up array with every set of selected links
+            #Copying the select link matrices from results
             self.select_links = results.select_links
             self.sl_od_matrix = results.sl_od_matrix
             self.sl_link_loading = results.sl_link_loading

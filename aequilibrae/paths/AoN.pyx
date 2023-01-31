@@ -94,22 +94,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
-
-    #CDEF FOR UNCOMBINED SL
-    # cdef:
-    #     # long long [:] selected_links_view
-    #     double [:, :] sl_od_matrix_view
-    #     double [:, :] sl_link_loading_view
-    #     unsigned char [:] tmp_flow_view
-    #     long long[:] link_list
     cdef:
-        # long long [:] selected_links_view
         double [:, :, :] sl_od_matrix_view
         double [:, :, :] sl_link_loading_view
         unsigned char [:] tmp_flow_view
         long long[:, :] link_list
-
-
 
     #Now we do all procedures with NO GIL
     with nogil:
@@ -153,21 +142,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
-    #TODO: PROPAGATE TMP FLOW CHANGES, change linklist to np array by default
-    #TODO: Write a test to confirm SL_NETWORK LOADING IS CORRECT
-    #TODO: Consider Pointer approach instead
     if result._selected_links:
         tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
         sl_od_matrix_view = aux_result.sl_od_matrix[:, origin_index, :, :]
         sl_link_loading_view = aux_result.sl_link_loading[:, :, :]
         link_list = aux_result.select_links[:, :]
         with nogil:
-        #         perform_select_link_analysis(origin_index,
-        #                                      link_list, demand_view, predecessors_view, conn_view,
-        #                                      sl_od_matrix_view,
-        #                                      sl_link_loading_view,
-        #                                      tmp_flow_view,
-        #          classes)
             sl_network_loading(link_list,
                                demand_view,
                                predecessors_view,
