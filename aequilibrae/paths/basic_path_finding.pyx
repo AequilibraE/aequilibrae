@@ -131,7 +131,7 @@ cdef void sl_network_loading(
             predecessor = pred[predecessor]
 
         for i in range(selected_links.shape[0]):
-            #Scanning to find any SL links
+            # Scanning to find any SL links
             found = 0
             l = 0
             while l < selected_links.shape[1] and found == 0:
