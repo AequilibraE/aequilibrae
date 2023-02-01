@@ -101,20 +101,19 @@ cdef void sl_network_loading(
     unsigned char [:] tmp_flow,
     long classes) nogil:
 # VARIABLES:
-# selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
-# demand: The input demand matrix for a given origin. The first index corresponds to destination, second is the class
-# pred: The list of predecessor nodes, i.e. given a node, referencing that node's index in pred yields the previous node
+#   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
+#   demand:         The input demand matrix for a given origin. The first index corresponds to destination, second is the class
+#   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred yields the previous node
 # in the minimum spanning tree
-# conn: the list of links which connect predecessor nodes. referencing it by the predecessor yields the link it
-# used to connect the two nodes
-# link_loads: Stores the loading on each link. Equivalent to link_loads in network_loading
-# sl_od_matrix: Stores the OD matrix for each set of selected links sliced for the given origin
+#   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields the link it
+#                   used to connect the two nodes
+# link_loads:       Stores the loading on each link. Equivalent to link_loads in network_loading
+# sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
 # The indices are: set of links, destination, class
-# sl_link_loading: Stores the loading on the Selected links, and the paths which use the selected links
-# The indices are: set of links, link_id, class
-# tmp_flow: An array which acts as a flag for which links were used in retracing a given OD path
-# classes: the number of subclasses of vehicles for the given TrafficClass
-# Two purposes: SL loading and network loading
+# sl_link_loading: Stores the loading on the Selected links, and the paths which use the selected links (The indices are: set of links, link_id, class)
+# tmp_flow:        An array which acts as a flag for which links were used in retracing a given OD path
+# classes:         the number of subclasses of vehicles for the given TrafficClass
+# 
 # Executes regular loading, while keeping track of SL links
     cdef:
         int i, j, k, l, dests = demand.shape[0], xshape = tmp_flow.shape[0]
