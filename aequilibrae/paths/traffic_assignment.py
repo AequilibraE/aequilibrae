@@ -644,3 +644,28 @@ class TrafficAssignment(object):
             record.procedure = "Traffic Assignment"
             record.description = out_skims.description
             record.save()
+
+    def save_select_links(self, table_name: str):
+        for cls in self.classes:
+            if cls._selected_links is None:
+                continue
+            cls_flows = cls.decompress_select_link_flows()
+
+            for name, df in cls_flows.items():
+                # Create Values table
+                conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+                df.to_sql(table_name, conn)
+                conn.close()
+            # Create description table
+            self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"
+            conn = self.project.connect()
+            report = {"SL_sets": cls._selected_links.keys()}
+            data = [table_name, "select link", self.procedure_id, str(report), self.procedure_date,
+                    self.description]
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                                description) Values(?,?,?,?,?,?)""",
+                data,
+            )
+            conn.commit()
+            conn.close()

@@ -1,5 +1,7 @@
 from typing import Union, List, Tuple, Dict
 import numpy as np
+import pandas as pd
+
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results import AssignmentResults
@@ -48,6 +50,7 @@ class TrafficClass:
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.__id__ = name
+        # self.sl_data = None
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -121,6 +124,47 @@ class TrafficClass:
                     else:
                         link_ids.append(comp_id)
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
+        # self.sl_data = links
+
+    def decompress_select_link_flows(self) -> Dict[str, pd.DataFrame]:
+        """
+        Converts the select_link_flows from compressed link ids, back into regular ids.
+        In addition, it maps the flow on the individual links based on their direction.
+
+         Returns a dictionary of dataframes which map the link_set name to their link flows
+         """
+        decompressed_flows = {}
+        num_subclasses = self.matrix.matrix_view.shape[2] if len(self.matrix.matrix_view.shape) > 2 else 1
+        #Setting up common column names
+        columns = []
+        for x in range(num_subclasses):
+            columns.append(f"ab_subclass_{x + 1}")
+            columns.append(f"ba_subclass_{x + 1}")
+
+        for name in self._selected_links.keys():
+            link_loads = self.results.select_link_loading.matrix[name]
+
+            n_links = self.graph.num_links
+            graph = self.graph.graph
+            ab_loading = np.zeros((n_links, num_subclasses))
+            ba_loading = np.zeros((n_links, num_subclasses))
+
+            for i, link in enumerate(link_loads):
+                query = graph.query(f"__compressed_id__ == {i}")
+                for j in query.itertuples():
+                    # print(j)
+                    if j.direction == 1:
+                        # -1 to account for 0 indexing
+                        ab_loading[j.link_id - 1, :] = link_loads[i, :]
+                    else:
+                        ba_loading[j.link_id - 1, :] = link_loads[i, :]
+            loads = np.concatenate((ab_loading, ba_loading), axis=1)
+            df = pd.DataFrame(loads, columns=sorted(columns))
+            df.insert(loc=0, column="link_id", value=np.arange(1, self.graph.num_links + 1, 1))
+            # rearrange columns so each subclass' flows are adjacent to each other
+            decompressed_flows[name] = df[["link_id"] + columns]
+        return decompressed_flows
+
 
     def __setattr__(self, key, value):
 

@@ -3,7 +3,6 @@ import os
 
 cimport numpy as np
 from libcpp cimport bool
-
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -99,7 +98,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         double [:, :, :] sl_link_loading_view
         unsigned char [:] tmp_flow_view
         long long[:, :] link_list
+        unsigned char select_link = 0
 
+    if result._selected_links:
+        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
+        sl_od_matrix_view = aux_result.sl_od_matrix[:, origin_index, :, :]
+        sl_link_loading_view = aux_result.sl_link_loading[:, :, :]
+        link_list = aux_result.select_links[:, :]
+        select_link = 1
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -142,12 +148,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
-    if result._selected_links:
-        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
-        sl_od_matrix_view = aux_result.sl_od_matrix[:, origin_index, :, :]
-        sl_link_loading_view = aux_result.sl_link_loading[:, :, :]
-        link_list = aux_result.select_links[:, :]
-        with nogil:
+        if select_link == 1:
             sl_network_loading(link_list,
                                demand_view,
                                predecessors_view,
@@ -157,8 +158,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                sl_link_loading_view,
                                tmp_flow_view,
                                classes)
-    else:
-        with nogil:
+        else:
             network_loading(classes,
                             demand_view,
                             predecessors_view,
