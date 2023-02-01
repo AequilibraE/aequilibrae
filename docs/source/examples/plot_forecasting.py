@@ -21,7 +21,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 logger = project.logger
 
-# We the project open, we can tell the logger to direct all messages to the terminal as well
+# We get the project open, we can tell the logger to direct all messages to the terminal as well
 stdout_handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
@@ -325,7 +325,8 @@ demand.names
 
 # Let's use the IPF matrix
 demand.computational_view("matrix")
-
+print(graph.graph[["link_id", "direction", "a_node", "b_node"]])
+raise Exception()
 assig = TrafficAssignment()
 
 # Creates the assignment class
@@ -347,6 +348,21 @@ assig.set_algorithm("bfw")
 # since I haven't checked the parameters file, let's make sure convergence criteria is good
 assig.max_iter = 500
 assig.rgap_target = 0.00001
+
+# %%
+
+# OPTIONAL: If we want to execute select link analysis on a particular TrafficClass, we set the links we are analysing
+# The format of the input select links is a dictionary (str: list[tuple]).
+# Each entry represents a separate set of selected links to compute. The str name will name the set of links
+# The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph
+# direction can be 0, 1, -1. 0 denotes bi-directionality
+# For example, let's use Select Link on two sets of links,
+select_links = {
+    "Leaving node 1": [(1, 1), (2, 1)],
+    "Random nodes": [(3, 1), (5, 1)]
+}
+#We call this command on the class we are analysing with our dictionary of values
+assigclass.set_select_links(select_links)
 
 assig.execute()  # we then execute the assignment
 
