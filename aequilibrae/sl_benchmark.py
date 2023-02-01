@@ -8,10 +8,10 @@ import sys
 import timeit
 import pandas as pd
 import warnings
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from aequilibrae import Project, TrafficAssignment, TrafficClass, AequilibraeMatrix
 import numpy as np
 
-sys.path.append(str(Path(__file__).resolve().parent))
 
 
 def aequilibrae_init(
