@@ -72,8 +72,6 @@ def arkansas(path):
         nd = nodes.get(n)
         nd.is_centroid = 0
         nd.save()
-    net.build_graphs(modes=["T"])
-    truckGraph = net.graphs["T"]
     net.build_graphs(modes=["c"])
     carGraph = net.graphs["c"]
     # Link exclusions (equivalent to selections when creating TransCAD .net
@@ -81,12 +79,10 @@ def arkansas(path):
     exclude_from_passenger = [x[0] for x in curr.fetchall()]
     curr.execute("select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')")
     exclude_from_truck = [x[0] for x in curr.fetchall()]
-    graph = truckGraph
+    graph = carGraph
     set1 = graph.network[(graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
     set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
     exclude_from_passenger.extend(set1 + set2)
-    exclude_from_truck.extend(set1 + set2)
-    truckGraph.exclude_links(exclude_from_truck)
     carGraph.exclude_links(exclude_from_passenger)
     # And turn them back into centroids to not alter the model
     for n in [4701, 4702, 4703]:
@@ -94,59 +90,44 @@ def arkansas(path):
         nd.is_centroid = 1
         nd.save()
     # Default parameters for BPR and tolls
-    for graph in [carGraph, truckGraph]:
-        graph.graph.alpha.fillna(0.15, inplace=True)
-        graph.graph.beta.fillna(4.0, inplace=True)
-        graph.graph.hov1tollcost.fillna(0, inplace=True)
-        graph.graph.mttollcost.fillna(0, inplace=True)
-        graph.graph.httollcost.fillna(0, inplace=True)
-        # Sets capacities and travel times for links without any
-        for period in ["am"]:  #'pm', 'md', 'nt']:
-            graph.graph.loc[graph.graph.a_node == graph.graph.b_node, f"{period}_assncap_10"] = 1.0
-            graph.graph.loc[graph.graph.a_node == graph.graph.b_node, f"tt_{period}_10"] = 0.001  # Assigns all periods
-    for period in ["am"]:  # , 'md', 'pm', 'nt']:
-        logger.info(f"\n\n Assigning {period.upper()}")
-        proj_matrices = proj.matrices
-        carDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
-        carDemand.computational_view()  #'AUTO')
-        lightTruckDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
-        lightTruckDemand.computational_view("COMMTRK")
-        lightTruckDemand.matrix_view = np.array(lightTruckDemand.matrix_view, np.float64)
-        heavyTruckDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
-        heavyTruckDemand.computational_view("HTRK")
-        heavyTruckDemand.matrix_view = np.array(heavyTruckDemand.matrix_view, np.float64)
-        assig = TrafficAssignment()
-        assig.procedure_id = f"{period}_baseline"
-        carClass = TrafficClass("car", carGraph, carDemand)
-        carClass.set_pce(1)
-        carClass.set_vot(0.2)
-        carClass.set_fixed_cost("hov1tollcost")
-        # The link exclusions for commercial trucks are actually the same as the ones for passenger cars, and not heavy trucks
-        lightTruckClass = TrafficClass("light_truck", carGraph, lightTruckDemand)
-        lightTruckClass.set_pce(1.5)
-        lightTruckClass.set_vot(0.5)
-        lightTruckClass.set_fixed_cost("mttollcost")
+    carGraph.graph.alpha.fillna(0.15, inplace=True)
+    carGraph.graph.beta.fillna(4.0, inplace=True)
+    carGraph.graph.hov1tollcost.fillna(0, inplace=True)
+    carGraph.graph.mttollcost.fillna(0, inplace=True)
+    carGraph.graph.httollcost.fillna(0, inplace=True)
+    # Sets capacities and travel times for links without any
+    carGraph.graph.loc[carGraph.graph.a_node == carGraph.graph.b_node, f"am_assncap_10"] = 1.0
+    carGraph.graph.loc[carGraph.graph.a_node == carGraph.graph.b_node, f"tt_am_10"] = 0.001  # Assigns all periods
+    period = "am"
+    logger.info(f"\n\n Assigning {period.upper()}")
+    proj_matrices = proj.matrices
+    carDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
+    carDemand.computational_view()  #'AUTO')
+    lightTruckDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
+    lightTruckDemand.computational_view("COMMTRK")
+    lightTruckDemand.matrix_view = np.array(lightTruckDemand.matrix_view, np.float64)
+    heavyTruckDemand = proj_matrices.get_matrix(f"{period.upper()}_omx")
+    heavyTruckDemand.computational_view("HTRK")
+    heavyTruckDemand.matrix_view = np.array(heavyTruckDemand.matrix_view, np.float64)
+    assig = TrafficAssignment()
+    assig.procedure_id = f"{period}_baseline"
+    carClass = TrafficClass("car", carGraph, carDemand)
+    carClass.set_pce(1)
+    carClass.set_vot(0.2)
+    carClass.set_fixed_cost("hov1tollcost")
+    # The link exclusions for commercial trucks are actually the same as the ones for passenger cars, and not heavy trucks
+    # The first thing to do is to add at list of traffic classes to be assigned
+    assig.set_classes([carClass])
+    assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+    assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
+    assig.set_time_field(f"tt_{period}_10")
+    assig.set_capacity_field(
+        f"{period}_assncap_10"
+    )  # The capacity and free flow travel times as they exist in the graph    # And the algorithm we want to use to assign    # NT is not converging properly (it is too loose, so even MSA converges incredibly fast)
 
-        heavyTruckClass = TrafficClass("heavy_truck", truckGraph, heavyTruckDemand)
-        heavyTruckClass.set_pce(2.5)
-        heavyTruckClass.set_vot(1.0)
-        heavyTruckClass.set_fixed_cost("httollcost")
-        # The first thing to do is to add at list of traffic classes to be assigned
-        assig.set_classes([heavyTruckClass, carClass, lightTruckClass])
-        assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
-        assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
-        assig.set_time_field(f"tt_{period}_10")
-        assig.set_capacity_field(
-            f"{period}_assncap_10"
-        )  # The capacity and free flow travel times as they exist in the graph    # And the algorithm we want to use to assign    # NT is not converging properly (it is too loose, so even MSA converges incredibly fast)
-        if period == "nt":
-            assig.set_algorithm("msa")
-            assig.max_iter = 50
-            assig.rgap_target = 0.000001
-        else:
-            assig.set_algorithm("bfw")
-            assig.max_iter = 50
-            assig.rgap_target = 0.00001
+    assig.max_iter = 1
+    assig.set_algorithm("msa")
+    assig.rgap_target = 0.00001
     return assig, carClass
     assig.execute()  # we then execute the assignment
     assig.save_results(f"assign_{period}_gen_cost_path_file")
@@ -218,7 +199,7 @@ def main():
         results = []
 
         for project_name in args["projects"]:
-            if project_name in "chicago_sketch":
+            if project_name in ["chicago_sketch"]:
                 graph, matrix, assignment, car = aequilibrae_init(
                     f"{args['path']}/{project_name}", args["cost"], args["cores"]
                 )
