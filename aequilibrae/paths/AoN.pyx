@@ -148,17 +148,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
+        # If we aren't doing SL analysis we use a fast cascade assignment in the 'network_loading' method.
+        # However, if we are doing SL analysis, we have to walk the entire path for each OD pair anyway
+        # Even if cascading is more efficient, we can do the link loading concurrently while executing SL loading
+        # which reduces the amount of repeated work we would do if they were separate
         if select_link == 1:
-            sl_network_loading(link_list,
-                               demand_view,
-                               predecessors_view,
-                               conn_view,
-                               link_loads_view,
-                               sl_od_matrix_view,
-                               sl_link_loading_view,
-                               tmp_flow_view,
-                               classes)
+            # Do SL and network loading at once
+            sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
+                               sl_link_loading_view, tmp_flow_view, classes)
         else:
+            # do ONLY reular loading (via cascade assignment)
             network_loading(classes,
                             demand_view,
                             predecessors_view,

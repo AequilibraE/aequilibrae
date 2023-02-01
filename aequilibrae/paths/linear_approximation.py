@@ -345,9 +345,7 @@ class LinearApproximation(WorkerThread):
         # We build the fixed cost field
 
         for c in self.traffic_classes:
-            # Prep for select link
-            # mapping of traffic class to the respective link_set to temp output matrix
-            # c._aon_results._selected_links = c._selected_links  # maps name to link_set
+            # Copying select link dictionary that maps name to its relevant matrices into the class' results
             c._aon_results._selected_links = c._selected_links
             c.results._selected_links = c._selected_links
 

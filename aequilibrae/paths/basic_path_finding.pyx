@@ -98,7 +98,7 @@ cdef void sl_network_loading(
     double [:, :] link_loads,
     double [:, :, :] sl_od_matrix,
     double [:, :, :] sl_link_loading,
-    unsigned char [:] tmp_flow,
+    unsigned char [:] has_flow_mask,
     long classes) nogil:
 # VARIABLES:
 # selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
@@ -117,17 +117,17 @@ cdef void sl_network_loading(
 # Two purposes: SL loading and network loading
 # Executes regular loading, while keeping track of SL links
     cdef:
-        int i, j, k, l, dests = demand.shape[0], xshape = tmp_flow.shape[0]
+        int i, j, k, l, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
         long long predecessor, connection, lid, link
         bint found
     for j in range(dests):
-        memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
+        memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
         connection = conn[j]
         predecessor = pred[j]
         while predecessor >= 0:
             for k in range(classes):
                 link_loads[connection, k] += demand[j, k]
-            tmp_flow[connection] = 1
+            has_flow_mask[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
 
@@ -143,94 +143,20 @@ cdef void sl_network_loading(
                 #Which just has placeholder values
                 if selected_links[i][l] == -1:
                     break
-                if tmp_flow[selected_links[i][l]] != 0:
+                if has_flow_mask[selected_links[i][l]] != 0:
                     found = 1
                 l += 1
-            if found == 1:
+            if found == 0:
+                continue
+            for k in range(classes):
+                sl_od_matrix[i, j, k] = demand[j, k]
+            connection = conn[j]
+            predecessor = pred[j]
+            while predecessor >= 0:
                 for k in range(classes):
-                    sl_od_matrix[i, j, k] = demand[j, k]
-                connection = conn[j]
-                predecessor = pred[j]
-                while predecessor >= 0:
-                    for k in range(classes):
-                        sl_link_loading[i, connection, k] += demand[j, k]
-                    connection = conn[predecessor]
-                    predecessor = pred[predecessor]
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cdef void perform_select_link_analysis(long origin,
-                                        long long [:, :] selected_links,
-                                        double [:, :] demand,
-                                        long long [:] pred,
-                                        long long [:] conn,
-                                        double [:, :, :] sl_od_matrix,
-                                        double [:, :, :] sl_link_loading,
-                                        unsigned char [:] tmp_flow,
-                                        long classes) nogil:
-# origin: Origin of the path
-# demand: Demand matrix of size Destinations x classes. Stores the loading on the given OD pair for the given class
-# pred: Stores the predecessor to a node at a given index e.g. in path 2, 3, 4 indexing into pred[4] would return 3.
-# conn: Stores the link connecting the given index (predecessor) to its next node
-#e.g: in sioux falls, for origin 0, the node 1's predecessor is 0. Referencing conn[1] will return the link 0 (link 1)
-# conn gives the link that connects the current predecessor to its predecessor
-# sl_od_loading: Destination x classes size matrix. Stores 0 if the selected links aren't used in the path, demand otherwise
-# sl_link_loading: Stores the demand loading on each individual link across all links in the project and all paths
-#Dimension: num_links by 1
-# NOTE: Each call of this function will only do the sl_link_loading for the given origin to all destinations.
-# selected links: An array of link_id's (from the compressed graph) which are being examined in the SL pipeline
-#tmp flow: array of zeros as long as the number of links in compressed graph
-
-#NOTE: METHOD ONLY EXECUTES SL ANALYSIS, DOESN'T DO NETWORK LOADING
-    cdef:
-        int i, j, k, l, dests = demand.shape[0], xshape = tmp_flow.shape[0]
-        long long predecessor, connection, lid, link
-        double tot
-        bint found
-
-    for j in range(dests):
-        tot = 0
-        k = 0
-        while tot == 0 and k < classes:
-            tot += demand[j, k]
-            k += 1
-        if tot == 0:
-            continue
-        memset(&tmp_flow[0], 0, xshape * sizeof(unsigned char))
-        predecessor = j
-        connection = conn[predecessor]
-        predecessor = pred[predecessor]
-        while predecessor >= 0:
-            tmp_flow[connection] = 1
-            connection = conn[predecessor]
-            predecessor = pred[predecessor]
-
-        for i in range(selected_links.shape[0]):
-            #Scanning to find any SL links
-            found = 0
-            l = 0
-            while l < selected_links.shape[1] and found == 0:
-                #Checks to see if the current set of selected links has finished
-                #NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
-                #There is either a serious bug, or the program has reached the end of a set of links in SL.
-                #This lets us early exit from the loop without needing to iterate through the rest of the array
-                #Which just has placeholder values
-                if selected_links[i][l] == -1:
-                    break
-                if tmp_flow[selected_links[i][l]] != 0:
-                    found = 1
-                l += 1
-            if found == 1:
-                for k in range(classes):
-                    sl_od_matrix[i, j, k] = demand[j, k]
-                connection = conn[j]
-                predecessor = pred[j]
-                while predecessor >= 0:
-                    for k in range(classes):
-                        sl_link_loading[i, connection, k] += demand[j, k]
-                    connection = conn[predecessor]
-                    predecessor = pred[predecessor]
+                    sl_link_loading[i, connection, k] += demand[j, k]
+                connection = conn[predecessor]
+                predecessor = pred[predecessor]
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

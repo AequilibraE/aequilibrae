@@ -91,7 +91,7 @@ class TrafficClass:
 
         self.vot = float(value_of_time)
 
-    def set_select_links(self, links: Union[None, Dict[str, List[Tuple[int, int]]]]):
+    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
         """Set the selected links. Checks if the links and directions are valid. Translates link_id and
         direction into unique link id used in compact graph.
         Supply links=None to disable select link analysis.
@@ -100,9 +100,6 @@ class TrafficClass:
             links (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
              Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
-        if links is None:
-            return
-
         for name, link_set in links.items():
             link_ids = []
             for link, dir in link_set:
@@ -112,8 +109,8 @@ class TrafficClass:
                     )
                 else:
                     query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-                    if not query.any():
-                        raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+                if not query.any():
+                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
                     # Check for duplicate compressed link ids in the current link set
                 for comp_id in self.graph.graph[query]["__compressed_id__"].values:
                     if comp_id in link_ids:
