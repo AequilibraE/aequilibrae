@@ -53,20 +53,16 @@ def aequilibrae_init(
     graph.set_blocked_centroid_flows(False)
     return graph, matrix, assignment, car
 
-
-def arkansas():
+def arkansas(path):
     # from os.path import joinfrom
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
-
     # import logging import sys
     import numpy as np
     from aequilibrae import logger
-
-    print("ark")
-    pth = r"C:\Users\61435\Desktop\aequilibrae_performance_tests\models\Arkansas"
+    print('ark')
     proj = Project()
-    proj.open(pth)
+    proj.open(path)
     net = proj.network
     curr = proj.conn.cursor()
     proj_matrices = proj.matrices
@@ -210,9 +206,9 @@ def main():
     # print(f"Running with {args['iters']} iterations, {args['repeats']}",
     #       f"times, for a total of {args['iters'] * args['repeats']} samples.")
     # Arkansas links
-    # select_links = [None, {"test": [(24, 1), (79146, 1)], "test 2": [(61, 1), (68, 1)]}]
+    # 
     # Chicago links
-    select_links = [None, {"test": [(2, 1), (7, 1), (1, 1), (6, 1)], "set 2": [(1, 1), (3, 1)]}]
+    
 
     with warnings.catch_warnings():
         # pandas future warnings are really annoying FIXME
@@ -226,8 +222,11 @@ def main():
                 graph, matrix, assignment, car = aequilibrae_init(
                     f"{args['path']}/{project_name}", args["cost"], args["cores"]
                 )
+                select_links = [None, {"test": [(2, 1), (7, 1), (1, 1), (6, 1)], "set 2": [(1, 1), (3, 1)]}]
+        
             elif project_name in "Arkansas":
-                assignment, car = arkansas()
+                assignment, car = arkansas(f"{args['path']}/{project_name}")
+                select_links = [None, {"test": [(24, 1), (79146, 1)], "test 2": [(61, 1), (68, 1)]}]
             else:
                 raise Exception("Model Doesn't Exist Fool")
             assignment.set_cores(args["cores"][0])
