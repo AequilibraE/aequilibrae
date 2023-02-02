@@ -101,6 +101,10 @@ class TrafficClass:
              Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
         for name, link_set in links.items():
+            if len(name.split(" ")) != 1:
+                warnings.warn("Input string name has a space in it. Replacing with _")
+                name = str.join("_", name.split(" "))
+
             link_ids = []
             for link, dir in link_set:
                 if dir == 0:
@@ -124,44 +128,41 @@ class TrafficClass:
         # self.sl_data = links
 
     def decompress_select_link_flows(self) -> Dict[str, pd.DataFrame]:
-        """
-        Converts the select_link_flows from compressed link ids, back into regular ids.
-        In addition, it maps the flow on the individual links based on their direction.
-
-         Returns a dictionary of dataframes which map the link_set name to their link flows
-         """
-        decompressed_flows = {}
+        #Creating a column for each subclass in the TrafficClass for ab and ba flows
         num_subclasses = self.matrix.matrix_view.shape[2] if len(self.matrix.matrix_view.shape) > 2 else 1
-        #Setting up common column names
         columns = []
         for x in range(num_subclasses):
+            #TODO use the built in class names
             columns.append(f"ab_subclass_{x + 1}")
             columns.append(f"ba_subclass_{x + 1}")
-
+        n_links = self.graph.num_links
+        graph = self.graph.graph
+        final_flows = {}
+        # 3d array which stores ab flows in 0 index, ba flows in index 1
+        # Within these indices, the flows for each subclass are stored in sequential order
+        # e.g. subclass1_ab, subclass2_ab etc.
+        sl_loading = np.empty((2, n_links, num_subclasses))
         for name in self._selected_links.keys():
+    #TODO: RENAME to a nicer name
+    #TODO: swap SL matrix to dictionary
             link_loads = self.results.select_link_loading.matrix[name]
-
-            n_links = self.graph.num_links
-            graph = self.graph.graph
-            ab_loading = np.zeros((n_links, num_subclasses))
-            ba_loading = np.zeros((n_links, num_subclasses))
-
-            for i, link in enumerate(link_loads):
-                query = graph.query(f"__compressed_id__ == {i}")
-                for j in query.itertuples():
-                    # print(j)
-                    if j.direction == 1:
-                        # -1 to account for 0 indexing
-                        ab_loading[j.link_id - 1, :] = link_loads[i, :]
-                    else:
-                        ba_loading[j.link_id - 1, :] = link_loads[i, :]
-            loads = np.concatenate((ab_loading, ba_loading), axis=1)
+            # CHANGE TO NANS/ RESET FLOW
+            sl_loading.fill(0)
+            # LAMBDA: Specifying how to use the map_links helper method
+            func = lambda row: map_links(row["direction"] // 2, row["link_id"] - 1, row["__compressed_id__"],
+                                         link_loads, sl_loading)
+            graph.apply(func, axis=1)
+            #turning np array of link flows into a df for writing into SQL
+            loads = np.concatenate((sl_loading[0], sl_loading[1]), axis=1)
+            # sorted(columns) ensure the order will have the subclass flows in the same order as the loads array
+            # Specifically, ab_subclass1, ab_subclass2 ..., ba_subclass1, ba_subclass2, ...
             df = pd.DataFrame(loads, columns=sorted(columns))
+            # Associate flows with their link ids
             df.insert(loc=0, column="link_id", value=np.arange(1, self.graph.num_links + 1, 1))
-            # rearrange columns so each subclass' flows are adjacent to each other
-            decompressed_flows[name] = df[["link_id"] + columns]
-        return decompressed_flows
-
+            # rearrange columns so each subclass' flows are adjacent to each other for user convenience
+            # e.g. ab_subclass1, ba_subclass1, ab_subclass2 ...
+            final_flows[name] = df[["link_id"] + columns]
+        return final_flows
 
     def __setattr__(self, key, value):
 
@@ -183,3 +184,11 @@ class TrafficClass:
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
+
+def map_links(dir: int, id: int , cid: int, links: np.array, res: np.array) -> None:
+    """
+    Helper method to decompress_select_link_flows. Takes an input direction, index (based on link_id),
+    corresponding compressed link_od, compressed link flows and uncompressed link flow arrays.
+    Maps the from the compressed array to the uncompressed array.
+    """
+    res[dir, id, :] = links[cid, :]

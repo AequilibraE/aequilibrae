@@ -646,15 +646,23 @@ class TrafficAssignment(object):
             record.save()
 
     def save_select_links(self, table_name: str):
+        """
+        Saves the select link analysis for all classes
+        """
         for cls in self.classes:
+            #Save OD_matrices
+            # cls.results.select_link_od.flush()
+            cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
             if cls._selected_links is None:
                 continue
             cls_flows = cls.decompress_select_link_flows()
 
+
             for name, df in cls_flows.items():
                 # Create Values table
                 conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
-                df.to_sql(table_name, conn)
+                tble = str.join("_", [table_name,cls.__id__, name,])
+                df.to_sql(tble, conn)
                 conn.close()
             # Create description table
             self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"

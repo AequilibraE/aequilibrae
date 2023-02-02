@@ -41,6 +41,7 @@ class AssignmentResults:
 
         self._selected_links = {}
         self.select_link_od = AequilibraeMatrix()
+        #TODO: UPDATE TO A DICT
         self.select_link_loading = AequilibraeMatrix()
 
         self.nodes = -1
@@ -231,9 +232,7 @@ class AssignmentResults:
         Returns:
             dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
-        fields = []
-        for n in self.classes["names"]:
-            fields.extend([f"{n}_ab", f"{n}_ba", f"{n}_tot"])
+        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
         types = [np.float64] * len(fields)
 
         entries = int(np.unique(self.lids).shape[0])
@@ -274,6 +273,12 @@ class AssignmentResults:
         if output == "loads":
             res = self.get_load_results()
             res.export(file_name)
+
+        elif output in "SL":
+            #od matrix only exportable as an OMX (I think
+            split = file_name.split(".")
+            self.select_link_od.export(split[0]+"_OD_matrices.OMX")
+            # self.select_link_loading.export(split[0]+"_link_loading."+split[-1])
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
