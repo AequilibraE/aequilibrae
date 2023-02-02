@@ -1,5 +1,7 @@
 import dataclasses
 import multiprocessing as mp
+from typing import Dict
+
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
@@ -7,7 +9,7 @@ from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
 
 try:
-    from aequilibrae.paths.AoN import sum_axis1
+    from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -51,7 +53,7 @@ class AssignmentResults:
         self._selected_links = {}
         self.select_link_od = AequilibraeMatrix()
         # TODO: UPDATE TO A DICT
-        self.select_link_loading = AequilibraeMatrix()
+        self.select_link_loading = {} # actual results
 
         self.nodes = -1
         self.zones = -1
@@ -122,13 +124,7 @@ class AssignmentResults:
                 index_names=matrix.index_names,
             )
 
-            self.select_link_loading = AequilibraeMatrix()
-            self.select_link_loading.create_empty(
-                memory_only=True,
-                zones=matrix.zones,
-                matrix_names=list(self._selected_links.keys()),
-                index_names=matrix.index_names,
-            )
+            self.select_link_loading = {}
             # Combine each set of selected links into one large matrix that can be parsed into Cython
             # Each row corresponds a link set, and the equivalent rows in sl_od_matrix and sl_link_loading
             # Correspond to that set
@@ -156,7 +152,7 @@ class AssignmentResults:
                 self.select_links[i][: len(arr)] = arr
                 # Correctly sets the dimensions for the final output matrices
                 self.select_link_od.matrix[name] = self.sl_od_matrix[i]
-                self.select_link_loading.matrix[name] = self.sl_link_loading[i]
+                self.select_link_loading[name] = self.sl_link_loading[i]
 
             # Overwrites previous arrays on assignment results level with the index to access that array in Cython
             self._selected_links = sl_idx
@@ -256,7 +252,7 @@ class AssignmentResults:
 
         # Create a data store with a row for each uncompressed link
         res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
-                                    data_types=types, fill=np.nan, index=np.unique(self.lids)[:])
+                                    data_types=types, fill=np.nan, index=np.unique(self.lids))
 
         # Get a mapping from the compressed graph to/from the network graph
         m = self.get_graph_to_network_mapping()
@@ -272,6 +268,32 @@ class AssignmentResults:
             res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
 
         return res
+
+    def get_sl_results(self) -> Dict[str, AequilibraeData]:
+        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
+        types = [np.float64] * len(fields)
+        final = {}
+        for name in self._selected_links.keys():
+            print(np.unique(self.lids)[:])
+            print(fields)
+            # Create a data store with a row for each uncompressed link
+            res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
+                                        data_types=types, fill=np.nan, index=np.unique(self.lids))
+
+            # Get a mapping from the compressed graph to/from the network graph
+            m = self.get_graph_to_network_mapping()
+            # Link flows
+            link_flows = np.full((self.links, self.classes["number"]), np.nan)
+            assign_link_loads(link_flows, self.select_link_loading[name], self.crosswalk, self.cores)
+            for i, n in enumerate(self.classes["names"]):
+                # Directional Flows
+                res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+                res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+
+                # Tot Flow
+                res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+            final[name] = res
+        return final
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
         """Function to write to disk all outputs computed during assignment
@@ -289,7 +311,6 @@ class AssignmentResults:
             # od matrix only exportable as an OMX (I think
             split = file_name.split(".")
             self.select_link_od.export(split[0] + "_OD_matrices.OMX")
-            # self.select_link_loading.export(split[0]+"_link_loading."+split[-1])
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":

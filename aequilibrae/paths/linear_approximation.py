@@ -411,7 +411,7 @@ class LinearApproximation(WorkerThread):
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
-                                c.results.select_link_loading.matrix[name],  # ouput matrix
+                                c.results.select_link_loading[name],  # ouput matrix
                                 c._aon_results.sl_link_loading[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
@@ -447,9 +447,9 @@ class LinearApproximation(WorkerThread):
                             )
 
                             linear_combination(
-                                c.results.select_link_loading.matrix[name],  # output matrix
+                                c.results.select_link_loading[name],  # output matrix
                                 c._aon_results.sl_link_loading[idx],  # matrix 1
-                                c.results.select_link_loading.matrix[name],  # matrix 2 (previous iteration)
+                                c.results.select_link_loading[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
                             )

@@ -50,7 +50,6 @@ class TrafficClass:
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.__id__ = name
-        # self.sl_data = None
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -128,16 +127,24 @@ class TrafficClass:
         # self.sl_data = links
 
     def decompress_select_link_flows(self) -> Dict[str, pd.DataFrame]:
+
         #Creating a column for each subclass in the TrafficClass for ab and ba flows
         num_subclasses = self.matrix.matrix_view.shape[2] if len(self.matrix.matrix_view.shape) > 2 else 1
         columns = []
-        for x in range(num_subclasses):
-            #TODO use the built in class names
-            columns.append(f"ab_subclass_{x + 1}")
-            columns.append(f"ba_subclass_{x + 1}")
+        fields = [e for n in self.matrix.view_names for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
+        types = [np.float64] * len(fields)
+
+        # Create a data store with a row for each uncompressed link
+        # res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
+        #                             data_types=types, fill=np.nan, index=np.unique(self.lids)[:])
         n_links = self.graph.num_links
         graph = self.graph.graph
         final_flows = {}
+
+
+
+
+
         # 3d array which stores ab flows in 0 index, ba flows in index 1
         # Within these indices, the flows for each subclass are stored in sequential order
         # e.g. subclass1_ab, subclass2_ab etc.

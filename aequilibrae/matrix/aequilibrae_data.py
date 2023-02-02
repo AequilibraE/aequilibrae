@@ -113,7 +113,7 @@ class AequilibraeData(object):
             if fill is not None:
                 self.data.fill(fill)
             if index is not None:
-                self.index = index
+                self.index[:] = index[:]
 
     def __getattr__(self, field_name):
         if field_name in object.__dict__:

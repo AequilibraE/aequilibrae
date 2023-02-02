@@ -63,7 +63,7 @@ class TestSelectLink(TestCase):
                 err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
             np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading.matrix[key],
+                self.assignclass.results.select_link_loading[key],
                 link_loading,
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
@@ -88,7 +88,7 @@ class TestSelectLink(TestCase):
                 err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
             np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading.matrix[key],
+                self.assignclass.results.select_link_loading[key],
                 link_loading,
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )
@@ -116,7 +116,7 @@ class TestSelectLink(TestCase):
                 err_msg="OD SL matrix for: " + str(key) + " does not match",
             )
             np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading.matrix[key],
+                self.assignclass.results.select_link_loading[key],
                 link_loading,
                 err_msg="Link loading SL matrix for: " + str(key) + " does not match",
             )

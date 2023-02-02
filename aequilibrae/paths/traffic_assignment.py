@@ -647,13 +647,18 @@ class TrafficAssignment(object):
         for cls in self.classes:
             # Save OD_matrices
             # cls.results.select_link_od.flush()
-            cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
             if cls._selected_links is None:
                 continue
-            cls_flows = cls.decompress_select_link_flows()
+            cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
+            cls_flows = cls.results.get_sl_results()
 
             for name, df in cls_flows.items():
                 # Create Values table
+                df = pd.DataFrame(df.data)
+                print(df["index"], df.columns)
+                df.rename(columns={"index": "link_id"}, inplace=True)
+                df.set_index("link_id", inplace=True)
+                print(df)
                 conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
                 tble = str.join(
                     "_",
