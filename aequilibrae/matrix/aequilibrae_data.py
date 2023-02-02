@@ -25,7 +25,8 @@ class AequilibraeData(object):
         self.memory_mode = None
 
     @classmethod
-    def create_empty(cls, *args, **kwargs):
+    def empty(cls, *args, **kwargs):
+        print(cls, args, kwargs)
         instance = cls()
         instance.create_empty(*args, **kwargs)
         return instance

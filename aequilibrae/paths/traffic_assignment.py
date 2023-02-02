@@ -464,7 +464,7 @@ class TrafficAssignment(object):
             "PCE_tot",
         ]
 
-        agg = AequilibraeData.create_empty(
+        agg = AequilibraeData.empty(
             memory_mode=True,
             entries=res1.data.shape[0],
             field_names=fields,

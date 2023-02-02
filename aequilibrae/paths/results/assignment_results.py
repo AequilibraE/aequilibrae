@@ -255,14 +255,8 @@ class AssignmentResults:
         types = [np.float64] * len(fields)
 
         # Create a data store with a row for each uncompressed link
-        res = AequilibraeData.create_empty(
-            memory_mode=True,
-            entries=int(np.unique(self.lids).shape[0]),
-            field_names=fields,
-            data_types=types,
-            fill=np.nan,
-            index=np.unique(self.lids)[:],
-        )
+        res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
+                                    data_types=types, fill=np.nan, index=np.unique(self.lids)[:])
 
         # Get a mapping from the compressed graph to/from the network graph
         m = self.get_graph_to_network_mapping()
