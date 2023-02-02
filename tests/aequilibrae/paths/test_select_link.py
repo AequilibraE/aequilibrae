@@ -157,21 +157,11 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     graph.set_graph("free_flow_time")
     res.prepare(graph)
 
-    a = []
-    # compute a path from node 8 to 13
-    for origin in range(1, 25):
-        b = []
-        for dest in range(1, 25):
-            if origin == dest:
-                pass
-            else:
-                res.compute_path(origin, dest)
-            if res.path_nodes is not None:
-                b.append(list(res.path_nodes))
-                res.path_nodes = None
-            else:
-                b.append([])
-        a.append(b)
+    def g(o,d):
+        res.compute_path(o,d)
+        return list(res.path_nodes) if res.path_nodes is not None else []
+   
+    a = [[g(o,d) for d in range(1,25) if o != d] for o in range(1,25)]
     sl_links = []
     for i in range(len(sl)):
         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
