@@ -1,3 +1,4 @@
+import dataclasses
 import multiprocessing as mp
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
@@ -16,6 +17,14 @@ TO-DO:
    Same idea of the AequilibraEData container, but using the format.memmap from NumPy
 2. Make the writing to SQL faster by disabling all checks before the actual writing
 """
+
+
+@dataclasses.dataclass
+class NetworkGraphIndices:
+    network_ab_idx: np.array
+    network_ba_idx: np.array
+    graph_ab_idx: np.array
+    graph_ba_idx: np.array
 
 
 class AssignmentResults:
@@ -41,7 +50,7 @@ class AssignmentResults:
 
         self._selected_links = {}
         self.select_link_od = AequilibraeMatrix()
-        #TODO: UPDATE TO A DICT
+        # TODO: UPDATE TO A DICT
         self.select_link_loading = AequilibraeMatrix()
 
         self.nodes = -1
@@ -87,7 +96,6 @@ class AssignmentResults:
         if graph is None:
             raise ("Please provide a graph")
         else:
-
             self.compact_nodes = graph.compact_num_nodes
             self.compact_links = graph.compact_num_links
 
@@ -225,6 +233,17 @@ class AssignmentResults:
         if self.link_loads.shape[0]:
             self.__redim()
 
+    def get_graph_to_network_mapping(self):
+        num_uncompressed_links = int(np.unique(self.lids).shape[0])
+        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
+        indexing[np.unique(self.lids)[:]] = np.arange(num_uncompressed_links)
+
+        graph_ab_idx = self.direcs > 0
+        graph_ba_idx = self.direcs < 0
+        network_ab_idx = indexing[self.lids[graph_ab_idx]]
+        network_ba_idx = indexing[self.lids[graph_ba_idx]]
+        return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+
     def get_load_results(self) -> AequilibraeData:
         """
         Translates the assignment results from the graph format into the network format
@@ -235,31 +254,29 @@ class AssignmentResults:
         fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
         types = [np.float64] * len(fields)
 
-        entries = int(np.unique(self.lids).shape[0])
-        res = AequilibraeData()
-        res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
-        res.data.fill(np.nan)
-        res.index[:] = np.unique(self.lids)[:]
+        # Create a data store with a row for each uncompressed link
+        res = AequilibraeData.create_empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids)[:],
+        )
 
-        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
-        indexing[res.index[:]] = np.arange(entries)
-
-        # Indices of links BA and AB
-        ABs = self.direcs > 0
-        BAs = self.direcs < 0
-        ab_ids = indexing[self.lids[ABs]]
-        ba_ids = indexing[self.lids[BAs]]
+        # Get a mapping from the compressed graph to/from the network graph
+        m = self.get_graph_to_network_mapping()
 
         # Link flows
         link_flows = self.link_loads[self.__graph_ids, :]
         for i, n in enumerate(self.classes["names"]):
-            # AB Flows
-            res.data[n + "_ab"][ab_ids] = np.nan_to_num(link_flows[ABs, i])
-            # BA Flows
-            res.data[n + "_ba"][ba_ids] = np.nan_to_num(link_flows[BAs, i])
+            # Directional Flows
+            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
             # Tot Flow
             res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
@@ -275,9 +292,9 @@ class AssignmentResults:
             res.export(file_name)
 
         elif output in "SL":
-            #od matrix only exportable as an OMX (I think
+            # od matrix only exportable as an OMX (I think
             split = file_name.split(".")
-            self.select_link_od.export(split[0]+"_OD_matrices.OMX")
+            self.select_link_od.export(split[0] + "_OD_matrices.OMX")
             # self.select_link_loading.export(split[0]+"_link_loading."+split[-1])
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format

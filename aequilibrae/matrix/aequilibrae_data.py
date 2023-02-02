@@ -24,7 +24,13 @@ class AequilibraeData(object):
         self.aeq_index_type = None
         self.memory_mode = None
 
-    def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False):
+    @classmethod
+    def create_empty(cls, *args, **kwargs):
+        instance = cls()
+        instance.create_empty(*args, **kwargs)
+        return instance
+
+    def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False, fill=None, index=None):
         """
         Creates a new empty dataset
 
@@ -95,8 +101,7 @@ class AequilibraeData(object):
 
             self.num_fields = len(self.fields)
 
-            dtype = [("index", self.aeq_index_type)]
-            dtype.extend([(self.fields[i], self.data_types[i]) for i in range(self.num_fields)])
+            dtype = [("index", self.aeq_index_type)] + [(f, dt) for f, dt in zip(self.fields, self.data_types)]
 
             # the file
             if self.memory_mode:
@@ -104,8 +109,12 @@ class AequilibraeData(object):
             else:
                 self.data = open_memmap(self.file_path, mode="w+", dtype=dtype, shape=(self.entries,))
 
-    def __getattr__(self, field_name):
+            if fill is not None:
+                self.data.fill(fill)
+            if index is not None:
+                self.index = index
 
+    def __getattr__(self, field_name):
         if field_name in object.__dict__:
             return self.__dict__[field_name]
 

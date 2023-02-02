@@ -7,6 +7,7 @@ from typing import List
 from uuid import uuid4
 
 import numpy as np
+from numpy import nan_to_num
 import pandas as pd
 
 from aequilibrae.context import get_active_project
@@ -120,7 +121,6 @@ class TrafficAssignment(object):
         self.__dict__["project"] = project
 
     def __setattr__(self, instance, value) -> None:
-
         check, value, message = self.__check_attributes(instance, value)
         if check:
             self.__dict__[instance] = value
@@ -449,7 +449,6 @@ class TrafficAssignment(object):
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
 
-        entries = res1.data.shape[0]
         fields = [
             "Congested_Time_AB",
             "Congested_Time_BA",
@@ -465,37 +464,33 @@ class TrafficAssignment(object):
             "PCE_tot",
         ]
 
-        types = [np.float64] * len(fields)
-        agg = AequilibraeData()
-        agg.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
-        agg.data.fill(np.nan)
-        agg.index[:] = res1.data.index[:]
+        agg = AequilibraeData.create_empty(
+            memory_mode=True,
+            entries=res1.data.shape[0],
+            field_names=fields,
+            data_types=[np.float64] * len(fields),
+            fill=np.nan,
+            index=res1.data.index[:],
+        )
 
-        link_ids = class1.results.lids
-        ABs = class1.results.direcs > 0
-        BAs = class1.results.direcs < 0
+        # Use the first class to get a graph -> network link ID mapping
+        m = class1.results.get_graph_to_network_mapping()
+        graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
 
-        indexing = np.zeros(int(link_ids.max()) + 1, np.uint64)
-        indexing[agg.index[:]] = np.arange(entries)
-
-        # Indices of links BA and AB
-        ab_ids = indexing[link_ids[ABs]]
-        ba_ids = indexing[link_ids[BAs]]
-
-        agg.data["Congested_Time_AB"][ab_ids] = np.nan_to_num(congested_time[ABs])
-        agg.data["Congested_Time_BA"][ba_ids] = np.nan_to_num(congested_time[BAs])
+        agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][ab_ids] = np.nan_to_num(congested_time[ABs] / free_flow_tt[ABs])
-        agg.data["Delay_factor_BA"][ba_ids] = np.nan_to_num(congested_time[BAs] / free_flow_tt[BAs])
+        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ba])
+        agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
         agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
 
-        agg.data["VOC_AB"][ab_ids] = np.nan_to_num(voc[ABs])
-        agg.data["VOC_BA"][ba_ids] = np.nan_to_num(voc[BAs])
+        agg.data["VOC_AB"][m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        agg.data["VOC_BA"][m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
         agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
 
-        agg.data["PCE_AB"][ab_ids] = np.nan_to_num(tot_flow[ABs])
-        agg.data["PCE_BA"][ba_ids] = np.nan_to_num(tot_flow[BAs])
+        agg.data["PCE_AB"][m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        agg.data["PCE_BA"][m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
         agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
 
         assig_results.append(agg)
@@ -650,26 +645,31 @@ class TrafficAssignment(object):
         Saves the select link analysis for all classes
         """
         for cls in self.classes:
-            #Save OD_matrices
+            # Save OD_matrices
             # cls.results.select_link_od.flush()
             cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
             if cls._selected_links is None:
                 continue
             cls_flows = cls.decompress_select_link_flows()
 
-
             for name, df in cls_flows.items():
                 # Create Values table
                 conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
-                tble = str.join("_", [table_name,cls.__id__, name,])
+                tble = str.join(
+                    "_",
+                    [
+                        table_name,
+                        cls.__id__,
+                        name,
+                    ],
+                )
                 df.to_sql(tble, conn)
                 conn.close()
             # Create description table
             self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"
             conn = self.project.connect()
             report = {"SL_sets": cls._selected_links.keys()}
-            data = [table_name, "select link", self.procedure_id, str(report), self.procedure_date,
-                    self.description]
+            data = [table_name, "select link", self.procedure_id, str(report), self.procedure_date, self.description]
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",
