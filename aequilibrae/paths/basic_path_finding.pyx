@@ -123,7 +123,6 @@ cdef void sl_network_loading(
         memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
         connection = conn[j]
         predecessor = pred[j]
-        # Walk the path and mark all used links in the has_flow_mask
 
         # Walk the path and mark all used links in the has_flow_mask
         while predecessor >= 0:
@@ -132,8 +131,7 @@ cdef void sl_network_loading(
             has_flow_mask[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-        # Now we iterate through all our sets of selected links
-        # Now go through our select links sets and see if their links were marked
+        # Now iterate through each SL set and see if any of their links were marked
         for i in range(selected_links.shape[0]):
             # We check to see if the given OD path marked any of our selected links
             found = 0
