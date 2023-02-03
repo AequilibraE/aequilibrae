@@ -1,6 +1,5 @@
 import dataclasses
 import multiprocessing as mp
-from typing import Dict
 
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
@@ -275,7 +274,7 @@ class AssignmentResults:
 
         return res
 
-    def get_sl_results(self) -> Dict[str, AequilibraeData]:
+    def get_sl_results(self) -> AequilibraeData:
         # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
         # for each subclass contained in the TrafficClass
         fields = [
