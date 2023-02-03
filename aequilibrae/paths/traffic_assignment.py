@@ -649,7 +649,6 @@ class TrafficAssignment(object):
         """
         for cls in self.classes:
             # Save OD_matrices
-            # cls.results.select_link_od.flush()
             if cls._selected_links is None:
                 continue
             cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")

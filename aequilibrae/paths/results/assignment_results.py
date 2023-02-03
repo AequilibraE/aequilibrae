@@ -305,7 +305,7 @@ class AssignmentResults:
             res.export(file_name)
 
         elif output in "SL":
-            # od matrix only exportable as an OMX (I think
+            # od matrix only exportable as an OMX
             split = file_name.split(".")
             self.select_link_od.export(split[0] + "_OD_matrices.OMX")
 
