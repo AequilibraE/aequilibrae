@@ -404,14 +404,16 @@ class LinearApproximation(WorkerThread):
 
                     if c._selected_links:
                         for name, idx in c._aon_results._selected_links.items():
+                            # Copy the temporary results into the final od matrix, referenced by link_set name
+                            # The temp has an index associated with the link_set name
                             copy_three_dimensions(
-                                c.results.select_link_od.matrix[name],  # ouput matrix
-                                c._aon_results.sl_od_matrix[idx, :, :, :],  # matrix 1
+                                c.results.select_link_od.matrix[name],  # matrix being written into
+                                c._aon_results.temp_sl_od_matrix[idx, :, :, :],  # results after the iteration
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # ouput matrix
-                                c._aon_results.sl_link_loading[idx, :, :],  # matrix 1
+                                c._aon_results.temp_sl_link_loading[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
                     flows.append(c.results.total_link_loads)
@@ -437,9 +439,11 @@ class LinearApproximation(WorkerThread):
 
                     if c._selected_links:
                         for name, idx in c._selected_links.items():
+                            # Copy the temporary results into the final od matrix, referenced by link_set name
+                            # The temp has an index associated with the link_set name
                             linear_combination_skims(
                                 c.results.select_link_od.matrix[name],  # output matrix
-                                c._aon_results.sl_od_matrix[idx],  # matrix 1
+                                c._aon_results.temp_sl_od_matrix[idx],  # matrix 1
                                 c.results.select_link_od.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
@@ -447,7 +451,7 @@ class LinearApproximation(WorkerThread):
 
                             linear_combination(
                                 c.results.select_link_loading[name],  # output matrix
-                                c._aon_results.sl_link_loading[idx],  # matrix 1
+                                c._aon_results.temp_sl_link_loading[idx],  # matrix 1
                                 c.results.select_link_loading[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count

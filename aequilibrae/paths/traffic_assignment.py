@@ -651,24 +651,22 @@ class TrafficAssignment(object):
             if cls._selected_links is None:
                 continue
             cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
-            cls_flows = cls.results.get_sl_results()
+            df = cls.results.get_sl_results()
 
-            for name, df in cls_flows.items():
-                # Create Values table
-                df = pd.DataFrame(df.data)
-                df.rename(columns={"index": "link_id"}, inplace=True)
-                df.set_index("link_id", inplace=True)
-                conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
-                tble = str.join(
-                    "_",
-                    [
-                        table_name,
-                        cls.__id__,
-                        name,
-                    ],
-                )
-                df.to_sql(tble, conn)
-                conn.close()
+            # Create Values table
+            df = pd.DataFrame(df.data)
+            df.rename(columns={"index": "link_id"}, inplace=True)
+            df.set_index("link_id", inplace=True)
+            conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+            tble = str.join(
+                "_",
+                [
+                    table_name,
+                    cls.__id__,
+                ],
+            )
+            df.to_sql(tble, conn)
+            conn.close()
             # Create description table
             self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"
             conn = self.project.connect()

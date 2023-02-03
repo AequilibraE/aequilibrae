@@ -96,16 +96,17 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef:
         double [:, :, :] sl_od_matrix_view
         double [:, :, :] sl_link_loading_view
-        unsigned char [:] tmp_flow_view
+        unsigned char [:] has_flow_mask
         long long[:, :] link_list
-        unsigned char select_link = 0
+        bint select_link = False
 
     if result._selected_links:
-        tmp_flow_view = aux_result.tmp_flow[curr_thread, :]
-        sl_od_matrix_view = aux_result.sl_od_matrix[:, origin_index, :, :]
-        sl_link_loading_view = aux_result.sl_link_loading[:, :, :]
+
+        has_flow_mask = aux_result.has_flow_mask[curr_thread, :]
+        sl_od_matrix_view = aux_result.temp_sl_od_matrix[:, origin_index, :, :]
+        sl_link_loading_view = aux_result.temp_sl_link_loading[:, :, :]
         link_list = aux_result.select_links[:, :]
-        select_link = 1
+        select_link = True
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -152,10 +153,11 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         # However, if we are doing SL analysis, we have to walk the entire path for each OD pair anyway
         # Even if cascading is more efficient, we can do the link loading concurrently while executing SL loading
         # which reduces the amount of repeated work we would do if they were separate
-        if select_link == 1:
+        # Note: 1 corresponds to select link analysis, 0 means no select link
+        if select_link:
             # Do SL and network loading at once
             sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
-                               sl_link_loading_view, tmp_flow_view, classes)
+                               sl_link_loading_view, has_flow_mask, classes)
         else:
             # do ONLY reular loading (via cascade assignment)
             network_loading(classes,

@@ -10,9 +10,7 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 """
 cimport cython
 from libc.math cimport isnan, INFINITY
-from libc.stdio cimport printf
 from libc.string cimport memset
-from libc.stdlib cimport malloc, free
 
 include 'pq_4ary_heap.pyx'
 
@@ -102,17 +100,19 @@ cdef void sl_network_loading(
     long classes) nogil:
 # VARIABLES:
 #   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
-#   demand:         The input demand matrix for a given origin. The first index corresponds to destination, second is the class
-#   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred yields the previous node
-# in the minimum spanning tree
-#   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields the link it
-#                   used to connect the two nodes
+#   demand:         The input demand matrix for a given origin. The first index corresponds to destination,
+#                   second is the class
+#   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred
+#                   yields the previous node in the minimum spanning tree
+#   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields
+#                   the link it used to connect the two nodes
 # link_loads:       Stores the loading on each link. Equivalent to link_loads in network_loading
-# sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
-# The indices are: set of links, destination, class
-# sl_link_loading: Stores the loading on the Selected links, and the paths which use the selected links (The indices are: set of links, link_id, class)
-# tmp_flow:        An array which acts as a flag for which links were used in retracing a given OD path
-# classes:         the number of subclasses of vehicles for the given TrafficClass
+# temp_sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
+# The indices are:  set of links, destination, class
+# temp_sl_link_loading:  Stores the loading on the Selected links, and the paths which use the selected links
+#                   The indices are: set of links, link_id, class)
+# has_flow_mask:    An array which acts as a flag for which links were used in retracing a given OD path
+# classes:          the number of subclasses of vehicles for the given TrafficClass
 # 
 # Executes regular loading, while keeping track of SL links
     cdef:
@@ -123,23 +123,24 @@ cdef void sl_network_loading(
         memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
         connection = conn[j]
         predecessor = pred[j]
+        # Walk the path and mark all used links in the has_flow_mask
         while predecessor >= 0:
             for k in range(classes):
                 link_loads[connection, k] += demand[j, k]
             has_flow_mask[connection] = 1
             connection = conn[predecessor]
             predecessor = pred[predecessor]
-
+        # Now we iterate through all our sets of selected links
         for i in range(selected_links.shape[0]):
-            # Scanning to find any SL links
+            # We check to see if the given OD path marked any of our selected links
             found = 0
             l = 0
             while l < selected_links.shape[1] and found == 0:
-                #Checks to see if the current set of selected links has finished
-                #NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
-                #There is either a serious bug, or the program has reached the end of a set of links in SL.
-                #This lets us early exit from the loop without needing to iterate through the rest of the array
-                #Which just has placeholder values
+                # Checks to see if the current set of selected links has finished
+                # NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                # There is either a serious bug, or the program has reached the end of a set of links in SL.
+                # This lets us early exit from the loop without needing to iterate through the rest of the array
+                # Which just has placeholder values
                 if selected_links[i][l] == -1:
                     break
                 if has_flow_mask[selected_links[i][l]] != 0:

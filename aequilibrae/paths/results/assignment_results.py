@@ -7,6 +7,7 @@ from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
+from pathlib import Path
 
 try:
     from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
@@ -51,7 +52,7 @@ class AssignmentResults:
         self.classes = {"number": 1, "names": ["flow"]}
 
         self._selected_links = {}
-        self.select_link_od = AequilibraeMatrix()
+        self.select_link_od = None
         self.select_link_loading = {}
 
         self.nodes = -1
@@ -88,31 +89,29 @@ class AssignmentResults:
 
         if matrix.view_names is None:
             raise ("Please set the matrix_procedures computational view")
-        else:
-            self.classes["number"] = 1
-            if len(matrix.matrix_view.shape) > 2:
-                self.classes["number"] = matrix.matrix_view.shape[2]
-            self.classes["names"] = matrix.view_names
+        self.classes["number"] = 1
+        if len(matrix.matrix_view.shape) > 2:
+            self.classes["number"] = matrix.matrix_view.shape[2]
+        self.classes["names"] = matrix.view_names
 
         if graph is None:
             raise ("Please provide a graph")
-        else:
-            self.compact_nodes = graph.compact_num_nodes
-            self.compact_links = graph.compact_num_links
+        self.compact_nodes = graph.compact_num_nodes
+        self.compact_links = graph.compact_num_links
 
-            self.nodes = graph.num_nodes
-            self.zones = graph.num_zones
-            self.centroids = graph.centroids
-            self.links = graph.num_links
-            self.num_skims = len(graph.skim_fields)
-            self.skim_names = [x for x in graph.skim_fields]
-            self.lids = graph.graph.link_id.values
-            self.direcs = graph.graph.direction.values
-            self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-            self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
-            self.__graph_ids = graph.graph.__supernet_id__.values
-            self.__redim()
-            self.__graph_id__ = graph.__id__
+        self.nodes = graph.num_nodes
+        self.zones = graph.num_zones
+        self.centroids = graph.centroids
+        self.links = graph.num_links
+        self.num_skims = len(graph.skim_fields)
+        self.skim_names = [x for x in graph.skim_fields]
+        self.lids = graph.graph.link_id.values
+        self.direcs = graph.graph.direction.values
+        self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
+        self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
+        self.__graph_ids = graph.graph.__supernet_id__.values
+        self.__redim()
+        self.__graph_id__ = graph.__id__
 
         if self._selected_links:
             self.select_link_od = AequilibraeMatrix()
@@ -125,18 +124,20 @@ class AssignmentResults:
 
             self.select_link_loading = {}
             # Combine each set of selected links into one large matrix that can be parsed into Cython
-            # Each row corresponds a link set, and the equivalent rows in sl_od_matrix and sl_link_loading
+            # Each row corresponds a link set, and the equivalent rows in temp_sl_od_matrix and temp_sl_link_loading
             # Correspond to that set
             self.select_links = np.full(
                 (len(self._selected_links), max([len(x) for x in self._selected_links.values()])),
                 -1,
                 dtype=graph.default_types("int"),
             )
-            self.sl_od_matrix = np.zeros(
+            # 4d dimensions: link_set, origins, destinations, subclass
+            self.temp_sl_od_matrix = np.zeros(
                 (len(self._selected_links), graph.num_zones, graph.num_zones, self.classes["number"]),
                 dtype=graph.default_types("float"),
             )
-            self.sl_link_loading = np.zeros(
+            # 3d dimensions: link_set, link_id, subclass
+            self.temp_sl_link_loading = np.zeros(
                 (len(self._selected_links), graph.compact_num_links, self.classes["number"]),
                 dtype=graph.default_types("float"),
             )
@@ -150,8 +151,8 @@ class AssignmentResults:
                 # Multidimensional arrays where each row has different lengths
                 self.select_links[i][: len(arr)] = arr
                 # Correctly sets the dimensions for the final output matrices
-                self.select_link_od.matrix[name] = self.sl_od_matrix[i]
-                self.select_link_loading[name] = self.sl_link_loading[i]
+                self.select_link_od.matrix[name] = self.temp_sl_od_matrix[i]
+                self.select_link_loading[name] = self.temp_sl_link_loading[i]
 
             # Overwrites previous arrays on assignment results level with the index to access that array in Cython
             self._selected_links = sl_idx
@@ -275,34 +276,41 @@ class AssignmentResults:
         return res
 
     def get_sl_results(self) -> Dict[str, AequilibraeData]:
-        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
+        # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
+        # for each subclass contained in the TrafficClass
+        fields = [
+            e
+            for name in self._selected_links.keys()
+            for n in self.classes["names"]
+            for e in [f"{name}_{n}_ab", f"{name}_{n}_ba", f"{name}_{n}_tot"]
+        ]
         types = [np.float64] * len(fields)
         final = {}
+        # Create a data store with a row for each uncompressed link, columns for each set of select links
+        res = AequilibraeData.empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids),
+        )
+        m = self.get_graph_to_network_mapping()
         for name in self._selected_links.keys():
-            # Create a data store with a row for each uncompressed link
-            res = AequilibraeData.empty(
-                memory_mode=True,
-                entries=int(np.unique(self.lids).shape[0]),
-                field_names=fields,
-                data_types=types,
-                fill=np.nan,
-                index=np.unique(self.lids),
-            )
-
-            # Get a mapping from the compressed graph to/from the network graph
-            m = self.get_graph_to_network_mapping()
-            # Link flows
+            # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
+            # maps link flows from the compressed graph to the uncompressed graph
             assign_link_loads(link_flows, self.select_link_loading[name], self.crosswalk, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
-                res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-                res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+                res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+                res.data[name + "_" + n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
                 # Tot Flow
-                res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
-            final[name] = res
-        return final
+                res.data[name + "_" + n + "_tot"] = np.nan_to_num(res.data[name + "_" + n + "_ab"]) + np.nan_to_num(
+                    res.data[name + "_" + n + "_ba"]
+                )
+        return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
         """Function to write to disk all outputs computed during assignment
@@ -316,10 +324,9 @@ class AssignmentResults:
             res = self.get_load_results()
             res.export(file_name)
 
-        elif output in "SL":
-            # od matrix only exportable as an OMX
-            split = file_name.split(".")
-            self.select_link_od.export(split[0] + "_OD_matrices.OMX")
+        elif output == "SL":
+            # od matrix only exportable as an OMX, rename before parsing to export
+            self.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
