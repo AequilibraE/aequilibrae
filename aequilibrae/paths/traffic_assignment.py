@@ -10,6 +10,7 @@ import numpy as np
 from numpy import nan_to_num
 import pandas as pd
 
+from pathlib import Path
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
@@ -639,7 +640,22 @@ class TrafficAssignment(object):
             record.description = out_skims.description
             record.save()
 
-    def save_select_links(self, table_name: str):
+    def select_link_flows(self):
+        sl_links = {}
+        for cls in self.classes:
+            # Save OD_matrices
+            if cls._selected_links is None:
+                continue
+            df = cls.results.get_sl_results()
+
+            # Create Values table
+            df = pd.DataFrame(df.data)
+            df.rename(columns={"index": "link_id"}, inplace=True)
+            df.set_index("link_id", inplace=True)
+            sl_links[cls] = df
+        return sl_links
+
+    def save_select_link_flows(self, table_name: str):
         """
         Saves the select link link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
@@ -650,7 +666,6 @@ class TrafficAssignment(object):
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
-            cls.results.save_to_disk(str.join("_", [cls.__id__, "SL"]), output="SL")
             df = cls.results.get_sl_results()
 
             # Create Values table
@@ -686,3 +701,10 @@ class TrafficAssignment(object):
             )
             conn.commit()
             conn.close()
+
+    def save_select_link_matrices(self, file_name: str):
+        for cls in self.classes:
+            # Save OD_matrices
+            if cls._selected_links is None:
+                continue
+            cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))

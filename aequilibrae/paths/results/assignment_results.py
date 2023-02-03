@@ -311,7 +311,8 @@ class AssignmentResults:
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
-        """Function to write to disk all outputs computed during assignment
+        """DEPRECATED
+        Function to write to disk all outputs computed during assignment
 
         Args:
             *file_name* (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
@@ -322,9 +323,6 @@ class AssignmentResults:
             res = self.get_load_results()
             res.export(file_name)
 
-        elif output == "SL":
-            # od matrix only exportable as an OMX, rename before parsing to export
-            self.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
 
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
