@@ -671,7 +671,14 @@ class TrafficAssignment(object):
             self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"
             conn = self.project.connect()
             report = {"SL_sets": cls._selected_links.keys()}
-            data = [table_name, "select link", self.procedure_id, str(report), self.procedure_date, self.description]
+            data = [
+                table_name,
+                "select link",
+                self.procedure_id + "sl",
+                str(report),
+                self.procedure_date,
+                self.description,
+            ]
             conn.execute(
                 """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                                 description) Values(?,?,?,?,?,?)""",

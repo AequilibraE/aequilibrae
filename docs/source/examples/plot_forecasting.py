@@ -373,7 +373,6 @@ assig.execute()  # we then execute the assignment
 # In additional to exporting the select link flows, it also exports the OD matrices in OMX format.
 assig.save_select_links("select_link_analysis")
 
-
 # We could export it to CSV or AequilibraE data, but let's put it directly into the results database
 assig.save_results("future_year_assignment")
 
