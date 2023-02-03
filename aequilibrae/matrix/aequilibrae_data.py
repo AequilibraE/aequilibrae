@@ -26,7 +26,6 @@ class AequilibraeData(object):
 
     @classmethod
     def empty(cls, *args, **kwargs):
-        print(cls, args, kwargs)
         instance = cls()
         instance.create_empty(*args, **kwargs)
         return instance

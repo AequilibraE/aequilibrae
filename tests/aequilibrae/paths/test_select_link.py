@@ -40,7 +40,6 @@ class TestSelectLink(TestCase):
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
 
-
     def tearDown(self) -> None:
         self.matrix.close()
         self.project.close()
@@ -157,11 +156,11 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     graph.set_graph("free_flow_time")
     res.prepare(graph)
 
-    def g(o,d):
-        res.compute_path(o,d)
-        return list(res.path_nodes) if res.path_nodes is not None else []
+    def g(o, d):
+        res.compute_path(o, d)
+        return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
    
-    a = [[g(o,d) for d in range(1,25) if o != d] for o in range(1,25)]
+    a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
     sl_links = []
     for i in range(len(sl)):
         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1

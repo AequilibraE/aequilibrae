@@ -476,12 +476,12 @@ class TrafficAssignment(object):
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
-
+        print(m.network_ba_idx.shape, m.network_ab_idx.shape)
         agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
         agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ba])
+        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
         agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
         agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
 
@@ -642,7 +642,10 @@ class TrafficAssignment(object):
 
     def save_select_links(self, table_name: str):
         """
-        Saves the select link analysis for all classes
+        Saves the select link link flows for all classes into the results database. Additionally, it exports
+        the OD matrices into OMX format.
+        Args:
+            str table_name: Name of the table being inserted to. Note the traffic class
         """
         for cls in self.classes:
             # Save OD_matrices
@@ -655,10 +658,8 @@ class TrafficAssignment(object):
             for name, df in cls_flows.items():
                 # Create Values table
                 df = pd.DataFrame(df.data)
-                print(df["index"], df.columns)
                 df.rename(columns={"index": "link_id"}, inplace=True)
                 df.set_index("link_id", inplace=True)
-                print(df)
                 conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
                 tble = str.join(
                     "_",

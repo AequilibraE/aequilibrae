@@ -52,8 +52,7 @@ class AssignmentResults:
 
         self._selected_links = {}
         self.select_link_od = AequilibraeMatrix()
-        # TODO: UPDATE TO A DICT
-        self.select_link_loading = {} # actual results
+        self.select_link_loading = {}
 
         self.nodes = -1
         self.zones = -1
@@ -274,8 +273,6 @@ class AssignmentResults:
         types = [np.float64] * len(fields)
         final = {}
         for name in self._selected_links.keys():
-            print(np.unique(self.lids)[:])
-            print(fields)
             # Create a data store with a row for each uncompressed link
             res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
                                         data_types=types, fill=np.nan, index=np.unique(self.lids))

@@ -367,6 +367,13 @@ assigclass.set_select_links(select_links)
 assig.execute()  # we then execute the assignment
 
 # %%
+# Now let us save our select link results, all we need to do is provide it with a name
+# It should be noted the saving process appends each individual TrafficClass' name to the end of the supplied name
+# e.g. if we have our class named "car", the input name "select_link_analysis" would have a table named
+# "select_link_analysis_car", similar for multiple TrafficClass assignment
+# In additional to exporting the select link flows, it also exports the OD matrices in OMX format.
+assig.save_select_links("select_link_analysis")
+
 
 # We could export it to CSV or AequilibraE data, but let's put it directly into the results database
 assig.save_results("future_year_assignment")

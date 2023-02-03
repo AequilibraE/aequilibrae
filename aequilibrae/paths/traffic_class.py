@@ -124,55 +124,8 @@ class TrafficClass:
                     else:
                         link_ids.append(comp_id)
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
-        # self.sl_data = links
-
-    def decompress_select_link_flows(self) -> Dict[str, pd.DataFrame]:
-
-        #Creating a column for each subclass in the TrafficClass for ab and ba flows
-        num_subclasses = self.matrix.matrix_view.shape[2] if len(self.matrix.matrix_view.shape) > 2 else 1
-        columns = []
-        fields = [e for n in self.matrix.view_names for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
-        types = [np.float64] * len(fields)
-
-        # Create a data store with a row for each uncompressed link
-        # res = AequilibraeData.empty(memory_mode=True, entries=int(np.unique(self.lids).shape[0]), field_names=fields,
-        #                             data_types=types, fill=np.nan, index=np.unique(self.lids)[:])
-        n_links = self.graph.num_links
-        graph = self.graph.graph
-        final_flows = {}
-
-
-
-
-
-        # 3d array which stores ab flows in 0 index, ba flows in index 1
-        # Within these indices, the flows for each subclass are stored in sequential order
-        # e.g. subclass1_ab, subclass2_ab etc.
-        sl_loading = np.empty((2, n_links, num_subclasses))
-        for name in self._selected_links.keys():
-    #TODO: RENAME to a nicer name
-    #TODO: swap SL matrix to dictionary
-            link_loads = self.results.select_link_loading.matrix[name]
-            # CHANGE TO NANS/ RESET FLOW
-            sl_loading.fill(0)
-            # LAMBDA: Specifying how to use the map_links helper method
-            func = lambda row: map_links(row["direction"] // 2, row["link_id"] - 1, row["__compressed_id__"],
-                                         link_loads, sl_loading)
-            graph.apply(func, axis=1)
-            #turning np array of link flows into a df for writing into SQL
-            loads = np.concatenate((sl_loading[0], sl_loading[1]), axis=1)
-            # sorted(columns) ensure the order will have the subclass flows in the same order as the loads array
-            # Specifically, ab_subclass1, ab_subclass2 ..., ba_subclass1, ba_subclass2, ...
-            df = pd.DataFrame(loads, columns=sorted(columns))
-            # Associate flows with their link ids
-            df.insert(loc=0, column="link_id", value=np.arange(1, self.graph.num_links + 1, 1))
-            # rearrange columns so each subclass' flows are adjacent to each other for user convenience
-            # e.g. ab_subclass1, ba_subclass1, ab_subclass2 ...
-            final_flows[name] = df[["link_id"] + columns]
-        return final_flows
 
     def __setattr__(self, key, value):
-
         if key not in [
             "graph",
             "logger",
@@ -191,11 +144,3 @@ class TrafficClass:
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
-
-def map_links(dir: int, id: int , cid: int, links: np.array, res: np.array) -> None:
-    """
-    Helper method to decompress_select_link_flows. Takes an input direction, index (based on link_id),
-    corresponding compressed link_od, compressed link flows and uncompressed link flow arrays.
-    Maps the from the compressed array to the uncompressed array.
-    """
-    res[dir, id, :] = links[cid, :]
