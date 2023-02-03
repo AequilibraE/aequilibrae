@@ -159,7 +159,6 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     def g(o, d):
         res.compute_path(o, d)
         return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
-   
     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
     sl_links = []
     for i in range(len(sl)):
