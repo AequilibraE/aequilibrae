@@ -285,7 +285,6 @@ class AssignmentResults:
             for e in [f"{name}_{n}_ab", f"{name}_{n}_ba", f"{name}_{n}_tot"]
         ]
         types = [np.float64] * len(fields)
-        final = {}
         # Create a data store with a row for each uncompressed link, columns for each set of select links
         res = AequilibraeData.empty(
             memory_mode=True,
