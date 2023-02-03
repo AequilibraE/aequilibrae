@@ -124,6 +124,8 @@ cdef void sl_network_loading(
         connection = conn[j]
         predecessor = pred[j]
         # Walk the path and mark all used links in the has_flow_mask
+
+        # Walk the path and mark all used links in the has_flow_mask
         while predecessor >= 0:
             for k in range(classes):
                 link_loads[connection, k] += demand[j, k]
@@ -131,6 +133,7 @@ cdef void sl_network_loading(
             connection = conn[predecessor]
             predecessor = pred[predecessor]
         # Now we iterate through all our sets of selected links
+        # Now go through our select links sets and see if their links were marked
         for i in range(selected_links.shape[0]):
             # We check to see if the given OD path marked any of our selected links
             found = 0
