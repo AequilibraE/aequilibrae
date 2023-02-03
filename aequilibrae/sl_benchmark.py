@@ -8,10 +8,10 @@ import sys
 import timeit
 import pandas as pd
 import warnings
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from aequilibrae import Project, TrafficAssignment, TrafficClass, AequilibraeMatrix
 import numpy as np
-
 
 
 def aequilibrae_init(
@@ -30,10 +30,6 @@ def aequilibrae_init(
     graph = proj.network.graphs["c"]
     matrix = proj.matrices.get_matrix("demand_omx")
     matrix.computational_view()
-    # matrix.matrix_view = np.zeros((1790, 1790, 1))
-    # matrix = AequilibraeMatrix()
-    # matrix.create_empty(zones=graph.num_zones, matrix_names=["dummy"])
-    #
     assignment = TrafficAssignment()
     car = TrafficClass("car", graph, matrix)
     assignment.set_classes([car])
@@ -44,7 +40,6 @@ def aequilibrae_init(
     assignment.set_time_field("distance")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
-    # assignment.set_cores(1)
     algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 
     # And we will allow paths to be compute going through other centroids/centroid connectors
@@ -53,14 +48,17 @@ def aequilibrae_init(
     graph.set_blocked_centroid_flows(False)
     return graph, matrix, assignment, car
 
+
 def arkansas(path):
     # from os.path import joinfrom
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
+
     # import logging import sys
     import numpy as np
     from aequilibrae import logger
-    print('ark')
+
+    print("ark")
     proj = Project()
     proj.open(path)
     net = proj.network
@@ -187,9 +185,8 @@ def main():
     # print(f"Running with {args['iters']} iterations, {args['repeats']}",
     #       f"times, for a total of {args['iters'] * args['repeats']} samples.")
     # Arkansas links
-    # 
+    #
     # Chicago links
-    
 
     with warnings.catch_warnings():
         # pandas future warnings are really annoying FIXME
@@ -204,12 +201,13 @@ def main():
                     f"{args['path']}/{project_name}", args["cost"], args["cores"]
                 )
                 select_links = [None, {"test": [(2, 1), (7, 1), (1, 1), (6, 1)], "set 2": [(1, 1), (3, 1)]}]
-        
+
             elif project_name in "Arkansas":
                 assignment, car = arkansas(f"{args['path']}/{project_name}")
                 select_links = [None, {"test": [(24, 1), (79146, 1)], "test 2": [(61, 1), (68, 1)]}]
             else:
                 raise Exception("Model Doesn't Exist Fool")
+
             assignment.set_cores(args["cores"][0])
             for link in select_links:
                 if link is not None:

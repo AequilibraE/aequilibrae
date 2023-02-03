@@ -30,7 +30,9 @@ class AequilibraeData(object):
         instance.create_empty(*args, **kwargs)
         return instance
 
-    def create_empty(self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False, fill=None, index=None):
+    def create_empty(
+        self, file_path=None, entries=1, field_names=None, data_types=None, memory_mode=False, fill=None, index=None
+    ):
         """
         Creates a new empty dataset
 

@@ -462,7 +462,6 @@ class create_gtfsdb(WorkerThread):
         self.cursor.execute(create_query)
 
     def __load_tables(self, table_name):
-
         # list fields from table
         cursor = self.cursor.execute("select * from " + table_name)
         available_columns = [description[0].lower() for description in cursor.description]

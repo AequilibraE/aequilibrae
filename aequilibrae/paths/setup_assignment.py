@@ -16,7 +16,7 @@ if "WINDOWS" in platform.platform().upper():
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=["/openmp", "c++17"],
+            extra_compile_args=["/openmp"],
             extra_link_args=["/openmp"],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
             include_dirs=[np.get_include(), pa.get_include()],
@@ -27,7 +27,7 @@ else:
         Extension(
             "AoN",
             ["AoN.pyx"],
-            extra_compile_args=["-fopenmp", "c++17"],  # do we want -Ofast?
+            extra_compile_args=["-fopenmp", "-std=c++17"],  # do we want -Ofast?
             extra_link_args=["-fopenmp"],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
             include_dirs=[np.get_include(), pa.get_include()],

@@ -127,7 +127,6 @@ class LinearApproximation(WorkerThread):
             self.step_direction[c.__id__] = r
 
         if self.algorithm in ["cfw", "bfw"]:
-
             for c in self.traffic_classes:
                 r = AssignmentResults()
                 r.prepare(c.graph, c.matrix)

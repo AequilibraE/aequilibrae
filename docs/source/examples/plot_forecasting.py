@@ -359,9 +359,9 @@ assig.rgap_target = 0.00001
 # For example, let's use Select Link on two sets of links,
 select_links = {
     "Leaving node 1": [(1, 1), (2, 1)],
-    "Random nodes": [(3, 1), (5, 1)]
+    "Random nodes": [(3, 1), (5, 1)],
 }
-#We call this command on the class we are analysing with our dictionary of values
+# We call this command on the class we are analysing with our dictionary of values
 assigclass.set_select_links(select_links)
 
 assig.execute()  # we then execute the assignment

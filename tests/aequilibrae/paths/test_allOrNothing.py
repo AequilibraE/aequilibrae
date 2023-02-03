@@ -32,7 +32,6 @@ class TestAllOrNothing(TestCase):
         self.project.close()
 
     def test_skimming_on_assignment(self):
-
         res = AssignmentResults()
 
         res.prepare(self.g, self.matrix)
