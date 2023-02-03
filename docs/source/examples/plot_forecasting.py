@@ -325,8 +325,7 @@ demand.names
 
 # Let's use the IPF matrix
 demand.computational_view("matrix")
-print(graph.graph[["link_id", "direction", "a_node", "b_node"]])
-raise Exception()
+
 assig = TrafficAssignment()
 
 # Creates the assignment class
