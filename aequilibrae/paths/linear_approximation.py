@@ -438,9 +438,9 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
-                        for name, idx in c._selected_links.items():
+                        for name, idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
-                            # The temp has an index associated with the link_set name
+                            # The temp flows have an index associated with the link_set name
                             linear_combination_skims(
                                 c.results.select_link_od.matrix[name],  # output matrix
                                 c._aon_results.temp_sl_od_matrix[idx, :, :, :],  # matrix 1
