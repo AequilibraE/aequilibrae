@@ -674,7 +674,7 @@ class TrafficAssignment(object):
             data = [
                 table_name,
                 "select link",
-                self.procedure_id + "sl",
+                self.procedure_id,
                 str(report),
                 self.procedure_date,
                 self.description,
