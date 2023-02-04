@@ -3,7 +3,7 @@ import importlib.util as iutil
 import socket
 import sqlite3
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 from uuid import uuid4
 
 import numpy as np
@@ -640,8 +640,12 @@ class TrafficAssignment(object):
             record.description = out_skims.description
             record.save()
 
-    def select_link_flows(self):
-        sl_links = {}
+    def select_link_flows(self) -> Dict[str, pd.DataFrame]:
+        """
+        Returns a dictionary of Select Link Flows,
+        where the flows are identified by the provided name of the TrafficClass.
+        """
+        sl_links = {} # classname as a key
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -652,40 +656,30 @@ class TrafficAssignment(object):
             df = pd.DataFrame(df.data)
             df.rename(columns={"index": "link_id"}, inplace=True)
             df.set_index("link_id", inplace=True)
-            sl_links[cls] = df
+            sl_links[cls.__id__] = df
         return sl_links
 
-    def save_select_link_flows(self, table_name: str):
+    def save_select_link_flows(self, table_name: str) -> None:
         """
         Saves the select link link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
         """
-        for cls in self.classes:
-            # Save OD_matrices
-            if cls._selected_links is None:
-                continue
-            df = cls.results.get_sl_results()
-
-            # Create Values table
+        dfs = self.select_link_flows()
+        for name, df in dfs.items():
+            # Create the dataframe with the sl flows, format it to be indexed by link_id
             df = pd.DataFrame(df.data)
             df.rename(columns={"index": "link_id"}, inplace=True)
             df.set_index("link_id", inplace=True)
             conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
-            tble = str.join(
-                "_",
-                [
-                    table_name,
-                    cls.__id__,
-                ],
-            )
+            tble = str.join("_", [table_name, name])
             df.to_sql(tble, conn)
             conn.close()
             # Create description table
-            self.description = f"Select link analysis from {self.procedure_id}. Class {cls.__id__}"
+            self.description = f"Select link analysis from {self.procedure_id}. Class {name}"
             conn = self.project.connect()
-            report = {"SL_sets": cls._selected_links.keys()}
+            report = {"SL executed on": name}
             data = [
                 table_name,
                 "select link",
@@ -702,9 +696,29 @@ class TrafficAssignment(object):
             conn.commit()
             conn.close()
 
-    def save_select_link_matrices(self, file_name: str):
+    def save_select_link_matrices(self, file_name: str) -> None:
+        """
+        Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
+        """
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
             cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
+
+    def save_select_link_results(self, file_name: str) -> None:
+        """
+        Saves both the Select Link matrices and flow results at the same time, using the same name.
+        Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
+        e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
+
+        Select Link Flows: inserts the select link flows into the database with the table name:
+        {file_name}_{TrafficClass_name} for each TrafficClass in Assignment that had SL activated
+
+        Select Link Matrices (only exports to OMX format):
+        {file_name}_SL_matrices.omx
+
+        """
+        self.save_select_link_matrices(file_name)
+        self.save_select_link_flows(file_name+"_Sl_matrices.omx")
+
