@@ -705,18 +705,16 @@ class TrafficAssignment(object):
                 continue
             cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
 
-    def save_select_link_results(self, file_name: str) -> None:
+    def save_select_link_results(self, name: str) -> None:
         """
         Saves both the Select Link matrices and flow results at the same time, using the same name.
         Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
         e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
-
-        Select Link Flows: inserts the select link flows into the database with the table name:
-        {file_name}_{TrafficClass_name} for each TrafficClass in Assignment that had SL activated
-
+        Select Link Flows: inserts the select link flows for each class into the database with the table name:
+        Car
         Select Link Matrices (only exports to OMX format):
-        {file_name}_SL_matrices.omx
+        Car.omx
 
         """
-        self.save_select_link_flows(file_name)
-        self.save_select_link_matrices(file_name + "_Sl_matrices.omx")
+        self.save_select_link_flows(name)
+        self.save_select_link_matrices(name)
