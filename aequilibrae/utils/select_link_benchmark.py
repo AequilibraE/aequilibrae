@@ -9,10 +9,7 @@ from aequilibrae import Project, TrafficAssignment, TrafficClass
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
-def aequilibrae_init(
-        proj_path: str,
-        cost: str,
-):
+def aequilibrae_init(proj_path: str, cost: str):
     """
     Prepare the graph for skimming the network for `cost`
     """
@@ -31,7 +28,6 @@ def aequilibrae_init(
     assignment.set_time_field("distance")
     assignment.max_iter = 1
     assignment.set_algorithm("msa")
-
     # And we will allow paths to be compute going through other centroids/centroid connectors
     # required for the Sioux Falls network, as all nodes are centroids
     # BE CAREFUL WITH THIS SETTING
@@ -88,9 +84,7 @@ def arkansas(path: str):
     assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
     assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
     assig.set_time_field(f"tt_{period}_10")
-    assig.set_capacity_field(
-        f"{period}_assncap_10"
-    )
+    assig.set_capacity_field(f"{period}_assncap_10")
     assig.max_iter = 1
     assig.set_algorithm("msa")
     assig.rgap_target = 0.00001
