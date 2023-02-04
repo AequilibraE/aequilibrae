@@ -44,7 +44,6 @@ def arkansas(path):
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
     # import logging import sys
-    import numpy as np
     from aequilibrae import logger
     proj = Project()
     proj.open(path)
@@ -90,13 +89,13 @@ def arkansas(path):
     car_demand.computational_view()  # 'AUTO')
     assig = TrafficAssignment()
     assig.procedure_id = f"{period}_baseline"
-    carClass = TrafficClass("car", car_graph, car_demand)
-    carClass.set_pce(1)
-    carClass.set_vot(0.2)
-    carClass.set_fixed_cost("hov1tollcost")
+    car_class = TrafficClass("car", car_graph, car_demand)
+    car_class.set_pce(1)
+    car_class.set_vot(0.2)
+    car_class.set_fixed_cost("hov1tollcost")
 # The link exclusions for commercial trucks are actually the same as the ones for passenger cars, and not heavy trucks
     # The first thing to do is to add at list of traffic classes to be assigned
-    assig.set_classes([carClass])
+    assig.set_classes([car_class])
     assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
     assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
     assig.set_time_field(f"tt_{period}_10")
@@ -110,7 +109,7 @@ def arkansas(path):
     assig.max_iter = 1
     assig.set_algorithm("msa")
     assig.rgap_target = 0.00001
-    return assig, carClass
+    return assig, car_class
 
 
 def main():
