@@ -1,12 +1,15 @@
+import dataclasses
 import multiprocessing as mp
+
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
+from pathlib import Path
 
 try:
-    from aequilibrae.paths.AoN import sum_axis1
+    from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -16,6 +19,14 @@ TO-DO:
    Same idea of the AequilibraEData container, but using the format.memmap from NumPy
 2. Make the writing to SQL faster by disabling all checks before the actual writing
 """
+
+
+@dataclasses.dataclass
+class NetworkGraphIndices:
+    network_ab_idx: np.array
+    network_ba_idx: np.array
+    graph_ab_idx: np.array
+    graph_ba_idx: np.array
 
 
 class AssignmentResults:
@@ -38,6 +49,10 @@ class AssignmentResults:
         self.set_cores(p)
 
         self.classes = {"number": 1, "names": ["flow"]}
+
+        self._selected_links = {}
+        self.select_link_od = None
+        self.select_link_loading = {}
 
         self.nodes = -1
         self.zones = -1
@@ -73,32 +88,73 @@ class AssignmentResults:
 
         if matrix.view_names is None:
             raise ("Please set the matrix_procedures computational view")
-        else:
-            self.classes["number"] = 1
-            if len(matrix.matrix_view.shape) > 2:
-                self.classes["number"] = matrix.matrix_view.shape[2]
-            self.classes["names"] = matrix.view_names
+        self.classes["number"] = 1
+        if len(matrix.matrix_view.shape) > 2:
+            self.classes["number"] = matrix.matrix_view.shape[2]
+        self.classes["names"] = matrix.view_names
 
         if graph is None:
             raise ("Please provide a graph")
-        else:
+        self.compact_nodes = graph.compact_num_nodes
+        self.compact_links = graph.compact_num_links
 
-            self.compact_nodes = graph.compact_num_nodes
-            self.compact_links = graph.compact_num_links
+        self.nodes = graph.num_nodes
+        self.zones = graph.num_zones
+        self.centroids = graph.centroids
+        self.links = graph.num_links
+        self.num_skims = len(graph.skim_fields)
+        self.skim_names = [x for x in graph.skim_fields]
+        self.lids = graph.graph.link_id.values
+        self.direcs = graph.graph.direction.values
+        self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
+        self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
+        self.__graph_ids = graph.graph.__supernet_id__.values
+        self.__redim()
+        self.__graph_id__ = graph.__id__
 
-            self.nodes = graph.num_nodes
-            self.zones = graph.num_zones
-            self.centroids = graph.centroids
-            self.links = graph.num_links
-            self.num_skims = len(graph.skim_fields)
-            self.skim_names = [x for x in graph.skim_fields]
-            self.lids = graph.graph.link_id.values
-            self.direcs = graph.graph.direction.values
-            self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
-            self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
-            self.__graph_ids = graph.graph.__supernet_id__.values
-            self.__redim()
-            self.__graph_id__ = graph.__id__
+        if self._selected_links:
+            self.select_link_od = AequilibraeMatrix()
+            self.select_link_od.create_empty(
+                memory_only=True,
+                zones=matrix.zones,
+                matrix_names=list(self._selected_links.keys()),
+                index_names=matrix.index_names,
+            )
+
+            self.select_link_loading = {}
+            # Combine each set of selected links into one large matrix that can be parsed into Cython
+            # Each row corresponds a link set, and the equivalent rows in temp_sl_od_matrix and temp_sl_link_loading
+            # Correspond to that set
+            self.select_links = np.full(
+                (len(self._selected_links), max([len(x) for x in self._selected_links.values()])),
+                -1,
+                dtype=graph.default_types("int"),
+            )
+            # 4d dimensions: link_set, origins, destinations, subclass
+            self.temp_sl_od_matrix = np.zeros(
+                (len(self._selected_links), graph.num_zones, graph.num_zones, self.classes["number"]),
+                dtype=graph.default_types("float"),
+            )
+            # 3d dimensions: link_set, link_id, subclass
+            self.temp_sl_link_loading = np.zeros(
+                (len(self._selected_links), graph.compact_num_links, self.classes["number"]),
+                dtype=graph.default_types("float"),
+            )
+
+            sl_idx = {}
+            for i, val in enumerate(self._selected_links.items()):
+                name, arr = val
+                sl_idx[name] = i
+                # Filling select_links array with linksets. Note the default value is -1, which is used as a placeholder
+                # It also denotes when the given row has no more selected links, since Cython cannot handle
+                # Multidimensional arrays where each row has different lengths
+                self.select_links[i][: len(arr)] = arr
+                # Correctly sets the dimensions for the final output matrices
+                self.select_link_od.matrix[name] = self.temp_sl_od_matrix[i]
+                self.select_link_loading[name] = self.temp_sl_link_loading[i]
+
+            # Overwrites previous arrays on assignment results level with the index to access that array in Cython
+            self._selected_links = sl_idx
 
     def reset(self) -> None:
         """
@@ -172,6 +228,17 @@ class AssignmentResults:
         if self.link_loads.shape[0]:
             self.__redim()
 
+    def get_graph_to_network_mapping(self):
+        num_uncompressed_links = int(np.unique(self.lids).shape[0])
+        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
+        indexing[np.unique(self.lids)[:]] = np.arange(num_uncompressed_links)
+
+        graph_ab_idx = self.direcs > 0
+        graph_ba_idx = self.direcs < 0
+        network_ab_idx = indexing[self.lids[graph_ab_idx]]
+        network_ba_idx = indexing[self.lids[graph_ba_idx]]
+        return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+
     def get_load_results(self) -> AequilibraeData:
         """
         Translates the assignment results from the graph format into the network format
@@ -179,40 +246,73 @@ class AssignmentResults:
         Returns:
             dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
-        fields = []
-        for n in self.classes["names"]:
-            fields.extend([f"{n}_ab", f"{n}_ba", f"{n}_tot"])
+        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
         types = [np.float64] * len(fields)
 
-        entries = int(np.unique(self.lids).shape[0])
-        res = AequilibraeData()
-        res.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
-        res.data.fill(np.nan)
-        res.index[:] = np.unique(self.lids)[:]
+        # Create a data store with a row for each uncompressed link
+        res = AequilibraeData.empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids),
+        )
 
-        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
-        indexing[res.index[:]] = np.arange(entries)
-
-        # Indices of links BA and AB
-        ABs = self.direcs > 0
-        BAs = self.direcs < 0
-        ab_ids = indexing[self.lids[ABs]]
-        ba_ids = indexing[self.lids[BAs]]
+        # Get a mapping from the compressed graph to/from the network graph
+        m = self.get_graph_to_network_mapping()
 
         # Link flows
         link_flows = self.link_loads[self.__graph_ids, :]
         for i, n in enumerate(self.classes["names"]):
-            # AB Flows
-            res.data[n + "_ab"][ab_ids] = np.nan_to_num(link_flows[ABs, i])
-            # BA Flows
-            res.data[n + "_ba"][ba_ids] = np.nan_to_num(link_flows[BAs, i])
+            # Directional Flows
+            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
 
             # Tot Flow
             res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+
+        return res
+
+    def get_sl_results(self) -> AequilibraeData:
+        # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
+        # for each subclass contained in the TrafficClass
+        fields = [
+            e
+            for name in self._selected_links.keys()
+            for n in self.classes["names"]
+            for e in [f"{name}_{n}_ab", f"{name}_{n}_ba", f"{name}_{n}_tot"]
+        ]
+        types = [np.float64] * len(fields)
+        # Create a data store with a row for each uncompressed link, columns for each set of select links
+        res = AequilibraeData.empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids),
+        )
+        m = self.get_graph_to_network_mapping()
+        for name in self._selected_links.keys():
+            # Link flows initialised
+            link_flows = np.full((self.links, self.classes["number"]), np.nan)
+            # maps link flows from the compressed graph to the uncompressed graph
+            assign_link_loads(link_flows, self.select_link_loading[name], self.crosswalk, self.cores)
+            for i, n in enumerate(self.classes["names"]):
+                # Directional Flows
+                res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+                res.data[name + "_" + n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+
+                # Tot Flow
+                res.data[name + "_" + n + "_tot"] = np.nan_to_num(res.data[name + "_" + n + "_ab"]) + np.nan_to_num(
+                    res.data[name + "_" + n + "_ba"]
+                )
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
-        """Function to write to disk all outputs computed during assignment
+        """DEPRECATED
+        Function to write to disk all outputs computed during assignment
 
         Args:
             *file_name* (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']

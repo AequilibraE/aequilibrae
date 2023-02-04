@@ -1,8 +1,11 @@
-from typing import Union
+from typing import Union, List, Tuple, Dict
 import numpy as np
+import pandas as pd
+
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results import AssignmentResults
+import warnings
 
 
 class TrafficClass:
@@ -45,6 +48,7 @@ class TrafficClass:
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
         self._aon_results = AssignmentResults()
+        self._selected_links = {}  # maps human name to link_set
         self.__id__ = name
 
     def set_pce(self, pce: Union[float, int]) -> None:
@@ -86,8 +90,42 @@ class TrafficClass:
 
         self.vot = float(value_of_time)
 
-    def __setattr__(self, key, value):
+    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
+        """Set the selected links. Checks if the links and directions are valid. Translates link_id and
+        direction into unique link id used in compact graph.
+        Supply links=None to disable select link analysis.
 
+        Args:
+            links (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
+             Link IDs and directions to be used in select link analysis"""
+        self._selected_links = {}
+        for name, link_set in links.items():
+            if len(name.split(" ")) != 1:
+                warnings.warn("Input string name has a space in it. Replacing with _")
+                name = str.join("_", name.split(" "))
+
+            link_ids = []
+            for link, dir in link_set:
+                if dir == 0:
+                    query = (self.graph.graph["link_id"] == link) & (
+                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+                    )
+                else:
+                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
+                if not query.any():
+                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+                    # Check for duplicate compressed link ids in the current link set
+                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                    if comp_id in link_ids:
+                        warnings.warn(
+                            "Two input links map to the same compressed link in the network"
+                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                        )
+                    else:
+                        link_ids.append(comp_id)
+            self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
+
+    def __setattr__(self, key, value):
         if key not in [
             "graph",
             "logger",
@@ -102,6 +140,7 @@ class TrafficClass:
             "fixed_cost",
             "fc_multiplier",
             "fixed_cost_field",
+            "_selected_links",
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value

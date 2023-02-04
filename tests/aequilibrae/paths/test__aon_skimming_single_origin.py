@@ -21,7 +21,6 @@ class TestSkimming_single_origin(unittest.TestCase):
         self.project.close()
 
     def test_skimming_single_origin(self):
-
         self.project.network.build_graphs()
         g = self.project.network.graphs["c"]
         g.set_graph(cost_field="distance")

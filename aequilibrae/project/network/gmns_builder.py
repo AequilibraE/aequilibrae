@@ -35,7 +35,6 @@ class GMNSBuilder(WorkerThread):
         self.n_equiv = self.p.parameters["network"]["gmns"]["node"]["equivalency"]
 
     def doWork(self):
-
         p = self.p
         gmns_n_fields = p.parameters["network"]["gmns"]["node"]["fields"]
         gmns_l_fields = p.parameters["network"]["gmns"]["link"]["fields"]
@@ -186,7 +185,6 @@ class GMNSBuilder(WorkerThread):
         self.save_to_database(links_fields, nodes_fields)
 
     def maybe_transform_srid(self, srid):
-
         if srid == 4326:
             return
 
@@ -209,7 +207,6 @@ class GMNSBuilder(WorkerThread):
             self.link_df.loc[idx, "geometry"] = LineString(new_points).wkt
 
     def get_aeq_direction(self):
-
         gmns_dir = self.l_equiv["direction"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -220,7 +217,6 @@ class GMNSBuilder(WorkerThread):
 
         to_drop_lst = []
         for idx, row in sorted_df.iterrows():
-
             same_dir_df = sorted_df[
                 (sorted_df[["from_node_id", "to_node_id"]].apply(tuple, 1) == (row["from_node_id"], row["to_node_id"]))
                 & (sorted_df.link_id > row.link_id)
@@ -255,7 +251,6 @@ class GMNSBuilder(WorkerThread):
         return direction
 
     def get_ab_lists(self, direction):
-
         gmns_speed = self.l_equiv["speed"]
         gmns_cap = self.l_equiv["capacity"]
         gmns_lanes = self.l_equiv["lanes"]
@@ -291,7 +286,6 @@ class GMNSBuilder(WorkerThread):
         return speed_ab, speed_ba, capacity_ab, capacity_ba, lanes_ab, lanes_ba, toll_ab, toll_ba
 
     def save_types_to_aeq(self):
-
         gmns_ltype = self.l_equiv["link_type"]
 
         # Setting link_type = 'unclassified' if there is no information about it in the GMNS links table
@@ -310,7 +304,6 @@ class GMNSBuilder(WorkerThread):
         type_saved = ""
         all_types = list(self.link_types.all_types())
         for lt_name in list(dict.fromkeys(link_types_list)):
-
             letters = lt_name.lower() + lt_name.upper() + string.ascii_letters
             letters = "".join([lt for lt in letters if lt not in all_types + [type_saved]])
 
@@ -324,7 +317,6 @@ class GMNSBuilder(WorkerThread):
         return link_types_list
 
     def save_modes_to_aeq(self):
-
         gmns_modes = self.l_equiv["modes"]
 
         if gmns_modes in self.link_df.columns.to_list():
@@ -350,7 +342,6 @@ class GMNSBuilder(WorkerThread):
         pattern = re.compile("|".join(char_replaces.keys()))
 
         if self.uses_df is not None:
-
             use_group = self.uses_df
             groups_dict = dict(zip(use_group.use_group, use_group.uses))
 
@@ -358,7 +349,6 @@ class GMNSBuilder(WorkerThread):
                 grouped = True
 
                 while grouped:
-
                     if re.search("|".join(list(groups_dict.keys())), use) is not None:
                         group = re.search("|".join(list(groups_dict.keys())), use).group(0)
                         use = use.replace(
@@ -392,7 +382,6 @@ class GMNSBuilder(WorkerThread):
             self.conn.execute("select mode_name, mode_id from modes").fetchall(), columns=["name", "id"]
         )
         for mode in list(dict.fromkeys(modes_list)):
-
             if mode in groups_dict.keys():
                 modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
                 desc_list = [
@@ -431,7 +420,6 @@ class GMNSBuilder(WorkerThread):
         return mode_ids_list
 
     def correct_geometries(self):
-
         p = self.p
         gmns_lid = self.l_equiv["link_id"]
         gmns_a_node = self.l_equiv["a_node"]
@@ -440,7 +428,6 @@ class GMNSBuilder(WorkerThread):
         critical_dist = p.parameters["network"]["gmns"]["critical_dist"]
 
         for idx, row in self.link_df.iterrows():
-
             [from_point_x, from_point_y] = (
                 self.node_df.loc[self.node_df[gmns_nid] == row[gmns_a_node], ["x_coord", "y_coord"]]
                 .apply(list, 1)
