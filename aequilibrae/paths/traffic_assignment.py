@@ -671,7 +671,6 @@ class TrafficAssignment(object):
             str table_name: Name of the table being inserted to. Note the traffic class
         """
         df = self.select_link_flows()
-        print(df)
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
