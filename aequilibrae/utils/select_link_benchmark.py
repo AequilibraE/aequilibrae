@@ -81,8 +81,8 @@ def arkansas(path):
     car_graph.graph.mttollcost.fillna(0, inplace=True)
     car_graph.graph.httollcost.fillna(0, inplace=True)
     # Sets capacities and travel times for links without any
-    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, f"am_assncap_10"] = 1.0
-    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, f"tt_am_10"] = 0.001  # Assigns all periods
+    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "am_assncap_10"] = 1.0
+    car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "tt_am_10"] = 0.001  # Assigns all periods
     period = "am"
     logger.info(f"\n\n Assigning {period.upper()}")
     proj_matrices = proj.matrices
@@ -160,8 +160,6 @@ def main():
     args = vars(parser.parse_args())
 
     # libraries = args['libraries']
-    output_path = args["output"]
-    cores = args["cores"]
     print(f"Now benchmarking {libraries} on the {args['projects']} model(s).")
     # print(f"Running with {args['iters']} iterations, {args['repeats']}",
     #       f"times, for a total of {args['iters'] * args['repeats']} samples.")
@@ -178,9 +176,7 @@ def main():
 
         for project_name in args["projects"]:
             if project_name in ["chicago_sketch"]:
-                graph, matrix, assignment, car = aequilibrae_init(
-                    f"{args['path']}/{project_name}", args["cost"], args["cores"]
-                )
+                graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])
                 select_links = [None, {"test": [(2, 1), (7, 1), (1, 1), (6, 1)], "set 2": [(1, 1), (3, 1)]}]
 
             elif project_name in "Arkansas":
@@ -207,15 +203,11 @@ def main():
         ratios = []
         final = pd.concat(results)
         for project_name in args["projects"]:
-            no_sl = final.loc[(final["Project"] == project_name) & (final["Select_Link"] == False)][
-                "Minimum_Runtime"
-            ].values[0]
-            sl = final.loc[(final["Project"] == project_name) & (final["Select_Link"] == True)][
-                "Minimum_Runtime"
-            ].values[0]
-            df = pd.DataFrame({"Project": project_name, "Runtime_%_Increase": [(sl - no_sl) / no_sl * 100]})
+            no_sl = final.query(f"Project == '{project_name}' and Select_Link == False")["Minimum_Runtime"]
+            sl = final.query(f"Project == '{project_name}' and Select_Link == True")["Minimum_Runtime"]
+            df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [((sl - no_sl) / no_sl * 100)]})
             ratios.append(df)
-        final_ratio = pd.concat(ratios)
+        final_ratio = pd.concat(ratios) if len(ratios) != 1 else ratios[0]
         print(final)
         print("\n")
         print(final_ratio)
