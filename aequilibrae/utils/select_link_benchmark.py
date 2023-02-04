@@ -39,18 +39,14 @@ def aequilibrae_init(
     return graph, matrix, assignment, car
 
 
-def arkansas(path):
-    # from os.path import joinfrom
+def arkansas(path: str):
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
-    # import logging import sys
     from aequilibrae import logger
     proj = Project()
     proj.open(path)
     net = proj.network
     curr = proj.conn.cursor()
-    # proj_matrices = proj.matrices
-    # modes = net.modes
     nodes = net.nodes  # These centroids are not in the matrices, so we turn them off
     for n in [4701, 4702, 4703]:
         nd = nodes.get(n)
@@ -58,11 +54,8 @@ def arkansas(path):
         nd.save()
     net.build_graphs(modes=["c"])
     car_graph = net.graphs["c"]
-    # Link exclusions (equivalent to selections when creating TransCAD .net
-    curr.execute("select link_id from links where exclusionset IN ('TruckOnly', 'HOV2', 'HOV3')")
     exclude_from_passenger = [x[0] for x in curr.fetchall()]
     curr.execute("select link_id from links where exclusionset IN ('PassengerOnly', 'HOV2', 'HOV3')")
-    # exclude_from_truck = [x[0] for x in curr.fetchall()]
     graph = car_graph
     set1 = graph.network[(graph.network.builtyear > 2010) | (graph.network.removedyear < 2010)].link_id.to_list()
     set2 = graph.network[(graph.network.mode_code < 10) | (graph.network.mode_code > 11)].link_id.to_list()
@@ -73,13 +66,11 @@ def arkansas(path):
         nd = nodes.get(n)
         nd.is_centroid = 1
         nd.save()
-    # Default parameters for BPR and tolls
     car_graph.graph.alpha.fillna(0.15, inplace=True)
     car_graph.graph.beta.fillna(4.0, inplace=True)
     car_graph.graph.hov1tollcost.fillna(0, inplace=True)
     car_graph.graph.mttollcost.fillna(0, inplace=True)
     car_graph.graph.httollcost.fillna(0, inplace=True)
-    # Sets capacities and travel times for links without any
     car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "am_assncap_10"] = 1.0
     car_graph.graph.loc[car_graph.graph.a_node == car_graph.graph.b_node, "tt_am_10"] = 0.001  # Assigns all periods
     period = "am"
@@ -93,8 +84,6 @@ def arkansas(path):
     car_class.set_pce(1)
     car_class.set_vot(0.2)
     car_class.set_fixed_cost("hov1tollcost")
-# The link exclusions for commercial trucks are actually the same as the ones for passenger cars, and not heavy trucks
-    # The first thing to do is to add at list of traffic classes to be assigned
     assig.set_classes([car_class])
     assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
     assig.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})  # And its parameters
@@ -102,10 +91,6 @@ def arkansas(path):
     assig.set_capacity_field(
         f"{period}_assncap_10"
     )
-    # The capacity and free flow travel times as they exist in the graph
-    # And the algorithm we want to use to assign
-    # NT is not converging properly (it is too loose, so even MSA converges incredibly fast)
-
     assig.max_iter = 1
     assig.set_algorithm("msa")
     assig.rgap_target = 0.00001
@@ -115,7 +100,6 @@ def arkansas(path):
 def main():
     projects = ["Arkansas"]
     libraries = ["aequilibrae"]
-
     parser = ArgumentParser()
     parser.add_argument("-m", "--model-path", dest="path", default="../models", help="path to models", metavar="FILE")
     parser.add_argument(
@@ -146,33 +130,18 @@ def main():
         type=int,
         metavar="N",
     )
-    # parser.add_argument("-l", "--libraries", nargs='+', dest="libraries",
-    #                     choices=libraries, default=libraries,
-    #                     help="libraries to benchmark")
     parser.add_argument(
         "-p", "--projects", nargs="+", dest="projects", default=projects, help="projects to benchmark using"
     )
     parser.add_argument("--cost", dest="cost", default="distance", help="cost column to skim for")
-    # parser.add_argument('--details', dest='details')
     parser.set_defaults(feature=True)
-
     args = vars(parser.parse_args())
-
-    # libraries = args['libraries']
     print(f"Now benchmarking {libraries} on the {args['projects']} model(s).")
-    # print(f"Running with {args['iters']} iterations, {args['repeats']}",
-    #       f"times, for a total of {args['iters'] * args['repeats']} samples.")
-    # Arkansas links
-    #
-    # Chicago links
-
     with warnings.catch_warnings():
         # pandas future warnings are really annoying FIXME
         warnings.simplefilter(action="ignore", category=FutureWarning)
-        # proj_path: str, cost: str, select_links, cores: int = 0,
         # Benchmark time
         results = []
-
         for project_name in args["projects"]:
             if project_name in ["chicago_sketch"]:
                 graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])
