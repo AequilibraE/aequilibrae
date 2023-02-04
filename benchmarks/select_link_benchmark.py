@@ -6,6 +6,7 @@ import timeit
 import pandas as pd
 import warnings
 from aequilibrae import Project, TrafficAssignment, TrafficClass
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
@@ -39,6 +40,7 @@ def arkansas(path: str):
     from aequilibrae import Project
     from aequilibrae.paths import TrafficAssignment, TrafficClass
     from aequilibrae import logger
+
     proj = Project()
     proj.open(path)
     net = proj.network
