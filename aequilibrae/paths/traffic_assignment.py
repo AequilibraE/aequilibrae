@@ -654,7 +654,7 @@ class TrafficAssignment(object):
             df = pd.DataFrame(df.data)
             # Remap the dataframe names to add the prefix classname for each class
             cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
-            df.rename(columns=cls_cols)
+            df.rename(columns=cls_cols, inplace=True)
             df.set_index("link_id", inplace=True)
             class_flows.append(df)
         sl_flows = pd.concat(class_flows)
