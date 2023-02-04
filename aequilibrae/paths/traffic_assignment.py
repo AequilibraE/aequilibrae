@@ -642,22 +642,23 @@ class TrafficAssignment(object):
 
     def select_link_flows(self) -> Dict[str, pd.DataFrame]:
         """
-        Returns a dictionary of Select Link Flows,
-        where the flows are identified by the provided name of the TrafficClass.
+        Returns a dataframe of the select link flows for each class
         """
-        sl_links = {}  # classname as a key
+        class_flows = []  # stores the df for each class
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
                 continue
             df = cls.results.get_sl_results()
-
             # Create Values table
             df = pd.DataFrame(df.data)
-            df.rename(columns={"index": "link_id"}, inplace=True)
+            # Remap the dataframe names to add the prefix classname for each class
+            cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
+            df.rename(columns=cls_cols)
             df.set_index("link_id", inplace=True)
-            sl_links[cls.__id__] = df
-        return sl_links
+            class_flows.append(df)
+        sl_flows = pd.concat(class_flows)
+        return sl_flows
 
     def save_select_link_flows(self, table_name: str) -> None:
         """
@@ -666,35 +667,29 @@ class TrafficAssignment(object):
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
         """
-        dfs = self.select_link_flows()
-        for name, df in dfs.items():
-            # Create the dataframe with the sl flows, format it to be indexed by link_id
-            df = pd.DataFrame(df.data)
-            df.rename(columns={"index": "link_id"}, inplace=True)
-            df.set_index("link_id", inplace=True)
-            conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
-            tble = str.join("_", [table_name, name])
-            df.to_sql(tble, conn)
-            conn.close()
-            # Create description table
-            self.description = f"Select link analysis from {self.procedure_id}. Class {name}"
-            conn = self.project.connect()
-            report = {"SL executed on": name}
-            data = [
-                table_name,
-                "select link",
-                self.procedure_id,
-                str(report),
-                self.procedure_date,
-                self.description,
-            ]
-            conn.execute(
-                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                                description) Values(?,?,?,?,?,?)""",
-                data,
-            )
-            conn.commit()
-            conn.close()
+        df = self.select_link_flows()
+        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        df.to_sql(table_name, conn)
+        conn.close()
+        # Create description table
+        self.description = f"Select link analysis from {self.procedure_id}"
+        conn = self.project.connect()
+        report = {}
+        data = [
+            table_name,
+            "select link",
+            self.procedure_id,
+            str(report),
+            self.procedure_date,
+            self.description,
+        ]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
+        conn.commit()
+        conn.close()
 
     def save_select_link_matrices(self, file_name: str) -> None:
         """
@@ -719,5 +714,5 @@ class TrafficAssignment(object):
         {file_name}_SL_matrices.omx
 
         """
-        self.save_select_link_matrices(file_name)
-        self.save_select_link_flows(file_name + "_Sl_matrices.omx")
+        self.save_select_link_flows(file_name)
+        self.save_select_link_matrices(file_name + "_Sl_matrices.omx")
