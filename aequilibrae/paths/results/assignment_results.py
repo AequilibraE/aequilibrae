@@ -323,7 +323,6 @@ class AssignmentResults:
             res = self.get_load_results()
             res.export(file_name)
 
-
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
             raise NotImplementedError

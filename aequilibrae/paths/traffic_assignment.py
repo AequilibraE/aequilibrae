@@ -645,7 +645,7 @@ class TrafficAssignment(object):
         Returns a dictionary of Select Link Flows,
         where the flows are identified by the provided name of the TrafficClass.
         """
-        sl_links = {} # classname as a key
+        sl_links = {}  # classname as a key
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -720,5 +720,4 @@ class TrafficAssignment(object):
 
         """
         self.save_select_link_matrices(file_name)
-        self.save_select_link_flows(file_name+"_Sl_matrices.omx")
-
+        self.save_select_link_flows(file_name + "_Sl_matrices.omx")
