@@ -19,7 +19,6 @@ def gtfs_fldr(create_path):
 
 
 def test_set_feed_path(gtfs_loader, gtfs_fldr):
-
     gtfs = gtfs_loader
 
     with pytest.raises(Exception):
@@ -27,7 +26,6 @@ def test_set_feed_path(gtfs_loader, gtfs_fldr):
 
 
 def test_load_data(gtfs_loader, gtfs_fldr):
-
     cap = pd.read_csv(join(abspath(dirname("tests")), "tests/data/gtfs/transit_max_speeds.txt"))
 
     df = cap[cap.city == "Coquimbo"]

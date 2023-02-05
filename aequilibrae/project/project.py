@@ -168,7 +168,6 @@ class Project:
         return Zoning(self.network)
 
     def __create_empty_network(self):
-
         shutil.copyfile(spatialite_database, self.path_to_file)
 
         self.conn = self.connect()

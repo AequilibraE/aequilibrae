@@ -377,7 +377,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return p
 
     def __build_route_shape(self, patterns) -> MultiLineString:
-
         shapes = [p.best_shape() for p in patterns if p.best_shape() is not None]
         return MultiLineString(shapes)
 

@@ -11,7 +11,6 @@ def gtfs_file(create_path):
 
 @pytest.fixture
 def system_builder(transit_conn, gtfs_file):
-
     yield GTFSRouteSystemBuilder(
         network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
     )
@@ -91,7 +90,6 @@ def test_load_date_not_available_date_exception(system_builder):
 
 
 def test_save_to_disk(transit_conn, system_builder):
-
     system_builder.load_date("2016-04-13")
     system_builder.save_to_disk()
 

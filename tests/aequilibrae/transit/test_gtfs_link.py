@@ -38,7 +38,6 @@ class TestLink:
         assert new_link.length == pytest.approx(5 * pi * 6371000 / 180), "Length not computed properly"
 
     def test_save_to_database(self, srid, transit_conn):
-
         route_type = randint(0, 13)
         fstop = randomword(randint(3, 15))
         tstop = randomword(randint(3, 15))

@@ -19,7 +19,6 @@ class Service:
     """
 
     def __init__(self) -> None:
-
         self.service_id = ""
         self.monday = 0
         self.tuesday = 0

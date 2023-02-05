@@ -4,7 +4,6 @@ import os
 
 @pytest.fixture
 def pat(create_path, create_gtfs_project):
-
     gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
 
     transit = create_gtfs_project.new_gtfs_builder(
