@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
       max-parallel: 20
     steps:
@@ -54,20 +54,15 @@ jobs:
         sudo apt update
         sudo apt install libsqlite3-mod-spatialite
         sudo apt install -y libspatialite-dev
-        pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Download spatialite on Windows
       if: matrix.os == 'windows-latest'
       run:  python tests/setup_windows_spatialite.py
 
-    - name: Compile library
-      run: |
-        cd aequilibrae/paths
-        python setup_assignment.py build_ext --inplace
-        cd ../distribution
-        python setup_ipf.py build_ext --inplace
-        cd ../..
+    - name: Download spatialite on MacOS
+      if: matrix.os == 'macos-latest'
+      run:  brew install sqlite3 libspatialite
 
     - name: Build
       run: python setup.py sdist bdist_wheel
