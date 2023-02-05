@@ -1,18 +1,4 @@
 """
- -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
- Name:       Core path computation algorithms, accessible only at Cython/C Level
- Purpose:    Supports the implementation shortest path and network loading routines
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Pedro Camrgo
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
- Created:    15/09/2013
- Updated:    24/04/2018
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------
 Original Algorithm for Shortest path (Dijkstra with a 4-ary heap) was written by François Pacull <francois.pacull@architecture-performance.fr> under license: MIT, (C) 2022
 """
 
@@ -24,14 +10,13 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 """
 cimport cython
 from libc.math cimport isnan, INFINITY
-
-from libc.stdlib cimport malloc, free
+from libc.string cimport memset
 
 include 'pq_4ary_heap.pyx'
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
-@cython.boundscheck(False) # turn of bounds-checking for entire function
+@cython.boundscheck(False) # turn off bounds-checking for entire function
 cpdef void network_loading(long classes,
                            double[:, :] demand,
                            long long [:] pred,
@@ -45,7 +30,6 @@ cpdef void network_loading(long classes,
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
     cdef long long N = node_load.shape[0]
-
 # Traditional loading, without cascading
 #    for i in range(zones):
 #        node = i
@@ -101,40 +85,79 @@ cdef return_an_int_view(input):
     cdef int [:] critical_links_view = input
     return critical_links_view
 
-
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void perform_select_link_analysis(long origin,
-                                        int classes,
-                                        double[:, :] demand,
-                                        long long [:] pred,
-                                        long long [:] conn,
-                                        long long [:] aux_link_flows,
-                                        double [:, :] critical_array,
-                                        int query_type) nogil:
-    cdef unsigned int t_origin
-    cdef ITYPE_t c, j, i, p, l
-    cdef unsigned int dests = demand.shape[0]
-    cdef unsigned int q = critical_array.shape[0]
-
-    """ TODO:
-    FIX THE SELECT LINK ANALYSIS FOR MULTIPLE CLASSES"""
-    l = 0
+cdef void sl_network_loading(
+    long long [:, :] selected_links,
+    double [:, :] demand,
+    long long [:] pred,
+    long long [:] conn,
+    double [:, :] link_loads,
+    double [:, :, :] sl_od_matrix,
+    double [:, :, :] sl_link_loading,
+    unsigned char [:] has_flow_mask,
+    long classes) nogil:
+# VARIABLES:
+#   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
+#   demand:         The input demand matrix for a given origin. The first index corresponds to destination,
+#                   second is the class
+#   pred:           The list of predecessor nodes, i.e. given a node, referencing that node's index in pred
+#                   yields the previous node in the minimum spanning tree
+#   conn:           The list of links which connect predecessor nodes. referencing it by the predecessor yields
+#                   the link it used to connect the two nodes
+# link_loads:       Stores the loading on each link. Equivalent to link_loads in network_loading
+# temp_sl_od_matrix:     Stores the OD matrix for each set of selected links sliced for the given origin
+# The indices are:  set of links, destination, class
+# temp_sl_link_loading:  Stores the loading on the Selected links, and the paths which use the selected links
+#                   The indices are: set of links, link_id, class)
+# has_flow_mask:    An array which acts as a flag for which links were used in retracing a given OD path
+# classes:          the number of subclasses of vehicles for the given TrafficClass
+# 
+# Executes regular loading, while keeping track of SL links
+    cdef:
+        int i, j, k, l, dests = demand.shape[0], xshape = has_flow_mask.shape[0]
+        long long predecessor, connection, lid, link
+        bint found
     for j in range(dests):
-        if demand[j, l] > 0:
-            p = pred[j]
-            j = i
-            while p >= 0:
-                c = conn[j]
-                aux_link_flows[c] = 1
-                j = p
-                p = pred[j]
-        if query_type == 1: # Either one of the links in the query
-            for i in range(q):
-                if aux_link_flows[i] == 1:
-                    critical_array
+        memset(&has_flow_mask[0], 0, xshape * sizeof(unsigned char))
+        connection = conn[j]
+        predecessor = pred[j]
 
+        # Walk the path and mark all used links in the has_flow_mask
+        while predecessor >= 0:
+            for k in range(classes):
+                link_loads[connection, k] += demand[j, k]
+            has_flow_mask[connection] = 1
+            connection = conn[predecessor]
+            predecessor = pred[predecessor]
+        # Now iterate through each SL set and see if any of their links were marked
+        for i in range(selected_links.shape[0]):
+            # We check to see if the given OD path marked any of our selected links
+            found = 0
+            l = 0
+            while l < selected_links.shape[1] and found == 0:
+                # Checks to see if the current set of selected links has finished
+                # NOTE: -1 is a default value for the selected_links array. It cannot be a link id, if -1 turns up
+                # There is either a serious bug, or the program has reached the end of a set of links in SL.
+                # This lets us early exit from the loop without needing to iterate through the rest of the array
+                # Which just has placeholder values
+                if selected_links[i][l] == -1:
+                    break
+                if has_flow_mask[selected_links[i][l]] != 0:
+                    found = 1
+                l += 1
+            if found == 0:
+                continue
+            for k in range(classes):
+                sl_od_matrix[i, j, k] = demand[j, k]
+            connection = conn[j]
+            predecessor = pred[j]
+            while predecessor >= 0:
+                for k in range(classes):
+                    sl_link_loading[i, connection, k] += demand[j, k]
+                connection = conn[predecessor]
+                predecessor = pred[predecessor]
 
 @cython.wraparound(False)
 @cython.embedsignature(True)

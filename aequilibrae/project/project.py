@@ -185,7 +185,6 @@ class Project:
         initialize_tables(self, "network")
 
     def __setup_logger(self):
-
         self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
         self.logger.propagate = False
         self.logger.setLevel(logging.DEBUG)

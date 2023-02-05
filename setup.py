@@ -18,10 +18,17 @@ if spec is not None:
 
     include_dirs.append(pa.get_include())
 
-whole_path = join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")
-ext_module = Extension(
+ext_mod_aon = Extension(
     "aequilibrae.paths.AoN",
-    [whole_path],
+    [join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")],
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
+
+ext_mod_ipf = Extension(
+    "aequilibrae.distribution.ipf_core",
+    [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
     language="c++",
@@ -29,7 +36,7 @@ ext_module = Extension(
 
 # this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
 if "WINDOWS" not in platform.platform().upper():
-    ext_module.extra_compile_args.append("-std=c++17")
+    ext_mod_aon.extra_compile_args.append("-std=c++17")
 
 reqs = [
     "numpy>=1.18.0,<1.22",
@@ -55,7 +62,8 @@ pkgs = [pkg for pkg in find_packages()]
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
-    "aequilibrae": ["parameters.yml"],
+    "aequilibrae.distribution": ["*.pyx"],
+    "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
@@ -89,5 +97,5 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.10",
         ],
         cmdclass={"build_ext": build_ext},
-        ext_modules=[ext_module],
+        ext_modules=[ext_mod_aon, ext_mod_ipf],
     )

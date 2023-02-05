@@ -23,7 +23,6 @@ class GMNSExporter(WorkerThread):
         self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
 
     def doWork(self):
-
         if "ogc_fid" in list(self.links_df.columns):
             self.links_df.drop("ogc_fid", axis=1, inplace=True)
         if "ogc_fid" in list(self.nodes_df.columns):
@@ -48,10 +47,8 @@ class GMNSExporter(WorkerThread):
         self.modes_df.to_csv(join(self.output_path, "use_definition.csv"), index=False)
 
     def update_direction_field(self):
-
         two_way_cols = list(set([col[:-3] for col in list(self.links_df.columns) if col[-3:] in ["_ab", "_ba"]]))
         for idx, row in self.links_df.iterrows():
-
             if row.direction == 0:
                 self.links_df = pd.concat([self.links_df, self.links_df.loc[idx:idx, :]], axis=0)
                 self.links_df.reset_index(drop=True, inplace=True)
@@ -121,7 +118,6 @@ class GMNSExporter(WorkerThread):
                 self.nodes_df.drop("geometry", axis=1, inplace=True)
 
     def reorder_fields(self):
-
         link_cols = list(self.links_df.columns)
         link_req = [k for k in self.gmns_links["fields"] if self.gmns_links["fields"][k]["required"]]
         main_cols = ["link_id", "from_node_id", "to_node_id", "directed"]

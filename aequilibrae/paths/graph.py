@@ -583,7 +583,6 @@ class Graph(object):
 
     # We check if all minimum fields are there
     def __network_error_checking__(self):
-
         # Checking field names
         has_fields = self.network.columns
         must_fields = ["link_id", "a_node", "b_node", "direction"]
@@ -604,7 +603,6 @@ class Graph(object):
             self.network = self.network.assign(id=np.nan)
 
     def __determine_types__(self, new_type, current_type):
-
         if new_type.isdigit():
             new_type = int(new_type)
         else:

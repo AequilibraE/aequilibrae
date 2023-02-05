@@ -6,7 +6,6 @@ from aequilibrae.log import logger, global_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.data import Matrices
 from aequilibrae.log import Log
-from aequilibrae import distribution
 from aequilibrae import matrix
 from aequilibrae import transit
 from aequilibrae import project
@@ -21,7 +20,7 @@ except Exception as e:
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
     from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-
+    from aequilibrae import distribution
     from aequilibrae.paths.network_skimming import NetworkSkimming
     from aequilibrae.paths.traffic_class import TrafficClass
     from aequilibrae.paths.vdf import VDF

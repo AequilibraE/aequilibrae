@@ -13,6 +13,6 @@ cdef DTYPE_t DTYPE_EPS = 1E-15
 cdef ITYPE_t NULL_IDX = 18446744073709551615
 
 VERSION = 0.8
-MINOR_VRSN = 0
-binary_version = "0.8.0"
+MINOR_VRSN = 1
+binary_version = "0.8.1"
 release_name = "Rio de Janeiro"
