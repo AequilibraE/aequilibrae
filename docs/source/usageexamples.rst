@@ -994,6 +994,54 @@ to be contiguous if an * .aem instead of a * .omx file) however.
     mat.load('demand.aem')
     mat.computational_view(['red_cars', 'blue_cars'])
 
+.. _turn_volumes:
+Extract turn volumes
+~~~~~~~~~
+The extraction of turning movements requires assignment paths. They have to be saved while
+assigning.
+Turn movements can be extracted straight after assignment or using assignment results table,
+provided it's been saved.
+
+::
+
+    from aequilibrae.paths import TurnVolumesResults
+
+    # Required input
+    # Procedure id (option 1) can be derived from assignment class
+    procedure_id = assig.info["procedure_id"]
+
+    # Procedure id (option 2) from assignment results table
+
+    # Project dir (option 1) from project
+    project_dir = project.project dir
+
+    # Project dir (option 2)
+    project_dir = Path('D:/src/TransportationNetworks/SiouxFalls')
+
+    # Traffic class (option 1)
+    assigclass = TrafficClass(g, mat)
+
+    # Betas
+    betas_df = ""
+
+    # We need a dataframe containing turns' abc nodes with column names: a, b, c
+    turn_abc = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+        ],
+        columns=["a", "b", "c"]
+    )
+
+    tv = TurnVolumesResults.from_traffic_class(
+        traffic_class = assigclass,
+        project_dir=project_dir,
+        procedure_id=procedure_id,
+        iteration=None,  # Default: grabs all iterations
+        blend_iterations=True, # Default: blends iterations
+    )
+
+    volumes = calculate_turn_volumes(turns_df=turn_abc, betas=betas_df)
 
 Advanced usage: Building a Graph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
