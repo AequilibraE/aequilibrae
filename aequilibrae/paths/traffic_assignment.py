@@ -511,12 +511,12 @@ class TrafficAssignment(object):
         return df
 
     def save_turning_volumes(
-            self,
-            table_name: str,
-            turns_df: pd.DataFrame,
-            classes: Optional[list[str]] = None,
-            iteration: Optional[int] = None,
-            blend_iterations: bool = True
+        self,
+        table_name: str,
+        turns_df: pd.DataFrame,
+        classes: Optional[list[str]] = None,
+        iteration: Optional[int] = None,
+        blend_iterations: bool = True,
     ) -> None:
         """Saves the assignment results to results_database.sqlite
 
@@ -546,14 +546,14 @@ class TrafficAssignment(object):
         conn.close()
 
     def turning_volumes(
-            self,
-            turns_df: pd.DataFrame,
-            classes: Optional[list[str]] = None,
-            iteration: Optional[int] = None,
-            blend_iterations: bool = True
+        self,
+        turns_df: pd.DataFrame,
+        classes: Optional[list[str]] = None,
+        iteration: Optional[int] = None,
+        blend_iterations: bool = True,
     ) -> pd.DataFrame:
-        betas_df = self.report()[['iteration', "beta0", "beta1", "beta2"]].replace(-1, None).ffill().set_index(
-            'iteration'
+        betas_df = (
+            self.report()[["iteration", "beta0", "beta1", "beta2"]].replace(-1, None).ffill().set_index("iteration")
         )
 
         ta_turn_vol_list = []
@@ -564,10 +564,10 @@ class TrafficAssignment(object):
         for tc in classes:
             tc_turns = TurnVolumesResults.from_traffic_class(
                 tc,
-                Path(self.project.project_base_path),
                 self.procedure_id,
+                project=None,  # will get the active project
                 iteration=iteration,
-                blend_iterations=blend_iterations
+                blend_iterations=blend_iterations,
             )
             ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 

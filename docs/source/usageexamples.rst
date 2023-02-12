@@ -999,30 +999,41 @@ Extract turn volumes
 ~~~~~~~~~
 The extraction of turning movements requires assignment paths. They have to be saved while
 assigning.
-Turn movements can be extracted straight after assignment or using assignment results table,
+Turn movements can be extracted while assigning or using an assignment results table,
 provided it's been saved.
+
+The turn volumes functions require a dataframe containing the a, b, and c nodes of the desired turns.
+
+To save turn movements from the assignment class it will be sufficient to use save_turning_volumes.
+
+
+::
+
+    # Create (or load) a dataframe with turns' a,b, c nodes
+    turn_abc = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+        ],
+        columns=["a", "b", "c"]
+    )
+
+    # add a line to save turning volumes to the specified table
+    assigclass.save_turning_volumes("table_name", turns_df)
+
+
+To save turning volumes for an existing set of assignemnt results, we need to retrieve some information
+from the results table.
+
 
 ::
 
     from aequilibrae.paths import TurnVolumesResults
 
-    # Required input
-    # Procedure id (option 1) can be derived from assignment class
-    procedure_id = assig.info["procedure_id"]
-
-    # Procedure id (option 2) from assignment results table
-
-    # Project dir (option 1) from project
-    project_dir = project.project dir
-
-    # Project dir (option 2)
-    project_dir = Path('D:/src/TransportationNetworks/SiouxFalls')
-
-    # Traffic class (option 1)
+    # Required inputs from assignment results table
+    procedure_id = ""
     assigclass = TrafficClass(g, mat)
 
-    # Betas
-    betas_df = ""
 
     # We need a dataframe containing turns' abc nodes with column names: a, b, c
     turn_abc = pd.DataFrame(

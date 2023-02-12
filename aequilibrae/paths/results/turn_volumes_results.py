@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae import AequilibraeMatrix
+from aequilibrae import Project
+from aequilibrae import TrafficAssignment
 from aequilibrae import TrafficClass
+from context import get_active_project
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["matrix_name", "network mode", "class_name", "iteration", "a", "b", "c"]
 TURNING_VOLUME_COLUMNS = TURNING_VOLUME_GROUPING_COLUMNS + ["demand"]
@@ -37,33 +40,34 @@ class TurnVolumesResults:
         class_name: str,
         mode_id: str,
         matrix: AequilibraeMatrix,
-        project_dir: Path,
         procedure_id: str,
+        project: Project = None,
         iteration: Optional[int] = None,
         blend_iterations: bool = True,
     ):
+        project = project or get_active_project()
         self.class_name = class_name
         self.mode_id = mode_id
         self.matrix = matrix
         self.matrix_mapping = matrix.matrix_hash
-        self.project_dir = project_dir
+        self.project_dir = project.project_base_path
         self.procedure_id = procedure_id
-        self.procedure_dir = project_dir / "path_files" / procedure_id
+        self.procedure_dir = self.project_dir / "path_files" / procedure_id
         self.iteration = self.get_iteration(iteration)
         self.blend_iterations = False if self.iteration == 1 else blend_iterations
 
     @staticmethod
     def from_traffic_class(
         traffic_class: TrafficClass,
-        project_dir: Path,
         procedure_id: str,
+        project: Project = None,
         iteration: Optional[list[int]] = None,
         blend_iterations: bool = True,
     ):
         class_name = traffic_class.__id__
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
-        return TurnVolumesResults(class_name, mode_id, matrix, project_dir, procedure_id, iteration, blend_iterations)
+        return TurnVolumesResults(class_name, mode_id, matrix, procedure_id, project, iteration, blend_iterations)
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
@@ -86,7 +90,6 @@ class TurnVolumesResults:
         return pd.concat(turn_volume_list)
 
     def read_path_aux_file(self, file_type: Literal["node_to_index", "correspondence"]) -> pd.DataFrame:
-
         if file_type == "node_to_index":
             return pd.read_feather(self.procedure_dir / f"nodes_to_indices_c{self.mode_id}_{self.class_name}.feather")
         elif file_type == "correspondence":
