@@ -181,7 +181,6 @@ class TestAequilibraeMatrix(TestCase):
         del omxfile
 
     def test_copy_from_omx_long_name(self):
-
         temp_file = AequilibraeMatrix().random_name()
         a = AequilibraeMatrix()
 

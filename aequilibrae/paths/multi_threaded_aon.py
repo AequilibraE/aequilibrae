@@ -17,12 +17,30 @@ class MultiThreadedAoN:
         self.temp_node_loads = np.array([])
         #  holds the b_nodes in case of flows through centroid connectors are blocked
         self.temp_b_nodes = np.array([])
+        # Temporary array which stores whether a link is accessed in a path for Select Link Analysis functionality
+        self.has_flow_mask = np.array([])
+        # Stores all selected link sets in one array
+        self.select_links = np.array([])
+        # Stores all select link OD matrices
+        self.temp_sl_od_matrix = np.array([])
+        # Stores all link loading matrices
+        self.temp_sl_link_loading = np.array([])
+        # Maps the names of the SL link sets to array indices
+        self.sl_idx = {}
 
     # In case we want to do by hand, we can prepare each method individually
+
     def prepare(self, graph, results):
         itype = graph.default_types("int")
         ftype = graph.default_types("float")
         self.predecessors = np.zeros((results.cores, results.compact_nodes), dtype=itype)
+        if results._selected_links:
+            self.has_flow_mask = np.zeros((results.cores, graph.compact_num_links), dtype=bool)
+            # Copying the select link matrices from results
+            self.select_links = results.select_links
+            self.temp_sl_od_matrix = results.temp_sl_od_matrix
+            self.temp_sl_link_loading = results.temp_sl_link_loading
+
         if results.num_skims > 0:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:

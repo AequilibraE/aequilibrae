@@ -334,7 +334,6 @@ class OSMBuilder(WorkerThread):
                 if field_name in tp:
                     return tp[field_name]["type"]
         else:
-
             for tp in fields["one-way"]:
                 if field_name in tp:
                     return tp[field_name]["type"]
