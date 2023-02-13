@@ -7,17 +7,17 @@ link costs (e.g. tolls) besides travel time. We also do assignment with
 three different vehicle classes
 """
 
-## Imports
-from tempfile import gettempdir
-from os.path import join
+import logging
+import sys
 import urllib
 import zipfile
+from os.path import join
+## Imports
+from tempfile import gettempdir
 
 # %%
 from aequilibrae import logger, Project
 from aequilibrae.paths import TrafficAssignment, TrafficClass
-import logging
-import sys
 
 # We the project open, we can tell the logger to direct all messages to the terminal as well
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -54,7 +54,7 @@ motoGraph = project.network.graphs["M"]
 matrix_name = "demand_mc_omx"
 carDemand = proj_matrices.get_matrix(matrix_name)
 carDemand.computational_view("car")
-carClass = TrafficClass(carGraph, carDemand)
+carClass = TrafficClass("car", carGraph, carDemand)
 carClass.set_pce(1)
 carClass.set_vot(35)
 carClass.set_fixed_cost("toll", 0.025)
@@ -64,7 +64,7 @@ carClass.set_fixed_cost("toll", 0.025)
 
 motoDemand = proj_matrices.get_matrix(matrix_name)
 motoDemand.computational_view("motorcycle")
-motoClass = TrafficClass(motoGraph, motoDemand)
+motoClass = TrafficClass("motorcycle", motoGraph, motoDemand)
 motoClass.set_pce(0.2)
 motoClass.set_vot(35)
 # Fixed cost can be any field (or field_AB/BA in the network).  And the factor defaults to 1.0
@@ -73,7 +73,7 @@ motoClass.set_fixed_cost("toll", 0.0125)
 # %%
 truckDemand = proj_matrices.get_matrix(matrix_name)
 truckDemand.computational_view("trucks")
-truckClass = TrafficClass(truckGraph, truckDemand)
+truckClass = TrafficClass("trucks", truckGraph, truckDemand)
 truckClass.set_pce(1.5)
 truckClass.set_vot(35)
 truckClass.set_fixed_cost("toll", 0.05)
@@ -102,7 +102,6 @@ assig.rgap_target = 0.01
 assig.execute()  # we then execute the assignment
 assig.save_results("test_assignment")
 
-
 # %% md
 # Let's validate our results against those previously converged to 1 e-5
 import matplotlib.pyplot as plt
@@ -126,7 +125,6 @@ ref_results.columns = [x.lower() for x in ref_results.columns]
 df = assig_results.join(ref_results, rsuffix="_ref")
 
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
-
 
 for per, ax in zip(charted, [ax1, ax2, ax3, ax4]):
     ax.scatter(df[f"{per}_tot"], df[f"{per}_tot_ref"])
