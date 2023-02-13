@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-from pathlib import Path
-from argparse import ArgumentParser
 import sys
 import timeit
-import pandas as pd
 import warnings
-from aequilibrae import Project, TrafficAssignment, TrafficClass
+from argparse import ArgumentParser
+from pathlib import Path
+
+import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -14,6 +14,8 @@ def aequilibrae_init(proj_path: str, cost: str):
     """
     Prepare the graph for skimming the network for `cost`
     """
+    from aequilibrae import Project, TrafficAssignment, TrafficClass
+
     proj = Project()
     proj.open(proj_path)
     proj.network.build_graphs([cost, "capacity_ab", "capacity_ba"], ["c"])
