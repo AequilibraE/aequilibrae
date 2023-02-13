@@ -127,7 +127,6 @@ class LinearApproximation(WorkerThread):
             self.step_direction[c.__id__] = r
 
         if self.algorithm in ["cfw", "bfw"]:
-
             for c in self.traffic_classes:
                 r = AssignmentResults()
                 r.prepare(c.graph, c.matrix)
@@ -345,6 +344,10 @@ class LinearApproximation(WorkerThread):
         # We build the fixed cost field
 
         for c in self.traffic_classes:
+            # Copying select link dictionary that maps name to its relevant matrices into the class' results
+            c._aon_results._selected_links = c._selected_links
+            c.results._selected_links = c._selected_links
+
             # Sizes the temporary objects used for the results
             c.results.prepare(c.graph, c.matrix)
             c._aon_results.prepare(c.graph, c.matrix)
@@ -398,6 +401,21 @@ class LinearApproximation(WorkerThread):
                     c.results.total_flows()
                     if c.results.num_skims > 0:
                         copy_three_dimensions(c.results.skims.matrix_view, c._aon_results.skims.matrix_view, self.cores)
+
+                    if c._selected_links:
+                        for name, idx in c._aon_results._selected_links.items():
+                            # Copy the temporary results into the final od matrix, referenced by link_set name
+                            # The temp has an index associated with the link_set name
+                            copy_three_dimensions(
+                                c.results.select_link_od.matrix[name],  # matrix being written into
+                                c._aon_results.temp_sl_od_matrix[idx, :, :, :],  # results after the iteration
+                                self.cores,  # core count
+                            )
+                            copy_two_dimensions(
+                                c.results.select_link_loading[name],  # ouput matrix
+                                c._aon_results.temp_sl_link_loading[idx, :, :],  # matrix 1
+                                self.cores,  # core count
+                            )
                     flows.append(c.results.total_link_loads)
 
             else:
@@ -418,6 +436,27 @@ class LinearApproximation(WorkerThread):
                             self.stepsize,
                             self.cores,
                         )
+
+                    if c._selected_links:
+                        for name, idx in c._aon_results._selected_links.items():
+                            # Copy the temporary results into the final od matrix, referenced by link_set name
+                            # The temp flows have an index associated with the link_set name
+                            linear_combination_skims(
+                                c.results.select_link_od.matrix[name],  # output matrix
+                                c._aon_results.temp_sl_od_matrix[idx, :, :, :],  # matrix 1
+                                c.results.select_link_od.matrix[name],  # matrix 2 (previous iteration)
+                                self.stepsize,  # stepsize
+                                self.cores,  # core count
+                            )
+
+                            linear_combination(
+                                c.results.select_link_loading[name],  # output matrix
+                                c._aon_results.temp_sl_link_loading[idx, :, :],  # matrix 1
+                                c.results.select_link_loading[name],  # matrix 2 (previous iteration)
+                                self.stepsize,  # stepsize
+                                self.cores,  # core count
+                            )
+
                     cls_res.total_flows()
                     flows.append(cls_res.total_link_loads)
 

@@ -7,17 +7,21 @@ on:
 jobs:
   testing:
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [3.9]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Install dependencies
       run: |
-        sudo apt-get install libsqlite3-mod-spatialite
-        sudo apt-get install -y libspatialite-dev
+        sudo apt update
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev
         pip3 install setuptools --upgrade
         pip3 install -r requirements.txt
+        pip3 install -r requirements_additional.txt
         pip3 install spatialite
         pip3 install pytest
         pip3 install pytest-cov
@@ -25,15 +29,17 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        python3 setup_assignment.py build_ext --inplace
+        cd ../distribution
+        python3 setup_ipf.py build_ext --inplace
+        cd ../..
+
     - name: Generate coverage report
       run: |
         python3 -m pytest --cov=./ --cov-report=xml
     - name: Upload coverage to Codecov
-      if: ${{ (github.repository_owner == 'AequilibraE') }}
-      uses: codecov/codecov-action@v1
+      if: ${{ (env.HAS_SECRETS == 'true') }}
+      uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml

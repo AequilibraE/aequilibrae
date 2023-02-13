@@ -75,7 +75,7 @@ class allOrNothing(WorkerThread):
         pool.close()
         pool.join()
         # TODO: Multi-thread this sum
-        self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=2)
+        self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )

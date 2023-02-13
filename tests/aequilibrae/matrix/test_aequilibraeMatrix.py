@@ -11,6 +11,7 @@ import uuid
 from aequilibrae.matrix import AequilibraeMatrix
 from ...data import omx_example, no_index_omx, siouxfalls_skims
 import pandas as pd
+import pytest
 
 zones = 50
 
@@ -33,15 +34,16 @@ class TestAequilibraeMatrix(TestCase):
             "file_name": self.name_test,
             "zones": zones,
             "matrix_names": ["mat", "seed", "dist"],
-            "index_names": ["my indices"],
+            "index_names": ["my_indices"],
+            "memory_only": False,
         }
 
         self.matrix = AequilibraeMatrix()
         self.matrix.create_empty(**args)
 
         self.matrix.index[:] = np.arange(self.matrix.zones) + 100
-        self.matrix.mat[:, :] = np.random.rand(self.matrix.zones, self.matrix.zones)[:, :]
-        self.matrix.mat[:, :] = self.matrix.mat[:, :] * (1000 / np.sum(self.matrix.mat[:, :]))
+        self.matrix.matrices[:, :, 0] = np.random.rand(self.matrix.zones, self.matrix.zones)
+        self.matrix.matrices[:, :, 0] = self.matrix.mat * (1000 / np.sum(self.matrix.mat))
         self.matrix.setName("Test matrix - " + str(random.randint(1, 10)))
         self.matrix.setDescription("Generated at " + datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"))
         self.new_matrix = self.matrix
@@ -115,6 +117,16 @@ class TestAequilibraeMatrix(TestCase):
         matrix_copy.close()
         del matrix_copy
 
+    def test_copy_memory_only(self):
+        # test in-memory matrix_procedures copy
+
+        matrix_copy = self.new_matrix.copy(self.copy_matrix_name, cores=["mat"], memory_only=True)
+
+        for orig, new_arr in [[matrix_copy.mat, self.new_matrix.mat], [matrix_copy.index, self.new_matrix.index]]:
+            if not np.array_equal(orig, new_arr):
+                self.fail("Matrix copy was not perfect")
+        matrix_copy.close()
+
     def test_export_to_csv(self):
         self.new_matrix.export(self.csv_export_name)
         df = pd.read_csv(self.csv_export_name)
@@ -140,7 +152,7 @@ class TestAequilibraeMatrix(TestCase):
         m = self.new_matrix.mat.sum() - self.new_matrix.mat[1, 1]
         self.new_matrix.computational_view(["mat", "seed"])
         self.new_matrix.nan_to_num()
-        self.new_matrix.mat[1, 1] = np.nan
+        self.new_matrix.matrices[1, 1, 0] = np.nan
         self.new_matrix.computational_view(["mat"])
         self.new_matrix.nan_to_num()
 
@@ -169,7 +181,6 @@ class TestAequilibraeMatrix(TestCase):
         del omxfile
 
     def test_copy_from_omx_long_name(self):
-
         temp_file = AequilibraeMatrix().random_name()
         a = AequilibraeMatrix()
 
@@ -238,3 +249,37 @@ class TestAequilibraeMatrix(TestCase):
         b.save()
         b.computational_view(["mat", "seed", "dist"])
         b.save()
+
+
+def test_can_reuse_matrix_after_close(tmp_path):
+    kwargs = {
+        "file_name": tmp_path / "matrix.aem",
+        "zones": 1,
+        "matrix_names": ["mat"],
+        "index_names": ["index"],
+    }
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(**kwargs)
+    matrix.close()
+    try:
+        AequilibraeMatrix().create_empty(**kwargs)
+    except OSError:
+        pytest.fail("Should not raise OSError")
+
+
+def test_matrix_reference_doesnt_prevent_resource_cleanup(tmp_path):
+    kwargs = {
+        "file_name": tmp_path / "matrix.aem",
+        "zones": 1,
+        "matrix_names": ["mat"],
+        "index_names": ["index"],
+    }
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(**kwargs)
+    _ = matrix.mat
+    del matrix
+
+    try:
+        AequilibraeMatrix().create_empty(**kwargs)
+    except OSError:
+        pytest.fail("Should not raise OSError")

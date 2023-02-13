@@ -1,3 +1,5 @@
+MIT License
+
 Copyright (c) 2014-, AequilibraE Developers.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

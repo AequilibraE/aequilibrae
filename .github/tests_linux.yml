@@ -7,14 +7,14 @@ on: [pull_request]
 
 jobs:
   testing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         python-version: [ '3.7', '3.8' ]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set Python environment
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -23,6 +23,7 @@ jobs:
         sudo apt-get install -y libspatialite-dev
         pip3 install setuptools --upgrade
         pip install -r requirements.txt
+        pip install -r requirements_additional.txt
         pip3 install pytest
         pip3 install spatialite pysqlite3-binary
         pip3 install pytest
@@ -31,9 +32,10 @@ jobs:
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        python3 setup_assignment.py build_ext --inplace
+        cd ../distribution
+        python3 setup_ipf.py build_ext --inplace
+        cd ../..
 
     - name: Test
       run: |

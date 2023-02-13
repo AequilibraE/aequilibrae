@@ -5,13 +5,15 @@ on:  [pull_request, release]
 jobs:
   deploy:
     runs-on:  macos-latest
+    env:
+      HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9']
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set Python environment
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
@@ -20,6 +22,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install setuptools wheel twine
         pip install -r requirements.txt
+        pip install -r requirements_additional.txt
 
     - name: Build
       run: |
@@ -27,14 +30,14 @@ jobs:
 
     - name: Stores artifacts along with the workflow result
       if: ${{ github.event_name == 'push'}}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: library
         path: dist/*.whl
         if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
     - name: Publish
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -42,7 +45,7 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ (github.event_name == 'release') && (github.repository_owner == 'AequilibraE') && (matrix.python-version == '3.9') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') && (matrix.python-version == '3.9') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

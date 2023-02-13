@@ -1,17 +1,20 @@
 from os.path import join
-from tempfile import gettempdir
-from uuid import uuid4
-from unittest import TestCase
 from aequilibrae.utils.create_example import create_example
 from aequilibrae import Parameters
+import pytest
 
 
-class Test(TestCase):
-    def test_create_example(self):
-        par = Parameters()._default
-        for p in ["nauru", "sioux_falls"]:
-            pth = join(gettempdir(), f"proj_example_{p}_{uuid4().hex}")
-            proj = create_example(pth, p)
-            parproj = proj.parameters
-            self.assertEqual(parproj.keys(), par.keys(), f"Wrong parameter keys for {p} example")
-            proj.close()
+class TestCreateExample:
+    # We use fixture parametrization here to create the projects so that we can do proper teardown
+    # of the project, even when the test fails
+    # see also: https://docs.pytest.org/en/6.2.x/fixture.html#fixture-parametrize
+    @pytest.fixture(params=["nauru", "sioux_falls"])
+    def model_project(self, tmp_path, request):
+        proj = create_example(str(tmp_path / request.param), from_model=request.param)
+        yield proj
+        proj.close()
+
+    def test_create_example(self, model_project):
+        par = Parameters._default
+        parproj = model_project.parameters
+        assert par.keys() == parproj.keys(), "Wrong parameter keys for example project"

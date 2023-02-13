@@ -1,13 +1,18 @@
+import importlib.util as iutil
 import os
+from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
-from datetime import datetime
-import importlib.util as iutil
+
 import numpy as np
 import yaml
+
+from aequilibrae import global_logger
+from aequilibrae.context import get_active_project
+from aequilibrae.distribution.ipf_core import ipf_core
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.project.data.matrix_record import MatrixRecord
-from aequilibrae.context import get_active_project
+
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -88,11 +93,12 @@ class Ipf:
 
             error (:obj:`str`): Error description
         """
+        self.cpus = 0
         self.project = project or get_active_project()
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
-        self.matrix = kwargs.get("matrix", None)
+        self.matrix = kwargs.get("matrix", None)  # type: AequilibraeMatrix
 
         # NaN as zero
         self.nan_as_zero = kwargs.get("nan_as_zero", True)
@@ -198,7 +204,7 @@ class Ipf:
                 )
                 self.output.computational_view()
             else:
-                self.output = self.matrix.copy(self.output_name)
+                self.output = self.matrix.copy(self.output_name, memory_only=True)
             if self.nan_as_zero:
                 self.output.matrix_view[:, :] = np.nan_to_num(self.output.matrix_view)[:, :]
 
@@ -219,33 +225,13 @@ class Ipf:
             self.report.append("Iteration,   Convergence")
             self.gap = conv_criteria + 1
 
-            iter = 0
-            while self.gap > conv_criteria and iter < max_iter:
-                iter += 1
-                # computes factors for zones
-                marg_rows = self.__tot_rows(self.output.matrix_view[:, :])
-                row_factor = self.__factor(marg_rows, rows)
-                # applies factor
-                self.output.matrix_view[:, :] = np.transpose(
-                    np.transpose(self.output.matrix_view[:, :]) * np.transpose(row_factor)
-                )[:, :]
+            seed = np.array(self.output.matrix_view[:, :], copy=True)
+            iter, self.gap = ipf_core(
+                seed, rows, columns, max_iterations=max_iter, tolerance=conv_criteria, cores=self.cpus
+            )
+            self.output.matrix_view[:, :] = seed[:, :]
 
-                # computes factors for columns
-                marg_cols = self.__tot_columns(self.output.matrix_view[:, :])
-                column_factor = self.__factor(marg_cols, columns)
-
-                # applies factor
-                self.output.matrix_view[:, :] = self.output.matrix_view[:, :] * column_factor
-
-                # increments iterarions and computes errors
-                self.gap = max(
-                    abs(1 - np.min(row_factor)),
-                    abs(np.max(row_factor) - 1),
-                    abs(1 - np.min(column_factor)),
-                    abs(np.max(column_factor) - 1),
-                )
-
-                self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
+            self.report.append(str(iter) + "   ,   " + str("{:4,.10f}".format(float(np.nansum(self.gap)))))
 
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
@@ -281,4 +267,6 @@ class Ipf:
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(path + "/parameters.yml", "r") as yml:
             path = yaml.safe_load(yml)
+
+        self.cpus = int(path["system"]["cpus"])
         return path["distribution"][model]

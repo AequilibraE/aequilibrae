@@ -1,23 +1,8 @@
-""" -----------------------------------------------------------------------------------------------------------
- Package:    AequilibraE
- Name:       Core path computation algorithms
- Purpose:    Implement shortest path and network loading routines
- Original Author:  Pedro Camargo (c@margo.co)
- Contributors:
- Last edited by: Arthur E.
- Website:    www.AequilibraE.com
- Repository:  https://github.com/AequilibraE/AequilibraE
- Created:    15/09/2013
- Updated:    24/04/2018
- Copyright:   (c) AequilibraE authors
- Licence:     See LICENSE.TXT
- -----------------------------------------------------------------------------------------------------------"""
+# cython: language_level=3
 import os
 
-# cython: language_level=3
 cimport numpy as np
 from libcpp cimport bool
-
 # include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
@@ -31,11 +16,9 @@ include 'path_file_saving.pyx'
 from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
-    cdef long nodes, orig, i, block_flows_through_centroids, classes, b, origin_index, zones, posit, posit1, links
-    cdef int critical_queries = 0
-    cdef int path_file = 0
+    # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
+    cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
     cdef int skims
-    cdef int link_extract_queries, query_type
 
     # Origin index is the index of the matrix we are assigning
     # this is used as index for the skim matrices
@@ -71,7 +54,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     if skims > 0:
         gskim = graph.compact_skims
-        tskim = aux_result.temporary_skims[:, :, curr_thread]
+        tskim = aux_result.temporary_skims[curr_thread, :, :]
         fskm = result.skims.matrix_view[origin_index, :, :]
     else:
         gskim = np.zeros((1,1))
@@ -86,12 +69,12 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     cdef long long [:] no_path_view = result.no_path[origin_index, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
-    cdef long long [:] reached_first_view = aux_result.reached_first[:, curr_thread]
-    cdef long long [:] conn_view = aux_result.connectors[:, curr_thread]
-    cdef double [:, :] link_loads_view = aux_result.temp_link_loads[:, :, curr_thread]
-    cdef double [:, :] node_load_view = aux_result.temp_node_loads[:, :, curr_thread]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
+    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef double [:, :] link_loads_view = aux_result.temp_link_loads[curr_thread, :, :]
+    cdef double [:, :] node_load_view = aux_result.temp_node_loads[curr_thread, :, :]
+    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
 
     # path saving file paths
     cdef string path_file_base
@@ -110,8 +93,20 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         path_file_base = base_string.encode('utf-8')
         path_index_file_base = index_string.encode('utf-8')
 
+    cdef:
+        double [:, :, :] sl_od_matrix_view
+        double [:, :, :] sl_link_loading_view
+        unsigned char [:] has_flow_mask
+        long long[:, :] link_list
+        bint select_link = False
 
+    if result._selected_links:
 
+        has_flow_mask = aux_result.has_flow_mask[curr_thread, :]
+        sl_od_matrix_view = aux_result.temp_sl_od_matrix[:, origin_index, :, :]
+        sl_link_loading_view = aux_result.temp_sl_link_loading[:, :, :]
+        link_list = aux_result.select_links[:, :]
+        select_link = True
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -122,6 +117,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
+
         w = path_finding(origin_index,
                          g_view,
                          b_nodes_view,
@@ -131,15 +127,14 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                          conn_view,
                          reached_first_view)
 
-        network_loading(classes,
-                        demand_view,
-                        predecessors_view,
-                        conn_view,
-                        link_loads_view,
-                        no_path_view,
-                        reached_first_view,
-                        node_load_view,
-                        w)
+        if block_flows_through_centroids: # Re-blocks the centroid if that is the case
+            b = 1
+            blocking_centroid_flows(b,
+                                    origin_index,
+                                    zones,
+                                    graph_fs_view,
+                                    b_nodes_view,
+                                    original_b_nodes_view)
 
         if skims > 0:
             skim_single_path(origin_index,
@@ -154,18 +149,29 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
             _copy_skims(skim_matrix_view,
                         final_skim_matrices_view)
 
-        if block_flows_through_centroids: # Re-blocks the centroid if that is the case
-            b = 1
-            blocking_centroid_flows(b,
-                                    origin_index,
-                                    zones,
-                                    graph_fs_view,
-                                    b_nodes_view,
-                                    original_b_nodes_view)
+        # If we aren't doing SL analysis we use a fast cascade assignment in the 'network_loading' method.
+        # However, if we are doing SL analysis, we have to walk the entire path for each OD pair anyway
+        # Even if cascading is more efficient, we can do the link loading concurrently while executing SL loading
+        # which reduces the amount of repeated work we would do if they were separate
+        # Note: 1 corresponds to select link analysis, 0 means no select link
+        if select_link:
+            # Do SL and network loading at once
+            sl_network_loading(link_list, demand_view, predecessors_view, conn_view, link_loads_view, sl_od_matrix_view,
+                               sl_link_loading_view, has_flow_mask, classes)
+        else:
+            # do ONLY reular loading (via cascade assignment)
+            network_loading(classes,
+                            demand_view,
+                            predecessors_view,
+                            conn_view,
+                            link_loads_view,
+                            no_path_view,
+                            reached_first_view,
+                            node_load_view,
+                            w)
 
     if result.save_path_file == True:
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
-
     return origin
 
 def path_computation(origin, destination, graph, results):
@@ -370,11 +376,11 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     cdef double [:, :] final_skim_matrices_view = result.skims.matrix_view[origin_index, :, :]
 
     # views from the aux-result object
-    cdef long long [:] predecessors_view = aux_result.predecessors[:, curr_thread]
-    cdef long long [:] reached_first_view = aux_result.reached_first[:, curr_thread]
-    cdef long long [:] conn_view = aux_result.connectors[:, curr_thread]
-    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[:, curr_thread]
-    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[:, :, curr_thread]
+    cdef long long [:] predecessors_view = aux_result.predecessors[curr_thread, :]
+    cdef long long [:] reached_first_view = aux_result.reached_first[curr_thread, :]
+    cdef long long [:] conn_view = aux_result.connectors[curr_thread, :]
+    cdef long long [:] b_nodes_view = aux_result.temp_b_nodes[curr_thread, :]
+    cdef double [:, :] skim_matrix_view = aux_result.temporary_skims[curr_thread, :, :]
 
     #Now we do all procedures with NO GIL
     with nogil:
