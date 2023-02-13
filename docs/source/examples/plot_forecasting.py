@@ -348,36 +348,6 @@ assig.set_algorithm("bfw")
 assig.max_iter = 500
 assig.rgap_target = 0.00001
 
-# %%
-
-# OPTIONAL: If we want to execute select link analysis on a particular TrafficClass, we set the links we are analysing
-# The format of the input select links is a dictionary (str: list[tuple]).
-# Each entry represents a separate set of selected links to compute. The str name will name the set of links
-# The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph
-# direction can be 0, 1, -1. 0 denotes bi-directionality
-# For example, let's use Select Link on two sets of links,
-select_links = {
-    "Leaving node 1": [(1, 1), (2, 1)],
-    "Random nodes": [(3, 1), (5, 1)],
-}
-# We call this command on the class we are analysing with our dictionary of values
-assigclass.set_select_links(select_links)
-
-assig.execute()  # we then execute the assignment
-
-# %%
-# Now let us save our select link results, all we need to do is provide it with a name
-# In additional to exporting the select link flows, it also exports the Select Link matrices in OMX format.
-assig.save_select_link_results("select_link_analysis")
-
-# %%
-# Say we just want to save our select link flows, we can call:
-assig.save_select_link_flows("just_flows")
-
-# Or if we just want the SL matrices:
-assig.save_select_link_matrices("just_matrices")
-# Internally, the save_select_link_results calls both of these methods at once.
-
 # We could export it to CSV or AequilibraE data, but let's put it directly into the results database
 assig.save_results("future_year_assignment")
 

@@ -1,6 +1,6 @@
 """
-Toll analysis
-=============
+Toll analysis with Select Link
+==============================
 
 On this example we show how to perform traffic assignment considering fixed
 link costs (e.g. tolls) besides travel time. We also do assignment with
@@ -12,6 +12,7 @@ import sys
 import urllib
 import zipfile
 from os.path import join
+
 ## Imports
 from tempfile import gettempdir
 
@@ -77,11 +78,31 @@ truckClass = TrafficClass("trucks", truckGraph, truckDemand)
 truckClass.set_pce(1.5)
 truckClass.set_vot(35)
 truckClass.set_fixed_cost("toll", 0.05)
+
 # %%
 
+# OPTIONAL: If we want to execute select link analysis on a particular TrafficClass, we set the links we are analysing
+# The format of the input select links is a dictionary (str: list[tuple]).
+# Each entry represents a separate set of selected links to compute. The str name will name the set of links
+# The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph
+# direction can be 0, 1, -1. 0 denotes bi-directionality
+# For example, let's use Select Link on four sets of links to see what OD pairs are using tolls
 
+select_links = {
+    "toll_link_37": [(37, 1)],
+    "toll_link_24": [(24, 1)],
+    "toll_link_56": [(56, 1)],
+    "all_other_tolls": [(49, 1), (36, 1)],
+}
+# We call this command on the class we are analysing with our dictionary of values
+# We can query one or more classes
+carClass.set_select_links(select_links)
+truckClass.set_select_links(select_links)
+
+
+# %%
 assig = TrafficAssignment()
-# Different (and better) than some commercial software, your results are as proportional as the
+# Different than some commercial software, your results are as proportional as the
 # convergence models allow and your results do not depend on the order you put the classes in.
 assig.set_classes([carClass, motoClass, truckClass])
 
@@ -101,6 +122,19 @@ assig.rgap_target = 0.01
 
 assig.execute()  # we then execute the assignment
 assig.save_results("test_assignment")
+
+# %%
+# Now let us save our select link results, all we need to do is provide it with a name
+# In additional to exporting the select link flows, it also exports the Select Link matrices in OMX format.
+assig.save_select_link_results("select_link_analysis")
+
+# %%
+# Say we just want to save our select link flows, we can call:
+assig.save_select_link_flows("just_select_link_flows")
+
+# Or if we just want the SL matrices:
+assig.save_select_link_matrices("just_select_link_matrices")
+# Internally, the save_select_link_results calls both of these methods at once.
 
 # %% md
 # Let's validate our results against those previously converged to 1 e-5
