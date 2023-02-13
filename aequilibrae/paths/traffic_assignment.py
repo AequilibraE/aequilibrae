@@ -4,13 +4,14 @@ import sqlite3
 from datetime import datetime
 from os import path
 from pathlib import Path
-from typing import List
-from typing import Optional
+from typing import List, Dict, Optional
 from uuid import uuid4
 
 import numpy as np
+from numpy import nan_to_num
 import pandas as pd
 
+from pathlib import Path
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
@@ -124,7 +125,6 @@ class TrafficAssignment(object):
         self.__dict__["project"] = project
 
     def __setattr__(self, instance, value) -> None:
-
         check, value, message = self.__check_attributes(instance, value)
         if check:
             self.__dict__[instance] = value
@@ -453,7 +453,6 @@ class TrafficAssignment(object):
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
 
-        entries = res1.data.shape[0]
         fields = [
             "Congested_Time_AB",
             "Congested_Time_BA",
@@ -469,37 +468,32 @@ class TrafficAssignment(object):
             "PCE_tot",
         ]
 
-        types = [np.float64] * len(fields)
-        agg = AequilibraeData()
-        agg.create_empty(memory_mode=True, entries=entries, field_names=fields, data_types=types)
-        agg.data.fill(np.nan)
-        agg.index[:] = res1.data.index[:]
+        agg = AequilibraeData.empty(
+            memory_mode=True,
+            entries=res1.data.shape[0],
+            field_names=fields,
+            data_types=[np.float64] * len(fields),
+            fill=np.nan,
+            index=res1.data.index[:],
+        )
 
-        link_ids = class1.results.lids
-        ABs = class1.results.direcs > 0
-        BAs = class1.results.direcs < 0
-
-        indexing = np.zeros(int(link_ids.max()) + 1, np.uint64)
-        indexing[agg.index[:]] = np.arange(entries)
-
-        # Indices of links BA and AB
-        ab_ids = indexing[link_ids[ABs]]
-        ba_ids = indexing[link_ids[BAs]]
-
-        agg.data["Congested_Time_AB"][ab_ids] = np.nan_to_num(congested_time[ABs])
-        agg.data["Congested_Time_BA"][ba_ids] = np.nan_to_num(congested_time[BAs])
+        # Use the first class to get a graph -> network link ID mapping
+        m = class1.results.get_graph_to_network_mapping()
+        graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
+        agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
+        agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)
 
-        agg.data["Delay_factor_AB"][ab_ids] = np.nan_to_num(congested_time[ABs] / free_flow_tt[ABs])
-        agg.data["Delay_factor_BA"][ba_ids] = np.nan_to_num(congested_time[BAs] / free_flow_tt[BAs])
+        agg.data["Delay_factor_AB"][m.network_ab_idx] = nan_to_num(congested_time[graph_ab] / free_flow_tt[graph_ab])
+        agg.data["Delay_factor_BA"][m.network_ba_idx] = nan_to_num(congested_time[graph_ba] / free_flow_tt[graph_ba])
         agg.data["Delay_factor_Max"][:] = np.nanmax([agg.data.Delay_factor_AB, agg.data.Delay_factor_BA], axis=0)
 
-        agg.data["VOC_AB"][ab_ids] = np.nan_to_num(voc[ABs])
-        agg.data["VOC_BA"][ba_ids] = np.nan_to_num(voc[BAs])
+        agg.data["VOC_AB"][m.network_ab_idx] = nan_to_num(voc[m.graph_ab_idx])
+        agg.data["VOC_BA"][m.network_ba_idx] = nan_to_num(voc[m.graph_ba_idx])
         agg.data["VOC_max"][:] = np.nanmax([agg.data.VOC_AB, agg.data.VOC_BA], axis=0)
 
-        agg.data["PCE_AB"][ab_ids] = np.nan_to_num(tot_flow[ABs])
-        agg.data["PCE_BA"][ba_ids] = np.nan_to_num(tot_flow[BAs])
+        agg.data["PCE_AB"][m.network_ab_idx] = nan_to_num(tot_flow[m.graph_ab_idx])
+        agg.data["PCE_BA"][m.network_ba_idx] = nan_to_num(tot_flow[m.graph_ba_idx])
         agg.data["PCE_tot"][:] = np.nansum([agg.data.PCE_AB, agg.data.PCE_BA], axis=0)
 
         assig_results.append(agg)
@@ -679,6 +673,7 @@ class TrafficAssignment(object):
                 "file_name": working_name,
                 "zones": self.classes[0].graph.centroids.shape[0],
                 "matrix_names": names,
+                "memory_only": False,
             }
 
             # Create the matrix to manipulate
@@ -710,3 +705,81 @@ class TrafficAssignment(object):
             record.procedure = "Traffic Assignment"
             record.description = out_skims.description
             record.save()
+
+    def select_link_flows(self) -> Dict[str, pd.DataFrame]:
+        """
+        Returns a dataframe of the select link flows for each class
+        """
+        sl_flows = None  # stores the df for each class
+        for cls in self.classes:
+            # Save OD_matrices
+            if cls._selected_links is None:
+                continue
+            df = cls.results.get_sl_results()
+            # Create Values table
+            df = pd.DataFrame(df.data)
+            # Remap the dataframe names to add the prefix classname for each class
+            cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
+            df.rename(columns=cls_cols, inplace=True)
+            df.set_index("link_id", inplace=True)
+            if sl_flows is None:
+                sl_flows = df
+            else:
+                sl_flows.join(df)
+        # sl_flows = pd.concat(class_flows, axis=1)
+        return sl_flows
+
+    def save_select_link_flows(self, table_name: str) -> None:
+        """
+        Saves the select link link flows for all classes into the results database. Additionally, it exports
+        the OD matrices into OMX format.
+        Args:
+            str table_name: Name of the table being inserted to. Note the traffic class
+        """
+        df = self.select_link_flows()
+        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        df.to_sql(table_name, conn)
+        conn.close()
+        # Create description table
+        self.description = f"Select link analysis from {self.procedure_id}"
+        conn = self.project.connect()
+        report = {}
+        data = [
+            table_name,
+            "select link",
+            self.procedure_id,
+            str(report),
+            self.procedure_date,
+            self.description,
+        ]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
+        conn.commit()
+        conn.close()
+
+    def save_select_link_matrices(self, file_name: str) -> None:
+        """
+        Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
+        """
+        for cls in self.classes:
+            # Save OD_matrices
+            if cls._selected_links is None:
+                continue
+            cls.results.select_link_od.export(str(Path(file_name).with_suffix(".omx")))
+
+    def save_select_link_results(self, name: str) -> None:
+        """
+        Saves both the Select Link matrices and flow results at the same time, using the same name.
+        Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
+        e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
+        Select Link Flows: inserts the select link flows for each class into the database with the table name:
+        Car
+        Select Link Matrices (only exports to OMX format):
+        Car.omx
+
+        """
+        self.save_select_link_flows(name)
+        self.save_select_link_matrices(name)

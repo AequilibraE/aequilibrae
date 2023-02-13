@@ -33,7 +33,6 @@ class TestNetwork_skimming(TestCase):
             print(f"Failed to remove at {e.args}")
 
     def test_network_skimming(self):
-
         self.network.build_graphs()
         graph = self.network.graphs["c"]
         graph.set_graph(cost_field="distance")

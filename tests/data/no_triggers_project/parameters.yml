@@ -204,5 +204,4 @@ system:
   driving side: right
   logging: true
   logging_directory: D:/no_triggers_project
-  spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp

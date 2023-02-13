@@ -110,7 +110,6 @@ class TestLink(TestCase):
         self.assertEqual(self.__check_mode(), "c")
 
     def test_data_fields(self):
-
         link2 = self.links.get(randint(1, 24))
         while link2.link_id == self.link.link_id:
             link2 = self.links.get(randint(1, 24))

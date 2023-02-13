@@ -28,19 +28,21 @@ jobs:
         pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
         python -m pip install sphinx-gallery --user
-        sudo apt-get install libsqlite3-mod-spatialite
-        sudo apt-get install -y libspatialite-dev
+        sudo apt update
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-
-    - name: Check history of versions
-      run: python docs/website/check_documentation_versions.py
 
     - name: Compile library
       run: |
         cd aequilibrae/paths
-        python3 setup_Assignment.py build_ext --inplace
-        cd ..
-        cd ..
+        python3 setup_assignment.py build_ext --inplace
+        cd ../distribution
+        python3 setup_ipf.py build_ext --inplace
+        cd ../..
+
+    - name: Check history of versions
+      run: python docs/website/check_documentation_versions.py
 
     - name: Build documentation
       run: |
