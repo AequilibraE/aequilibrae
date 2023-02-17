@@ -1,4 +1,6 @@
 import re
+import sqlite3
+from os import path
 from pathlib import Path
 from typing import Literal
 from typing import Optional
@@ -45,7 +47,7 @@ class TurnVolumesResults:
         iteration: Optional[int] = None,
         blend_iterations: bool = True,
     ):
-        project = project or get_active_project()
+        self.project = project or get_active_project()
         self.class_name = class_name
         self.mode_id = mode_id
         self.matrix = matrix
@@ -68,6 +70,49 @@ class TurnVolumesResults:
         mode_id = traffic_class.mode
         matrix = traffic_class.matrix
         return TurnVolumesResults(class_name, mode_id, matrix, procedure_id, project, iteration, blend_iterations)
+
+    def calculate_from_result_table(
+        self, turns_df: pd.DataFrame, table_name: str, user_classes: Optional[list[str]], blend_iterations: bool = True
+    ):
+        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        df = pd.read_sql_query(f"select * from 'results' where table_name={table_name}", conn)
+        conn.close()
+        procedure_id = df.at[0, "procedure_id"]
+        procedure_report = eval(df.at[0, "procedure_report"])
+        convergence_report = pd.DataFrame(eval(procedure_report["convergence"]))
+        asgn_classes = procedure_report["setup"]["Classes"]
+
+        if "beta0" not in convergence_report.columns:
+            # if betas are not in the report, create dummy betas, where beta0 is 1
+            convergence_report["beta0"] = 1
+            convergence_report[["beta1", "beta2"]] = 0
+
+        betas_df = (
+            convergence_report[["iteration", "beta0", "beta1", "beta2"]]
+            .replace(-1, None)
+            .ffill()
+            .set_index("iteration")
+        )
+
+        if user_classes is None:
+            user_classes = list(asgn_classes.keys())
+
+        missing_classes = []
+        ta_turn_vol_list = []
+        for class_name, class_specs in asgn_classes:
+            if class_name not in user_classes:
+                missing_classes.append(class_name)
+                continue
+
+            tc_turns = TurnVolumesResults(
+                class_name=class_name,
+                mode_id=class_specs["network_mode"],
+                matrix=AequilibraeMatrix(),
+                procedure_id=procedure_id,
+                iteration=betas_df.index.max(),
+                blend_iterations=blend_iterations,
+            )
+            ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
