@@ -117,6 +117,10 @@ class NetworkSkimming(WorkerThread):
         """
 
         file_name = f"{name}.{format.lower()}"
+
+        if self.project._processing_pipeline:
+            self.results.skims.export(file_name)
+            return
         mats = self.project.matrices
         record = mats.new_record(name, file_name, self.results.skims)
         record.procedure_id = self.procedure_id

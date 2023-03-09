@@ -98,14 +98,10 @@ class TrafficAssignment(object):
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
-    def __init__(self, project=None, no_project=False) -> None:
+    def __init__(self, project=None) -> None:
         """"""
-        if no_project:
-            parameters = Parameters().parameters["assignment"]["equilibrium"]
-        else:
-            project = project or get_active_project()
-            parameters = project.parameters["assignment"]["equilibrium"]
-            self.__dict__["project"] = project
+        project = project or get_active_project()
+        parameters = project.parameters["assignment"]["equilibrium"]
 
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
@@ -127,6 +123,7 @@ class TrafficAssignment(object):
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
+        self.__dict__["project"] = project
 
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)
@@ -423,7 +420,6 @@ class TrafficAssignment(object):
             table_name (:obj:`str`): Name of the table to hold this assignment result
             keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
         """
-        self.__check_if_project()
 
         df = self.results()
         if not keep_zero_flows:
@@ -433,6 +429,8 @@ class TrafficAssignment(object):
         df.to_sql(table_name, conn)
         conn.close()
 
+        if self.project._processing_pipeline:
+            return
         conn = self.project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
@@ -575,8 +573,6 @@ class TrafficAssignment(object):
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
         """
-        self.__check_if_project()
-
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
@@ -646,6 +642,9 @@ class TrafficAssignment(object):
 
             out_skims.description = f"Skimming for assignment procedure. Class {cls.__id__}"
             # Now we create the appropriate record
+
+            if self.project._processing_pipeline:
+                return
             record = mats.new_record(f"{matrix_name}_{cls.__id__}", file_name)
             record.procedure_id = self.procedure_id
             record.timestamp = self.procedure_date
@@ -683,13 +682,14 @@ class TrafficAssignment(object):
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
         """
-        self.__check_if_project()
-
         df = self.select_link_flows()
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
         # Create description table
+
+        if self.project._processing_pipeline:
+            return
         self.description = f"Select link analysis from {self.procedure_id}"
         conn = self.project.connect()
         report = {}
@@ -733,7 +733,3 @@ class TrafficAssignment(object):
         """
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)
-
-    def __check_if_project(self):
-        if "project" not in self.__dict__:
-            raise ValueError("You performed traffic assignment without a project open")

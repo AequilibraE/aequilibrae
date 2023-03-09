@@ -15,10 +15,13 @@ class Matrices:
         self.__items = {}
         self.__fields = []
 
-        self.conn = project.connect()
-        self.curr = self.conn.cursor()
         self.fldr = os.path.join(project.project_base_path, "matrices")
 
+        if project._processing_pipeline:
+            return
+
+        self.conn = project.connect()
+        self.curr = self.conn.cursor()
         tl = TableLoader()
         matrices_list = tl.load_table(self.curr, "matrices")
         self.__fields = [x for x in tl.fields]

@@ -41,6 +41,7 @@ class Project:
         self.network: Network = None
         self.about: About = None
         self.logger: logging.Logger = None
+        self._processing_pipeline = False
 
     def open(self, project_path: str) -> None:
         """
@@ -91,6 +92,29 @@ class Project:
         self.__load_objects()
         self.about.create()
         global_logger.info(f"Created project on {self.project_base_path}")
+
+    def data_processing_pipeline(self, project_path: str) -> None:
+        """Creates an empty project to support data processing pipelines
+
+        Args:
+            *project_path* (:obj:`str`): Full path to the project data folder
+        """
+
+        self.project_base_path = project_path
+
+        # We create the project folder and create the base file
+        if not os.path.isdir(project_path):
+            os.mkdir(self.project_base_path)
+
+        self.__setup_logger()
+        self.activate()
+        self._processing_pipeline = True
+
+        matrix_folder = os.path.join(self.project_base_path, "matrices")
+        if not os.path.isdir(matrix_folder):
+            os.mkdir(matrix_folder)
+        self.matrices = Matrices(self)
+        global_logger.info(f"Created data processing pipeline on {self.project_base_path}")
 
     def close(self) -> None:
         """Safely closes the project"""

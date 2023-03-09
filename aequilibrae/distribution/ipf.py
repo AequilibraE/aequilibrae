@@ -243,6 +243,8 @@ class Ipf:
             name (:obj:`str`): Name of the desired matrix record
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
         """
+        if self.project._processing_pipeline:
+            raise ValueError("You don't have a project open to save this matrix to")
 
         mats = self.project.matrices
         record = mats.new_record(name, file_name, self.output)
