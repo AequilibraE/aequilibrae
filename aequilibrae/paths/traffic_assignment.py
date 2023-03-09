@@ -11,6 +11,8 @@ from numpy import nan_to_num
 import pandas as pd
 
 from pathlib import Path
+
+from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
@@ -96,9 +98,15 @@ class TrafficAssignment(object):
     bpr_parameters = ["alpha", "beta"]
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
-    def __init__(self, project=None) -> None:
-        project = project or get_active_project()
-        parameters = project.parameters["assignment"]["equilibrium"]
+    def __init__(self, project=None, no_project=False) -> None:
+        """"""
+        if no_project:
+            parameters = Parameters().parameters["assignment"]["equilibrium"]
+        else:
+            project = project or get_active_project()
+            parameters = project.parameters["assignment"]["equilibrium"]
+            self.__dict__["project"] = project
+
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = VDF()
@@ -119,7 +127,6 @@ class TrafficAssignment(object):
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
-        self.__dict__["project"] = project
 
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)
@@ -416,7 +423,12 @@ class TrafficAssignment(object):
             table_name (:obj:`str`): Name of the table to hold this assignment result
             keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
         """
+        self.__check_if_project()
+
         df = self.results()
+        if not keep_zero_flows:
+            df = df[df.PCE_tot > 0]
+
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
@@ -563,6 +575,7 @@ class TrafficAssignment(object):
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
         """
+        self.__check_if_project()
 
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
@@ -670,6 +683,8 @@ class TrafficAssignment(object):
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
         """
+        self.__check_if_project()
+
         df = self.select_link_flows()
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
@@ -698,6 +713,7 @@ class TrafficAssignment(object):
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
+
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -717,3 +733,7 @@ class TrafficAssignment(object):
         """
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)
+
+    def __check_if_project(self):
+        if "project" not in self.__dict__:
+            raise ValueError("You performed traffic assignment without a project open")
