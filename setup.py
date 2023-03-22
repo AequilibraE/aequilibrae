@@ -14,10 +14,11 @@ with open("__version__.py") as f:
 include_dirs = [np.get_include()]
 if iutil.find_spec("pyarrow") is not None:
     import pyarrow as pa
+
     include_dirs.append(pa.get_include())
 
 is_win = "WINDOWS" in platform.platform().upper()
-prefix = "/" if is_win  else "-f"
+prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
 
 ext_mod_aon = Extension(
@@ -57,7 +58,7 @@ loose_modules = ["__version__", "parameters"]
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
-        version=release_version,
+        version=release_version,  # noqa: F821
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
         install_requires=install_requirements,
         packages=pkgs,

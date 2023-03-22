@@ -28,7 +28,9 @@ class LinkType(SafeClass):
                     v_old = self.__original__.get(key, None)
                     if value != v_old and value is not None:
                         self.__original__[key] = value
-                        conn.execute(f"update 'link_types' set '{key}'=? where link_type_id='{self.link_type_id}'", [value])
+                        conn.execute(
+                            f"update 'link_types' set '{key}'=? where link_type_id='{self.link_type_id}'", [value]
+                        )
         finally:
             conn.commit()
             conn.close()

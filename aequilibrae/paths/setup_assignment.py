@@ -15,7 +15,7 @@ except ImportError:
     from distutils.extension import Extension
 
 is_win = "WINDOWS" in platform.platform().upper()
-prefix = "/" if is_win  else "-f"
+prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
 
 ext_modules = [

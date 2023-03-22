@@ -2,6 +2,8 @@
 line-length = 120
 target-version = ['py36', 'py37', 'py38']
 include = '\.pyi?$'
+extend-exclude = '''docs/*'''
+
 
 [build-system]
 requires = ["setuptools", "numpy<1.22", "cython", "pyaml", "pyqt5", "requests", "scipy", "shapely", "pandas", "pyarrow<10.0.0", "pyproj", "wheel"]

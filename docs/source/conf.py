@@ -17,16 +17,12 @@ import sys
 
 import sphinx_theme
 
-try:
-    from aequilibrae.paths.__version__ import release_version
-except ImportError as e:
-    sys.path.insert(0, os.path.abspath("../.."))
-    from aequilibrae.paths.__version__ import release_version
-    import warnings
+npth = os.path.abspath(".")
+if npth not in sys.path:
+    sys.path.append(npth)
 
-    warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
+from __version__ import release_version
 
-#
 
 # -- Project information -----------------------------------------------------
 
