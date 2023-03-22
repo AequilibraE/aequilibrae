@@ -16,21 +16,22 @@ class LinkType(SafeClass):
 
     def save(self):
         conn = self.connect_db()
-        curr = conn.cursor()
 
-        curr.execute(f'select count(*) from link_types where link_type_id="{self.link_type_id}"')
-        if curr.fetchone()[0] == 0:
-            data = [self.link_type_id, self.link_type]
-            curr.execute("Insert into link_types (link_type_id, link_type) values(?,?)", data)
+        try:
+            sql = f'select count(*) from link_types where link_type_id="{self.link_type_id}"'
+            if conn.execute(sql).fetchone()[0] == 0:
+                data = [self.link_type_id, self.link_type]
+                conn.execute("Insert into link_types (link_type_id, link_type) values(?,?)", data)
 
-        for key, value in self.__dict__.items():
-            if key != "link_type_id" and key in self.__original__:
-                v_old = self.__original__.get(key, None)
-                if value != v_old and value is not None:
-                    self.__original__[key] = value
-                    curr.execute(f"update 'link_types' set '{key}'=? where link_type_id='{self.link_type_id}'", [value])
-        conn.commit()
-        conn.close()
+            for key, value in self.__dict__.items():
+                if key != "link_type_id" and key in self.__original__:
+                    v_old = self.__original__.get(key, None)
+                    if value != v_old and value is not None:
+                        self.__original__[key] = value
+                        conn.execute(f"update 'link_types' set '{key}'=? where link_type_id='{self.link_type_id}'", [value])
+        finally:
+            conn.commit()
+            conn.close()
 
     def __setattr__(self, instance, value) -> None:
         if instance == "link_type":
