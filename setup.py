@@ -18,14 +18,17 @@ if iutil.find_spec("pyarrow") is not None:
     include_dirs.append(pa.get_include())
 
 is_win = "WINDOWS" in platform.platform().upper()
+is_mac = "MACOS" in platform.platform().upper()
 prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
+compile_args = [cpp_std, "-Wno-unreachable-code"] if is_mac else [f"{prefix}openmp", cpp_std]
+link_args = [] if is_mac else [f"{prefix}openmp"]
 
 ext_mod_aon = Extension(
     "aequilibrae.paths.AoN",
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")],
-    extra_compile_args=[f"{prefix}openmp", cpp_std],
-    extra_link_args=[f"{prefix}openmp"],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
     language="c++",
@@ -34,8 +37,8 @@ ext_mod_aon = Extension(
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
-    extra_compile_args=[f"{prefix}openmp", cpp_std],
-    extra_link_args=[f"{prefix}openmp"],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
     language="c++",
