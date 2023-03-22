@@ -35,11 +35,7 @@ jobs:
 
     - name: Compile library
       run: |
-        cd aequilibrae/paths
-        python3 setup_assignment.py build_ext --inplace
-        cd ../distribution
-        python3 setup_ipf.py build_ext --inplace
-        cd ../..
+        python3 setup.py build_ext --inplace
 
     - name: Check history of versions
       run: python docs/website/check_documentation_versions.py
