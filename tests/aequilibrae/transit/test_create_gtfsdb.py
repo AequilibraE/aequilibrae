@@ -27,6 +27,6 @@ class TestCreate_gtfsdb(TestCase):
         self.gtfs.conn.close()
 
     def test_import_gtfs(self):
-        self.gtfs = create_gtfsdb(gtfs_folder, save_db = None, spatialite_enabled=False, memory_db=True)
+        self.gtfs = create_gtfsdb(gtfs_folder, save_db=None, spatialite_enabled=False, memory_db=True)
         self.gtfs.import_gtfs()
         self.gtfs.conn.close()

@@ -23,7 +23,7 @@ class TestOSMDownloader(TestCase):
 
     def test_do_work2(self):
         if not self.should_do_work():
-            return 
+            return
 
         # LITTLE PLACE IN THE MIDDLE OF THE Grand Canyon North Rim
         o = OSMDownloader([[-112.185, 36.59, -112.179, 36.60]], ["car"])
