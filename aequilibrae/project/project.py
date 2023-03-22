@@ -100,7 +100,7 @@ class Project:
 
         try:
             self.conn.commit()
-            clean(self, self.conn)
+            clean(self)
             self.conn.close()
             for obj in [self.parameters, self.network]:
                 del obj

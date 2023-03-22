@@ -6,7 +6,6 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_logger
-from .__version__ import binary_version as VERSION
 
 
 class Graph(object):
@@ -71,8 +70,6 @@ class Graph(object):
         self.centroids = None  # NumPy array of centroid IDs
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
-
-        self.__version__ = VERSION
 
         # Randomly generate a unique Graph ID randomly
         self.__id__ = uuid.uuid4().hex
@@ -532,7 +529,6 @@ class Graph(object):
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
         mygraph["graph_id"] = self.__id__
-        mygraph["graph_version"] = self.__version__
         mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
@@ -563,7 +559,6 @@ class Graph(object):
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
             self.__id__ = mygraph["graph_id"]
-            self.__version__ = mygraph["graph_version"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 

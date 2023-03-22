@@ -13,7 +13,7 @@ include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 
 
-from .__version__ import binary_version as VERSION_COMPILED
+# from .__version__ import binary_version as VERSION_COMPILED
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
@@ -34,8 +34,8 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
 
     skims = len(graph.skim_fields)
 
-    if VERSION_COMPILED != graph.__version__:
-        raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
+    # if VERSION_COMPILED != graph.__version__:
+    #     raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
     zones = graph.num_zones
     block_flows_through_centroids = graph.block_centroid_flows
@@ -193,8 +193,8 @@ def path_computation(origin, destination, graph, results):
     if results.__graph_id__ != graph.__id__:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
-    if VERSION_COMPILED != graph.__version__:
-        raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
+    # if VERSION_COMPILED != graph.__version__:
+    #     raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
     #We transform the python variables in Cython variables
     nodes = graph.num_nodes
@@ -355,8 +355,8 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     if graph_fs[origin_index] == graph_fs[origin_index + 1]:
         raise ValueError("Centroid " + str(orig) + " does not exist in the graph")
 
-    if VERSION_COMPILED != graph.__version__:
-        raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
+    # if VERSION_COMPILED != graph.__version__:
+    #     raise ValueError('This graph was created for a different version of AequilibraE. Please re-create it')
 
     nodes = graph.compact_num_nodes + 1
     zones = graph.num_zones

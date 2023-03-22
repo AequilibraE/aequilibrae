@@ -16,6 +16,7 @@ try:
 except Exception as e:
     compiled = False
     global_logger.warning(f"Failed to import compiled modules. {e.args}")
+    raise
 
 if compiled:
     from aequilibrae.distribution import Ipf, GravityApplication, GravityCalibration, SyntheticGravityModel
@@ -31,7 +32,6 @@ if compiled:
     from aequilibrae.project import Project
     from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
     from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
-    from aequilibrae.paths import release_version as __version__
 
     from aequilibrae import paths
 name = "aequilibrae"
