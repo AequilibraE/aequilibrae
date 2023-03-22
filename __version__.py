@@ -1,6 +1,6 @@
 import os
 
-with open(os.path.join(os.path.dirname(__file__), "parameters.pxi"), "r") as a:
+with open(os.path.join(os.path.dirname(__file__), "aequilibrae", "paths", "parameters.pxi"), "r") as a:
     for i in a.readlines():
         if "VERSION" in i:
             version = i[10:].rstrip()

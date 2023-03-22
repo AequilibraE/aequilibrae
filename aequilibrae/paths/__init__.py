@@ -8,7 +8,7 @@ from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.traffic_assignment import TrafficAssignment
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph
-from .__version__ import binary_version, release_name, minor_version, release_version
+# from .__version__ import binary_version, release_name, minor_version, release_version
 from aequilibrae import global_logger
 
 

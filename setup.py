@@ -8,19 +8,23 @@ from Cython.Distutils import build_ext
 from setuptools import Extension
 from setuptools import setup, find_packages
 
-from aequilibrae.paths.__version__ import release_version
-
-spec = iutil.find_spec("pyarrow")
+with open("__version__.py") as f:
+    exec(f.read())
 
 include_dirs = [np.get_include()]
-if spec is not None:
+if iutil.find_spec("pyarrow") is not None:
     import pyarrow as pa
-
     include_dirs.append(pa.get_include())
+
+is_win = "WINDOWS" in platform.platform().upper()
+prefix = "/" if is_win  else "-f"
+cpp_std = "/std:c++17" if is_win else "-std=c++17"
 
 ext_mod_aon = Extension(
     "aequilibrae.paths.AoN",
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")],
+    extra_compile_args=[f"{prefix}openmp", cpp_std],
+    extra_link_args=[f"{prefix}openmp"],
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
     language="c++",
@@ -29,22 +33,15 @@ ext_mod_aon = Extension(
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
     [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
+    extra_compile_args=[f"{prefix}openmp", cpp_std],
+    extra_link_args=[f"{prefix}openmp"],
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
     language="c++",
 )
 
-# this is for building pyarrow on platforms w/o wheel, like our one of our macos/python combos
-if "WINDOWS" not in platform.platform().upper():
-    ext_mod_aon.extra_compile_args.append("-std=c++17")
-
-reqs = ["numpy>=1.18.0,<1.22", "scipy", "pyaml", "cython", "pyshp", "requests", "shapely >= 1.7.0", "pandas", "pyproj"]
-
-if isfile("requirements.txt"):
-    # We just make sure to keep the requirements sync'ed with the setup file
-    with open("requirements.txt", "r") as fl:
-        install_requirements = [x.strip() for x in fl.readlines()]
-    assert sorted(install_requirements) == sorted(reqs)
+with open("requirements.txt", "r") as fl:
+    install_requirements = [x.strip() for x in fl.readlines()]
 
 pkgs = [pkg for pkg in find_packages()]
 
@@ -62,7 +59,7 @@ if __name__ == "__main__":
         name="aequilibrae",
         version=release_version,
         # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
-        install_requires=reqs,
+        install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},
         py_modules=loose_modules,
@@ -79,6 +76,7 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=[ext_mod_aon, ext_mod_ipf],

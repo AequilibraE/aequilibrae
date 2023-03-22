@@ -1,3 +1,6 @@
+# This is a convenience file to allow developers easier compilation of just the IPF module
+# Generally compilation is done directly from the root setup.py
+# Make sure to keep this up to date with that file
 import numpy as np
 import platform
 from Cython.Build import cythonize
