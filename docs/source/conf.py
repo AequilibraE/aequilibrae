@@ -14,12 +14,13 @@
 
 import os
 import sys
+from pathlib import Path
 
 import sphinx_theme
 
-npth = os.path.abspath(".")
-if npth not in sys.path:
-    sys.path.append(npth)
+project_dir = Path(__file__).parent.parent
+if str(project_dir) not in sys.path:
+    sys.path.append(str(project_dir))
 
 from __version__ import release_version
 
