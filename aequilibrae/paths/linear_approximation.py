@@ -1,7 +1,9 @@
 import importlib.util as iutil
+import logging
 import os
 from functools import partial
 from pathlib import Path
+from tempfile import gettempdir
 from typing import List, Dict
 
 import numpy as np
@@ -49,9 +51,11 @@ class LinearApproximation(WorkerThread):
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        project = project or get_active_project()
-        self.project_path = project.project_base_path
-        self.logger = project.logger
+
+        self.logger = project.logger if project else logging.getLogger("aequilibrae")
+
+        self.project_path = project.project_base_path if project else gettempdir()
+
         self.algorithm = algorithm
         self.rgap_target = assig_spec.rgap_target
         self.max_iter = assig_spec.max_iter
