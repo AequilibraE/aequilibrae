@@ -6,13 +6,11 @@ from uuid import uuid4
 
 import numpy as np
 import yaml
-
-from aequilibrae import global_logger
-from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf_core import ipf_core
+
+from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.project.data.matrix_record import MatrixRecord
-
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -80,8 +78,6 @@ class Ipf:
 
             column_field (:obj:`str`): Field name that contains the data for the column totals
 
-            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
-
             parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
             nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
@@ -94,7 +90,6 @@ class Ipf:
             error (:obj:`str`): Error description
         """
         self.cpus = 0
-        self.project = project or get_active_project()
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
 
         # Seed matrix
@@ -236,17 +231,17 @@ class Ipf:
             self.report.append("")
             self.report.append("Running time: " + str("{:4,.3f}".format(perf_counter() - t)) + "s")
 
-    def save_to_project(self, name: str, file_name: str) -> MatrixRecord:
+    def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
         """Saves the matrix output to the project file
 
         Args:
             name (:obj:`str`): Name of the desired matrix record
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
-        if self.project._processing_pipeline:
-            raise ValueError("You don't have a project open to save this matrix to")
 
-        mats = self.project.matrices
+        project = project or get_active_project()
+        mats = project.matrices
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date

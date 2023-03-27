@@ -66,7 +66,7 @@ class NetworkSkimming(WorkerThread):
 
     def __init__(self, graph, origins=None, project=None):
         WorkerThread.__init__(self, None)
-        self.project = project or get_active_project()
+        self.project = project
         self.origins = origins
         self.graph = graph
         self.results = SkimResults()
@@ -108,20 +108,19 @@ class NetworkSkimming(WorkerThread):
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
 
-    def save_to_project(self, name: str, format="omx") -> None:
+    def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database
 
         Args:
             *name* (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
         file_name = f"{name}.{format.lower()}"
-
-        if self.project._processing_pipeline:
-            self.results.skims.export(file_name)
-            return
-        mats = self.project.matrices
+        if not project:
+            project = self.project or get_active_project()
+        mats = project.matrices
         record = mats.new_record(name, file_name, self.results.skims)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
