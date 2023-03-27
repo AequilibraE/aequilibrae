@@ -60,11 +60,6 @@ pkg_data = {
 loose_modules = ["__version__", "parameters"]
 
 if __name__ == "__main__":
-    os.environ["QGIS_RELEASE"] = "true"
-
-    if os.environ.get("CI_BUILD_QGIS_BINARY", None):
-        release_version = f"{release_version}+qgis"
-
     setup(
         name="aequilibrae",
         version=release_version,  # noqa: F821
