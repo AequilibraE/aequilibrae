@@ -3,14 +3,11 @@ import sys
 import shutil
 
 npth = os.path.abspath(".")
-try:
-    from aequilibrae.paths.__version__ import release_version
-except ImportError as e:
-    sys.path.insert(0, npth)
-    from aequilibrae.paths.__version__ import release_version
-    import warnings
+if npth not in sys.path:
+    sys.path.append(npth)
 
-    warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
+from __version__ import release_version
+
 
 version = f"V.{release_version}"
 
