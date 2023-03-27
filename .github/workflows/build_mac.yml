@@ -6,7 +6,11 @@ jobs:
   deploy:
     runs-on:  macos-latest
     env:
+      # Note that compiler options for macos-latest are documented here:
+      # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+      CC: "gcc-12"
+      CXX: "g++-12"
     strategy:
       matrix:
         python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11']
@@ -21,20 +25,12 @@ jobs:
 
     - name: Install dependencies
       run: |
-        # Note that compiler options for macos-latest are documented here:
-        # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md
-        export CC="gcc-12"
-        export CXX="g++-12"
-
         python -m pip install --upgrade pip setuptools wheel twine
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
 
     - name: Build
       run: |
-        export CC="gcc-12"
-        export CXX="g++-12"
-
         python setup.py sdist bdist_wheel
 
     - name: Stores artifacts along with the workflow result

@@ -1,8 +1,7 @@
 import importlib.util as iutil
-import logging
 import os
 import platform
-from os.path import dirname, join, isfile
+from os.path import dirname, join
 
 import numpy as np
 from Cython.Distutils import build_ext
