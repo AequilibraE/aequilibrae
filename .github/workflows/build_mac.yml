@@ -22,6 +22,7 @@ jobs:
     - name: Install dependencies
       run: |
         export clang_dir=$(brew --prefix llvm@15)
+        echo "Clang DIR: ${clang_dir}"
         export CC="${clang_dir}/bin/clang"
         export CXX="${clang_dir}/bin/clang++"
         export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
@@ -32,6 +33,12 @@ jobs:
 
     - name: Build
       run: |
+        export clang_dir=$(brew --prefix llvm@15)
+        echo "Clang DIR: ${clang_dir}"
+        export CC="${clang_dir}/bin/clang"
+        export CXX="${clang_dir}/bin/clang++"
+        export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
+
         python setup.py sdist bdist_wheel
 
     - name: Stores artifacts along with the workflow result
