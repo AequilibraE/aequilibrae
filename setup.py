@@ -19,7 +19,7 @@ if iutil.find_spec("pyarrow") is not None:
     include_dirs.append(pa.get_include())
 
 is_win = "WINDOWS" in platform.platform().upper()
-is_mac = "MACOS" in platform.platform().upper()
+is_mac = any([e in platform.platform().upper() for e in ["MACOS", "DARWIN"]])
 logging.error(platform.platform())
 print(platform.platform())
 prefix = "/" if is_win else "-f"
@@ -65,7 +65,6 @@ if __name__ == "__main__":
     setup(
         name="aequilibrae",
         version=release_version,  # noqa: F821
-        # TODO: Fix the requirements and optional requirements to bring directly from the requirements file
         install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},
