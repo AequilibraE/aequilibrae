@@ -1,3 +1,4 @@
-pyarrow
+pyarrow < 10.0; sys_platform == 'darwin' and python_version < '3.11'
+pyarrow;        sys_platform != 'darwin'
 PyQt5
 openmatrix

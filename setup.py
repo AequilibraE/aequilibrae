@@ -1,4 +1,5 @@
 import importlib.util as iutil
+import logging
 import os
 import platform
 from os.path import dirname, join, isfile
@@ -19,6 +20,8 @@ if iutil.find_spec("pyarrow") is not None:
 
 is_win = "WINDOWS" in platform.platform().upper()
 is_mac = "MACOS" in platform.platform().upper()
+logging.error(platform.platform())
+print(platform.platform())
 prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
 compile_args = [cpp_std, "-Wno-unreachable-code"] if is_mac else [f"{prefix}openmp", cpp_std]
