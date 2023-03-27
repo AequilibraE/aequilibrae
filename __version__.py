@@ -8,7 +8,5 @@ with open(os.path.join(os.path.dirname(__file__), "aequilibrae", "paths", "param
             minor_version = i[13:].rstrip()
         if "release_name" in i:
             release_name = i[16:-1].rstrip()
-        if "binary" in i:
-            binary_version = i[17:-1].rstrip()
 
 release_version = "{}.{}".format(version.rstrip(), minor_version.rstrip())
