@@ -233,7 +233,7 @@ class TestTrafficAssignment(TestCase):
         correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
         self.assertLess(0.8, correl)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(FileNotFoundError):
             assignment.save_results("anything")
 
     def test_info(self):

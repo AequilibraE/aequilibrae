@@ -101,6 +101,7 @@ class TrafficAssignment(object):
     def __init__(self, project=None) -> None:
         """"""
 
+        project = project or get_active_project(must_exist=False)
         par = project.parameters if project else Parameters().parameters
         parameters = par["assignment"]["equilibrium"]
 

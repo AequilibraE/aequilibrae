@@ -77,7 +77,8 @@ class TestTrafficAssignmentPathFiles(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        path_file_dir = pathlib.Path(join(self.project.project_base_path, "path_files", self.assignment.procedure_id))
+        pid = self.assignment.procedure_id
+        path_file_dir = pathlib.Path(join(str(self.project.project_base_path), "path_files", pid))
         self.assertTrue(path_file_dir.is_dir())
 
         # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
