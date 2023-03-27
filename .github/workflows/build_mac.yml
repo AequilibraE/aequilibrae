@@ -21,6 +21,11 @@ jobs:
 
     - name: Install dependencies
       run: |
+        export clang_dir=$(brew --prefix llvm@15)
+        export CC="${clang_dir}/bin/clang"
+        export CXX="${clang_dir}/bin/clang++"
+        export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
+
         python -m pip install --upgrade pip setuptools wheel twine
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
