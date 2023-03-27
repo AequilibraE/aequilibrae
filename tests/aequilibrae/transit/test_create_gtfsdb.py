@@ -17,7 +17,6 @@ class TestCreate_gtfsdb(TestCase):
 
     def tearDown(self) -> None:
         if os.path.isfile(gtfs_db_output):
-            print(gtfs_db_output)
             os.unlink(gtfs_db_output)
 
     def test_create_database(self):
