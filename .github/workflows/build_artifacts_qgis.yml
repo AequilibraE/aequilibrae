@@ -32,7 +32,7 @@ jobs:
     - name: update versions to conform with QGIS
       run: |
         cd .github
-        python qgis_version.py
+        python qgis_requirements.py
         cd ..
 
     - name: Install dependencies MacOS
