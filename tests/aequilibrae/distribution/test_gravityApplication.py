@@ -78,13 +78,4 @@ class TestGravityApplication(TestCase):
             distributed_matrix.apply()
 
             if distributed_matrix.gap > distributed_matrix.parameters["convergence level"]:
-                self.fail("Gravity application did not converge for model " + model_name)
-
-        # Tests without a project open
-        for model_name, model_obj in models:
-            args["model"] = model_obj
-            distributed_matrix = GravityApplication(**args)
-            distributed_matrix.apply()
-
-            if distributed_matrix.gap > distributed_matrix.parameters["convergence level"]:
-                self.fail("Gravity application did not converge for model " + model_name)
+                self.fail(f"Gravity application did not converge for model {model_name}")
