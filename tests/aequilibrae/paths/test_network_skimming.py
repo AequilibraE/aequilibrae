@@ -1,4 +1,3 @@
-from os.path import join, isfile
 import os
 import uuid
 from os.path import join, isfile
