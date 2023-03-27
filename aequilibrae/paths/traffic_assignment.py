@@ -1,16 +1,15 @@
-from os import path
 import importlib.util as iutil
 import socket
 import sqlite3
 from datetime import datetime
+from os import path
+from pathlib import Path
 from typing import List, Dict
 from uuid import uuid4
 
 import numpy as np
-from numpy import nan_to_num
 import pandas as pd
-
-from pathlib import Path
+from numpy import nan_to_num
 
 from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
@@ -101,8 +100,8 @@ class TrafficAssignment(object):
     def __init__(self, project=None) -> None:
         """"""
 
-        project = project or get_active_project(must_exist=False)
-        par = project.parameters if project else Parameters().parameters
+        proj = project or get_active_project(must_exist=False)
+        par = proj.parameters if proj else Parameters().parameters
         parameters = par["assignment"]["equilibrium"]
 
         self.__dict__["rgap_target"] = parameters["rgap"]
@@ -125,7 +124,7 @@ class TrafficAssignment(object):
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
-        self.__dict__["project"] = project
+        self.__dict__["project"] = proj
 
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)
@@ -243,7 +242,7 @@ class TrafficAssignment(object):
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = LinearApproximation(self, algo)
+            self.assignment = LinearApproximation(self, algo, project=self.project)
         else:
             raise Exception("Algorithm not listed in the case selection")
 
