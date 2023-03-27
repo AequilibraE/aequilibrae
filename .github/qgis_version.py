@@ -1,9 +1,14 @@
-with open("../aequilibrae/paths/parameters.pxi", "r") as fl:
-    cts = [c.rstrip() for c in fl.readlines()]
+def replace_in_file(file_path, text_orig, suffix):
+    with open(file_path, "r") as fl:
+        cts = [c.rstrip() for c in fl.readlines()]
 
-with open("../aequilibrae/paths/parameters.pxi", "w") as fl:
-    for c in cts:
-        if "MINOR_VRSN" in c:
-            fl.write(f"{c}-qgis\n")
-        else:
-            fl.write(f"{c}\n")
+    with open(file_path, "w") as fl:
+        for c in cts:
+            if text_orig in c:
+                fl.write(f"{c}{suffix}\n")
+            else:
+                fl.write(f"{c}\n")
+
+
+replace_in_file("../aequilibrae/paths/parameters.pxi", "MINOR_VRSN", "-qgis")
+replace_in_file("../requirements.txt", "numpy", "<1.22")
