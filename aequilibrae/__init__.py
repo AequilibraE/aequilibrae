@@ -31,6 +31,7 @@ from aequilibrae.transit.gtfs import GTFS, create_gtfsdb
 from aequilibrae.paths.results import AssignmentResults, SkimResults, PathResults
 
 from aequilibrae import paths
+
 name = "aequilibrae"
 
 
