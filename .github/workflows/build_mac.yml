@@ -21,11 +21,14 @@ jobs:
 
     - name: Install dependencies
       run: |
-        export clang_dir=$(brew --prefix llvm@15)
-        echo "Clang DIR: ${clang_dir}"
-        export CC="${clang_dir}/bin/clang"
-        export CXX="${clang_dir}/bin/clang++"
-        export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
+        # export clang_dir=$(brew --prefix llvm@15)
+        # echo "Clang DIR: ${clang_dir}"
+        # export CC="${clang_dir}/bin/clang"
+        # export CXX="${clang_dir}/bin/clang++"
+        # export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
+
+        export CC="gcc-12"
+        export CXX="g++-12"
 
         python -m pip install --upgrade pip setuptools wheel twine
         pip install -r requirements.txt
@@ -33,11 +36,8 @@ jobs:
 
     - name: Build
       run: |
-        export clang_dir=$(brew --prefix llvm@15)
-        echo "Clang DIR: ${clang_dir}"
-        export CC="${clang_dir}/bin/clang"
-        export CXX="${clang_dir}/bin/clang++"
-        export LDFLAGS="-L${clang_dir}/lib/c++ -Wl,-rpath,${clang_dir}/lib/c++"
+        export CC="gcc-12"
+        export CXX="g++-12"
 
         python setup.py sdist bdist_wheel
 
