@@ -3,7 +3,6 @@ import pathlib
 import uuid
 import zipfile
 from os.path import join, dirname
-from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
 
@@ -78,7 +77,7 @@ class TestTrafficAssignmentPathFiles(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
+        path_file_dir = pathlib.Path(join(self.project.project_base_path, "path_files", self.assignment.procedure_id))
         self.assertTrue(path_file_dir.is_dir())
 
         # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
