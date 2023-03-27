@@ -16,7 +16,7 @@ jobs:
       matrix:
         python-version: ['3.9']
         architecture: ['x64']
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, macos-latest]
         include:
           - os: macos-latest
             CC: "gcc-12"
