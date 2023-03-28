@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
+import sqlite3
+from copy import deepcopy
+from os.path import join
 from pathlib import Path
 from argparse import ArgumentParser
 import sys
 import timeit
 import pandas as pd
 import warnings
-from aequilibrae import Project, TrafficAssignment, TrafficClass
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from aequilibrae import Project, TrafficAssignment, TrafficClass
 
 
 def aequilibrae_init(proj_path: str, cost: str):
@@ -138,10 +142,17 @@ def main():
         warnings.simplefilter(action="ignore", category=FutureWarning)
         # Benchmark time
         results = []
+        conn = sqlite3.connect(join(args['path'], "r.sqlite"))
         for project_name in args["projects"]:
             if project_name in ["chicago_sketch"]:
                 graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])
-                select_links = [None, {"test": [(2, 1), (7, 1), (1, 1), (6, 1)], "set 2": [(1, 1), (3, 1)]}]
+                dt = {}
+                data = []
+                select_links = [None]
+                for sla in range(1, 21):
+                    data.append((9000 + sla, 1))
+                    dt[f"qry_{sla}"] = [(9000 + sla, 1)]
+                    select_links.append(deepcopy(dt))
 
             elif project_name in "Arkansas":
                 assignment, car = arkansas(f"{args['path']}/{project_name}")
@@ -152,7 +163,8 @@ def main():
             for link in select_links:
                 if link is not None:
                     car.set_select_links(link)
-                print("BENCHING links: ", link)
+                print("BENCHING links: ", link.keys() if link else link)
+                qries = [] if link is None else list(link.values())
 
                 t = timeit.Timer(lambda: assignment.execute())
                 times = t.repeat(repeat=3, number=args["iters"])
@@ -160,10 +172,14 @@ def main():
                     {
                         "Project": project_name,
                         "Select_Link": False if link is None else True,
+                        "queries": 0 if link is None else len(link),
+                        "queries_size": sum([len(x) for x in qries]) / max(1, len(qries)),
                         "Minimum_Runtime": [min(times)],
+                        "cores": args["cores"][0],
                     }
                 )
                 results.append(df)
+                df.to_sql("benchmarking", conn, if_exists="append")
         ratios = []
         final = pd.concat(results)
         for project_name in args["projects"]:
@@ -172,6 +188,7 @@ def main():
             df = pd.DataFrame({"Project": [project_name], "Runtime_%_Increase": [((sl - no_sl) / no_sl * 100)]})
             ratios.append(df)
         final_ratio = pd.concat(ratios) if len(ratios) != 1 else ratios[0]
+
         print(final)
         print("\n")
         print(final_ratio)

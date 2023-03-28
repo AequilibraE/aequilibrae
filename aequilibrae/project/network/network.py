@@ -10,16 +10,17 @@ import shapely.wkt
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
+from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network import OSMDownloader
+from aequilibrae.project.network.gmns_builder import GMNSBuilder
+from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.osm_builder import OSMBuilder
-from aequilibrae.project.network.gmns_builder import GMNSBuilder
-from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -119,13 +120,13 @@ class Network(WorkerThread):
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -242,12 +243,12 @@ class Network(WorkerThread):
         self.logger.info("Network built successfully")
 
     def create_from_gmns(
-        self,
-        link_file_path: str,
-        node_file_path: str,
-        use_group_path: str = None,
-        geometry_path: str = None,
-        srid: int = 4326,
+            self,
+            link_file_path: str,
+            node_file_path: str,
+            use_group_path: str = None,
+            geometry_path: str = None,
+            srid: int = 4326,
     ) -> None:
         """
         Creates AequilibraE model from links and nodes in GMNS format.
@@ -343,8 +344,11 @@ class Network(WorkerThread):
             g = Graph()
             g.mode = m
             g.network = net
-            g.prepare_graph(centroids)
-            g.set_blocked_centroid_flows(True)
+            if centroids.shape[0]:
+                g.prepare_graph(centroids)
+                g.set_blocked_centroid_flows(True)
+            else:
+                get_logger().warning("Your graph has no centroids")
             self.graphs[m] = g
 
     def set_time_field(self, time_field: str) -> None:
