@@ -3,13 +3,10 @@ import sys
 import shutil
 
 npth = os.path.abspath(".")
-try:
-    from aequilibrae.paths.__version__ import release_version
-except ImportError as e:
-    sys.path.insert(0, npth)
-    from aequilibrae.paths.__version__ import release_version
+if npth not in sys.path:
+    sys.path.append(npth)
 
-    print(e.args)
+from __version__ import release_version
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
