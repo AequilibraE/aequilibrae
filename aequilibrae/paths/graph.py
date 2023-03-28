@@ -233,7 +233,8 @@ class Graph(object):
 
         links_to_remove = np.argwhere(simplified_links >= 0)
         df = pd.DataFrame(self.network, copy=True)
-        df = df[~df.link_id.isin(links_to_remove[:, 0])]
+        if links_to_remove.shape[0]:
+            df = df[~df.link_id.isin(links_to_remove[:, 0])]
         df = df[df.a_node != df.b_node]
 
         comp_lnk = pd.DataFrame(
