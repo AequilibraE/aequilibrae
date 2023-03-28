@@ -142,7 +142,7 @@ def main():
         warnings.simplefilter(action="ignore", category=FutureWarning)
         # Benchmark time
         results = []
-        conn = sqlite3.connect(join(args['path'], "r.sqlite"))
+        conn = sqlite3.connect(join(args["path"], "r.sqlite"))
         for project_name in args["projects"]:
             if project_name in ["chicago_sketch"]:
                 graph, matrix, assignment, car = aequilibrae_init(f"{args['path']}/{project_name}", args["cost"])

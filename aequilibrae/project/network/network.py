@@ -120,13 +120,13 @@ class Network(WorkerThread):
         return [x[0] for x in curr.fetchall()]
 
     def create_from_osm(
-            self,
-            west: float = None,
-            south: float = None,
-            east: float = None,
-            north: float = None,
-            place_name: str = None,
-            modes=["car", "transit", "bicycle", "walk"],
+        self,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
+        place_name: str = None,
+        modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -243,12 +243,12 @@ class Network(WorkerThread):
         self.logger.info("Network built successfully")
 
     def create_from_gmns(
-            self,
-            link_file_path: str,
-            node_file_path: str,
-            use_group_path: str = None,
-            geometry_path: str = None,
-            srid: int = 4326,
+        self,
+        link_file_path: str,
+        node_file_path: str,
+        use_group_path: str = None,
+        geometry_path: str = None,
+        srid: int = 4326,
     ) -> None:
         """
         Creates AequilibraE model from links and nodes in GMNS format.
