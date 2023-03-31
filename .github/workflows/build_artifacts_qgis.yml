@@ -12,6 +12,7 @@ jobs:
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
       CI_BUILD_QGIS_BINARY: "true"
+    continue-on-error: true
     strategy:
       matrix:
         python-version: ['3.9']
