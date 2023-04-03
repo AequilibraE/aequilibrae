@@ -18,7 +18,7 @@ from pathlib import Path
 
 import sphinx_theme
 
-project_dir = Path(__file__).parent.parent
+project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
     sys.path.append(str(project_dir))
 
@@ -61,6 +61,7 @@ extensions = [
     "sphinx_autodoc_annotation",
     "sphinx.ext.autosummary",
     "sphinx_git",
+    "sphinx_panels",
 ]
 
 sphinx_gallery_conf = {
@@ -101,19 +102,23 @@ highlight_language = "none"
 # a list of builtin themes.
 #
 # html_theme = "pyramid"
-html_theme = "neo_rtd_theme"
-html_theme_path = [sphinx_theme.get_html_theme_path(html_theme)]
+html_theme = "pydata_sphinx_theme"
 
-# html_theme_options = {
-#     "body_max_width": '70%',
-#     'sidebarwidth': '20%'
-# }
+html_theme_options = {
+    "show_nav_level": 0,
+    #     "body_max_width": '70%',
+    #     'sidebarwidth': '20%'
+}
 
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+# The name for this set of Sphinx documents.  If None, it defaults to
+# "<project> v<release> documentation".
+html_title = f"AequilibraE {version}"
 
 # -- Options for HTMLHelp output ---------------------------------------------
 

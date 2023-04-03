@@ -3,6 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+===========
 AequilibraE
 ===========
 
@@ -11,36 +12,94 @@ modeling, and it aims to provide all the resources not easily available from
 other open-source packages in the Python (NumPy, really) ecosystem.
 
 If you are looking for the documentation for AequilibraE for QGIS, you can
-see it on its own webpage `aequilibrae for QGIS 3 <http://www.aequilibrae.com/qgis>`__
-
-Examples
-========
-
-Skip the *blah-blah-blah* and go straight to the point: :ref:`sphx_glr__auto_examples`
-
-or to :ref:`getting_started` if you are new to Python or are having trouble with Spatialite
+see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
 
-Contents
-========
-.. sectnum::
+.. panels::
+   :card: shadow
+   :header: text-center
+
+   ---
+   :column: col-lg-12 p-2
+   :fa:`workflow`
+   Examples
+   ^^^^^^^^^
+
+   AequilibraE's example gallery.
+
+   +++
+
+   .. link-button:: _auto_examples/index
+      :type: ref
+      :text: Examples
+      :classes: btn-block btn-secondary stretched-link
+
+   ---
+   :fa:`book`
+   Modeling with AequilibraE
+   ^^^^^^^^^^^
+
+   In-depth information on AequilibraE's main concepts.
+
+   +++
+
+   .. link-button:: user_guide
+         :type: ref
+         :text: Modeling with AequilibraE
+         :classes: btn-block btn-secondary stretched-link
+   
+   ---
+   :fa:`tools`
+   API references
+   ^^^^^^^^^^^^^^
+
+   Reference guide to AequilibraE's API.
+
+   +++
+
+   .. link-button:: api
+         :type: ref
+         :text: API references
+         :classes: btn-block btn-secondary stretched-link
+   
+   ---
+   :fa:`check`
+   Validation & Benchmarking
+   ^^^^^^^^^^^^^^^
+
+   Instances used for validation and benchmarking.
+
+   +++
+
+   .. link-button:: validation
+         :type: ref
+         :text: Validation & Benchmarking
+         :classes: btn-block btn-secondary stretched-link
+
+   ---
+   :fa:`lightbulb`
+   Nitty-Gritty
+   ^^^^^^^^^^^^^^^
+
+   New to AequilibraE? Check out the getting started guides. 
+
+   +++
+
+   .. link-button:: getting_started
+         :type: ref
+         :text: Nitty-Gritty
+         :classes: btn-block btn-secondary stretched-link
+
 
 .. toctree::
-   :numbered:
+   :hidden:
    :maxdepth: 1
-   :caption: Contents:
 
-   overview
-   gettingstarted
-   project
-   modeling
-   path_computation_engine
-   api
    _auto_examples/index
-   softwaredevelopment
-   roadmap
-   qgis
-
+   user_guide
+   api
+   validation
+   gettingstarted
 
 Note to users
 =============
@@ -60,39 +119,3 @@ there are two alternatives for support:
 Aequilibrae **does not have paid support** but if you are looking to hire its developers
 for specific projects or to **fund AequilibraE's** development,
 please e-mail the developers at contact@aequilibrae.com.
-
-
-Version history
-===============
-
-AequilibraE has been evolving quite fast, so we recommend you upgrading to a
-newer version as soon as you can.  In the meantime, you can find the
-documentation for all versions since 0.5.3.
-
-* `0.5.3 <https://aequilibrae.com/python/V.0.5.3/>`_
-* `0.6.0 <https://aequilibrae.com/python/V.0.6.0/>`_
-* `0.6.1 <https://aequilibrae.com/python/V.0.6.1/>`_
-* `0.6.2 <https://aequilibrae.com/python/V.0.6.2/>`_
-* `0.6.3 <https://aequilibrae.com/python/V.0.6.3/>`_
-* `0.6.4 <https://aequilibrae.com/python/V.0.6.4/>`_
-* `0.6.5 <https://aequilibrae.com/python/V.0.6.5/>`_
-* `0.7.0 <https://aequilibrae.com/python/V.0.7.0/>`_
-* `0.7.1 <https://aequilibrae.com/python/V.0.7.1/>`_
-* `0.7.2 <https://aequilibrae.com/python/V.0.7.2/>`_
-* `0.7.3 <https://aequilibrae.com/python/V.0.7.3/>`_
-* `0.7.4 <https://aequilibrae.com/python/V.0.7.4/>`_
-* `0.7.5 <https://aequilibrae.com/python/V.0.7.5/>`_
-* `0.7.6 <https://aequilibrae.com/python/V.0.7.6/>`_
-* `0.7.7 <https://aequilibrae.com/python/V.0.7.7/>`_
-* `0.8.0 <https://aequilibrae.com/python/V.0.8.0/>`_
-* `0.8.1 <https://aequilibrae.com/python/V.0.8.1/>`_
-
-* `Develop Branch (upcoming version) <https://aequilibrae.com/python/develop/>`_
-This documentation correspond to software version:
-
-.. git_commit_detail::
-    :branch:
-    :commit:
-    :sha_length: 10
-    :uncommitted:
-    :untracked:

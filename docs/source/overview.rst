@@ -13,7 +13,7 @@ open source software QGIS, which is separately mantained and discussed in
 detail its `documentation. <http://www.aequilibrae.com/qgis>`_
 
 Sub-modules
-~~~~~~~~~~~
+-----------
 
 AequilibraE is organized in submodules that are often derived from the
 traditional 4-step model. However, other modules have already been added or are

@@ -1,6 +1,6 @@
 .. _getting_started:
 
-Getting Started
+Nitty-Gritty
 ===============
 
 This page describes how to get started with AequilibraE.
@@ -11,7 +11,7 @@ This page describes how to get started with AequilibraE.
    and possible API changes often.
 
 .. note::
-   The recommendations on this page are current as of August 2021.
+   The recommendations on this page are current as of March 2023.
 
 .. index:: installation
 
@@ -129,3 +129,13 @@ modelling computers these days. In most cases 16Gb of RAM is enough even for
 large models (5,000+ zones).  Parallelization is fully implemented for path
 computation, and can make use of as many CPUs as there are available in the
 system when doing traffic assignment.
+
+.. toctree::
+    :maxdepth: 1
+    :hidden:
+
+    :ref:`installation`
+    softwaredevelopment
+    roadmap
+    version_history
+  
