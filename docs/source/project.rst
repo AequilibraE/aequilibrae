@@ -43,9 +43,6 @@ series of files and sub folders exist. The files are the following:
 
 - **matrices** (*folder*) - Contains all matrices to be used within a project
 
-- **scenarios** (*folder*) - Contains copies of each *project_database.sqlite*
-  at the time a certain scenario was saved (upcoming in version 0.8)
-
 Data consistency
 ----------------
 
@@ -102,24 +99,3 @@ Parameters file
    :maxdepth: 1
 
    parameter_file
-
-Extra user data fields
-~~~~~~~~~~~~~~~~~~~~~~
-The AequilibraE standard configuration is not particularly minimalist, but it is
-reasonable to expect that users would require further data fields in one or more
-of the data tables that are part of the AequilibraE project. For this reason, and
-to incentivate the creation of a consistent culture around the handling of model
-data in aequilibrae, we have added 10 additional data fields to each table which
-are not used by AequilibraE's standard configuration, all of which are named as
-Greek letters. They are the following:
-
-- 'alpha'
-- 'beta'
-- 'gamma'
-- 'delta'
-- 'epsilon'
-- 'zeta'
-- 'iota'
-- 'sigma'
-- 'phi'
-- 'tau'

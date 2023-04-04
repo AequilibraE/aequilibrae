@@ -22,10 +22,12 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
    :column: col-lg-12 p-2
    :fa:`workflow`
-   Examples
-   ^^^^^^^^^
+   Using AequilibraE
+   ^^^^^^^^^^^^^^^^^
 
-   AequilibraE's example gallery.
+   A series of examples on how to use AequilibraE, from building a model from scratch
+to editing an existing, performing trip distribution or traffic assignment to analyzing
+results.
 
    +++
 
@@ -39,7 +41,8 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    Modeling with AequilibraE
    ^^^^^^^^^^^
 
-   In-depth information on AequilibraE's main concepts.
+   An in-depth guide to modeling with AequilibraE, including the concepts that guide its
+development and user-experience.
 
    +++
 
@@ -64,10 +67,10 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    
    ---
    :fa:`check`
-   Validation & Benchmarking
-   ^^^^^^^^^^^^^^^
+   Software Validation & Benchmarking
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   Instances used for validation and benchmarking.
+   Want to see how we test the software for correctness and performance?
 
    +++
 
