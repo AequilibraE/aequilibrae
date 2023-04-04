@@ -8,5 +8,4 @@ The User Guide covers all AequilibraE's topics by area.
 
     overview
     project
-    path_computation_engine
     project_database/datamodel.rst

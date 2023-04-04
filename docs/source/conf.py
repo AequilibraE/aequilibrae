@@ -23,7 +23,7 @@ if str(project_dir) not in sys.path:
     sys.path.append(str(project_dir))
 
 # Sometimes this file is exec'd directly from sphinx code...
-project_dir = os.path.abspath("../..")
+project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
@@ -142,13 +142,10 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 autodoc_default_options = {
     "members": "var1, var2",
     "member-order": "bysource",
-    "special-members": "__init__",
+    "special-members": False,
     "private-members": False,
     "undoc-members": True,
     "exclude-members": "__weakref__",
-    "inherited-members": False,
-    "show-inheritance": False,
-    "autodoc_inherit_docstrings": False,
 }
 
 autodoc_member_order = "groupwise"

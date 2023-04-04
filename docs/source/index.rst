@@ -18,18 +18,18 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 .. panels::
    :card: shadow
    :header: text-center
+   :column: col-lg-12 p-2
 
    ---
-   :column: col-lg-12 p-2
    :fa:`workflow`
    Using AequilibraE
    ^^^^^^^^^^^^^^^^^
 
    A series of examples on how to use AequilibraE, from building a model from scratch
-to editing an existing, performing trip distribution or traffic assignment to analyzing
-results.
+   to editing an existing, performing trip distribution or traffic assignment to analyzing
+   results.
 
-   +++
+   +++++++++++++++++
 
    .. link-button:: _auto_examples/index
       :type: ref
@@ -39,12 +39,12 @@ results.
    ---
    :fa:`book`
    Modeling with AequilibraE
-   ^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^^^^^^^^
 
    An in-depth guide to modeling with AequilibraE, including the concepts that guide its
-development and user-experience.
+   development and user-experience.
 
-   +++
+   +++++++++++++++++
 
    .. link-button:: user_guide
          :type: ref
@@ -52,13 +52,14 @@ development and user-experience.
          :classes: btn-block btn-secondary stretched-link
    
    ---
+
    :fa:`tools`
    API references
    ^^^^^^^^^^^^^^
 
    Reference guide to AequilibraE's API.
 
-   +++
+   +++++++++++++++++
 
    .. link-button:: api
          :type: ref
@@ -66,13 +67,14 @@ development and user-experience.
          :classes: btn-block btn-secondary stretched-link
    
    ---
+
    :fa:`check`
    Software Validation & Benchmarking
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
    Want to see how we test the software for correctness and performance?
 
-   +++
+   ++++++++++++++++++++++++++++++++++
 
    .. link-button:: validation
          :type: ref
@@ -80,13 +82,14 @@ development and user-experience.
          :classes: btn-block btn-secondary stretched-link
 
    ---
+
    :fa:`lightbulb`
    Nitty-Gritty
-   ^^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^
 
    Looking for something more than using the software? Check out the development info.
 
-   +++
+   ++++++++++++
 
    .. link-button:: getting_started
          :type: ref

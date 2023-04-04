@@ -54,7 +54,7 @@ Network Items
 
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: api/
 
     Mode
     LinkType
@@ -67,7 +67,7 @@ Parameters
 
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: api/
 
     Parameters
 
@@ -124,11 +124,3 @@ Transit
 
     GTFS
     create_gtfsdb
-
-Use examples
-------------
-
-.. toctree::
-   :maxdepth: 1
-
-   usageexamples

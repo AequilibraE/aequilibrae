@@ -1,6 +1,16 @@
 --@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@ The Nodes table holds all the network nodes available in AequilibraE model.
 --@
+--@ The *node_id* field is an identifier of the node.
 --@
+--@ The *is_centroid* field holds information if the node is a centroid
+--@ of a network or not. Assumes values 0 or 1. Defaults to **0**.
+--@
+--@ The *modes* field identifies all modes connected to the node.
+--@
+--@ The *link_types* field identifies all link types connected
+--@ to the node.
+
 
 CREATE TABLE if not exists nodes (ogc_fid     INTEGER PRIMARY KEY,
                                   node_id     INTEGER UNIQUE NOT NULL,

@@ -1,6 +1,18 @@
---@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@ The link_types table holds information about the available
+--@ link types in the network.
 --@
+--@ The *link_type* field corresponds to the link type, and it is the 
+--@ table's primary key
 --@
+--@ The *link_type_id* field presents the identification of the link type
+--@
+--@ The *description* field holds the description of the link type
+--@
+--@ The *lanes* field presents the number or lanes for the link type
+--@
+--@ The *lane_capacity* field presents the number of lanes for the link type
+--@
+--@ The *speed* field holds information about the speed in the link type
 
 
 CREATE TABLE  if not exists link_types (link_type     VARCHAR UNIQUE NOT NULL PRIMARY KEY,

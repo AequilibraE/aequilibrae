@@ -78,7 +78,7 @@ documentation for all versions since 0.5.3.
     .. link-button:: https://aequilibrae.com/python/V.0.8.1/
       :text: 0.8.1
       :classes: btn-block btn-secondary stretched-link
-
+    ---
     .. link-button:: https://aequilibrae.com/python/V.0.8.2/
       :text: 0.8.2
       :classes: btn-block btn-secondary stretched-link

@@ -1,6 +1,10 @@
---@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@ The About table holds information about the AequilibraE model
+--@ currently developed.
 --@
+--@ The *infoname* field holds the name of information being added
 --@
+--@ The *infovalue* field holds the information to add
+
 
 CREATE TABLE  if not exists about (infoname  TEXT UNIQUE NOT NULL,
                                    infovalue TEXT
