@@ -33,13 +33,11 @@ from __version__ import release_version
 # -- Project information -----------------------------------------------------
 
 project = "AequilibraE"
-copyright = "2018, Pedro Camargo"
-author = "Pedro Camargo"
+copyright = "2023, AequilibraE developers"
+author = "AequilibraE developers"
 
 # The short X.Y version
 version = release_version
-# The full version, including alpha/beta/rc tags
-release = "30/07/2018"
 
 # -- General configuration ---------------------------------------------------
 
@@ -117,7 +115,6 @@ html_theme_options = {
 html_static_path = ["_static"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
-# "<project> v<release> documentation".
 html_title = f"AequilibraE {version}"
 
 # -- Options for HTMLHelp output ---------------------------------------------
