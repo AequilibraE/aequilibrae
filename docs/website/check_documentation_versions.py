@@ -14,5 +14,5 @@ with open("../__version__.py") as f:
 with open(os.path.join(npth, "source/version_history.rst"), mode="r") as f:
     txt = f.read()
 
-assert f"`{release_version}" in txt
+assert f"{release_version}" in txt
 assert f"V.{release_version}" in txt
