@@ -15,3 +15,4 @@ keplergl
 sphinx-git
 sphinx-gallery
 sphinx-panels
+sphinx_theme
