@@ -11,7 +11,7 @@ with open("../__version__.py") as f:
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
-with open(os.path.join(npth, "docs/source/version_history.rst"), mode="r") as f:
+with open(os.path.join(npth, "source/version_history.rst"), mode="r") as f:
     txt = f.read()
 
 assert f"`{release_version}" in txt
