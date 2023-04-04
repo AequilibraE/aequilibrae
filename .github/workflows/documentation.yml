@@ -39,8 +39,8 @@ jobs:
     - name: Check history of versions
       run: |
           cd docs
-          python website/check_documentation_versions.py
           python table_documentation.py
+          python website/check_documentation_versions.py
 
     - name: Build documentation
       run: |
