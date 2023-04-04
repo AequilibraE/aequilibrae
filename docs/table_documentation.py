@@ -73,7 +73,7 @@ class CreateTablesSRC:
 
             txt.extend(sql_code)
 
-            output = join(self.doc_path, "auto_generated", f"{table_name}.rst")
+            output = join(self.doc_path, self.stub, f"{table_name}.rst")
             with open(output, "w") as f:
                 for line in txt:
                     f.write(line + "\n")
