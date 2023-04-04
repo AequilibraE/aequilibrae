@@ -1,3 +1,8 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
+
 CREATE TABLE  if not exists link_types (link_type     VARCHAR UNIQUE NOT NULL PRIMARY KEY,
                                         link_type_id  VARCHAR UNIQUE NOT NULL,
                                         description   VARCHAR,

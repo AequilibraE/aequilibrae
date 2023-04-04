@@ -37,12 +37,14 @@ jobs:
         python3 setup.py build_ext --inplace
 
     - name: Check history of versions
-      run: python docs/website/check_documentation_versions.py
+      run: |
+          cd docs
+          python website/check_documentation_versions.py
+          python table_documentation.py
 
     - name: Build documentation
       run: |
-        sphinx-apidoc -T -o docs/source/generated aequilibrae
-        cd docs
+        sphinx-apidoc -T -o source/generated aequilibrae
         make html
 
     - name: Upload to DEV on S3

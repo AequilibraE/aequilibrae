@@ -1,3 +1,7 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
 CREATE TABLE  if not exists about (infoname  TEXT UNIQUE NOT NULL,
                                    infovalue TEXT
                                   );

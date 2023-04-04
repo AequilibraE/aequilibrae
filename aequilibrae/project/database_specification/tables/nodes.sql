@@ -1,3 +1,7 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
 CREATE TABLE if not exists nodes (ogc_fid     INTEGER PRIMARY KEY,
                                   node_id     INTEGER UNIQUE NOT NULL,
                                   is_centroid INTEGER        NOT NULL DEFAULT 0,

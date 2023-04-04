@@ -1,3 +1,7 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
 CREATE TABLE 'zones' (ogc_fid    INTEGER PRIMARY KEY,
                       zone_id    INTEGER UNIQUE NOT NULL,
                       area       NUMERIC,

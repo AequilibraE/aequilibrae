@@ -1,3 +1,7 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
 CREATE TABLE if not exists modes (mode_name   VARCHAR UNIQUE NOT NULL,
                                   mode_id     VARCHAR UNIQUE NOT NULL       PRIMARY KEY,
                                   description VARCHAR,

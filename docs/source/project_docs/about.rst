@@ -52,7 +52,7 @@ be present when the project is open during future use.
     p.about.my_super_relevant_field = 'super relevant information'
     p.about.write_back()
 
-Changing existing fields can also be done programatically
+Changing existing fields can also be done programmatically
 
 ::
 

@@ -1,3 +1,7 @@
+--@ THIS TABLE REQUIRES FURTHER DOCUMENTATION
+--@
+--@
+
 CREATE TABLE  if not exists attributes_documentation (name_table  TEXT NOT NULL,
                                                       attribute   TEXT NOT NULL,
                                                       description TEXT,

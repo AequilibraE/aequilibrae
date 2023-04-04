@@ -81,7 +81,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    Nitty-Gritty
    ^^^^^^^^^^^^^^^
 
-   New to AequilibraE? Check out the getting started guides. 
+   Looking for something more than using the software? Check out the development info.
 
    +++
 
