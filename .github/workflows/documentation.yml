@@ -38,13 +38,13 @@ jobs:
 
     - name: Check history of versions
       run: |
-          cd docs
-          python table_documentation.py
-          python website/check_documentation_versions.py
+          python docs/table_documentation.py
+          python docs/website/check_documentation_versions.py
 
     - name: Build documentation
       run: |
-        sphinx-apidoc -T -o source/generated aequilibrae
+        sphinx-apidoc -T -o docs/source/generated aequilibrae
+        cd docs
         make html
 
     - name: Upload to DEV on S3
