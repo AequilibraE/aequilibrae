@@ -1,4 +1,6 @@
 """
+.. _example_usage_paths:
+
 Path and skimming
 =================
 

@@ -70,6 +70,8 @@ Parameters
    :toctree: api/
 
     Parameters
+    Parameters.restore_default
+    Parameters.write_back
 
 Distribution
 ~~~~~~~~~~~~

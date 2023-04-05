@@ -8,7 +8,7 @@
 --@ The *description* field holds the description of the mode.
 --@
 --@ The *pce* field holds information on Passenger-Car equivalent
---@ for assignment. Defaults to ***1.0**.
+--@ for assignment. Defaults to **1.0**.
 --@
 --@ The *vot* field holds information on Value-of-Time for traffic
 --@ assignment. Defaults to **0.0**.

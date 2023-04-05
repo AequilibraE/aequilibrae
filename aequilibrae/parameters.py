@@ -6,8 +6,7 @@ from aequilibrae.context import get_active_project
 
 
 class Parameters:
-    """
-    Global parameters module
+    """Global parameters module
 
     Parameters are used in many procedures, and are often defined only in the parameters.yml file ONLY
     Parameters are organized in the following groups:
@@ -54,12 +53,38 @@ class Parameters:
             self.parameters = deepcopy(self._default)
 
     def write_back(self):
-        """Writes the parameters back to file"""
+        """Writes the parameters back to file
+        
+        .. code-block:: python
+        
+            from aequilibrae import Parameters
+
+            fldr = 'D:/myProject/logs'
+
+            p = Parameters()
+            p.parameters['system']['logging_directory'] =  fldr 
+            p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+            p.parameters['osm']['max_query_area_size'] = 10000000000
+            p.parameters['osm']['sleeptime'] = 0
+            p.write_back()
+        
+        """
         with open(self.file, "w") as stream:
             yaml.dump(self.parameters, stream, default_flow_style=False)
 
     def restore_default(self):
-        """Restores parameters to generic default"""
+        """Restores parameters to generic default
+        
+        .. code-block:: python
+        
+            from aequilibrae import Parameters
+
+            fldr = 'D:/myProject/logs'
+
+            p = Parameters()
+            p.reset_default()
+
+        """
         self.parameters = self._default
         self.write_back()
 

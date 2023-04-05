@@ -40,274 +40,6 @@ use of the tool.
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific developed efforts.
 
-Network Fields
---------------
-
-As described in the :ref:`project` the AequilibraE network is composed of two layers (links
-and nodes), detailed below.
-
-Links
-~~~~~
-
-Network links are defined by geographic elements of type LineString (No
-MultiLineString allowed) and a series of required fields, as well a series of
-other optional fields that might be required for documentation and display
-purposes (e.g. street names) or by specific applications (e.g. parameters for
-Volume-Delay functions, hazardous vehicles restrictions, etc.).
-
-Below we present the
-
-**The mandatory fields are the following. REMOVING ANY OF THESE FIELDS WILL CORRUPT YOUR NETWORK**
-
-+-------------+-----------------------------------------------------------------------+-------------------------+
-|  Field name |                           Field Description                           |        Data Type        |
-+=============+=======================================================================+=========================+
-| link_id     | Unique identifier                                                     | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| a_node      | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| b_node      | node_id of the last (topologically) node of the link                  | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| direction   | Direction of flow allowed for the link (A-->B: 1, B-->A:-1, Both:0)   | Integer 8 bits          |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| distance    | Length of the link in meters                                          | Float 64 bits           |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| modes       | Modes allowed in this link. (Concatenation of mode ids)               | String                  |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| link_type   | Link type classification. Can be the highway tag for OSM or other     | String                  |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-
-
-**The following fields are generated when a new AequilibraE model is created,**
-**but may be removed without compromising the network's consistency.**
-
-+-------------+-----------------------------------------------------------------------+-------------------------+
-|  Field name |                           Field Description                           |        Data Type        |
-+=============+=======================================================================+=========================+
-| name        | Cadastre name of the street                                           | String                  |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| capacity_ab | Modeling capacity of the link for the direction A --> B               | Float 32 bits           |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| capacity_ba | Modeling capacity of the link for the direction B --> A               | Float 32 bits           |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| speed_ab    | Modeling (Free flow) speed for the link in the A --> B direction      | Float 32 Bits           |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| speed_ab    | Modeling (Free flow) speed for the link in the B --> A direction      | Float 32 bits           |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-
-The user is free to add a virtually unlimited number of fields to the network.
-Although we recommend adding fields using the Python API, adding fields
-directly to the database should not create any issues, but one should observe
-the convention that direction-specific information should be added in the
-form of two fields with the suffixes *_ab* & *_ba*.
-
-Nodes
-~~~~~
-
-The nodes table only has four mandatory fields as of now: *node_id*, which are
-directly linked to *a_node* and *b_node* in the links table through a series of
-database triggers, *is_centroid*, which is a binary 1/0 value identifying nodes
-as centroids (1) or not (0).
-
-The fields for *modes* and *link_types* are linked to the *modes* and
-*link_type* fields from the links layer through a series of triggers, and
-cannot be safely edited by the user (nor there is reason for such).
-
-+-------------+-----------------------------------------------------------------------+-------------------------+
-|  Field name |                           Field Description                           |        Data Type        |
-+=============+=======================================================================+=========================+
-| node_id     | Unique identifier. Tied to the link table's a_node & b_node           | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| is_centroid | node_id of the first (topologically) node of the link                 | Integer (32/64 bits)    |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| modes       | Concatenation of all mode_ids of all links connected to the node      | String                  |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-| link_types  | Concatenation of all link_type_ids of all links connected to the node | String                  |
-+-------------+-----------------------------------------------------------------------+-------------------------+
-
-As it is the case for the lin k layer, the user is welcome to add new fields
-directly to the database, but we recommend using the API.
-
-.. note::
-    It is good practice when working with the sqlite to keep all field names without
-    spaces and all lowercase. **SPACES AND NUMBERS IN THE FIELD NAMES ARE NOT**
-    **SUPPORTED**
-
-Future components
-~~~~~~~~~~~~~~~~~
-
-3.	Turn penalties/restrictions
-
-4.	Transit routes
-
-5.	Transit stops
-
-.. _importing_from_osm:
-
-Importing from Open Street Maps
--------------------------------
-
-Please review the information :ref:`parameters_osm`
-
-.. note::
-
-   **ALL links that cannot be imported due to errors in the SQL insert**
-   **statements are written to the log file with error message AND the SQL**
-   **statement itself, and therefore errors in import can be analyzed for**
-   **re-downloading or fixed by re-running the failed SQL statements after**
-   **manual fixing**
-
-.. _sqlite_python_limitations:
-
-Python limitations
-~~~~~~~~~~~~~~~~~~
-As it happens in other cases, Python's usual implementation of SQLite is
-incomplete, and does not include R-Tree, a key extension used by Spatialite for
-GIS operations.
-
-For this reason, AequilibraE's default option when importing a network from OSM
-is to **NOT create spatial indices**, which renders the network consistency
-triggers useless.
-
-If you are using a vanilla Python installation (your case if you are not sure),
-you can import the network without creating indices, as shown below.
-
-::
-
-  from aequilibrae.project import Project
-
-  p = Project()
-  p.new('path/to/project/new/folder')
-  p.network.create_from_osm(place_name='my favorite place')
-  p.conn.close()
-
-And then manually add the spatial index on QGIS by adding both links and nodes
-layers to the canvas, and selecting properties and clicking on *create spatial*
-*index* for each layer at a time. This action automatically saves the spatial
-indices to the sqlite database.
-
-.. image:: ../images/qgis_creating_spatial_indices.png
-    :width: 1383
-    :align: center
-    :alt: Adding Spatial indices with QGIS
-
-If you are an expert user and made sure your Python installation was compiled
-against a complete SQLite set of extensions, then go ahead an import the network
-with the option for creating such indices.
-
-::
-
-  from aequilibrae.project import Project
-
-  p = Project()
-  p.new('path/to/project/new/folder/')
-  p.network.create_from_osm(place_name='my favorite place', spatial_index=True)
-  p.conn.close()
-
-If you want to learn a little more about this topic, you can access this
-`blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
-or the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
-
-If you want to take a stab at solving your SQLite/SpatiaLite problem
-permanently, take a look at this
-`OTHER BLOG POST <https://www.xl-optim.com/spatialite-and-python-in-2020/>`_.
-
-Please also note that the network consistency triggers will NOT work before
-spatial indices have been created and/or if the editing is being done on a
-platform that does not support both RTree and Spatialite.
-
-.. _importing_from_gmns:
-
-Importing from files in GMNS format
------------------------------------
-
-Before importing a network from a source in GMNS format, it is imperative to know 
-in which spatial reference its geometries (links and nodes) were created. If the SRID
-is different than 4326, it must be passed as an input using the argument 'srid'.
-
-You can import a GMNS network as shown below:
-
-::
-  from aequilibrae.project import Project
-
-  p = Project()
-  p.new('path/to/project/new/folder')
-  p.network.create_from_gmns(link_file_path='path/to/link_file.csv', node_file_path='path/to/node_file.csv', srid=32619)
-  # p.network.create_from_gmns(
-  #   link_file_path='path/to/link_file.csv', node_file_path='path/to/node_file.csv', 
-  #   use_group_path='path/to/use_group.csv', geometry_path='path/to/geometry.csv', srid=32619
-  # ) 
-  p.conn.close()
-
-As of July 2022, it is possible to import the following files from a GMNS source:
-
-* link table;
-* node table;
-* use_group table;
-* geometry table.
-
-You can find the specification for all these tables in the GMNS documentation, 
-`here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
-
-By default, the method *create_from_gmns()* read all required and optional fields
-specified in the GMNS link and node tables specification. If you need it to read 
-any additional fields as well, you have to modify the AequilibraE parameters as
-shown in the :ref:`example <sphx_glr__auto_examples_plot_import_from_gmns.py>`.
-When adding a new field to be read in the parameters.yml file, it is important to 
-keep the "required" key set to False, since you will always be adding a non-required 
-field. Required fields for a specific table are only those defined in the GMNS
-specification.
-
-.. note::
-
-    **In the AequilibraE nodes table, if a node is to be identified as a centroid, its**
-    **'is_centroid' field has to be set to 1. However, this is not part of the GMNS**
-    **specification. Thus, if you want a node to be identified as a centroid during the**
-    **import process, in the GMNS node table you have to set the field 'node_type' equals**
-    **to 'centroid'.**
-
-.. _exporting_to_gmns:
-
-Exporting AequilibraE model to GMNS format
-------------------------------------------
-
-After loading an existing AequilibraE project, you can export it to GMNS format as
-shown below:
-
-::
-  from aequilibrae.project import Project
-
-  p = Project()
-  p.load('path/to/project/new/folder')
-  p.network.export_to_gmns(path='path/to/output/folder')
-
-  p.conn.close()
-
-As of July 2022, it is possible to export an AequilibraE network to the following
-tables in GMNS format:
-
-* link table
-* node table
-* use_definition table
-
-This list does not include the optional use_group table, which is an optional argument
-of the *create_from_gmns()* function, because mode groups are not used in the AequilibraE
-modes table.
-
-In addition to all GMNS required fileds for each of the three exported tables, some
-other fields are also added as riminder of where the features came from when looking 
-back at the AequilibraE project.
-
-.. note::
-
-    **When a node is identified as a centroid in the AequilibraE nodes table, this**
-    **information is transmitted to the GMNS node table by meaans of the field**
-    **'node_type', which is set to 'centroid' in this case. The 'node_type' field**
-    **is an optinal field listed in the GMNS node table specification.**
-
-You can find the GMNS specification
-`here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
-
 .. _network_triggers_behaviour:
 
 Network consistency behaviour
@@ -335,16 +67,37 @@ problem:
 .. _net_section.1:
 
 Change behavior
-~~~~~~~~~~~~~~~
+---------------
 
 In this section we present the mapping of all meaningful changes that a user can
 do to each part of the transportation network, doing so for each element of the
-transportation network.
+transportation network. You can use the table below to navigate between each of the
+meaningful changes documented for nodes and links of your network.
+
+.. table::
+   :align: center
+
++------------------------------+--------------------------+
+| Nodes                        |     Links                |
++==============================+==========================+
+| :ref:`net_section.1.1.1`     | :ref:`net_section.1.2.1` |
++------------------------------+--------------------------+
+| :ref:`net_section.1.1.2`     | :ref:`net_section.1.2.2` |
++------------------------------+--------------------------+
+| :ref:`net_section.1.1.3`     | :ref:`net_section.1.2.3` |
++------------------------------+--------------------------+
+| :ref:`net_section.1.1.4`     |                          |
++------------------------------+--------------------------+
+| :ref:`net_section.1.1.5`     |                          |
++------------------------------+--------------------------+
+| :ref:`net_section.1.1.6`     | :ref:`net_section.1.2.6` |
++------------------------------+--------------------------+
+
 
 .. _net_section.1.1:
 
 Node layer changes and expected behavior
-++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are 6 possible changes envisioned for the network nodes layer, being 3 of
 geographic nature and 3 of data-only nature. The possible variations for each
@@ -451,7 +204,7 @@ to turn restrictions and to transit stops)
 .. _net_section.1.2:
 
 Link layer changes and expected behavior
-++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are 8 possible changes envisioned for the network links layer, being 5 of
 geographic nature and 3 of data-only nature.
@@ -499,7 +252,7 @@ When reshaping a link, the only thing other than we expect to be updated in the
 link database is their length (or distance, in AequilibraE's field structure).
 As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 
-.. .. _net_section.1.2.4:
+.. _net_section.1.2.4:
 
 .. Splitting a link
 .. ^^^^^^^^^^^^^^^^
@@ -523,8 +276,8 @@ field, they will most likely corrupt the project.
 .. _net_section.1.3:
 
 Field-specific data consistency
-+++++++++++++++++++++++++++++++
- Some data fields are specially
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some data fields are specially sensitive to user changes.
 
 .. _net_section.1.3.1:
 
@@ -543,7 +296,6 @@ Link direction
 Triggers enforce link direction to be -1, 0 or 1, and any other value results in
 an SQL exception.
 
-
 .. _net_section.1.3.3:
 
 *modes* field (Links and Nodes layers)
@@ -551,35 +303,16 @@ an SQL exception.
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_modes`.
 
+.. _net_section.1.3.4:
 *link_type* field (Links layer) & *link_types* field (Nodes layer)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_link_types`.
 
+.. _net_section.1.3.5:
 a_node and b_node
 ^^^^^^^^^^^^^^^^^
 The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not
 possible to enforce that users do not change these two fields, as it is not
 possible to choose the trigger application sequence in SQLite
-
-
-Projection
-----------
-
-Although GIS technology allows for a number of different projections to be used
-in pretty much any platform, we have decided to have all AequilibraE's project
-using a single projection, WGS84 - CRS 4326.
-
-This should not affect users too much, as GIS platforms allow for on-the-fly
-reprojection for mapping purposes.
-
-
-# 4	References
-http://tfresource.org/Category:Transportation_networks
-
-# 5	Authors
-
-## Pedro Camargo
-- www.xl-optim.com
--

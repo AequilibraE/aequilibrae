@@ -1,4 +1,6 @@
 """
+.. _example_usage_distribution:
+
 Trip Distribution
 =================
 

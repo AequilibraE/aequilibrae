@@ -18,9 +18,9 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 .. panels::
    :card: shadow
    :header: text-center
-   :column: col-lg-12 p-2
 
    ---
+   :column: col-lg-12
    :fa:`workflow`
    Using AequilibraE
    ^^^^^^^^^^^^^^^^^

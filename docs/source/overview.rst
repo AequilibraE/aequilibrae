@@ -10,7 +10,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
 AequilibraE has also a fully features interface avalaible as a plugin for the
 open source software QGIS, which is separately mantained and discussed in
-detail its `documentation. <http://www.aequilibrae.com/qgis>`_
+detail its `documentation <http://www.aequilibrae.com/qgis>`_.
 
 Sub-modules
 -----------
@@ -46,7 +46,7 @@ This concept is still under heavy development, but it is already possible to use
 its structure to download full, routable networks directly from
 `Open Street Maps <https://www.openstreetmap.org/>`_ .
 
-More detailed is provided in - :ref:`project`.
+More detailed is provided in :ref:`project`.
 
 
 .. _overview_parameters:
@@ -128,7 +128,7 @@ AequilibraE project.
 Matrix
 ~~~~~~
 
-The matrix submodule has two main components. Datasets and Matrices
+The matrix submodule has two main components: *Datasets* and *Matrices*.
 
 Their existence is required for performance purposes and to support consistency
 across other modules. It also make it a lot faster to develop new features.

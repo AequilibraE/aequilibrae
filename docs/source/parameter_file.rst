@@ -1,71 +1,15 @@
 .. _parameters_file:
+====================
+Parameters YAML File
+====================
 
-Parameter File
-==============
-
-The parameter file has 4 distinct sections, each of which hold parameters for a
-certain portion of the software.
-
-* :ref:`parameters_system`
+The parameter file holds the parameters information for a certain portion of the software.
 
 * :ref:`parameters_assignment`
-
-* :ref:`parameters_osm`
-
 * :ref:`parameters_distribution`
-
 * :ref:`parameters_network`
-
-Basic use of the parameters module is exemplified through the AequilibraE API
-as detailed in the :ref:`example_usage_parameters` section of the use cases.
-
-.. _parameters_system:
-
-System
--------
-
-The system section of the parameters file holds information on things like the
-number of threads used in multi-threaded processes, logging and temp folders
-and whether we should be saving information to a log file at all, as exemplified
-below.
-
-.. image:: images/parameters_system_example.png
-    :width: 812
-    :align: center
-    :alt: System example
-
-The number of CPUs have a special behaviour defined, as follows:
-
-* **cpus<0** : The system will use the total number logical processors
-  **MINUS** the absolute value of **cpus**
-
-* **cpus=0** : The system will use the total number logical processors available
-
-* **cpus>0** : The system will use exactly **cpus** for computation, limited to
-   the total number logical processors available
-
-A few of these parameters, however, are targeted at its QGIS plugin, which is
-the case of the *driving side* and  *default_directory* parameters.
-
-.. _parameters_osm:
-
-Open Streeet Maps
------------------
-The OSM section of the parameter file is relevant only when one plans to
-download a substantial amount of data from an Overpass API, in which case it is
-recommended to deploy a local Overpass server.
-
-.. image:: images/parameters_assignment_example.png
-    :width: 840
-    :align: center
-    :alt: OSM example
-
-The user is also welcome to change the maximum area for a single query to the
-Overpass API (m\ :sup:`2`) and the pause duration between successive
-requests *sleeptime*.
-
-It is also possible to set a custom address for the Nominatim server, but its
-use by AequilibraE is so small that it is likely not necessary to do so.
+* :ref:`parameters_system`
+* :ref:`parameters_osm`
 
 .. _parameters_assignment:
 
@@ -104,10 +48,11 @@ synthetic gravity models, as shown below.
 Network
 -------
 
-There are three groups of parameters under the network section: *links*, *nodes* & *OSM*. The
-first are basically responsible for the design of the network to be created in case a new
-project/network is to bre created from scratch, and for now each one of these groups
-contains only a single group of parameters called *fields*.
+There are four groups of parameters under the network section: *links*, *nodes*,
+*OSM*, and *GMNS*. The first are basically responsible for the design of the network 
+to be created in case a new project/network is to bre created from scratch, and for
+now each one of these groups contains only a single group of parameters called 
+*fields*.
 
 link fields
 ~~~~~~~~~~~
@@ -172,11 +117,10 @@ would have no effect here.
 
 
 Open Street Maps
-----------------
-The **OSM** group of parameters has as its only
-there are further groups: **modes** and **all_link_types**.
+~~~~~~~~~~~~~~~~
+The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
-List of key tags we will import for each mode. Description of tags can be found on
+**modes** contains the list of key tags we will import for each mode. Description of tags can be found on
 `Open-Street Maps <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
 not changing the standard parameters unless you are exactly sure of what you are doing.
 
@@ -188,3 +132,57 @@ This feature is stored under the key *mode_filter* under each mode to be importe
 There is also the possibility that not all keywords for link types for the region being
 imported, and therefore unknown link type tags are treated as a special case for each
 mode, and that is controlled by the key *unknown_tags* in the parameters file.
+
+GMNS
+~~~~
+
+XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
+XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
+
+.. _parameters_system:
+
+System
+------
+
+The system section of the parameters file holds information on the
+number of threads used in multi-threaded processes, logging and temp folders
+and whether we should be saving information to a log file at all, as exemplified
+below.
+
+.. image:: images/parameters_system_example.png
+    :width: 812
+    :align: center
+    :alt: System example
+
+The number of CPUs have a special behaviour defined, as follows:
+
+* **cpus<0** : The system will use the total number logical processors
+  **MINUS** the absolute value of **cpus**
+
+* **cpus=0** : The system will use the total number logical processors available
+
+* **cpus>0** : The system will use exactly **cpus** for computation, limited to
+   the total number logical processors available
+
+A few of these parameters, however, are targeted at its QGIS plugin, which is
+the case of the *driving side* and  *default_directory* parameters.
+
+.. _parameters_osm:
+
+Open Streeet Maps
+-----------------
+The OSM section of the parameter file is relevant only when one plans to
+download a substantial amount of data from an Overpass API, in which case it is
+recommended to deploy a local Overpass server.
+
+.. image:: images/parameters_osm_example.png
+    :width: 840
+    :align: center
+    :alt: OSM example
+
+The user is also welcome to change the maximum area for a single query to the
+Overpass API (m\ :sup:`2`) and the pause duration between successive
+requests *sleeptime*.
+
+It is also possible to set a custom address for the Nominatim server, but its
+use by AequilibraE is so small that it is likely not necessary to do so.
