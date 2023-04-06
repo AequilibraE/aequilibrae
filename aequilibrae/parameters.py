@@ -30,6 +30,23 @@ class Parameters:
                     - 50: 'CRITICAL'
     * report zeros
     * temp directory
+
+    .. code-block:: python
+
+        from aequilibrae import Project
+
+        project = Project.from_path("/tmp/test_project")
+
+        p = project.parameters
+
+        p.parameters['system']['logging_directory'] =  fldr
+        p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+        p.parameters['osm']['max_query_area_size'] = 10000000000
+        p.parameters['osm']['sleeptime'] = 0
+        p.write_back()
+
+        # You can also restore the software default values
+        p.restore_default()
     """
 
     _default: dict
@@ -53,38 +70,12 @@ class Parameters:
             self.parameters = deepcopy(self._default)
 
     def write_back(self):
-        """Writes the parameters back to file
-        
-        .. code-block:: python
-        
-            from aequilibrae import Parameters
-
-            fldr = 'D:/myProject/logs'
-
-            p = Parameters()
-            p.parameters['system']['logging_directory'] =  fldr 
-            p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
-            p.parameters['osm']['max_query_area_size'] = 10000000000
-            p.parameters['osm']['sleeptime'] = 0
-            p.write_back()
-        
-        """
+        """Writes the parameters back to file"""
         with open(self.file, "w") as stream:
             yaml.dump(self.parameters, stream, default_flow_style=False)
 
     def restore_default(self):
-        """Restores parameters to generic default
-        
-        .. code-block:: python
-        
-            from aequilibrae import Parameters
-
-            fldr = 'D:/myProject/logs'
-
-            p = Parameters()
-            p.restore_default()
-
-        """
+        """Restores parameters to generic default"""
         self.parameters = self._default
         self.write_back()
 

@@ -42,6 +42,12 @@ class Project:
         self.about: About = None
         self.logger: logging.Logger = None
 
+    @classmethod
+    def from_path(cls, project_folder):
+        project = Project()
+        project.open(project_folder)
+        return project
+
     def open(self, project_path: str) -> None:
         """
         Loads project from disk
