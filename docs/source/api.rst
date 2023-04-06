@@ -12,6 +12,9 @@ Project
    :toctree: api/
 
    Project
+   Project.load
+   Project.new
+   Project.open
 
 Project Components
 ------------------
@@ -70,8 +73,6 @@ Parameters
    :toctree: api/
 
     Parameters
-    Parameters.restore_default
-    Parameters.write_back
 
 Distribution
 ~~~~~~~~~~~~

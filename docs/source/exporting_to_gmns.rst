@@ -5,7 +5,7 @@ Exporting AequilibraE model to GMNS format
 
 After loading an existing AequilibraE project, you can export it to GMNS format. 
 
-.. image:: images/parameters_links_example.png
+.. image:: images/plot_export_to_gmns.png
     :align: center
     :alt: example
     :target: _auto_examples/plot_export_to_gmns.html

@@ -1,4 +1,6 @@
 """
+.. _find_disconnected_links:
+
 Finding disconnected links
 ==========================
 
@@ -6,24 +8,17 @@ On this example, we show how to find disconnected links in an AequilibraE networ
 
 We use the Nauru example to find disconnected links
 """
-
 # %%
-import numpy as np
-import pandas as pd
-from PIL import Image
-import matplotlib.pyplot as plt
-
-img = Image.open("disconnected_network.png")
-plt.imshow(img)
-
-# %%
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from datetime import datetime
+import pandas as pd
+import numpy as np
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.paths.results import PathResults
+# sphinx_gallery_thumbnail_path = 'images/disconnected_network.png'
 
 # %%
 # We create an empty project on an arbitrary folder

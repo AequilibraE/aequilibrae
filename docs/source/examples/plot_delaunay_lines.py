@@ -2,9 +2,9 @@
 Creating Delaunay Lines
 =======================
 
-On this example we show how to create AequilibraE's famous Delaunay Lines, but in Python
+On this example we show how to create AequilibraE's famous Delaunay Lines, but in Python.
 
-For more on this topic, the firs publication is here: https://xl-optim.com/delaunay/
+For more on this topic, the first publication is `here <https://xl-optim.com/delaunay/>`_.
 
 We use the Sioux-Falls example once again.
 """

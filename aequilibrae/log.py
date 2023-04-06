@@ -2,26 +2,25 @@ import os
 import tempfile
 import logging
 
-from .parameters import Parameters
+from aequilibrae.parameters import Parameters
 
 
 class Log:
     """API entry point to the log file contents
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> project = Project.from_path("/tmp/test_project")
 
-        log = p.log()
+        >>> log = project.log()
 
         # We get all entries for the log file
-        entries = log.contents()
+        >>> entries = log.contents()
 
         # Or clear everything (NO UN-DOs)
-        log.clear()
+        >>> log.clear()
     """
 
     def __init__(self, project_base_path: str):

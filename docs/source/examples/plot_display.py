@@ -1,31 +1,22 @@
 """
+.. _explore_network_on_notebook:
+
 Exploring the network on a notebook
 ===================================
 
-On this example we show how to use Folium to plot a network for different modes
+On this example we show how to use Folium to plot a network for different modes.
 
 We will need Folium for this example, and we will focus on creating a layer for
-each mode in the network, a layer for all links and a layer for all nodes
+each mode in the network, a layer for all links and a layer for all nodes.
 """
-
 # %%
-# **What we want is a map that looks a little like this**
-
-# %%
-from PIL import Image
-import matplotlib.pyplot as plt
-
-img = Image.open("plot_network_image.png")
-plt.imshow(img)
-
-
-# %%
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 import folium
+# sphinx_gallery_thumbnail_path = 'images/plot_network_image.png'
 
 # %%
 # We create an empty project on an arbitrary folder

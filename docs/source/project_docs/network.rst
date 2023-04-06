@@ -40,6 +40,14 @@ use of the tool.
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific developed efforts.
 
+Currently, AequilibraE can create networks from OpenStreetMaps and GMNS, and
+also export this network to GMNS format. You can check out more information about 
+these features in the following pages:
+
+- :ref:`exporting_to_gmns`
+- :ref:`importing_from_gmns`
+- :ref:`importing_from_osm`
+
 .. _network_triggers_behaviour:
 
 Network consistency behaviour
@@ -86,11 +94,11 @@ meaningful changes documented for nodes and links of your network.
 +------------------------------+--------------------------+
 | :ref:`net_section.1.1.3`     | :ref:`net_section.1.2.3` |
 +------------------------------+--------------------------+
-| :ref:`net_section.1.1.4`     |                          |
+| :ref:`net_section.1.1.4`     | :ref:`net_section.1.2.6` |
 +------------------------------+--------------------------+
 | :ref:`net_section.1.1.5`     |                          |
 +------------------------------+--------------------------+
-| :ref:`net_section.1.1.6`     | :ref:`net_section.1.2.6` |
+| :ref:`net_section.1.1.6`     |                          |
 +------------------------------+--------------------------+
 
 
@@ -206,8 +214,11 @@ to turn restrictions and to transit stops)
 Link layer changes and expected behavior
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are 8 possible changes envisioned for the network links layer, being 5 of
-geographic nature and 3 of data-only nature.
+Network links layer also has some possible changes of geographic and data-only nature.
+
+.. note::
+   AequilibraE's link layer manipulation has other geographic nature
+   changes to be implemented.
 
 .. _net_section.1.2.1:
 

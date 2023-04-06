@@ -1,4 +1,6 @@
 """
+.. _export_to_gmns:
+
 Exporting network to GMNS
 ===========================
 
@@ -9,13 +11,14 @@ in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 """
 
 # %%
-## Imports
+# Imports
 from uuid import uuid4
 import os
 from tempfile import gettempdir
 from aequilibrae.utils.create_example import create_example
 import pandas as pd
 import folium
+# sphinx_gallery_thumbnail_path = 'images/plot_export_to_gmns.png'
 
 # %%
 # We load the example project inside a temp folder

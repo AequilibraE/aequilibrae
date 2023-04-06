@@ -1,9 +1,6 @@
 An overview of AequilibraE
 ==========================
 
-.. toctree::
-   :maxdepth: 4
-
 AequilibraE is the first comprehensive Python package for transportation
 modeling, and it aims to provide all the resources not easily available from
 other open-source packages in the Python (NumPy, really) ecosystem.
@@ -27,7 +24,6 @@ expected to be added in the future. The current modules are:
 - :ref:`overview_matrix`
 
 Contributions can be made to the existing modules or in the form of new modules.
-
 
 .. _overview_project:
 
@@ -175,3 +171,4 @@ AequilibraE data currently supports export to **csv** and **sqlite**. Extending
 it to other binary files such as HDF5 or `Arrow <https://arrow.apache.org/>`_
 are being considered for future development. If you require them, please file an
 issue on GitHub.
+

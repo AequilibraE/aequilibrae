@@ -2,11 +2,11 @@
 Editing network geometry: Splitting link
 ========================================
 
-In this example we split a link right in the middle,  while keeping all fields
-in the database equal.  Distance is proportionally computed automatically in the database
+In this example we split a link right in the middle, while keeping all fields
+in the database equal. Distance is proportionally computed automatically in the database.
 """
 
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -56,7 +56,7 @@ plt.plot(*new_link.geometry.xy, color="blue")
 
 for node in [link.a_node, link.b_node, new_link.b_node]:
     geo = all_nodes.get(node).geometry
-    plt.plot(*geo.xy, "ro", color="black")
+    plt.plot(*geo.xy, "o", color="black")
 plt.show()
 
 # %%
@@ -75,7 +75,7 @@ curr.execute("Select node_id from nodes;")
 
 for nid in curr.fetchall():
     geo = all_nodes.get(nid[0]).geometry
-    plt.plot(*geo.xy, "ro", color="black")
+    plt.plot(*geo.xy, "o", color="black")
 
 plt.show()
 

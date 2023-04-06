@@ -1,4 +1,6 @@
 """
+.. _import_from_gmns:
+
 Importing network from GMNS
 ===========================
 
@@ -8,13 +10,14 @@ Here's the repository: https://github.com/zephyr-data-specs/GMNS
 """
 
 # %%
-## Imports
+# Imports
 from uuid import uuid4
 from os.path import join
 from tempfile import gettempdir
 from aequilibrae.project import Project
 from aequilibrae.parameters import Parameters
 import folium
+# sphinx_gallery_thumbnail_path = 'images/plot_import_from_gmns.png'
 
 # %%
 # We load the example file from the GMNS GitHub repository
@@ -102,7 +105,6 @@ curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%
-
 # We create the map
 map_gmns = folium.Map(location=[lat, long], zoom_start=17)
 
@@ -113,7 +115,6 @@ for layer in layers:
 # And Add layer control before we display it
 folium.LayerControl().add_to(map_gmns)
 map_gmns
-
 
 # %%
 project.close()

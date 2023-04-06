@@ -1,19 +1,22 @@
 """
+.. _plot_from_osm:
+
 Project from Open-Street Maps
 =============================
 
-On this example we show how to create an empty project and populate with a network from Open-Street maps
+On this example we show how to create an empty project and populate with a network from Open-Street maps.
 
-But this time we will use Folium to visualize the network
+But this time we will use Folium to visualize the network.
 """
 
 # %%
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae import Project
 import folium
+# sphinx_gallery_thumbnail_path = 'images/nauru.png'
 
 # %%
 # We create an empty project on an arbitrary folder
@@ -24,12 +27,12 @@ project.new(fldr)
 # Now we can download the network from any place in the world (as long as you have memory for all the download
 # and data wrangling that will be done)
 
-# We can create from a bounding box
-# or from a named place. For the sake of this example, we will choose the small nation of Nauru
+# We can create from a bounding box or from a named place. 
+# For the sake of this example, we will choose the small nation of Nauru.
 project.network.create_from_osm(place_name="Nauru")
 
 # %%
-# We grab all the links data as a Pandas dataframe so we can process it easier
+# We grab all the links data as a Pandas DataFrame so we can process it easier
 links = project.network.links.data
 
 # We create a Folium layer
@@ -61,13 +64,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# **Don't know Nauru? Here is a map**
-
-# %%
-from PIL import Image
-import matplotlib.pyplot as plt
-
-img = Image.open("nauru.png")
-plt.imshow(img)

@@ -28,7 +28,7 @@ triggers useless.
 If you are using a vanilla Python installation (your case if you are not sure),
 you can import the network without creating indices, as shown below.
 
-::
+.. code-block:: python
 
   from aequilibrae.project import Project
 
@@ -42,7 +42,7 @@ layers to the canvas, and selecting properties and clicking on *create spatial*
 *index* for each layer at a time. This action automatically saves the spatial
 indices to the sqlite database.
 
-.. image:: ../images/qgis_creating_spatial_indices.png
+.. image:: images/qgis_creating_spatial_indices.png
     :width: 1383
     :align: center
     :alt: Adding Spatial indices with QGIS
@@ -51,7 +51,7 @@ If you are an expert user and made sure your Python installation was compiled
 against a complete SQLite set of extensions, then go ahead an import the network
 with the option for creating such indices.
 
-::
+.. code-block:: python
 
   from aequilibrae.project import Project
 
@@ -62,11 +62,11 @@ with the option for creating such indices.
 
 If you want to learn a little more about this topic, you can access this
 `blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
-or the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
+or check out the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
 
 If you want to take a stab at solving your SQLite/SpatiaLite problem
 permanently, take a look at this
-`OTHER BLOG POST <https://www.xl-optim.com/spatialite-and-python-in-2020/>`_.
+`other blog post <https://www.xl-optim.com/spatialite-and-python-in-2020/>`_.
 
 Please also note that the network consistency triggers will NOT work before
 spatial indices have been created and/or if the editing is being done on a

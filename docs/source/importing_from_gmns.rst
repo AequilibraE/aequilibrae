@@ -7,19 +7,10 @@ Before importing a network from a source in GMNS format, it is imperative to kno
 in which spatial reference its geometries (links and nodes) were created. If the SRID
 is different than 4326, it must be passed as an input using the argument 'srid'.
 
-You can import a GMNS network as shown below:
-
-::
-  from aequilibrae.project import Project
-
-  p = Project()
-  p.new('path/to/project/new/folder')
-  p.network.create_from_gmns(link_file_path='path/to/link_file.csv', node_file_path='path/to/node_file.csv', srid=32619)
-  # p.network.create_from_gmns(
-  #   link_file_path='path/to/link_file.csv', node_file_path='path/to/node_file.csv', 
-  #   use_group_path='path/to/use_group.csv', geometry_path='path/to/geometry.csv', srid=32619
-  # ) 
-  p.conn.close()
+.. image:: images/plot_import_from_gmns.png
+    :align: center
+    :alt: example
+    :target: _auto_examples/plot_import_from_gmns.html
 
 As of July 2022, it is possible to import the following files from a GMNS source:
 

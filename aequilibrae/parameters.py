@@ -33,20 +33,20 @@ class Parameters:
 
     .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project, Parameters
 
-        project = Project.from_path("/tmp/test_project")
+        >>> project = Project.from_path("/tmp/test_project")
 
-        p = project.parameters
+        >>> p = Parameters(project)
 
-        p.parameters['system']['logging_directory'] =  fldr
-        p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
-        p.parameters['osm']['max_query_area_size'] = 10000000000
-        p.parameters['osm']['sleeptime'] = 0
-        p.write_back()
+        >>> p.parameters['system']['logging_directory'] =  "/tmp/other_folder"
+        >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+        >>> p.parameters['osm']['max_query_area_size'] = 10000000000
+        >>> p.parameters['osm']['sleeptime'] = 0
+        >>> p.write_back()
 
-        # You can also restore the software default values
-        p.restore_default()
+        >>> # You can also restore the software default values
+        >>> p.restore_default()
     """
 
     _default: dict

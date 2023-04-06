@@ -4,13 +4,13 @@ Project from a link layer
 
 On this example we show how to create an empty project and populate it with a
 network coming from a link layer we load from a text file. It can easily be
-replaced with a different form of loading the data (GeoPandas, for example)
+replaced with a different form of loading the data (GeoPandas, for example).
 
-We use Folium to visualize the resulting network
+We use Folium to visualize the resulting network.
 """
 
 # %%
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -27,6 +27,7 @@ from string import ascii_lowercase
 fldr = join(gettempdir(), uuid4().hex)
 project = Project()
 project.new(fldr)
+
 # %%
 # Now we obtain the link data for our example (in this case from a link layer
 # we will download from the AequilibraE website)
@@ -49,7 +50,6 @@ existing_types = [ltype.link_type for ltype in lt_dict.values()]
 
 # We could also get it directly from the project database
 # existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
-
 
 # %%
 # We add the link types that do not exist yet
@@ -110,7 +110,8 @@ link_data.add("source_id", "link_id from the data source")
 links.refresh_fields()
 
 # %%
-## We can now add all links to the project!
+# We can now add all links to the project!
+
 for idx, record in df.iterrows():
     new_link = links.new()
 
@@ -123,10 +124,8 @@ for idx, record in df.iterrows():
     new_link.geometry = load_wkt(record.WKT)
     new_link.save()
 
-#
-#
 # %%
-# We grab all the links data as a Pandas dataframe so we can process it easier
+# We grab all the links data as a Pandas DataFrame so we can process it easier
 links = project.network.links.data
 
 # We create a Folium layer
@@ -151,14 +150,14 @@ curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%
-map_osm = folium.Map(location=[lat, long], zoom_start=14)
+map_osm = folium.Map(location=[lat, long], zoom_start=15)
 network_links.add_to(map_osm)
 folium.LayerControl().add_to(map_osm)
 map_osm
-#
+
 # %%
 project.close()
-#
+
 # %%
 # **Don't know Queluz? Here is a picture of its most impressive urban structure**
 

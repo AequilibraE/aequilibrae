@@ -3,10 +3,10 @@ Editing network geometry: Links
 ===============================
 
 On this example we move a link extremity from one point to another
-and see what happens to the network
+and see what happens to the network.
 """
 
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -57,12 +57,11 @@ curr.execute("Select node_id from nodes;")
 
 for nid in curr.fetchall():
     geo = all_nodes.get(nid[0]).geometry
-    plt.plot(*geo.xy, "ro", color="black")
+    plt.plot(*geo.xy, "o", color="black")
 
 plt.show()
 
 # Now look at the network how it used to be
-
 
 # %%
 project.close()

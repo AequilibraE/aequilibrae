@@ -1,4 +1,6 @@
 """
+.. _create_zones:
+
 Creating a zone system based on Hex Bins
 ========================================
 
@@ -12,20 +14,11 @@ you have the geometries for them. In that case, you can just skip the Hex bin co
 part of this notebook.
 
 We also add centroid connectors to our network to make it a pretty complete example
+
 """
 
 # %%
-# **What we want to create a zoning system like this**
-
-# %%
-from PIL import Image
-import matplotlib.pyplot as plt
-
-img = Image.open("plot_create_zoning.png")
-plt.imshow(img)
-
-# %%
-## Imports
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -33,6 +26,7 @@ from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
 from aequilibrae.utils.create_example import create_example
+# sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
 # We create an empty project on an arbitrary folder
@@ -45,15 +39,13 @@ project = create_example(fldr, "nauru")
 # We said we wanted 100 zones
 zones = 100
 
-# %% md
+#%%
 # Hex Bins using SpatiaLite
-
-
-# %% md
-#### Spatialite requires a few things to compute hex bins
+# -------------------------
 
 # %%
-# One of the them is the area you want to cover
+# Spatialite requires a few things to compute hex bins. 
+# One of the them is the area you want to cover.
 network = project.network
 
 # So we use the convenient network method convex_hull() (it may take some time for very large networks)
@@ -108,8 +100,9 @@ for i, zone_geo in enumerate(grid):
     zone.add_centroid(None)
 
 
-# %% md
-## Centroid connectors
+#%%
+# Centroid connectors
+# -------------------
 
 # %%
 for zone_id, zone in zoning.all_zones().items():
@@ -125,7 +118,7 @@ for zone_id, zone in zoning.all_zones().items():
         break
 
 # %%
-#  Let's add an special generator zones
+# Let's add an special generator zones
 # We also add a centroid at  the airport terminal
 nodes = project.network.nodes
 
@@ -139,10 +132,6 @@ airport.save()
 # the centroid that needs to be considered when looking for candidate nodes
 # Distance here is in degrees, so 0.01 is equivalent to roughly 1.1km
 airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytrusP", connectors=1)
-
-
-# %%
-
 
 # %%
 project.close()
