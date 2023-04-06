@@ -82,7 +82,7 @@ class Parameters:
             fldr = 'D:/myProject/logs'
 
             p = Parameters()
-            p.reset_default()
+            p.restore_default()
 
         """
         self.parameters = self._default
