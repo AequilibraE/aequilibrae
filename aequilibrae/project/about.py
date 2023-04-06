@@ -2,7 +2,6 @@ from os.path import join, dirname, realpath
 import string
 import uuid
 from aequilibrae.project.project_creation import run_queries_from_sql_file
-from aequilibrae.paths import release_version
 
 
 class About:
@@ -35,10 +34,9 @@ class About:
             run_queries_from_sql_file(self.__conn, qry_file)
 
         cursor = self.__conn.cursor()
-        cursor.execute('select infovalue from about where infoname="aequilibrae_version"')
 
-        if cursor.fetchone()[0] is None:
-            cursor.execute(f"UPDATE 'about' set infovalue='{release_version}' where infoname='aequilibrae_version'")
+        sql = "SELECT count(*) as num_records from about;"
+        if self.__conn.execute(sql).fetchone()[0] == 0:
             cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
             cursor.execute("UPDATE 'about' set infovalue='right' where infoname='driving_side'")
             self.__conn.commit()

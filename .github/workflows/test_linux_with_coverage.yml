@@ -28,11 +28,7 @@ jobs:
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
     - name: Compile library
       run: |
-        cd aequilibrae/paths
-        python3 setup_assignment.py build_ext --inplace
-        cd ../distribution
-        python3 setup_ipf.py build_ext --inplace
-        cd ../..
+        python3 setup.py build_ext --inplace
 
     - name: Generate coverage report
       run: |

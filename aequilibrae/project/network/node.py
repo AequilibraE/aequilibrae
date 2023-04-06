@@ -83,12 +83,11 @@ class Node(SafeClass):
             return
 
         conn = self.connect_db()
-        curr = conn.cursor()
-
-        curr.execute("BEGIN;")
-        curr.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
-        curr.execute("COMMIT;")
-        conn.close()
+        try:
+            conn.execute("Update Nodes set node_id=? where node_id=?", [new_id, self.node_id])
+        finally:
+            conn.commit()
+            conn.close()
         self._logger.info(f"Node {self.node_id} was renumbered to {new_id}")
         self.__dict__["node_id"] = new_id
         self.__original__["node_id"] = new_id
