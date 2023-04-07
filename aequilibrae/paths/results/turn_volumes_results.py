@@ -79,7 +79,7 @@ class TurnVolumesResults:
         conn.close()
         procedure_id = df.at[0, "procedure_id"]
         procedure_report = eval(df.at[0, "procedure_report"])
-        convergence_report = pd.DataFrame(eval(procedure_report["convergence"]))
+        convergence_report = pd.DataFrame(procedure_report["convergence"])
         asgn_classes = procedure_report["setup"]["Classes"]
 
         if "beta0" not in convergence_report.columns:
