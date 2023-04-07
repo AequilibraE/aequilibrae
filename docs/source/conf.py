@@ -14,9 +14,8 @@
 
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
-
-import sphinx_theme
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -29,12 +28,11 @@ if str(project_dir) not in sys.path:
 
 from __version__ import release_version
 
-
 # -- Project information -----------------------------------------------------
 
 project = "AequilibraE"
-copyright = "2023, AequilibraE developers"
-author = "AequilibraE developers"
+copyright = f"{str(datetime.now().date())}, AequilibraE developers"
+author = "Pedro Camargo"
 
 # The short X.Y version
 version = release_version
@@ -110,7 +108,6 @@ html_theme_options = {
     #     "body_max_width": '70%',
     #     'sidebarwidth': '20%'
 }
-
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
