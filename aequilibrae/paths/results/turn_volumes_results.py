@@ -79,7 +79,7 @@ class TurnVolumesResults:
         blend_iterations: bool = True,
     ):
         conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df = pd.read_sql_query(f"select * from 'results' where table_name={table_name}", conn)
+        df = pd.read_sql_query(f"select * from 'results' where table_name=\'{table_name}\'", conn)
         conn.close()
         procedure_id = df.at[0, "procedure_id"]
         procedure_report = eval(df.at[0, "procedure_report"])
