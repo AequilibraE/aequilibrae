@@ -10,7 +10,6 @@ import pandas as pd
 
 from aequilibrae import AequilibraeMatrix
 from aequilibrae import Project
-from aequilibrae import TrafficAssignment
 from aequilibrae import TrafficClass
 from context import get_active_project
 
@@ -71,28 +70,27 @@ class TurnVolumesResults:
         matrix = traffic_class.matrix
         return TurnVolumesResults(class_name, mode_id, matrix, procedure_id, project, iteration, blend_iterations)
 
+    @staticmethod
     def calculate_from_result_table(
-        self, turns_df: pd.DataFrame, table_name: str, user_classes: Optional[list[str]], blend_iterations: bool = True
+        project: Project,
+        turns_df: pd.DataFrame,
+        table_name: str,
+        user_classes: Optional[list[str]],
+        blend_iterations: bool = True,
     ):
-        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
         df = pd.read_sql_query(f"select * from 'results' where table_name={table_name}", conn)
         conn.close()
         procedure_id = df.at[0, "procedure_id"]
         procedure_report = eval(df.at[0, "procedure_report"])
-        convergence_report = pd.DataFrame(procedure_report["convergence"])
+        # Accessing the convergence data inside the procedure report requires evaluating both.
+        # inf is not recognised in eval, replacing with np.inf to allow eval
+        convergence_report = pd.DataFrame(
+            eval(eval(df.at[0, "procedure_report"])["convergence"].replace("inf", "np.inf"))
+        )
         asgn_classes = procedure_report["setup"]["Classes"]
 
-        if "beta0" not in convergence_report.columns:
-            # if betas are not in the report, create dummy betas, where beta0 is 1
-            convergence_report["beta0"] = 1
-            convergence_report[["beta1", "beta2"]] = 0
-
-        betas_df = (
-            convergence_report[["iteration", "beta0", "beta1", "beta2"]]
-            .replace(-1, None)
-            .ffill()
-            .set_index("iteration")
-        )
+        betas_df = TurnVolumesResults.get_betas_df(convergence_report)
 
         if user_classes is None:
             user_classes = list(asgn_classes.keys())
@@ -113,6 +111,22 @@ class TurnVolumesResults:
                 blend_iterations=blend_iterations,
             )
             ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
+
+    @staticmethod
+    def get_betas_df(convergence_report: pd.DataFrame) -> pd.DataFrame:
+        if "beta0" not in convergence_report.columns:
+            # if betas are not in the report, create dummy betas, where beta0 is 1
+            # This allows to calculate volumes for AoN.
+            convergence_report["beta0"] = 1
+            convergence_report[["beta1", "beta2"]] = 0
+
+        betas_df = (
+            convergence_report[["iteration", "beta0", "beta1", "beta2"]]
+            .replace(-1, None)
+            .ffill()
+            .set_index("iteration")
+        )
+        return betas_df
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """

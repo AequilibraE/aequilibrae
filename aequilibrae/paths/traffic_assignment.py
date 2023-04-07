@@ -556,9 +556,7 @@ class TrafficAssignment(object):
         iteration: Optional[int] = None,
         blend_iterations: bool = True,
     ) -> pd.DataFrame:
-        betas_df = (
-            self.report()[["iteration", "beta0", "beta1", "beta2"]].replace(-1, None).ffill().set_index("iteration")
-        )
+        betas_df = TurnVolumesResults.get_betas_df(self.report())
 
         ta_turn_vol_list = []
 
@@ -745,7 +743,7 @@ class TrafficAssignment(object):
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
-        Saves the select link link flows for all classes into the results database. Additionally, it exports
+        Saves the select link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
