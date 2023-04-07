@@ -1,3 +1,4 @@
+from pathlib import Path
 import sqlite3
 from collections import OrderedDict
 import os
@@ -12,6 +13,7 @@ import logging
 import csv
 from io import BytesIO
 from tempfile import gettempdir
+from os.path import join, isfile
 from ...reference_files import spatialite_database
 from ...utils import WorkerThread
 
@@ -74,6 +76,10 @@ class create_gtfsdb(WorkerThread):
             self.logger.error(msg)
             raise ValueError(msg)
 
+        if self.save_db and self.memory_db:
+            self.logger.error("You can't have a file name and have the file in memory at the same time")
+            raise ValueError(msg)
+
         # Input consistency checks
         if self.source is None:
             msg = "Input is neither a zip file nor a folder"
@@ -84,24 +90,6 @@ class create_gtfsdb(WorkerThread):
             msg = "Spatialite is only supported on disk"
             self.logger.error("      " + msg)
             raise ValueError(msg)
-
-        if not self.overwrite:
-            if os.path.isfile(os.path.join(save_db)):
-                msg = "Output database exists. Please use overwrite=True or choose a different path/name"
-                self.logger.error("      " + msg)
-                raise ValueError(msg)
-        else:
-            if os.path.isfile(save_db):
-                os.unlink(save_db)
-
-        if self.save_db is None:
-            if not self.memory_db:
-                save_db = ":memory:"
-        else:
-            if self.memory_db:
-                msg = "You can't have a file name and have the file in memory at the same time"
-                self.logger.error("      " + msg)
-                raise ValueError(msg)
 
         OrderedDict([("s", (1, 2)), ("p", (3, 4)), ("a", (5, 6)), ("m", (7, 8))])
         self.column_order = {
@@ -268,9 +256,16 @@ class create_gtfsdb(WorkerThread):
         self.__emit_all(["text", "Creating empty database"])
 
         if self.spatialite_enabled:
+            if self.save_db and isfile(self.save_db) and not self.overwrite:
+                msg = "Output database exists. Please use overwrite=True or choose a different path/name"
+                self.logger.error("      " + msg)
+                raise ValueError(msg)
+            Path(self.save_db).unlink(missing_ok=True)
             shutil.copy(spatialite_database, self.save_db)
+        else:
+            pass
 
-        self.conn = sqlite3.connect(self.save_db)
+        self.conn = sqlite3.connect(self.save_db or ":memory:")
         self.cursor = self.conn.cursor()
 
         self.__create_empty_tables()

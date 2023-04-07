@@ -1,5 +1,4 @@
 import os
-import pathlib
 import random
 import sqlite3
 import string
@@ -34,10 +33,6 @@ class TestTrafficAssignment(TestCase):
         self.assigclass = TrafficClass("car", self.car_graph, self.matrix)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
-
-    def tearDown(self) -> None:
-        self.matrix.close()
-        self.project.close()
 
     def test_matrix_with_wrong_type(self):
         self.matrix.matrix_view = np.array(self.matrix.matrix_view, np.int32)
@@ -215,6 +210,31 @@ class TestTrafficAssignment(TestCase):
 
         with self.assertRaises(ValueError):
             self.assignment.save_results("save_to_database")
+
+    def test_execute_no_project(self):
+        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        results = pd.read_sql("select volume from links order by link_id", conn)
+
+        self.project.close()
+
+        assignment = TrafficAssignment()
+        assignment.add_class(self.assigclass)
+        assignment.set_vdf("BPR")
+        assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+        assignment.set_capacity_field("capacity")
+        assignment.set_time_field("free_flow_time")
+
+        assignment.max_iter = 10
+        assignment.set_algorithm("msa")
+        assignment.execute()
+
+        correl = np.corrcoef(self.assigclass.results.total_link_loads, results.volume.values)[0, 1]
+        self.assertLess(0.8, correl)
+
+        with self.assertRaises(FileNotFoundError):
+            assignment.save_results("anything")
 
     def test_info(self):
         iterations = random.randint(1, 10000)

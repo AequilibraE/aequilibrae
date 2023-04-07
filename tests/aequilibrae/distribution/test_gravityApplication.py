@@ -1,13 +1,12 @@
-from unittest import TestCase
-from unittest.mock import Mock
-from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
-from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
-import numpy as np
-import tempfile
 import os
-from aequilibrae.parameters import Parameters
+import tempfile
+from unittest import TestCase
 
-from aequilibrae.project.project import Project
+import numpy as np
+
+from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
+from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
+from aequilibrae.parameters import Parameters
 
 zones = 10
 
@@ -79,4 +78,4 @@ class TestGravityApplication(TestCase):
             distributed_matrix.apply()
 
             if distributed_matrix.gap > distributed_matrix.parameters["convergence level"]:
-                self.fail("Gravity application did not converge for model " + model_name)
+                self.fail(f"Gravity application did not converge for model {model_name}")

@@ -14,19 +14,21 @@
 
 import os
 import sys
+from pathlib import Path
 
 import sphinx_theme
 
-try:
-    from aequilibrae.paths.__version__ import release_version
-except ImportError as e:
-    sys.path.insert(0, os.path.abspath("../.."))
-    from aequilibrae.paths.__version__ import release_version
-    import warnings
+project_dir = Path(__file__).parent.parent
+if str(project_dir) not in sys.path:
+    sys.path.append(str(project_dir))
 
-    warnings.warn(f"It is really annoying to deal with Flake8 sometimes. {e.args}")
+# Sometimes this file is exec'd directly from sphinx code...
+project_dir = os.path.abspath("../..")
+if str(project_dir) not in sys.path:
+    sys.path.insert(0, project_dir)
 
-#
+from __version__ import release_version
+
 
 # -- Project information -----------------------------------------------------
 

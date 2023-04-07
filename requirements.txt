@@ -1,9 +1,9 @@
-numpy>=1.18.0,<1.22
+numpy
 scipy
 pyaml
 cython
 pyshp
 requests
-shapely >= 1.7.0
+shapely
 pandas
 pyproj

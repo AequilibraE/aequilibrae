@@ -8,10 +8,10 @@ from typing import List, Dict, Optional
 from uuid import uuid4
 
 import numpy as np
-from numpy import nan_to_num
 import pandas as pd
+from numpy import nan_to_num
 
-from pathlib import Path
+from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
@@ -100,8 +100,12 @@ class TrafficAssignment(object):
     all_algorithms = ["all-or-nothing", "msa", "frank-wolfe", "fw", "cfw", "bfw"]
 
     def __init__(self, project=None) -> None:
-        project = project or get_active_project()
-        parameters = project.parameters["assignment"]["equilibrium"]
+        """"""
+
+        proj = project or get_active_project(must_exist=False)
+        par = proj.parameters if proj else Parameters().parameters
+        parameters = par["assignment"]["equilibrium"]
+
         self.__dict__["rgap_target"] = parameters["rgap"]
         self.__dict__["max_iter"] = parameters["maximum_iterations"]
         self.__dict__["vdf"] = VDF()
@@ -122,7 +126,7 @@ class TrafficAssignment(object):
         self.__dict__["description"] = ""
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
-        self.__dict__["project"] = project
+        self.__dict__["project"] = proj
 
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)
@@ -240,7 +244,7 @@ class TrafficAssignment(object):
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
         if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
-            self.assignment = LinearApproximation(self, algo)
+            self.assignment = LinearApproximation(self, algo, project=self.project)
         else:
             raise Exception("Algorithm not listed in the case selection")
 
@@ -400,8 +404,7 @@ class TrafficAssignment(object):
             raise ValueError("First you need to set the Volume-Delay Function to use")
 
         par = list(kwargs.keys())
-        if self.vdf.function == "BPR":
-            q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
+        q = [x for x in par if x not in self.bpr_parameters] + [x for x in self.bpr_parameters if x not in par]
         if len(q) > 0:
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
@@ -410,7 +413,7 @@ class TrafficAssignment(object):
         """Processes assignment"""
         self.assignment.execute()
 
-    def save_results(self, table_name: str, keep_zero_flows=True) -> None:
+    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
 
         Method fails if table exists
@@ -418,13 +421,20 @@ class TrafficAssignment(object):
         Args:
             table_name (:obj:`str`): Name of the table to hold this assignment result
             keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
+
         df = self.results()
-        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        if not keep_zero_flows:
+            df = df[df.PCE_tot > 0]
+
+        if not project:
+            project = self.project or get_active_project()
+        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
 
-        conn = self.project.connect()
+        conn = project.connect()
         report = {"convergence": str(self.assignment.convergence_report), "setup": str(self.info())}
         data = [table_name, "traffic assignment", self.procedure_id, str(report), self.procedure_date, self.description]
         conn.execute(
@@ -620,7 +630,7 @@ class TrafficAssignment(object):
         }
         return info
 
-    def save_skims(self, matrix_name: str, which_ones="final", format="omx") -> None:
+    def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
         Args:
@@ -628,15 +638,18 @@ class TrafficAssignment(object):
             which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
-
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
         if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
-        mats = self.project.matrices
+        if not project:
+            project = self.project or get_active_project()
+
+        mats = project.matrices
 
         for cls in self.classes:
             file_name = f"{matrix_name}_{cls.__id__}.{mat_format}"
@@ -699,6 +712,7 @@ class TrafficAssignment(object):
 
             out_skims.description = f"Skimming for assignment procedure. Class {cls.__id__}"
             # Now we create the appropriate record
+
             record = mats.new_record(f"{matrix_name}_{cls.__id__}", file_name)
             record.procedure_id = self.procedure_id
             record.timestamp = self.procedure_date
@@ -729,20 +743,25 @@ class TrafficAssignment(object):
         # sl_flows = pd.concat(class_flows, axis=1)
         return sl_flows
 
-    def save_select_link_flows(self, table_name: str) -> None:
+    def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
         Saves the select link link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
+
+        if not project:
+            project = self.project or get_active_project()
         df = self.select_link_flows()
-        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()
         # Create description table
+
         self.description = f"Select link analysis from {self.procedure_id}"
-        conn = self.project.connect()
+        conn = project.connect()
         report = {}
         data = [
             table_name,
@@ -764,6 +783,7 @@ class TrafficAssignment(object):
         """
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
+
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:

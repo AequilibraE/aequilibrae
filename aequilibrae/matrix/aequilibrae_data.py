@@ -112,7 +112,7 @@ class AequilibraeData(object):
                 self.data = open_memmap(self.file_path, mode="w+", dtype=dtype, shape=(self.entries,))
 
             if fill is not None:
-                self.data.fill(fill)
+                [self.data[f].fill(fill) for f in self.fields]
             if index is not None:
                 self.index[:] = index[:]
 
