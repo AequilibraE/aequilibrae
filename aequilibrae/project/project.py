@@ -97,6 +97,7 @@ class Project:
         if not self.project_base_path:
             global_logger.warning("This Aequilibrae project is not opened")
             return
+
         try:
             self.conn.commit()
             clean(self)
@@ -107,10 +108,11 @@ class Project:
             del self.network.link_types
             del self.network.modes
 
+            global_logger.info(f"Closed project on {self.project_base_path}")
+
         except (sqlite3.ProgrammingError, AttributeError):
             global_logger.warning(f"This project at {self.project_base_path} is already closed")
-        else:
-            global_logger.info(f"Closed project on {self.project_base_path}")
+
         finally:
             self.deactivate()
 
@@ -167,7 +169,6 @@ class Project:
         return Zoning(self.network)
 
     def __create_empty_project(self):
-
         shutil.copyfile(spatialite_database, self.path_to_file)
 
         self.conn = self.connect()
@@ -184,7 +185,6 @@ class Project:
         initialize_tables(self)
 
     def __setup_logger(self):
-
         self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")
         self.logger.propagate = False
         self.logger.setLevel(logging.DEBUG)

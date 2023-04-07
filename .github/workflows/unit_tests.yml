@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   linting:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Set Python environment
@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os}}
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8', '3.9']
+        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11']
         os: [windows-latest, ubuntu-latest]
 
       max-parallel: 20
@@ -51,8 +51,9 @@ jobs:
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt-get install libsqlite3-mod-spatialite
-        sudo apt-get install -y libspatialite-dev
+        sudo apt update
+        sudo apt install libsqlite3-mod-spatialite
+        sudo apt install -y libspatialite-dev
         pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
@@ -62,12 +63,7 @@ jobs:
 
     - name: Compile library
       run: |
-        cd aequilibrae/paths
-        python setup_Assignment.py build_ext --inplace
-        cd ../..
-
-    - name: Build
-      run: python setup.py sdist bdist_wheel
+        python setup.py build_ext --inplace
 
     - name: Runs test
       run: python -m pytest

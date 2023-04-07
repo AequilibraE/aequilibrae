@@ -2,7 +2,6 @@ import glob
 import importlib.util as iutil
 import logging
 import os
-import sys
 import tempfile
 from datetime import datetime
 from time import perf_counter
@@ -10,12 +9,11 @@ from uuid import uuid4
 
 import numpy as np
 
+from aequilibrae import Parameters
 from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-
-sys.dont_write_bytecode = True
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -136,7 +134,7 @@ class GravityApplication:
             error (:obj:`str`): Error description
         """
 
-        self.project = project or get_active_project()
+        self.project = project
         self.__required_parameters = ["max trip length"]
         self.__required_model = ["function", "parameters"]
 
@@ -192,7 +190,6 @@ class GravityApplication:
 
         # And adjust with a fratar
         self.__ipf = Ipf(
-            project=self.project,
             matrix=self.output,
             rows=self.rows,
             columns=self.columns,
@@ -224,15 +221,17 @@ class GravityApplication:
             except PermissionError as err:
                 self.logger.warning(f"Could not remove {err.filename}")
 
-    def save_to_project(self, name: str, file_name: str) -> None:
+    def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
 
         Args:
             name (:obj:`str`): Name of the desired matrix record
             file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
-        mats = self.project.matrices
+        project = project or get_active_project()
+        mats = project.matrices
         record = mats.new_record(name, file_name, self.output)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
@@ -241,7 +240,7 @@ class GravityApplication:
         record.save()
 
     def __get_parameters(self):
-        par = self.project.parameters
+        par = self.project.parameters if self.project else Parameters().parameters
         para = par["distribution"]["ipf"].copy()
         para.update(par["distribution"]["gravity"])
         return para

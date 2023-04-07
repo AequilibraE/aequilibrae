@@ -3,7 +3,6 @@ import pathlib
 import uuid
 import zipfile
 from os.path import join, dirname
-from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
 
@@ -78,7 +77,8 @@ class TestTrafficAssignmentPathFiles(TestCase):
         self.assignment.set_algorithm("msa")
         self.assignment.execute()
 
-        path_file_dir = pathlib.Path(self.project.project_base_path) / "path_files" / self.assignment.procedure_id
+        pid = self.assignment.procedure_id
+        path_file_dir = pathlib.Path(join(str(self.project.project_base_path), "path_files", pid))
         self.assertTrue(path_file_dir.is_dir())
 
         # compare everything to reference files. Note that there is no graph simplification happening in SiouxFalls
@@ -110,10 +110,8 @@ class TestTrafficAssignmentPathFiles(TestCase):
                 o_ind = self.assigclass.graph.compact_nodes_to_indices[o]
                 this_o_path_file = pd.read_feather(class_dir / f"o{o_ind}.feather")
                 ref_this_o_path_file = pd.read_feather(ref_class_dir / f"o{o_ind}.feather")
-                is_eq = this_o_path_file == ref_this_o_path_file
-                self.assertTrue(is_eq.all().all())
+                pd.testing.assert_frame_equal(ref_this_o_path_file, this_o_path_file)
 
                 this_o_index_file = pd.read_feather(class_dir / f"o{o_ind}_indexdata.feather")
                 ref_this_o_index_file = pd.read_feather(ref_class_dir / f"o{o_ind}_indexdata.feather")
-                is_eq = this_o_index_file == ref_this_o_index_file
-                self.assertTrue(is_eq.all().all())
+                pd.testing.assert_frame_equal(ref_this_o_index_file, this_o_index_file)

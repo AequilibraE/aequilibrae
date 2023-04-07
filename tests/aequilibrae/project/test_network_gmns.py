@@ -13,7 +13,6 @@ from ...data import siouxfalls_project
 
 class TestNetwork(TestCase):
     def test_create_from_gmns(self):
-
         proj_path = os.path.join(gettempdir(), uuid.uuid4().hex)
         self.project = Project()
         self.project.new(proj_path)
@@ -60,7 +59,6 @@ class TestNetwork(TestCase):
             self.fail("At least one link is disconnected from its start/end nodes")
 
     def test_export_to_gmns(self):
-
         output_path = os.path.join(gettempdir(), uuid.uuid4().hex)
         if not os.path.exists(output_path):
             os.mkdir(output_path)

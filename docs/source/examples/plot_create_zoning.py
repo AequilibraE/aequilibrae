@@ -86,7 +86,7 @@ grid = shapely.wkb.loads(grid)
 # %%
 # Since we used the bounding box, we have WAY more zones than we wanted, so we clean them
 # by only keeping those that intersect the network convex hull.
-grid = [p for p in grid if p.intersects(geo)]
+grid = [p for p in grid.geoms if p.intersects(geo)]
 
 # Let's re-number all nodes with IDs smaller than 300 to something bigger as to free space to our centroids to go from 1
 # to N

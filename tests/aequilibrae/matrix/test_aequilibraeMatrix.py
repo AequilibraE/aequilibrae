@@ -35,6 +35,7 @@ class TestAequilibraeMatrix(TestCase):
             "zones": zones,
             "matrix_names": ["mat", "seed", "dist"],
             "index_names": ["my_indices"],
+            "memory_only": False,
         }
 
         self.matrix = AequilibraeMatrix()
@@ -180,7 +181,6 @@ class TestAequilibraeMatrix(TestCase):
         del omxfile
 
     def test_copy_from_omx_long_name(self):
-
         temp_file = AequilibraeMatrix().random_name()
         a = AequilibraeMatrix()
 

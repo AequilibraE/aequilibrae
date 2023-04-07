@@ -6,7 +6,6 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_logger
-from .__version__ import binary_version as VERSION
 
 
 class Graph(object):
@@ -72,8 +71,6 @@ class Graph(object):
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
-        self.__version__ = VERSION
-
         # Randomly generate a unique Graph ID randomly
         self.__id__ = uuid.uuid4().hex
 
@@ -126,7 +123,7 @@ class Graph(object):
 
         # We generate IDs that we KNOW will be constant across modes
         self.graph.sort_values(by=["link_id", "direction"], inplace=True)
-        self.graph.loc[:, "__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
+        self.graph["__supernet_id__"] = np.arange(self.graph.shape[0]).astype(self.__integer_type)
         self.graph.sort_values(by=["a_node", "b_node"], inplace=True)
 
         self.num_links = self.graph.shape[0]
@@ -236,7 +233,8 @@ class Graph(object):
 
         links_to_remove = np.argwhere(simplified_links >= 0)
         df = pd.DataFrame(self.network, copy=True)
-        df = df[~df.link_id.isin(links_to_remove[:, 0])]
+        if links_to_remove.shape[0]:
+            df = df[~df.link_id.isin(links_to_remove[:, 0])]
         df = df[df.a_node != df.b_node]
 
         comp_lnk = pd.DataFrame(
@@ -351,7 +349,7 @@ class Graph(object):
         df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
-        df.loc[:, "id"] = np.arange(df.shape[0])
+        df["id"] = np.arange(df.shape[0])
         fs = np.empty(num_nodes + 1, dtype=self.__integer_type)
         fs.fill(-1)
         y, x, _ = np.intersect1d(df.a_node.values, nlist, assume_unique=False, return_indices=True)
@@ -368,7 +366,7 @@ class Graph(object):
         df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
         df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
         df.loc[:, "link_id"] = df.link_id.values.astype(self.__integer_type)
-        df.loc[:, "direction"] = df.direction.values.astype(np.int8)
+        df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df
 
@@ -441,9 +439,9 @@ class Graph(object):
         """
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
-            self.compact_cost = np.zeros(self.compact_graph.id.max() + 1, self.__float_type)
+            self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
             df = self.__graph_groupby.sum()[[cost_field]].reset_index()
-            self.compact_cost[df.index.values[:-1]] = df[cost_field].values[:-1]
+            self.compact_cost[df.index.values] = df[cost_field].values
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
             else:
@@ -475,10 +473,10 @@ class Graph(object):
         if k:
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
-        self.compact_skims = np.zeros((self.compact_num_links, len(skim_fields) + 1), self.__float_type)
+        self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
         df = self.__graph_groupby.sum()[skim_fields].reset_index()
         for i, skm in enumerate(skim_fields):
-            self.compact_skims[df.index.values[:-1], i] = df[skm].values[:-1].astype(self.__float_type)
+            self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 
         self.skims = np.zeros((self.num_links, len(skim_fields) + 1), self.__float_type)
         t = [x for x in skim_fields if self.graph[x].dtype != self.__float_type]
@@ -532,7 +530,6 @@ class Graph(object):
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
         mygraph["graph_id"] = self.__id__
-        mygraph["graph_version"] = self.__version__
         mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
@@ -563,7 +560,6 @@ class Graph(object):
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
             self.__id__ = mygraph["graph_id"]
-            self.__version__ = mygraph["graph_version"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 
@@ -583,7 +579,6 @@ class Graph(object):
 
     # We check if all minimum fields are there
     def __network_error_checking__(self):
-
         # Checking field names
         has_fields = self.network.columns
         must_fields = ["link_id", "a_node", "b_node", "direction"]
@@ -604,7 +599,6 @@ class Graph(object):
             self.network = self.network.assign(id=np.nan)
 
     def __determine_types__(self, new_type, current_type):
-
         if new_type.isdigit():
             new_type = int(new_type)
         else:

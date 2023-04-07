@@ -47,10 +47,6 @@ The number of CPUs have a special behaviour defined, as follows:
 A few of these parameters, however, are targeted at its QGIS plugin, which is
 the case of the *driving side* and  *default_directory* parameters.
 
-*spatialite_path* is a parameter needed only by Windows users. Please refer to
-the instructions on how to set :ref:`installing_spatialite_on_windows` on
-Windows.
-
 .. _parameters_osm:
 
 Open Streeet Maps

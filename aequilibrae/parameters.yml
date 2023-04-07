@@ -368,8 +368,8 @@ network:
       equivalency:
         mode_name: use
 osm:
-    overpass_endpoint: "https://lz4.overpass-api.de/api/interpreter"
-    nominatim_endpoint: "https://nominatim.openstreetmap.org/"
+    overpass_endpoint: http://overpass-api.de/api
+    nominatim_endpoint: https://nominatim.openstreetmap.org/
     accept_language: "en"
     max_attempts: 50
     timeout: 540
@@ -381,5 +381,4 @@ system:
   default_directory: C:\
   logging: true
   logging_directory: /temp/
-  spatialite_path: C:\mod_spatialite-NG-win-amd64
   temp directory: /temp
