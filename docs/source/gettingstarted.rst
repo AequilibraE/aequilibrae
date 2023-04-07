@@ -135,7 +135,7 @@ system when doing traffic assignment.
     :hidden:
 
     :ref:`installation`
-    softwaredevelopment
-    roadmap
-    version_history
+    nitty_gritty/softwaredevelopment
+    nitty_gritty/roadmap
+    nitty_gritty/version_history
   

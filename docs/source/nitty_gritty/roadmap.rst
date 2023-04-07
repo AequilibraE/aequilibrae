@@ -1,9 +1,9 @@
-Roadmap
-=======
+Development Roadmap
+===================
 
-As AequilibraE is a project with an incredibly small team and no source of
+As AequilibraE is a project with an incredibly small team and very little external
 funding, it is not feasible to determine a precise schedule for the development
-of new features or even a proper roadmap of specific developments.
+of new features or even a detailed roadmap.
 
 However, there are a number of enhancements to the software that we have already
 identified and that we intend to dedicate some time to in the future.
@@ -17,19 +17,16 @@ identified and that we intend to dedicate some time to in the future.
 
     * Re-development of the path-finding algorithm to allow for turn
       penalties/bans
-    * Implementation of network simplification to improve performance of
-      path-finding
     * New origin-based traffic assignment to achieve ultra-converged
       assignment
+    * New path-finding algorithm based on contraction-hierarchies
 
 * Public Transport
 
     * Import of GTFS map-matching it into a project network
     * Re-development of Public Transport data model for GTFS/AequilibraE
     * Export of GTFS (enables editing of GTFS in QGIS
-    * Transit path computation (Likely to be the
-      `CSA <https://link.springer.com/chapter/10.1007/978-3-642-38527-8_6>`_ or
-      similar)
+    * Public transit assignment
 
 * Project
 

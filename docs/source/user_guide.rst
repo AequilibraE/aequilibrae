@@ -6,7 +6,7 @@ The User Guide covers all AequilibraE's topics by area.
 .. toctree::
     :maxdepth: 1
 
-    overview
-    project
+    modelling_with_aequilibrae/overview
+    modelling_with_aequilibrae/project
     project_database/datamodel.rst
-    create_model
+    modelling_with_aequilibrae/create_model

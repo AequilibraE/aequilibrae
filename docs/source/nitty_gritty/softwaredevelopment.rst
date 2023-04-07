@@ -203,8 +203,8 @@ AequilibraE releases are automatically  uploaded to the `Python Package Index
 <https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (2 to 6 times per year).
 
 
-Finally
-~~~~~~~~~
+Acknowledgement
+~~~~~~~~~~~~~~~
 
 A LOT of the structure around the documentation was borrowed (copied) from the excellent project `ActivitySim
 <https://activitysim.github.io/>`_

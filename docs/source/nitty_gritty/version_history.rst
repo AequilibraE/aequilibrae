@@ -1,7 +1,7 @@
 .. _versionhistory:
 
-Version history
----------------
+Older versions
+--------------
 
 AequilibraE has been evolving quite fast, so we recommend you upgrading to a
 newer version as soon as you can.  In the meantime, you can find the
