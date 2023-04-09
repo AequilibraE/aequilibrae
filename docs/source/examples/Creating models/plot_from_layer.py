@@ -11,6 +11,7 @@ We use Folium to visualize the resulting network.
 
 # %%
 # Imports
+# sphinx_gallery_thumbnail_path = 'images/plot_from_layer.png'
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -157,21 +158,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# **Don't know Queluz? Here is a picture of its most impressive urban structure**
-
-from PIL import Image
-import matplotlib.pyplot as plt
-
-pic = "https://upload.wikimedia.org/wikipedia/commons/2/2c/Ponte_Governador_Mario_Covas_01.jpg"
-pic_local = join(fldr, "queluz.jpg")
-headers = {"User-Agent": "AequilibraE (https://aequilibrae.com/; contact@aequilibrae.com)  python-library/0.7"}
-
-response = requests.get(pic, headers=headers)
-if response.status_code == 200:
-    with open(pic_local, "wb") as f:
-        f.write(response.content)
-
-    img = Image.open(pic_local)
-    plt.imshow(img)
