@@ -15,25 +15,28 @@ class Zoning(BasicTable):
     """
     Access to the API resources to manipulate the zones table in the project
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> project = Project.from_path("/tmp/test_project")
 
-        zones = p.zoning
 
-        # We edit the fields for a particular zone
-        zone_downtown = zones.get(1)
-        zone_downtown.population = 637
-        zone_downtown.employment = 10039
-        zone_downtown.save()
+        >>> zoning = project.zoning
 
-        fields = zones.fields
+        >>> zone_downtown = zoning.get(1)
+        >>> zone_downtown.population = 637
+        >>> zone_downtown.employment = 10039
+        >>> zone_downtown.save()
+
+
+        # changing the value for an existing value/field
+        >>> project.about.scenario_name = 'Just a better scenario name'
+        >>> project.about.write_back()
 
         # We can also add one more field to the table
-        fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
+        >>> fields = zoning.fields
+        >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
 
     """
 

@@ -46,6 +46,8 @@ jobs:
       run: |
         echo "DOCUMENTATION TESTING GOES HERE"
         python -m doctest -v ./aequilibrae/parameters.py
+        python -m doctest -v ./aequilibrae/project/about.py
+        python -m doctest -v ./aequilibrae/project/zoning.py
 
 
     - name: Build documentation

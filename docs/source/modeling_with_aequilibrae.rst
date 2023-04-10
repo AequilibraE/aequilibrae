@@ -18,4 +18,6 @@ a start guide to a complete view into AequilibraE's data structure.
     :maxdepth: 1
 
     modeling_with_aequilibrae/project
+    modeling_with_aequilibrae/project_database
+    modeling_with_aequilibrae/parameter_file
 

@@ -1,7 +1,7 @@
 .. _parameters_file:
-====================
+
 Parameters YAML File
-====================
+--------------------
 
 The parameter file holds the parameters information for a certain portion of the software.
 
@@ -14,7 +14,8 @@ The parameter file holds the parameters information for a certain portion of the
 .. _parameters_assignment:
 
 Assignment
-----------
+~~~~~~~~~~
+
 The assignment section of the parameter file is the smallest one, and it
 contains only the convergence criteria for assignment in terms of maximum number
 of iterations and target Relative Gap.
@@ -31,7 +32,7 @@ override them during assignment, as detailed in :ref:`convergence_criteria`.
 .. _parameters_distribution:
 
 Distribution
-------------
+~~~~~~~~~~~~
 
 The distribution section of the parameter file is also fairly short, as it
 contains only the parameters for number of maximum iterations, convergence level
@@ -46,7 +47,7 @@ synthetic gravity models, as shown below.
 .. _parameters_network:
 
 Network
--------
+~~~~~~~
 
 There are four groups of parameters under the network section: *links*, *nodes*,
 *OSM*, and *GMNS*. The first are basically responsible for the design of the network 
@@ -55,7 +56,7 @@ now each one of these groups contains only a single group of parameters called
 *fields*.
 
 link fields
-~~~~~~~~~~~
+^^^^^^^^^^^
 
 The section for link fields are divided into *one-way* fields and *two-way* fields, where the
 two-way fields will be created by appending *_ab* and *_ba* to the end of each field's name.
@@ -108,7 +109,7 @@ to be in the network but should not be imported from OSM, such as link capacitie
 
 
 Node fields
-~~~~~~~~~~~
+^^^^^^^^^^^
 
 The specification for node fields is similar to the one for link fields, with the key difference
 that it does not make sense to have fields for one or two directions and that it is not possible
@@ -117,7 +118,7 @@ would have no effect here.
 
 
 Open Street Maps
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
@@ -134,7 +135,7 @@ imported, and therefore unknown link type tags are treated as a special case for
 mode, and that is controlled by the key *unknown_tags* in the parameters file.
 
 GMNS
-~~~~
+^^^^
 
 XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
 XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
@@ -142,7 +143,7 @@ XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX
 .. _parameters_system:
 
 System
-------
+~~~~~~
 
 The system section of the parameters file holds information on the
 number of threads used in multi-threaded processes, logging and temp folders
@@ -170,7 +171,7 @@ the case of the *driving side* and  *default_directory* parameters.
 .. _parameters_osm:
 
 Open Streeet Maps
------------------
+~~~~~~~~~~~~~~~~~
 The OSM section of the parameter file is relevant only when one plans to
 download a substantial amount of data from an Overpass API, in which case it is
 recommended to deploy a local Overpass server.

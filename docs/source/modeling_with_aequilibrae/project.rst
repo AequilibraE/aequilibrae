@@ -1,7 +1,7 @@
 .. _project:
 
 The AequilibraE project
-=======================
+-----------------------
 
 Similarly to commercial packages, any AequilibraE project must have a certain
 structure and follow a certain set of guidelines in order for software to
@@ -28,7 +28,8 @@ for Windows users this dependency is automatically handled under the hood, but
 the details are also discussed in the aforementioned dependencies section.
 
 Project structure
------------------
+~~~~~~~~~~~~~~~~~
+
 Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
 is as follows:
@@ -72,7 +73,7 @@ model, but there is still no support for manually or programmatically adding rou
 to a route system as of yet.
 
 Package components: A conceptual view
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As all the components of an AequilibraE model based on open-source software and
 open-data standards, modeling with AequilibraE is a little different than
@@ -94,28 +95,3 @@ These software layers are *stacked* and depend on each other, which means that a
 network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
 while any procedure such as traffic assignment done in QGIS is nothing more than an
 API call to the corresponding Python method.
-
-Project database
-----------------
-More details on the **project_database.sqlite** are discussed on a nearly *per-table*
-basis below, and we recommend understanding the role of each table before setting
-an AequilibraE model you intend to use in anger.
-
-.. toctree::
-   :maxdepth: 1
-
-   project_database/about
-   project_database/network
-   project_database/modes
-   project_database/link_types
-   project_database/matrices
-   project_database/zones
-   project_database/parameters_metadata
-   project_database/results
-
-Parameters file
-----------------
-.. toctree::
-   :maxdepth: 1
-
-   parameter_file

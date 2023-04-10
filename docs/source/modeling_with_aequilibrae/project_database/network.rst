@@ -10,10 +10,8 @@ Network
   `Andrew <https://au.linkedin.com/in/andrew-o-brien-5a8bb486>`_.
 
 
-
-
 Data consistency
-----------------
+^^^^^^^^^^^^^^^^
 
 One of the key characteristics of any modeling platform is the ability of the
 supporting software to maintain internal data consistency. Network data
@@ -33,7 +31,7 @@ features they implement.
 
 
 Dealing with Geometries
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 Geometry is a key feature when dealing with transportation infrastructure and
 actual travel. For this reason, all datasets in AequilibraE that correspond to
 elements with physical GIS representation are geo-enabled.
@@ -90,7 +88,7 @@ these features in the following pages:
 .. _network_triggers_behaviour:
 
 Network consistency behaviour
------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In order for the implementation of this standard to be successful, it is
 necessary to map all the possible user-driven changes to the underlying data and
@@ -114,7 +112,7 @@ problem:
 .. _net_section.1:
 
 Change behavior
----------------
+^^^^^^^^^^^^^^^
 
 In this section we present the mapping of all meaningful changes that a user can
 do to each part of the transportation network, doing so for each element of the
@@ -144,7 +142,7 @@ meaningful changes documented for nodes and links of your network.
 .. _net_section.1.1:
 
 Node layer changes and expected behavior
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+''''''''''''''''''''''''''''''''''''''''
 
 There are 6 possible changes envisioned for the network nodes layer, being 3 of
 geographic nature and 3 of data-only nature. The possible variations for each
@@ -154,7 +152,7 @@ conceivable are also explored.
 .. _net_section.1.1.1:
 
 Creating a node
-^^^^^^^^^^^^^^^
+```````````````
 
 There are only three situations when a node is to be created:
 - Placement of a link extremity (new or moved) at a position where no node
@@ -176,7 +174,7 @@ their respective table descriptions
 .. _net_section.1.1.2:
 
 Deleting a node
-^^^^^^^^^^^^^^^
+```````````````
 
 Deleting a node is only allowed in two situations:
 - No link is connected to such node (in this case, the deletion of the node
@@ -200,7 +198,7 @@ their respective table descriptions
 .. _net_section.1.1.3:
 
 Moving a node
-^^^^^^^^^^^^^
+`````````````
 
 There are two possibilities for moving a node: Moving to an empty space, and
 moving on top of another node.
@@ -225,7 +223,7 @@ their respective table descriptions
 .. _net_section.1.1.4:
 
 Adding a data field
-^^^^^^^^^^^^^^^^^^^
+```````````````````
 
 No consistency check is needed other than ensuring that no repeated data field
 names exist
@@ -233,7 +231,7 @@ names exist
 .. _net_section.1.1.5:
 
 Deleting a data field
-^^^^^^^^^^^^^^^^^^^^^
+`````````````````````
 
 If the data field whose attempted deletion is mandatory, the network should
 return an error and not perform such operation. Otherwise the operation can be
@@ -242,7 +240,7 @@ performed.
 .. _net_section.1.1.6:
 
 Modifying a data entry
-^^^^^^^^^^^^^^^^^^^^^^
+``````````````````````
 
 If the field being edited is the node_id field, then all the related tables need
 to be edited as well (e.g. a_b and b_node in the link layer, the node_id tagged
@@ -251,7 +249,7 @@ to turn restrictions and to transit stops)
 .. _net_section.1.2:
 
 Link layer changes and expected behavior
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+''''''''''''''''''''''''''''''''''''''''
 
 Network links layer also has some possible changes of geographic and data-only nature.
 
@@ -262,7 +260,7 @@ Network links layer also has some possible changes of geographic and data-only n
 .. _net_section.1.2.1:
 
 Deleting a link
-^^^^^^^^^^^^^^^
+`````````````````
 
 In case a link is deleted, it is necessary to check for orphan nodes, and deal
 with them as prescribed in :ref:`net_section.1.1.2`
@@ -274,7 +272,7 @@ their respective table descriptions.
 .. _net_section.1.2.2:
 
 Moving a link extremity
-^^^^^^^^^^^^^^^^^^^^^^^
+```````````````````````
 
 This change can happen in two different forms:
 
@@ -296,28 +294,16 @@ their respective table descriptions.
 .. _net_section.1.2.3:
 
 Re-shaping a link
-^^^^^^^^^^^^^^^^^
+`````````````````
 
 When reshaping a link, the only thing other than we expect to be updated in the
 link database is their length (or distance, in AequilibraE's field structure).
 As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 
-.. _net_section.1.2.4:
-
-.. Splitting a link
-.. ^^^^^^^^^^^^^^^^
-.. *To come*
-
-.. _net_section.1.2.5:
-
-.. Merging two links
-.. ^^^^^^^^^^^^^^^^^
-.. *To come*
-
 .. _net_section.1.2.6:
 
 Deleting a required field
-^^^^^^^^^^^^^^^^^^^^^^^^^
+`````````````````````````
 Unfortunately, SQLite does not have the resources to prevent a user to remove a
 data field from the table. For this reason, if the user removes a required
 field, they will most likely corrupt the project.
@@ -326,13 +312,13 @@ field, they will most likely corrupt the project.
 .. _net_section.1.3:
 
 Field-specific data consistency
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''''''''''''''''''''''
 Some data fields are specially sensitive to user changes.
 
 .. _net_section.1.3.1:
 
 Link distance
-^^^^^^^^^^^^^
+`````````````
 
 Link distance cannot be changed by the user, as it is automatically recalculated
 using the Spatialite function *GeodesicLength*, which always returns distances
@@ -341,7 +327,7 @@ in meters.
 .. _net_section.1.3.2:
 
 Link direction
-^^^^^^^^^^^^^^
+``````````````
 
 Triggers enforce link direction to be -1, 0 or 1, and any other value results in
 an SQL exception.
@@ -349,19 +335,19 @@ an SQL exception.
 .. _net_section.1.3.3:
 
 *modes* field (Links and Nodes layers)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``````````````````````````````````````
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_modes`.
 
 .. _net_section.1.3.4:
 *link_type* field (Links layer) & *link_types* field (Nodes layer)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``````````````````````````````````````````````````````````````````
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_link_types`.
 
 .. _net_section.1.3.5:
 a_node and b_node
-^^^^^^^^^^^^^^^^^
+`````````````````
 The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not
 possible to enforce that users do not change these two fields, as it is not

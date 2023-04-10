@@ -121,6 +121,6 @@ class CreateTablesSRC:
             return [x.strip() for x in f.readlines()]
 
 
-for table, pth in [("project_database", "modelling_with_aequilibrae/project_database")]:
+for table, pth in [("project_database", "modeling_with_aequilibrae/project_database")]:
     s = CreateTablesSRC(table, pth)
     s.create()

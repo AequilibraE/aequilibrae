@@ -9,7 +9,7 @@ class About:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project, Parameters
+        >>> from aequilibrae import Project
 
         >>> project = Project.from_path("/tmp/test_project")
 
