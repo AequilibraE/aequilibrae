@@ -1,4 +1,4 @@
-We use the following hierarchy of header markers throught the documentation
+We use the following hierarchy of header markers through the documentation
 H1: =
 H2: -
 H3: ~

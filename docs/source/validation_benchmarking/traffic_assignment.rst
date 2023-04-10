@@ -64,7 +64,7 @@ please look in the :ref:`example_logging` section of the use cases.
 
 To begin building the assignment it is easy:
 
-::
+.. code-block:: python
 
     from aequilibrae.paths import TrafficAssignment
 
@@ -96,7 +96,7 @@ More functions will be added as needed/requested/possible.
 Setting the volume delay function is one of the first things you should do after
 instantiating an assignment problem in AequilibraE, and it is as simple as:
 
-::
+.. code-block:: python
 
     assig.set_vdf('BPR')
 
@@ -128,7 +128,7 @@ required in the composition of this class:
 
 Example:
 
-::
+.. code-block:: python
 
   tc = TrafficClass(graph_car, matrix_car)
 
@@ -139,7 +139,7 @@ Example:
 To add traffic classes to the assignment instance it is just a matter of making
 a method call:
 
-::
+.. code-block:: python
 
   assig.set_classes([tc, tc2])
 
@@ -162,14 +162,14 @@ choice and adding traffic classes to the assignment, or it will **fail**.
 To choose a field that exists in the graph, we just pass the parameters as
 follows:
 
-::
+.. code-block:: python
 
   assig.set_vdf_parameters({"alpha": "alphas", "beta": "betas"})
 
 
 To pass global values, it is simply a matter of doing the following:
 
-::
+.. code-block:: python
 
   assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
 
@@ -185,7 +185,7 @@ There are still three parameters missing for the assignment.
 
 * Equilibrium algorithm to use
 
-::
+.. code-block:: python
 
   assig.set_capacity_field("capacity")
   assig.set_time_field("free_flow_time")
@@ -193,7 +193,7 @@ There are still three parameters missing for the assignment.
 
 Finally, one can execute assignment:
 
-::
+.. code-block:: python
 
   assig.execute()
 
@@ -260,7 +260,7 @@ the :ref:`parameters_assignment` section.
 In order to override the parameter file values, one can set the assignment
 object member variables directly before execution.
 
-::
+.. code-block:: python
 
   assig.max_iter = 250
   assig.rgap_target = 0.0001
@@ -441,16 +441,16 @@ Network has:
 * Nodes: 24
 * Zones: 24
 
-.. image:: images/sioux_falls_msa-500_iter.png
+.. image:: ../images/sioux_falls_msa-500_iter.png
     :width: 590
     :alt: Sioux Falls MSA 500 iterations
-.. image:: images/sioux_falls_frank-wolfe-500_iter.png
+.. image:: ../images/sioux_falls_frank-wolfe-500_iter.png
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
-.. image:: images/sioux_falls_cfw-500_iter.png
+.. image:: ../images/sioux_falls_cfw-500_iter.png
     :width: 590
     :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
-.. image:: images/sioux_falls_bfw-500_iter.png
+.. image:: ../images/sioux_falls_bfw-500_iter.png
     :width: 590
     :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
 
@@ -463,16 +463,16 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-.. image:: images/anaheim_msa-500_iter.png
+.. image:: ../images/anaheim_msa-500_iter.png
     :width: 590
     :alt: Anaheim MSA 500 iterations
-.. image:: images/anaheim_frank-wolfe-500_iter.png
+.. image:: ../images/anaheim_frank-wolfe-500_iter.png
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
-.. image:: images/anaheim_cfw-500_iter.png
+.. image:: ../images/anaheim_cfw-500_iter.png
     :width: 590
     :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
-.. image:: images/anaheim_bfw-500_iter.png
+.. image:: ../images/anaheim_bfw-500_iter.png
     :width: 590
     :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
 
@@ -485,16 +485,16 @@ Network has:
 * Nodes: 416
 * Zones: 38
 
-.. image:: images/winnipeg_msa-500_iter.png
+.. image:: ../images/winnipeg_msa-500_iter.png
     :width: 590
     :alt: Winnipeg MSA 500 iterations
-.. image:: images/winnipeg_frank-wolfe-500_iter.png
+.. image:: ../images/winnipeg_frank-wolfe-500_iter.png
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
-.. image:: images/winnipeg_cfw-500_iter.png
+.. image:: ../images/winnipeg_cfw-500_iter.png
     :width: 590
     :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
-.. image:: images/winnipeg_bfw-500_iter.png
+.. image:: ../images/winnipeg_bfw-500_iter.png
     :width: 590
     :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
@@ -512,16 +512,16 @@ Network has:
 * Nodes: 1,020
 * Zones: 110
 
-.. image:: images/barcelona_msa-500_iter.png
+.. image:: ../images/barcelona_msa-500_iter.png
     :width: 590
     :alt: Barcelona MSA 500 iterations
-.. image:: images/barcelona_frank-wolfe-500_iter.png
+.. image:: ../images/barcelona_frank-wolfe-500_iter.png
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
-.. image:: images/barcelona_cfw-500_iter.png
+.. image:: ../images/barcelona_cfw-500_iter.png
     :width: 590
     :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
-.. image:: images/barcelona_bfw-500_iter.png
+.. image:: ../images/barcelona_bfw-500_iter.png
     :width: 590
     :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
 
@@ -534,16 +534,16 @@ Network has:
 * Nodes: 12,982
 * Zones: 1,790
 
-.. image:: images/chicago_regional_msa-500_iter.png
+.. image:: ../images/chicago_regional_msa-500_iter.png
     :width: 590
     :alt: Chicago MSA 500 iterations
-.. image:: images/chicago_regional_frank-wolfe-500_iter.png
+.. image:: ../images/chicago_regional_frank-wolfe-500_iter.png
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
-.. image:: images/chicago_regional_cfw-500_iter.png
+.. image:: ../images/chicago_regional_cfw-500_iter.png
     :width: 590
     :alt: Chicago Conjugate Frank-Wolfe 500 iterations
-.. image:: images/chicago_regional_bfw-500_iter.png
+.. image:: ../images/chicago_regional_bfw-500_iter.png
     :width: 590
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
 
@@ -554,7 +554,7 @@ Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago
 Regional), as that instance has a comparable size to real-world models.
 
-.. image:: images/convergence_comparison.png
+.. image:: ../images/convergence_comparison.png
     :width: 590
     :alt: Algorithm convergence comparison
 
