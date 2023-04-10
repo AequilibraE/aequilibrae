@@ -87,7 +87,7 @@ It is then important to highlight that AequilibraE, as a software, is divided in
 three very distinctive layers.  The first, which is responsible for tables
 consistent with each other (including links and nodes, modes and link_types),
 are embedded in the data layer in the form of geo-spatial database triggers. The
-second is the Python API, which provides all of AeuqilibraE's core algorithms
+second is the Python API, which provides all of AequilibraE's core algorithms
 and data manipulation facilities. The third is the GUI implemented in QGIS,
 which provides a user-friendly interface to access the model, visualize results
 and run procedures.

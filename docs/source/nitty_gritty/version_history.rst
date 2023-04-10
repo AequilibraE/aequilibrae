@@ -86,6 +86,10 @@ documentation for all versions since 0.5.3.
     .. link-button:: https://aequilibrae.com/python/V.0.8.3/
       :text: 0.8.3
       :classes: btn-block btn-secondary stretched-link
+    ---
+    .. link-button:: https://aequilibrae.com/python/V.0.8.4/
+      :text: 0.8.4
+      :classes: btn-block btn-secondary stretched-link
 
 
 * `Develop Branch (upcoming version) <https://aequilibrae.com/python/develop/>`_
