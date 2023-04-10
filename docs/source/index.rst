@@ -102,7 +102,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    :maxdepth: 1
 
    _auto_examples/index
-   user_guide
+   modeling_with_aequilibrae
    api
    validation
    nitty_gritty
