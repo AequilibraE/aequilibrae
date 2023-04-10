@@ -12,9 +12,6 @@ include 'inrets.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
 
-
-# from .__version__ import binary_version as VERSION_COMPILED
-
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
     cdef long nodes, orig, block_flows_through_centroids, classes, b, origin_index, zones, links
