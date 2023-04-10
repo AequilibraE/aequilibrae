@@ -4,11 +4,16 @@ Results
 ~~~~~~~
 
 The **results** table exists to hold the metadata for the results stored in the
-*results_database.sqlite* in the same folder as the model database.
+**results_database.sqlite** in the same folder as the model database. In that,
+the *table_name* field is unique and must match exactly the table name in the
+**results_database.sqlite**.
 
 Although those results could as be stored in the model database, it is possible
 that the number of tables in the model file would grow too quickly and would
-essentially clutter the *project_database.sqlite*.
+essentially clutter the **project_database.sqlite**.
 
-This is just a matter of software design and can change in future versions of
-the software, however.
+As a simple table, it looks as follows:
+
+.. image:: ../../images/results_table.png
+    :width: 800
+    :alt: results table structure

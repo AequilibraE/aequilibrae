@@ -12,7 +12,7 @@ should refer to the matrix in order to access it through the API.
 
 .. image:: ../../images/matrices_table.png
     :width: 1000
-    :alt: Link_types table structure
+    :alt: Matrices table structure
 
 As AequilibraE is fully compatible with OMX, the index can have a mix of matrix
 types (AEM and OMX) without prejudice to functionality.
