@@ -61,7 +61,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
    +++++++++++++++++
 
-   .. link-button:: api
+   .. link-button:: generated
          :type: ref
          :text: API references
          :classes: btn-block btn-secondary stretched-link

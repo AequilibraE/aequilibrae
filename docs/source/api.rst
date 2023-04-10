@@ -9,7 +9,7 @@ Project
 .. current_module:: aequilibrae
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
    Project
    Project.load
@@ -21,7 +21,7 @@ Project Components
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     About
     FieldEditor
@@ -35,7 +35,7 @@ Project Objects
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Zone
 
@@ -44,7 +44,7 @@ Network Data
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Modes
     LinkTypes
@@ -57,7 +57,7 @@ Network Items
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Mode
     LinkType
@@ -70,7 +70,7 @@ Parameters
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Parameters
 
@@ -81,7 +81,7 @@ Distribution
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Ipf
     GravityApplication
@@ -94,7 +94,7 @@ Matrix
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     AequilibraeMatrix
     AequilibraeData
@@ -106,7 +106,7 @@ Paths
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     Graph
     AssignmentResults
@@ -123,7 +123,7 @@ Transit
 
 .. autosummary::
    :nosignatures:
-   :toctree: api/
+   :toctree: generated/
 
     GTFS
     create_gtfsdb
