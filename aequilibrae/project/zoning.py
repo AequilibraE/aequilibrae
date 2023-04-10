@@ -29,7 +29,6 @@ class Zoning(BasicTable):
         >>> zone_downtown.employment = 10039
         >>> zone_downtown.save()
 
-
         # changing the value for an existing value/field
         >>> project.about.scenario_name = 'Just a better scenario name'
         >>> project.about.write_back()
@@ -37,7 +36,6 @@ class Zoning(BasicTable):
         # We can also add one more field to the table
         >>> fields = zoning.fields
         >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
-
     """
 
     def __init__(self, network):

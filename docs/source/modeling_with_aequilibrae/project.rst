@@ -84,12 +84,13 @@ Thus, using/manipulating each one of an AequilibraE model components can be done
 in different ways depending on the tool you use for such.
 
 It is then important to highlight that AequilibraE, as a software, is divided in
-three very distinctive layers.  The first, which is responsible for keeping
-links and nodes consistent with each other, are embedded in the data layer in the
-form of geo-spatial database triggers. The second is the Python API, which provides
-all of AeuqilibraE's core algorithms and data manipulation facilities. The third is
-the GUI implemented in QGIS, which provides a user-friendly interface to access the
-model, visualize results and run procedures.
+three very distinctive layers.  The first, which is responsible for tables
+consistent with each other (including links and nodes, modes and link_types),
+are embedded in the data layer in the form of geo-spatial database triggers. The
+second is the Python API, which provides all of AeuqilibraE's core algorithms
+and data manipulation facilities. The third is the GUI implemented in QGIS,
+which provides a user-friendly interface to access the model, visualize results
+and run procedures.
 
 These software layers are *stacked* and depend on each other, which means that any
 network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
