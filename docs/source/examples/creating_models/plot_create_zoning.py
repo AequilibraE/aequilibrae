@@ -26,6 +26,7 @@ from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%

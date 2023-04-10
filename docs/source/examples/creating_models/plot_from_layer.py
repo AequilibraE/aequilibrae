@@ -13,15 +13,15 @@ We use Folium to visualize the resulting network.
 # Imports
 # sphinx_gallery_thumbnail_path = 'images/plot_from_layer.png'
 from uuid import uuid4
+import urllib.request
+from string import ascii_lowercase
 from tempfile import gettempdir
 from os.path import join
-from aequilibrae import Project
 from shapely.wkt import loads as load_wkt
 import pandas as pd
 import folium
-import requests
-import urllib.request
-from string import ascii_lowercase
+
+from aequilibrae import Project
 
 # %%
 # We create an empty project on an arbitrary folder
