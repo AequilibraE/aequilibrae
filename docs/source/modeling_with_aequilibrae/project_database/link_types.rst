@@ -21,7 +21,8 @@ removed from the model without breaking it.
 
 - **default** - This link type exists to facilitate the creation of networks
   when link types are irrelevant. The identifying letter for this mode is **y**.
-  That is right, you have from a to x to create your own link types. :-D
+  That is right, you have from a to x to create your own link types, as well
+  as all upper-case letters of the alphabet
 
 .. _adding_new_link_types:
 

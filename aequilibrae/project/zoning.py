@@ -5,10 +5,10 @@ import shapely.wkb
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
+from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
-from .basic_table import BasicTable
-from .zone import Zone
+from aequilibrae.project.zone import Zone
 
 
 class Zoning(BasicTable):
