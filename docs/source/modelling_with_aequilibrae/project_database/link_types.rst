@@ -1,8 +1,7 @@
 .. _tables_link_types:
 
-================
 Link types table
-================
+~~~~~~~~~~~~~~~~
 
 The **link_types** table exists to list all the link types available in the
 model's network, and its main role is to support processes such as adding

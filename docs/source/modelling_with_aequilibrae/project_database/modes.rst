@@ -1,8 +1,7 @@
 .. _tables_modes:
 
-===========
 Modes table
-===========
+~~~~~~~~~~~
 
 The **modes** table exists to list all the modes available in the model's network,
 and its main role is to support the creation of graphs directly from the SQLite

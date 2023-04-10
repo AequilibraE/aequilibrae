@@ -3,95 +3,115 @@
 The AequilibraE project
 =======================
 
-Similarly to commercial packages, AequilibraE is moving towards having the
-majority of a model's components residing inside a single file. This change is motivated
-by the fact that it is easier to develop and maintain documentation for models
-if they are kept in a format that favors data integrity and that supports a
-variety of data types and uses.
+Similarly to commercial packages, any AequilibraE project must have a certain
+structure and follow a certain set of guidelines in order for software to
+work correctly.
 
-.. note::
-  As of now, only projection WGS84, 4326 is supported in AequilibraE.
-  Generalization is not guaranteed, but should come with time.
+One of these requirements is that AequilibraE currently only supports one
+projection system for all its layers, which is the **EPSG:4326** (WGS84).
+This limitation is planned to be lifted at some point, but it does not impact
+the result of any modeling procedure.
 
-The chosen format for AequilibraE is `SQLite <https://sqlite.org/index.html>`_,
-with all the GIS capability supported by
-`SpatiaLite <http://www.gaia-gis.it/gaia-sins/>`_. The
+AequilibraE is built on the shoulder of much older and more established
+projects, such as `SQLite <https://sqlite.org/index.html>`_,
+`SpatiaLite <http://www.gaia-gis.it/gaia-sins/>`_ and `NumPy
+<https://numpy.org/>`_, as well as reasonably new industry standards such as the
+`Open-Matrix format <https://github.com/osPlanning/omx>`_.
+
 impressive performance, portability, self containment and open-source character
-of these two pieces of software, along with their large user base and wide
+of these pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
-Since working with Spatialite is not just a matter of *pip installing* a
-package, please refer to :ref:`dependencies`.
 
-.. note::
-   AequilibraE 0.7.0 brought and important changes to the project structure and
-   the API. Versions 0.8 and beyond should see a much more stable API, with new
-   capabilities being incorporated after that.
+Since working with Spatialite is not just a matter of a *pip install*,
+please refer to :ref:`dependencies`. For QGIS users this is not a concern, while
+for Windows users this dependency is automatically handled under the hood, but
+the details are also discussed in the aforementioned dependencies section.
 
 Project structure
 -----------------
 Since version 0.7, the AequilibraE project consists of a main folder, where a
-series of files and sub folders exist. The files are the following:
+series of files and sub folders exist, and the current project organization
+is as follows:
 
-- **project_database.sqlite** - Main project file, containing network and data
-  tables for the project
+.. image:: ../images/project_structure.png
+    :width: 700
+    :alt: AequilibraE project structure
 
-- **results_database.sqlite** - Database containing outputs for all algorithms
-  such as those resulting from traffic assignment
+|
 
-- **parameters.yml** - Contains parameters for all parameterized AequilibraE
-  procedures
+The main component of an AequilibraE model is the **project_database.sqlite**,
+where the network and zoning system are stored and maintained, as well as the
+documentation records of all matrices and procedure results stored in other
+folders and databases.
 
-- **matrices** (*folder*) - Contains all matrices to be used within a project
+The second key component of any model is the **parameters.yaml** file, which
+holds the default values for a number of procedures (e.g. assignment
+convergence), as well as the specification for networks imported from
+Open-Street Maps and other general *import-export* parameters.
 
-Data consistency
-----------------
+The third and last required component of an AequilibraE model is the Matrices
+folder, where all the matrices in binary format (in AequilibraE's native AEM or
+OMX formats) should be placed. This folder can be empty, however, as no
+particular matrix is required to exist in an AequilibraE model.
 
-One of the key characteristics of any modelling platform is the ability of the
-supporting software to maintain internal data consistency. Network data
-consistency is surely the most critical and complex aspect of overall data
-consistency, which has been introduced in the AequilibraE framework with
-`TranspoNET <https://www.github.com/aequilibrae/transponet>`_,  where
-`Andrew O'Brien <https://www.linkedin.com/in/andrew-o-brien-5a8bb486/>`_
-implemented link-node consistency infrastructure in the form of spatialite
-triggers.
+The database that stores results in tabular format (e.g. link loads from traffic
+assignment), **results_database.sqlite** is created on-the-fly the first time
+a command to save a tabular result into the model is invoked, so the user does
+not need to worry about its existence until it is automatically created.
 
-Further data consistency, especially for tabular data, is also necessary. This
-need has been largely addressed in version 0.7, but more triggers will most
-likely be added in upcoming versions.
+The **demand_database.sqlite** is envisioned to hold all the demand-related
+information, and it is not yet structured within the AequilibraE code, as there
+is no pre-defined demand model available for use with AequilibraE. This detabase
+is not created with the model, but we recommend using this concept on
+your demand models.
 
-All consistency triggers/procedures are discussed in parallel with the
-features they implement.
+The **public_transport.sqlite** database holds a *transportation route system* for
+a model, and has been introduced in AequilibraE version 0.9. This database is
+also created *on-the-fly* when the user imports a GTFS source into an AequilibraE
+model, but there is still no support for manually or programmatically adding routes
+to a route system as of yet.
 
+Package components: A conceptual view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Dealing with Geometries
------------------------
-Geometry is a key feature when dealing with transportation infrastructure and
-actual travel. For this reason, all datasets in AequilibraE that correspond to
-elements with physical GIS representation are geo-enabled.
+As all the components of an AequilibraE model based on open-source software and
+open-data standards, modeling with AequilibraE is a little different than
+modeling with commercial packages, as the user can read and manipulate model
+components outside the software modeling environments (Python and QGIS).
 
-This also means that the AequilibraE API needs to provide an interface to
-manipulate each element's geometry in a convenient way. This is done using the
-wonderful `Shapely <https://shapely.readthedocs.io/>`_, and we urge you to study
-its comprehensive API before attempting to edit a feature's geometry in memory.
+Thus, using/manipulating each one of an AequilibraE model components can be done
+in different ways depending on the tool you use for such.
 
-As AequilibraE is based on Spatialite, the user is also welcome to use its
-powerful tools to manipulate your model's geometries, although that is not
-recommended, as the "training wheels are off".
+It is then important to highlight that AequilibraE, as a software, is divided in
+three very distinctive layers.  The first, which is responsible for keeping
+links and nodes consistent with each other, are embedded in the data layer in the
+form of geo-spatial database triggers. The second is the Python API, which provides
+all of AeuqilibraE's core algorithms and data manipulation facilities. The third is
+the GUI implemented in QGIS, which provides a user-friendly interface to access the
+model, visualize results and run procedures.
 
+These software layers are *stacked* and depend on each other, which means that any
+network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
+while any procedure such as traffic assignment done in QGIS is nothing more than an
+API call to the corresponding Python method.
 
 Project database
 ----------------
+More details on the **project_database.sqlite** are discussed on a nearly *per-table*
+basis below, and we recommend understanding the role of each table before setting
+an AequilibraE model you intend to use in anger.
+
 .. toctree::
    :maxdepth: 1
 
-   project_docs/about
-   project_docs/network
-   project_docs/modes
-   project_docs/link_types
-   project_docs/matrices
-   project_docs/zones
-   project_docs/parameters_metadata
-   project_docs/results
+   project_database/about
+   project_database/network
+   project_database/modes
+   project_database/link_types
+   project_database/matrices
+   project_database/zones
+   project_database/parameters_metadata
+   project_database/results
 
 Parameters file
 ----------------

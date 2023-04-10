@@ -1,14 +1,53 @@
 .. _network:
 
-=======
 Network
-=======
+~~~~~~~
 
 .. note::
   This documentation, as well as the SQL code it referred to, comes from the
   seminal work done in `TranspoNet <http://github.com/AequilibraE/TranspoNet/>`_
   by `Pedro <https://au.linkedin.com/in/pedrocamargo>`_ and
   `Andrew <https://au.linkedin.com/in/andrew-o-brien-5a8bb486>`_.
+
+
+
+
+Data consistency
+----------------
+
+One of the key characteristics of any modeling platform is the ability of the
+supporting software to maintain internal data consistency. Network data
+consistency is surely the most critical and complex aspect of overall data
+consistency, which has been introduced in the AequilibraE framework with
+`TranspoNET <https://www.github.com/aequilibrae/transponet>`_,  where
+`Andrew O'Brien <https://www.linkedin.com/in/andrew-o-brien-5a8bb486/>`_
+implemented link-node consistency infrastructure in the form of spatialite
+triggers.
+
+Further data consistency, especially for tabular data, is also necessary. This
+need has been largely addressed in version 0.7, but more triggers will most
+likely be added in upcoming versions.
+
+All consistency triggers/procedures are discussed in parallel with the
+features they implement.
+
+
+Dealing with Geometries
+-----------------------
+Geometry is a key feature when dealing with transportation infrastructure and
+actual travel. For this reason, all datasets in AequilibraE that correspond to
+elements with physical GIS representation are geo-enabled.
+
+This also means that the AequilibraE API needs to provide an interface to
+manipulate each element's geometry in a convenient way. This is done using the
+wonderful `Shapely <https://shapely.readthedocs.io/>`_, and we urge you to study
+its comprehensive API before attempting to edit a feature's geometry in memory.
+
+As AequilibraE is based on Spatialite, the user is also welcome to use its
+powerful tools to manipulate your model's geometries, although that is not
+recommended, as the "training wheels are off".
+
+
 
 The objectives of developing a network format for AequilibraE are to provide the
 users a seamless integration between network data and transportation modeling
@@ -20,7 +59,7 @@ As mentioned in other sections of this documentation, the AequilibraE
 network file is composed by a links and a nodes layer that are kept
 consistent with each other through the use of database triggers, and
 the network can therefore be edited in any GIS platform or
-programatically in any fashion, as these triggers will ensure that
+programmatically in any fashion, as these triggers will ensure that
 the two layers are kept compatible with each other by either making
 other changes to the layers or preventing the changes.
 

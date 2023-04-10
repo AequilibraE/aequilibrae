@@ -1,7 +1,7 @@
 .. _tables_zones:
-===========
+
 Zones table
-===========
+~~~~~~~~~~~
 
 The **zones** table exists only for the user's convenience, as it is likely to
 be required in a full-blown model. As it is not required to exist, the table

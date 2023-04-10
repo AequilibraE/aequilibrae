@@ -6,15 +6,21 @@ from aequilibrae.project.project_creation import run_queries_from_sql_file
 
 class About:
     """Provides an interface for querying and editing the **about** table of an AequilibraE project
-    ::
 
-        p = Project()
-        p.open('my/project/folder')
-        about = p.about
+    .. code-block:: python
 
-        about.description = 'This is the example project. Do not use for forecast'
-        about.write_back()
+        >>> from aequilibrae import Project, Parameters
 
+        >>> project = Project.from_path("/tmp/test_project")
+
+        # Adding a new field and saving it
+        >>> project.about.add_info_field('my_super_relevant_field')
+        >>> project.about.my_super_relevant_field = 'super relevant information'
+        >>> project.about.write_back()
+
+        # changing the value for an existing value/field
+        >>> project.about.scenario_name = 'Just a better scenario name'
+        >>> project.about.write_back()
 
     """
 

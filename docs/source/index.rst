@@ -46,7 +46,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
    +++++++++++++++++
 
-   .. link-button:: user_guide
+   .. link-button:: modeling_with_aequilibrae
          :type: ref
          :text: Modeling with AequilibraE
          :classes: btn-block btn-secondary stretched-link
@@ -105,7 +105,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    user_guide
    api
    validation
-   gettingstarted
+   nitty_gritty
 
 Note to users
 =============

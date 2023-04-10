@@ -12,7 +12,7 @@ if str(project_dir) not in sys.path:
 
 
 class CreateTablesSRC:
-    def __init__(self, component: str):
+    def __init__(self, component: str, tgt_fldr: str):
         from aequilibrae.project import Project
 
         # Create a new project
@@ -21,12 +21,12 @@ class CreateTablesSRC:
         self.proj.new(self.proj_path)
 
         if component == "project_database":
-            self.stub = component
+            self.stub = "data_model"
             # Get the appropriate data for the database we are documenting
             self.conn = self.proj.conn
             self.path = join(*Path(realpath(__file__)).parts[:-1],
                              "../aequilibrae/project/database_specification/tables")
-            self.doc_path = str(Path(realpath(__file__)).parent / "source")
+            self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -121,6 +121,6 @@ class CreateTablesSRC:
             return [x.strip() for x in f.readlines()]
 
 
-for table in ["project_database"]:
-    s = CreateTablesSRC(table)
+for table, pth in [("project_database", "modelling_with_aequilibrae/project_database")]:
+    s = CreateTablesSRC(table, pth)
     s.create()

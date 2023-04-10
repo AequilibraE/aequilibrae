@@ -1,8 +1,8 @@
 .. _matrix_table:
 
-========
+
 Matrices
-========
+~~~~~~~~
 
 The infrastructure around matrices in AequilibraE is composed of an index table,
 **matrices**, in the main project file that lists all matrices associated with

@@ -1,8 +1,7 @@
 .. _parameters_metadata:
 
-=========================
 Parameters metadata table
-=========================
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Documentation is paramount for any successful modeling project. For this reason,
 AequilibraE has a database table dedicated to the documentation of each field in

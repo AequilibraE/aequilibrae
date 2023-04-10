@@ -7,8 +7,8 @@
 --@ The *procedure* field holds the name the the procedure that generated
 --@ the result (e.g.: Traffic Assignment).
 --@
---@ The *procedure_id* field holds an unique alpha-numeric identifier for
---@ this prodecure.
+--@ The *procedure_id* field holds an unique UUID identifier for this procedure,
+--@ which is created at runtime.
 --@
 --@ The *procedure_report* field
 --@

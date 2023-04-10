@@ -121,7 +121,7 @@ required in the composition of this class:
   but which can have an arbitrary number of user-classes, setup as different
   layers of the matrix object (see the :ref:`multiple_user_classes`
 
-* **pce** - The passenger-car equivalent is the standard way of modelling
+* **pce** - The passenger-car equivalent is the standard way of modeling
   multi-class traffic assignment equilibrium in a consistent manner (see [4] for
   the technical detail), and it is set to 1 by default.  If the **pce** for a
   certain class should be different than one, one can make a quick method call.

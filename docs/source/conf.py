@@ -60,12 +60,13 @@ extensions = [
     "sphinx_panels",
 ]
 
+# Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     'capture_repr': ('_repr_html_', '__repr__'),
     'remove_config_comments': True,
-    "plot_gallery": True,
+    "plot_gallery": False,
 }
 
 # Add any paths that contain templates here, relative to this directory.

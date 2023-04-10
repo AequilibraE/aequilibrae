@@ -6,7 +6,7 @@ Creating a zone system based on Hex Bins
 
 On this example we show how to create a hex bin zones covering an arbitrary area.
 
-We use the Nauru example to create roughly 100 zones covering the whole modelling
+We use the Nauru example to create roughly 100 zones covering the whole modeling
 area as delimited by the entire network
 
 You are obviously welcome to create whatever zone system you would like, as long as

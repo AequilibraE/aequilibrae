@@ -1,7 +1,7 @@
 .. _tables_results:
-=======
+
 Results
-=======
+~~~~~~~
 
 The **results** table exists to hold the metadata for the results stored in the
 *results_database.sqlite* in the same folder as the model database.

@@ -11,12 +11,13 @@ each mode in the network, a layer for all links and a layer for all nodes.
 """
 # %%
 # Imports
+# sphinx_gallery_thumbnail_path = 'images/plot_network_image.png'
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 import folium
-# sphinx_gallery_thumbnail_path = 'images/plot_network_image.png'
+
 
 # %%
 # We create an empty project on an arbitrary folder

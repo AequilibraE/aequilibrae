@@ -1,20 +1,11 @@
-An overview of AequilibraE
-==========================
 
-AequilibraE is the first comprehensive Python package for transportation
-modeling, and it aims to provide all the resources not easily available from
-other open-source packages in the Python (NumPy, really) ecosystem.
-
-AequilibraE has also a fully features interface avalaible as a plugin for the
-open source software QGIS, which is separately mantained and discussed in
-detail its `documentation <http://www.aequilibrae.com/qgis>`_.
 
 Sub-modules
 -----------
 
-AequilibraE is organized in submodules that are often derived from the
-traditional 4-step model. However, other modules have already been added or are
-expected to be added in the future. The current modules are:
+AequilibraE is organized in submodules organized around common workflows
+used in transport modeling, as well as connected to the maintenance and
+operation of models. The current modules are:
 
 - :ref:`overview_project`
 - :ref:`overview_parameters`
@@ -22,27 +13,6 @@ expected to be added in the future. The current modules are:
 - :ref:`overview_paths`
 - :ref:`overview_transit`
 - :ref:`overview_matrix`
-
-Contributions can be made to the existing modules or in the form of new modules.
-
-.. _overview_project:
-
-AequilibraE Project
-~~~~~~~~~~~~~~~~~~~
-The AequilibraE Project, as a consistent model file, comes from the vision of
-having a complete model system that would have capabilities to support the vast
-majority of analysis usually performed with traditional transport models.
-
-In a nutshell, the AequilibraE project file is designed to behave like many of
-the commercial platforms available in the market, where a single file hosts the
-majority of the data. Differently then these platforms, however, AequilibraE is
-designed on top of an open data format, SQLite.
-
-This concept is still under heavy development, but it is already possible to use
-its structure to download full, routable networks directly from
-`Open Street Maps <https://www.openstreetmap.org/>`_ .
-
-More detailed is provided in :ref:`project`.
 
 
 .. _overview_parameters:
