@@ -11,13 +11,13 @@ all_vdf_functions = ["bpr", "bpr2", "conical", "inrets"]
 class VDF:
     """Volume-Delay function
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae.paths import VDF
+        >>> from aequilibrae.paths import VDF
 
-        vdf = VDF()
-        vdf.functions_available()
-      ['bpr', 'bpr2', 'conical', 'inrets']
+        >>> vdf = VDF()
+        >>> vdf.functions_available()
+        ['bpr', 'bpr2', 'conical', 'inrets']
 
     """
 

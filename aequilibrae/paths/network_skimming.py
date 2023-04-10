@@ -29,7 +29,7 @@ sys.dont_write_bytecode = True
 class NetworkSkimming(WorkerThread):
     """
 
-    ::
+    .. code-block:: python
 
         from aequilibrae.paths.network_skimming import NetworkSkimming
         from aequilibrae.project import Project
@@ -114,7 +114,7 @@ class NetworkSkimming(WorkerThread):
         Args:
             *name* (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
             *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+            *project* (:obj:`Project`, `Optional`): Project we want to save the results to. Defaults to the active project
         """
 
         file_name = f"{name}.{format.lower()}"

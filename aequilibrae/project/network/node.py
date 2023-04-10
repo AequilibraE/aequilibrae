@@ -6,7 +6,7 @@ from .connector_creation import connector_creation
 class Node(SafeClass):
     """A Node object represents a single record in the *nodes* table
 
-    ::
+    .. code-block:: python
 
         from aequilibrae import Project
         from shapely.geometry import Point

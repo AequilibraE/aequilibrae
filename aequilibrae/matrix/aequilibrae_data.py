@@ -51,7 +51,7 @@ class AequilibraeData(object):
             *memory_mode* (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
             be a memory-mapped numpy array
 
-        ::
+        .. code-block:: python
 
             vectors = "D:/release/Sample models/Chicago_2020_02_15/vectors.aed"
             args = {
@@ -138,7 +138,7 @@ class AequilibraeData(object):
         Args:
             *file_path* (:obj:`str`): Full file path to the AequilibraeData to be loaded
 
-        ::
+        .. code-block:: python
 
             dataset = AequilibraeData()
             dataset.load("D:/datasets/vectors.aed")
@@ -164,7 +164,7 @@ class AequilibraeData(object):
 
             *table_name* (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
 
-        ::
+        .. code-block:: python
 
             dataset = AequilibraeData()
             dataset.load("D:/datasets/vectors.aed")
@@ -221,9 +221,9 @@ class AequilibraeData(object):
         """
         Returns a random name for a dataset with root in the temp directory of the user
 
-        ::
+        .. code-block:: python
 
             name = AequilibraeData().random_name()
-          '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
+            '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
         """
         return os.path.join(tempfile.gettempdir(), f"Aequilibrae_data_{uuid.uuid4()}.aed")

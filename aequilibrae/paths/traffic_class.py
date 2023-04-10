@@ -11,7 +11,7 @@ import warnings
 class TrafficClass:
     """Traffic class for equilibrium traffic assignment
 
-    ::
+    .. code-block:: python
 
         from aequilibrae.paths import TrafficClass
 

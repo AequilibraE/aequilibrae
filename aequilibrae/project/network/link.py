@@ -6,7 +6,7 @@ from aequilibrae.project.network.mode import Mode
 class Link(SafeClass):
     """A Link object represents a single record in the *links* table
 
-    ::
+    .. code-block:: python
 
         from aequilibrae import Project
 

@@ -144,14 +144,11 @@ class Network(WorkerThread):
             *modes* (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
 
-            p = Project()
-            p.new(nm)
-
-        ::
+        .. code-block:: python
 
             from aequilibrae import Project, Parameters
-            p = Project()
-            p.new('path/to/project')
+            
+            project = Project.from_path("/tmp/test_project")
 
             # We now choose a different overpass endpoint (say a deployment in your local network)
             par = Parameters()
@@ -302,7 +299,8 @@ class Network(WorkerThread):
                                               database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
-        ::
+        
+        .. code-block:: python
 
             p = Project()
             p.open(nm)

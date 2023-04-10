@@ -26,7 +26,7 @@ class GravityApplication:
     Impedance is an instance of AequilibraEMatrix
     Row and Column vectors are instances of AequilibraeData
 
-    ::
+    .. code-block:: python
 
         import pandas as pd
         import sqlite3
