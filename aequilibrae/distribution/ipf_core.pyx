@@ -41,7 +41,7 @@ def ipf_core(seed_matrix, target_productions, target_attractions, max_iterations
 
     iter, err = _fratar(flows, prod_tot, prod_tgt, prod_factor, attr_tot, attr_tgt, attr_factor, max_iter, toler, cpus)
     if err > tolerance:
-        warnings.warn(f"C ould not reach convergence in {iter} iterations: {err}")
+        warnings.warn(f"Could not reach convergence in {iter} iterations: {err}")
     return iter, err
 
 @cython.wraparound(False)
