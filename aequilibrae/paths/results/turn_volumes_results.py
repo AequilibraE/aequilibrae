@@ -8,9 +8,9 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from aequilibrae import AequilibraeMatrix
-from aequilibrae import Project
-from aequilibrae import TrafficClass
+from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
+from aequilibrae.project.project import Project
+from aequilibrae.paths.traffic_class import TrafficClass
 from context import get_active_project
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["matrix_name", "network mode", "class_name", "iteration", "a", "b", "c"]
