@@ -31,34 +31,35 @@ class NetworkSkimming(WorkerThread):
 
     .. code-block:: python
 
-        from aequilibrae.paths.network_skimming import NetworkSkimming
-        from aequilibrae.project import Project
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
-        project = Project()
-        project.open(self.proj_dir)
-        network = self.project.network
+        >>> project = Project.from_path("/tmp/test_project")
+        
+        >>> network = project.network
+        >>> network.build_graphs()
+        
+        >>> graph = network.graphs['c']
+        >>> graph.set_graph(cost_field="distance")
+        >>> graph.set_skimming("distance")
 
-        network.build_graphs()
-        graph = network.graphs['c']
-        graph.set_graph(cost_field="distance")
-        graph.set_skimming("distance")
-
-        skm = NetworkSkimming(graph)
-        skm.execute()
+        >>> skm = NetworkSkimming(graph)
+        >>> skm.execute()
 
         # The skim report (if any error generated) is available here
-        skm.report
+        >>> skm.report
+        []
 
         # To access the skim matrix directly from its temporary file
-        matrix = skm.results.skims
+        >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        skm.save_to_project('skimming result')
+        >>> skm.save_to_project('/tmp/skimming result.omx')
 
         # Or specify the AequilibraE's matrix file format
-        skm.save_to_project('skimming result', 'aem')
+        >>> skm.save_to_project('skimming result', 'aem')
 
-        project.close()
+        >>> project.close()
     """
 
     if pyqt:

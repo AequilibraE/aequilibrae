@@ -40,8 +40,7 @@ class Modes:
 
         # We can also create a completely new mode and add to the model
         >>> new_mode = modes.new('k')
-        >>> new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed
-        # other fields are not mandatory
+        >>> new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed # other fields are not mandatory
 
         # We then explicitly add it to the network
         >>> modes.add(new_mode)

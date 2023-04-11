@@ -10,30 +10,29 @@ except ImportError as ie:
 
 
 class PathResults:
-    """
-    Path computation result holder
+    """Path computation result holder
 
-    ::
+    .. code-block:: python
 
-          from aequilibrae.project import Project
-          from aequilibrae.paths.results import PathResults
+          >>> from aequilibrae import Project
+          >>> from aequilibrae.paths.results import PathResults
 
-          proj = Project()
-          proj.load('path/to/project/folder')
-          proj.network.build_graphs()
+          >>> proj = Project.from_path("/tmp/test_project")
+          >>> proj.network.build_graphs()
+
           # Mode c is car in this project
-          car_graph = proj.network.graphs['c']
+          >>> car_graph = proj.network.graphs['c']
 
           # minimize distance
-          car_graph.set_graph('distance')
+          >>> car_graph.set_graph('distance')
 
           # If you want to compute skims
           # It does increase path computation time substantially
-          car_graph.set_skimming(['distance', 'travel_time'])
+          >>> car_graph.set_skimming(['distance', 'free_flow_time'])
 
-          res = PathResults()
-          res.prepare(car_graph)
-          res.compute_path(17, 13199)
+          >>> res = PathResults()
+          >>> res.prepare(car_graph)
+          >>> res.compute_path(1, 17)
 
           # res.milepost contains the milepost corresponding to each node along the path
           # res.path_nodes contains the sequence of nodes that form the path
@@ -41,11 +40,11 @@ class PathResults:
           # res.path_link_directions contains the link directions corresponding to the above links
           # res.skims contain all skims requested when preparing the graph
 
-          # Update all the outputs mentioned above for destination 1265. Same origin: 17
-          res.update_trace(1265)
+          # Update all the outputs mentioned above for destination 9. Same origin: 1
+          >>> res.update_trace(9)
 
           # clears all computation results
-          res.reset()
+          >>> res.reset()
     """
 
     def __init__(self) -> None:

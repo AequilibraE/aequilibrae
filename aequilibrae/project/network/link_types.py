@@ -24,7 +24,7 @@ class LinkTypes:
         ...     link_type_obj.beta = 1
 
         # We can save changes for all link types in one go
-        >>> all_link_types.save()
+        >>> link_types.save()
 
         # or just get one link_type in specific
         >>> default_link_type = link_types.get('y')
@@ -43,8 +43,7 @@ class LinkTypes:
 
         # We can also create a completely new link_type and add to the model
         >>> new_type = link_types.new('a')
-        >>> new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed
-        # other fields are not mandatory
+        >>> new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed # other fields are not mandatory
 
         # We then save it to the database
         >>> new_type.save()

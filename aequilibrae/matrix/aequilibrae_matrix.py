@@ -92,7 +92,7 @@ class AequilibraeMatrix(object):
     def save(self, names=()) -> None:
         """Saves matrix data back to file.
 
-        If working with AEM file, it flushes data to disk.  If working with OMX, requires new names
+        If working with AEM file, it flushes data to disk. If working with OMX, requires new names.
 
         Args:
             *names* (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files"""
@@ -155,19 +155,19 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file',
-                             zones=zones_in_the_model,
-                             matrix_names= names_list)
-            mat.num_indices
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names= names_list)
+            >>> mat.num_indices
             1
-            mat.zones
+            >>> mat.zones
             3317
-            np.sum(mat[trips])
-            0.0
         """
 
         self.__memory_only = memory_only
