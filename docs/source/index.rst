@@ -61,7 +61,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
    +++++++++++++++++
 
-   .. link-button:: generated
+   .. link-button:: api
          :type: ref
          :text: API references
          :classes: btn-block btn-secondary stretched-link
@@ -91,7 +91,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
    ++++++++++++
 
-   .. link-button:: getting_started
+   .. link-button:: nitty_gritty
          :type: ref
          :text: Nitty-Gritty
          :classes: btn-block btn-secondary stretched-link
@@ -115,13 +115,13 @@ any funding or profit from this work, so if your organization is making use of
 AequilibraE, please consider funding some of the new developments or maintenance
 of the project.
 
-**We appreciate if you do not send questions directly to the developers**, but
+**We appreciate it if you do not send questions directly to the developers**, but
 there are two alternatives for support:
 
-1. Posting your question to `StackOverflow <https:www.stackoverflow.com/>`_
+1. Posting your question to `StackOverflow <https:www.stackoverflow.com/>`_;
 2. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
    and sending your question there.
 
-Aequilibrae **does not have paid support** but if you are looking to hire its developers
+AequilibraE **does not have paid support** but if you are looking to hire its developers
 for specific projects or to **fund AequilibraE's** development,
 please e-mail the developers at contact@aequilibrae.com.
