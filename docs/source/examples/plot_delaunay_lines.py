@@ -8,7 +8,7 @@ In this example, we show how to create AequilibraE's famous Delaunay Lines, but 
 
 For more on this topic, the first publication is `here <https://xl-optim.com/delaunay/>`_.
 
-We use the Sioux-Falls example once again.
+We use the Sioux Falls example once again.
 """
 
 # %%

@@ -4,7 +4,7 @@
 Path and skimming
 =================
 
-On this example we show how to perform path computation and network skimming
+In this example, we show how to perform path computation and network skimming
 for the Sioux Falls example model.
 """
 
@@ -23,7 +23,7 @@ project = create_example(fldr)
 import logging
 import sys
 
-# We the project open, we can tell the logger to direct all messages to the terminal as well
+# We the project opens, we can tell the logger to direct all messages to the terminal as well
 logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
@@ -38,30 +38,31 @@ logger.addHandler(stdout_handler)
 from aequilibrae.paths import PathResults
 
 # %%
-# we build all graphs
+# We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs.  Which is true, but we won't use those fields
+# We get warnings that several fields in the project are filled with NaNs. 
+# This is true, but we won't use those fields.
 
 # %%
-# we grab the graph for cars
+# We grab the graph for cars
 graph = project.network.graphs["c"]
 
 # we also see what graphs are available
 # project.network.graphs.keys()
 
-# let's say we want to minimize distance
+# let's say we want to minimize the distance
 graph.set_graph("distance")
 
 # And will skim time and distance while we are at it
 graph.set_skimming(["free_flow_time", "distance"])
 
-# And we will allow paths to be compute going through other centroids/centroid connectors
+# And we will allow paths to be computed going through other centroids/centroid connectors
 # required for the Sioux Falls network, as all nodes are centroids
 # BE CAREFUL WITH THIS SETTING
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# instantiate a path results object and prepare it to work with the graph
+# Let's instantiate a path results object and prepare it to work with the graph
 res = PathResults()
 res.prepare(graph)
 
@@ -85,7 +86,7 @@ res.milepost
 
 # %%
 
-# If we want to compute the path for a different destination and same origin, we can just do this
+# If we want to compute the path for a different destination and the same origin, we can just do this
 # It is way faster when you have large networks
 res.update_trace(13)
 
@@ -99,6 +100,7 @@ res.path_nodes
 import matplotlib.pyplot as plt
 from shapely.ops import linemerge
 
+# %%
 links = project.network.links
 
 # We plot the entire network

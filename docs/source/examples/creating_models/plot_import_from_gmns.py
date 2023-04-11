@@ -5,7 +5,7 @@ Importing network from GMNS
 ===========================
 
 In this example, we import a simple network in GMNS format.
-The source files of this network is publicly available in the GMNS GitHub repository itself.
+The source files of this network are publicly available in the GMNS GitHub repository itself.
 Here's the repository: https://github.com/zephyr-data-specs/GMNS
 """
 
@@ -42,7 +42,7 @@ new_link_fields = {
 }
 new_node_fields = {
     "port": {"description": "port flag", "type": "text", "required": False},
-    "hospital": {"description": "hoospital flag", "type": "text", "required": False},
+    "hospital": {"description": "hospital flag", "type": "text", "required": False},
 }
 
 par = Parameters()
@@ -51,7 +51,7 @@ par.parameters["network"]["gmns"]["node"]["fields"].update(new_node_fields)
 par.write_back()
 
 # %%
-# As it is specified in that the geometries are in the coordinate system EPSG:32619,
+# As it is specified that the geometries are in the coordinate system EPSG:32619,
 # which is different than the system supported by AequilibraE (EPSG:4326), we inform
 # the srid in the method call:
 project.network.create_from_gmns(
@@ -108,7 +108,7 @@ long, lat = curr.fetchone()
 # We create the map
 map_gmns = folium.Map(location=[lat, long], zoom_start=17)
 
-# add all layers
+# Add all layers
 for layer in layers:
     layer.add_to(map_gmns)
 

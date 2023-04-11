@@ -19,7 +19,7 @@ other changes to the layers or preventing the changes.
 
 **We cannot stress enough how impactful this set of spatial triggers was to**
 **the transportation modelling practice, as this is the first time a**
-transportation network can be edited without specialized software that**
+transportation network can be edited without specialized software that 
 **requires the editing to be done inside such software.**
 
 .. note::

@@ -1,12 +1,15 @@
 """
+.. editing_network_nodes:
+
 Editing network geometry: Nodes
 ===============================
 
-On this example we show how to mode a node in the network and look into
+In this example, we show how to mode a node in the network and look into
 what happens to the links.
 """
 
-## Imports
+# %%
+# Imports
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -14,6 +17,7 @@ from aequilibrae.utils.create_example import create_example
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 
+# %%
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -44,7 +48,7 @@ for lid in curr.fetchall():
     geo = links.get(lid[0]).geometry
     plt.plot(*geo.xy, color="blue")
 
-plt.plot(*node.geometry.xy, "ro", color="black")
+plt.plot(*node.geometry.xy, "o", color="black")
 
 plt.show()
 
@@ -52,5 +56,4 @@ plt.show()
 # Look at the original network and see how it used to look like
 
 # %%
-
 project.close()

@@ -17,7 +17,7 @@ Assignment
 ----------
 
 The assignment section of the parameter file is the smallest one, and it
-contains only the convergence criteria for assignment in terms of maximum number
+contains only the convergence criteria for assignment in terms of the maximum number
 of iterations and target Relative Gap.
 
 .. image:: ../images/parameters_assignment_example.png
@@ -26,7 +26,7 @@ of iterations and target Relative Gap.
     :alt: Assignment example
 
 Although these parameters are required to exist in the parameters file, one can
-override them during assignment, as detailed in :ref:`convergence_criteria`.
+override them during the assignment, as detailed in :ref:`convergence_criteria`.
 
 
 .. _parameters_distribution:
@@ -55,7 +55,7 @@ to be created in case a new project/network is to bre created from scratch, and 
 now each one of these groups contains only a single group of parameters called 
 *fields*.
 
-link fields
+Link Fields
 ~~~~~~~~~~~
 
 The section for link fields are divided into *one-way* fields and *two-way* fields, where the

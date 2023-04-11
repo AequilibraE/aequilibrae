@@ -1,8 +1,10 @@
+.. _software_development:
+
 Contributing to AequilibraE
 ===========================
 
-This page presents some initial instructions on how to setup your system to start contributing to AequilibraE and lists
-the requirements for all pull-requests to be merged into master.
+This page presents some initial instructions on how to set up your system to start contributing to 
+AequilibraE and lists the requirements for all pull requests to be merged into master.
 
 .. note::
    The recommendations on this page are current as of October 2021.
@@ -74,7 +76,7 @@ AequilibraE development (tries) to follow a few standards. Since this is largely
 portions of the code are still not up to such standards.
 
 Style
-~~~~~~
+~~~~~
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
@@ -89,7 +91,7 @@ Imports
   does it automatically on PyCharm).
 * Imports of NumPy should follow the following convention:
 
-::
+.. code-block:: python
 
     import numpy as np
 

@@ -1,4 +1,4 @@
-
+.. _software_components:
 
 Sub-modules
 -----------
@@ -28,7 +28,7 @@ There are currently 4 main sessions with the parameters file: *Assignment*,
 
 The parameters for *assignment* and *distribution* control only convergence
 criteria, while the *System* section controls things like the number of CPU
-cores used by the software, default directories and Spatialite location for
+cores used by the software, default directories, and Spatialite location for
 Windows systems. The *Network* section, however, contains parameters that
 control the creation of networks and the import from Open Street Maps.
 
@@ -55,7 +55,7 @@ Path computation
 ~~~~~~~~~~~~~~~~
 
 The path computation module contains some of the oldest code in AequilibraE,
-some of which preceed the existance of AequilibraE as a proper Python package.
+some of which preceeded the existence of AequilibraE as a proper Python package.
 
 The package is built around a shortest path algorithm ported from SciPy and
 adapted to support proper multi-threading, network loading and multi-field
@@ -73,7 +73,7 @@ concurrent shortest paths computation, although the path computation path does
 release the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`_, which
 allows the users to get some performance gains using Python's threading module.
 
-A wealth of usage examples are available in the examples page under
+A wealth of usage examples are available on the examples page under
 :ref:`example_usage_paths`.
 
 
@@ -82,8 +82,8 @@ A wealth of usage examples are available in the examples page under
 Transit
 ~~~~~~~
 
-For now the only transit-related capability of AequilibraE is to import GTFS
-into SQLite/Spatialite. The results of this import is NOT integrated with the
+For now, the only transit-related capability of AequilibraE is to import GTFS
+into SQLite/Spatialite. The results of this import are NOT integrated with the
 AequilibraE project.
 
 .. Usage examples can be found on :ref:`example_usage_transit`.
@@ -97,13 +97,13 @@ Matrix
 The matrix submodule has two main components: *Datasets* and *Matrices*.
 
 Their existence is required for performance purposes and to support consistency
-across other modules. It also make it a lot faster to develop new features.
-Compatibility with de-facto open standards is also pursued as a major
+across other modules. It also makes it a lot faster to develop new features.
+Compatibility with de facto open standards is also pursued as a major
 requirement.
 
-They are both memory mapped structures, which allows for some nice features,
+They are both memory-mapped structures, which allows for some nice features,
 but they still consume all memory necessary to handle them in full. In the
-future we will look into dropping that requirement, but the software work is
+future, we will look into dropping that requirement, but the software work is
 substantial.
 
 AequilibraE Matrix

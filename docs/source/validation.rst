@@ -1,5 +1,5 @@
 Validation & Benchmarking
-====================
+=========================
 
 AequilibraE's main objective is to be a fully-fledged modeling platform, and
 therefore most of its features are geared towards that. In time, this section

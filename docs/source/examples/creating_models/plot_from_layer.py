@@ -1,8 +1,10 @@
 """
+.. _project_from_link_layer:
+
 Project from a link layer
 =========================
 
-On this example we show how to create an empty project and populate it with a
+In this example, we show how to create an empty project and populate it with a
 network coming from a link layer we load from a text file. It can easily be
 replaced with a different form of loading the data (GeoPandas, for example).
 
@@ -11,7 +13,6 @@ We use Folium to visualize the resulting network.
 
 # %%
 # Imports
-# sphinx_gallery_thumbnail_path = 'images/plot_from_layer.png'
 from uuid import uuid4
 import urllib.request
 from string import ascii_lowercase
@@ -22,6 +23,7 @@ import pandas as pd
 import folium
 
 from aequilibrae import Project
+# sphinx_gallery_thumbnail_path = 'images/plot_from_layer.png'
 
 # %%
 # We create an empty project on an arbitrary folder
@@ -50,7 +52,7 @@ lt_dict = lt.all_types()
 existing_types = [ltype.link_type for ltype in lt_dict.values()]
 
 # We could also get it directly from the project database
-# existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
+# ``existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]``
 
 # %%
 # We add the link types that do not exist yet
@@ -76,7 +78,7 @@ existing_modes = {k: v.mode_name for k, v in md_dict.items()}
 # Now let's see the modes we have in the network that we DON'T have already in
 # the model
 
-# We get all the unique mode combinations and merge into a single string
+# We get all the unique mode combinations and merge them into a single string
 all_variations_string = "".join(df.modes.unique())
 
 # We then get all the unique modes in that string above
@@ -94,7 +96,7 @@ for i, mode_id in enumerate(modes_to_add):
     new_mode.mode_name = f"Mode_from_original_data_{mode_id}"
     # new_type.description = 'Your custom description here if you have one'
 
-    # It is a little different, because you need to add it to the project
+    # It is a little different because you need to add it to the project
     project.network.modes.add(new_mode)
     new_mode.save()
 
@@ -137,7 +139,7 @@ network_links = folium.FeatureGroup("links")
 for i, row in links.iterrows():
     points = row.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
     points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-    # we need to take from x/y to lat/long
+    # We need to take from x/y to lat/long
     points = [[x[1], x[0]] for x in eval(points)]
 
     line = folium.vector_layers.PolyLine(

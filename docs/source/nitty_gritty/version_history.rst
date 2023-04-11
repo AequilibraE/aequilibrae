@@ -1,10 +1,10 @@
 .. _versionhistory:
 
 Older versions
---------------
+==============
 
 AequilibraE has been evolving quite fast, so we recommend you upgrading to a
-newer version as soon as you can.  In the meantime, you can find the
+newer version as soon as you can. In the meantime, you can find the
 documentation for all versions since 0.5.3.
 
 .. panels::

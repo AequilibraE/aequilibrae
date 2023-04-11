@@ -1,8 +1,10 @@
 """
+.. _example_usage_forecasting:
+
 Forecasting
 ============
 
-On this example we present a full forecasting workflow for the Sioux Falls
+In this example, we present a full forecasting workflow for the Sioux Falls
 example model.
 """
 # %%
@@ -21,7 +23,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 logger = project.logger
 
-# We get the project open, we can tell the logger to direct all messages to the terminal as well
+# We get the project open, and we can tell the logger to direct all messages to the terminal as well
 stdout_handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
@@ -35,27 +37,28 @@ logger.addHandler(stdout_handler)
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # %%
-# we build all graphs
+# We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs.  Which is true, but we won't use those fields
+# We get warnings that several fields in the project are filled with NaNs. 
+# This is true, but we won't use those fields
 
 # %%
-# we grab the graph for cars
+# We grab the graph for cars
 graph = project.network.graphs["c"]
 
-# let's say we want to minimize free_flow_time
+# Let's say we want to minimize the free_flow_time
 graph.set_graph("free_flow_time")
 
 # And will skim time and distance while we are at it
 graph.set_skimming(["free_flow_time", "distance"])
 
-# And we will allow paths to be compute going through other centroids/centroid connectors
+# And we will allow paths to be computed going through other centroids/centroid connectors
 # required for the Sioux Falls network, as all nodes are centroids
 graph.set_blocked_centroid_flows(False)
 
 # %%
 # We get the demand matrix directly from the project record
-# so let's inspect what we have in the project
+# So let's inspect what we have in the project
 proj_matrices = project.matrices
 proj_matrices.list()
 
@@ -67,15 +70,16 @@ demand.computational_view(["matrix"])
 # %%
 assig = TrafficAssignment()
 
-# Creates the assignment class
+# Create the assignment class
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
 # The first thing to do is to add at list of traffic classes to be assigned
 assig.add_class(assigclass)
 
 # We set these parameters only after adding one class to the assignment
-assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+assig.set_vdf("BPR")  # This is not case-sensitive 
 
+# Then we set the volume delay function
 assig.set_vdf_parameters({"alpha": "b", "beta": "power"})  # And its parameters
 
 assig.set_capacity_field("capacity")  # The capacity and free flow travel times as they exist in the graph
@@ -84,7 +88,7 @@ assig.set_time_field("free_flow_time")
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")
 
-# since I haven't checked the parameters file, let's make sure convergence criteria is good
+# Since I haven't checked the parameters file, let's make sure convergence criteria is good
 assig.max_iter = 1000
 assig.rgap_target = 0.001
 
@@ -135,7 +139,7 @@ imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 # We can check which matrix cores were created for our skims to decide which one to use
 imped.names
 
-# Where free_flow_time_final is actually the congested time for the last iteration
+# Where ``free_flow_time_final`` is actually the congested time for the last iteration
 
 # %%
 # But before using the data, let's get some impedance for the intrazonals
@@ -173,11 +177,11 @@ for function in ["power", "expo"]:
     gc = GravityCalibration(matrix=demand, impedance=imped, function=function, nan_as_zero=True)
     gc.calibrate()
     model = gc.model
-    # we save the model
+    # We save the model
     model.save(join(fldr, f"{function}_model.mod"))
 
     # We can save the result of applying the model as well
-    # we can also save the calibration report
+    # We can also save the calibration report
     with open(join(fldr, f"{function}_convergence.log"), "w") as otp:
         for r in gc.report:
             otp.write(r + "\n")
@@ -186,7 +190,8 @@ for function in ["power", "expo"]:
 # Forecast
 # --------
 # We create a set of 'future' vectors using some random growth factors.
-# We apply the model for inverse power, as the TFLD seems to be a better fit for the actual one.
+# We apply the model for inverse power, as the trip frequency length distribution
+# (TFLD) seems to be a better fit for the actual one.
 
 # %%
 from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel
@@ -210,7 +215,7 @@ vectors.create_empty(**args)
 
 vectors.index[:] = demand.index[:]
 
-# Then grow them with some random growth between 0 and 10% - Plus balance them
+# Then grow them with some random growth between 0 and 10%, and balance them
 vectors.origins[:] = origins * (1 + np.random.rand(vectors.entries) / 10)
 vectors.destinations[:] = destinations * (1 + np.random.rand(vectors.entries) / 10)
 vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
@@ -224,7 +229,7 @@ imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 imped.computational_view(["final_time_with_intrazonals"])
 
 # If we wanted the main diagonal to not be considered...
-# np.fill_diagonal(imped.matrix_view, np.nan)
+# ``np.fill_diagonal(imped.matrix_view, np.nan)`` 
 
 # %%
 for function in ["power", "expo"]:
@@ -290,7 +295,7 @@ logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR")
 # %%
 demand = proj_matrices.get_matrix("demand_ipfd")
 
-# let's see what is the core we ended up getting. It should be 'gravity'
+# Let's see what is the core we ended up getting. It should be 'gravity'
 demand.names
 
 # %%
@@ -302,11 +307,12 @@ assig = TrafficAssignment()
 # Creates the assignment class
 assigclass = TrafficClass(name="car", graph=graph, matrix=demand)
 
-# The first thing to do is to add at list of traffic classes to be assigned
+# The first thing to do is to add at a list of traffic classes to be assigned
 assig.add_class(assigclass)
 
-assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+assig.set_vdf("BPR")  # This is not case-sensitive 
 
+# Then we set the volume delay function
 assig.set_vdf_parameters({"alpha": "b", "beta": "power"})  # And its parameters
 
 assig.set_capacity_field("capacity")  # The capacity and free flow travel times as they exist in the graph
@@ -315,16 +321,18 @@ assig.set_time_field("free_flow_time")
 # And the algorithm we want to use to assign
 assig.set_algorithm("bfw")
 
-# since I haven't checked the parameters file, let's make sure convergence criteria is good
+# Since I haven't checked the parameters file, let's make sure convergence criteria is good
 assig.max_iter = 500
 assig.rgap_target = 0.00001
 
 #%%
-# OPTIONAL: If we want to execute select link analysis on a particular TrafficClass, we set the links we are analyzing
+# **OPTIONAL**
+
+# If we want to execute select link analysis on a particular TrafficClass, we set the links we are analyzing.
 # The format of the input select links is a dictionary (str: list[tuple]).
-# Each entry represents a separate set of selected links to compute. The str name will name the set of links
-# The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph
-# direction can be 0, 1, -1. 0 denotes bi-directionality
+# Each entry represents a separate set of selected links to compute. The str name will name the set of links.
+# The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph.
+# Direction can be 0, 1, -1. 0 denotes bi-directionality
 # For example, let's use Select Link on two sets of links:
 
 # %% 
@@ -339,7 +347,7 @@ assig.execute()  # we then execute the assignment
 
 # %%
 # Now let us save our select link results, all we need to do is provide it with a name
-# In additional to exporting the select link flows, it also exports the Select Link matrices in OMX format.
+# In addition to exporting the select link flows, it also exports the Select Link matrices in OMX format.
 assig.save_select_link_results("select_link_analysis")
 
 # %%

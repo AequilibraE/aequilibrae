@@ -4,7 +4,7 @@
 Trip Distribution
 =================
 
-On this example we calibrate a Synthetic Gravity Model that same model plus IPF (Fratar/Furness).
+In this example, we calibrate a Synthetic Gravity Model that same model plus IPF (Fratar/Furness).
 """
 
 # Imports
@@ -72,14 +72,14 @@ for function in ["power", "expo"]:
     gc = GravityCalibration(matrix=demand, impedance=impedance, function=function, nan_as_zero=True)
     gc.calibrate()
     model = gc.model
-    # we save the model
+    # We save the model
     model.save(join(fldr, f"{function}_model.mod"))
 
     # We can save an image for the resulting model
     _ = plot_tlfd(gc.result_matrix.matrix_view, impedance.matrix_view, join(fldr, f"{function}_tfld.png"))
 
     # We can save the result of applying the model as well
-    # we can also save the calibration report
+    # We can also save the calibration report
     with open(join(fldr, f"{function}_convergence.log"), "w") as otp:
         for r in gc.report:
             otp.write(r + "\n")

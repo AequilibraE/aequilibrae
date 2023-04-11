@@ -1,12 +1,12 @@
 """
 .. _plot_from_osm:
 
-Project from Open-Street Maps
+Project from OpenStreetMap
 =============================
 
-On this example we show how to create an empty project and populate with a network from Open-Street maps.
+In this example, we show how to create an empty project and populate it with a network from OpenStreetMap.
 
-But this time we will use Folium to visualize the network.
+This time we will use Folium to visualize the network.
 """
 
 # %%
@@ -27,7 +27,7 @@ project.new(fldr)
 # Now we can download the network from any place in the world (as long as you have memory for all the download
 # and data wrangling that will be done)
 
-# We can create from a bounding box or from a named place. 
+# We can create from a bounding box or a named place.
 # For the sake of this example, we will choose the small nation of Nauru.
 project.network.create_from_osm(place_name="Nauru")
 

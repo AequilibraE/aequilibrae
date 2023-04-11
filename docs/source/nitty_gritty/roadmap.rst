@@ -1,3 +1,5 @@
+.. _development_roadmap:
+
 Development Roadmap
 ===================
 
@@ -10,7 +12,7 @@ identified and that we intend to dedicate some time to in the future.
 
 * Network data model
 
-    * Introduce centroid connector data type to replace inference that all links
+    * Introduce centroid connector data type to replace the inference that all links
       connected to centroids are connectors
 
 * Traffic assignment
@@ -39,7 +41,7 @@ identified and that we intend to dedicate some time to in the future.
 * QGIS
 
     * Inclusion of TSP and more general vehicle routing problems (resource
-      constraints, pick-up and delivery, etc.)
+      constraints, pick-up, and delivery, etc.)
 
 If there is any other feature you would like to suggest, please record a new
 issue on `GitHub <https://github.com/AequilibraE/aequilibrae/issues>`_, or drop
