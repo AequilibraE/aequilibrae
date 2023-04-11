@@ -147,7 +147,7 @@ class Network(WorkerThread):
         .. code-block:: python
 
             from aequilibrae import Project, Parameters
-            
+
             project = Project.from_path("/tmp/test_project")
 
             # We now choose a different overpass endpoint (say a deployment in your local network)
@@ -299,7 +299,7 @@ class Network(WorkerThread):
                                               database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
-        
+
         .. code-block:: python
 
             p = Project()

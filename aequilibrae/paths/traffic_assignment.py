@@ -27,7 +27,7 @@ class TrafficAssignment(object):
     """Traffic assignment class
 
     For a comprehensive example on use, see the Use examples page.
-    
+
     .. code-block:: python
 
         from os.path import join

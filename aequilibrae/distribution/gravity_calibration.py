@@ -17,7 +17,7 @@ class GravityCalibration:
     """Calibrate a traditional gravity model
 
         Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
-    
+
     .. code-block:: python
 
         from aequilibrae.matrix import AequilibraeMatrix

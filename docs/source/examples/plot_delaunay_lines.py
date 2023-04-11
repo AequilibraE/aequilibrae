@@ -1,8 +1,10 @@
 """
+.. _creating_delaunay_lines:
+
 Creating Delaunay Lines
 =======================
 
-On this example we show how to create AequilibraE's famous Delaunay Lines, but in Python.
+In this example, we show how to create AequilibraE's famous Delaunay Lines, but in Python.
 
 For more on this topic, the first publication is `here <https://xl-optim.com/delaunay/>`_.
 
@@ -49,7 +51,6 @@ results = pd.read_sql("Select * from delaunay_test", conn).set_index("link_id")
 
 # %%
 # Now we get the matrix we want and create the Delaunay Lines
-
 links = pd.read_sql("Select link_id, st_asBinary(geometry) geometry from delaunay_network", project.conn)
 links.geometry = links.geometry.apply(shapely.wkb.loads)
 links.set_index("link_id", inplace=True)

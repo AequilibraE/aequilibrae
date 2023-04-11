@@ -6,7 +6,7 @@ Exporting network to GMNS
 
 In this example, we export a simple network to GMNS format.
 The source AequilibraE model used as input for this is the result of the import process
-(create_from_gmns()) using the GMNS example of Arlington Signals, which can be found
+(``create_from_gmns()``) using the GMNS example of Arlington Signals, which can be found
 in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 """
 

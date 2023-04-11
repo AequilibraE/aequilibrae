@@ -1,20 +1,21 @@
 """
+.. _logging_to_terminal:
+
 Logging to terminal
 ===================
 
-On this example we show how to make all log messages show in the terminal.
+In this example, we show how to make all log messages show in the terminal.
 """
 
 # %%
 # Imports
-# sphinx_gallery_thumbnail_path = 'images/plot_logging_to_terminal_image.png'
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 import logging
 import sys
-
+# sphinx_gallery_thumbnail_path = 'images/plot_logging_to_terminal_image.png'
 
 # %%
 # We create the example project inside our temp folder
