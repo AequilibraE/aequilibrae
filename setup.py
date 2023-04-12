@@ -51,11 +51,16 @@ with open("requirements.txt", "r") as fl:
 pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
-    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
+    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae.distribution": ["*.pyx"],
     "aequilibrae": ["./parameters.yml", "../requirements.txt"],
-    "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
+    "aequilibrae.project": [
+        "database_specification/network/tables/*.*",
+        "database_specification/network/triggers/*.*",
+        "database_specification/transit/tables/*.*",
+        "database_specification/transit/triggers/*.*",
+    ],
 }
 loose_modules = ["__version__", "parameters"]
 

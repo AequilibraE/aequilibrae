@@ -1,2 +1,0 @@
-﻿agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone
-PT,Public Transport,http://www.transport.nt.gov.au/public/bus/alice,Australia/Darwin,en,08-8924-7666

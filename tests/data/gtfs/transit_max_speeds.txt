@@ -1,0 +1,8 @@
+city,mode,min_distance,max_distance,speed
+Coquimbo,0,0,2500,6.8
+Coquimbo,0,2500,5000,7.4
+Coquimbo,0,5000,10000,14.7
+Coquimbo,0,10000,1000000,17.3
+Coquimbo,3,0,600,9.6
+Coquimbo,3,600,1000,10.1
+Coquimbo,3,1000,1000000,11.9
