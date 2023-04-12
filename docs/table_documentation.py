@@ -25,7 +25,7 @@ class CreateTablesSRC:
             # Get the appropriate data for the database we are documenting
             self.conn = self.proj.conn
             self.path = join(*Path(realpath(__file__)).parts[:-1],
-                             "../aequilibrae/project/database_specification/tables")
+                             "../aequilibrae/project/database_specification/network/tables")
             self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
