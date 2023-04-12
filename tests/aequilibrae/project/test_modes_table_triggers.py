@@ -36,7 +36,7 @@ class TestProject(TestCase):
             warn(f"RTREE not available --> {e.args}")
 
         root = os.path.dirname(os.path.realpath(__file__)).replace("tests", "")
-        qry_file = os.path.join(root, "database_specification/triggers/modes_table_triggers.sql")
+        qry_file = os.path.join(root, "database_specification/network/triggers/modes_table_triggers.sql")
         with open(qry_file, "r") as sql_file:
             self.queries = sql_file.read()
         self.queries = [cmd for cmd in self.queries.split("#")]

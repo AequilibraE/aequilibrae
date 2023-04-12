@@ -7,7 +7,7 @@ from shutil import copytree, rmtree
 from os.path import join
 from tempfile import gettempdir
 from unittest import TestCase
-from shapely.geometry import Point, MultiPolygon
+from shapely.geometry import Point, MultiPolygon, LineString, MultiLineString
 import shapely.wkb
 from aequilibrae import Project
 from ...data import siouxfalls_project
@@ -178,3 +178,23 @@ class TestZone(TestCase):
 
         curr.execute("""Select count(*) from links where a_node=1 and instr(modes,'w')>0""")
         self.assertEqual(curr.fetchone()[0], 0, "Failed to remove mode from all connectors")
+
+    def test_get_closest_zone(self):
+        pt_in = Point(-96.7716, 43.6069)
+        pt_out = Point(-96.7754, 43.5664)
+        self.assertEqual(self.proj.zoning.get_closest_zone(pt_in), 1)
+        self.assertEqual(self.proj.zoning.get_closest_zone(pt_out), 3)
+
+        line_in = LineString([(-96.7209, 43.6132), (-96.7033, 43.61316)])
+        line_out = LineString([(-96.7473, 43.6046), (-96.7341, 43.6046)])
+        self.assertEqual(self.proj.zoning.get_closest_zone(line_in), 2)
+        self.assertEqual(self.proj.zoning.get_closest_zone(line_out), 2)
+
+        multi_line_in = MultiLineString(
+            [((-96.7589, 43.5692), (-96.7531, 43.5807)), ((-96.7531, 43.5807), (-96.7504, 43.5704))]
+        )
+        multi_line_out = MultiLineString(
+            [((-96.7716, 43.5769), (-96.7683, 43.5801)), ((-96.7683, 43.5801), (-96.7574, 43.5784))]
+        )
+        self.assertEqual(self.proj.zoning.get_closest_zone(multi_line_in), 3)
+        self.assertEqual(self.proj.zoning.get_closest_zone(multi_line_out), 3)

@@ -1,12 +1,14 @@
 from copy import deepcopy
 from os.path import join, realpath
+from typing import Union, Dict
 
 import shapely.wkb
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon, LineString, MultiLineString
 from shapely.ops import unary_union
 
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.utils.geo_index import GeoIndex
 from .basic_table import BasicTable
 from .zone import Zone
 
@@ -39,10 +41,11 @@ class Zoning(BasicTable):
 
     def __init__(self, network):
         super().__init__(network.project)
-        self.__items = {}
+        self.__items: Dict[int, Zone] = {}
         self.network = network
         self.__table_type__ = "zones"
         self.__fields = []
+        self.__geo_index = GeoIndex()
         if self.__has_zoning():
             self.__load()
 
@@ -96,6 +99,33 @@ class Zoning(BasicTable):
         for item in self.__items.values():
             item.save()
 
+    def get_closest_zone(self, geometry: Union[Point, LineString, MultiLineString]) -> int:
+        """Returns the zone in which the given geometry is located.
+
+            If the geometry is not fully enclosed by any zone, the zone closest to
+            the geometry is returned
+
+        Args:
+            *geometry* (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
+
+        Return:
+            *zone_id* (:obj:`int`): ID of the zone applicable to the point provided
+        """
+
+        nearest = self.__geo_index.nearest(geometry, 10)
+        dists = {}
+        for zone_id in nearest:
+            geo = self.__items[zone_id].geometry
+            if geo.contains(geometry):
+                return zone_id
+            dists[geo.distance(geometry)] = zone_id
+        return dists[min(dists.keys())]
+
+    def refresh_geo_index(self):
+        self.__geo_index.reset()
+        for zone_id, zone in self.__items.items():
+            self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
+
     def __has_zoning(self):
         curr = self.conn.cursor()
         curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -116,6 +146,7 @@ class Zoning(BasicTable):
         to_del = [key for key in self.__items.keys() if key not in existing_list]
         for key in to_del:
             del self.__items[key]
+        self.refresh_geo_index()
 
     def _remove_zone(self, zone_id: int):
         del self.__items[zone_id]

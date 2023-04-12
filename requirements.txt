@@ -7,3 +7,4 @@ requests
 shapely
 pandas
 pyproj
+rtree
