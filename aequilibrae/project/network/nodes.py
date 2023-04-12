@@ -12,20 +12,19 @@ class Nodes(BasicTable):
     """
     Access to the API resources to manipulate the links table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        proj = Project()
-        proj.open('path/to/project/folder')
+        >>> proj = Project.from_path("/tmp/test_project")
 
-        all_nodes = proj.network.nodes
+        >>> all_nodes = proj.network.nodes
 
         # We can just get one link in specific
-        node = all_nodes.get(7894)
+        >>> node = all_nodes.get(21)
 
         # We can save changes for all nodes we have edited so far
-        all_nodes.save()
+        >>> all_nodes.save()
     """
 
     #: Query sql for retrieving nodes

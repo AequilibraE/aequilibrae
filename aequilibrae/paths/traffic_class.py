@@ -11,12 +11,28 @@ import warnings
 class TrafficClass:
     """Traffic class for equilibrium traffic assignment
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae.paths import TrafficClass
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.paths import TrafficClass
 
-        tc = TrafficClass(graph, demand_matrix)
-        tc.set_pce(1.3)
+        >>> project = Project.from_path("/tmp/test_project")
+        >>> project.network.build_graphs()
+
+        >>> graph = project.network.graphs['c'] # we grab the graph for cars
+        >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
+        >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> graph.set_blocked_centroid_flows(True)
+
+        >>> proj_matrices = project.matrices
+
+        >>> demand = AequilibraeMatrix()
+        >>> demand = proj_matrices.get_matrix("demand_omx")
+        >>> demand.computational_view(['matrix'])
+
+        >>> tc = TrafficClass("car", graph, demand)
+        >>> tc.set_pce(1.3)
     """
 
     def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:

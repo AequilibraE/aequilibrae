@@ -7,49 +7,47 @@ class Modes:
     """
     Access to the API resources to manipulate the modes table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> p = Project.from_path("/tmp/test_project")
 
-        modes = p.network.modes
+        >>> modes = p.network.modes
 
         # We can get a dictionary of all modes in the model
-        all_modes = modes.all_modes()
+        >>> all_modes = modes.all_modes()
 
         #And do a bulk change and save it
-        for mode_id, mode_obj in all_modes.items():
-            mode_obj.beta = 1
-            mode_obj.save()
+        >>> for mode_id, mode_obj in all_modes.items():
+        ...     mode_obj.beta = 1
+        ...     mode_obj.save()
 
         # or just get one mode in specific
-        car_mode = modes.get('c')
+        >>> car_mode = modes.get('c')
 
         # or just get this same mode by name
-        car_mode = modes.get_by_name('c')
+        >>> car_mode = modes.get_by_name('car')
 
         # We can change the description of the mode
-        car_mode.description = 'personal autos only'
+        >>> car_mode.description = 'personal autos only'
 
         # Let's say we are using alpha to store the PCE for a future year with much smaller cars
-        car_mode.alpha = 0.95
+        >>> car_mode.alpha = 0.95
 
         # To save this mode we can simply
-        car_mode.save()
+        >>> car_mode.save()
 
         # We can also create a completely new mode and add to the model
-        new_mode = modes.new('k')
-        new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed
-        # other fields are not mandatory
+        >>> new_mode = modes.new('k')
+        >>> new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed # other fields are not mandatory
 
         # We then explicitly add it to the network
-        modes.add(new_mode)
+        >>> modes.add(new_mode)
 
         # we can even keep editing and save it directly once we have added it to the project
-        new_mode.description = 'this is my new description'
-        new_mode.save()
+        >>> new_mode.description = 'this is my new description'
+        >>> new_mode.save()
     """
 
     def __init__(self, net):

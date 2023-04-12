@@ -1,12 +1,29 @@
 IPF Performance
 ===============
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin aliquet enim lorem. In vitae lacus libero. Donec eu dolor ut nibh lacinia aliquam. Ut et nibh id lorem congue rutrum. Cras sollicitudin porta elit sed tempus. Sed non erat turpis. Vestibulum ut libero cursus lorem suscipit aliquet in fringilla eros.
+It is quite common to have zones with different growth rates. To improve obtaining
+a trip matrix, which satisfies both trip-end constraints, we can use iterative methods,
+such as the iterative proportional fitting (IPF). In this section, we compare the 
+runtime of AquilibraE's current implementation of IPF, 
+with a general IPF algorithm, available `here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
 
-Pellentesque mattis quis lacus sed facilisis. Quisque id velit velit. In justo felis, elementum non accumsan non, luctus nec metus. Duis dignissim, dolor ut pharetra sollicitudin, neque diam congue odio, sit amet laoreet tellus lorem vestibulum dui. Aenean ultrices volutpat neque, in bibendum nisi interdum nec. Nulla facilisi. In scelerisque consequat ex nec fringilla. Morbi non lacus blandit, hendrerit enim a, convallis ipsum.
+The first analysis is related to the :ref:`number of cores used in IPF`. AequilibraE's
+IPF allows the user to use more than one core to speed up the fitting process, which
+is extremely useful when handling models with lots of traffic zones. As we can see,
+instances with 100, 500, and 1,000 zones were promptly solved, but as their size increased,
+the power of multi-processing shows up and we can see that it barely halves the runtime.
 
-Maecenas dapibus, dui ut pulvinar lacinia, nunc quam ultrices eros, sed fringilla nisi ligula sed lorem. Cras posuere arcu et varius mollis. Praesent vestibulum, quam id condimentum elementum, leo tellus varius risus, eget faucibus erat urna in dolor. Nulla velit lacus, condimentum quis feugiat non, vulputate ut urna. Aenean dictum felis sed sagittis blandit. Duis ac tempus lectus, ac rutrum felis. Aliquam hendrerit arcu a accumsan condimentum. Sed mollis, urna non posuere imperdiet, felis ipsum finibus turpis, id rutrum lorem augue quis enim. Praesent nec vehicula leo. Integer nunc ante, tempor et sem quis, sagittis auctor neque. Ut pharetra semper convallis. Mauris accumsan nibh sit amet congue posuere. Fusce pretium eget nunc et scelerisque.
+.. image:: ../images/ipf_runtime_vs_num_cores.png
+    :alt: number of cores used in IPF
 
-Maecenas felis enim, laoreet vel faucibus eget, congue non libero. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Sed ut bibendum leo. Nullam id egestas velit, id imperdiet sem. Aenean ac congue elit, quis consectetur quam. Aliquam ornare commodo nunc, nec facilisis nibh aliquam vitae. Donec in dapibus nisl. Praesent sit amet erat imperdiet, tempor neque id, laoreet turpis. Aenean in justo sapien. Maecenas et augue et lectus viverra scelerisque.
+.. image:: ../images/ipf_speedup.png
+    :alt: IPF speedup
 
-Aenean posuere euismod elit, fermentum ullamcorper nisi blandit nec. Donec lorem ante, molestie nec rhoncus in, interdum sed justo. Proin sed odio auctor eros laoreet laoreet a sed est. Aliquam nec libero sem. Aenean venenatis est et nulla cursus, finibus congue nibh tempor. Morbi vel tellus ex. Quisque at ante tempus, accumsan leo id, aliquam libero. Morbi facilisis vitae orci sed pharetra.
+:ref:`AequilibraE's runtime` is smaller when compared with the benchmark code.
+From the figure below, we can notice that the runtimes were practically the same for the instance with 100 zones.
+As the number of zones increases, even AequilibraE's IPF results for one core demonstrate that our
+algorithm requires less processing time. It's also worth mentioning that the user can set up a threshold for
+AequilibraE's IPF function, as well as uses more than one core to speed up the fitting process.
+
+.. image:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
+    :alt: AequilibraE's runtime

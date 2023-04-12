@@ -1,7 +1,7 @@
 .. _parameters_file:
 
 Parameters YAML File
---------------------
+====================
 
 The parameter file holds the parameters information for a certain portion of the software.
 
@@ -14,32 +14,32 @@ The parameter file holds the parameters information for a certain portion of the
 .. _parameters_assignment:
 
 Assignment
-~~~~~~~~~~
+----------
 
 The assignment section of the parameter file is the smallest one, and it
-contains only the convergence criteria for assignment in terms of maximum number
+contains only the convergence criteria for assignment in terms of the maximum number
 of iterations and target Relative Gap.
 
-.. image:: images/parameters_assignment_example.png
+.. image:: ../images/parameters_assignment_example.png
     :width: 487
     :align: center
     :alt: Assignment example
 
 Although these parameters are required to exist in the parameters file, one can
-override them during assignment, as detailed in :ref:`convergence_criteria`.
+override them during the assignment, as detailed in :ref:`convergence_criteria`.
 
 
 .. _parameters_distribution:
 
 Distribution
-~~~~~~~~~~~~
+------------
 
 The distribution section of the parameter file is also fairly short, as it
 contains only the parameters for number of maximum iterations, convergence level
 and maximum trip length to be applied in Iterative Proportional Fitting and
 synthetic gravity models, as shown below.
 
-.. image:: images/parameters_distribution_example.png
+.. image:: ../images/parameters_distribution_example.png
     :width: 546
     :align: center
     :alt: Distribution example
@@ -47,7 +47,7 @@ synthetic gravity models, as shown below.
 .. _parameters_network:
 
 Network
-~~~~~~~
+-------
 
 There are four groups of parameters under the network section: *links*, *nodes*,
 *OSM*, and *GMNS*. The first are basically responsible for the design of the network 
@@ -55,8 +55,8 @@ to be created in case a new project/network is to bre created from scratch, and 
 now each one of these groups contains only a single group of parameters called 
 *fields*.
 
-link fields
-^^^^^^^^^^^
+Link Fields
+~~~~~~~~~~~
 
 The section for link fields are divided into *one-way* fields and *two-way* fields, where the
 two-way fields will be created by appending *_ab* and *_ba* to the end of each field's name.
@@ -73,7 +73,7 @@ The data types available are those that exist within the
 `SQLite specification <https://www.sqlite.org/datatype3.html>`_ . We recommend limiting yourself
 to the use of **integer**, **numeric** and **varchar**.
 
-.. image:: images/parameters_links_example.png
+.. image:: ../images/parameters_links_example.png
     :width: 704
     :align: center
     :alt: Link example
@@ -98,7 +98,7 @@ forward/backward values tagged). For this reason, one can use the parameter *osm
 to define what to do with numeric tag values that have not been tagged for both directions.
 the allowed values for this parameter are **copy** and **divide**, as shown below.
 
-.. image:: images/parameters_links_osm_behaviour.png
+.. image:: ../images/parameters_links_osm_behaviour.png
     :width: 437
     :align: center
     :alt: OSM behaviour examples
@@ -109,7 +109,7 @@ to be in the network but should not be imported from OSM, such as link capacitie
 
 
 Node fields
-^^^^^^^^^^^
+~~~~~~~~~~~
 
 The specification for node fields is similar to the one for link fields, with the key difference
 that it does not make sense to have fields for one or two directions and that it is not possible
@@ -118,7 +118,7 @@ would have no effect here.
 
 
 Open Street Maps
-^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
@@ -135,7 +135,7 @@ imported, and therefore unknown link type tags are treated as a special case for
 mode, and that is controlled by the key *unknown_tags* in the parameters file.
 
 GMNS
-^^^^
+~~~~
 
 XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
 XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
@@ -143,14 +143,14 @@ XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX
 .. _parameters_system:
 
 System
-~~~~~~
+------
 
 The system section of the parameters file holds information on the
 number of threads used in multi-threaded processes, logging and temp folders
 and whether we should be saving information to a log file at all, as exemplified
 below.
 
-.. image:: images/parameters_system_example.png
+.. image:: ../images/parameters_system_example.png
     :width: 812
     :align: center
     :alt: System example
@@ -171,12 +171,12 @@ the case of the *driving side* and  *default_directory* parameters.
 .. _parameters_osm:
 
 Open Streeet Maps
-~~~~~~~~~~~~~~~~~
+-----------------
 The OSM section of the parameter file is relevant only when one plans to
 download a substantial amount of data from an Overpass API, in which case it is
 recommended to deploy a local Overpass server.
 
-.. image:: images/parameters_osm_example.png
+.. image:: ../images/parameters_osm_example.png
     :width: 840
     :align: center
     :alt: OSM example

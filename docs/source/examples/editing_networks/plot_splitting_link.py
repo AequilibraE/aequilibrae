@@ -1,11 +1,13 @@
 """
+.. _editing_network_splitting_link:
+
 Editing network geometry: Splitting link
 ========================================
 
-In this example we split a link right in the middle, while keeping all fields
+In this example, we split a link right in the middle, while keeping all fields
 in the database equal. Distance is proportionally computed automatically in the database.
 """
-
+# %%
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -80,5 +82,4 @@ for nid in curr.fetchall():
 plt.show()
 
 # %%
-
 project.close()

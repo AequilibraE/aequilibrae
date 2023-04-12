@@ -24,74 +24,75 @@ has_omx = spec is not None
 
 
 class TrafficAssignment(object):
-    """Traffic assignment class
+    """Traffic assignment class.
 
     For a comprehensive example on use, see the Use examples page.
-    ::
 
-        from os.path import join
-        from aequilibrae.matrix import AequilibraeMatrix
-        from aequilibrae.paths import TrafficAssignment, TrafficClass
+    .. code-block:: python
 
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        fldr = 'D:/release/Sample models/sioux_falls_2020_02_15'
-        proj_name = 'SiouxFalls.sqlite'
-        dt_fldr = '0_tntp_data'
-        prj_fldr = '1_project'
+        >>> project = Project.from_path("/tmp/test_project")
+        >>> project.network.build_graphs()
 
-        demand = AequilibraeMatrix()
-        demand.load(join(fldr, dt_fldr, 'demand.omx'))
-        demand.computational_view(['matrix']) # We will only assign one user class stored as 'matrix' inside the OMX file
+        >>> graph = project.network.graphs['c'] # we grab the graph for cars
+        >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
+        >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> graph.set_blocked_centroid_flows(True)
 
-        project = Project()
-        project.load(join(fldr, prj_fldr))
-        project.network.build_graphs()
+        >>> proj_matrices = project.matrices
 
-        graph = project.network.graphs['c'] # we grab the graph for cars
-        graph.set_graph('free_flow_time') # let's say we want to minimize time
-        graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
-        graph.set_blocked_centroid_flows(True)
+        >>> demand = AequilibraeMatrix()
+        >>> demand = proj_matrices.get_matrix("demand_omx")
+
+        # We will only assign one user class stored as 'matrix' inside the OMX file
+        >>> demand.computational_view(['matrix'])
 
         # Creates the assignment class
-        assigclass = TrafficClass(graph, demand)
+        >>> assigclass = TrafficClass("car", graph, demand)
 
-        assig = TrafficAssignment()
+        >>> assig = TrafficAssignment()
+
         # The first thing to do is to add at list of traffic classes to be assigned
-        assig.set_classes([assigclass])
+        >>> assig.set_classes([assigclass])
 
-        assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+        # Then we set the volume delay function
+        >>> assig.set_vdf("BPR")  # This is not case-sensitive
 
-        assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # And its parameters
+        # And its parameters
+        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
-        assig.set_capacity_field("capacity") # The capacity and free flow travel times as they exist in the graph
-        assig.set_time_field("free_flow_time")
+        # The capacity and free flow travel times as they exist in the graph
+        >>> assig.set_capacity_field("capacity")
+        >>> assig.set_time_field("free_flow_time")
 
         # And the algorithm we want to use to assign
-        assig.set_algorithm('bfw')
+        >>> assig.set_algorithm('bfw')
 
-        # since I haven't checked the parameters file, let's make sure convergence criteria is good
-        assig.max_iter = 1000
-        assig.rgap_target = 0.00001
+        # Since we haven't checked the parameters file, let's make sure convergence criteria is good
+        >>> assig.max_iter = 1000
+        >>> assig.rgap_target = 0.00001
 
-        assig.execute() # we then execute the assignment
+        >>> assig.execute() # we then execute the assignment
 
-        # Convergence report is here
-        import pandas as pd
-        convergence_report = pd.DataFrame(assig.assignment.convergence_report)
-        convergence_report.head()
+        # If you want, it is possible to access the convergence report
+        >>> import pandas as pd
+        >>> convergence_report = pd.DataFrame(assig.assignment.convergence_report)
 
         # Assignment results can be viewed as a Pandas DataFrame
-        results_df = assig.results()
+        >>> results_df = assig.results()
 
-        # information on the assignment setup can be recovered with
-        info = assig.info()
+        # Information on the assignment setup can be recovered with
+        >>> info = assig.info()
 
         # Or save it directly to the results database
-        results = assig.save_results(table_name='example_from_the_documentation')
+        >>> results = assig.save_results(table_name='base_year_assignment')
 
         # skims are here
-        avg_skims = assigclass.results.skims # blended ones
-        last_skims = assigclass._aon_results.skims # those for the last iteration
+        >>> avg_skims = assigclass.results.skims # blended ones
+        >>> last_skims = assigclass._aon_results.skims # those for the last iteration
     """
 
     bpr_parameters = ["alpha", "beta"]

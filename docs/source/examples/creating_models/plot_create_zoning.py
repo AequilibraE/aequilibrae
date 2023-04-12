@@ -4,13 +4,13 @@
 Creating a zone system based on Hex Bins
 ========================================
 
-On this example we show how to create a hex bin zones covering an arbitrary area.
+In this example, we show how to create hex bin zones covering an arbitrary area.
 
 We use the Nauru example to create roughly 100 zones covering the whole modeling
 area as delimited by the entire network
 
 You are obviously welcome to create whatever zone system you would like, as long as
-you have the geometries for them. In that case, you can just skip the Hex bin computation
+you have the geometries for them. In that case, you can just skip the hex bin computation
 part of this notebook.
 
 We also add centroid connectors to our network to make it a pretty complete example
@@ -26,7 +26,6 @@ from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
 from aequilibrae.utils.create_example import create_example
-
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
@@ -41,29 +40,29 @@ project = create_example(fldr, "nauru")
 zones = 100
 
 #%%
-# Hex Bins using SpatiaLite
+# Hex Bins using Spatialite
 # -------------------------
 
 # %%
-# Spatialite requires a few things to compute hex bins. 
-# One of the them is the area you want to cover.
+# Spatialite requires a few things to compute hex bins.
+# One of them is the area you want to cover.
 network = project.network
 
-# So we use the convenient network method convex_hull() (it may take some time for very large networks)
+# So we use the convenient network method ``convex_hull()`` (it may take some time for very large networks)
 geo = network.convex_hull()
 
 # %%
-# The second thing is the side of the hexbin, which we can compute from its area
-# The approximate area of the desired hexbin is
+# The second thing is the side of the hex bin, which we can compute from its area.
+# The approximate area of the desired hex bin is
 zone_area = geo.area / zones
 # Since the area of the hexagon is **3 * sqrt(3) * side^2 / 2**
 # is side is equal to  **sqrt(2 * sqrt(3) * A/9)**
 zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 
 # %%
-# Now we can run an sql query to compute the hexagonal grid
-# There are many ways to create Hex bins (including with a GUI on QGIS), but we find that
-# using SpatiaLite is a pretty neat solution
+# Now we can run an SQL query to compute the hexagonal grid.
+# There are many ways to create hex bins (including with a GUI on QGIS), but we find that
+# using SpatiaLite is a pretty neat solution.
 # For which we will use the entire network bounding box to make sure we cover everything
 extent = network.extent()
 
@@ -119,8 +118,8 @@ for zone_id, zone in zoning.all_zones().items():
         break
 
 # %%
-# Let's add an special generator zones
-# We also add a centroid at  the airport terminal
+# Let's add special generator zones
+# We also add a centroid at the airport terminal
 nodes = project.network.nodes
 
 # Let's use some silly number for its ID, like 10,000, just so we can easily differentiate it
@@ -128,9 +127,8 @@ airport = nodes.new_centroid(10000)
 airport.geometry = Point(166.91749582, -0.54472590)
 airport.save()
 
-
 # When connecting a centroid not associated with a zone, we need to tell AequilibraE what is the initial area around
-# the centroid that needs to be considered when looking for candidate nodes
+# the centroid that needs to be considered when looking for candidate nodes.
 # Distance here is in degrees, so 0.01 is equivalent to roughly 1.1km
 airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytrusP", connectors=1)
 

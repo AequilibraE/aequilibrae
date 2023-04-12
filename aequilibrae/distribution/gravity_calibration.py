@@ -14,11 +14,11 @@ from ..parameters import Parameters
 
 
 class GravityCalibration:
-    r"""
-        Calibrate a traditional gravity model
+    """Calibrate a traditional gravity model
 
         Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
-    ::
+
+    .. code-block:: python
 
         from aequilibrae.matrix import AequilibraeMatrix
         from aequilibrae.distribution import GravityCalibration

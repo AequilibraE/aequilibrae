@@ -19,7 +19,7 @@ has_omx = spec is not None
 class Ipf:
     """Iterative proportional fitting procedure
 
-    ::
+    .. code-block:: python
 
         import pandas as pd
         from aequilibrae.distribution import Ipf
@@ -56,7 +56,7 @@ class Ipf:
 
         fratar = Ipf(**args)
 
-         fratar.fit()
+        fratar.fit()
 
         # We can get back to our OMX matrix in the end
         fratar.output.export(path/to_omx/output.omx)

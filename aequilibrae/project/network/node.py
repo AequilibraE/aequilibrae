@@ -6,32 +6,28 @@ from .connector_creation import connector_creation
 class Node(SafeClass):
     """A Node object represents a single record in the *nodes* table
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
-        from shapely.geometry import Point
+        >>> from aequilibrae import Project
+        >>> from shapely.geometry import Point
 
-        proj = Project()
-        proj.open('path/to/project/folder')
+        >>> proj = Project.from_path("/tmp/test_project")
 
-        all_nodes = proj.network.nodes
+        >>> all_nodes = proj.network.nodes
 
         # We can just get one link in specific
-        node1 = all_nodes.get(7890)
+        >>> node1 = all_nodes.get(7)
 
         # We can find out which fields exist for the links
-        which_fields_do_we_have = node1.data_fields()
-
-        # And edit each one like this
-        node1.comment = 'This node is important'
+        >>> which_fields_do_we_have = node1.data_fields()
 
         # It success if the node_id already does not exist
-        node1.renumber(998877)
+        >>> node1.renumber(998877)
 
-        node.geometry = Point(1,2)
+        >>> node1.geometry = Point(1,2)
 
         # We can just save the node
-        node1.save()
+        >>> node1.save()
     """
 
     def __init__(self, dataset, project):

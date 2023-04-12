@@ -63,13 +63,14 @@ class About:
             *info_field* (:obj:`str`): Name of the desired information field to be added.  Has to be a valid
             Python VARIABLE name (i.e. letter as first character, no spaces and no special characters)
 
-        ::
+        .. code-block:: python
 
-            p = Project()
-            p.open('my/project/folder')
-            p.about.add_info_field('my_super_relevant_field')
-            p.about.my_super_relevant_field = 'super relevant information'
-            p.about.write_back()
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> p.about.add_info_field('a_cool_field')
+            >>> p.about.a_cool_field = 'super relevant information'
+            >>> p.about.write_back()
         """
         allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
@@ -87,12 +88,13 @@ class About:
     def write_back(self):
         """Saves the information parameters back to the project database
 
-        ::
+        .. code-block:: python
 
-            p = Project()
-            p.open('my/project/folder')
-            p.about.description = 'This is the example project. Do not use for forecast'
-            p.about.write_back()
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> p.about.description = 'This is the example project. Do not use for forecast'
+            >>> p.about.write_back()
         """
         curr = self.__conn.cursor()
         for k in self.__characteristics:

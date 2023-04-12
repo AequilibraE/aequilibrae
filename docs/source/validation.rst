@@ -1,5 +1,5 @@
 Validation & Benchmarking
-====================
+=========================
 
 AequilibraE's main objective is to be a fully-fledged modeling platform, and
 therefore most of its features are geared towards that. In time, this section
@@ -9,6 +9,6 @@ of Traffic Assignment, linked below.
 .. toctree::
     :maxdepth: 1
 
-    traffic_assignment
-    select_link_analysis
-    ipf_performance
+    validation_benchmarking/traffic_assignment
+    validation_benchmarking/select_link_analysis
+    validation_benchmarking/ipf_performance

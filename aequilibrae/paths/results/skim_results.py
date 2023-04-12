@@ -8,28 +8,27 @@ class SkimResults:
     """
     Network skimming result holder
 
-    ::
+    .. code-block:: python
 
-          from aequilibrae.project import Project
-          from aequilibrae.paths.results import SkimResults
+          >>> from aequilibrae import Project
+          >>> from aequilibrae.paths.results import SkimResults
 
-          proj = Project()
-          proj.load('path/to/project/folder')
-          proj.network.build_graphs()
+          >>> proj = Project.from_path("/tmp/test_project")
+          >>> proj.network.build_graphs()
+
           # Mode c is car in this project
-          car_graph = proj.network.graphs['c']
+          >>> car_graph = proj.network.graphs['c']
 
           # minimize travel time
-          car_graph.set_graph('free_flow_travel_time')
+          >>> car_graph.set_graph('free_flow_time')
 
           # Skims travel time and distance
-          car_graph.set_skimming(['free_flow_travel_time', 'distance'])
+          >>> car_graph.set_skimming(['free_flow_time', 'distance'])
 
-          res = SkimResults()
-          res.prepare(car_graph)
-          res.compute_skims()
+          >>> res = SkimResults()
+          >>> res.prepare(car_graph)
 
-          res.skims.export('path/to/matrix.aem')
+          >>> res.skims.export('/tmp/test_project/matrix.aem')
     """
 
     def __init__(self):

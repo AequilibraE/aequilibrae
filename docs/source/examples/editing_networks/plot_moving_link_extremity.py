@@ -1,11 +1,14 @@
 """
+.. _editing_network_links:
+
 Editing network geometry: Links
 ===============================
 
-On this example we move a link extremity from one point to another
+In this example, we move a link extremity from one point to another
 and see what happens to the network.
 """
 
+# %%
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -14,6 +17,7 @@ from aequilibrae.utils.create_example import create_example
 from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 
+# %%
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -61,7 +65,7 @@ for nid in curr.fetchall():
 
 plt.show()
 
-# Now look at the network how it used to be
+# Now look at the network and how it used to be
 
 # %%
 project.close()

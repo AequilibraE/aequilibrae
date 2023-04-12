@@ -4,7 +4,7 @@
 Finding disconnected links
 ==========================
 
-On this example, we show how to find disconnected links in an AequilibraE network
+In this example, we show how to find disconnected links in an AequilibraE network
 
 We use the Nauru example to find disconnected links
 """
@@ -27,11 +27,11 @@ fldr = join(gettempdir(), uuid4().hex)
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
 
-# Let's analyze the mode car, or 'c' in our model
+# Let's analyze the mode car or 'c' in our model
 mode = "c"
 
 # %%
-# We need to create the graph, but before that we need to have at least one centroid in our network
+# We need to create the graph, but before that, we need to have at least one centroid in our network
 
 # We get an arbitrary node to set as centroid and allow for the construction of graphs
 centroid_count = project.conn.execute("select count(*) from nodes where is_centroid=1").fetchone()[0]
@@ -49,7 +49,7 @@ graph = network.graphs[mode]
 graph.set_blocked_centroid_flows(False)
 
 if centroid_count == 0:
-    # Let's revert of setting up that node as centroid in case we had to do it
+    # Let's revert to setting up that node as centroid in case we had to do it
 
     nd.is_centroid = 0
     nd.save()
@@ -97,6 +97,7 @@ islands = pd.concat(islands)
 # And save to disk alongside our model
 islands.to_csv(join(fldr, "island_outputs_complete.csv"), index=False)
 
+#%%
 # If you join the node_id field in the csv file generated above with the a_node or b_node fields
 # in the links table, you will have the corresponding links in each disjoint island found
 

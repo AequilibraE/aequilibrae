@@ -6,44 +6,41 @@ from aequilibrae.project.network.mode import Mode
 class Link(SafeClass):
     """A Link object represents a single record in the *links* table
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        proj = Project()
-        proj.open('path/to/project/folder')
+        >>> proj = Project.from_path("/tmp/test_project")
 
-        all_links = proj.network.links
+        >>> all_links = proj.network.links
 
         # Let's get a mode to work with
-        modes = proj.network.modes
-        car_mode = modes.get('c')
+        >>> modes = proj.network.modes
+        >>> car_mode = modes.get('c')
 
         # We can just get one link in specific
-        link1 = all_links.get(4523)
-        link2 = all_links.get(3254)
+        >>> link1 = all_links.get(3)
+        >>> link2 = all_links.get(17)
 
         # We can find out which fields exist for the links
-        which_fields_do_we_have = link1.data_fields()
+        >>> which_fields_do_we_have = link1.data_fields()
 
         # And edit each one like this
-        link1.lanes_ab = 3
-        link1.lanes_ba = 2
+        >>> link1.lanes_ab = 3
+        >>> link1.lanes_ba = 2
 
         # we can drop a mode from the link
-        link1.drop_mode(car_mode)
-        # or link1.drop_mode('c')
+        >>> link1.drop_mode(car_mode)  # or link1.drop_mode('c')
 
         # we can add a mode to the link
-        link2.add_mode(car_mode)
-        # or link2.add_mode('c')
+        >>> link2.add_mode(car_mode)  # or link2.add_mode('c')
 
         # Or set all modes at once
-        link2.set_modes('cmtw')
+        >>> link2.set_modes('cbtw')
 
         # We can just save the link
-        link1.save()
-        link2.save()
+        >>> link1.save()
+        >>> link2.save()
     """
 
     def __init__(self, dataset, project):

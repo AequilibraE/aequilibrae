@@ -8,52 +8,50 @@ class LinkTypes:
     """
     Access to the API resources to manipulate the link_types table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> p = Project.from_path("/tmp/test_project")
 
-        link_types = p.network.link_types
+        >>> link_types = p.network.link_types
 
         # We can get a dictionary of link types in the model
-        all_link_types = link_types.all_types()
+        >>> all_link_types = link_types.all_types()
 
         #And do a bulk change and save it
-        for link_type_id, link_type_obj in all_link_types.items():
-            link_type_obj.beta = 1
+        >>> for link_type_id, link_type_obj in all_link_types.items():
+        ...     link_type_obj.beta = 1
 
         # We can save changes for all link types in one go
-        all_link_types.save()
+        >>> link_types.save()
 
         # or just get one link_type in specific
-        default_link_type = link_types.get('y')
+        >>> default_link_type = link_types.get('y')
 
         # or just get it by name
-        default_link_type = link_types.get_by_name('default')
+        >>> default_link_type = link_types.get_by_name('default')
 
         # We can change the description of the link types
-        default_link_type.description = 'My own new description'
+        >>> default_link_type.description = 'My own new description'
 
         # Let's say we are using alpha to store lane capacity during the night as 90% of the standard
-        default_link_type.alpha =0.9 * default_link_type.lane_capacity
+        >>> default_link_type.alpha = 0.9 * default_link_type.lane_capacity
 
         # To save this link types we can simply
-        default_link_type.save()
+        >>> default_link_type.save()
 
         # We can also create a completely new link_type and add to the model
-        new_type = link_types.new('a')
-        new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed
-        # other fields are not mandatory
+        >>> new_type = link_types.new('a')
+        >>> new_type.link_type = 'Arterial'  # Only ASCII letters and *_* allowed # other fields are not mandatory
 
         # We then save it to the database
-        new_type.save()
+        >>> new_type.save()
 
         # we can even keep editing and save it directly once we have added it to the project
-        new_type.lanes = 3
-        new_type.lane_capacity = 1100
-        new_type.save()
+        >>> new_type.lanes = 3
+        >>> new_type.lane_capacity = 1100
+        >>> new_type.save()
 
     """
 
