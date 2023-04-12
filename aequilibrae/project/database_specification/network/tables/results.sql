@@ -10,7 +10,7 @@
 --@ The *procedure_id* field holds an unique UUID identifier for this procedure,
 --@ which is created at runtime.
 --@
---@ The *procedure_report* field
+--@ The *procedure_report* field holds the output of the complete procedure report. 
 --@
 --@ The *timestamp* field holds the information when the procedure was executed.
 --@

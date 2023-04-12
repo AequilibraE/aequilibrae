@@ -153,6 +153,8 @@ class AequilibraeMatrix(object):
             *compressed* (:obj:`bool`, optional): Whether it is a flat matrix or a compressed one (Boolean - Not yet
             implemented)
 
+            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
@@ -161,7 +163,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix.OMX',
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.num_indices
@@ -277,7 +279,7 @@ class AequilibraeMatrix(object):
             *compressed* (:obj:`bool`, optional): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to False
+            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
 
         """
 
@@ -646,7 +648,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name="/tmp/path_to_matrix",
+            >>> mat.create_empty(file_name="/tmp/path_to_matrix.aem",
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
@@ -715,7 +717,7 @@ class AequilibraeMatrix(object):
 
     def export(self, output_name: str, cores: List[str] = None):
         """
-        Exports the matrix to other formats. Formats currently supported: CSV, OMX
+        Exports the matrix to other formats, rather than AEM. Formats currently supported: CSV, OMX
 
         When exporting to AEM or OMX, the user can chose to export only a set of cores, but all indices are exported
 
@@ -735,15 +737,15 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.cores
             5
-            >>> mat.export('/tmp/my_new_path.OMX', ['Car trips', 'bike trips'])
+            >>> mat.export('/tmp/my_new_path.aem', ['Car trips', 'bike trips'])
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load('/tmp/my_new_path.OMX')
+            >>> mat2.load('/tmp/my_new_path.aem')
             >>> mat2.cores
             2
         """
@@ -797,19 +799,11 @@ class AequilibraeMatrix(object):
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> zones_in_the_model = 3317
-            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
-
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
-            ...                  zones=zones_in_the_model,
-            ...                  matrix_names=names_list)
-            >>> mat.close()
-
-            >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load('/tmp/path_to_matrix')
-            >>> mat2.zones
-            3317
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.computational_view(["bike trips"])
+            >>> mat.names
+            ['Car trips', 'bike trips']
         """
 
         self.file_path = file_path
@@ -844,7 +838,7 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.computational_view(['bike trips', 'walk trips'])
@@ -908,29 +902,23 @@ class AequilibraeMatrix(object):
             *compress* (:obj:`bool`, optional): Whether you want to compress the matrix or not. Defaults to False
             Not yet implemented
 
-            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to False
+            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> zones_in_the_model = 3317
-            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
-
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
-            ...                  zones=zones_in_the_model,
-            ...                  matrix_names=names_list)
-            >>> mat.copy(output_name='/tmp/new_path_to_file.omx',
-            ...               cores=['bike trips', 'walk trips'],
-            ...               names=['bicycle', 'walking'])  # doctest: +ELLIPSIS
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.copy(output_name='/tmp/newest_path.aem',
+            ...          names=['bike trips'],
+            ...          memory_only=False)  # doctest: +ELLIPSIS
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load('/tmp/new_path_to_file.omx')
-            >>> mat.cores
-            2
+            >>> mat2.load('/tmp/newest_path.aem')
+            >>> mat2.num_indices
+            1
         """
-
         if compress:
             raise Warning("Matrix compression not yet supported")
 
@@ -981,11 +969,18 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            mat = AequilibraeMatrix()
-            mat.load('my/path/to/file')
-            mat.computational_view(mat.cores[0])
-            mat.rows()
-            array([0.,...,0.])
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.computational_view(["bike trip"])
+            >>> mat.rows()
+            array([598.89588583, 630.89361187, 566.82487965, 534.47826837,
+                   529.08901242, 575.63041841, 530.4004686 , 534.64387588,
+                   523.5314345 , 524.50902808, 545.5050474 , 600.06981703,
+                   626.37253543, 576.80434145, 555.41591427, 568.56946298,
+                   604.83538944, 522.05662318, 584.57320122, 540.67350743,
+                   575.31116594, 558.55658833, 596.04006016, 597.22041963])
         """
         return self.__vector(axis=0)
 
@@ -1001,11 +996,18 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            mat = AequilibraeMatrix()
-            mat.load('my/path/to/file')
-            mat.computational_view(mat.cores[0])
-            mat.columns()
-            array([0.34,.0.,...,14.03])
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.computational_view(["bike trip"])
+            >>> mat.columns()
+            array([357.54256811, 357.45109051, 310.88655449, 276.6783439 ,
+                   266.70388637, 270.62976319, 266.32888632, 279.6897402 ,
+                   285.89821842, 242.79743295, 252.34085912, 301.78116548,
+                   302.97058146, 270.61855294, 264.59944248, 257.83842251,
+                   276.63310578, 257.74513863, 281.15724257, 271.63886077,
+                   264.62215032, 252.79791125, 273.18139747, 282.7636574 ])
         """
         return self.__vector(axis=1)
 
@@ -1015,10 +1017,12 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            mat = AequilibraeMatrix()
-            mat.load('my/path/to/file')
-            mat.computational_view(mat.cores[0])
-            mat.nan_to_num()
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.computational_view(["bike trips"])
+            >>> mat.nan_to_num()
         """
 
         if self.__omx:
@@ -1061,10 +1065,12 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            mat = AequilibraeMatrix()
-            mat.load('my/path/to/file')
-            mat.setName('This is my example')
-            mat.name
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.setName('This is my example')
+            >>> mat.name
             'This is my example'
         """
         if self.__omx:
@@ -1087,10 +1093,12 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            mat = AequilibraeMatrix()
-            mat.load('my/path/to/file')
-            mat.setDescription('This is some text about this matrix of mine')
-            mat.description
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.setDescription('This is some text about this matrix of mine')
+            >>> mat.description
             'This is some text about this matrix of mine'
         """
         if self.__omx:
@@ -1102,8 +1110,8 @@ class AequilibraeMatrix(object):
 
             np.memmap(
                 self.file_path,
-                dtype="S" + str(MATRIX_NAME_MAX_LENGTH),
-                offset=18 + MATRIX_NAME_MAX_LENGTH,
+                dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH),
+                offset=18 + MATRIX_DESCRIPTION_MAX_LENGTH,
                 mode="r+",
                 shape=1,
             )[0] = matrix_description
@@ -1115,7 +1123,11 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            name = AequilibraeMatrix().random_name()
-            '/tmp/Aequilibrae_matrix_54625f36-bf41-4c85-80fb-7fc2e3f3d76e.aem'
+            >>> from aequilibrae.matrix import AequilibraeMatrix
+
+            >>> name = AequilibraeMatrix().random_name() # doctest: +ELLIPSIS
+
+            # This is an example of output
+            # '/tmp/Aequilibrae_matrix_54625f36-bf41-4c85-80fb-7fc2e3f3d76e.aem'
         """
         return os.path.join(tempfile.gettempdir(), f"Aequilibrae_matrix_{uuid.uuid4()}.aem")

@@ -8,46 +8,50 @@ from time import perf_counter
 
 import numpy as np
 
-from .gravity_application import GravityApplication, SyntheticGravityModel
-from ..matrix import AequilibraeMatrix, AequilibraeData
-from ..parameters import Parameters
+from aequilibrae.distribution.gravity_application import GravityApplication, SyntheticGravityModel
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from aequilibrae.parameters import Parameters
 
 
 class GravityCalibration:
     """Calibrate a traditional gravity model
 
-        Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
+    Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
 
     .. code-block:: python
 
-        from aequilibrae.matrix import AequilibraeMatrix
-        from aequilibrae.distribution import GravityCalibration
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.distribution import GravityCalibration
+
+        >>> project = Project.from_path("/tmp/test_project_gc")
 
         # We load the impedance matrix
-        matrix = AequilibraeMatrix()
-        matrix.load('path/to/trip_matrix.aem')
-        matrix.computational_view(['total_trips'])
+        >>> matrix = AequilibraeMatrix()
+        >>> matrix.load('/tmp/test_project_gc/matrices/demand.omx')
+        >>> matrix.computational_view(['matrix'])
 
-         # We load the impedance matrix
-        impedmatrix = AequilibraeMatrix()
-        impedmatrix.load('path/to/impedance_matrix.aem')
-        impedmatrix.computational_view(['traveltime'])
+        # We load the impedance matrix
+        >>> impedmatrix = AequilibraeMatrix()
+        >>> impedmatrix.load('/tmp/test_project_gc/matrices/skims.omx')
+        >>> impedmatrix.computational_view(['time_final'])
 
         # Creates the problem
-        args = {"matrix": matrix,
-                "impedance": impedmatrix,
-                "row_field": "productions",
-                "function": 'expo',
-                "nan_as_zero":True
-                }
-        gravity = GravityCalibration(**args)
+        >>> args = {"matrix": matrix,
+        ...         "impedance": impedmatrix,
+        ...         "row_field": "productions",
+        ...         "function": 'expo',
+        ...         "nan_as_zero": True}
+        >>> gravity = GravityCalibration(**args)
 
         # Solve and save outputs
-        gravity.calibrate()
-        gravity.model.save('path/to/dist_expo_model.mod')
-        with open('path.to/report.txt', 'w') as f:
-            for line in gravity.report:
-                f.write(f'{line}\n')
+        >>> gravity.calibrate()
+        >>> gravity.model.save('/tmp/test_project_gc/dist_expo_model.mod')
+
+        # To save the model report in a file
+        # with open('/tmp/test_project_gc/report.txt', 'w') as f:
+        #     for line in gravity.report:
+        #         f.write(f'{line}\\n')
     """
 
     def __init__(self, project=None, **kwargs):

@@ -6,7 +6,7 @@
 --@
 --@ The *file_name* field holds the file name.
 --@
---@ The *cores* field holds
+--@ The *cores* field holds the information on the number of cores used.
 --@
 --@ The *procedure* field holds the name the the procedure that generated
 --@ the result (e.g.: Traffic Assignment).

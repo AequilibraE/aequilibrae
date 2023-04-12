@@ -53,10 +53,7 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
             >>> from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
-
-            >>> project = Project.from_path("/tmp/test_project")
 
             >>> mat = AequilibraeMatrix()
             >>> mat.load('/tmp/test_project/matrices/demand.omx')
