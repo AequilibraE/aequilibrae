@@ -161,9 +161,9 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix.OMX',
             ...                  zones=zones_in_the_model,
-            ...                  matrix_names= names_list)
+            ...                  matrix_names=names_list)
             >>> mat.num_indices
             1
             >>> mat.zones
@@ -639,21 +639,23 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
-            index_list = ['tazs',  'census']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file',
-                             zones=zones_in_the_model,
-                             matrix_names=names_list,
-                             index_names =index_list )
-            mat.num_indices
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> index_list = ['tazs', 'census']
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name="/tmp/path_to_matrix",
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names=names_list,
+            ...                  index_names=index_list )
+            >>> mat.num_indices
             2
-            mat.current_index
+            >>> mat.current_index
             'tazs'
-            mat.set_index('census')
-            mat.current_index
+            >>> mat.set_index('census')
+            >>> mat.current_index
             'census'
         """
         if self.__omx:
@@ -727,20 +729,23 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
-            mat.cores
-            ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
-            mat.export('my_new_path', ['Car trips', 'bike trips'])
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
+            >>> mat.cores
+            5
+            >>> mat.export('/tmp/my_new_path.OMX', ['Car trips', 'bike trips'])
 
-            mat2 = AequilibraeMatrix()
-            mat2.load('my_new_path')
-            mat2.cores
-            ['Car trips', 'bike trips']
+            >>> mat2 = AequilibraeMatrix()
+            >>> mat2.load('/tmp/my_new_path.OMX')
+            >>> mat2.cores
+            2
         """
 
         if self.__omx:
@@ -783,23 +788,27 @@ class AequilibraeMatrix(object):
 
     def load(self, file_path: str):
         """
-        Loads matrix from disk. All cores and indices are load. First index is default
+        Loads matrix from disk. All cores and indices are load. First index is default.
 
         Args:
             file_path (:obj:`str`): Path to AEM or OMX file on disk
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
-            mat.close()
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
-            mat2 = AequilibraeMatrix()
-            mat2.load('my/path/to/file.omx')
-            mat2.zones
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
+            >>> mat.close()
+
+            >>> mat2 = AequilibraeMatrix()
+            >>> mat2.load('/tmp/path_to_matrix')
+            >>> mat2.zones
             3317
         """
 
@@ -829,13 +838,17 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
-            mat.computational_view(['bike trips', 'walk trips'])
-            mat.view_names
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
+            >>> mat.computational_view(['bike trips', 'walk trips'])
+            >>> mat.view_names
             ['bike trips', 'walk trips']
         """
 
@@ -899,17 +912,23 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            zones_in_the_model = 3317
-            names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+            >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            mat = AequilibraeMatrix()
-            mat.create_empty(file_name='my/path/to/file', zones=zones_in_the_model, matrix_names= names_list)
-            mat.copy('my/new/path/to/file', cores=['bike trips', 'walk trips'], names=['bicycle', 'walking'])
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
-            mat2 = AequilibraeMatrix()
-            mat2.load('my/new/path/to/file')
-            mat.cores
-            ['bicycle', 'walking']
+            >>> mat = AequilibraeMatrix()
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix',
+            ...                  zones=zones_in_the_model,
+            ...                  matrix_names=names_list)
+            >>> mat.copy(output_name='/tmp/new_path_to_file.omx',
+            ...               cores=['bike trips', 'walk trips'],
+            ...               names=['bicycle', 'walking'])  # doctest: +ELLIPSIS
+
+            >>> mat2 = AequilibraeMatrix()
+            >>> mat2.load('/tmp/new_path_to_file.omx')
+            >>> mat.cores
+            2
         """
 
         if compress:

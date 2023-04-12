@@ -146,26 +146,28 @@ class Network(WorkerThread):
 
         .. code-block:: python
 
-            from aequilibrae import Project, Parameters
+            >>> from aequilibrae import Project
 
-            project = Project.from_path("/tmp/test_project")
+            >>> p = Project()
+            >>> p.new("/tmp/new_project")
 
             # We now choose a different overpass endpoint (say a deployment in your local network)
-            par = Parameters()
-            par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
+            >>> par = Parameters()
+            >>> par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
 
             # Because we have our own server, we can set a bigger area for download (in M2)
-            par.parameters['osm']['max_query_area_size'] = 10000000000
+            >>> par.parameters['osm']['max_query_area_size'] = 10000000000
 
             # And have no pause between successive queries
-            par.parameters['osm']['sleeptime'] = 0
+            >>> par.parameters['osm']['sleeptime'] = 0
 
             # Save the parameters to disk
-            par.write_back()
+            >>> par.write_back()
 
-            # And do the import
-            p.network.create_from_osm(place_name=my_beautiful_hometown)
-            p.close()
+            # Now we can import the network for any place we want
+            # p.network.create_from_osm(place_name="my_beautiful_hometown")
+
+            >>> p.close()
         """
 
         if self.count_links() > 0:
@@ -302,10 +304,11 @@ class Network(WorkerThread):
 
         .. code-block:: python
 
-            p = Project()
-            p.open(nm)
-            fields = ['distance']
-            p.network.build_graphs(fields, modes = ['c', 'w'])
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> fields = ['distance']
+            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
         from aequilibrae.paths import Graph

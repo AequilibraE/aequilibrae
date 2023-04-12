@@ -35,10 +35,10 @@ class NetworkSkimming(WorkerThread):
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
         >>> project = Project.from_path("/tmp/test_project")
-        
+
         >>> network = project.network
         >>> network.build_graphs()
-        
+
         >>> graph = network.graphs['c']
         >>> graph.set_graph(cost_field="distance")
         >>> graph.set_skimming("distance")

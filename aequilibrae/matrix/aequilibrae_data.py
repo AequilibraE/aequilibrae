@@ -53,15 +53,26 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            vectors = "D:/release/Sample models/Chicago_2020_02_15/vectors.aed"
-            args = {
-                 "file_path": vectors,
-                 "entries": vec_1.shape[0],
-                 "field_names": ["origins", "destinations"],
-                 "data_types": [np.float64, np.float64],
-             }
-            dataset = AequilibraeData()
-            dataset.create_empty(**args)
+            >>> from aequilibrae import Project
+            >>> from aequilibrae.matrix import AequilibraeData, AequilibraeMatrix
+
+            >>> project = Project.from_path("/tmp/test_project")
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load('/tmp/test_project/matrices/demand.omx')
+            >>> mat.computational_view()
+
+            >>> vectors = "/tmp/test_project/vectors.aed"
+
+            >>> args = {
+            ...      "file_path": vectors,
+            ...      "entries": mat.zones,
+            ...      "field_names": ["origins", "destinations"],
+            ...      "data_types": [np.float64, np.float64]
+            ... }
+
+            >>> dataset = AequilibraeData()
+            >>> dataset.create_empty(**args)
 
         """
 
@@ -140,8 +151,10 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            dataset = AequilibraeData()
-            dataset.load("D:/datasets/vectors.aed")
+            >>> from aequilibrae.matrix import AequilibraeData
+
+            >>> dataset = AequilibraeData()
+            >>> dataset.load("/tmp/test_project/vectors.aed")
         """
         f = open(file_path)
         self.file_path = os.path.realpath(f.name)
@@ -166,9 +179,11 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            dataset = AequilibraeData()
-            dataset.load("D:/datasets/vectors.aed")
-            dataset.export("D:/datasets/vectors.csv")
+            >>> from aequilibrae.matrix import AequilibraeData
+
+            >>> dataset = AequilibraeData()
+            >>> dataset.load("/tmp/test_project/vectors.aed")
+            >>> dataset.export("/tmp/test_project/vectors.csv")
         """
 
         file_type = os.path.splitext(file_name)[1]
@@ -223,7 +238,11 @@ class AequilibraeData(object):
 
         .. code-block:: python
 
-            name = AequilibraeData().random_name()
-            '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
+            >>> from aequilibrae.matrix import AequilibraeData
+
+            >>> name = AequilibraeData().random_name() # doctest: +ELLIPSIS
+
+            # This is an example of output
+            # '/tmp/Aequilibrae_data_5werr5f36-b123-asdf-4587-adfglkjhqwe.aed'
         """
         return os.path.join(tempfile.gettempdir(), f"Aequilibrae_data_{uuid.uuid4()}.aed")

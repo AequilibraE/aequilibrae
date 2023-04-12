@@ -5,7 +5,7 @@ API Reference
 .. automodule:: aequilibrae
 
 Project
-~~~~~~~
+-------
 .. current_module:: aequilibrae
 .. autosummary::
    :nosignatures:
@@ -17,7 +17,7 @@ Project
    Project.open
 
 Project Components
-------------------
+~~~~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
@@ -31,7 +31,7 @@ Project Components
     Zoning
 
 Project Objects
----------------
+~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
@@ -40,7 +40,7 @@ Project Objects
     Zone
 
 Network Data
-~~~~~~~~~~~~
+------------
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
    :nosignatures:
@@ -52,7 +52,7 @@ Network Data
     Nodes
 
 Network Items
-~~~~~~~~~~~~~
+-------------
 .. currentmodule:: aequilibrae.project.network
 
 .. autosummary::
@@ -65,7 +65,7 @@ Network Items
     Node
 
 Parameters
-~~~~~~~~~~
+----------
 .. currentmodule:: aequilibrae
 
 .. autosummary::
@@ -73,9 +73,11 @@ Parameters
    :toctree: generated/
 
     Parameters
+    Parameters.restore_default
+    Parameters.write_back
 
 Distribution
-~~~~~~~~~~~~
+------------
 
 .. currentmodule:: aequilibrae
 
@@ -84,25 +86,55 @@ Distribution
    :toctree: generated/
 
     Ipf
+    Ipf.fit
+    Ipf.save_to_project
     GravityApplication
+    GravityApplication.apply
+    GravityApplication.save_to_project
     GravityCalibration
+    GravityCalibration.calibrate
     SyntheticGravityModel
+    SyntheticGravityModel.load
+    SyntheticGravityModel.save
 
 Matrix
-~~~~~~
-.. currentmodule:: aequilibrae
+------
+.. currentmodule:: aequilibrae.matrix
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/
 
-    AequilibraeMatrix
-    AequilibraeData
+   AequilibraeData
+   AequilibraeData.create_empty
+   AequilibraeData.empty
+   AequilibraeData.export
+   AequilibraeData.load
+   AequilibraeData.random_name
+   AequilibraeMatrix
+   AequilibraeMatrix.close
+   AequilibraeMatrix.columns
+   AequilibraeMatrix.computational_view
+   AequilibraeMatrix.copy
+   AequilibraeMatrix.create_empty
+   AequilibraeMatrix.create_from_omx
+   AequilibraeMatrix.create_from_trip_list
+   AequilibraeMatrix.export
+   AequilibraeMatrix.get_matrix
+   AequilibraeMatrix.is_omx
+   AequilibraeMatrix.load
+   AequilibraeMatrix.nan_to_num
+   AequilibraeMatrix.random_name
+   AequilibraeMatrix.rows
+   AequilibraeMatrix.save
+   AequilibraeMatrix.setDescription
+   AequilibraeMatrix.setName
+   AequilibraeMatrix.set_index
 
 Paths
-~~~~~
+-----
 
-.. currentmodule:: aequilibrae
+.. currentmodule:: aequilibrae.paths
 
 .. autosummary::
    :nosignatures:
@@ -111,15 +143,17 @@ Paths
     Graph
     AssignmentResults
     SkimResults
+    SkimResults.prepare
+    SkimResults.set_cores
     PathResults
     VDF
     TrafficClass
     TrafficAssignment
 
 Transit
-~~~~~~~
+-------
 
-.. currentmodule:: aequilibrae
+.. currentmodule:: aequilibrae.transit
 
 .. autosummary::
    :nosignatures:

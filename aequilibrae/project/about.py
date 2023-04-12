@@ -89,7 +89,7 @@ class About:
         """Saves the information parameters back to the project database
 
         .. code-block:: python
-            
+
             >>> from aequilibrae import Project
 
             >>> p = Project.from_path("/tmp/test_project")

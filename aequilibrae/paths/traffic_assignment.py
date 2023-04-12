@@ -46,7 +46,7 @@ class TrafficAssignment(object):
 
         >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
-        
+
         # We will only assign one user class stored as 'matrix' inside the OMX file
         >>> demand.computational_view(['matrix'])
 
@@ -54,18 +54,18 @@ class TrafficAssignment(object):
         >>> assigclass = TrafficClass("car", graph, demand)
 
         >>> assig = TrafficAssignment()
-        
+
         # The first thing to do is to add at list of traffic classes to be assigned
         >>> assig.set_classes([assigclass])
 
         # Then we set the volume delay function
-        >>> assig.set_vdf("BPR")  # This is not case-sensitive 
+        >>> assig.set_vdf("BPR")  # This is not case-sensitive
 
         # And its parameters
-        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) 
+        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
         # The capacity and free flow travel times as they exist in the graph
-        >>> assig.set_capacity_field("capacity") 
+        >>> assig.set_capacity_field("capacity")
         >>> assig.set_time_field("free_flow_time")
 
         # And the algorithm we want to use to assign
