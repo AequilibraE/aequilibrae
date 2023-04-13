@@ -16,3 +16,4 @@ sphinx-git
 sphinx-gallery
 sphinx-panels
 sphinx_theme
+sphinx-copybutton

@@ -29,8 +29,8 @@ class Log:
     def contents(self) -> list:
         """Returns contents of log file
 
-        Return:
-            *log_contents* (:obj:`list`): List with all entries in the log file
+        :Return:
+            **log_contents** (:obj:`list`): List with all entries in the log file
         """
 
         with open(self.log_file_path, "r") as file:
@@ -59,7 +59,7 @@ def _setup_logger():
 
 
 def get_log_handler(log_file: str, ensure_file_exists=True):
-    """return a log handler that writes to the given log_file"""
+    """Return a log handler that writes to the given log_file"""
     if os.path.exists(log_file) and not os.path.isfile(log_file):
         raise FileExistsError(f"{log_file} is not a valid file")
 

@@ -53,8 +53,8 @@ class Zoning(BasicTable):
     def new(self, zone_id: int) -> Zone:
         """Creates a new zone
 
-        Returns:
-            *zone* (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
+        :Returns:
+            **zone** (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
         """
 
         if zone_id in self.__items:
@@ -79,8 +79,8 @@ class Zoning(BasicTable):
     def coverage(self) -> Polygon:
         """Returns a single polygon for the entire zoning coverage
 
-        Returns:
-            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
+        :Returns:
+            **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
         self._curr.execute('Select ST_asBinary("geometry") from zones;')
         polygons = [shapely.wkb.loads(x[0]) for x in self._curr.fetchall()]
@@ -106,11 +106,11 @@ class Zoning(BasicTable):
             If the geometry is not fully enclosed by any zone, the zone closest to
             the geometry is returned
 
-        Args:
-            *geometry* (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
+        :Arguments:
+            **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
 
-        Return:
-            *zone_id* (:obj:`int`): ID of the zone applicable to the point provided
+        :Return:
+            **zone_id** (:obj:`int`): ID of the zone applicable to the point provided
         """
 
         nearest = self.__geo_index.nearest(geometry, 10)

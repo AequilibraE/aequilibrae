@@ -82,8 +82,8 @@ class Link(SafeClass):
     def set_modes(self, modes: str):
         """Sets the modes acceptable for this link
 
-        Args:
-            *modes* (:obj:`str`): string with all mode_ids to be assigned to this link
+        :Arguments:
+            **modes** (:obj:`str`): string with all mode_ids to be assigned to this link
         """
 
         if not isinstance(modes, str):
@@ -98,8 +98,8 @@ class Link(SafeClass):
 
         Raises a warning if mode is already allowed on the link, and fails if mode does not exist
 
-        Args:
-            *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be added to the link
+        :Arguments:
+            **mode_id** (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be added to the link
         """
         mode_id = self.__validate(mode)
 
@@ -114,8 +114,8 @@ class Link(SafeClass):
 
         Raises a warning if mode is already NOT allowed on the link, and fails if mode does not exist
 
-        Args:
-            *mode_id* (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be removed from the link
+        :Arguments:
+            **mode_id** (:obj:`str` or `Mode`): Mode_id of the mode or mode object to be removed from the link
         """
 
         mode_id = self.__validate(mode)
@@ -132,8 +132,8 @@ class Link(SafeClass):
     def data_fields(self) -> list:
         """lists all data fields for the link, as available in the database
 
-        Returns:
-            *data fields* (:obj:`list`): list of all fields available for editing
+        :Returns:
+            **data fields** (:obj:`list`): list of all fields available for editing
         """
 
         return list(self.__original__.keys())

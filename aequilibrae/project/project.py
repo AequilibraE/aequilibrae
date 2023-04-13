@@ -67,8 +67,8 @@ class Project:
         """
         Loads project from disk
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
 
@@ -90,8 +90,8 @@ class Project:
     def new(self, project_path: str) -> None:
         """Creates a new project
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
         self.project_base_path = project_path
@@ -143,8 +143,8 @@ class Project:
         .. deprecated:: 0.7.0
             Use :func:`open` instead.
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
         warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)

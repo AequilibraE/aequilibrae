@@ -58,8 +58,8 @@ class Node(SafeClass):
     def data_fields(self) -> list:
         """lists all data fields for the node, as available in the database
 
-        Returns:
-            *data fields* (:obj:`list`): list of all fields available for editing
+        :Returns:
+            **data fields** (:obj:`list`): list of all fields available for editing
         """
 
         return list(self.__original__.keys())
@@ -69,8 +69,8 @@ class Node(SafeClass):
 
         Logs a warning if another node already exists with this node_id
 
-        Args:
-            *new_id* (:obj:`int`): New node_id
+        :Arguments:
+            **new_id** (:obj:`int`): New node_id
         """
 
         new_id = int(new_id)
@@ -126,16 +126,15 @@ class Node(SafeClass):
 
         If fewer candidates than required connectors are found, all candidates are connected.
 
-            Args:
+        :Arguments:
+            **area** (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
 
-                *area* (:obj:`Polygon`): Initial area where AequilibraE will look for nodes to connect
+            **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
-                *mode_id* (:obj:`str`): Mode ID we are trying to connect
+            **link_types** (:obj:`str`, `Optional`): String with all the link type IDs that can
+            be considered. eg: yCdR. Defaults to ALL link types
 
-                *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
-                eg: yCdR. Defaults to ALL link types
-
-                *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+            **connectors** (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
         """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
             self._logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")

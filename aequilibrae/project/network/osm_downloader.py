@@ -82,25 +82,17 @@ class OSMDownloader(WorkerThread):
         self.__emit_all(["FinishedDownloading", 0])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
-        """
-        Send a request to the Overpass API via HTTP POST and return the JSON
-        response.
+        """Send a request to the Overpass API via HTTP POST and return the JSON response.
 
-        Parameters
-        ----------
-        data : dict or OrderedDict
-            key-value pairs of parameters to post to the API
-        pause_duration : int
-            how long to pause in seconds before requests, if None, will query API
+        :Arguments:
+            **data**(:obj:`dict` or `OrderedDict`): key-value pairs of parameters to post to the API
+            **pause_duration** (:obj:`int`): how long to pause in seconds before requests, if None, will query API
             status endpoint to find when next slot is available
-        timeout : int
-            the timeout interval for the requests library
-        error_pause_duration : int
-            how long to pause in seconds before re-trying requests if error
+            **timeout** (:obj:`int`): the timeout interval for the requests library
+            **error_pause_duration**(:obj:`int`): how long to pause in seconds before re-trying requests if error
 
-        Returns
-        -------
-        dict
+        :Returns:
+            :obj:`dict`
         """
 
         # define the Overpass API URL, then construct a GET-style URL as a string to

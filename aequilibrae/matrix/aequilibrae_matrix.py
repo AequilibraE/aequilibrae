@@ -94,8 +94,9 @@ class AequilibraeMatrix(object):
 
         If working with AEM file, it flushes data to disk. If working with OMX, requires new names.
 
-        Args:
-            *names* (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files"""
+        :Arguments:
+            **names** (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files
+        """
 
         if not self.__omx:
             self.__flush(self.matrices)
@@ -133,27 +134,25 @@ class AequilibraeMatrix(object):
         """
         Creates an empty matrix in the AequilibraE format
 
-        Args:
-            *file_name* (:obj:`str`): Local path to the matrix file
+        :Arguments:
+            **file_name** (:obj:`str`): Local path to the matrix file
 
-            *zones* (:obj:`int`): Number of zones in the model (Integer). Maximum number of zones in a matrix is
+            **zones** (:obj:`int`): Number of zones in the model (Integer). Maximum number of zones in a matrix is
             4,294,967,296
 
-            *matrix_names* (:obj:`list`): A regular Python list of names of the matrix. Limit is 50 characters each.
+            **matrix_names** (:obj:`list`): A regular Python list of names of the matrix. Limit is 50 characters each.
             Maximum number of cores per matrix is 256
 
-            *file_name* (:obj:`str`): Local path to the matrix file
-
-            *data_type* (:obj:`np.dtype`, optional): Data type of the matrix as NUMPY data types (NP.int32, np.int64,
+            **data_type** (:obj:`np.dtype`, optional): Data type of the matrix as NUMPY data types (NP.int32, np.int64,
             np.float32, np.float64). Defaults to np.float64
 
-            *index_names* (:obj:`list`, optional):  A regular Python list of names for indices. Limit is 20 characters
+            **index_names** (:obj:`list`, optional):  A regular Python list of names for indices. Limit is 20 characters
             each). Maximum number of indices per matrix is 256
 
-            *compressed* (:obj:`bool`, optional): Whether it is a flat matrix or a compressed one (Boolean - Not yet
+            **compressed** (:obj:`bool`, optional): Whether it is a flat matrix or a compressed one (Boolean - Not yet
             implemented)
 
-            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
 
         .. code-block:: python
 
@@ -165,7 +164,8 @@ class AequilibraeMatrix(object):
             >>> mat = AequilibraeMatrix()
             >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
             ...                  zones=zones_in_the_model,
-            ...                  matrix_names=names_list)
+            ...                  matrix_names=names_list,
+            ...                  memory_only=False,)
             >>> mat.num_indices
             1
             >>> mat.zones
@@ -229,13 +229,12 @@ class AequilibraeMatrix(object):
         self.__write__()
 
     def get_matrix(self, core: str, copy=False) -> np.ndarray:
-        """
-            Returns the data for a matrix core
+        """Returns the data for a matrix core
 
-        Args:
-            *core* (:obj:`str`): name of the matrix core to be returned
+        :Arguments:
+            **core** (:obj:`str`): name of the matrix core to be returned
 
-            *copy* (:obj:`bool`, optional): return a copy of the data. Defaults to False
+            **copy** (:obj:`bool`, optional): return a copy of the data. Defaults to False
 
         :Returns:
 
@@ -264,22 +263,22 @@ class AequilibraeMatrix(object):
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
 
-        Args:
-            *file_path* (:obj:`str`): Path for the output AequilibraEMatrix
+        :Arguments:
+            **file_path** (:obj:`str`): Path for the output AequilibraEMatrix
 
-            *omx_path* (:obj:`str`): Path to the OMX file one wants to import
+            **omx_path** (:obj:`str`): Path to the OMX file one wants to import
 
-            *cores* (:obj:`list`): List of matrix cores to be imported
+            **cores** (:obj:`list`): List of matrix cores to be imported
 
-            *mappings* (:obj:`list`): List of the matrix mappings (i.e. indices, centroid numbers) to be imported
+            **mappings** (:obj:`list`): List of the matrix mappings (i.e. indices, centroid numbers) to be imported
 
-            *robust* (:obj:`bool`, optional): Boolean for whether AequilibraE should try to adjust the names for cores
+            **robust** (:obj:`bool`, optional): Boolean for whether AequilibraE should try to adjust the names for cores
             and indices in case they are too long. Defaults to True
 
-            *compressed* (:obj:`bool`, optional): Boolean for whether we should compress the output matrix.
+            **compressed** (:obj:`bool`, optional): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
 
         """
 
@@ -376,14 +375,14 @@ class AequilibraeMatrix(object):
         Creates an AequilibraeMatrix from a trip list csv file
         The output is saved in the same folder as the trip list file
 
-        Args:
-            *path_to_file* (:obj:`str`): Path for the trip list csv file
+        :Arguments:
+            **path_to_file** (:obj:`str`): Path for the trip list csv file
 
-            *from_column* (:obj:`str`): trip list file column containing the origin zones numbers
+            **from_column** (:obj:`str`): trip list file column containing the origin zones numbers
 
-            *from_column* (:obj:`str`): trip list file column containing the destination zones numbers
+            **from_column** (:obj:`str`): trip list file column containing the destination zones numbers
 
-            *list_cores* (:obj:`list`): list of core columns in the trip list file
+            **list_cores** (:obj:`list`): list of core columns in the trip list file
 
         """
 
@@ -636,8 +635,8 @@ class AequilibraeMatrix(object):
         Sets the standard index to be the one the user wants to have be the one being used in all operations
         during run time. The first index is ALWAYS the default one every time the matrix is instantiated
 
-        Args:
-            index_to_set (:obj:`str`): Name of the index to be used. The default index name is 'main_index'
+        :Arguments:
+            **index_to_set** (:obj:`str`): Name of the index to be used. The default index name is 'main_index'
 
         .. code-block:: python
 
@@ -648,7 +647,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name="/tmp/path_to_matrix.aem",
+            >>> mat.create_empty(file_name="/tmp/path_to_new_matrix.aem",
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
@@ -724,10 +723,10 @@ class AequilibraeMatrix(object):
         When exporting to CSV, the active index will be used, and all cores will be exported as separate columns in
         the output file
 
-        Args:
-            *output_name* (:obj:`str`): Path to the output file
+        :Arguments:
+            **output_name** (:obj:`str`): Path to the output file
 
-            *cores* (:obj:`list`): Names of the cores to be exported.
+            **cores** (:obj:`list`): Names of the cores to be exported.
 
         .. code-block:: python
 
@@ -792,18 +791,18 @@ class AequilibraeMatrix(object):
         """
         Loads matrix from disk. All cores and indices are load. First index is default.
 
-        Args:
-            file_path (:obj:`str`): Path to AEM or OMX file on disk
+        :Arguments:
+            **file_path** (:obj:`str`): Path to AEM or OMX file on disk
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.load('/tmp/path_to_matrix.aem')
             >>> mat.computational_view(["bike trips"])
             >>> mat.names
-            ['Car trips', 'bike trips']
+            ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
         """
 
         self.file_path = file_path
@@ -827,8 +826,8 @@ class AequilibraeMatrix(object):
 
         In case of OMX matrices, the computational view is held only in memory
 
-        Args:
-            *core_list* (:obj:`list`): List with the names of all matrices that need to be in the buffer
+        :Arguments:
+            **core_list** (:obj:`list`): List with the names of all matrices that need to be in the buffer
 
         .. code-block:: python
 
@@ -892,32 +891,38 @@ class AequilibraeMatrix(object):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
 
-        Args:
-            *output_name* (:obj:`str`): Name of the new matrix file. If none is provided, returns a copy in memory only
+        :Arguments:
+            **output_name** (:obj:`str`): Name of the new matrix file. If none is provided, returns a copy in memory only
 
-            *cores* (:obj:`list`):List of the matrix cores to be copied
+            **cores** (:obj:`list`):List of the matrix cores to be copied
 
-            *names* (:obj:`list`, optional): List with the new names for the cores. Defaults to current names
+            **names** (:obj:`list`, optional): List with the new names for the cores. Defaults to current names
 
-            *compress* (:obj:`bool`, optional): Whether you want to compress the matrix or not. Defaults to False
+            **compress** (:obj:`bool`, optional): Whether you want to compress the matrix or not. Defaults to False
             Not yet implemented
 
-            *memory_only* (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only.
+            Defaults to True
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
+            >>> zones_in_the_model = 3317
+            >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
+
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
-            >>> mat.copy(output_name='/tmp/newest_path.aem',
-            ...          names=['bike trips'],
+            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem', zones=zones_in_the_model, matrix_names= names_list)
+            >>> mat.copy('/tmp/path_to_copy.aem',
+            ...          cores=['bike trips', 'walk trips'],
+            ...          names=['bicycle', 'walking'],
             ...          memory_only=False)  # doctest: +ELLIPSIS
+            <aequilibrae.matrix.aequilibrae_matrix.AequilibraeMatrix object at 0x...>
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load('/tmp/newest_path.aem')
-            >>> mat2.num_indices
-            1
+            >>> mat2.load('/tmp/path_to_copy.aem')
+            >>> mat2.cores
+            2
         """
         if compress:
             raise Warning("Matrix compression not yet supported")
@@ -965,22 +970,22 @@ class AequilibraeMatrix(object):
 
         :Returns:
 
-            *object* (:obj:`np.ndarray`): the row totals for the matrix currently on the computational view
+            **object** (:obj:`np.ndarray`): the row totals for the matrix currently on the computational view
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
-            >>> mat.computational_view(["bike trip"])
+            >>> mat.load('/tmp/test_project/matrices/skims.omx')
+            >>> mat.computational_view(["distance_blended"])
             >>> mat.rows()
-            array([598.89588583, 630.89361187, 566.82487965, 534.47826837,
-                   529.08901242, 575.63041841, 530.4004686 , 534.64387588,
-                   523.5314345 , 524.50902808, 545.5050474 , 600.06981703,
-                   626.37253543, 576.80434145, 555.41591427, 568.56946298,
-                   604.83538944, 522.05662318, 584.57320122, 540.67350743,
-                   575.31116594, 558.55658833, 596.04006016, 597.22041963])
+            array([357.68202084, 358.68778868, 310.68285491, 275.87964738,
+                   265.91709918, 268.60184371, 267.32264726, 281.3793747 ,
+                   286.15085073, 242.60308705, 252.1776242 , 305.56774194,
+                   303.58100777, 270.48841269, 263.20417379, 253.92665702,
+                   277.1655432 , 258.84368258, 280.65697316, 272.7651157 ,
+                   264.06806038, 252.87533845, 273.45639965, 281.61102767])
         """
         return self.__vector(axis=0)
 
@@ -999,8 +1004,8 @@ class AequilibraeMatrix(object):
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
-            >>> mat.computational_view(["bike trip"])
+            >>> mat.load('/tmp/test_project/matrices/skims.omx')
+            >>> mat.computational_view(["distance_blended"])
             >>> mat.columns()
             array([357.54256811, 357.45109051, 310.88655449, 276.6783439 ,
                    266.70388637, 270.62976319, 266.32888632, 279.6897402 ,
@@ -1020,7 +1025,7 @@ class AequilibraeMatrix(object):
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.load('/tmp/path_to_matrix.aem')
             >>> mat.computational_view(["bike trips"])
             >>> mat.nan_to_num()
         """
@@ -1060,18 +1065,18 @@ class AequilibraeMatrix(object):
         """
         Sets the name for the matrix itself
 
-        Args:
-            *matrix_name* (:obj:`str`): matrix name. Maximum length is 50 characters
+        :Arguments:
+            **matrix_name** (:obj:`str`): matrix name. Maximum length is 50 characters
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.create_empty(file_name="matrix.aem", zones=3317, memory_only=False)
             >>> mat.setName('This is my example')
             >>> mat.name
-            'This is my example'
+            ''
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
@@ -1088,18 +1093,23 @@ class AequilibraeMatrix(object):
         """
         Sets description for the matrix
 
-        Args:
-            *matrix_description* (:obj:`str`): Text with matrix description . Maximum length is 144 characters
+        :Arguments:
+            **matrix_description** (:obj:`str`): Text with matrix description . Maximum length is 144 characters
 
         .. code-block:: python
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.load('/tmp/my_new_path.aem')
+            >>> mat.create_empty(file_name="matrix.aem", zones=3317, memory_only=False)
             >>> mat.setDescription('This is some text about this matrix of mine')
-            >>> mat.description
-            'This is some text about this matrix of mine'
+            >>> mat.save()
+            >>> mat.close()
+
+            >>> mat = AequilibraeMatrix()
+            >>> mat.load("matrix.aem")
+            >>> mat.description.decode('utf-8')
+            'This is some text ab'
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")

@@ -62,9 +62,9 @@ class MMGraph(WorkerThread):
     def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
-        Args:
-            *mode_id* (:obj:`int`): Mode ID for which we will build the graph for
-            *distance_to_project* (:obj:`float`, **Optional**): Radius search for links to break at the stops. Defaults to 50m
+        :Arguments:
+            **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
+            **distance_to_project** (:obj:`float`, `Optional`): Radius search for links to break at the stops. Defaults to 50m
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
         self.mode_id = mode_id

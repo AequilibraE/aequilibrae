@@ -58,25 +58,25 @@ class GravityCalibration:
         """
         Instantiates the Gravity calibration problem
 
-        Args:
-            matrix (:obj:`AequilibraeMatrix`): Seed/base trip matrix
+        :Arguments:
+            **matrix** (:obj:`AequilibraeMatrix`): Seed/base trip matrix
 
-            impedance (:obj:`AequilibraeMatrix`): Impedance matrix to be used
+            **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
 
-            function (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
+            **function** (:obj:`str`): Function name to be calibrated. "EXPO" or "POWER"
 
-            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+            **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
 
-            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
-            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
 
-        Results:
-            model (:obj:`SyntheticGravityModel`): Calibrated model
+        :Results:
+            **model** (:obj:`SyntheticGravityModel`): Calibrated model
 
-            report (:obj:`list`): Iteration and convergence report
+            **report** (:obj:`list`): Iteration and convergence report
 
-            error (:obj:`str`): Error description
+            **error** (:obj:`str`): Error description
 
         """
 

@@ -7,7 +7,7 @@ class PathStorage:
     preserves the entire shortest path tree when computing a path between two nodes and can re-trace the
     same tree for a path from the same origin to a different destination.
 
-    Since this caching in memory can take too much memory, the **threshold** parameter exists to limit the number
+    Since this caching in memory can take too much memory, the *threshold* parameter exists to limit the number
     of path objects kept in memory.
 
     If you have a large amount of memory in your system, you can set the threshold class variable accordingly.

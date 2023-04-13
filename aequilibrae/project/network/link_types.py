@@ -6,7 +6,7 @@ from aequilibrae.project.table_loader import TableLoader
 
 class LinkTypes:
     """
-    Access to the API resources to manipulate the link_types table in the network
+    Access to the API resources to manipulate the link_types table in the network.
 
     .. code-block:: python
 
@@ -19,7 +19,7 @@ class LinkTypes:
         # We can get a dictionary of link types in the model
         >>> all_link_types = link_types.all_types()
 
-        #And do a bulk change and save it
+        # And do a bulk change and save it
         >>> for link_type_id, link_type_obj in all_link_types.items():
         ...     link_type_obj.beta = 1
 
@@ -87,7 +87,7 @@ class LinkTypes:
         return lt
 
     def delete(self, link_type_id: str) -> None:
-        """Removes the link_type with **link_type_id** from the project"""
+        """Removes the link_type with *link_type_id* from the project"""
         try:
             lt = self.__items[link_type_id]  # type: LinkType
             lt.delete()
@@ -99,13 +99,13 @@ class LinkTypes:
         self.logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
 
     def get(self, link_type_id: str) -> LinkType:
-        """Get a link_type from the network by its **link_type_id**"""
+        """Get a link_type from the network by its *link_type_id*"""
         if link_type_id not in self.__items:
             raise ValueError(f"Link type {link_type_id} does not exist in the model")
         return self.__items[link_type_id]
 
     def get_by_name(self, link_type: str) -> LinkType:
-        """Get a link_type from the network by its **link_type** (i.e. name)"""
+        """Get a link_type from the network by its *link_type* (i.e. name)"""
         for lt in self.__items.values():
             if lt.link_type.lower() == link_type.lower():
                 return lt

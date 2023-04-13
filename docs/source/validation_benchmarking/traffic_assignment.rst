@@ -11,16 +11,14 @@ making it overly complex to use, develop and maintain (we know how subjective
 
 .. note::
    AequilibraE has had efficient multi-threaded All-or-Nothing (AoN) assignment
-   for a while, but since the Method-of-Successive-Averages, Frank-Wolfe,
-   Conjugate-Frank-Wolfe and Biconjugate-Frank-Wolfe are new in the software, it
+   for a while, but since the Method of Successive Averages, Frank-Wolfe,
+   Conjugate-Frank-Wolfe, and Biconjugate-Frank-Wolfe are new in the software, it
    should take some time for these implementations to reach full maturity.
 
 Performing traffic assignment
 -----------------------------
 
-For a comprehensive use case for the traffic assignment module, please see the
-:ref:`comprehensive_traffic_assignment_case` section of the use cases page.
-
+For a comprehensive use case for the traffic assignment module, please see the application in :ref:`this example <example_usage_forecasting>`.
 
 Traffic Assignment Class
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -60,7 +58,7 @@ as we have implemented it. These requirements are loosely listed in
 :ref:`technical_requirements_multi_class` .
 
 If you want to see the assignment log on your terminal during the assignment,
-please look in the :ref:`example_logging` section of the use cases.
+please look in the :ref:`logging to terminal <logging_to_terminal>` example.
 
 To begin building the assignment it is easy:
 
@@ -73,23 +71,25 @@ To begin building the assignment it is easy:
 Volume Delay Function
 +++++++++++++++++++++
 
-For now, the only VDF functions available in AequilibraE are the BPR,
+For now, the only VDF functions available in AequilibraE are the 
 
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)`
+* BPR [8]_ which double beta when traffic flow is over the link capacity,
 
-BPR2 which double beta when traffic flow is over the link capacity,
+.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
 
-Spiess' conical,
+* Spiess' conical [7]_
 
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)`
+.. math:: CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)
 
-and French INRETS (alpha < 1)
+* and French INRETS (alpha < 1)
 
 Before capacity
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- (\alpha *\frac{Volume_{i}}{Capacity_{i}})}{1.1-\frac{Volume_{i}}{Capacity_{i}}}`
 
+.. math:: CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- (\alpha *\frac{Volume_{i}}{Capacity_{i}})}{1.1-\frac{Volume_{i}}{Capacity_{i}}}
+  
 and after capacity
-:math:`CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- \alpha}{0.1} * (\frac{Volume_{i}}{Capacity_{i}})^2`
+
+.. math:: CongestedTime_{i} = FreeFlowTime_{i} * \frac{1.1- \alpha}{0.1} * (\frac{Volume_{i}}{Capacity_{i}})^2
 
 More functions will be added as needed/requested/possible.
 
@@ -111,7 +111,7 @@ Traffic class
 ~~~~~~~~~~~~~
 
 The Traffic class object holds all the information pertaining to a specific
-traffic class to be assigned.  There are three pieces of information that are
+traffic class to be assigned. There are three pieces of information that are
 required in the composition of this class:
 
 * **graph** - It is the Graph object corresponding to that particular traffic class/
@@ -119,11 +119,11 @@ required in the composition of this class:
 
 * **matrix** - It is the AequilibraE matrix with the demand for that traffic class,
   but which can have an arbitrary number of user-classes, setup as different
-  layers of the matrix object (see the :ref:`multiple_user_classes`
+  layers of the matrix object
 
 * **pce** - The passenger-car equivalent is the standard way of modeling
-  multi-class traffic assignment equilibrium in a consistent manner (see [4] for
-  the technical detail), and it is set to 1 by default.  If the **pce** for a
+  multi-class traffic assignment equilibrium in a consistent manner (see [4]_ for
+  the technical detail), and it is set to 1 by default. If the **pce** for a
   certain class should be different than one, one can make a quick method call.
 
 Example:
@@ -144,7 +144,7 @@ a method call:
   assig.set_classes([tc, tc2])
 
 
-setting VDF Parameters
+Setting VDF Parameters
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Parameters for VDF functions can be passed as a fixed value to use for all
@@ -202,7 +202,7 @@ Finally, one can execute assignment:
 Multi-class Equilibrium assignment
 ----------------------------------
 
-By introducing equilibrium assignment [1] with as many algorithms as we have, it
+By introducing equilibrium assignment [1]_ with as many algorithms as we have, it
 makes sense to also introduce multi-class assignment, adding to the pre-existing
 capability of assigning multiple user-classes at once.  However, multi-class
 equilibrium assignments have strict technical requirements and different
@@ -210,8 +210,8 @@ equilibrium algorithms have slightly different resource requirements.
 
 .. note::
    Our implementations of the conjudate and Biconjugate-Frank-Wolfe methods
-   should be inherently proportional [6], but we have not yet carried the
-   appropriate testing that would be required for an empirical proof
+   should be inherently proportional [6]_, but we have not yet carried the
+   appropriate testing that would be required for an empirical proof.
 
 Cost function
 ~~~~~~~~~~~~~
@@ -226,7 +226,7 @@ Technical requirements
 
 This documentation is not intended to discuss in detail the mathematical
 requirements of multi-class traffic assignment, which can be found discussed in
-detail on `Zill et all. <https://journals.sagepub.com/doi/10.1177/0361198119837496>`_
+detail on [4]_.
 
 A few requirements, however, need to be made clear.
 
@@ -247,15 +247,15 @@ Convergence criteria
 ~~~~~~~~~~~~~~~~~~~~
 
 Convergence in AequilibraE is measured solely in terms of relative gap, which is
-a somewhat old recommendation [5], but it is still the most used measure in
+a somewhat old recommendation [5]_, but it is still the most used measure in
 practice, and is detailed below.
 
-:math:`RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}`
+.. math:: RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}
 
 The algorithm's two stop criteria currently used are the maximum number of
 iterations and the target Relative Gap, as specified above. These two parameters
-are collected directly from the :ref:`parameters_file`, described in detail in
-the :ref:`parameters_assignment` section.
+are described in detail in the :ref:`parameters_assignment` section, in the
+:ref:`parameters_file`.
 
 In order to override the parameter file values, one can set the assignment
 object member variables directly before execution.
@@ -289,7 +289,7 @@ Method of Successive Averages
 +++++++++++++++++++++++++++++
 
 This algorithm has been included largely for hystorical reasons, and we see very
-little reason to use it.  Yet, it has been implemented with the appropriate
+little reason to use it. Yet, it has been implemented with the appropriate
 computation of relative gap computation and supports all the analysis features
 available.
 
@@ -299,13 +299,13 @@ Frank-Wolfe (FW)
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
 engine for the line search, and it is a standard implementation of the algorithm
-introduced by LeBlanc in 1975 [2].
+introduced by LeBlanc in 1975 [2]_.
 
 
 Conjugate Frank-Wolfe
 +++++++++++++++++++++
 
-The conjugate direction algorithm was introduced in 2013 [3], which is quite
+The conjugate direction algorithm was introduced in 2013 [3]_, which is quite
 recent if you consider that the Frank-Wolfe algorithm was first applied in the
 early 1970's, and it was introduced at the same as its Biconjugate evolution,
 so it was born outdated.
@@ -350,9 +350,9 @@ could still be paralellized for maximum performance on system with high number
 of cores, such as the latest Threadripper CPUs.  These numpy functions are the
 following:
 
-* np.sum
-* np.power
-* np.fill
+* ``np.sum``
+* ``np.power``
+* ``np.fill``
 
 A few NumPy operations have already been parallelized, and can be seen on a file
 called *parallel_numpy.pyx* if you are curious to look at.
@@ -360,45 +360,6 @@ called *parallel_numpy.pyx* if you are curious to look at.
 Most of the gains of going back to Cython to paralelize these functions came
 from making in-place computation using previously existing arrays, as the
 instantiation of large NumPy arrays can be computationally expensive.
-
-References
-++++++++++
-
-Volume delay functions
-^^^^^^^^^^^^^^^^^^^^^^
-
-[1] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."
-Transportation Science, Vol 24 Issue 2. `Conical <https://doi.org/10.1287/trsc.24.2.153>`_
-
-[2] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2
-`Technical Documentation - Final Report <https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf>`_
-(2020)
-
-Traffic assignment and equilibrium
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-[1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
-Proc. Inst. Civil Eng. 1 Part II, pp.325-378.
-
-[2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) "An efficient
-approach to solving the road network equilibrium traffic assignment problem"
-Transpn Res. 9, 309-318.
-
-[3] Maria Mitradjieva and Per Olov Lindberg (2013) "The Stiff Is Moving—Conjugate
-Direction Frank-Wolfe Methods with Applications to Traffic Assignment",
-`Mitradjieva and Lindberg <https://doi.org/10.1287/trsc.1120.0409>`_
-
-[4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and
-Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research
-Record, Vol 2673, Issue 4 `Zill et. all <https://doi.org/10.1177%2F0361198119837496>`_
-
-[5] Rose, G., Daskin, M., Koppelman, F. (1988) "An examination of convergence
-error in equilibrium traffic assignment models",  Transportation Res. B, Vol 22
-Issue 4, PP 261-274 `Rose, Daskin and Koppelman <https://doi.org/10.1016/0191-2615(88)90003-3>`_
-
-[6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in
-multi-class equilibrium assignment", Transportation Research Part B, Volume 70,
-pg 261-274 `Florian and Morosan <https://doi.org/10.1016/j.trb.2014.06.011>`_
 
 Handling the network
 --------------------
@@ -411,7 +372,7 @@ called a **super-network**.
 Super-network
 ~~~~~~~~~~~~~
 We deal with a super-network by having all classes with the same links in their
-sub-graphs, but assigning b_node identical to a_node for all links whenever a
+sub-graphs, but assigning *b_node* identical to *a_node* for all links whenever a
 link is not available for a certain user class.
 It is slightly less efficient when we are computing shortest paths, but a LOT
 more efficient when we are aggregating flows.
@@ -424,13 +385,12 @@ Numerical Study
 ---------------
 Similar to other complex algorthms that handle a large amount of data through
 complex computations, traffic assignment procedures can always be subject to at
-least one very reasonable question:  Are the results right?
+least one very reasonable question: Are the results right?
 
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
 comparing algorithm results, some of which have are available with highly
-converged solutions (~1e-14):
-`<https://github.com/bstabler/TransportationNetworks/>`_
+converged solutions (~1e-14). Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 Sioux Falls
 ~~~~~~~~~~~~
@@ -442,15 +402,19 @@ Network has:
 * Zones: 24
 
 .. image:: ../images/sioux_falls_msa-500_iter.png
+    :align: center
     :width: 590
     :alt: Sioux Falls MSA 500 iterations
 .. image:: ../images/sioux_falls_frank-wolfe-500_iter.png
+    :align: center
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
 .. image:: ../images/sioux_falls_cfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
 .. image:: ../images/sioux_falls_bfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
 
@@ -464,15 +428,19 @@ Network has:
 * Zones: 38
 
 .. image:: ../images/anaheim_msa-500_iter.png
+    :align: center
     :width: 590
     :alt: Anaheim MSA 500 iterations
 .. image:: ../images/anaheim_frank-wolfe-500_iter.png
+    :align: center
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
 .. image:: ../images/anaheim_cfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
 .. image:: ../images/anaheim_bfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
 
@@ -486,21 +454,25 @@ Network has:
 * Zones: 38
 
 .. image:: ../images/winnipeg_msa-500_iter.png
+    :align: center
     :width: 590
     :alt: Winnipeg MSA 500 iterations
 .. image:: ../images/winnipeg_frank-wolfe-500_iter.png
+    :align: center
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
 .. image:: ../images/winnipeg_cfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
 .. image:: ../images/winnipeg_bfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
 
 The results for Winnipeg do not seem extremely good when compared to a highly,
 but we believe posting its results would suggest deeper investigation by one
-of our users :-),
+of our users :-)
 
 
 Barcelona
@@ -513,15 +485,19 @@ Network has:
 * Zones: 110
 
 .. image:: ../images/barcelona_msa-500_iter.png
+    :align: center
     :width: 590
     :alt: Barcelona MSA 500 iterations
 .. image:: ../images/barcelona_frank-wolfe-500_iter.png
+    :align: center
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
 .. image:: ../images/barcelona_cfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
 .. image:: ../images/barcelona_bfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
 
@@ -535,15 +511,19 @@ Network has:
 * Zones: 1,790
 
 .. image:: ../images/chicago_regional_msa-500_iter.png
+    :align: center
     :width: 590
     :alt: Chicago MSA 500 iterations
 .. image:: ../images/chicago_regional_frank-wolfe-500_iter.png
+    :align: center
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
 .. image:: ../images/chicago_regional_cfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Chicago Conjugate Frank-Wolfe 500 iterations
 .. image:: ../images/chicago_regional_bfw-500_iter.png
+    :align: center
     :width: 590
     :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
 
@@ -555,6 +535,7 @@ how well they converge for the largest instance we have tested (Chicago
 Regional), as that instance has a comparable size to real-world models.
 
 .. image:: ../images/convergence_comparison.png
+    :align: center
     :width: 590
     :alt: Algorithm convergence comparison
 
@@ -590,3 +571,29 @@ Noteworthy items
    network contraction hierarchies to the building of the graph, but that is
    still a long-term goal
 
+.. _traffic-assignment-references:
+
+References
+----------
+
+Traffic assignment and equilibrium
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
+
+.. [2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) "An efficientapproach to solving the road network equilibrium traffic assignment problem". Transportation Research, 9(5):309-318. Available in: https://doi.org/10.1016/0041-1647(75)90030-1
+
+.. [3] Mitradjieva, M. and Lindberg, P.O. (2013) "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment". Transportation Science, 47(2):280-293. Available in: https://doi.org/10.1287/trsc.1120.0409
+
+.. [4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. Available in: https://doi.org/10.1177%2F0361198119837496
+
+.. [5] Rose, G., Daskin, M., Koppelman, F. (1988) "An examination of convergence error in equilibrium traffic assignment models",  Transportation Res. B, 22(4):261-274. Available in: https://doi.org/10.1016/0191-2615(88)90003-3
+
+.. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment", Transportation Research Part B, 70:261-274. Available in: https://doi.org/10.1016/j.trb.2014.06.011
+
+Volume delay functions
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. [7] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158. Available in: https://doi.org/10.1287/trsc.24.2.153
+
+.. [8] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf

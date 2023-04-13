@@ -56,10 +56,10 @@ class FieldEditor:
     def add(self, field_name: str, description: str, data_type="NUMERIC") -> None:
         """Adds new field to the data table
 
-        Args:
-            *field_name* (:obj:`str`): Field to be added to the table. Must be a valid SQLite field name
-            *description* (:obj:`str`): Description of the field to be inserted in the metadata
-            *data_type* (:obj:`str`, optional): Valid SQLite Data type. Default: "NUMERIC"
+        :Arguments:
+            **field_name** (:obj:`str`): Field to be added to the table. Must be a valid SQLite field name
+            **description** (:obj:`str`): Description of the field to be inserted in the metadata
+            **data_type** (:obj:`str`, optional): Valid SQLite Data type. Default: "NUMERIC"
         """
         if field_name.lower() in self._original_values.keys():
             raise ValueError("attribute_name already exists")

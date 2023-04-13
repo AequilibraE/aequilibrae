@@ -16,13 +16,16 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
 
 .. panels::
-   :card: shadow
-   :header: text-center
+   :card: text-center bg-transparent border-light
+   :container: container pb-3
+   :header: text-center border-light
+   :footer: border-light
+   :column: col-lg-6 col-md-6 col-sm-6 col-xs-12 p-2
 
    ---
-   :column: col-lg-12
-   :fa:`workflow`
-   Using AequilibraE
+   :column: col-lg-12 p-2
+   :fa:`folder`
+   **Using AequilibraE**
    ^^^^^^^^^^^^^^^^^
 
    A series of examples on how to use AequilibraE, from building a model from scratch
@@ -38,7 +41,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
    ---
    :fa:`book`
-   Modeling with AequilibraE
+   **Modeling with AequilibraE**
    ^^^^^^^^^^^^^^^^^^^^^^^^^
 
    An in-depth guide to modeling with AequilibraE, including the concepts that guide its
@@ -54,7 +57,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
 
    :fa:`tools`
-   API references
+   **API references**
    ^^^^^^^^^^^^^^
 
    Reference guide to AequilibraE's API.
@@ -69,7 +72,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
 
    :fa:`check`
-   Software Validation & Benchmarking
+   **Software Validation & Benchmarking**
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
    Want to see how we test the software for correctness and performance?
@@ -84,7 +87,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
 
    :fa:`lightbulb`
-   Nitty-Gritty
+   **Nitty-Gritty**
    ^^^^^^^^^^^^
 
    Looking for something more than using the software? Check out the development info.

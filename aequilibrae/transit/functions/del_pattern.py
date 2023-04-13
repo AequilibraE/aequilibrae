@@ -5,8 +5,8 @@ from aequilibrae.utils.db_utils import commit_and_close
 def delete_pattern(pattern_id: int):
     """Deletes all information regarding one specific transit_pattern.
 
-    Args:
-        *pattern_id* (:obj:`str`): pattern_id as present in the database
+    :Arguments:
+        **pattern_id** (:obj:`str`): pattern_id as present in the database
     """
     sqls = [
         """DELETE from trips where trip_id IN

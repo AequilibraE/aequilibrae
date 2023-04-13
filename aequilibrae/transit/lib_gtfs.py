@@ -37,13 +37,13 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def __init__(self, network, agency_identifier, file_path, day="", description="", default_capacities={}):
         """Instantiates a transit class for the network
 
-        Args:
+        :Arguments:
 
-            *local network* (:obj:`Network`): Supply model to which this GTFS will be imported
-            *agency_identifier* (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
-            *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-            *day* (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
-            *description* (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
+            **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+            **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
+            **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+            **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         WorkerThread.__init__(self, None)
 
@@ -86,8 +86,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.
 
-        Args:
-            *capacities* (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
+        :Arguments:
+            **capacities** (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
                                         of 3 items for values for capacities: seated and total
                                         i.e. -> "{0: [150, 300],...}"
         """
@@ -96,8 +96,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
 
-        Args:
-            *max_speeds* (:obj:`pd.DataFrame`): Requires 4 fields: mode, min_distance, max_distance, speed.
+        :Arguments:
+            **max_speeds** (:obj:`pd.DataFrame`): Requires 4 fields: mode, min_distance, max_distance, speed.
             Modes not covered in the data will not be touched and distance brackets not covered will receive
             the maximum speed, with a warning
         """
@@ -107,16 +107,16 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def dates_available(self) -> list:
         """Returns a list of all dates available for this feed.
 
-        Returns:
-            *feed dates* (:obj:`list`): list of all dates available for this feed
+        :Returns:
+            **feed dates** (:obj:`list`): list of all dates available for this feed
         """
         return deepcopy(self.gtfs_data.feed_dates)
 
     def set_allow_map_match(self, allow=True):
         """Changes behavior for finding transit-link shapes. Defaults to True.
 
-        Args:
-              *allow* (:obj:`bool` *optional*): If True, allows uses map-matching in search of precise
+        :Arguments:
+              **allow** (:obj:`bool` *optional*): If True, allows uses map-matching in search of precise
               transit_link shapes. If False, sets transit_link shapes equal to straight lines between
               stops. In the presence of GTFS raw shapes it has no effect.
         """
@@ -130,8 +130,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         For a reference of route types, see https://developers.google.com/transit/gtfs/reference#routestxt
 
-        Args:
-              *route_types* (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
+        :Arguments:
+            **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
         """
         if not isinstance(route_types, list) and not isinstance(route_types, tuple):
             raise TypeError("Route_types must be list or tuple")
@@ -153,16 +153,16 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
 
-        Args:
-            *agency_id* (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
+        :Arguments:
+            **agency_id** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
         """
         self.gtfs_data.agency.agency = agency_id
 
     def set_feed(self, feed_path: str) -> None:
         """Sets GTFS feed source to be used.
 
-        Args:
-            *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+        :Arguments:
+            **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
         """
         self.gtfs_data.set_feed_path(feed_path)
         self.gtfs_data.agency.feed_date = self.gtfs_data.feed_date
@@ -170,8 +170,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def set_description(self, description: str) -> None:
         """Adds description to be added to the imported layers metadata
 
-        Args:
-            *description* (:obj:`str`): Description for this feed (e.g. 'CTA2019 fixed by John Doe after strong coffee')
+        :Arguments:
+            **description** (:obj:`str`): Description for this feed (e.g. 'CTA2019 fixed by John Doe after strong coffee')
         """
         self.description = description
 
@@ -182,8 +182,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def load_date(self, service_date: str) -> None:
         """Loads the transit services available for *service_date*
 
-        Args:
-            *service_date* (:obj:`str`): Service data contained in this field to be imported (e.g. '2019-10-04')
+        :Arguments:
+            **service_date** (:obj:`str`): Service data contained in this field to be imported (e.g. '2019-10-04')
         """
         if self.srid is None:
             raise ValueError("We cannot load data without an SRID")
@@ -440,8 +440,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
     def builds_link_graphs_with_broken_stops(self):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
 
-        Args:
-            *mode_id* (:obj:`int`): Mode ID for which we will build the graph for
+        :Arguments:
+            **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
         """
 
         route_types = list(set([r.route_type for r in self.select_routes.values()]))

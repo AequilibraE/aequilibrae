@@ -78,8 +78,8 @@ class Graph(object):
         """
         Returns the default integer and float types used for computation
 
-        Args:
-            tp (:obj:`str`): data type. 'int' or 'float'
+        :Arguments:
+            **tp** (:obj:`str`): data type. 'int' or 'float'
         """
         if tp == "int":
             return self.__integer_type
@@ -99,8 +99,8 @@ class Graph(object):
         the inference that all links connected to these nodes are centroid
         connectors.
 
-        Args:
-            centroids (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+        :Arguments:
+            **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
         """
         self.__network_error_checking__()
 
@@ -374,8 +374,8 @@ class Graph(object):
         """
         Excludes a list of links from a graph by setting their B node equal to their A node
 
-        Args:
-            links (:obj:`list`): List of link IDs to be excluded from the graph
+        :Arguments:
+            **links** (:obj:`list`): List of link IDs to be excluded from the graph
         """
         filter = self.network.link_id.isin(links)
         # We check is the list makes sense in order to warn the user
@@ -434,8 +434,8 @@ class Graph(object):
         """
         Sets the field to be used for path computation
 
-        Args:
-            cost_field (:obj:`str`): Field name. Must be numeric
+        :Arguments:
+            **cost_field** (:obj:`str`): Field name. Must be numeric
         """
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
@@ -456,8 +456,8 @@ class Graph(object):
         """
         Sets the list of skims to be computed
 
-        Args:
-            skim_fields (:obj:`list`): Fields must be numeric
+        :Arguments:
+            **skim_fields** (:obj:`list`): Fields must be numeric
         """
         if not skim_fields:
             self.skim_fields = []
@@ -495,8 +495,8 @@ class Graph(object):
 
         Default value is True
 
-        Args:
-            block_centroid_flows (:obj:`bool`): Blocking or not
+        :Arguments:
+            **block_centroid_flows** (:obj:`bool`): Blocking or not
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
@@ -510,8 +510,8 @@ class Graph(object):
         """
         Saves graph to disk
 
-        Args:
-            filename (:obj:`str`): Path to file. Usual file extension is *aeg*
+        :Arguments:
+            **filename** (:obj:`str`): Path to file. Usual file extension is *aeg*
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -539,8 +539,8 @@ class Graph(object):
         """
         Loads graph from disk
 
-        Args:
-            filename (:obj:`str`): Path to file
+        :Arguments:
+            **filename** (:obj:`str`): Path to file
         """
         with open(filename, "rb") as f:
             mygraph = pickle.load(f)
@@ -572,7 +572,7 @@ class Graph(object):
         """
         Returns graph fields that are available to be set as skims
 
-        Returns:
+        :Returns:
             *list* (:obj:`str`): Field names
         """
         return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]

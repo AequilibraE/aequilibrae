@@ -1,5 +1,5 @@
 """
-.. editing_network_nodes:
+.. _editing_network_nodes:
 
 Editing network geometry: Nodes
 ===============================

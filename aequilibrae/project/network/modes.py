@@ -18,7 +18,7 @@ class Modes:
         # We can get a dictionary of all modes in the model
         >>> all_modes = modes.all_modes()
 
-        #And do a bulk change and save it
+        # And do a bulk change and save it
         >>> for mode_id, mode_obj in all_modes.items():
         ...     mode_obj.beta = 1
         ...     mode_obj.save()
@@ -72,7 +72,7 @@ class Modes:
         self.__update_list_of_modes()
 
     def delete(self, mode_id: str) -> None:
-        """Removes the mode with **mode_id** from the project"""
+        """Removes the mode with *mode_id* from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
             self.conn.commit()
@@ -88,14 +88,14 @@ class Modes:
         return FieldEditor(self.project, "modes")
 
     def get(self, mode_id: str) -> Mode:
-        """Get a mode from the network by its **mode_id**"""
+        """Get a mode from the network by its *mode_id*"""
         self.__update_list_of_modes()
         if mode_id not in self.__all_modes:
             raise ValueError(f"Mode {mode_id} does not exist in the model")
         return Mode(mode_id, self.project)
 
     def get_by_name(self, mode: str) -> Mode:
-        """Get a mode from the network by its **mode_name**"""
+        """Get a mode from the network by its *mode_name*"""
         self.__update_list_of_modes()
         self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
         found = self.curr.fetchone()

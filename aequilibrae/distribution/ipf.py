@@ -62,27 +62,27 @@ class Ipf:
         """
         Instantiates the Ipf problem
 
-        Args:
-            matrix (:obj:`AequilibraeMatrix`): Seed Matrix
+        :Arguments:
+            **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
 
-            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+            **rows** (:obj:`AequilibraeData`): Vector object with data for row totals
 
-            row_field (:obj:`str`): Field name that contains the data for the row totals
+            **row_field** (:obj:`str`): Field name that contains the data for the row totals
 
-            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+            **columns** (:obj:`AequilibraeData`): Vector object with data for column totals
 
-            column_field (:obj:`str`): Field name that contains the data for the column totals
+            **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
-            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
 
-        Results:
-            output (:obj:`AequilibraeMatrix`): Result Matrix
+        :Results:
+            **output** (:obj:`AequilibraeMatrix`): Result Matrix
 
-            report (:obj:`list`): Iteration and convergence report
+            **report** (:obj:`list`): Iteration and convergence report
 
-            error (:obj:`str`): Error description
+            **error** (:obj:`str`): Error description
         """
         self.cpus = 0
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
@@ -229,10 +229,11 @@ class Ipf:
     def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
         """Saves the matrix output to the project file
 
-        Args:
-            name (:obj:`str`): Name of the desired matrix record
-            file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        :Arguments:
+            **name** (:obj:`str`): Name of the desired matrix record
+            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **project** (:obj:`Project`, Optional): Project we want to save the results to.
+            Defaults to the active project
         """
 
         project = project or get_active_project()

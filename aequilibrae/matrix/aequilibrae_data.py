@@ -36,19 +36,19 @@ class AequilibraeData(object):
         """
         Creates a new empty dataset
 
-        Args:
-            *file_path* (:obj:`str`, Optional): Full path for the output data file. If *memory_false* is 'false' and
+        :Arguments:
+            **file_path** (:obj:`str`, Optional): Full path for the output data file. If *memory_mode* is 'false' and
             path is missing, then the file is created in the temp folder
 
-            *entries* (:obj:`int`, Optional): Number of records in the dataset. Default is 1
+            **entries** (:obj:`int`, Optional): Number of records in the dataset. Default is 1
 
-            *field_names* (:obj:`list`, Optional): List of field names for this dataset. If no list is provided, the
+            **field_names** (:obj:`list`, Optional): List of field names for this dataset. If no list is provided, the
             field 'data' will be created
 
-            *data_types* (:obj:`np.dtype`, Optional): List of data types for the dataset. Types need to be NumPy data
+            **data_types** (:obj:`np.dtype`, Optional): List of data types for the dataset. Types need to be NumPy data
             types (e.g. np.int16, np.float64). If no list of types are provided, type will be *np.float64*
 
-            *memory_mode* (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
+            **memory_mode** (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
             be a memory-mapped numpy array
 
         .. code-block:: python
@@ -143,8 +143,8 @@ class AequilibraeData(object):
         """
         Loads dataset from file
 
-        Args:
-            *file_path* (:obj:`str`): Full file path to the AequilibraeData to be loaded
+        :Arguments:
+            **file_path** (:obj:`str`): Full file path to the AequilibraeData to be loaded
 
         .. code-block:: python
 
@@ -169,10 +169,10 @@ class AequilibraeData(object):
         """
         Exports the dataset to another format. Supports CSV and SQLite
 
-        Args:
-            *file_name* (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
+        :Arguments:
+            **file_name** (:obj:`str`): File name with PATH and extension (csv, or sqlite3, sqlite or db)
 
-            *table_name* (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
+            **table_name** (:obj:`str`): It only applies if you are saving to an SQLite table. Otherwise ignored
 
         .. code-block:: python
 

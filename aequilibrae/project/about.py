@@ -59,8 +59,8 @@ class About:
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
 
-        Args:
-            *info_field* (:obj:`str`): Name of the desired information field to be added.  Has to be a valid
+        :Arguments:
+            **info_field** (:obj:`str`): Name of the desired information field to be added. Has to be a valid
             Python VARIABLE name (i.e. letter as first character, no spaces and no special characters)
 
         .. code-block:: python
