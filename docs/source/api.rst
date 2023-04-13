@@ -1,20 +1,19 @@
-===========
+.. _api_reference:
+
+=============
 API Reference
-===========
+=============
 
 .. automodule:: aequilibrae
 
 Project
 -------
-.. current_module:: aequilibrae
+.. current_module:: aequilibrae.project
 .. autosummary::
    :nosignatures:
    :toctree: generated/
 
    Project
-   Project.load
-   Project.new
-   Project.open
 
 Project Components
 ~~~~~~~~~~~~~~~~~~
@@ -54,7 +53,6 @@ Network Data
 Network Items
 -------------
 .. currentmodule:: aequilibrae.project.network
-
 .. autosummary::
    :nosignatures:
    :toctree: generated/
@@ -67,40 +65,26 @@ Network Items
 Parameters
 ----------
 .. currentmodule:: aequilibrae
-
 .. autosummary::
    :nosignatures:
    :toctree: generated/
 
     Parameters
-    Parameters.restore_default
-    Parameters.write_back
 
 Distribution
 ------------
-
-.. currentmodule:: aequilibrae
-
+.. currentmodule:: aequilibrae.distribution
 .. autosummary::
-   :nosignatures:
    :toctree: generated/
 
     Ipf
-    Ipf.fit
-    Ipf.save_to_project
     GravityApplication
-    GravityApplication.apply
-    GravityApplication.save_to_project
     GravityCalibration
-    GravityCalibration.calibrate
     SyntheticGravityModel
-    SyntheticGravityModel.load
-    SyntheticGravityModel.save
 
 Matrix
 ------
 .. currentmodule:: aequilibrae.matrix
-
 .. autosummary::
    :nosignatures:
    :toctree: generated/
@@ -133,9 +117,7 @@ Matrix
 
 Paths
 -----
-
 .. currentmodule:: aequilibrae.paths
-
 .. autosummary::
    :nosignatures:
    :toctree: generated/
@@ -143,8 +125,6 @@ Paths
     Graph
     AssignmentResults
     SkimResults
-    SkimResults.prepare
-    SkimResults.set_cores
     PathResults
     VDF
     TrafficClass
@@ -152,12 +132,11 @@ Paths
 
 Transit
 -------
-
 .. currentmodule:: aequilibrae.transit
-
 .. autosummary::
    :nosignatures:
    :toctree: generated/
 
-    GTFS
-    create_gtfsdb
+    Transit
+    Transit.new_gtfs_builder
+    Transit.create_transit_database
