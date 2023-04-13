@@ -567,13 +567,13 @@ class TrafficAssignment(object):
             tc_turns = TurnVolumesResults.from_traffic_class(
                 tc,
                 self.procedure_id,
-                project=None,  # will get the active project
+                project=self.project,  # will get the active project
                 iteration=iteration,
                 blend_iterations=blend_iterations,
             )
             ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 
-        return pd.concat(ta_turn_vol_list)
+        return pd.concat(ta_turn_vol_list).reset_index(drop=True)
 
     def report(self) -> pd.DataFrame:
         """Returns the assignment convergence report

@@ -51,7 +51,7 @@ class TurnVolumesResults:
         self.mode_id = mode_id
         self.matrix = matrix
         self.matrix_mapping = matrix.matrix_hash
-        self.project_dir = project.project_base_path
+        self.project_dir = Path(project.project_base_path)
         self.procedure_id = procedure_id
         self.procedure_dir = self.project_dir / "path_files" / procedure_id
         self.iteration = self.get_iteration(iteration)
@@ -120,12 +120,16 @@ class TurnVolumesResults:
             convergence_report["beta0"] = 1
             convergence_report[["beta1", "beta2"]] = 0
 
-        betas_df = (
-            convergence_report[["iteration", "beta0", "beta1", "beta2"]]
-            .replace(-1, None)
-            .ffill()
-            .set_index("iteration")
-        )
+        if "alpha" not in convergence_report.columns:
+            convergence_report["alpha"] = 1
+
+        betas_df = convergence_report[["iteration", "alpha", "beta0", "beta1", "beta2"]].copy()
+
+        for beta_field in ["beta0", "beta1", "beta2"]:
+            betas_df.loc[betas_df[beta_field] == -1, beta_field] = np.nan
+
+        betas_df = betas_df.ffill().set_index("iteration").copy()
+
         return betas_df
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
@@ -323,11 +327,6 @@ class TurnVolumesResults:
         # cannot be done with pandas rolling, as it doesn't take in account updated values within the window.
         aon_volume = df.set_index("iteration")["demand"].sort_index()
         iterations = df["iteration"].max()
-
-        if "beta0" not in ta_report.columns:
-            # if betas are not in the report, create dummy betas, where beta0 is 1
-            ta_report["beta0"] = 1
-            ta_report[["beta1", "beta2"]] = 0
 
         # initialise blended volumes with first iteration equal to AoN volume.
         blended_volumes = pd.Series(data=0, index=aon_volume.index)
