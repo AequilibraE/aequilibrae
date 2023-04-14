@@ -11,6 +11,7 @@ include 'conical.pyx'
 include 'inrets.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
+include 'graph_building.pyx'
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
