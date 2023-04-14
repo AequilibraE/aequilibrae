@@ -90,9 +90,21 @@ cdef long long _build_compressed_graph(long long[:] link_idx,
     return slink
 
 
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef void _back_fill(long long[:] links_index, long long max_node):
+    cdef Py_ssize_t i
+
+    for i in range(max_node + 1, 0, -1):
+        links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
+
+
 def build_compressed_graph(graph):
     # Build link index
-    link_idx = np.empty(graph.network.link_id.max() + 1).astype(int)
+    link_id_max = graph.network.link_id.max()
+
+    link_idx = np.empty(link_id_max + 1).astype(int)
     link_idx[graph.network.link_id] = np.arange(graph.network.shape[0])
 
     nodes = np.hstack([graph.network.a_node.values, graph.network.b_node.values])
@@ -103,16 +115,17 @@ def build_compressed_graph(graph):
     idx = np.argsort(nodes)
     all_nodes = nodes[idx]
     all_links = links[idx]
-    links_index = np.empty(all_nodes.max() + 2, np.int64)
+    all_nodes_max = all_nodes.max()
+
+    links_index = np.empty(all_nodes_max + 2, np.int64)
     links_index.fill(-1)
-    nlist = np.arange(all_nodes.max() + 2)
+    nlist = np.arange(all_nodes_max + 2)
 
     y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
     links_index[y] = x[:]
     links_index[-1] = all_links.shape[0]
 
-    for i in range(all_nodes.max() + 1, 0, -1):
-        links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
+    _back_fill(links_index[:], all_nodes_max)
 
     # We keep all centroids for sure
     counts[graph.centroids] = 999
@@ -121,12 +134,12 @@ def build_compressed_graph(graph):
     link_edge = truth[graph.network.a_node.values] + truth[graph.network.b_node.values]
     link_edge = graph.network.link_id.values[link_edge == 1]
 
-    simplified_links = np.repeat(-1, graph.network.link_id.max() + 1)
-    simplified_directions = np.zeros(graph.network.link_id.max() + 1, int)
+    simplified_links = np.repeat(-1, link_id_max + 1)
+    simplified_directions = np.zeros(link_id_max + 1, int)
 
-    compressed_dir = np.zeros(graph.network.link_id.max() + 1, int)
-    compressed_a_node = np.zeros(graph.network.link_id.max() + 1, int)
-    compressed_b_node = np.zeros(graph.network.link_id.max() + 1, int)
+    compressed_dir = np.zeros(link_id_max + 1, int)
+    compressed_a_node = np.zeros(link_id_max + 1, int)
+    compressed_b_node = np.zeros(link_id_max + 1, int)
 
     slink = _build_compressed_graph(
         link_idx[:],
@@ -135,7 +148,7 @@ def build_compressed_graph(graph):
         graph.network.a_node.values[:],
         graph.network.b_node.values[:],
         graph.network.direction.values[:],
-        graph.network.link_id.max(),
+        link_id_max,
         simplified_links[:],
         simplified_directions[:],
         counts[:],
@@ -159,7 +172,7 @@ def build_compressed_graph(graph):
             "link_id": np.arange(slink),
         }
     )
-    max_link_id = graph.network.link_id.max() * 10
+    max_link_id = link_id_max * 10
     comp_lnk.loc[:, "link_id"] += max_link_id
 
     df = pd.concat([df, comp_lnk])
