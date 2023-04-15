@@ -1,0 +1,11 @@
+transit_agencies
+transit_fare_attributes
+transit_routes
+transit_fare_rules
+transit_pattern_links
+transit_pattern_mapping
+transit_stops
+transit_stop_connectors
+transit_trips
+transit_trips_schedule
+transit_zones

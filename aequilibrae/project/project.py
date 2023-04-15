@@ -17,6 +17,7 @@ from aequilibrae.reference_files import spatialite_database
 from aequilibrae.log import get_log_handler
 from .project_cleaning import clean
 from .project_creation import initialize_tables
+from ..transit import Transit
 
 
 class Project:
@@ -41,6 +42,7 @@ class Project:
         self.network: Network = None
         self.about: About = None
         self.logger: logging.Logger = None
+        self.transit: Transit = None
 
     def open(self, project_path: str) -> None:
         """
@@ -54,7 +56,6 @@ class Project:
         file_name = os.path.join(project_path, "project_database.sqlite")
         if not os.path.isfile(file_name):
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
@@ -87,7 +88,7 @@ class Project:
         self.__setup_logger()
         self.activate()
 
-        self.__create_empty_project()
+        self.__create_empty_network()
         self.__load_objects()
         self.about.create()
         global_logger.info(f"Created project on {self.project_base_path}")
@@ -128,7 +129,7 @@ class Project:
         self.open(project_path)
 
     def connect(self):
-        return database_connection(self.project_base_path)
+        return database_connection("network", self.project_base_path)
 
     def activate(self):
         activate_project(self)
@@ -168,7 +169,7 @@ class Project:
     def zoning(self):
         return Zoning(self.network)
 
-    def __create_empty_project(self):
+    def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
 
         self.conn = self.connect()
@@ -182,7 +183,7 @@ class Project:
         cursor = self.conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
-        initialize_tables(self)
+        initialize_tables(self, "network")
 
     def __setup_logger(self):
         self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")

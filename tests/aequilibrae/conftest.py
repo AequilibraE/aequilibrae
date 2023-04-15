@@ -2,12 +2,16 @@
 # Fixtures defined in a conftest.py can be used by any test in that package without
 # needing to import them (pytest will automatically discover them).
 
+import os
 import uuid
 from shutil import copytree
 
 import pytest
 
 from aequilibrae import Project
+from aequilibrae.project.database_connection import database_connection
+from aequilibrae.transit import Transit
+from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 
 from ..data import siouxfalls_project
@@ -71,3 +75,26 @@ def _empty_project(tmp_path_factory):
 @pytest.fixture
 def project(create_empty_project):
     return create_empty_project()
+
+
+@pytest.fixture
+def create_path(tmp_path):
+    return tmp_path / uuid.uuid4().hex
+
+
+@pytest.fixture
+def create_gtfs_project(create_path):
+    prj = create_example(create_path, "coquimbo")
+
+    if os.path.isfile(os.path.join(create_path, "public_transport.sqlite")):
+        os.remove(os.path.join(create_path, "public_transport.sqlite"))
+
+    data = Transit(prj)
+
+    yield data
+    prj.close()
+
+
+@pytest.fixture
+def transit_conn(create_gtfs_project):
+    return database_connection("transit")
