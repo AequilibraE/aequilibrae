@@ -74,13 +74,13 @@ class TurnVolumesResults:
     def calculate_from_result_table(
         project: Project,
         turns_df: pd.DataFrame,
-        table_name: str,
+        asgn_result_table_name: str,
         class_to_matrix: dict[str, AequilibraeMatrix],
         user_classes: Optional[list[str]] = None,
         blend_iterations: bool = True,
     ):
         conn = sqlite3.connect(path.join(project.project_base_path, "project_database.sqlite"))
-        df = pd.read_sql_query(f"select * from results where table_name='{table_name}'", conn)
+        df = pd.read_sql_query(f"select * from results where table_name='{asgn_result_table_name}'", conn)
         conn.close()
 
         procedure_id = df.at[0, "procedure_id"]
@@ -118,7 +118,7 @@ class TurnVolumesResults:
             )
             ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 
-        return pd.concat(ta_turn_vol_list).reset_index()
+        return pd.concat(ta_turn_vol_list).reset_index(drop=True)
 
     @staticmethod
     def get_betas_df(convergence_report: pd.DataFrame) -> pd.DataFrame:

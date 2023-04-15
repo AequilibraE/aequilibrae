@@ -521,8 +521,8 @@ class TrafficAssignment(object):
         classes: Optional[list[str]] = None,
         iteration: Optional[int] = None,
         blend_iterations: bool = True,
-    ) -> None:
-        """Saves the assignment results to results_database.sqlite
+    ) -> pd.DataFrame:
+        """Saves the turning movements to results_database.sqlite
 
         Method fails if table exists
 
@@ -548,6 +548,7 @@ class TrafficAssignment(object):
         )
         conn.commit()
         conn.close()
+        return df
 
     def turning_volumes(
         self,

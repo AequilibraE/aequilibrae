@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import uuid
 import zipfile
 from os.path import dirname
@@ -107,7 +108,10 @@ class TestTurnVolumes(TestCase):
 
         class_to_matrix = {"car": self.matrix_1, "truck": self.matrix_2}
         turning_movements = TurnVolumesResults.calculate_from_result_table(
-            project=self.project, turns_df=TURNS_DF, table_name="test_turn_movements", class_to_matrix=class_to_matrix
+            project=self.project,
+            turns_df=TURNS_DF,
+            asgn_result_table_name="test_turn_movements",
+            class_to_matrix=class_to_matrix,
         )
         self.assertEqual(turning_movements.at[0, "volume"], 150)
         self.assertEqual(turning_movements.at[1, "volume"], 300)
@@ -143,8 +147,25 @@ class TestTurnVolumes(TestCase):
 
         class_to_matrix = {"car": self.matrix_1, "truck": self.matrix_2}
         turning_movements = TurnVolumesResults.calculate_from_result_table(
-            project=self.project, turns_df=TURNS_DF, table_name="test_turn_movements", class_to_matrix=class_to_matrix
+            project=self.project,
+            turns_df=TURNS_DF,
+            asgn_result_table_name="test_turn_movements",
+            class_to_matrix=class_to_matrix,
         )
 
         self.assertEqual(turning_movements.at[0, "volume"], 150)
         self.assertEqual(turning_movements.at[1, "volume"], 300)
+
+    def test_save_turn_volumes(self):
+        """
+        Tests whether the turn volumes are saved to the results database
+        """
+        self.assignment.set_algorithm("all-or-nothing")
+        self.assignment.set_save_path_files(True)
+        self.assignment.execute()
+        turn_volumes_table_name = "test_turn_movements"
+        turning_movements = self.assignment.save_turning_volumes(turn_volumes_table_name, TURNS_DF)
+        conn = sqlite3.connect(os.path.join(self.project.project_base_path, "results_database.sqlite"))
+        df = pd.read_sql_query(f"select * from {turn_volumes_table_name}", conn).drop(columns="index")
+        conn.close()
+        self.assertIsNone(pd.testing.assert_frame_equal(turning_movements, df))
