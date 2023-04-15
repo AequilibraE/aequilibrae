@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
-from aequilibrae.project.project import Project
 from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.project.project import Project
 from context import get_active_project
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["matrix_name", "network mode", "class_name", "iteration", "a", "b", "c"]
@@ -75,20 +75,25 @@ class TurnVolumesResults:
         project: Project,
         turns_df: pd.DataFrame,
         table_name: str,
-        user_classes: Optional[list[str]],
+        class_to_matrix: dict[str, AequilibraeMatrix],
+        user_classes: Optional[list[str]] = None,
         blend_iterations: bool = True,
     ):
-        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df = pd.read_sql_query(f"select * from 'results' where table_name=\'{table_name}\'", conn)
+        conn = sqlite3.connect(path.join(project.project_base_path, "project_database.sqlite"))
+        df = pd.read_sql_query(f"select * from results where table_name='{table_name}'", conn)
         conn.close()
+
         procedure_id = df.at[0, "procedure_id"]
-        procedure_report = eval(df.at[0, "procedure_report"])
-        # Accessing the convergence data inside the procedure report requires evaluating both.
+
+        # Requires multi eval as json.loads fails to read the procedure report.
         # inf is not recognised in eval, replacing with np.inf to allow eval
-        convergence_report = pd.DataFrame(
-            eval(eval(df.at[0, "procedure_report"])["convergence"].replace("inf", "np.inf"))
-        )
-        asgn_classes = procedure_report["setup"]["Classes"]
+        procedure_report = eval(df.at[0, "procedure_report"])
+        convergence_report = eval(procedure_report["convergence"].replace("inf", "np.inf"))
+        setup_report = eval(procedure_report["setup"])
+
+        convergence_report = pd.DataFrame(convergence_report)
+
+        asgn_classes = setup_report["Classes"]
 
         betas_df = TurnVolumesResults.get_betas_df(convergence_report)
 
@@ -97,23 +102,29 @@ class TurnVolumesResults:
 
         missing_classes = []
         ta_turn_vol_list = []
-        for class_name, class_specs in asgn_classes:
+        for class_name, class_specs in asgn_classes.items():
             if class_name not in user_classes:
                 missing_classes.append(class_name)
                 continue
 
             tc_turns = TurnVolumesResults(
                 class_name=class_name,
-                mode_id=class_specs["network_mode"],
-                matrix=AequilibraeMatrix(),
+                mode_id=class_specs["network mode"],
+                matrix=class_to_matrix[class_name],
                 procedure_id=procedure_id,
                 iteration=betas_df.index.max(),
                 blend_iterations=blend_iterations,
+                project=project,
             )
             ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
 
+        return pd.concat(ta_turn_vol_list).reset_index()
+
     @staticmethod
     def get_betas_df(convergence_report: pd.DataFrame) -> pd.DataFrame:
+        if convergence_report.empty:
+            convergence_report = pd.DataFrame({"iteration": [1]})
+
         if "beta0" not in convergence_report.columns:
             # if betas are not in the report, create dummy betas, where beta0 is 1
             # This allows to calculate volumes for AoN.
@@ -183,7 +194,7 @@ class TurnVolumesResults:
             return self.read_paths_from_folder(paths_folder, self.iteration)
 
         paths_list = []
-        for iteration in range(1, self.iteration + 1):
+        for iteration in range(1, int(self.iteration) + 1):
             paths_folder = self.procedure_dir / f"iter{iteration}" / f"path_c{self.mode_id}_{self.class_name}"
             paths_list.append(self.read_paths_from_folder(paths_folder, iteration))
         return pd.concat(paths_list)
