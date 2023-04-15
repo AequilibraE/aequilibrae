@@ -1,2 +1,0 @@
-﻿fare_id,price,currency_type,payment_method,transfers,transfer_duration,agency_id
-Adult Bus,3.00,AUD,0,,10800,PT

@@ -1,1 +1,1 @@
-from . import gtfs
+from .transit import Transit
