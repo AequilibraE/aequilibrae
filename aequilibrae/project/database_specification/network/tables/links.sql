@@ -1,4 +1,4 @@
---@ The Links table holds all the links available in the aequilibrae network model
+--@ The links table holds all the links available in the aequilibrae network model
 --@ regardless of the modes allowed on it.
 --@
 --@ All information on the fields a_node and b_node correspond to a entries in
@@ -6,11 +6,11 @@
 --@ triggers as the user edits the network, but they are not protected by manual
 --@ editing, which would break the network if it were to happen.
 --@
---@ The *modes* field is a concatenation of all the ids (mode_id) of the models allowed
+--@ The **modes** field is a concatenation of all the ids (mode_id) of the models allowed
 --@ on each link, and map directly to the mode_id field in the **Modes** table. A mode
 --@ can only be added to a link if it exists in the **Modes** table.
 --@
---@ The *link_type* corresponds to the *link_type* field from the **link_types** table.
+--@ The **link_type** corresponds to the *link_type* field from the *link_types* table.
 --@ As it is the case for modes, a link_type can only be assigned to a link if it exists
 --@ in the **link_types** table.
 --@

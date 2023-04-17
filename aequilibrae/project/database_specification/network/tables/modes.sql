@@ -1,20 +1,20 @@
---@ The Modes table holds the information on all the modes available in 
+--@ The *modes* table holds the information on all the modes available in 
 --@ the model's network.
 --@
---@ The *mode_name* field contains the descriptive name of the field.
+--@ The **mode_name** field contains the descriptive name of the field.
 --@
---@ The *mode_id* field contains a single letter that identifies the mode.
+--@ The **mode_id** field contains a single letter that identifies the mode.
 --@
---@ The *description* field holds the description of the mode.
+--@ The **description** field holds the description of the mode.
 --@
---@ The *pce* field holds information on Passenger-Car equivalent
+--@ The **pce** field holds information on Passenger-Car equivalent
 --@ for assignment. Defaults to **1.0**.
 --@
---@ The *vot* field holds information on Value-of-Time for traffic
+--@ The **vot** field holds information on Value-of-Time for traffic
 --@ assignment. Defaults to **0.0**.
 --@
---@ The *ppv* field holds information on average persons per vehicle.
---@ Defaults to **1.0**. *ppv* can assume value 0 for non-travel uses.
+--@ The **ppv** field holds information on average persons per vehicle.
+--@ Defaults to **1.0**. **ppv** can assume value 0 for non-travel uses.
 
 
 CREATE TABLE if not exists modes (mode_name   VARCHAR UNIQUE NOT NULL,

@@ -1,12 +1,12 @@
---@ The Zones table holds information on the Traffic Analysis Zones (TAZs) 
+--@ The *zones* table holds information on the Traffic Analysis Zones (TAZs) 
 --@ in AequilibraE's model.
 --@
---@ The *zone_id* field identifies the zone.
+--@ The **zone_id** field identifies the zone.
 --@
---@ The *area* field corresponds to the area of the zone in **km2**.
+--@ The **area** field corresponds to the area of the zone in **km2**.
 --@ TAZs' area is automatically updated by triggers.
 --@
---@ The *name* fields allows one to identity the zone using a name
+--@ The **name** fields allows one to identity the zone using a name
 --@ or any other description.
 
 CREATE TABLE 'zones' (ogc_fid    INTEGER PRIMARY KEY,
