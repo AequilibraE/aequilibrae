@@ -23,8 +23,9 @@ class Transit:
 
     def __init__(self, project):
         """
-        Args.:
-             *project* (:obj:``):
+        :Arguments:
+             **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            active project
         """
 
         self.project_base_path = project.project_base_path
@@ -42,7 +43,7 @@ class Transit:
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
 
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
-            
+
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
         :Return:
