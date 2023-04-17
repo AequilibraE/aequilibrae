@@ -20,4 +20,5 @@ a start guide to a complete view into AequilibraE's data structure.
     modeling_with_aequilibrae/project
     modeling_with_aequilibrae/project_database
     modeling_with_aequilibrae/parameter_file
+    modeling_with_aequilibrae/public_transport
 

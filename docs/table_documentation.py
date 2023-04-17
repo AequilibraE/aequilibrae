@@ -20,13 +20,13 @@ class CreateTablesSRC:
         self.proj = Project()
         self.proj.new(self.proj_path)
 
-        if component == "project_database":
-            self.stub = "data_model"
-            # Get the appropriate data for the database we are documenting
-            self.conn = self.proj.conn
-            self.path = join(*Path(realpath(__file__)).parts[:-1],
-                             "../aequilibrae/project/database_specification/network/tables")
-            self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
+        folder = "network" if component == "project_database" else "transit"
+        self.stub = "data_model"
+        # Get the appropriate data for the database we are documenting
+        self.conn = self.proj.conn
+        self.path = join(*Path(realpath(__file__)).parts[:-1],
+                        f"../aequilibrae/project/database_specification/{folder}/tables")
+        self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -36,6 +36,8 @@ class CreateTablesSRC:
         placeholder = "LIST_OF_TABLES"
         tables_txt = "table_list.txt"
         all_tables = [e for e in self.readlines(join(self.path, tables_txt)) if e != "migrations"]
+
+        print(all_tables)
 
         for table_name in all_tables:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()
@@ -120,7 +122,9 @@ class CreateTablesSRC:
         with open(filename, "r") as f:
             return [x.strip() for x in f.readlines()]
 
+tables = [("project_database", "modeling_with_aequilibrae/project_database"),
+          ("transit_database", "modeling_with_aequilibrae/transit_database")]
 
-for table, pth in [("project_database", "modeling_with_aequilibrae/project_database")]:
+for table, pth in tables:
     s = CreateTablesSRC(table, pth)
     s.create()

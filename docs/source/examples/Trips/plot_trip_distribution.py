@@ -26,7 +26,7 @@ project = create_example(fldr)
 # We get the demand matrix directly from the project record
 # so let's inspect what we have in the project
 proj_matrices = project.matrices
-proj_matrices.list()
+print(proj_matrices.list())
 
 # %%
 
@@ -153,7 +153,7 @@ for function in ["power", "expo"]:
 
 # We update the matrices table/records and verify that the new matrices are indeed there
 proj_matrices.update_database()
-proj_matrices.list()
+print(proj_matrices.list())
 
 # %% md
 
@@ -178,7 +178,7 @@ ipf.save_to_project(name="demand_ipf_omx", file_name="demand_ipf.omx")
 
 # %%
 
-proj_matrices.list()
+print(proj_matrices.list())
 
 # %%
 

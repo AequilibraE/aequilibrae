@@ -1,9 +1,10 @@
-.. _nitty_gritty:
+.. _getting_started:
 
-Nitty-Gritty
+Getting started
 ===============
 
-This page describes how to get started with AequilibraE.
+In this section we describe how to install AequilibraE.
+If you have already installed AequilibraE, you can move on to the :ref:`first steps <first_steps>` in modeling with AequilibraE page.
 
 .. note::
    Although AequilibraE is under intense development, we try to avoid making
@@ -123,9 +124,5 @@ use of as many CPUs as there are available in the system for such procedures.
     :maxdepth: 1
     :hidden:
 
-    :ref:`installation`
-    nitty_gritty/softwaredevelopment
-    nitty_gritty/roadmap
-    nitty_gritty/version_history
-    nitty_gritty/useful_links
-  
+    getting_started/first_steps
+    getting_started/first_model

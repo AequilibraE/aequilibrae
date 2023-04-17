@@ -137,8 +137,18 @@ mode, and that is controlled by the key *unknown_tags* in the parameters file.
 GMNS
 ~~~~
 
-XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
-XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX XXXXXXX 
+The **GMNS** group of parameters has four specifications: **critical_dist**, **link**,
+**node**, and **use_definition**.
+
+.. image:: ../images/parameter_yaml_files_gmns.png
+    :align: center
+    :alt: GMNS parameter group
+|
+**critical_dist** is a numeric threshold for the distance.
+
+Under the keys **links**, **nodes**, and **use_definition** there are the fields 
+*equivalency* and *fields*. They represent the equivalency between GMNS and 
+AequilibraE data fields and data types for each field.
 
 .. _parameters_system:
 

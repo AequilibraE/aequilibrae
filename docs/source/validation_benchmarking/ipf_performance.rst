@@ -10,20 +10,21 @@ with a general IPF algorithm, available `here <https://github.com/joshchea/pytho
 The first analysis is related to the :ref:`number of cores used in IPF`. AequilibraE's
 IPF allows the user to use more than one core to speed up the fitting process, which
 is extremely useful when handling models with lots of traffic zones. As we can see,
-instances with 100, 500, and 1,000 zones were promptly solved, but as their size increased,
-the power of multi-processing shows up and we can see that it barely halves the runtime.
+instances with more zones benefited the most from the power of multi-processing 
+speeding up the runtime in barely five times using five cores.
 
 .. image:: ../images/ipf_runtime_vs_num_cores.png
+    :align: center
     :alt: number of cores used in IPF
 
-.. image:: ../images/ipf_speedup.png
-    :alt: IPF speedup
-
-:ref:`AequilibraE's runtime` is smaller when compared with the benchmark code.
-From the figure below, we can notice that the runtimes were practically the same for the instance with 100 zones.
-As the number of zones increases, even AequilibraE's IPF results for one core demonstrate that our
-algorithm requires less processing time. It's also worth mentioning that the user can set up a threshold for
-AequilibraE's IPF function, as well as uses more than one core to speed up the fitting process.
+The figure below compares the :ref:`AequilibraE's IPF runtime` with one core with the benchmark Python
+code. From the figure below, we can notice that the runtimes were practically the same for the 
+instances with 1,000 zones or less. As the number of zones increases, AequilibraE demonstrated to be faster 
+than the benchmark python code in instances with :math: 1000 < zones < 10000, but it was a 
+slower than the benchmark for the larger instances with 10,000 and 15,000 zones. It's worth mentioning that 
+the user can set up a threshold for AequilibraE's IPF function, as well as uses more than one 
+core to speed up the fitting process.
 
 .. image:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
-    :alt: AequilibraE's runtime
+    :align: center
+    :alt: AequilibraE's IPF runtime

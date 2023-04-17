@@ -60,7 +60,7 @@ graph.set_blocked_centroid_flows(False)
 # We get the demand matrix directly from the project record
 # So let's inspect what we have in the project
 proj_matrices = project.matrices
-proj_matrices.list()
+print(proj_matrices.list())
 
 # %%
 # Let's get it in this better way
@@ -99,11 +99,11 @@ assig.execute()  # we then execute the assignment
 import pandas as pd
 
 convergence_report = assig.report()
-convergence_report.head()
+print(convergence_report.head())
 
 # %%
 volumes = assig.results()
-volumes.head()
+print(volumes.head())
 
 # %%
 # We could export it to CSV or AequilibraE data, but let's put it directly into the results database
@@ -126,7 +126,7 @@ from aequilibrae.distribution import GravityCalibration
 
 # %%
 # Let's take another look at what we have in terms of matrices in the model
-proj_matrices.list()
+print(proj_matrices.list())
 
 # %%
 # We need the demand
@@ -257,7 +257,7 @@ for function in ["power", "expo"]:
 # %%
 # We update the matrices table/records and verify that the new matrices are indeed there
 proj_matrices.update_database()
-proj_matrices.list()
+print(proj_matrices.list())
 
 #%%
 # IPF for the future vectors

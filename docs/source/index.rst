@@ -11,9 +11,10 @@ AequilibraE is the first comprehensive Python package for transportation
 modeling, and it aims to provide all the resources not easily available from
 other open-source packages in the Python (NumPy, really) ecosystem.
 
-If you are looking for the documentation for AequilibraE for QGIS, you can
-see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
+.. tip::
 
+   If you are looking for the documentation for **AequilibraE for QGIS**, you can
+   see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
 .. panels::
    :card: text-center bg-transparent border-light
@@ -21,6 +22,21 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    :header: text-center border-light
    :footer: border-light
    :column: col-lg-6 col-md-6 col-sm-6 col-xs-12 p-2
+
+   ---
+   :column: col-lg-12 p-2
+   :fa:`folder`
+   **Getting Started**
+   ^^^^^^^^^^^^^^^^^
+
+   New to AequilibraE? Get started here!
+
+   +++++++++++++++++
+
+   .. link-button:: getting_started
+      :type: ref
+      :text: Getting Started
+      :classes: btn-block btn-secondary stretched-link
 
    ---
    :column: col-lg-12 p-2
@@ -57,7 +73,7 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
 
    :fa:`tools`
-   **API references**
+   **API References**
    ^^^^^^^^^^^^^^
 
    Reference guide to AequilibraE's API.
@@ -87,16 +103,16 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    ---
 
    :fa:`lightbulb`
-   **Nitty-Gritty**
+   **Developing**
    ^^^^^^^^^^^^
 
    Looking for something more than using the software? Check out the development info.
 
    ++++++++++++
 
-   .. link-button:: nitty_gritty
+   .. link-button:: developing
          :type: ref
-         :text: Nitty-Gritty
+         :text: Developing
          :classes: btn-block btn-secondary stretched-link
 
 
@@ -104,11 +120,12 @@ see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
    :hidden:
    :maxdepth: 1
 
+   getting_started
    _auto_examples/index
    modeling_with_aequilibrae
    api
    validation
-   nitty_gritty
+   developing
 
 Note to users
 =============
@@ -128,3 +145,8 @@ there are two alternatives for support:
 AequilibraE **does not have paid support** but if you are looking to hire its developers
 for specific projects or to **fund AequilibraE's** development,
 please e-mail the developers at contact@aequilibrae.com.
+
+.. note::
+
+   If you want to check any of AequilibraE's older versions, you can checkout their
+   documentation in :ref:`this page <versionhistory>`
