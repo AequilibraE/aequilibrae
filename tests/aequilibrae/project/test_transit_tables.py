@@ -37,7 +37,6 @@ def create_project(project: Project):
             ],
         ),
         ("route_links", ["transit_link", "pattern_id", "seq", "from_stop", "to_stop", "distance", "geometry"]),
-        ("stop_connectors", ["id_from", "id_to", "conn_type", "traversal_time", "penalty_cost", "geometry"]),
         (
             "stops",
             [
