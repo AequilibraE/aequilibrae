@@ -1120,8 +1120,8 @@ class AequilibraeMatrix(object):
 
             np.memmap(
                 self.file_path,
-                dtype="S" + str(MATRIX_DESCRIPTION_MAX_LENGTH),
-                offset=18 + MATRIX_DESCRIPTION_MAX_LENGTH,
+                dtype="S" + str(MATRIX_NAME_MAX_LENGTH),
+                offset=18 + MATRIX_NAME_MAX_LENGTH,
                 mode="r+",
                 shape=1,
             )[0] = matrix_description
