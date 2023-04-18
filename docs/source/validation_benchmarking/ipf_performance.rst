@@ -20,9 +20,9 @@ speeding up the runtime in barely five times using five cores.
 The figure below compares the :ref:`AequilibraE's IPF runtime` with one core with the benchmark Python
 code. From the figure below, we can notice that the runtimes were practically the same for the 
 instances with 1,000 zones or less. As the number of zones increases, AequilibraE demonstrated to be faster 
-than the benchmark python code in instances with :math: 1000 < zones < 10000, but it was a 
+than the benchmark python code in instances with :math: 1,000 < zones < 10,000, but it was a 
 slower than the benchmark for the larger instances with 10,000 and 15,000 zones. It's worth mentioning that 
-the user can set up a threshold for AequilibraE's IPF function, as well as uses more than one 
+the user can set up a threshold for AequilibraE's IPF function, as well as use more than one 
 core to speed up the fitting process.
 
 .. image:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
