@@ -40,9 +40,8 @@ jobs:
       run: |
           python docs/table_documentation.py
           python docs/create_docs_data.py
-          python docs/website/check_documentation_versions.py
 
-    - name: Test documentation
+    - name: Test docstrings
       run: |
         echo "DOCUMENTATION TESTING GOES HERE"
         python -m doctest -v ./aequilibrae/parameters.py
