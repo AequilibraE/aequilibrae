@@ -573,7 +573,7 @@ class Graph(object):
         Returns graph fields that are available to be set as skims
 
         :Returns:
-            *list* (:obj:`str`): Field names
+            **list** (:obj:`str`): Field names
         """
         return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 

@@ -73,10 +73,10 @@ class PathResults:
         """
         Computes the path between two nodes in the network
 
-        Args:
-            *origin* (:obj:`int`): Origin for the path
+        :Arguments:
+            **origin** (:obj:`int`): Origin for the path
 
-            *destination* (:obj:`int`): Destination for the path
+            **destination** (:obj:`int`): Destination for the path
         """
 
         if self.graph is None:
@@ -92,8 +92,8 @@ class PathResults:
         """
         Prepares the object with dimensions corresponding to the graph object
 
-        Args:
-            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+        :Arguments:
+            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
         """
 
         if not graph.cost_field:
@@ -146,8 +146,8 @@ class PathResults:
 
         It does not re-compute the path tree, so it saves most of the computation time
 
-        Args:
-            *destination* (:obj:`int`): ID of the node we are computing the path too
+        :Arguments:
+            **destination** (:obj:`int`): ID of the node we are computing the path too
         """
         if not isinstance(destination, int):
             raise TypeError("destination needs to be an integer")

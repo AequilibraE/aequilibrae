@@ -16,6 +16,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from sphinx_gallery.sorting import ExplicitOrder
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -68,6 +69,11 @@ sphinx_gallery_conf = {
     'capture_repr': ('_repr_html_', '__repr__'),
     'remove_config_comments': True,
     "plot_gallery": False,
+    "subsection_order": ExplicitOrder(["examples/creating_models",
+                                      "examples/Network",
+                                      "examples/editing_networks",
+                                      "examples/Trips",
+                                      "examples/other_applications"])
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -107,20 +113,20 @@ html_theme = "pydata_sphinx_theme"
 
 html_theme_options = {
     "show_nav_level": 0,
-    "default_mode": "light",
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "navbar_end": ["theme-switcher", "version-switcher"],
     "switcher": {
-        "json_url": "_static/switcher.json",
-        "version_match": version, 
+        "json_url": "https://aequilibrae.com/python/dev/_static/switcher.json",
+        "version_match": release_version,
     },
-    "check_switcher": False,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+html_css_files = ["conf.css"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 html_title = f"AequilibraE {version}"

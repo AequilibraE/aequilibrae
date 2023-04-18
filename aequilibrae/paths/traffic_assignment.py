@@ -683,6 +683,7 @@ class TrafficAssignment(object):
         """
         Saves the select link link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
+
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
             **project** (:obj:`Project`, `Optional`): Project we want to save the results to.

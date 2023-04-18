@@ -1,8 +1,8 @@
 [
     {
-        "name": "latest",
+        "name": "dev",
         "version": "0.9.0",
-        "url": "https://aequilibrae.com/python/dev/_static/switcher.json"
+        "url": "https://aequilibrae.com/python/dev/"
     },
     {
         "name": "0.8.3",

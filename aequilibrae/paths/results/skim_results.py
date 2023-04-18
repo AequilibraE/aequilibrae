@@ -6,7 +6,7 @@ from aequilibrae.paths.graph import Graph
 
 class SkimResults:
     """
-    Network skimming result holder
+    Network skimming result holder.
 
     .. code-block:: python
 
@@ -46,8 +46,8 @@ class SkimResults:
         """
         Prepares the object with dimensions corresponding to the graph objects
 
-        Args:
-            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+        :Arguments:
+            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
         """
 
         if not graph.cost_field:
@@ -78,8 +78,8 @@ class SkimResults:
         Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
         inputs result in values outside those limits
 
-        Args:
-            *cores* (:obj:`int`): Number of cores to be used in computation
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
         """
 
         if isinstance(cores, int):
