@@ -5,6 +5,7 @@ fare_zones
 pattern_mapping
 route_links
 routes
+stop_connectors
 stops
 trips_schedule
 trips
