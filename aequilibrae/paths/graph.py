@@ -119,6 +119,15 @@ class Graph(object):
             raise ValueError("Centroid IDs are not unique")
         self.centroids = np.array(centroids, np.uint32)
 
+        self.network = self.network.astype(
+            {
+                "direction": np.int8,
+                "a_node": self.__integer_type,
+                "b_node": self.__integer_type,
+                "link_id": self.__integer_type,
+            }
+        )
+
         properties = self.__build_directed_graph(self.network, centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
