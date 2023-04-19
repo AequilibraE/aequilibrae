@@ -1,7 +1,25 @@
-.. modeling_in_practice:
+.. modeling_concepts:
+
+Modeling Concepts
+=================
+
+.. _aequilibrae-graphs:
+
+AequilibraE Graphs
+------------------
+
+AequilibraE's graphs are the backbone of path computation, skimming, Traffic Assignment,
+Select Link Analysis, and others.
+
+Imagine you have a network with all its links connected by nodes. Not all links can be
+traveled both directions (such as one way roads), and each link might have a different
+speed limit, congestion levels, tolls, etc. An AequilibraE graph would come in handy to
+represent that ability to travel in the network via a particular mode (car, for example).
+With this graph, we can calculate many shortest paths on that graph for each of the OD pairs
+we are interested in.
 
 Traffic Assignment Procedure
-============================
+----------------------------
 
 Along with a network data model, traffic assignment is the most technically
 challenging portion to develop in a modeling platform, especially if you want it
@@ -16,12 +34,12 @@ making it overly complex to use, develop and maintain (we know how subjective
    should take some time for these implementations to reach full maturity.
 
 Performing traffic assignment
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For a comprehensive use case for the traffic assignment module, please see the application in :ref:`this example <example_usage_forecasting>`.
 
 Traffic Assignment Class
-~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Traffic assignment is organized within a object new to version 0.6.1 that
 includes a small list of member variables which should be populated by the user,
@@ -69,7 +87,7 @@ To begin building the assignment it is easy:
     assig = TrafficAssignment()
 
 Volume Delay Function
-+++++++++++++++++++++
+'''''''''''''''''''''
 
 For now, the only VDF functions available in AequilibraE are the 
 
@@ -108,7 +126,7 @@ especially in modern multi-core systems.
 .. _assignment_class_object:
 
 Traffic class
-~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 
 The Traffic class object holds all the information pertaining to a specific
 traffic class to be assigned. There are three pieces of information that are
@@ -145,7 +163,7 @@ a method call:
 
 
 Setting VDF Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^
 
 Parameters for VDF functions can be passed as a fixed value to use for all
 links, or as graph fields. As it is the case for the travel time and capacity
@@ -175,7 +193,7 @@ To pass global values, it is simply a matter of doing the following:
 
 
 Setting final parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 There are still three parameters missing for the assignment.
 
@@ -200,7 +218,7 @@ Finally, one can execute assignment:
 :ref:`convergence_criteria` is discussed below.
 
 Multi-class Equilibrium assignment
-----------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By introducing equilibrium assignment [1]_ with as many algorithms as we have, it
 makes sense to also introduce multi-class assignment, adding to the pre-existing
@@ -214,7 +232,7 @@ equilibrium algorithms have slightly different resource requirements.
    appropriate testing that would be required for an empirical proof.
 
 Cost function
-~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 
 It is currently not possible to use custom cost functions for assignment, and
 the only cost function available to be minimized is simply travel time.
@@ -222,7 +240,7 @@ the only cost function available to be minimized is simply travel time.
 .. _technical_requirements_multi_class:
 
 Technical requirements
-~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^
 
 This documentation is not intended to discuss in detail the mathematical
 requirements of multi-class traffic assignment, which can be found discussed in
@@ -244,7 +262,7 @@ that the VDFs are differentiable.
 .. _convergence_criteria:
 
 Convergence criteria
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 Convergence in AequilibraE is measured solely in terms of relative gap, which is
 a somewhat old recommendation [5]_, but it is still the most used measure in
@@ -267,7 +285,7 @@ object member variables directly before execution.
 
 
 Algorithms available
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 All algorithms have been implemented as a single software class, as the
 differences between them are simply the step direction and step size after each
@@ -285,8 +303,8 @@ iteration of all-or-nothing assignment, as shown in the table below
 | Biconjugate Frank-Wolfe       | Biconjugate direction (Current and two previous AoN)      | Optimal value derived from Wardrop's principle  |
 +-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
 
-Method of Successive Averages
-+++++++++++++++++++++++++++++
+Method of Successive Averages (MSA)
+'''''''''''''''''''''''''''''''''''
 
 This algorithm has been included largely for hystorical reasons, and we see very
 little reason to use it. Yet, it has been implemented with the appropriate
@@ -294,7 +312,7 @@ computation of relative gap computation and supports all the analysis features
 available.
 
 Frank-Wolfe (FW)
-++++++++++++++++
+''''''''''''''''
 
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
@@ -303,7 +321,7 @@ introduced by LeBlanc in 1975 [2]_.
 
 
 Conjugate Frank-Wolfe
-+++++++++++++++++++++
+'''''''''''''''''''''
 
 The conjugate direction algorithm was introduced in 2013 [3]_, which is quite
 recent if you consider that the Frank-Wolfe algorithm was first applied in the
@@ -311,7 +329,7 @@ early 1970's, and it was introduced at the same as its Biconjugate evolution,
 so it was born outdated.
 
 Biconjugate Frank-Wolfe
-+++++++++++++++++++++++
+'''''''''''''''''''''''
 
 The Biconjugate Frank-Wolfe algorithm is currently the fastest converging link-
 based traffic assignment algorithm used in practice, and it is the recommended
@@ -320,7 +338,7 @@ it **requires more memory** during runtime, but very large networks should still
 fit nicely in systems with 16Gb of RAM.
 
 Implementation details & tricks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 A few implementation details and tricks are worth mentioning not because it is
 needed to use the software, but because they were things we grappled with during
 implementation, and it would be a shame not register it for those looking to
@@ -341,7 +359,7 @@ their own purposes.
 
 
 Opportunities for multi-threading
-+++++++++++++++++++++++++++++++++
+'''''''''''''''''''''''''''''''''
 
 Most multi-threading opportunities have already been taken advantage of during
 the implementation of the All-or-Nothing portion of the assignment. However, the
@@ -362,7 +380,7 @@ from making in-place computation using previously existing arrays, as the
 instantiation of large NumPy arrays can be computationally expensive.
 
 Handling the network
---------------------
+~~~~~~~~~~~~~~~~~~~~
 The other important topic when dealing with multi-class assignment is to have
 a single consistent handling of networks, as in the end there is only physical
 network being handled, regardless of access differences to each mode (e.g. truck
@@ -370,7 +388,7 @@ lanes, High-Occupancy Lanes, etc.). This handling is often done with something
 called a **super-network**.
 
 Super-network
-~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 We deal with a super-network by having all classes with the same links in their
 sub-graphs, but assigning *b_node* identical to *a_node* for all links whenever a
 link is not available for a certain user class.
@@ -384,10 +402,10 @@ assignment is possible.
 .. _traffic-assignment-references:
 
 References
-----------
+~~~~~~~~~~
 
 Traffic assignment and equilibrium
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
 
@@ -402,7 +420,7 @@ Traffic assignment and equilibrium
 .. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment", Transportation Research Part B, 70:261-274. Available in: https://doi.org/10.1016/j.trb.2014.06.011
 
 Volume delay functions
-~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. [7] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158. Available in: https://doi.org/10.1287/trsc.24.2.153
 

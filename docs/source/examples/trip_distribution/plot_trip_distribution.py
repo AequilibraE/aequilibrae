@@ -132,7 +132,6 @@ for function in ["power", "expo"]:
     model.load(join(fldr, f"{function}_model.mod"))
 
     outmatrix = join(proj_matrices.fldr, f"demand_{function}_model.aem")
-    apply = GravityApplication()
     args = {
         "impedance": impedance,
         "rows": vectors,

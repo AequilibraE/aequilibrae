@@ -1,4 +1,4 @@
-.. _examples_trips:
+.. _examples_trip_distribution:
 
 Trip Distribution
 -----------------

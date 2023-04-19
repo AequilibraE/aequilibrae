@@ -148,5 +148,5 @@ please e-mail the developers at contact@aequilibrae.com.
 
 .. note::
 
-   If you want to check any of AequilibraE's older versions, you can checkout their
+   If you want to check any of AequilibraE's versions before 0.9.0, you can checkout their
    documentation in :ref:`this page <versionhistory>`

@@ -1,11 +1,11 @@
 """
-.. _plot_ipf_with_empty_model:
+.. _plot_ipf_without_model:
 
-Running IPF with empty AequilibraE model
+Running IPF without an AequilibraE model
 ========================================
 
-In this example, we show you how to use AquilibraE's IPF function with an empty model.
-his is a compliment to the application in :ref:`Trip Distribution <example_usage_distribution>`.
+In this example, we show you how to use AequilibraE's IPF function without a model.
+This is a compliment to the application in :ref:`Trip Distribution <example_usage_distribution>`.
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
 *How would your trip distribution matrix using IPF look like?*
@@ -17,16 +17,12 @@ The data used in this example comes from Table 5.6 in [ORW2011]_.
 import numpy as np
 
 from aequilibrae.distribution import Ipf
-from aequilibrae.project import Project
 from os.path import join
 from tempfile import gettempdir
-from uuid import uuid4
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 
 # %%
-folder = join(gettempdir(), uuid4().hex)
-project = Project()
-project.new(folder)
+folder = gettempdir()
 
 # %%
 matrix = np.array([[5, 50, 100, 200], [50, 5, 100, 300], [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
