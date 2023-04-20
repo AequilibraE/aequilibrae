@@ -70,9 +70,10 @@ sphinx_gallery_conf = {
     'remove_config_comments': True,
     "plot_gallery": False,
     "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/Network",
+                                      "examples/network_manipulation",
                                       "examples/editing_networks",
-                                      "examples/Trips",
+                                      "examples/trip_distribution",
+                                      "examples/visualization",
                                       "examples/other_applications"])
 }
 
