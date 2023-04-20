@@ -42,11 +42,12 @@ layers to the canvas, and selecting properties and clicking on *create spatial*
 *index* for each layer at a time. This action automatically saves the spatial
 indices to the sqlite database.
 
-.. image:: images/qgis_creating_spatial_indices.png
+.. image:: ../../images/qgis_creating_spatial_indices.png
     :width: 1383
     :align: center
     :alt: Adding Spatial indices with QGIS
 
+|
 If you are an expert user and made sure your Python installation was compiled
 against a complete SQLite set of extensions, then go ahead an import the network
 with the option for creating such indices.

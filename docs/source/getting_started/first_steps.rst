@@ -6,15 +6,11 @@ First steps
 AequilibraE is a python package for transportation modeling. To take full
 advantage of its capacities, it would be great if you already have a little
 knowledge on transportation modeling. If you're totaly new to the area,
-you can either continue to the next session with a transportation modeling
-101 or to any of our :ref:`useful links <useful_links>`.
+we encourage you to do some research on your own or take a look in some useful
+books and research papers in the :ref:`useful links <useful_links>` session.
 
-If you're already feeling confortable with transportation modeling concepts,
-you can move on to :ref:`creating your first AequilibraE model <create_your_first_model>`.
-
-.. _transport_modeling_101:
-Transport modeling 101
-----------------------
+If you're already feeling confortable with some transportation modeling concepts,
+you can move on to :ref:`creating your first AequilibraE model <examples_creating_models>`.
 
 .. _useful_links:
 Useful links

@@ -14,16 +14,19 @@ if str(project_dir) not in sys.path:
 class CreateTablesSRC:
     def __init__(self, component: str, tgt_fldr: str):
         from aequilibrae.project import Project
+        from aequilibrae.project.database_connection import database_connection
+        from aequilibrae.transit import Transit
 
         # Create a new project
         self.proj_path = join(gettempdir(), f"aequilibrae_{uuid4().hex[:6]}")
         self.proj = Project()
         self.proj.new(self.proj_path)
+        Transit(self.proj)
 
         folder = "network" if component == "project_database" else "transit"
         self.stub = "data_model"
         # Get the appropriate data for the database we are documenting
-        self.conn = self.proj.conn
+        self.conn = database_connection(db_type=folder, project_path=self.proj_path)
         self.path = join(*Path(realpath(__file__)).parts[:-1],
                         f"../aequilibrae/project/database_specification/{folder}/tables")
         self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
@@ -36,8 +39,6 @@ class CreateTablesSRC:
         placeholder = "LIST_OF_TABLES"
         tables_txt = "table_list.txt"
         all_tables = [e for e in self.readlines(join(self.path, tables_txt)) if e != "migrations"]
-
-        print(all_tables)
 
         for table_name in all_tables:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()

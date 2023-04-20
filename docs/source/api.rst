@@ -90,30 +90,7 @@ Matrix
    :toctree: generated/
 
    AequilibraeData
-   AequilibraeData.create_empty
-   AequilibraeData.empty
-   AequilibraeData.export
-   AequilibraeData.load
-   AequilibraeData.random_name
    AequilibraeMatrix
-   AequilibraeMatrix.close
-   AequilibraeMatrix.columns
-   AequilibraeMatrix.computational_view
-   AequilibraeMatrix.copy
-   AequilibraeMatrix.create_empty
-   AequilibraeMatrix.create_from_omx
-   AequilibraeMatrix.create_from_trip_list
-   AequilibraeMatrix.export
-   AequilibraeMatrix.get_matrix
-   AequilibraeMatrix.is_omx
-   AequilibraeMatrix.load
-   AequilibraeMatrix.nan_to_num
-   AequilibraeMatrix.random_name
-   AequilibraeMatrix.rows
-   AequilibraeMatrix.save
-   AequilibraeMatrix.setDescription
-   AequilibraeMatrix.setName
-   AequilibraeMatrix.set_index
 
 Paths
 -----
@@ -138,5 +115,3 @@ Transit
    :toctree: generated/
 
     Transit
-    Transit.new_gtfs_builder
-    Transit.create_transit_database

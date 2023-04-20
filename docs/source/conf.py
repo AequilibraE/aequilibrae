@@ -112,13 +112,25 @@ pygments_style = "sphinx"
 #
 html_theme = "pydata_sphinx_theme"
 
+# Define the json_url for our version switcher.
+json_url = "https://aequilibrae.com/python/dev/_static/switcher.json"
+
+# For local development, infer the version to match from the package.
+if "dev" in version or "rc" in version:
+    version_match = "latest"
+    # We want to keep the relative reference if we are in dev mode
+    # but we want the whole url if we are effectively in a released version
+    json_url = "_static/switcher.json"
+else:
+    version_match = "V" + version
+
 html_theme_options = {
     "show_nav_level": 0,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "navbar_end": ["theme-switcher", "version-switcher"],
     "switcher": {
-        "json_url": "https://aequilibrae.com/python/dev/_static/switcher.json",
-        "version_match": release_version,
+        "json_url": json_url,
+        "version_match": version_match,
     },
 }
 

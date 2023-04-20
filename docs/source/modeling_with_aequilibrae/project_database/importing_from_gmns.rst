@@ -7,11 +7,12 @@ Before importing a network from a source in GMNS format, it is imperative to kno
 in which spatial reference its geometries (links and nodes) were created. If the SRID
 is different than 4326, it must be passed as an input using the argument 'srid'.
 
-.. image:: images/plot_import_from_gmns.png
+.. image:: ../../images/plot_import_from_gmns.png
     :align: center
     :alt: example
     :target: _auto_examples/plot_import_from_gmns.html
 
+|
 As of July 2022, it is possible to import the following files from a GMNS source:
 
 * link table;
@@ -22,7 +23,7 @@ As of July 2022, it is possible to import the following files from a GMNS source
 You can find the specification for all these tables in the GMNS documentation, 
 `here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
 
-By default, the method *create_from_gmns()* read all required and optional fields
+By default, the method ``create_from_gmns()`` read all required and optional fields
 specified in the GMNS link and node tables specification. If you need it to read 
 any additional fields as well, you have to modify the AequilibraE parameters as
 shown in the :ref:`example <sphx_glr__auto_examples_plot_import_from_gmns.py>`.

@@ -27,6 +27,19 @@ transportation network can be edited without specialized software that
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific development efforts.
 
+Importing and exporting the network
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Currently AequilibraE can import links and nodes from a network from OpenStreetMaps, 
+GMNS, and from link layers. AequilibraE can also export the existing network
+into GMNS format. There is some valuable information on these topics in the following
+pages:
+
+* :ref:`Importing files in GMNS format <importing_from_gmns>` 
+* :ref:`Importing from OpenStreetMaps <importing_from_osm>`
+* :ref:`Importing from link layers <project_from_link_layer>`
+* :ref:`Exporting AequilibraE model to GMNS format <exporting_to_gmns>`
+
 Dealing with Geometries
 ^^^^^^^^^^^^^^^^^^^^^^^
 Geometry is a key feature when dealing with transportation infrastructure and
