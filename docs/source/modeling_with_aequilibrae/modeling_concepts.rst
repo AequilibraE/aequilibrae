@@ -27,12 +27,6 @@ to be **FAST**. In AequilibraE, we aim to make it as fast as possible, without
 making it overly complex to use, develop and maintain (we know how subjective
 *complex* is).
 
-.. note::
-   AequilibraE has had efficient multi-threaded All-or-Nothing (AoN) assignment
-   for a while, but since the Method of Successive Averages, Frank-Wolfe,
-   Conjugate-Frank-Wolfe, and Biconjugate-Frank-Wolfe are new in the software, it
-   should take some time for these implementations to reach full maturity.
-
 Performing traffic assignment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
