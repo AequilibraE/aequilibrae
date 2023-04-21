@@ -37,6 +37,12 @@ author = "Pedro Camargo"
 
 # The short X.Y version
 version = release_version
+if ".dev" in version:
+    switcher_version = "dev"
+elif "rc" in version:
+    switcher_version = version.split("rc")[0] + " (rc)"
+else:
+    switcher_version = version
 
 # -- General configuration ---------------------------------------------------
 
@@ -112,34 +118,20 @@ pygments_style = "sphinx"
 #
 html_theme = "pydata_sphinx_theme"
 
-# Define the json_url for our version switcher.
-json_url = "https://aequilibrae.com/python/dev/_static/switcher.json"
-
-# For local development, infer the version to match from the package.
-if "dev" in version or "rc" in version:
-    version_match = "latest"
-    # We want to keep the relative reference if we are in dev mode
-    # but we want the whole url if we are effectively in a released version
-    json_url = "_static/switcher.json"
-else:
-    version_match = "V" + version
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ["_static"]
 
 html_theme_options = {
     "show_nav_level": 0,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "navbar_end": ["theme-switcher", "version-switcher"],
     "switcher": {
-        "json_url": json_url,
-        "version_match": version_match,
+        "json_url": "/_static/switcher.json",
+        "version_match": switcher_version,
     },
 }
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
-
-html_css_files = ["conf.css"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 html_title = f"AequilibraE {version}"

@@ -11,7 +11,7 @@
 --@
 --@ **service_date** indicates the date for the indicate route scheduling
 --@
---@ *description_field* provides useful description of a transit agency
+--@ **description_field** provides useful description of a transit agency
 
 create TABLE IF NOT EXISTS agencies (
 	agency_id     INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
