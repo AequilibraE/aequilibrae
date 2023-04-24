@@ -17,11 +17,6 @@ The most important piece of AequilibraE's backend is, without a doubt, `numpy <h
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
 accelerate computation. All compiled code is written in `Cython <www.cython.org>`_.
 
-AequilibraE also observes a strong requirement of only using libraries that are available in the Python installation
-used by `QGIS <www.qgis.org>`_ on Windows, as the most important use case of this library is as the computational
-backend of the AequilibraE GUI for QGIS. This requirement can be relaxed, but it has to be analysed on a base-by-case
-basis and CANNOT break current workflow within QGIS.
-
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article. <http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.1001745>`__
 
@@ -30,9 +25,10 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.7, 3.8 and 3.9, but we recommend using Python 3.8 for development.
+AequilibraE is currently tested for Python 3.7, 3.8, 3.9 & 3.11, but we recommend using Python 3.9 or 2.10 for development.
 
-We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_, which is an awesome IDE for Python.
+We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or `VSCode <https://code.visualstudio.com/>`_
+which are awesome IDEs for Python.
 
 If you are using a different IDE, we would welcome if you could contribute with instructions to set that up.
 
@@ -48,15 +44,15 @@ Windows
 Make sure to clone the AequilibraE repository and run the following from within
 that cloned repo using an elevated command prompt.
 
-Python 3.8 (or whatever version you chose) needs to be installed, and the
+Python 3.9 (or whatever version you chose) needs to be installed, and the
 following instructions assume you are using `Chocolatey
 <https://chocolatey.org/>`_ as a package manager.
 ::
 
-    cinst python3 --version 3.8
+    cinst python3 --version 3.9
     cinst python
 
-    set PATH=C:\Python38;%PATH%
+    set PATH=C:\Python39;%PATH%
     python -m pip install pipenv
     virtualenv .venv #Only if you want to save the virtual environment in the same folder
     python -m pipenv install --dev
@@ -89,11 +85,12 @@ Imports
 * Imports should be one per line.
 * Imports should be grouped into standard library, third-party, and intra-library imports (`ctrl+shit+o`
   does it automatically on PyCharm).
-* Imports of NumPy should follow the following convention:
+* Imports of NumPy and Pandas should follow the following convention:
 
 .. code-block:: python
 
     import numpy as np
+    import pandas as pd
 
 Contributing to AequilibraE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,9 +122,9 @@ In a more verbose way...
     * Unit testing
     * Build/packaging tests
     * Documentation building test
-* If the tests pass, then a manual pull request can be approved to merge into master.
-* The master branch is protected and therefore can only be written to after the code has been reviewed and approved.
-* No individual has the privileges to push to the master branch.
+* If the tests pass, then a manual pull request can be approved to merge into develop.
+* The master ande velop branches are protected and therefore can only be written to after the code has been reviewed and approved.
+* No individual has the privileges to push to the master or developer branches.
 
 Release versions
 ~~~~~~~~~~~~~~~~~
@@ -157,13 +154,10 @@ Testing
 AequilibraE testing is done with three tools:
 
 * `Flake8 <https://pypi.org/project/flake8/>`_, a tool to check Python code style
-* `pytest <http://pytest.org/latest/>`_, a Python testing tool
-* `coveralls <https://github.com/coagulant/coveralls-python>`_, a tool for measuring test code coverage
+* `Black <https://black.readthedocs.io/en/stable/index.html/>`_, The uncompromising code formatter
 
-To run the tests locally, you will need to figure out what to do...
-
-
-These same tests are run by Travis with each push to the repository.  These tests need to pass in order to somebody
+Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python versions, and we use GitHub Actions
+to run these tests. These tests need to pass in order to somebody
 manually review the code before merging it into master (or returning for corrections).
 
 In some cases, test targets need to be updated to match the new results produced by the code since these 

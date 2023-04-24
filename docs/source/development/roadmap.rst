@@ -25,10 +25,8 @@ identified and that we intend to dedicate some time to in the future.
 
 * Public Transport
 
-    * Import of GTFS map-matching it into a project network
-    * Re-development of Public Transport data model for GTFS/AequilibraE
-    * Export of GTFS (enables editing of GTFS in QGIS
-    * Public transit assignment
+    * Export of GTFS (enables editing of GTFS in QGIS)
+    * Public transit assignment (Scheduled for 3rd Quarter 2023)
 
 * Project
 
