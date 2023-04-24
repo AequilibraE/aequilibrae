@@ -10,5 +10,4 @@ of Traffic Assignment, linked below.
     :maxdepth: 1
 
     validation_benchmarking/traffic_assignment
-    validation_benchmarking/select_link_analysis
     validation_benchmarking/ipf_performance

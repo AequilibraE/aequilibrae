@@ -185,12 +185,13 @@ applications.
 
 Computational performance
 -------------------------
-Running on a IdeaPad Gaming3i equipped with a 12 cores Intel Core i7-10750H
+Running on a IdeaPad laptop equipped with a 6 cores (12 threads) Intel Core i7-10750H
 CPU @ 2.60 GHz, and 32GB of RAM, AequilibraE performed 1,000 iterations of 
 Frank-Wolfe assignment on the Chicago Network in just under 18 minutes, 
-while Biconjugate Frank Wolfe takes just under 19 minutes.
+while Bi-conjugate Frank Wolfe takes just under 19 minutes, or a little more than
+1s per All-or-Nothing iteration.
 
-Compared with AequilibraE previous versions, we can notice a reasonable descrease
+Compared with AequilibraE previous versions, we can notice a reasonable decrease
 in processing time.
 
 Noteworthy items
