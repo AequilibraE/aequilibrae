@@ -17,7 +17,7 @@ from networks that are :ref:`NOT housed inside an AequilibraE model <plot_assign
 .. _aequilibrae-graphs:
 
 AequilibraE Graphs
-------------------
+~~~~~~~~~~~~~~
 
 As mentioned above, AequilibraE's graphs are the backbone of path computation,
 skimming and Traffic Assignment. Besides handling the selection of links available to
@@ -39,7 +39,7 @@ those that are available two class member variables consisting of Pandas DataFra
     # g.graph
 
 Directionality
-~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^
 
 Links in the Network table (the Pandas representation of the project's *Links* table) are
 potentially bi-directional, and the directions allowed for traversal are dictated by the
@@ -55,7 +55,7 @@ the graph used to set computations (e.g. field to minimize during path-finding, 
 etc.) will be **free_flow_travel_time**.
 
 Graphs from a model
-~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^
 
 Building graphs directly from an AequilibraE model is the easiest option for beginners
 or when using AequilibraE in anger, as much of the setup is done by default.
@@ -70,7 +70,7 @@ or when using AequilibraE in anger, as much of the setup is done by default.
     graph = project.network.graphs['c'] # we grab the graph for cars
 
 Manipulating graphs in memory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As mentioned before, the AequilibraE Graph can be manipulated in memory, with all its
 components available for editing.  One of the simple tools available directly in the
@@ -94,7 +94,7 @@ changes to be made in the network DataFrame. For example:
         graph.set_skimming(graph.skim_fields)
 
 Skimming settings
-~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^
 Skimming the field of a graph when computing shortest path or performing
 traffic assignment must be done by setting the skimming fields in the
 **Graph** object, and there are no limits (other than memory) to the number
@@ -106,7 +106,7 @@ of fields that can be skimmed.
     graph.set_skimming(["tolls", "distance", "free_flow_travel_time"])
 
 Setting centroids
-~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^
 
 Like other elements of the AequilibraE **Graph**, the user can also manipulate the
 set of nodes interpreted by the software as centroids in the **Graph** itself.
@@ -125,16 +125,13 @@ not blocking flows through "centroids".
     graph.set_blocked_centroid_flows(False)
 
 Traffic Assignment Procedure
-----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Along with a network data model, traffic assignment is the most technically
 challenging portion to develop in a modeling platform, especially if you want it
 to be **FAST**. In AequilibraE, we aim to make it as fast as possible, without
 making it overly complex to use, develop and maintain (we know *complex* is
 subjective).
-
-Performing traffic assignment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Below we detail the components that go into performing traffic assignment, but for
 a comprehensive use case for the traffic assignment module, please see the complete
@@ -188,7 +185,7 @@ To begin building the assignment it is easy:
     assig = TrafficAssignment()
 
 Volume Delay Function
-'''''''''''''''''''''
+^^^^^^^^^^^^^^^^^^^^^
 
 For now, the only VDF functions available in AequilibraE are the
 
