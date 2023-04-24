@@ -18,7 +18,7 @@ the two layers are kept compatible with each other by either making
 other changes to the layers or preventing the changes.
 
 **We cannot stress enough how impactful this set of spatial triggers was to**
-**the transportation modelling practice, as this is the first time a**
+**the transportation modeling practice, as this is the first time a**
 transportation network can be edited without specialized software that 
 **requires the editing to be done inside such software.**
 
