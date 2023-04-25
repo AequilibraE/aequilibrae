@@ -17,7 +17,7 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10']
         architecture: ['x64']
-        os: [windows-latest, macos-latest, linux-latest]
+        os: [windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v3
     - name: Set Python environment
