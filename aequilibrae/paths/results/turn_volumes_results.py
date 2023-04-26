@@ -11,7 +11,7 @@ import pandas as pd
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.project.project import Project
-from context import get_active_project
+from aequilibrae.context import get_active_project
 
 TURNING_VOLUME_GROUPING_COLUMNS = ["matrix_name", "network mode", "class_name", "iteration", "a", "b", "c"]
 TURNING_VOLUME_COLUMNS = TURNING_VOLUME_GROUPING_COLUMNS + ["demand"]
@@ -51,7 +51,7 @@ class TurnVolumesResults:
         self.mode_id = mode_id
         self.matrix = matrix
         self.matrix_mapping = matrix.matrix_hash
-        self.project_dir = Path(project.project_base_path)
+        self.project_dir = Path(self.project.project_base_path)
         self.procedure_id = procedure_id
         self.procedure_dir = self.project_dir / "path_files" / procedure_id
         self.iteration = self.get_iteration(iteration)
@@ -145,10 +145,12 @@ class TurnVolumesResults:
 
     def calculate_turn_volumes(self, turns_df: pd.DataFrame, betas: pd.DataFrame) -> pd.DataFrame:
         """
+        Args:
+            turns_df (:obj:`pd.DataFrame`): Dataframe containing turns' abc nodes required fields: [a, b, c]
+            betas (:obj:`pd.DataFrame`): Dataframe with betas to aggregate volumes by iterations. Must be indexed by iteration
 
-        :param turns_df: Dataframe containing turns' abc nodes required fields: [a, b, c]
-        :param betas: dataframe with betas to aggregate volumes by iterations. Must be indexed by iteration
-        :return: dataframe containing the turning volumes
+        Returns:
+            df (:obj:`pd.DataFrame`): Dataframe Containing the turning volumes
         """
         node_to_index_df = self.read_path_aux_file("node_to_index")
         correspondence_df = self.read_path_aux_file("correspondence")

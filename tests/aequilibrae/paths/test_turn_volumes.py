@@ -16,7 +16,7 @@ from aequilibrae import TrafficAssignment
 from aequilibrae import TrafficClass
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.results.turn_volumes_results import TurnVolumesResults
-from utils.spatialite_utils import ensure_spatialite_binaries
+from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 from ...data import siouxfalls_project
 
 TURNS_DF = pd.DataFrame([[1, 2, 6]], columns=["a", "b", "c"])

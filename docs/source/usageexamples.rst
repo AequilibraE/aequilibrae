@@ -1020,10 +1020,10 @@ To save turn movements from the assignment class it will be sufficient to use sa
 
     # add a line to save turning volumes to the specified table
     # the saving option also returns the dataframe containing turning volumes
-    turning_volumes = assigclass.save_turning_volumes("my_turn_results", turn_abc)
+    turning_volumes = assig.save_turning_volumes("my_turn_results", turn_abc)
 
     # to retrieve the turning volumes without saving to a table you can use this line instead
-    turning_volumes = assigclass.turning_volumes(turn_abc)
+    turning_volumes = assig.turning_volumes(turn_abc)
 
 To save turning volumes for an existing set of assignment results, we need:
 - the aequilibrae project
@@ -1032,7 +1032,9 @@ To save turning volumes for an existing set of assignment results, we need:
 
 
 ::
-
+    from os.path import join
+    import pandas as pd
+    from aequilibrae.project import Project
     from aequilibrae.paths import TurnVolumesResults
 
     # Required inputs from assignment results table
@@ -1056,8 +1058,8 @@ To save turning volumes for an existing set of assignment results, we need:
     }
 
     turning_movements = TurnVolumesResults.calculate_from_result_table(
-        project=self.project,
-        turns_df=TURNS_DF,
+        project=project,
+        turns_df=turn_abc,
         asgn_result_table_name="test_turn_movements",
         class_to_matrix=class_to_matrix
     )
