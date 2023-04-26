@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 from os import path
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -16,8 +16,10 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
+from aequilibrae.paths.results.turn_volumes_results import TurnVolumesResults
 from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.vdf import VDF, all_vdf_functions
+from aequilibrae.paths.vdf import VDF
+from aequilibrae.paths.vdf import all_vdf_functions
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -512,6 +514,68 @@ class TrafficAssignment(object):
 
         return df
 
+    def save_turning_volumes(
+        self,
+        table_name: str,
+        turns_df: pd.DataFrame,
+        classes: Optional[list[str]] = None,
+        iteration: Optional[int] = None,
+        blend_iterations: bool = True,
+    ) -> pd.DataFrame:
+        """Saves the turning movements to results_database.sqlite
+
+        Method fails if table exists
+
+        Args:
+            table_name (:obj:`str`): Name of the table to hold this assignment result
+            turns_df (:obj:`pd.DataFrame`): Dataframe containing a, b, c nodes of required turning volumes.
+            classes: (:obj:`list`): List containing requires traffic classes.
+                If None, all classes used in assignment will be exported.
+            iteration: (:obj:`int`): Desired iteration.
+            blend_iterations: (:obj:`bool`): whether or not to blend iterations.
+        """
+        df = self.turning_volumes(turns_df, classes, iteration, blend_iterations)
+        conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
+        df.to_sql(table_name, conn)
+        conn.close()
+
+        conn = self.project.connect()
+        data = [table_name, "turn volumes", self.procedure_id, "", self.procedure_date, self.description]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
+        conn.commit()
+        conn.close()
+        return df
+
+    def turning_volumes(
+        self,
+        turns_df: pd.DataFrame,
+        classes: Optional[list[str]] = None,
+        iteration: Optional[int] = None,
+        blend_iterations: bool = True,
+    ) -> pd.DataFrame:
+        betas_df = TurnVolumesResults.get_betas_df(self.report())
+
+        ta_turn_vol_list = []
+
+        if classes is None:
+            classes = self.classes
+
+        for tc in classes:
+            tc_turns = TurnVolumesResults.from_traffic_class(
+                tc,
+                self.procedure_id,
+                project=self.project,  # will get the active project
+                iteration=iteration,
+                blend_iterations=blend_iterations,
+            )
+            ta_turn_vol_list.append(tc_turns.calculate_turn_volumes(turns_df, betas_df))
+
+        return pd.concat(ta_turn_vol_list).reset_index(drop=True)
+
     def report(self) -> pd.DataFrame:
         """Returns the assignment convergence report
 
@@ -680,7 +744,7 @@ class TrafficAssignment(object):
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
-        Saves the select link link flows for all classes into the results database. Additionally, it exports
+        Saves the select link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
         Args:
             str table_name: Name of the table being inserted to. Note the traffic class

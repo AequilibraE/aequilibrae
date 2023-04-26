@@ -994,6 +994,73 @@ to be contiguous if an * .aem instead of a * .omx file) however.
     mat.load('demand.aem')
     mat.computational_view(['red_cars', 'blue_cars'])
 
+.. _turn_volumes:
+Extract turn volumes
+~~~~~~~~~
+The extraction of turning movements requires assignment paths. They have to be saved while
+assigning.
+Turn movements can be extracted from the assignment class once the assignment is executed or using an
+existing assignment results table.
+
+The turn volumes functions require a dataframe containing the a, b, and c nodes of the desired turns.
+
+To save turn movements from the assignment class it will be sufficient to use save_turning_volumes.
+
+
+::
+
+    # Create (or load) a dataframe with turns' a,b, c nodes
+    turn_abc = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+        ],
+        columns=["a", "b", "c"]
+    )
+
+    # add a line to save turning volumes to the specified table
+    # the saving option also returns the dataframe containing turning volumes
+    turning_volumes = assigclass.save_turning_volumes("my_turn_results", turn_abc)
+
+    # to retrieve the turning volumes without saving to a table you can use this line instead
+    turning_volumes = assigclass.turning_volumes(turn_abc)
+
+To save turning volumes for an existing set of assignment results, we need:
+- the aequilibrae project
+- a dataframe containing the a, b, and c nodes of the desired turns
+- a dictionary with the desired traffic classes as keys and the corresponding AequilibraeMatrix.
+
+
+::
+
+    from aequilibrae.paths import TurnVolumesResults
+
+    # Required inputs from assignment results table
+    # A dataframe containing turns' abc nodes with column names: a, b, c
+    fldr = 'D:/release/Sample models/sioux_falls_2020_02_15'
+    prj_fldr = '1_project'
+    project = Project()
+    project.load(join(fldr, prj_fldr))
+
+    turn_abc = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+        ],
+        columns=["a", "b", "c"]
+    )
+
+    class_to_matrix = {
+        "car": project.matrices.get_matrix("car_matrix"),
+        "truck": project.matrices.get_matrix("truck_matrix")
+    }
+
+    turning_movements = TurnVolumesResults.calculate_from_result_table(
+        project=self.project,
+        turns_df=TURNS_DF,
+        asgn_result_table_name="test_turn_movements",
+        class_to_matrix=class_to_matrix
+    )
 
 Advanced usage: Building a Graph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
