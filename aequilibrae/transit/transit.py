@@ -23,8 +23,9 @@ class Transit:
 
     def __init__(self, project):
         """
-        Args.:
-             *project* (:obj:``):
+        :Arguments:
+             **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            active project
         """
 
         self.project_base_path = project.project_base_path
@@ -36,14 +37,17 @@ class Transit:
     def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
         """Returns a GTFSRouteSystemBuilder object compatible with the project
 
-        Args:
-            *agency* (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
-            *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-            *day* (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
-            *description* (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
+        :Arguments:
+            **agency** (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
 
-        Return:
-            *gtfs_feed* (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
+            **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+
+            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+
+            **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
+
+        :Return:
+            **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(
             network=self.project_base_path,

@@ -14,32 +14,35 @@
 
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
+from sphinx_gallery.sorting import ExplicitOrder
 
-import sphinx_theme
-
-project_dir = Path(__file__).parent.parent
+project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
     sys.path.append(str(project_dir))
 
 # Sometimes this file is exec'd directly from sphinx code...
-project_dir = os.path.abspath("../..")
+project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
 from __version__ import release_version
 
-
 # -- Project information -----------------------------------------------------
 
 project = "AequilibraE"
-copyright = "2018, Pedro Camargo"
+copyright = f"{str(datetime.now().date())}, AequilibraE developers"
 author = "Pedro Camargo"
 
 # The short X.Y version
 version = release_version
-# The full version, including alpha/beta/rc tags
-release = "30/07/2018"
+if ".dev" in version:
+    switcher_version = "dev"
+elif "rc" in version:
+    switcher_version = version.split("rc")[0] + " (rc)"
+else:
+    switcher_version = version
 
 # -- General configuration ---------------------------------------------------
 
@@ -61,11 +64,23 @@ extensions = [
     "sphinx_autodoc_annotation",
     "sphinx.ext.autosummary",
     "sphinx_git",
+    "sphinx_panels",
+    "sphinx_copybutton"
 ]
 
+# Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
+    'capture_repr': ('_repr_html_', '__repr__'),
+    'remove_config_comments': True,
+    "plot_gallery": False,
+    "subsection_order": ExplicitOrder(["examples/creating_models",
+                                      "examples/network_manipulation",
+                                      "examples/editing_networks",
+                                      "examples/trip_distribution",
+                                      "examples/visualization",
+                                      "examples/other_applications"])
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -85,7 +100,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -94,26 +109,32 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-highlight_language = "none"
+# highlight_language = "none"
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = "pyramid"
-html_theme = "neo_rtd_theme"
-html_theme_path = [sphinx_theme.get_html_theme_path(html_theme)]
-
-# html_theme_options = {
-#     "body_max_width": '70%',
-#     'sidebarwidth': '20%'
-# }
-
+html_theme = "pydata_sphinx_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+html_theme_options = {
+    "show_nav_level": 0,
+    "github_url": "https://github.com/AequilibraE/aequilibrae",
+    "navbar_end": ["theme-switcher", "version-switcher"],
+    "switcher": {
+        "json_url": "/_static/switcher.json",
+        "version_match": switcher_version,
+    },
+}
+
+# The name for this set of Sphinx documents.  If None, it defaults to
+html_title = f"AequilibraE {version}"
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
@@ -140,13 +161,10 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 autodoc_default_options = {
     "members": "var1, var2",
     "member-order": "bysource",
-    "special-members": "__init__",
+    "special-members": False,
     "private-members": False,
     "undoc-members": True,
     "exclude-members": "__weakref__",
-    "inherited-members": False,
-    "show-inheritance": False,
-    "autodoc_inherit_docstrings": False,
 }
 
 autodoc_member_order = "groupwise"

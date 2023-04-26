@@ -20,118 +20,119 @@ has_omx = spec is not None
 
 
 class GravityApplication:
-    """Applies a synthetic gravity model
+    """Applies a synthetic gravity model.
 
-    Model is an instance of SyntheticGravityModel class
-    Impedance is an instance of AequilibraEMatrix
-    Row and Column vectors are instances of AequilibraeData
+    Model is an instance of SyntheticGravityModel class.
+    Impedance is an instance of AequilibraEMatrix.
+    Row and Column vectors are instances of AequilibraeData.
 
-    ::
+    .. code-block:: python
 
-        import pandas as pd
-        import sqlite3
+        >>> import pandas as pd
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+        >>> from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 
-        from aequilibrae.matrix import AequilibraeMatrix
-        from aequilibrae.matrix import AequilibraeData
-
-        from aequilibrae.distribution import SyntheticGravityModel
-        from aequilibrae.distribution import GravityApplication
+        >>> project = Project.from_path("/tmp/test_project_ga")
 
         # We define the model we will use
-        model = SyntheticGravityModel()
+        >>> model = SyntheticGravityModel()
 
         # Before adding a parameter to the model, you need to define the model functional form
-        model.function = "GAMMA" # "EXPO" or "POWER"
+        >>> model.function = "GAMMA" # "EXPO" or "POWER"
 
         # Only the parameter(s) applicable to the chosen functional form will have any effect
-        model.alpha = 0.1
-        model.beta = 0.0001
+        >>> model.alpha = 0.1
+        >>> model.beta = 0.0001
 
         # Or you can load the model from a file
-        model.load('path/to/model/file')
+        # model.load('path/to/model/file')
 
         # We load the impedance matrix
-        matrix = AequilibraeMatrix()
-        matrix.load('path/to/impedance_matrix.aem')
-        matrix.computational_view(['distance'])
+        >>> matrix = AequilibraeMatrix()
+        >>> matrix.load('/tmp/test_project_ga/matrices/skims.omx')
+        >>> matrix.computational_view(['distance_blended'])
 
         # We create the vectors we will use
-        conn = sqlite3.connect('path/to/demographics/database')
-        query = "SELECT zone_id, population, employment FROM demographics;"
-        df = pd.read_sql_query(query,conn)
-
-        index = df.zone_id.values[:]
-        zones = index.shape[0]
+        >>> query = "SELECT zone_id, population, employment FROM zones;"
+        >>> df = pd.read_sql(query, project.conn)
+        >>> df.sort_values(by="zone_id", inplace=True)
 
         # You create the vectors you would have
-        df = df.assign(production=df.population * 3.0)
-        df = df.assign(attraction=df.employment * 4.0)
+        >>> df = df.assign(production=df.population * 3.0)
+        >>> df = df.assign(attraction=df.employment * 4.0)
+
+        >>> zones = df.index.shape[0]
 
         # We create the vector database
-        args = {"entries": zones, "field_names": ["productions", "attractions"],
-            "data_types": [np.float64, np.float64], "memory_mode": True}
-        vectors = AequilibraeData()
-        vectors.create_empty(**args)
+        >>> args = {"entries": zones, "field_names": ["productions", "attractions"],
+        ...     "data_types": [np.float64, np.float64], "memory_mode": True}
+        >>> vectors = AequilibraeData()
+        >>> vectors.create_empty(**args)
 
         # Assign the data to the vector object
-        vectors.productions[:] = df.production.values[:]
-        vectors.attractions[:] = df.attraction.values[:]
-        vectors.index[:] = zones[:]
+        >>> vectors.productions[:] = df.production.values[:]
+        >>> vectors.attractions[:] = df.attraction.values[:]
+        >>> vectors.index[:] = df.zone_id.values[:]
 
         # Balance the vectors
-        vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
+        >>> vectors.attractions[:] *= vectors.productions.sum() / vectors.attractions.sum()
 
         # Create the problem object
-        args = {"impedance": matrix,
-                "rows": vectors,
-                "row_field": "productions",
-                "model": model,
-                "columns": vectors,
-                "column_field": "attractions",
-                "output": 'path/to/output/matrix.aem',
-                "nan_as_zero":True
-                }
-        gravity = GravityApplication(**args)
+        >>> args = {"impedance": matrix,
+        ...         "rows": vectors,
+        ...         "row_field": "productions",
+        ...         "model": model,
+        ...         "columns": vectors,
+        ...         "column_field": "attractions",
+        ...         "output": '/tmp/test_project_ga/matrices/matrix.aem',
+        ...         "nan_as_zero":True
+        ...         }
+        >>> gravity = GravityApplication(**args)
 
         # Solve and save the outputs
-        gravity.apply()
-        gravity.output.export('path/to/omx_file.omx')
-        with open('path.to/report.txt', 'w') as f:
-            for line in gravity.report:
-                f.write(f'{line}\n')
+        >>> gravity.apply()
+        >>> gravity.output.export('/tmp/test_project_ga/matrices/omx_file.omx')
+
+        # To save your report into a file, you can do the following:
+        # with open('/tmp/test_project_ga/report.txt', 'w') as file:
+        #     for line in gravity.report:
+        #         file.write(f"{line}\\n")
+
     """
 
     def __init__(self, project=None, **kwargs):
         """
         Instantiates the Ipf problem
 
-        Args:
-            model (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
+        :Arguments:
+            **model** (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
 
-            impedance (:obj:`AequilibraeMatrix`): Impedance matrix to be used
+            **impedance** (:obj:`AequilibraeMatrix`): Impedance matrix to be used
 
-            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+            **rows** (:obj:`AequilibraeData`): Vector object with data for row totals
 
-            row_field (:obj:`str`): Field name that contains the data for the row totals
+            **row_field** (:obj:`str`): Field name that contains the data for the row totals
 
-            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+            **columns** (:obj:`AequilibraeData`): Vector object with data for column totals
 
-            column_field (:obj:`str`): Field name that contains the data for the column totals
+            **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+            **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            active project
 
-            core_name (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
+            **core_name** (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
 
-            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
-            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
 
-        Results:
-            output (:obj:`AequilibraeMatrix`): Result Matrix
+        :Results:
+            **output** (:obj:`AequilibraeMatrix`): Result Matrix
 
-            report (:obj:`list`): Iteration and convergence report
+            **report** (:obj:`list`): Iteration and convergence report
 
-            error (:obj:`str`): Error description
+            **error** (:obj:`str`): Error description
         """
 
         self.project = project
@@ -224,10 +225,10 @@ class GravityApplication:
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the matrix output to the project file
 
-        Args:
-            name (:obj:`str`): Name of the desired matrix record
-            file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        :Arguments:
+            **name** (:obj:`str`): Name of the desired matrix record
+            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
         project = project or get_active_project()

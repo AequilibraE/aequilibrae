@@ -58,7 +58,9 @@ class AssignmentResultsTable(object):
 
 class AssignmentPaths(object):
     """Class for accessing path files optionally generated during assignment.
-    ::
+
+    .. code-block:: python
+
         paths = AssignmentPath(table_name_with_assignment_results)
         paths.get_path_for_destination(origin, destination, iteration, traffic_class_id)
     """
@@ -66,10 +68,12 @@ class AssignmentPaths(object):
     def __init__(self, table_name: str, project=None) -> None:
         """
         Instantiates the class
-         Args:
-            table_name (str): Name of the traffic assignment result table used to generate the required path files
 
-            project (:obj:`Project`, optional): The Project to connect to. By default, uses the currently active project
+        :Arguments:
+            **table_name** (str): Name of the traffic assignment result table used to generate the required path files
+
+            **project** (:obj:`Project`, optional): The Project to connect to.
+            By default, uses the currently active project
 
         """
         project = project or get_active_project()

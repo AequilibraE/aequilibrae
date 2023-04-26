@@ -29,36 +29,37 @@ sys.dont_write_bytecode = True
 class NetworkSkimming(WorkerThread):
     """
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae.paths.network_skimming import NetworkSkimming
-        from aequilibrae.project import Project
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
-        project = Project()
-        project.open(self.proj_dir)
-        network = self.project.network
+        >>> project = Project.from_path("/tmp/test_project")
 
-        network.build_graphs()
-        graph = network.graphs['c']
-        graph.set_graph(cost_field="distance")
-        graph.set_skimming("distance")
+        >>> network = project.network
+        >>> network.build_graphs()
 
-        skm = NetworkSkimming(graph)
-        skm.execute()
+        >>> graph = network.graphs['c']
+        >>> graph.set_graph(cost_field="distance")
+        >>> graph.set_skimming("distance")
+
+        >>> skm = NetworkSkimming(graph)
+        >>> skm.execute()
 
         # The skim report (if any error generated) is available here
-        skm.report
+        >>> skm.report
+        []
 
         # To access the skim matrix directly from its temporary file
-        matrix = skm.results.skims
+        >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        skm.save_to_project('skimming result')
+        >>> skm.save_to_project('/tmp/skimming result.omx')
 
         # Or specify the AequilibraE's matrix file format
-        skm.save_to_project('skimming result', 'aem')
+        >>> skm.save_to_project('skimming result', 'aem')
 
-        project.close()
+        >>> project.close()
     """
 
     if pyqt:
@@ -111,10 +112,10 @@ class NetworkSkimming(WorkerThread):
     def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database
 
-        Args:
-            *name* (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-            *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        :Arguments:
+            **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
+            **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to. Defaults to the active project
         """
 
         file_name = f"{name}.{format.lower()}"

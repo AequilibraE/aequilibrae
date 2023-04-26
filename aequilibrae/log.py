@@ -2,26 +2,25 @@ import os
 import tempfile
 import logging
 
-from .parameters import Parameters
+from aequilibrae.parameters import Parameters
 
 
 class Log:
     """API entry point to the log file contents
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> project = Project.from_path("/tmp/test_project")
 
-        log = p.log()
+        >>> log = project.log()
 
         # We get all entries for the log file
-        entries = log.contents()
+        >>> entries = log.contents()
 
         # Or clear everything (NO UN-DOs)
-        log.clear()
+        >>> log.clear()
     """
 
     def __init__(self, project_base_path: str):
@@ -30,8 +29,8 @@ class Log:
     def contents(self) -> list:
         """Returns contents of log file
 
-        Return:
-            *log_contents* (:obj:`list`): List with all entries in the log file
+        :Return:
+            **log_contents** (:obj:`list`): List with all entries in the log file
         """
 
         with open(self.log_file_path, "r") as file:
@@ -60,7 +59,7 @@ def _setup_logger():
 
 
 def get_log_handler(log_file: str, ensure_file_exists=True):
-    """return a log handler that writes to the given log_file"""
+    """Return a log handler that writes to the given log_file"""
     if os.path.exists(log_file) and not os.path.isfile(log_file):
         raise FileExistsError(f"{log_file} is not a valid file")
 

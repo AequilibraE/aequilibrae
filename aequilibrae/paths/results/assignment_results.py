@@ -76,10 +76,10 @@ class AssignmentResults:
         """
         Prepares the object with dimensions corresponding to the assignment matrix and graph objects
 
-        Args:
-            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+        :Arguments:
+            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
 
-            *matrix* (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
              matrix.computational_view(:obj:`list`)
         """
 
@@ -210,8 +210,8 @@ class AssignmentResults:
         Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
         inputs result in values outside those limits
 
-        Args:
-            *cores* (:obj:`int`): Number of cores to be used in computation
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
         """
 
         if not isinstance(cores, int):
@@ -243,8 +243,8 @@ class AssignmentResults:
         """
         Translates the assignment results from the graph format into the network format
 
-        Returns:
-            dataset (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
+        :Returns:
+            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
         """
         fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
         types = [np.float64] * len(fields)
@@ -311,12 +311,14 @@ class AssignmentResults:
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:
-        """DEPRECATED
-        Function to write to disk all outputs computed during assignment
+        """
+        Function to write to disk all outputs computed during assignment.
 
-        Args:
-            *file_name* (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
-            *output* (:obj:`str`, optional): Type of output ('loads', 'path_file'). Defaults to 'loads'
+        .. deprecated:: 0.7.0
+
+        :Arguments:
+            **file_name** (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
+            **output** (:obj:`str`, optional): Type of output ('loads', 'path_file'). Defaults to 'loads'
         """
 
         if output == "loads":

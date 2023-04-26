@@ -15,23 +15,36 @@ from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.log import get_log_handler
-from .project_cleaning import clean
-from .project_creation import initialize_tables
-from ..transit import Transit
+from aequilibrae.project.project_cleaning import clean
+from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.transit.transit import Transit
 
 
 class Project:
     """AequilibraE project class
 
-    ::
+    .. code-block:: python
+        :caption: Create Project
 
-        from aequilibrae.project import Project
+        >>> newfile = Project()
+        >>> newfile.new('/tmp/new_project')
 
-        existing = Project()
-        existing.load('path/to/existing/project/folder')
+    .. code-block:: python
+        :caption: Open Project
 
-        newfile = Project()
-        newfile.new('path/to/new/project/folder')
+        >>> from aequilibrae.project import Project
+
+        >>> existing = Project()
+        >>> existing.open('/tmp/test_project')
+
+        >>> #Let's check some of the project's properties
+        >>> existing.network.list_modes()
+        ['M', 'T', 'b', 'c', 't', 'w']
+        >>> existing.network.count_links()
+        76
+        >>> existing.network.count_nodes()
+        24
+
     """
 
     def __init__(self):
@@ -44,12 +57,18 @@ class Project:
         self.logger: logging.Logger = None
         self.transit: Transit = None
 
+    @classmethod
+    def from_path(cls, project_folder):
+        project = Project()
+        project.open(project_folder)
+        return project
+
     def open(self, project_path: str) -> None:
         """
         Loads project from disk
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
 
@@ -71,8 +90,8 @@ class Project:
     def new(self, project_path: str) -> None:
         """Creates a new project
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
         self.project_base_path = project_path
@@ -121,8 +140,11 @@ class Project:
         """
         Loads project from disk
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        .. deprecated:: 0.7.0
+            Use :func:`open` instead.
+
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
         warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)

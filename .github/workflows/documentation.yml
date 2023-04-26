@@ -34,10 +34,21 @@ jobs:
 
     - name: Compile library
       run: |
-        python3 setup.py build_ext --inplace
+        python setup.py build_ext --inplace
 
     - name: Check history of versions
-      run: python docs/website/check_documentation_versions.py
+      run: |
+          python docs/table_documentation.py
+          python docs/create_docs_data.py
+          python docs/website/check_documentation_versions.py
+
+    - name: Test docstrings
+      run: |
+        echo "DOCUMENTATION TESTING GOES HERE"
+        python -m doctest -v ./aequilibrae/parameters.py
+        python -m doctest -v ./aequilibrae/project/about.py
+        python -m doctest -v ./aequilibrae/project/zoning.py
+
 
     - name: Build documentation
       run: |

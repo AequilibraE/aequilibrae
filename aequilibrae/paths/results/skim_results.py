@@ -6,30 +6,29 @@ from aequilibrae.paths.graph import Graph
 
 class SkimResults:
     """
-    Network skimming result holder
+    Network skimming result holder.
 
-    ::
+    .. code-block:: python
 
-          from aequilibrae.project import Project
-          from aequilibrae.paths.results import SkimResults
+          >>> from aequilibrae import Project
+          >>> from aequilibrae.paths.results import SkimResults
 
-          proj = Project()
-          proj.load('path/to/project/folder')
-          proj.network.build_graphs()
+          >>> proj = Project.from_path("/tmp/test_project")
+          >>> proj.network.build_graphs()
+
           # Mode c is car in this project
-          car_graph = proj.network.graphs['c']
+          >>> car_graph = proj.network.graphs['c']
 
           # minimize travel time
-          car_graph.set_graph('free_flow_travel_time')
+          >>> car_graph.set_graph('free_flow_time')
 
           # Skims travel time and distance
-          car_graph.set_skimming(['free_flow_travel_time', 'distance'])
+          >>> car_graph.set_skimming(['free_flow_time', 'distance'])
 
-          res = SkimResults()
-          res.prepare(car_graph)
-          res.compute_skims()
+          >>> res = SkimResults()
+          >>> res.prepare(car_graph)
 
-          res.skims.export('path/to/matrix.aem')
+          >>> res.skims.export('/tmp/test_project/matrix.aem')
     """
 
     def __init__(self):
@@ -47,8 +46,8 @@ class SkimResults:
         """
         Prepares the object with dimensions corresponding to the graph objects
 
-        Args:
-            *graph* (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
+        :Arguments:
+            **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
         """
 
         if not graph.cost_field:
@@ -79,8 +78,8 @@ class SkimResults:
         Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
         inputs result in values outside those limits
 
-        Args:
-            *cores* (:obj:`int`): Number of cores to be used in computation
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
         """
 
         if isinstance(cores, int):

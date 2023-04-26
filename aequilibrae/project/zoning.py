@@ -6,37 +6,38 @@ import shapely.wkb
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
 from shapely.ops import unary_union
 
+from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.utils.geo_index import GeoIndex
-from .basic_table import BasicTable
-from .zone import Zone
+from aequilibrae.project.zone import Zone
 
 
 class Zoning(BasicTable):
     """
     Access to the API resources to manipulate the zones table in the project
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> project = Project.from_path("/tmp/test_project")
 
-        zones = p.zoning
 
-        # We edit the fields for a particular zone
-        zone_downtown = zones.get(1)
-        zone_downtown.population = 637
-        zone_downtown.employment = 10039
-        zone_downtown.save()
+        >>> zoning = project.zoning
 
-        fields = zones.fields
+        >>> zone_downtown = zoning.get(1)
+        >>> zone_downtown.population = 637
+        >>> zone_downtown.employment = 10039
+        >>> zone_downtown.save()
+
+        # changing the value for an existing value/field
+        >>> project.about.scenario_name = 'Just a better scenario name'
+        >>> project.about.write_back()
 
         # We can also add one more field to the table
-        fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
-
+        >>> fields = zoning.fields
+        >>> fields.add('parking_spots', 'Total licensed parking spots', 'INTEGER')
     """
 
     def __init__(self, network):
@@ -52,8 +53,8 @@ class Zoning(BasicTable):
     def new(self, zone_id: int) -> Zone:
         """Creates a new zone
 
-        Returns:
-            *zone* (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
+        :Returns:
+            **zone** (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
         """
 
         if zone_id in self.__items:
@@ -78,8 +79,8 @@ class Zoning(BasicTable):
     def coverage(self) -> Polygon:
         """Returns a single polygon for the entire zoning coverage
 
-        Returns:
-            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
+        :Returns:
+            **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
         self._curr.execute('Select ST_asBinary("geometry") from zones;')
         polygons = [shapely.wkb.loads(x[0]) for x in self._curr.fetchall()]
@@ -105,11 +106,11 @@ class Zoning(BasicTable):
             If the geometry is not fully enclosed by any zone, the zone closest to
             the geometry is returned
 
-        Args:
-            *geometry* (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
+        :Arguments:
+            **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
 
-        Return:
-            *zone_id* (:obj:`int`): ID of the zone applicable to the point provided
+        :Return:
+            **zone_id** (:obj:`int`): ID of the zone applicable to the point provided
         """
 
         nearest = self.__geo_index.nearest(geometry, 10)

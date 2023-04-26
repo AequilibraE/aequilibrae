@@ -1,5 +1,5 @@
-Workflows
-=========
+Examples
+========
 
-A series of different workflows using AequilibraE's main features
+A series of different examples using AequilibraE's main features
 

@@ -1,33 +1,26 @@
-.. _aequilibrae_api:
+.. _api_reference:
 
-API documentation
-=================
+=============
+API Reference
+=============
 
 .. automodule:: aequilibrae
-   :no-members:
-   :no-undoc-members:
-   :no-inherited-members:
-   :no-show-inheritance:
 
-Project Module
---------------
-
-.. currentmodule:: aequilibrae
-
+Project
+-------
+.. current_module:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
-    Project
+   Project
 
-Project components
-++++++++++++++++++
-
+Project Components
+~~~~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
-
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     About
     FieldEditor
@@ -36,91 +29,75 @@ Project components
     Network
     Zoning
 
-Project objects
-++++++++++++++++++
-
+Project Objects
+~~~~~~~~~~~~~~~
 .. currentmodule:: aequilibrae.project
-
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     Zone
 
-Network data
-~~~~~~~~~~~~
-
+Network Data
+------------
 .. currentmodule:: aequilibrae.project.network
-
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     Modes
     LinkTypes
     Links
     Nodes
 
-Network items
-~~~~~~~~~~~~~
-
+Network Items
+-------------
 .. currentmodule:: aequilibrae.project.network
-
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
-
+   :toctree: generated/
 
     Mode
     LinkType
     Link
     Node
 
-Parameters Module
------------------
-
+Parameters
+----------
 .. currentmodule:: aequilibrae
-
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     Parameters
 
-Distribution Module
--------------------
-
-.. currentmodule:: aequilibrae
-
+Distribution
+------------
+.. currentmodule:: aequilibrae.distribution
 .. autosummary::
-   :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     Ipf
     GravityApplication
     GravityCalibration
     SyntheticGravityModel
 
-Matrix Module
--------------
-
-.. currentmodule:: aequilibrae
-
+Matrix
+------
+.. currentmodule:: aequilibrae.matrix
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
-    AequilibraeMatrix
-    AequilibraeData
+   AequilibraeData
+   AequilibraeMatrix
 
-Paths Module
-------------
-
-.. currentmodule:: aequilibrae
-
+Paths
+-----
+.. currentmodule:: aequilibrae.paths
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
     Graph
     AssignmentResults
@@ -130,22 +107,11 @@ Paths Module
     TrafficClass
     TrafficAssignment
 
-Transit Module
---------------
-
-.. currentmodule:: aequilibrae
-
+Transit
+-------
+.. currentmodule:: aequilibrae.transit
 .. autosummary::
    :nosignatures:
-   :toctree: _generated
+   :toctree: generated/
 
-    GTFS
-    create_gtfsdb
-
-Use examples
-------------
-
-.. toctree::
-   :maxdepth: 1
-
-   usageexamples
+    Transit

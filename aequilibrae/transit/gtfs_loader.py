@@ -63,8 +63,9 @@ class GTFSReader(WorkerThread):
 
     def set_feed_path(self, file_path):
         """Sets GTFS feed source to be used
-        Args:
-            *file_path* (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+
+        :Arguments:
+            **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
         """
 
         self.archive_dir = file_path
@@ -88,8 +89,8 @@ class GTFSReader(WorkerThread):
     def load_data(self, service_date: str):
         """Loads the data for a respective service date.
 
-        Args.:
-             *service_date*(:obj:`str`): service date. e.g. "2020-04-01".
+        :Arguments:
+            **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
         ag_id = self.agency.agency
         self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")

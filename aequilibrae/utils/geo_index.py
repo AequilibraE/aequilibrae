@@ -39,9 +39,9 @@ class GeoIndex:
     ) -> None:
         """Inserts a valid shapely geometry in the index
 
-        Args:
-            *feature_id* (:obj:`int`): ID of the geometry being inserted
-            *geo* (:obj:`Shapely geometry`): Any valid shapely geometry
+        :Arguments:
+            **feature_id** (:obj:`int`): ID of the geometry being inserted
+            **geo** (:obj:`Shapely.geometry`): Any valid shapely geometry
         """
         self.built = True
         if env == "QGIS":
@@ -59,11 +59,11 @@ class GeoIndex:
     def nearest(self, geo: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon], num_results) -> List[int]:
         """Finds nearest neighbor for a given geometry
 
-        Args:
-            *geo* (:obj:`Shapely geometry`): Any valid shapely geometry
-            *num_results* (:obj:`int`): A positive integer for the number of neighbors to return
-        Return:
-            *neighbors* (:obj:`List[int]`): List of IDs of the closest neighbors in the index
+        :Arguments:
+            **geo** (:obj:`Shapely geometry`): Any valid shapely geometry
+            **num_results** (:obj:`int`): A positive integer for the number of neighbors to return
+        :Return:
+            **neighbors** (:obj:`List[int]`): List of IDs of the closest neighbors in the index
         """
         if env == "QGIS":
             g = QgsGeometry()

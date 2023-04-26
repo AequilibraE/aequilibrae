@@ -52,7 +52,7 @@ What is available
 What is available only in QGIS
 ******************************
 
-Some common resources for transportation modelling are inherently visual, and therefore they make more sense if
+Some common resources for transportation modeling are inherently visual, and therefore they make more sense if
 available within a GIS platform. For that reason, many resources are available only from AequilibraE's `QGIS plugin
 <http://plugins.qgis.org/plugins/AequilibraE/>`_,
 which uses AequilibraE as its computational workhorse and also provides GUIs for most of AequilibraE's tools. Said tool
@@ -85,7 +85,7 @@ Before there was AequilibraE, there was a need for something like AequilibraE ou
 The very early days
 *******************
 It all started when I was a student at `UCI-ITS <www.its.uci.edu>`_ and needed low level access to outputs of standard
-algorithms used in transportation modelling (e.g. path files from traffic assignment) and had that denied by the maker
+algorithms used in transportation modeling (e.g. path files from traffic assignment) and had that denied by the maker
 of the commercial software he normally used. There, the `first scratch of a traffic assignment procedure
 <www.xl-optim.com/python-traffic-assignment>`_ was born.
 After that, there were a couple of scripts developed to implement synthetic gravity models (calibration and application)

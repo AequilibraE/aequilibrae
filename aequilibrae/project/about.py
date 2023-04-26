@@ -6,15 +6,21 @@ from aequilibrae.project.project_creation import run_queries_from_sql_file
 
 class About:
     """Provides an interface for querying and editing the **about** table of an AequilibraE project
-    ::
 
-        p = Project()
-        p.open('my/project/folder')
-        about = p.about
+    .. code-block:: python
 
-        about.description = 'This is the example project. Do not use for forecast'
-        about.write_back()
+        >>> from aequilibrae import Project
 
+        >>> project = Project.from_path("/tmp/test_project")
+
+        # Adding a new field and saving it
+        >>> project.about.add_info_field('my_super_relevant_field')
+        >>> project.about.my_super_relevant_field = 'super relevant information'
+        >>> project.about.write_back()
+
+        # changing the value for an existing value/field
+        >>> project.about.scenario_name = 'Just a better scenario name'
+        >>> project.about.write_back()
 
     """
 
@@ -53,17 +59,18 @@ class About:
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
 
-        Args:
-            *info_field* (:obj:`str`): Name of the desired information field to be added.  Has to be a valid
+        :Arguments:
+            **info_field** (:obj:`str`): Name of the desired information field to be added. Has to be a valid
             Python VARIABLE name (i.e. letter as first character, no spaces and no special characters)
 
-        ::
+        .. code-block:: python
 
-            p = Project()
-            p.open('my/project/folder')
-            p.about.add_info_field('my_super_relevant_field')
-            p.about.my_super_relevant_field = 'super relevant information'
-            p.about.write_back()
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> p.about.add_info_field('a_cool_field')
+            >>> p.about.a_cool_field = 'super relevant information'
+            >>> p.about.write_back()
         """
         allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
@@ -81,12 +88,13 @@ class About:
     def write_back(self):
         """Saves the information parameters back to the project database
 
-        ::
+        .. code-block:: python
 
-            p = Project()
-            p.open('my/project/folder')
-            p.about.description = 'This is the example project. Do not use for forecast'
-            p.about.write_back()
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> p.about.description = 'This is the example project. Do not use for forecast'
+            >>> p.about.write_back()
         """
         curr = self.__conn.cursor()
         for k in self.__characteristics:

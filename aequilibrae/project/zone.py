@@ -58,10 +58,10 @@ class Zone(SafeClass):
     def add_centroid(self, point: Point, robust=True) -> None:
         """Adds a centroid to the network file
 
-        Args:
-            *point* (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
+        :Arguments:
+            **point** (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
             If None, uses the geometric center of the zone
-            *robust* (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
+            **robust** (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
             Defaults to True.
         """
 
@@ -112,13 +112,13 @@ class Zone(SafeClass):
 
         If fewer candidates than required connectors are found, all candidates are connected.
 
-            Args:
-                *mode_id* (:obj:`str`): Mode ID we are trying to connect
+        :Arguments:
+            **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
-                *link_types* (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
-                eg: yCdR. Defaults to ALL link types
+            **link_types** (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
+            eg: yCdR. Defaults to ALL link types
 
-                *connectors* (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+            **connectors** (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
         """
         connector_creation(
             self.geometry,
@@ -133,8 +133,8 @@ class Zone(SafeClass):
     def disconnect_mode(self, mode_id: str) -> None:
         """Removes centroid connectors for the desired mode from the network file
 
-        Args:
-            *mode_id* (:obj:`str`): Mode ID we are trying to disconnect from this zone
+        :Arguments:
+            **mode_id** (:obj:`str`): Mode ID we are trying to disconnect from this zone
         """
 
         curr = self.conn.cursor()

@@ -1,3 +1,17 @@
+--@ The *stops_connectors* table holds information on the connection of
+--@ the GTFS network with the real network.
+--@
+--@ **id_from** identifies the network link the vehicle departs
+--@
+--@ **id_to** identifies the network link th vehicle is heading to
+--@
+--@ **conn_type** identifies the type of connection used to connect the links
+--@
+--@ **traversal_time** represents the time spent crossing the link
+--@
+--@ **penalty_cost** identifies the penalty in the connection
+
+
 CREATE TABLE IF NOT EXISTS stop_connectors (
 	id_from        INTEGER  NOT NULL,
 	id_to          INTEGER  NOT NULL,
