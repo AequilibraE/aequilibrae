@@ -123,7 +123,7 @@ In a more verbose way...
     * Build/packaging tests
     * Documentation building test
 * If the tests pass, then a manual pull request can be approved to merge into develop.
-* The master ande velop branches are protected and therefore can only be written to after the code has been reviewed and approved.
+* The master and develop branches are protected and therefore can only be written to after the code has been reviewed and approved.
 * No individual has the privileges to push to the master or developer branches.
 
 Release versions
