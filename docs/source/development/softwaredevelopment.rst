@@ -157,7 +157,7 @@ AequilibraE testing is done with three tools:
 * `Black <https://black.readthedocs.io/en/stable/index.html/>`_, The uncompromising code formatter
 
 Testing is done for Windows, MacOs and Ubuntu Linux on all supported Python versions, and we use GitHub Actions
-to run these tests. These tests need to pass in order to somebody
+to run these tests. These tests need to pass and additionally somebody has to
 manually review the code before merging it into master (or returning for corrections).
 
 In some cases, test targets need to be updated to match the new results produced by the code since these 
