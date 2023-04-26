@@ -10,4 +10,5 @@ def replace_in_file(file_path, text_orig, suffix):
 
 
 replace_in_file("../requirements.txt", "numpy", "<1.22")
+replace_in_file("../pyproject.toml", "numpy", "<1.22")
 replace_in_file("../__version__.py", "{minor_version}", ".dev0")

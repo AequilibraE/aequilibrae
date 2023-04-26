@@ -18,10 +18,6 @@ jobs:
         python-version: ['3.9', '3.10']
         architecture: ['x64']
         os: [windows-latest, macos-latest]
-        include:
-          - os: macos-latest
-            CC: "gcc-12"
-            CXX: "g++-12"
     steps:
     - uses: actions/checkout@v3
     - name: Set Python environment
@@ -62,7 +58,7 @@ jobs:
 
     - name: Build
       if: ${{matrix.os != 'macos-latest'}}
-      run: python setup.py bdist_wheel
+      run: python setup.py sdist bdist_wheel
 
     - name: Stores artifacts along with the workflow result
       uses: actions/upload-artifact@v3
@@ -77,3 +73,10 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: twine upload dist/*.whl
+
+    - name: Publish tar files
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') && (matrix.python-version == '3.9') }}
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload dist/*.gz
