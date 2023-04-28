@@ -15,22 +15,36 @@ from aequilibrae.project.network import Network
 from aequilibrae.project.zoning import Zoning
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.log import get_log_handler
-from .project_cleaning import clean
-from .project_creation import initialize_tables
+from aequilibrae.project.project_cleaning import clean
+from aequilibrae.project.project_creation import initialize_tables
+from aequilibrae.transit.transit import Transit
 
 
 class Project:
     """AequilibraE project class
 
-    ::
+    .. code-block:: python
+        :caption: Create Project
 
-        from aequilibrae.project import Project
+        >>> newfile = Project()
+        >>> newfile.new('/tmp/new_project')
 
-        existing = Project()
-        existing.load('path/to/existing/project/folder')
+    .. code-block:: python
+        :caption: Open Project
 
-        newfile = Project()
-        newfile.new('path/to/new/project/folder')
+        >>> from aequilibrae.project import Project
+
+        >>> existing = Project()
+        >>> existing.open('/tmp/test_project')
+
+        >>> #Let's check some of the project's properties
+        >>> existing.network.list_modes()
+        ['M', 'T', 'b', 'c', 't', 'w']
+        >>> existing.network.count_links()
+        76
+        >>> existing.network.count_nodes()
+        24
+
     """
 
     def __init__(self):
@@ -41,20 +55,26 @@ class Project:
         self.network: Network = None
         self.about: About = None
         self.logger: logging.Logger = None
+        self.transit: Transit = None
+
+    @classmethod
+    def from_path(cls, project_folder):
+        project = Project()
+        project.open(project_folder)
+        return project
 
     def open(self, project_path: str) -> None:
         """
         Loads project from disk
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
 
         file_name = os.path.join(project_path, "project_database.sqlite")
         if not os.path.isfile(file_name):
             raise FileNotFoundError("Model does not exist. Check your path and try again")
-
         self.project_base_path = project_path
         self.path_to_file = file_name
         self.source = self.path_to_file
@@ -70,8 +90,8 @@ class Project:
     def new(self, project_path: str) -> None:
         """Creates a new project
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If folder exists, it will fail
         """
 
         self.project_base_path = project_path
@@ -87,7 +107,7 @@ class Project:
         self.__setup_logger()
         self.activate()
 
-        self.__create_empty_project()
+        self.__create_empty_network()
         self.__load_objects()
         self.about.create()
         global_logger.info(f"Created project on {self.project_base_path}")
@@ -120,15 +140,18 @@ class Project:
         """
         Loads project from disk
 
-        Args:
-            *project_path* (:obj:`str`): Full path to the project data folder. If the project inside does
+        .. deprecated:: 0.7.0
+            Use :func:`open` instead.
+
+        :Arguments:
+            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
             not exist, it will fail.
         """
         warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
         self.open(project_path)
 
     def connect(self):
-        return database_connection(self.project_base_path)
+        return database_connection("network", self.project_base_path)
 
     def activate(self):
         activate_project(self)
@@ -168,7 +191,7 @@ class Project:
     def zoning(self):
         return Zoning(self.network)
 
-    def __create_empty_project(self):
+    def __create_empty_network(self):
         shutil.copyfile(spatialite_database, self.path_to_file)
 
         self.conn = self.connect()
@@ -182,7 +205,7 @@ class Project:
         cursor = self.conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
-        initialize_tables(self)
+        initialize_tables(self, "network")
 
     def __setup_logger(self):
         self.logger = logging.getLogger(f"aequilibrae.{self.project_base_path}")

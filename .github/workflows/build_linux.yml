@@ -1,4 +1,4 @@
-name: Build and upload Linux Python Package
+name: Build and upload Linux Python Package (includes QGIS artifacts)
 
 on:  [pull_request, release]
 
@@ -7,6 +7,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
@@ -18,9 +19,26 @@ jobs:
         python -m pip install --upgrade pip wheel cffi setuptools twine
 
     - name: Build manylinux Python wheels
-      uses: RalfG/python-wheels-manylinux-build@v0.7.0
+      uses: RalfG/python-wheels-manylinux-build@v0.7.1
       with:
         python-versions: 'cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311'
+        pip-wheel-args: '--no-deps'
+
+    - name: Moves wheels
+      run: |
+        mkdir -p dist
+        cp -v ./*-manylinux*.whl dist/
+
+    - name: update versions to conform with QGIS
+      run: |
+        cd .github
+        python qgis_requirements.py
+        cd ..
+
+    - name: Build manylinux Python wheels
+      uses: RalfG/python-wheels-manylinux-build@v0.7.1
+      with:
+        python-versions: 'cp38-cp38 cp39-cp39 cp310-cp310'
         pip-wheel-args: '--no-deps'
 
     - name: Moves wheels

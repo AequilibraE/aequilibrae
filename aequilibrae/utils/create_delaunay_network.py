@@ -17,8 +17,8 @@ class DelaunayAnalysis:
     def __init__(self, project):
         """Start a Delaunay analysis
 
-        Args:
-            project (:obj:`Project`): The Project to connect to
+        :Arguments:
+            **project** (:obj:`Project`): The Project to connect to
         """
 
         self.project = project
@@ -27,10 +27,10 @@ class DelaunayAnalysis:
     def create_network(self, source="zones", overwrite=False):
         """Creates a delaunay network based on the existing model
 
-        Args:
-            source (:obj:`str`, optional): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
+        :Arguments:
+            **source** (:obj:`str`, optional): Source of the centroids/zones. Either ``zones`` or ``network``. Default ``zones``
 
-            overwrite path (:obj:`bool`, optional): Whether to should overwrite an existing Delaunay Network. Default ``False``
+            **overwrite path** (:obj:`bool`, optional): Whether to should overwrite an existing Delaunay Network. Default ``False``
 
         """
 

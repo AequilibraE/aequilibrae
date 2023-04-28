@@ -5,7 +5,7 @@ pyshp
 cython
 enum34>=1.1.6
 Sphinx
-sphinx_theme
+pydata-sphinx-theme
 sphinx_autodoc_annotation
 nbsphinx
 pillow
@@ -13,3 +13,7 @@ matplotlib
 folium
 keplergl
 sphinx-git
+sphinx-gallery
+sphinx-panels
+sphinx_theme
+sphinx-copybutton

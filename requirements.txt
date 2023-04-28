@@ -2,8 +2,8 @@ numpy
 scipy
 pyaml
 cython
-pyshp
 requests
 shapely
 pandas
 pyproj
+rtree

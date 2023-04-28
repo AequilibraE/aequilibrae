@@ -11,24 +11,40 @@ import warnings
 class TrafficClass:
     """Traffic class for equilibrium traffic assignment
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae.paths import TrafficClass
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.paths import TrafficClass
 
-        tc = TrafficClass(graph, demand_matrix)
-        tc.set_pce(1.3)
+        >>> project = Project.from_path("/tmp/test_project")
+        >>> project.network.build_graphs()
+
+        >>> graph = project.network.graphs['c'] # we grab the graph for cars
+        >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
+        >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> graph.set_blocked_centroid_flows(True)
+
+        >>> proj_matrices = project.matrices
+
+        >>> demand = AequilibraeMatrix()
+        >>> demand = proj_matrices.get_matrix("demand_omx")
+        >>> demand.computational_view(['matrix'])
+
+        >>> tc = TrafficClass("car", graph, demand)
+        >>> tc.set_pce(1.3)
     """
 
     def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class
 
-         Args:
-            name (:obj:`str`): UNIQUE class name.
+        :Arguments:
+            **name** (:obj:`str`): UNIQUE class name.
 
-            graph (:obj:`Graph`): Class/mode-specific graph
+            **graph** (:obj:`Graph`): Class/mode-specific graph
 
-            matrix (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
+            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
         if not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
@@ -54,8 +70,8 @@ class TrafficClass:
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
 
-        Args:
-            pce (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
+        :Arguments:
+            **pce** (:obj:`Union[float, int]`): PCE. Defaults to 1 if not set
         """
         if not isinstance(pce, (float, int)):
             raise ValueError("PCE needs to be either integer or float ")
@@ -64,9 +80,9 @@ class TrafficClass:
     def set_fixed_cost(self, field_name: str, multiplier=1):
         """Sets value of time
 
-        Args:
-            field_name (:obj:`str`): Name of the graph field with fixed costs for this class
-            multiplier (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
+        :Arguments:
+             **field_name** (:obj:`str`): Name of the graph field with fixed costs for this class
+             **multiplier** (:obj:`Union[float, int]`): Multiplier for the fixed cost. Defaults to 1 if not set
         """
         if field_name not in self.graph.graph.columns:
             raise ValueError("Field does not exist in the graph")
@@ -84,8 +100,8 @@ class TrafficClass:
     def set_vot(self, value_of_time: float) -> None:
         """Sets value of time
 
-        Args:
-            value_of_time (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
+        :Arguments:
+            **value_of_time** (:obj:`Union[float, int]`): Value of time. Defaults to 1 if not set
         """
 
         self.vot = float(value_of_time)
@@ -95,8 +111,8 @@ class TrafficClass:
         direction into unique link id used in compact graph.
         Supply links=None to disable select link analysis.
 
-        Args:
-            links (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
+        :Arguments:
+            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
              Link IDs and directions to be used in select link analysis"""
         self._selected_links = {}
         for name, link_set in links.items():

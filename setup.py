@@ -27,7 +27,7 @@ link_args = [f"{prefix}openmp"]
 
 ext_mod_aon = Extension(
     "aequilibrae.paths.AoN",
-    [join(dirname(os.path.realpath(__file__)), "aequilibrae/paths", "AoN.pyx")],
+    [join("aequilibrae", "paths", "AoN.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -37,7 +37,7 @@ ext_mod_aon = Extension(
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
-    [join(dirname(os.path.realpath(__file__)), "aequilibrae/distribution", "ipf_core.pyx")],
+    [join("aequilibrae", "distribution", "ipf_core.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -51,11 +51,16 @@ with open("requirements.txt", "r") as fl:
 pkgs = [pkg for pkg in find_packages()]
 
 pkg_data = {
-    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip"],
+    "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae": ["./parameters.yml"],
-    "aequilibrae.project": ["database_specification/tables/*.*", "database_specification/triggers/*.*"],
+    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
+    "aequilibrae.project": [
+        "database_specification/network/tables/*.*",
+        "database_specification/network/triggers/*.*",
+        "database_specification/transit/tables/*.*",
+        "database_specification/transit/triggers/*.*",
+    ],
 }
 loose_modules = ["__version__", "parameters"]
 

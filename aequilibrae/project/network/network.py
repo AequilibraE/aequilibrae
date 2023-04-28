@@ -62,7 +62,7 @@ class Network(WorkerThread):
         """
         Returns a list of all fields that can be skimmed
 
-        Returns:
+        :Returns:
             :obj:`list`: List of all fields that can be skimmed
         """
         curr = self.conn.cursor()
@@ -112,7 +112,7 @@ class Network(WorkerThread):
         """
         Returns a list of all the modes in this model
 
-        Returns:
+        :Returns:
             :obj:`list`: List of all modes
         """
         curr = self.conn.cursor()
@@ -131,44 +131,43 @@ class Network(WorkerThread):
         """
         Downloads the network from Open-Street Maps
 
-        Args:
-            *west* (:obj:`float`, Optional): West most coordinate of the download bounding box
+        :Arguments:
+            **west** (:obj:`float`, Optional): West most coordinate of the download bounding box
 
-            *south* (:obj:`float`, Optional): South most coordinate of the download bounding box
+            **south** (:obj:`float`, Optional): South most coordinate of the download bounding box
 
-            *east* (:obj:`float`, Optional): East most coordinate of the download bounding box
+            **east** (:obj:`float`, Optional): East most coordinate of the download bounding box
 
-            *place_name* (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
+            **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
             required
 
-            *modes* (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
+            **modes** (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
 
-            p = Project()
-            p.new(nm)
+        .. code-block:: python
 
-        ::
+            >>> from aequilibrae import Project
 
-            from aequilibrae import Project, Parameters
-            p = Project()
-            p.new('path/to/project')
+            >>> p = Project()
+            >>> p.new("/tmp/new_project")
 
             # We now choose a different overpass endpoint (say a deployment in your local network)
-            par = Parameters()
-            par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
+            >>> par = Parameters()
+            >>> par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
 
             # Because we have our own server, we can set a bigger area for download (in M2)
-            par.parameters['osm']['max_query_area_size'] = 10000000000
+            >>> par.parameters['osm']['max_query_area_size'] = 10000000000
 
             # And have no pause between successive queries
-            par.parameters['osm']['sleeptime'] = 0
+            >>> par.parameters['osm']['sleeptime'] = 0
 
             # Save the parameters to disk
-            par.write_back()
+            >>> par.write_back()
 
-            # And do the import
-            p.network.create_from_osm(place_name=my_beautiful_hometown)
-            p.close()
+            # Now we can import the network for any place we want
+            # p.network.create_from_osm(place_name="my_beautiful_hometown")
+
+            >>> p.close()
         """
 
         if self.count_links() > 0:
@@ -253,18 +252,18 @@ class Network(WorkerThread):
         """
         Creates AequilibraE model from links and nodes in GMNS format.
 
-        Args:
-            *link_file_path* (:obj:`str`): Path to a links csv file in GMNS format
+        :Arguments:
+            **link_file_path** (:obj:`str`): Path to a links csv file in GMNS format
 
-            *node_file_path* (:obj:`str`): Path to a nodes csv file in GMNS format
+            **node_file_path** (:obj:`str`): Path to a nodes csv file in GMNS format
 
-            *use_group_path* (:obj:`str`, Optional): Path to a csv table containing groupings of uses. This helps AequilibraE
+            **use_group_path** (:obj:`str`, Optional): Path to a csv table containing groupings of uses. This helps AequilibraE
             know when a GMNS use is actually a group of other GMNS uses
 
-            *geometry_path* (:obj:`str`, Optional): Path to a csv file containing geometry information for a line object, if not
+            **geometry_path** (:obj:`str`, Optional): Path to a csv file containing geometry information for a line object, if not
             specified in the link table
 
-            *srid* (:obj:`int`, Optional): Spatial Reference ID in which the GMNS geometries were created
+            **srid** (:obj:`int`, Optional): Spatial Reference ID in which the GMNS geometries were created
         """
 
         gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
@@ -276,8 +275,8 @@ class Network(WorkerThread):
         """
         Exports AequilibraE network to csv files in GMNS format.
 
-        Arg:
-            *path* (:obj:`str`): Output folder path.
+        :Arguments:
+            **path** (:obj:`str`): Output folder path.
         """
 
         gmns_exporter = GMNSExporter(self, path)
@@ -295,19 +294,21 @@ class Network(WorkerThread):
         When called, it overwrites all graphs previously created and stored in the networks'
         dictionary of graphs
 
-        Args:
-            *fields* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+        :Arguments:
+            **fields** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
                                               database, it may be useful to specify which fields to use
-            *modes* (:obj:`list`, optional): When working with very large graphs with large number of fields in the
+            **modes** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
                                               database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
-        ::
 
-            p = Project()
-            p.open(nm)
-            fields = ['distance']
-            p.network.build_graphs(fields, modes = ['c', 'w'])
+        .. code-block:: python
+
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> fields = ['distance']
+            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
         from aequilibrae.paths import Graph
@@ -355,8 +356,8 @@ class Network(WorkerThread):
         """
         Set the time field for all graphs built in the model
 
-        Args:
-            *time_field* (:obj:`str`): Network field with travel time information
+        :Arguments:
+            **time_field** (:obj:`str`): Network field with travel time information
         """
         for m, g in self.graphs.items():
             if time_field not in list(g.graph.columns):
@@ -369,7 +370,7 @@ class Network(WorkerThread):
         """
         Returns the number of links in the model
 
-        Returns:
+        :Returns:
             :obj:`int`: Number of links
         """
         return self.__count_items("link_id", "links", "link_id>=0")
@@ -378,7 +379,7 @@ class Network(WorkerThread):
         """
         Returns the number of centroids in the model
 
-        Returns:
+        :Returns:
             :obj:`int`: Number of centroids
         """
         return self.__count_items("node_id", "nodes", "is_centroid=1")
@@ -387,7 +388,7 @@ class Network(WorkerThread):
         """
         Returns the number of nodes in the model
 
-        Returns:
+        :Returns:
             :obj:`int`: Number of nodes
         """
         return self.__count_items("node_id", "nodes", "node_id>=0")
@@ -395,8 +396,8 @@ class Network(WorkerThread):
     def extent(self):
         """Queries the extent of the network included in the model
 
-        Returns:
-            *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
+        :Returns:
+            **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
         curr = self.conn.cursor()
         curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
@@ -406,8 +407,8 @@ class Network(WorkerThread):
     def convex_hull(self) -> Polygon:
         """Queries the model for the convex hull of the entire network
 
-        Returns:
-            *model coverage* (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
+        :Returns:
+            **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
         curr = self.conn.cursor()
         curr.execute('Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;')

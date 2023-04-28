@@ -17,7 +17,6 @@ try:
         one_to_all,
         skimming_single_origin,
         path_computation,
-        VERSION_COMPILED,
         update_path_trace,
     )
 except ImportError as ie:

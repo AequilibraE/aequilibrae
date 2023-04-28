@@ -83,7 +83,7 @@ class GMNSExporter(WorkerThread):
                 self.links_df.loc[idx, "dir_flag"] = 1
 
     def update_field_names(self):
-        """'
+        """
         Updates field names according to equivalency between AequilibraE and GMNS fields.
         """
 

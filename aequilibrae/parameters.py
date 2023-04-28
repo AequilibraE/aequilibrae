@@ -6,31 +6,33 @@ from aequilibrae.context import get_active_project
 
 
 class Parameters:
-    """
-    Global parameters module
+    """Global parameters module
 
     Parameters are used in many procedures, and are often defined only in the parameters.yml file ONLY
     Parameters are organized in the following groups:
 
     * assignment
     * distribution
-
     * system
-        - cpus: Maximum threads to be used in any procedure
-
-        - default_directory: If is the directory QGIS file opening/saving dialogs will try to open as standard
-
-        - driving side: For purposes of plotting on QGIS
-
-        - logging: Level of logging to be written to temp/aequilibrae.log: Levels are those from the Python logging library
-                    - 0: 'NOTSET'
-                    - 10: 'DEBUG'
-                    - 20: 'INFO'
-                    - 30: 'WARNING'
-                    - 40: 'ERROR'
-                    - 50: 'CRITICAL'
     * report zeros
     * temp directory
+
+    .. code-block:: python
+
+        >>> from aequilibrae import Project, Parameters
+
+        >>> project = Project.from_path("/tmp/test_project")
+
+        >>> p = Parameters(project)
+
+        >>> p.parameters['system']['logging_directory'] =  "/tmp/other_folder"
+        >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
+        >>> p.parameters['osm']['max_query_area_size'] = 10000000000
+        >>> p.parameters['osm']['sleeptime'] = 0
+        >>> p.write_back()
+
+        >>> # You can also restore the software default values
+        >>> p.restore_default()
     """
 
     _default: dict

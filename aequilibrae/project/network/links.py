@@ -13,20 +13,19 @@ class Links(BasicTable):
     """
     Access to the API resources to manipulate the links table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        proj = Project()
-        proj.open('path/to/project/folder')
+        >>> proj = Project.from_path("/tmp/test_project")
 
-        all_links = proj.network.links
+        >>> all_links = proj.network.links
 
         # We can just get one link in specific
-        link = all_links.get(4523)
+        >>> link = all_links.get(1)
 
         # We can save changes for all links we have edited so far
-        all_links.save()
+        >>> all_links.save()
     """
 
     __max_id = -1
@@ -44,15 +43,15 @@ class Links(BasicTable):
             self.refresh_fields()
 
     def get(self, link_id: int) -> Link:
-        """Get a link from the network by its **link_id**
+        """Get a link from the network by its *link_id*
 
         It raises an error if link_id does not exist
 
-        Args:
-            *link_id* (:obj:`int`): Id of a link to retrieve
+        :Arguments:
+            **link_id** (:obj:`int`): Id of a link to retrieve
 
-        Returns:
-            *link* (:obj:`Link`): Link object for requested link_id
+        :Returns:
+            **link** (:obj:`Link`): Link object for requested link_id
         """
         link_id = int(link_id)
         if link_id in self.__items:
@@ -68,8 +67,8 @@ class Links(BasicTable):
     def new(self) -> Link:
         """Creates a new link
 
-        Returns:
-            *link* (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
+        :Returns:
+            **link** (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
         """
 
         data = {key: None for key in self.__fields}
@@ -84,11 +83,11 @@ class Links(BasicTable):
 
         It raises an error if link_id does not exist
 
-        Args:
-            *link_id* (:obj:`int`): Id of the link to copy
+        :Arguments:
+            **link_id** (:obj:`int`): Id of the link to copy
 
-        Returns:
-            *link* (:obj:`Link`): Link object for requested link_id
+        :Returns:
+            **link** (:obj:`Link`): Link object for requested link_id
         """
 
         data = self.__link_data(int(link_id))
@@ -106,8 +105,8 @@ class Links(BasicTable):
     def delete(self, link_id: int) -> None:
         """Removes the link with **link_id** from the project
 
-        Args:
-            *link_id* (:obj:`int`): Id of a link to delete"""
+        :Arguments:
+            **link_id** (:obj:`int`): Id of a link to delete"""
         d = 1
         link_id = int(link_id)
         if link_id in self.__items:
@@ -135,8 +134,8 @@ class Links(BasicTable):
     def data(self) -> pd.DataFrame:
         """Returns all links data as a Pandas dataFrame
 
-        Returns:
-            *table* (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
+        :Returns:
+            **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
         """
         dl = DataLoader(self.conn, "links")
         return dl.load_table()

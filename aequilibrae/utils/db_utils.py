@@ -30,9 +30,13 @@ class commit_and_close:
 
     def __init__(self, db: Union[str, Path, Connection], commit: bool = True, missing_ok: bool = False):
         """
-        :param db: The database (filename or connection) to be managed
-        :param commit: Boolean indicating if a commit/rollback should be attempted on closing
-        :param missing_ok: Boolean indicating that the db is not expected to exist yet
+        :Arguments:
+
+            **db** (:obj:`Union[str, Path, Connection]`): The database (filename or connection) to be managed
+
+            **commit** (:obj:`bool`): Boolean indicating if a commit/rollback should be attempted on closing
+
+            **missing_ok** (:obj:`bool`): Boolean indicating that the db is not expected to exist yet
         """
         if isinstance(db, str) or isinstance(db, Path):
             db = safe_connect(db, missing_ok)

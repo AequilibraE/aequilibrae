@@ -19,75 +19,70 @@ has_omx = spec is not None
 class Ipf:
     """Iterative proportional fitting procedure
 
-    ::
+    .. code-block:: python
 
-        import pandas as pd
-        from aequilibrae.distribution import Ipf
-        from aequilibrae.matrix import AequilibraeMatrix
-        from aequilibrae.matrix import AequilibraeData
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.distribution import Ipf
+        >>> from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 
-        matrix = AequilibraeMatrix()
+        >>> project = Project.from_path("/tmp/test_project_ipf")
+
+        >>> matrix = AequilibraeMatrix()
 
         # Here we can create from OMX or load from an AequilibraE matrix.
-        matrix.create_from_omx(path/to/aequilibrae_matrix, path/to/omxfile)
+        >>> matrix.load('/tmp/test_project/matrices/demand.omx')
+        >>> matrix.computational_view()
 
-        # The matrix will be operated one (see the note on overwriting), so it does
-        # not make sense load an OMX matrix
+        >>> args = {"entries": matrix.zones, "field_names": ["productions", "attractions"],
+        ...         "data_types": [np.float64, np.float64], "memory_mode": True}
 
+        >>> vectors = AequilibraeData()
+        >>> vectors.create_empty(**args)
 
-        source_vectors = pd.read_csv(path/to/CSVs)
-        zones = source_vectors.zone.shape[0]
-
-        args = {"entries": zones, "field_names": ["productions", "attractions"],
-                "data_types": [np.float64, np.float64], "memory_mode": True}
-
-        vectors = AequilibraEData()
-        vectors.create_empty(**args)
-
-        vectors.productions[:] = source_vectors.productions[:]
-        vectors.attractions[:] = source_vectors.attractions[:]
+        >>> vectors.productions[:] = matrix.rows()[:]
+        >>> vectors.attractions[:] = matrix.columns()[:]
 
         # We assume that the indices would be sorted and that they would match the matrix indices
-        vectors.index[:] = source_vectors.zones[:]
+        >>> vectors.index[:] = matrix.index[:]
 
-        args = {
-                "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
-                "column_field": "attractions", "nan_as_zero": False}
+        >>> args = {
+        ...         "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
+        ...         "column_field": "attractions", "nan_as_zero": False}
 
-        fratar = Ipf(**args)
+        >>> fratar = Ipf(**args)
 
-         fratar.fit()
+        >>> fratar.fit()
 
         # We can get back to our OMX matrix in the end
-        fratar.output.export(path/to_omx/output.omx)
-        fratar.output.export(path/to_aem/output.aem)
+        >>> fratar.output.export("/tmp/to_omx_output.omx")
+        >>> fratar.output.export("/tmp/to_aem_output.aem")
     """
 
     def __init__(self, project=None, **kwargs):
         """
         Instantiates the Ipf problem
 
-        Args:
-            matrix (:obj:`AequilibraeMatrix`): Seed Matrix
+        :Arguments:
+            **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
 
-            rows (:obj:`AequilibraeData`): Vector object with data for row totals
+            **rows** (:obj:`AequilibraeData`): Vector object with data for row totals
 
-            row_field (:obj:`str`): Field name that contains the data for the row totals
+            **row_field** (:obj:`str`): Field name that contains the data for the row totals
 
-            columns (:obj:`AequilibraeData`): Vector object with data for column totals
+            **columns** (:obj:`AequilibraeData`): Vector object with data for column totals
 
-            column_field (:obj:`str`): Field name that contains the data for the column totals
+            **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            parameters (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
 
-            nan_as_zero (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
 
-        Results:
-            output (:obj:`AequilibraeMatrix`): Result Matrix
+        :Results:
+            **output** (:obj:`AequilibraeMatrix`): Result Matrix
 
-            report (:obj:`list`): Iteration and convergence report
+            **report** (:obj:`list`): Iteration and convergence report
 
-            error (:obj:`str`): Error description
+            **error** (:obj:`str`): Error description
         """
         self.cpus = 0
         self.parameters = kwargs.get("parameters", self.__get_parameters("ipf"))
@@ -234,10 +229,11 @@ class Ipf:
     def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
         """Saves the matrix output to the project file
 
-        Args:
-            name (:obj:`str`): Name of the desired matrix record
-            file_name (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        :Arguments:
+            **name** (:obj:`str`): Name of the desired matrix record
+            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **project** (:obj:`Project`, Optional): Project we want to save the results to.
+            Defaults to the active project
         """
 
         project = project or get_active_project()

@@ -6,6 +6,7 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_logger
+from aequilibrae.paths.AoN import build_compressed_graph
 
 
 class Graph(object):
@@ -78,8 +79,8 @@ class Graph(object):
         """
         Returns the default integer and float types used for computation
 
-        Args:
-            tp (:obj:`str`): data type. 'int' or 'float'
+        :Arguments:
+            **tp** (:obj:`str`): data type. 'int' or 'float'
         """
         if tp == "int":
             return self.__integer_type
@@ -99,8 +100,8 @@ class Graph(object):
         the inference that all links connected to these nodes are centroid
         connectors.
 
-        Args:
-            centroids (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+        :Arguments:
+            **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
         """
         self.__network_error_checking__()
 
@@ -118,6 +119,15 @@ class Graph(object):
             raise ValueError("Centroid IDs are not unique")
         self.centroids = np.array(centroids, np.uint32)
 
+        self.network = self.network.astype(
+            {
+                "direction": np.int8,
+                "a_node": self.__integer_type,
+                "b_node": self.__integer_type,
+                "link_id": self.__integer_type,
+            }
+        )
+
         properties = self.__build_directed_graph(self.network, centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
@@ -133,170 +143,7 @@ class Graph(object):
         self.compact_num_links = self.compact_graph.shape[0]
 
     def __build_compressed_graph(self):
-        # Build link index
-        link_idx = np.empty(self.network.link_id.max() + 1).astype(int)
-        link_idx[self.network.link_id] = np.arange(self.network.shape[0])
-
-        nodes = np.hstack([self.network.a_node.values, self.network.b_node.values])
-        links = np.hstack([self.network.link_id.values, self.network.link_id.values])
-        counts = np.bincount(nodes)
-
-        idx = np.argsort(nodes)
-        all_nodes = nodes[idx]
-        all_links = links[idx]
-        links_index = np.empty(all_nodes.max() + 2, np.int64)
-        links_index.fill(-1)
-        nlist = np.arange(all_nodes.max() + 2)
-
-        y, x, _ = np.intersect1d(all_nodes, nlist, assume_unique=False, return_indices=True)
-        links_index[y] = x[:]
-        links_index[-1] = all_links.shape[0]
-
-        for i in range(all_nodes.max() + 1, 0, -1):
-            links_index[i - 1] = links_index[i] if links_index[i - 1] == -1 else links_index[i - 1]
-
-        # We keep all centroids for sure
-        counts[self.centroids] = 999
-
-        truth = (counts == 2).astype(int)
-        link_edge = truth[self.network.a_node.values] + truth[self.network.b_node.values]
-        link_edge = self.network.link_id.values[link_edge == 1]
-
-        simplified_links = np.repeat(-1, self.network.link_id.max() + 1)
-        simplified_directions = np.zeros(self.network.link_id.max() + 1, int)
-
-        compressed_dir = np.zeros(self.network.link_id.max() + 1, int)
-        compressed_a_node = np.zeros(self.network.link_id.max() + 1, int)
-        compressed_b_node = np.zeros(self.network.link_id.max() + 1, int)
-
-        slink = 0
-        major_nodes = {}
-        tot = 0
-        tot_graph_add = 0
-        for pre_link in link_edge:
-            if simplified_links[pre_link] >= 0:
-                continue
-            ab_dir = 1
-            ba_dir = 1
-            lidx = link_idx[pre_link]
-            a_node = self.network.a_node.values[lidx]
-            b_node = self.network.b_node.values[lidx]
-            drc = self.network.direction.values[lidx]
-            n = a_node if counts[a_node] == 2 else b_node
-            first_node = b_node if counts[a_node] == 2 else a_node
-
-            ab_dir = 0 if (first_node == a_node and drc < 0) or (first_node == b_node and drc > 0) else ab_dir
-            ba_dir = 0 if (first_node == a_node and drc > 0) or (first_node == b_node and drc < 0) else ba_dir
-
-            while counts[n] == 2:
-                # assert (simplified_links[pre_link] >= 0), "How the heck did this happen?"
-                simplified_links[pre_link] = slink
-                simplified_directions[pre_link] = -1 if a_node == n else 1
-
-                # Gets the link from the list that is not the link we are coming from
-                lnk = [all_links[k] for k in range(links_index[n], links_index[n + 1]) if pre_link != all_links[k]][0]
-                pre_link = lnk
-                lidx = link_idx[pre_link]
-                a_node = self.network.a_node.values[lidx]
-                b_node = self.network.b_node.values[lidx]
-                drc = self.network.direction.values[lidx]
-                ab_dir = 0 if (n == a_node and drc < 0) or (n == b_node and drc > 0) else ab_dir
-                ba_dir = 0 if (n == a_node and drc > 0) or (n == b_node and drc < 0) else ba_dir
-                n = (
-                    self.network.a_node.values[lidx]
-                    if n == self.network.b_node.values[lidx]
-                    else self.network.b_node.values[lidx]
-                )
-
-            if max(ab_dir, ba_dir) < 1:
-                tot += 1
-
-            tot_graph_add += ab_dir + ba_dir
-            simplified_links[pre_link] = slink
-            simplified_directions[pre_link] = -1 if a_node == n else 1
-            last_node = b_node if counts[a_node] == 2 else a_node
-            major_nodes[slink] = [first_node, last_node]
-
-            # Available directions are NOT indexed like the other arrays
-            compressed_a_node[slink] = first_node
-            compressed_b_node[slink] = last_node
-            if ab_dir > 0:
-                if ba_dir > 0:
-                    compressed_dir[slink] = 0
-                else:
-                    compressed_dir[slink] = 1
-            elif ba_dir > 0:
-                compressed_dir[slink] = -1
-            else:
-                compressed_dir[slink] = -999
-            slink += 1
-
-        links_to_remove = np.argwhere(simplified_links >= 0)
-        df = pd.DataFrame(self.network, copy=True)
-        if links_to_remove.shape[0]:
-            df = df[~df.link_id.isin(links_to_remove[:, 0])]
-        df = df[df.a_node != df.b_node]
-
-        comp_lnk = pd.DataFrame(
-            {
-                "a_node": compressed_a_node[:slink],
-                "b_node": compressed_b_node[:slink],
-                "direction": compressed_dir[:slink],
-                "link_id": np.arange(slink),
-            }
-        )
-        max_link_id = self.network.link_id.max() * 10
-        comp_lnk.loc[:, "link_id"] += max_link_id
-
-        df = pd.concat([df, comp_lnk])
-        df = df[["id", "link_id", "a_node", "b_node", "direction"]]
-        properties = self.__build_directed_graph(df, self.centroids)
-        self.compact_all_nodes = properties[0]
-        self.compact_num_nodes = properties[1]
-        self.compact_nodes_to_indices = properties[2]
-        self.compact_fs = properties[3]
-        self.compact_graph = properties[4]
-
-        crosswalk = pd.DataFrame(
-            {
-                "link_id": np.arange(simplified_directions.shape[0]),
-                "link_direction": simplified_directions,
-                "compressed_link": simplified_links,
-                "compressed_direction": np.ones(simplified_directions.shape[0]).astype(int),
-            }
-        )
-
-        crosswalk = crosswalk[crosswalk.compressed_link >= 0]
-        crosswalk.loc[:, "compressed_link"] += max_link_id
-
-        cw2 = pd.DataFrame(crosswalk, copy=True)
-        cw2.loc[:, "link_direction"] *= -1
-        cw2.loc[:, "compressed_direction"] = -1
-
-        crosswalk = pd.concat([crosswalk, cw2])
-        crosswalk = crosswalk.assign(key=crosswalk.compressed_link * crosswalk.compressed_direction)
-        crosswalk.drop(["compressed_link", "compressed_direction"], axis=1, inplace=True)
-
-        final_ids = pd.DataFrame(self.compact_graph[["id", "link_id", "direction"]], copy=True)
-        final_ids = final_ids.assign(key=final_ids.link_id * final_ids.direction)
-        final_ids.drop(["link_id", "direction"], axis=1, inplace=True)
-
-        agg_crosswalk = crosswalk.merge(final_ids, on="key")
-        agg_crosswalk.loc[:, "key"] = agg_crosswalk.link_id * agg_crosswalk.link_direction
-        agg_crosswalk.drop(["link_id", "link_direction"], axis=1, inplace=True)
-
-        direct_crosswalk = final_ids[final_ids.key.abs() < max_link_id]
-
-        crosswalk = pd.concat([agg_crosswalk, direct_crosswalk])[["key", "id"]]
-        crosswalk.columns = ["__graph_correlation_key__", "__compressed_id__"]
-
-        self.graph = self.graph.assign(__graph_correlation_key__=self.graph.link_id * self.graph.direction)
-        self.graph = self.graph.merge(crosswalk, on="__graph_correlation_key__", how="left")
-        self.graph.drop(["__graph_correlation_key__"], axis=1, inplace=True)
-
-        # If will refer all the links that have no correlation to an element beyond the last link
-        # This element will always be zero during assignment
-        self.graph.loc[self.graph.__compressed_id__.isna(), "__compressed_id__"] = self.compact_graph.id.max() + 1
+        build_compressed_graph(self)
 
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
@@ -374,8 +221,8 @@ class Graph(object):
         """
         Excludes a list of links from a graph by setting their B node equal to their A node
 
-        Args:
-            links (:obj:`list`): List of link IDs to be excluded from the graph
+        :Arguments:
+            **links** (:obj:`list`): List of link IDs to be excluded from the graph
         """
         filter = self.network.link_id.isin(links)
         # We check is the list makes sense in order to warn the user
@@ -434,8 +281,8 @@ class Graph(object):
         """
         Sets the field to be used for path computation
 
-        Args:
-            cost_field (:obj:`str`): Field name. Must be numeric
+        :Arguments:
+            **cost_field** (:obj:`str`): Field name. Must be numeric
         """
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
@@ -456,8 +303,8 @@ class Graph(object):
         """
         Sets the list of skims to be computed
 
-        Args:
-            skim_fields (:obj:`list`): Fields must be numeric
+        :Arguments:
+            **skim_fields** (:obj:`list`): Fields must be numeric
         """
         if not skim_fields:
             self.skim_fields = []
@@ -495,8 +342,8 @@ class Graph(object):
 
         Default value is True
 
-        Args:
-            block_centroid_flows (:obj:`bool`): Blocking or not
+        :Arguments:
+            **block_centroid_flows** (:obj:`bool`): Blocking or not
         """
         if not isinstance(block_centroid_flows, bool):
             raise TypeError("Blocking flows through centroids needs to be boolean")
@@ -510,8 +357,8 @@ class Graph(object):
         """
         Saves graph to disk
 
-        Args:
-            filename (:obj:`str`): Path to file. Usual file extension is *aeg*
+        :Arguments:
+            **filename** (:obj:`str`): Path to file. Usual file extension is *aeg*
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -539,8 +386,8 @@ class Graph(object):
         """
         Loads graph from disk
 
-        Args:
-            filename (:obj:`str`): Path to file
+        :Arguments:
+            **filename** (:obj:`str`): Path to file
         """
         with open(filename, "rb") as f:
             mygraph = pickle.load(f)
@@ -572,8 +419,8 @@ class Graph(object):
         """
         Returns graph fields that are available to be set as skims
 
-        Returns:
-            *list* (:obj:`str`): Field names
+        :Returns:
+            **list** (:obj:`str`): Field names
         """
         return [x for x in self.graph.columns if x not in ["link_id", "a_node", "b_node", "direction", "id"]]
 

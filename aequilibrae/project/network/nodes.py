@@ -12,20 +12,19 @@ class Nodes(BasicTable):
     """
     Access to the API resources to manipulate the links table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        proj = Project()
-        proj.open('path/to/project/folder')
+        >>> proj = Project.from_path("/tmp/test_project")
 
-        all_nodes = proj.network.nodes
+        >>> all_nodes = proj.network.nodes
 
         # We can just get one link in specific
-        node = all_nodes.get(7894)
+        >>> node = all_nodes.get(21)
 
         # We can save changes for all nodes we have edited so far
-        all_nodes.save()
+        >>> all_nodes.save()
     """
 
     #: Query sql for retrieving nodes
@@ -45,11 +44,11 @@ class Nodes(BasicTable):
 
         It raises an error if node_id does not exist
 
-        Args:
-            *node_id* (:obj:`int`): Id of a node to retrieve
+        :Arguments:
+            **node_id** (:obj:`int`): Id of a node to retrieve
 
-        Returns:
-            *node* (:obj:`Node`): Node object for requested node_id
+        :Returns:
+            **node** (:obj:`Node`): Node object for requested node_id
         """
 
         if node_id in self.__items:
@@ -88,8 +87,8 @@ class Nodes(BasicTable):
     def new_centroid(self, node_id: int) -> Node:
         """Creates a new centroid with a given ID
 
-        Args:
-            *node_id* (:obj:`int`): Id of the centroid to be created
+        :Arguments:
+            **node_id** (:obj:`int`): Id of the centroid to be created
         """
 
         self._curr.execute("select count(*) from nodes where node_id=?", [node_id])
@@ -109,10 +108,10 @@ class Nodes(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """Returns all nodes data as a Pandas dataFrame
+        """Returns all nodes data as a Pandas DataFrame
 
-        Returns:
-            *table* (:obj:`DataFrame`): Pandas dataframe with all the nodes, complete with Geometry
+        :Returns:
+            **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, complete with Geometry
         """
         dl = DataLoader(self.conn, "nodes")
         return dl.load_table()

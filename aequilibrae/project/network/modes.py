@@ -7,49 +7,47 @@ class Modes:
     """
     Access to the API resources to manipulate the modes table in the network
 
-    ::
+    .. code-block:: python
 
-        from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-        p = Project()
-        p.open('path/to/project/folder')
+        >>> p = Project.from_path("/tmp/test_project")
 
-        modes = p.network.modes
+        >>> modes = p.network.modes
 
         # We can get a dictionary of all modes in the model
-        all_modes = modes.all_modes()
+        >>> all_modes = modes.all_modes()
 
-        #And do a bulk change and save it
-        for mode_id, mode_obj in all_modes.items():
-            mode_obj.beta = 1
-            mode_obj.save()
+        # And do a bulk change and save it
+        >>> for mode_id, mode_obj in all_modes.items():
+        ...     mode_obj.beta = 1
+        ...     mode_obj.save()
 
         # or just get one mode in specific
-        car_mode = modes.get('c')
+        >>> car_mode = modes.get('c')
 
         # or just get this same mode by name
-        car_mode = modes.get_by_name('c')
+        >>> car_mode = modes.get_by_name('car')
 
         # We can change the description of the mode
-        car_mode.description = 'personal autos only'
+        >>> car_mode.description = 'personal autos only'
 
         # Let's say we are using alpha to store the PCE for a future year with much smaller cars
-        car_mode.alpha = 0.95
+        >>> car_mode.alpha = 0.95
 
         # To save this mode we can simply
-        car_mode.save()
+        >>> car_mode.save()
 
         # We can also create a completely new mode and add to the model
-        new_mode = modes.new('k')
-        new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed
-        # other fields are not mandatory
+        >>> new_mode = modes.new('k')
+        >>> new_mode.mode_name = 'flying_car'  # Only ASCII letters and *_* allowed # other fields are not mandatory
 
         # We then explicitly add it to the network
-        modes.add(new_mode)
+        >>> modes.add(new_mode)
 
         # we can even keep editing and save it directly once we have added it to the project
-        new_mode.description = 'this is my new description'
-        new_mode.save()
+        >>> new_mode.description = 'this is my new description'
+        >>> new_mode.save()
     """
 
     def __init__(self, net):
@@ -74,7 +72,7 @@ class Modes:
         self.__update_list_of_modes()
 
     def delete(self, mode_id: str) -> None:
-        """Removes the mode with **mode_id** from the project"""
+        """Removes the mode with *mode_id* from the project"""
         try:
             self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
             self.conn.commit()
@@ -90,14 +88,14 @@ class Modes:
         return FieldEditor(self.project, "modes")
 
     def get(self, mode_id: str) -> Mode:
-        """Get a mode from the network by its **mode_id**"""
+        """Get a mode from the network by its *mode_id*"""
         self.__update_list_of_modes()
         if mode_id not in self.__all_modes:
             raise ValueError(f"Mode {mode_id} does not exist in the model")
         return Mode(mode_id, self.project)
 
     def get_by_name(self, mode: str) -> Mode:
-        """Get a mode from the network by its **mode_name**"""
+        """Get a mode from the network by its *mode_name*"""
         self.__update_list_of_modes()
         self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
         found = self.curr.fetchone()

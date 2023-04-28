@@ -24,74 +24,75 @@ has_omx = spec is not None
 
 
 class TrafficAssignment(object):
-    """Traffic assignment class
+    """Traffic assignment class.
 
     For a comprehensive example on use, see the Use examples page.
-    ::
 
-        from os.path import join
-        from aequilibrae.matrix import AequilibraeMatrix
-        from aequilibrae.paths import TrafficAssignment, TrafficClass
+    .. code-block:: python
 
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        fldr = 'D:/release/Sample models/sioux_falls_2020_02_15'
-        proj_name = 'SiouxFalls.sqlite'
-        dt_fldr = '0_tntp_data'
-        prj_fldr = '1_project'
+        >>> project = Project.from_path("/tmp/test_project")
+        >>> project.network.build_graphs()
 
-        demand = AequilibraeMatrix()
-        demand.load(join(fldr, dt_fldr, 'demand.omx'))
-        demand.computational_view(['matrix']) # We will only assign one user class stored as 'matrix' inside the OMX file
+        >>> graph = project.network.graphs['c'] # we grab the graph for cars
+        >>> graph.set_graph('free_flow_time') # let's say we want to minimize time
+        >>> graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
+        >>> graph.set_blocked_centroid_flows(True)
 
-        project = Project()
-        project.load(join(fldr, prj_fldr))
-        project.network.build_graphs()
+        >>> proj_matrices = project.matrices
 
-        graph = project.network.graphs['c'] # we grab the graph for cars
-        graph.set_graph('free_flow_time') # let's say we want to minimize time
-        graph.set_skimming(['free_flow_time', 'distance']) # And will skim time and distance
-        graph.set_blocked_centroid_flows(True)
+        >>> demand = AequilibraeMatrix()
+        >>> demand = proj_matrices.get_matrix("demand_omx")
+
+        # We will only assign one user class stored as 'matrix' inside the OMX file
+        >>> demand.computational_view(['matrix'])
 
         # Creates the assignment class
-        assigclass = TrafficClass(graph, demand)
+        >>> assigclass = TrafficClass("car", graph, demand)
 
-        assig = TrafficAssignment()
+        >>> assig = TrafficAssignment()
+
         # The first thing to do is to add at list of traffic classes to be assigned
-        assig.set_classes([assigclass])
+        >>> assig.set_classes([assigclass])
 
-        assig.set_vdf("BPR")  # This is not case-sensitive # Then we set the volume delay function
+        # Then we set the volume delay function
+        >>> assig.set_vdf("BPR")  # This is not case-sensitive
 
-        assig.set_vdf_parameters({"alpha": "b", "beta": "power"}) # And its parameters
+        # And its parameters
+        >>> assig.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
-        assig.set_capacity_field("capacity") # The capacity and free flow travel times as they exist in the graph
-        assig.set_time_field("free_flow_time")
+        # The capacity and free flow travel times as they exist in the graph
+        >>> assig.set_capacity_field("capacity")
+        >>> assig.set_time_field("free_flow_time")
 
         # And the algorithm we want to use to assign
-        assig.set_algorithm('bfw')
+        >>> assig.set_algorithm('bfw')
 
-        # since I haven't checked the parameters file, let's make sure convergence criteria is good
-        assig.max_iter = 1000
-        assig.rgap_target = 0.00001
+        # Since we haven't checked the parameters file, let's make sure convergence criteria is good
+        >>> assig.max_iter = 1000
+        >>> assig.rgap_target = 0.00001
 
-        assig.execute() # we then execute the assignment
+        >>> assig.execute() # we then execute the assignment
 
-        # Convergence report is here
-        import pandas as pd
-        convergence_report = pd.DataFrame(assig.assignment.convergence_report)
-        convergence_report.head()
+        # If you want, it is possible to access the convergence report
+        >>> import pandas as pd
+        >>> convergence_report = pd.DataFrame(assig.assignment.convergence_report)
 
         # Assignment results can be viewed as a Pandas DataFrame
-        results_df = assig.results()
+        >>> results_df = assig.results()
 
-        # information on the assignment setup can be recovered with
-        info = assig.info()
+        # Information on the assignment setup can be recovered with
+        >>> info = assig.info()
 
         # Or save it directly to the results database
-        results = assig.save_results(table_name='example_from_the_documentation')
+        >>> results = assig.save_results(table_name='base_year_assignment')
 
         # skims are here
-        avg_skims = assigclass.results.skims # blended ones
-        last_skims = assigclass._aon_results.skims # those for the last iteration
+        >>> avg_skims = assigclass.results.skims # blended ones
+        >>> last_skims = assigclass._aon_results.skims # those for the last iteration
     """
 
     bpr_parameters = ["alpha", "beta"]
@@ -179,8 +180,8 @@ class TrafficAssignment(object):
         """
         Sets the Volume-delay function to be used
 
-        Args:
-            vdf_function(:obj:`str`:) Name of the VDF to be used
+        :Arguments:
+            **vdf_function** (:obj:`str`:) Name of the VDF to be used
         """
         self.vdf = vdf_function
 
@@ -188,8 +189,8 @@ class TrafficAssignment(object):
         """
         Sets Traffic classes to be assigned
 
-        Args:
-            classes (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+        :Arguments:
+            **classes** (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
         ids = set([x.__id__ for x in classes])
@@ -201,8 +202,8 @@ class TrafficAssignment(object):
         """
         Adds a traffic class to the assignment
 
-        Args:
-            traffic_class (:obj:`TrafficClass`:) Traffic class
+        :Arguments:
+            **traffic_class** (:obj:`TrafficClass`:) Traffic class
         """
 
         ids = [x.__id__ for x in self.classes if x.__id__ == traffic_class.__id__]
@@ -215,7 +216,7 @@ class TrafficAssignment(object):
         """
         Returns all algorithms available for use
 
-        Returns:
+        :Returns:
             :obj:`list`: List of string values to be used with **set_algorithm**
         """
         return self.all_algorithms
@@ -228,8 +229,8 @@ class TrafficAssignment(object):
 
         'fw' is also accepted as an alternative to 'frank-wolfe'
 
-        Args:
-            algorithm (:obj:`list`): Algorithm to be used
+        :Arguments:
+            **algorithm** (:obj:`list`): Algorithm to be used
         """
 
         # First we instantiate the arrays we will be using over and over
@@ -255,8 +256,8 @@ class TrafficAssignment(object):
         Parameter values can be scalars (same values for the entire network) or network field names
         (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
 
-        Args:
-            par (:obj:`dict`): Dictionary with all parameters for the chosen VDF
+        :Arguments:
+            **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
 
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
@@ -294,8 +295,8 @@ class TrafficAssignment(object):
 
             Inherited from :obj:`AssignmentResults`
 
-        Args:
-            cores (:obj:`int`): Number of CPU cores to use
+        :Arguments:
+            **cores** (:obj:`int`): Number of CPU cores to use
         """
         if not self.classes:
             raise Exception("You need load traffic classes before overwriting the number of cores")
@@ -308,8 +309,8 @@ class TrafficAssignment(object):
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
 
-        Args:
-            save_it (:obj:`bool`): Boolean to indicate whether paths should be saved
+        :Arguments:
+            **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved
         """
         if self.classes is None:
             raise Exception("You need to set traffic classes before turning path saving on or off")
@@ -321,8 +322,8 @@ class TrafficAssignment(object):
     def set_path_file_format(self, file_format: str) -> None:
         """Specify path saving format. Either parquet or feather.
 
-        Args:
-            file_format (:obj:`str`): Name of file format to use for path files
+        :Arguments:
+            **file_format** (:obj:`str`): Name of file format to use for path files
         """
         if self.classes is None:
             raise Exception("You need to set traffic classes before specifying path saving options")
@@ -340,8 +341,8 @@ class TrafficAssignment(object):
         """
         Sets the graph field that contains free flow travel time -> e.g. 'fftime'
 
-        Args:
-            time_field (:obj:`str`): Field name
+        :Arguments:
+            **time_field** (:obj:`str`): Field name
         """
 
         if not self.classes:
@@ -367,8 +368,8 @@ class TrafficAssignment(object):
         """
         Sets the graph field that contains link capacity for the assignment period -> e.g. 'capacity1h'
 
-        Args:
-            capacity_field (:obj:`str`): Field name
+        :Arguments:
+            **capacity_field** (:obj:`str`): Field name
         """
 
         if not self.classes:
@@ -416,10 +417,10 @@ class TrafficAssignment(object):
 
         Method fails if table exists
 
-        Args:
-            table_name (:obj:`str`): Name of the table to hold this assignment result
-            keep_zero_flows (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table to hold this assignment result
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
+            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
         df = self.results()
@@ -446,8 +447,8 @@ class TrafficAssignment(object):
     def results(self) -> pd.DataFrame:
         """Prepares the assignment results as a Pandas DataFrame
 
-        Returns:
-            *DataFrame* (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+        :Returns:
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
         """
 
         idx = self.classes[0].graph.graph.__supernet_id__
@@ -515,8 +516,8 @@ class TrafficAssignment(object):
     def report(self) -> pd.DataFrame:
         """Returns the assignment convergence report
 
-        Returns:
-           *DataFrame* (:obj:`pd.DataFrame`): Convergence report
+        :Returns:
+           **DataFrame** (:obj:`pd.DataFrame`): Convergence report
         """
         return pd.DataFrame(self.assignment.convergence_report)
 
@@ -529,8 +530,8 @@ class TrafficAssignment(object):
         The classes key is also a dictionary with all the user classes per traffic class and their respective
         matrix totals
 
-        Returns:
-            *info* (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
+        :Returns:
+            **info** (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
         """
 
         classes = {}
@@ -568,12 +569,12 @@ class TrafficAssignment(object):
     def save_skims(self, matrix_name: str, which_ones="final", format="omx", project=None) -> None:
         """Saves the skims (if any) to the skim folder and registers in the matrix list
 
-        Args:
-            name (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
-            which_ones (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
+        :Arguments:
+            **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
+            **which_ones** (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
             all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
-            *format* (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+            **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
+            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
@@ -682,9 +683,11 @@ class TrafficAssignment(object):
         """
         Saves the select link link flows for all classes into the results database. Additionally, it exports
         the OD matrices into OMX format.
-        Args:
-            str table_name: Name of the table being inserted to. Note the traffic class
-            project (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+            Defaults to the active project
         """
 
         if not project:
@@ -728,13 +731,17 @@ class TrafficAssignment(object):
     def save_select_link_results(self, name: str) -> None:
         """
         Saves both the Select Link matrices and flow results at the same time, using the same name.
-        Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
-        e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
-        Select Link Flows: inserts the select link flows for each class into the database with the table name:
-        Car
-        Select Link Matrices (only exports to OMX format):
-        Car.omx
 
+        .. note::
+            Note the Select Link matrices will have _SL_matrices.omx appended to the end for ease of identification.
+            e.g. save_select_link_results("Car") will result in the following names for the flows and matrices:
+            Select Link Flows: inserts the select link flows for each class into the database with the table name:
+            Car
+            Select Link Matrices (only exports to OMX format):
+            Car.omx
+
+        :Arguments:
+            **name** (:obj:`str`): name of the matrices
         """
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)
