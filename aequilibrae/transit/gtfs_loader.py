@@ -188,10 +188,10 @@ class GTFSReader(WorkerThread):
                         if to_fix.shape[0] > 0:
                             self.logger.debug(f"     Trip {trip.trip} had {to_fix.shape[0]} segments too fast")
                             total_fast += to_fix.shape[0]
-                            df.loc[to_fix[0]:, "source_time"] = 2
+                            df.loc[to_fix[0] :, "source_time"] = 2
                             for i in to_fix:
                                 df.loc[i:, "add_time"] += (
-                                        df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
+                                    df.elapsed_time[i] * (df.speed[i] / df.max_speed[i] - 1)
                                 ).astype(int)
 
                             source_time[1:] = df.source_time[:]
