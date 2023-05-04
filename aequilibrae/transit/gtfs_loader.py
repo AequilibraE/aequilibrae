@@ -28,6 +28,9 @@ if pyqt:
 else:
 
     class SignalImpl:
+        def __init__(self, *args, **kwargs):
+            pass
+
         def emit(*args, **kwargs):
             pass
 
