@@ -13,7 +13,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
 .. seealso::
 
-   If you are looking for the documentation for **AequilibraE for QGIS**, you can
+   If you are looking for the documentation for **QAequilibraE (the companion QGIS Plugin)**, you can
    see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
 .. panels::
