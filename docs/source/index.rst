@@ -138,7 +138,7 @@ of the project.
 **We appreciate it if you do not send questions directly to the developers**, but
 there are two alternatives for support:
 
-1. Posting your question to `StackOverflow <https:www.stackoverflow.com/>`_;
+1. Posting your question to `GIS StackOverflow <https://gis.stackexchange.com/>`_ using the #aequilibrae tag;
 2. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
    and sending your question there.
 
