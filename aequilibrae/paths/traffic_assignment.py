@@ -1,6 +1,7 @@
 import importlib.util as iutil
 import socket
 import sqlite3
+import warnings
 from datetime import datetime
 from os import path
 from pathlib import Path
@@ -535,6 +536,9 @@ class TrafficAssignment(object):
             blend_iterations: (:obj:`bool`): whether or not to blend iterations.
         """
         df = self.turning_volumes(turns_df, classes, iteration, blend_iterations)
+        if df.empty:
+            warnings.warn("No turning volumes found, not saving the table")
+            return df
         conn = sqlite3.connect(path.join(self.project.project_base_path, "results_database.sqlite"))
         df.to_sql(table_name, conn)
         conn.close()

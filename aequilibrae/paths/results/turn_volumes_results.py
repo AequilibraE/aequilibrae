@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import warnings
 from os import path
 from pathlib import Path
 from typing import Literal
@@ -158,6 +159,9 @@ class TurnVolumesResults:
         formatted_paths = self.format_paths(self.read_paths_for_iterations())
 
         formatted_turns = self.format_turns(turns_df, formatted_paths, node_to_index_df, correspondence_df)
+
+        if formatted_turns.empty:
+            return pd.DataFrame()
         turn_volume_list = []
         for matrix_name in self.matrix.view_names:
             turns_demand = self.get_turns_demand(matrix_name, self.matrix.get_matrix(matrix_name), formatted_turns)
@@ -247,6 +251,10 @@ class TurnVolumesResults:
     ) -> pd.DataFrame:
         turns_indices = self.get_turn_indices(turns_df, node_to_index_df)
         turns_w_links = self.get_turn_links(turns_indices, correspondence_df)
+        turns_with_no_links = turns_indices[~turns_indices["turn_id"].isin(turns_w_links["turn_id"])]
+        if not turns_with_no_links.empty:
+            warnings.warn("Couldn't find links for some turns")
+            print(turns_with_no_links)
         return self.get_turns_ods(turns_w_links, formatted_paths, node_to_index_df)
 
     def get_o_d_demand(self, row: pd.Series, matrix_values: np.array) -> float:
@@ -263,7 +271,7 @@ class TurnVolumesResults:
         # get nodes indices from paths aux file
         for node in ["a", "b", "c"]:
             turns_df[f"{node}_index"] = node_to_index_df.loc[turns_df[node]].values
-
+        turns_df["turn_id"] = turns_df["a"].astype(str) + "_" + turns_df["b"].astype(str) + "_" + turns_df["c"].astype(str)
         return turns_df
 
     def get_turn_links(self, turns_df: pd.DataFrame, correspondence_df: pd.DataFrame) -> pd.DataFrame:
@@ -288,6 +296,10 @@ class TurnVolumesResults:
     ) -> pd.DataFrame:
         index_to_node = node_to_index_df.reset_index()
         turns_w_od_idx = formatted_paths.merge(turns_w_links, on=["id", "id_next"])
+        turns_w_no_volumes = turns_w_links[~turns_w_links["turn_id"].isin(turns_w_od_idx["turn_id"])]
+        if not turns_w_no_volumes.empty:
+            warnings.warn("No volumes found for some turns")
+            print(turns_w_no_volumes[["a", "b", "c"]])
         turns_w_od = turns_w_od_idx.merge(index_to_node, left_on="origin_idx", right_on="node_index", how="left").merge(
             index_to_node,
             left_on="destination_idx",
