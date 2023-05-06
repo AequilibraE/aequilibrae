@@ -15,4 +15,4 @@ replace_in_file("../pyproject.toml", "numpy", "<1.22")
 replace_in_file("../requirements.txt", "pandas", "<1.2")
 replace_in_file("../pyproject.toml", "pandas", "<1.2")
 
-replace_in_file("../__version__.py", "{minor_version}", ".dev1")
+replace_in_file("../__version__.py", "{minor_version}", ".dev0")
