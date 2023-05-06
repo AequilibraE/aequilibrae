@@ -529,7 +529,7 @@ class TrafficAssignment(object):
         Args:
             table_name (:obj:`str`): Name of the table to hold this assignment result
             turns_df (:obj:`pd.DataFrame`): Dataframe containing a, b, c nodes of required turning volumes.
-            classes: (:obj:`list`): List containing requires traffic classes.
+            classes: (:obj:`list`): List containing required traffic classes.
                 If None, all classes used in assignment will be exported.
             iteration: (:obj:`int`): Desired iteration.
             blend_iterations: (:obj:`bool`): whether or not to blend iterations.
@@ -553,7 +553,7 @@ class TrafficAssignment(object):
     def turning_volumes(
         self,
         turns_df: pd.DataFrame,
-        classes: Optional[list[str]] = None,
+        classes: Optional[list[TrafficClass]] = None,
         iteration: Optional[int] = None,
         blend_iterations: bool = True,
     ) -> pd.DataFrame:
