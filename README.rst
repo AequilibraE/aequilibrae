@@ -2,34 +2,19 @@
 AequilibraE
 ###########
 
+[![Documentation](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml)
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Documentation/badge.svg
-    :alt: Documentation Status
+[![unit tests](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml)
 
+[![Code coverage](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml)
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Linting/badge.svg
-    :alt: Linting
+[![Linux builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml)
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Tests%20on%20Windows/badge.svg
-    :alt: Windows Unit tests
+[![MacOS buils](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml)
 
-.. image:: https://codecov.io/gh/AequilibraE/aequilibrae/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/AequilibraE/aequilibrae
+[![Windows builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml)
 
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20MacOS%20Python%20Package/badge.svg
-    :alt: PyPi - Mac OS
-
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Windows%20Python%20Package/badge.svg
-    :alt: PyPi - Windows
-
-.. image:: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Linux%20Python%20Package/badge.svg
-    :target: https://github.com/AequilibraE/aequilibrae/workflows/Upload%20Linux%20Python%20Package/badge.svg
-    :alt: PyPi - Linux
+[![QAequilibraE artifacts](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml)
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not available from other open-source packages in the Python (NumPy, really) ecosystem.
