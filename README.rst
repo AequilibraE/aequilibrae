@@ -6,15 +6,15 @@ AequilibraE
 
 [![unit tests](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml)
 
-[![Code coverage](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml)
+[![Code coverage](https://github.com/AequilibraE/aequilibrae/actions/workflows/test_linux_with_coverage.yml/badge.svg)]
 
-[![Linux builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml)
+[![Linux builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_linux.yml/badge.svg)]
 
-[![MacOS buils](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml)
+[![MacOS buils](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_mac.yml/badge.svg)]
 
-[![Windows builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml)
+[![Windows builds](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_windows.yml/badge.svg)]
 
-[![QAequilibraE artifacts](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml)
+[![QAequilibraE artifacts](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml/badge.svg)]
 
 AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
 resources not available from other open-source packages in the Python (NumPy, really) ecosystem.
