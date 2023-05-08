@@ -1,6 +1,4 @@
-###########
-AequilibraE
-###########
+# AequilibraE
 
 [![Documentation](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml)
 
