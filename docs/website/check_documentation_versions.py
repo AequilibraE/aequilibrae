@@ -12,8 +12,7 @@ with open(npth / "__version__.py") as f:
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
-with open(os.path.join(npth, "docs/source/version_history.rst"), mode="r") as f:
+with open(os.path.join(npth, "docs/source/_static/switcher.json"), mode="r") as f:
     txt = f.read()
 
-assert f"{release_version}" in txt
-assert f"V.{release_version}" in txt
+assert f"python/V./{release_version}" in txt
