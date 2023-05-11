@@ -15,4 +15,5 @@ with open(npth / "__version__.py") as f:
 with open(os.path.join(npth, "docs/source/_static/switcher.json"), mode="r") as f:
     txt = f.read()
 
+print(f"python/V.{release_version}")
 assert f"python/V.{release_version}" in txt
