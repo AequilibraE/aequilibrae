@@ -128,7 +128,7 @@ html_theme_options = {
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "navbar_end": ["theme-switcher", "version-switcher"],
     "switcher": {
-        "json_url": "/_static/switcher.json",
+        "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
 }
