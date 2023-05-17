@@ -5,11 +5,11 @@ from aequilibrae.transit.constants import Constants
 
 
 def test_new_gtfs_builder(create_gtfs_project, create_path):
+    c = Constants()
+    c.agencies["agencies"] = 0
+
     conn = database_connection("transit")
     existing = conn.execute("SELECT COALESCE(MAX(DISTINCT(agency_id)), 0) FROM agencies;").fetchone()[0]
-
-    c = Constants()
-    existing = max(c["agencies"], existing)
 
     transit = create_gtfs_project.new_gtfs_builder(
         agency="Agency_1",
