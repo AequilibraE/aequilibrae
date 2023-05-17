@@ -287,7 +287,7 @@ class Graph(object):
         if cost_field in self.graph.columns:
             self.cost_field = cost_field
             self.compact_cost = np.zeros(self.compact_graph.id.max() + 2, self.__float_type)
-            df = self.__graph_groupby.sum()[[cost_field]].reset_index()
+            df = self.__graph_groupby.sum(numeric_only=True)[[cost_field]].reset_index()
             self.compact_cost[df.index.values] = df[cost_field].values
             if self.graph[cost_field].dtype == self.__float_type:
                 self.cost = np.array(self.graph[cost_field].values, copy=True)
