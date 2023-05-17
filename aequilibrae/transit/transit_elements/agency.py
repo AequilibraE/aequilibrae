@@ -34,8 +34,8 @@ class Agency(BasicPTElement):
     def __get_agency_id(self):
         with closing(database_connection("transit")) as conn:
             sql = "Select coalesce(max(distinct(agency_id)), 0) from agencies;"
-            data = [x[0] for x in conn.execute(sql)]
+            max_db = conn.execute(sql).fetchone()[0]
 
         c = Constants()
-        c.agencies["agencies"] = data[0] + 1
+        c.agencies["agencies"] = max(c.agencies["agencies"], max_db) + 1
         return c.agencies["agencies"]
