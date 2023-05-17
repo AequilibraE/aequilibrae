@@ -37,5 +37,5 @@ class Agency(BasicPTElement):
             max_db = conn.execute(sql).fetchone()[0]
 
         c = Constants()
-        c.agencies["agencies"] = max(c.agencies["agencies"], max_db) + 1
+        c.agencies["agencies"] = max(c.agencies.get("agencies", 0), max_db) + 1
         return c.agencies["agencies"]
