@@ -75,9 +75,17 @@ class GeoIndex:
             warnings.warn("You need RTREE to build a spatial index")
 
     def delete(self, feature_id, geometry: Union[Point, Polygon, LineString, MultiPoint, MultiPolygon]):
-        if env not in ["QGIS", "Python"]:
+        if env == "QGIS":
+            g = QgsGeometry()
+            g.fromWkb(geometry.wkb)
+            feature = QgsFeature()
+            feature.setGeometry(g)
+            feature.setId(feature_id)
+            self.idx.deleteFeature(feature)
+        elif env == "Python":
+            self.idx.delete(feature_id, geometry.bounds)
+        else:
             warnings.warn("You need RTREE to build a spatial index")
-        self.idx.delete(feature_id, geometry.bounds)
 
     def reset(self):
         self.idx = Index()
