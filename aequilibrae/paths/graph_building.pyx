@@ -85,7 +85,7 @@ cdef long long _build_compressed_graph(long long[:] link_idx,
             compressed_dir[slink] = -1
         else:
             compressed_dir[slink] = -999
-            slink += 1
+        slink += 1
 
     return slink
 

@@ -1,4 +1,6 @@
 from os.path import join, dirname, abspath
+from pathlib import Path
+
 import pytest
 
 import pandas as pd
@@ -26,7 +28,8 @@ def test_set_feed_path(gtfs_loader, gtfs_fldr):
 
 
 def test_load_data(gtfs_loader, gtfs_fldr):
-    cap = pd.read_csv(join(abspath(dirname("tests")), "tests/data/gtfs/transit_max_speeds.txt"))
+    pth = Path(__file__).parent.parent.parent
+    cap = pd.read_csv(pth / "data/gtfs/transit_max_speeds.txt")
 
     df = cap[cap.city == "Coquimbo"]
     df.loc[df.min_distance < 100, "speed"] = 10

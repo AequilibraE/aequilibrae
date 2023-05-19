@@ -76,10 +76,10 @@ sphinx_gallery_conf = {
     'remove_config_comments': True,
     "plot_gallery": False,
     "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/network_manipulation",
                                       "examples/editing_networks",
                                       "examples/trip_distribution",
                                       "examples/visualization",
+                                      "examples/aequilibrae_without_a_model",
                                       "examples/other_applications"])
 }
 
@@ -128,7 +128,7 @@ html_theme_options = {
     "github_url": "https://github.com/AequilibraE/aequilibrae",
     "navbar_end": ["theme-switcher", "version-switcher"],
     "switcher": {
-        "json_url": "/_static/switcher.json",
+        "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
 }
