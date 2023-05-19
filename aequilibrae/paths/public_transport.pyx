@@ -130,6 +130,7 @@ class HyperpathGenerating:
         # check the input demand paramater
         if check_demand:
             self._check_demand(demand, origin_column, destination_column, demand_column)
+        demand = demand[demand[demand_column] > 0]
 
         # initialize the column storing the resulting edge volumes
         self._edges["volume"] = 0.0
