@@ -10,7 +10,7 @@ import pandas as pd
 from aequilibrae.paths.public_transport import HyperpathGenerating
 
 
-def test_SF_in_01():
+def test_SF_run_01():
     edges = create_SF_network(dwell_time=0.0)
     hp = HyperpathGenerating(edges, check_edges=False)
     hp.run(origin=0, destination=12, volume=1.0)
@@ -38,6 +38,24 @@ def test_SF_in_01():
         ]
     )
     assert np.allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
+
+
+def test_SF_assign_01():
+    edges = create_SF_network(dwell_time=0.0)
+    hp = HyperpathGenerating(edges, check_edges=False)
+    od_matrix = pd.DataFrame(
+        data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]}
+    )
+
+    hp.assign(
+        od_matrix,
+        origin_column="origin_vertex_id",
+        destination_column="destination_vertex_id",
+        demand_column="demand",
+        check_demand=True,
+    )
+
+    assert np.allclose(edges["volume_ref"].values, hp._edges["volume"].values)
 
 
 def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
