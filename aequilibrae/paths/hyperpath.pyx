@@ -136,6 +136,7 @@ cpdef void compute_SF_in(
     DATATYPE_t[::1] demand_values,
     DATATYPE_t[::1] v_a_vec,
     DATATYPE_t[::1] u_i_vec,
+    DATATYPE_t[::1] f_i_vec,
     int vertex_count,
     int dest_vert_index,
 ):
@@ -147,10 +148,13 @@ cpdef void compute_SF_in(
         cnp.uint32_t vert_idx 
 
     # initialization
+    for i in range(<size_t>vertex_count):
+        u_i_vec[i] = DATATYPE_INF_PY
+        f_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     # vertex properties
-    f_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex frequency (inverse of the maximum delay)
+    # f_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex frequency (inverse of the maximum delay)
     u_j_c_a_vec = DATATYPE_INF_PY * np.ones(edge_count, dtype=DATATYPE_PY)    
     v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
     
@@ -192,9 +196,9 @@ cpdef void compute_SF_in(
     if u_r < DATATYPE_INF_PY:
 
         # make sure f_i values are not zero
-        f_i_vec = np.where(
-            f_i_vec < MIN_FREQ_PY, MIN_FREQ_PY, f_i_vec
-        )
+        for i in range(<size_t>vertex_count):
+            if f_i_vec[i] < MIN_FREQ_PY:
+                f_i_vec[i] = MIN_FREQ_PY
 
         # sort the links with descreasing order of u_j + c_a
         h_a_count = h_a_vec.sum()
