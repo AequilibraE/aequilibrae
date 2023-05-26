@@ -6,6 +6,7 @@ assignment model for transit networks. Transportation Research Part B 23(2),
 83-102.
 """
 
+cimport cython
 import numpy as np
 cimport numpy as cnp
 
@@ -37,6 +38,11 @@ A_VERY_SMALL_TIME_INTERVAL_PY = A_VERY_SMALL_TIME_INTERVAL
 include 'pq_4ary_heap.pyx'  # priority queue
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
 cdef void _coo_tocsc_uint32(
     cnp.uint32_t [::1] Ai,
     cnp.uint32_t [::1] Aj,
@@ -208,7 +214,11 @@ cpdef void compute_SF_in(
             h_a_count
         )
 
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
 cdef void _SF_in_first_pass_full(
     cnp.uint32_t[::1] csc_indptr, 
     cnp.uint32_t[::1] csc_edge_idx,
@@ -303,6 +313,11 @@ cdef void _SF_in_first_pass_full(
     free_heap(&pqueue)
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.cdivision(True)
+@cython.initializedcheck(False)
 cdef void _SF_in_second_pass(
     cnp.uint32_t[::1] edge_indices,
     cnp.uint32_t[::1] tail_indices,
