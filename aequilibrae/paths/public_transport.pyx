@@ -49,8 +49,11 @@ class HyperpathGenerating:
 
         # vertex least travel time
         u_i_vec = DATATYPE_INF_PY * np.ones(self.vertex_count, dtype=DATATYPE_PY)
+
         # vertex frequency
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
+
+        u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
 
         # input check
         if type(volume) is not list:
@@ -79,6 +82,7 @@ class HyperpathGenerating:
             self._edges["volume"].values,
             u_i_vec,
             f_i_vec,
+            u_j_c_a_vec,
             self.vertex_count,
             destination,
         )
@@ -154,6 +158,8 @@ class HyperpathGenerating:
         # vertex frequency
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
 
+        u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
+
         # loop on destination vertices
         for destination_vertex_index in destination_vertex_indices:
             demand_indices = np.where(d_vert_ids == destination_vertex_index)[0]
@@ -182,6 +188,7 @@ class HyperpathGenerating:
                 edge_volume,
                 u_i_vec,
                 f_i_vec,
+                u_j_c_a_vec,
                 self.vertex_count,
                 destination_vertex_index,
             )

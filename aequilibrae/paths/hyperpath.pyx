@@ -137,6 +137,7 @@ cpdef void compute_SF_in(
     DATATYPE_t[::1] v_a_vec,
     DATATYPE_t[::1] u_i_vec,
     DATATYPE_t[::1] f_i_vec,
+    DATATYPE_t[::1] u_j_c_a_vec,
     int vertex_count,
     int dest_vert_index,
 ):
@@ -151,10 +152,11 @@ cpdef void compute_SF_in(
     for i in range(<size_t>vertex_count):
         u_i_vec[i] = DATATYPE_INF_PY
         f_i_vec[i] = 0.0
+        u_j_c_a_vec[i] = DATATYPE_INF_PY
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     # vertex properties
-    u_j_c_a_vec = DATATYPE_INF_PY * np.ones(edge_count, dtype=DATATYPE_PY)    
+    # u_j_c_a_vec = DATATYPE_INF_PY * np.ones(edge_count, dtype=DATATYPE_PY)    
     
     # edge properties
     h_a_vec = np.zeros(edge_count, dtype=bool)  # edge belonging to hyperpath
@@ -197,9 +199,12 @@ cpdef void compute_SF_in(
             if f_i_vec[i] < MIN_FREQ_PY:
                 f_i_vec[i] = MIN_FREQ_PY
 
+        for i in range(<size_t>edge_count):
+            u_j_c_a_vec[i] *= -1.0
+
         # sort the links with descreasing order of u_j + c_a
         h_a_count = h_a_vec.sum()
-        masked_a = np.ma.array(-u_j_c_a_vec, mask=~h_a_vec)
+        masked_a = np.ma.array(u_j_c_a_vec, mask=~h_a_vec)
         edge_indices = np.argsort(masked_a).astype(np.uint32)
 
         _SF_in_second_pass(
