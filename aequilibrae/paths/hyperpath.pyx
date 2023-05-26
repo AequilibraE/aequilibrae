@@ -155,15 +155,11 @@ cpdef void compute_SF_in(
         u_j_c_a_vec[i] = DATATYPE_INF_PY
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
-    # vertex properties
-    # u_j_c_a_vec = DATATYPE_INF_PY * np.ones(edge_count, dtype=DATATYPE_PY)    
-    
     # edge properties
     h_a_vec = np.zeros(edge_count, dtype=bool)  # edge belonging to hyperpath
 
     # first pass #
     # ---------- #
-
     _SF_in_first_pass_full(
         csc_indptr,
         csc_edge_idx,
@@ -188,7 +184,6 @@ cpdef void compute_SF_in(
         u_i = u_i_vec[<size_t>vert_idx]
 
         if u_i < u_r:
-
             u_r = u_i
 
     # if the destination can be reached from any of the origins
