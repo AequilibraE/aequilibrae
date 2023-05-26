@@ -154,9 +154,7 @@ cpdef void compute_SF_in(
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     # vertex properties
-    # f_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex frequency (inverse of the maximum delay)
     u_j_c_a_vec = DATATYPE_INF_PY * np.ones(edge_count, dtype=DATATYPE_PY)    
-    v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
     
     # edge properties
     h_a_vec = np.zeros(edge_count, dtype=bool)  # edge belonging to hyperpath
@@ -179,7 +177,6 @@ cpdef void compute_SF_in(
 
     # second pass #
     # ----------- #
-
     v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
 
     u_r = DATATYPE_INF_PY
