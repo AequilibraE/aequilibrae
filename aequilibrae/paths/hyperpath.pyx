@@ -183,6 +183,8 @@ cpdef void compute_SF_in(
     DATATYPE_t[::1] f_i_vec,
     DATATYPE_t[::1] u_j_c_a_vec,
     DATATYPE_t[::1] v_i_vec,
+    cnp.uint8_t[::1] h_a_vec,
+    cnp.uint32_t[::1] edge_indices,
     int vertex_count,
     int dest_vert_index,
 ):
@@ -201,8 +203,8 @@ cpdef void compute_SF_in(
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
-    # edge properties
-    h_a_vec = np.zeros(edge_count, dtype=bool)  # edge belonging to hyperpath
+    for i in range(<size_t>edge_count):
+        h_a_vec[i] = 0
 
     # first pass #
     # ---------- #
@@ -255,7 +257,7 @@ cpdef void compute_SF_in(
         for i in range(<size_t>edge_count):
             if h_a_vec[i] == 0:
                 u_j_c_a_vec[i] = 1.0
-        edge_indices = np.empty(shape=edge_count, dtype=np.uint32)
+        
         argsort(u_j_c_a_vec, edge_indices)
 
         _SF_in_second_pass(

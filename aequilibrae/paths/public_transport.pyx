@@ -47,11 +47,13 @@ class HyperpathGenerating:
         self._edges["volume"] = 0.0
         self.u_i_vec = None
 
-        # allocation
-        u_i_vec = DATATYPE_INF_PY * np.ones(self.vertex_count, dtype=DATATYPE_PY)
+        # allocation of working arrays
+        u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
-        v_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+        v_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
+        h_a_vec = np.empty(self.edge_count, dtype=bool)
+        edge_indices = np.empty(self.edge_count, dtype=np.uint32)
 
         # input check
         if type(volume) is not list:
@@ -82,6 +84,8 @@ class HyperpathGenerating:
             f_i_vec,
             u_j_c_a_vec,
             v_i_vec,
+            h_a_vec,
+            edge_indices,
             self.vertex_count,
             destination,
         )
@@ -151,11 +155,13 @@ class HyperpathGenerating:
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
 
-        # allocation
+        # allocation of working arrays
         u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
-        v_i_vec = np.zeros(self.vertex_count, dtype=DATATYPE_PY)
+        v_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
+        h_a_vec = np.empty(self.edge_count, dtype=bool)
+        edge_indices = np.empty(self.edge_count, dtype=np.uint32)
 
         # loop on destination vertices
         for destination_vertex_index in destination_vertex_indices:
@@ -187,6 +193,8 @@ class HyperpathGenerating:
                 f_i_vec,
                 u_j_c_a_vec,
                 v_i_vec,
+                h_a_vec,
+                edge_indices,
                 self.vertex_count,
                 destination_vertex_index,
             )
