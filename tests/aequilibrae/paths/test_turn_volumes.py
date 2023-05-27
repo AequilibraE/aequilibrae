@@ -25,7 +25,6 @@ TURNS_DF = pd.DataFrame([[1, 2, 6]], columns=["a", "b", "c"])
 class TestTurnVolumes(TestCase):
     def setUp(self) -> None:
         ensure_spatialite_binaries()
-        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
         proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
         os.mkdir(proj_path)
