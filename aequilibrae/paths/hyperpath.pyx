@@ -10,6 +10,8 @@ cimport cython
 import numpy as np
 cimport numpy as cnp
 
+from libc.stdlib cimport malloc, free
+ 
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -34,6 +36,20 @@ MIN_FREQ_PY =  MIN_FREQ
 cdef DATATYPE_t A_VERY_SMALL_TIME_INTERVAL
 A_VERY_SMALL_TIME_INTERVAL = 1.0e+08 * MIN_FREQ
 A_VERY_SMALL_TIME_INTERVAL_PY = A_VERY_SMALL_TIME_INTERVAL
+
+cdef extern from "stdlib.h":
+    ctypedef void const_void "const void"
+    void qsort(void *base, int nmemb, int size,
+            int(*compar)(const_void *, const_void *)) nogil
+
+cdef struct IndexedElement:
+    size_t index
+    DATATYPE_t value
+
+cdef int _compare(const_void *a, const_void *b):
+    cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
+    if v < 0: return -1
+    if v >= 0: return 1
 
 include 'pq_4ary_heap.pyx'  # priority queue
 
@@ -79,6 +95,34 @@ cdef void _coo_tocsc_uint32(
         temp = Bp[i]
         Bp[i] = last
         last = temp
+
+
+cdef argsort(DATATYPE_t[::1] data, cnp.uint32_t[:] order):
+    """
+    Wrapper of the C function qsort
+    source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
+    """
+    cdef: 
+        size_t i
+        size_t n = <size_t>data.shape[0]
+    
+    # Allocate index tracking array.
+    cdef IndexedElement *order_struct = <IndexedElement *> malloc(n * sizeof(IndexedElement))
+    
+    # Copy data into index tracking array.
+    for i in range(n):
+        order_struct[i].index = i
+        order_struct[i].value = data[i]
+        
+    # Sort index tracking array.
+    qsort(<void *> order_struct, n, sizeof(IndexedElement), _compare)
+    
+    # Copy indices from index tracking array to output array.
+    for i in range(n):
+        order[i] = <cnp.uint32_t>order_struct[i].index
+        
+    # Free index tracking array.
+    free(order_struct)
 
 
 cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
@@ -177,14 +221,14 @@ cpdef void compute_SF_in(
 
     # second pass #
     # ----------- #
-    # v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
 
+    # demand is loaded into all the origin vertices
+    # also we compute the min travel time from all the origin vertices
     u_r = DATATYPE_INF_PY
     for i, vert_idx in enumerate(demand_indices):
 
         v_i_vec[<size_t>vert_idx] = demand_values[i]
         u_i = u_i_vec[<size_t>vert_idx]
-
         if u_i < u_r:
             u_r = u_i
 
@@ -201,9 +245,18 @@ cpdef void compute_SF_in(
             u_j_c_a_vec[i] *= -1.0
             h_a_count += <size_t>h_a_vec[i]
 
-        # sort the links with descreasing order of u_j + c_a
-        masked_a = np.ma.array(u_j_c_a_vec, mask=~h_a_vec)
-        edge_indices = np.argsort(masked_a).astype(np.uint32)
+        # Sort the links with descreasing order of u_j + c_a.
+        # Because the sort function sorts in increasing order, we sort a 
+        # transformed array, multiplied by -1, and set the items 
+        # corresponding to edges that are not in the hyperpath to a 
+        # positive value (they will be at the end of the sorted array).
+        # The items corresponding to edges that are in the hyperpath have a 
+        # negative transformed value.
+        for i in range(<size_t>edge_count):
+            if h_a_vec[i] == 0:
+                u_j_c_a_vec[i] = 1.0
+        edge_indices = np.empty(shape=edge_count, dtype=np.uint32)
+        argsort(u_j_c_a_vec, edge_indices)
 
         _SF_in_second_pass(
             edge_indices,
