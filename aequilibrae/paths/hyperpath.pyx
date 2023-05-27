@@ -57,7 +57,6 @@ include 'pq_4ary_heap.pyx'  # priority queue
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
-@cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _coo_tocsc_uint32(
     cnp.uint32_t [::1] Ai,
@@ -97,7 +96,11 @@ cdef void _coo_tocsc_uint32(
         last = temp
 
 
-cdef argsort(DATATYPE_t[::1] data, cnp.uint32_t[:] order):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.initializedcheck(False)
+cdef void argsort(DATATYPE_t[::1] data, cnp.uint32_t[:] order) nogil:
     """
     Wrapper of the C function qsort
     source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
@@ -169,6 +172,10 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
 
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.initializedcheck(False)
 cpdef void compute_SF_in(
     cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
@@ -187,19 +194,20 @@ cpdef void compute_SF_in(
     cnp.uint32_t[::1] edge_indices,
     int vertex_count,
     int dest_vert_index,
-):
+) nogil:
 
     cdef:
         int edge_count = tail_indices.shape[0]
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, h_a_count
         cnp.uint32_t vert_idx 
+        int demand_size = demand_indices.shape[0]
 
     # initialization
     for i in range(<size_t>vertex_count):
-        u_i_vec[i] = DATATYPE_INF_PY
+        u_i_vec[i] = DATATYPE_INF
         f_i_vec[i] = 0.0
-        u_j_c_a_vec[i] = DATATYPE_INF_PY
+        u_j_c_a_vec[i] = DATATYPE_INF
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
@@ -226,21 +234,21 @@ cpdef void compute_SF_in(
 
     # demand is loaded into all the origin vertices
     # also we compute the min travel time from all the origin vertices
-    u_r = DATATYPE_INF_PY
-    for i, vert_idx in enumerate(demand_indices):
-
+    u_r = DATATYPE_INF
+    for i in range(<size_t>demand_size):
+        vert_idx = demand_indices[i]
         v_i_vec[<size_t>vert_idx] = demand_values[i]
         u_i = u_i_vec[<size_t>vert_idx]
         if u_i < u_r:
             u_r = u_i
 
     # if the destination can be reached from any of the origins
-    if u_r < DATATYPE_INF_PY:
+    if u_r < DATATYPE_INF:
 
         # make sure f_i values are not zero
         for i in range(<size_t>vertex_count):
-            if f_i_vec[i] < MIN_FREQ_PY:
-                f_i_vec[i] = MIN_FREQ_PY
+            if f_i_vec[i] < MIN_FREQ:
+                f_i_vec[i] = MIN_FREQ
 
         h_a_count = 0
         for i in range(<size_t>edge_count):
