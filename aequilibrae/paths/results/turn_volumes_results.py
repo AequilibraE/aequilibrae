@@ -89,7 +89,7 @@ class TurnVolumesResults:
         # Requires multi eval as json.loads fails to read the procedure report.
         # inf is not recognised in eval, replacing with np.inf to allow eval
         procedure_report = eval(df.at[0, "procedure_report"])
-        convergence_report = eval(procedure_report["convergence"].replace("inf", "np.inf"))
+        convergence_report = eval(procedure_report["convergence"].replace("inf", "np.inf").replace('nan', 'np.nan'))
         setup_report = eval(procedure_report["setup"])
 
         convergence_report = pd.DataFrame(convergence_report)
