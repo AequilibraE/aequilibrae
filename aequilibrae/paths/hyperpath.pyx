@@ -138,6 +138,7 @@ cpdef void compute_SF_in(
     DATATYPE_t[::1] u_i_vec,
     DATATYPE_t[::1] f_i_vec,
     DATATYPE_t[::1] u_j_c_a_vec,
+    DATATYPE_t[::1] v_i_vec,
     int vertex_count,
     int dest_vert_index,
 ):
@@ -153,6 +154,7 @@ cpdef void compute_SF_in(
         u_i_vec[i] = DATATYPE_INF_PY
         f_i_vec[i] = 0.0
         u_j_c_a_vec[i] = DATATYPE_INF_PY
+        v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     # edge properties
@@ -175,7 +177,7 @@ cpdef void compute_SF_in(
 
     # second pass #
     # ----------- #
-    v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
+    # v_i_vec = np.zeros(vertex_count, dtype=DATATYPE_PY)  # vertex volume
 
     u_r = DATATYPE_INF_PY
     for i, vert_idx in enumerate(demand_indices):
