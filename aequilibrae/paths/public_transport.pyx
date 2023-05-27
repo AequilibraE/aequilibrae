@@ -47,7 +47,7 @@ class HyperpathGenerating:
         self._edges["volume"] = 0.0
         self.u_i_vec = None
 
-        # allocation of working arrays
+        # allocation of work arrays
         u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
@@ -77,7 +77,7 @@ class HyperpathGenerating:
             self._freq,
             self._tail,
             self._head,
-            demand_indices,  # source vertex indices
+            demand_indices,
             demand_values,
             self._edges["volume"].values,
             u_i_vec,
@@ -155,7 +155,7 @@ class HyperpathGenerating:
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
 
-        # allocation of working arrays
+        # allocation of work arrays
         u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
         u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
@@ -186,7 +186,7 @@ class HyperpathGenerating:
                 self._freq,
                 self._tail,
                 self._head,
-                demand_origins,  # source vertex indices
+                demand_origins,
                 demand_values,
                 edge_volume,
                 u_i_vec,
