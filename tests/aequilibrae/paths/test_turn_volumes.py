@@ -57,6 +57,9 @@ class TestTurnVolumes(TestCase):
         self.project.close()
 
     def _create_assign_matrix(self):
+        # The matrices are designed to create congestion.
+        # Trips to and from centroid 2 are set to 0.
+        # Turn volumes for turn 1,2,6 should be the same as the volumes on link id 1
         zones = 24
         mat_file = join(gettempdir(), f"Aequilibrae_matrix_{uuid.uuid4()}.aem")
         args = {
@@ -68,9 +71,9 @@ class TestTurnVolumes(TestCase):
         }
         matrix = AequilibraeMatrix()
         matrix.create_empty(**args)
-        trips = np.zeros((zones, zones))
-        trips[0, 5] = 100
-        trips[0, 7] = 50
+        trips = np.ones((zones, zones)) * 500
+        trips[[1, 5], :] = 0
+        trips[:, [1, 5]] = 0
 
         matrix.index[:] = np.arange(matrix.zones) + 1
         matrix.matrices[:, :, 0] = trips
@@ -88,9 +91,11 @@ class TestTurnVolumes(TestCase):
         self.assignment.set_algorithm("all-or-nothing")
         self.assignment.set_save_path_files(True)
         self.assignment.execute()
+        results_df = self.assignment.results()
+
         turning_movements = self.assignment.turning_volumes(TURNS_DF)
-        self.assertEqual(turning_movements.at[0, "volume"], 150)
-        self.assertEqual(turning_movements.at[1, "volume"], 300)
+        self.assertEqual(turning_movements.at[0, "volume"], results_df.at[1, "mat1_ab"])
+        self.assertEqual(turning_movements.at[1, "volume"], results_df.at[1, "mat2_ab"])
 
     def test_all_or_nothing_from_results(self):
         """
@@ -104,7 +109,7 @@ class TestTurnVolumes(TestCase):
         self.assignment.set_save_path_files(True)
         self.assignment.execute()
         self.assignment.save_results("test_turn_movements")
-
+        results_df = self.assignment.results()
         class_to_matrix = {"car": self.matrix_1, "truck": self.matrix_2}
         turning_movements = TurnVolumesResults.calculate_from_result_table(
             project=self.project,
@@ -112,8 +117,8 @@ class TestTurnVolumes(TestCase):
             asgn_result_table_name="test_turn_movements",
             class_to_matrix=class_to_matrix,
         )
-        self.assertEqual(turning_movements.at[0, "volume"], 150)
-        self.assertEqual(turning_movements.at[1, "volume"], 300)
+        self.assertEqual(turning_movements.at[0, "volume"], results_df.at[1, "mat1_ab"])
+        self.assertEqual(turning_movements.at[1, "volume"], results_df.at[1, "mat2_ab"])
 
     def test_bfw_from_asgn(self):
         """
@@ -125,9 +130,10 @@ class TestTurnVolumes(TestCase):
         self.assignment.rgap_target = 0.001
         self.assignment.set_save_path_files(True)
         self.assignment.execute()
+        results_df = self.assignment.results()
         turning_movements = self.assignment.turning_volumes(TURNS_DF)
-        self.assertEqual(turning_movements.at[0, "volume"], 150)
-        self.assertEqual(turning_movements.at[1, "volume"], 300)
+        self.assertEqual(turning_movements.at[0, "volume"], results_df.at[1, "mat1_ab"])
+        self.assertEqual(turning_movements.at[1, "volume"], results_df.at[1, "mat2_ab"])
 
     def test_bfw_from_results(self):
         """
@@ -143,6 +149,7 @@ class TestTurnVolumes(TestCase):
         self.assignment.set_save_path_files(True)
         self.assignment.execute()
         self.assignment.save_results("test_turn_movements")
+        results_df = self.assignment.results()
 
         class_to_matrix = {"car": self.matrix_1, "truck": self.matrix_2}
         turning_movements = TurnVolumesResults.calculate_from_result_table(
@@ -152,8 +159,8 @@ class TestTurnVolumes(TestCase):
             class_to_matrix=class_to_matrix,
         )
 
-        self.assertEqual(turning_movements.at[0, "volume"], 150)
-        self.assertEqual(turning_movements.at[1, "volume"], 300)
+        self.assertEqual(turning_movements.at[0, "volume"], results_df.at[1, "mat1_ab"])
+        self.assertEqual(turning_movements.at[1, "volume"], results_df.at[1, "mat2_ab"])
 
     def test_save_turn_volumes(self):
         """
