@@ -363,7 +363,7 @@ class TurnVolumesResults:
         for it in range(2, iterations + 1):
             betas_for_it = pd.Series(ta_report.loc[it, ["beta0", "beta1", "beta2"]]).sort_index(ascending=True)
             alpha_for_it = ta_report.at[it, "alpha"]
-            if (betas_for_it != -1).any():
+            if (betas_for_it != -1).all():
                 # only calculate the new volume if betas are all not -1
                 min_idx = max(0, it - betas_for_it.size) + 1
                 max_idx = min_idx + min(it, betas_for_it.size)
