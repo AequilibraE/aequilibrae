@@ -89,7 +89,7 @@ class TurnVolumesResults:
         # Requires multi eval as json.loads fails to read the procedure report.
         # inf is not recognised in eval, replacing with np.inf to allow eval
         procedure_report = eval(df.at[0, "procedure_report"])
-        convergence_report = eval(procedure_report["convergence"].replace("inf", "np.inf").replace('nan', 'np.nan'))
+        convergence_report = eval(procedure_report["convergence"].replace("inf", "np.inf").replace("nan", "np.nan"))
         setup_report = eval(procedure_report["setup"])
 
         convergence_report = pd.DataFrame(convergence_report)
@@ -271,7 +271,9 @@ class TurnVolumesResults:
         # get nodes indices from paths aux file
         for node in ["a", "b", "c"]:
             turns_df[f"{node}_index"] = node_to_index_df.loc[turns_df[node]].values
-        turns_df["turn_id"] = turns_df["a"].astype(str) + "_" + turns_df["b"].astype(str) + "_" + turns_df["c"].astype(str)
+        turns_df["turn_id"] = (
+            turns_df["a"].astype(str) + "_" + turns_df["b"].astype(str) + "_" + turns_df["c"].astype(str)
+        )
         return turns_df
 
     def get_turn_links(self, turns_df: pd.DataFrame, correspondence_df: pd.DataFrame) -> pd.DataFrame:
@@ -366,7 +368,10 @@ class TurnVolumesResults:
                 min_idx = max(0, it - betas_for_it.size) + 1
                 max_idx = min_idx + min(it, betas_for_it.size)
                 window = range(min_idx, max_idx)
-                it_volume = (aon_volume.loc[window] * betas_for_it[0 : min(it, betas_for_it.size)].values).sum()
+                it_volume = (
+                    aon_volume.loc[window].sort_index(ascending=False)
+                    * betas_for_it[0 : min(it, betas_for_it.size)].values
+                ).sum()
             else:
                 it_volume = aon_volume.loc[it]
 
