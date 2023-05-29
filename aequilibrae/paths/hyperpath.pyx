@@ -213,6 +213,7 @@ cpdef void compute_SF_in(
 
     for i in range(<size_t>edge_count):
         h_a_vec[i] = 0
+        v_a_vec[i] = 0.0
 
     # first pass #
     # ---------- #
