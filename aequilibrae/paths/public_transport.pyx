@@ -1,6 +1,13 @@
 # cython: language_level=3
 
 import pandas as pd
+import numpy as np
+cimport numpy as cnp
+from cython.parallel import prange
+from libcpp.vector cimport vector
+from libc.stdlib cimport malloc, free
+from libc.string cimport memset
+
 
 include 'hyperpath.pyx'
 
@@ -70,25 +77,25 @@ class HyperpathGenerating:
 
         demand_values = np.array(volume, dtype=DATATYPE_PY)
 
-        compute_SF_in(
-            self._indptr,
-            self._edge_idx,
-            self._trav_time,
-            self._freq,
-            self._tail,
-            self._head,
-            demand_indices,
-            demand_values,
-            self._edges["volume"].values,
-            u_i_vec,
-            f_i_vec,
-            u_j_c_a_vec,
-            v_i_vec,
-            h_a_vec,
-            edge_indices,
-            self.vertex_count,
-            destination,
-        )
+        # compute_SF_in(
+        #     self._indptr,
+        #     self._edge_idx,
+        #     self._trav_time,
+        #     self._freq,
+        #     self._tail,
+        #     self._head,
+        #     demand_indices,
+        #     demand_values,
+        #     self._edges["volume"].values,
+        #     u_i_vec,
+        #     f_i_vec,
+        #     u_j_c_a_vec,
+        #     v_i_vec,
+        #     h_a_vec,
+        #     edge_indices,
+        #     self.vertex_count,
+        #     destination,
+        # )
         self.u_i_vec = u_i_vec
 
     def _check_vertex_idx(self, idx):
@@ -163,42 +170,91 @@ class HyperpathGenerating:
         h_a_vec = np.empty(self.edge_count, dtype=bool)
         edge_indices = np.empty(self.edge_count, dtype=np.uint32)
 
+        edge_volume = np.empty(self._edges["volume"].shape[0], dtype=np.float64)
         # loop on destination vertices
-        for destination_vertex_index in destination_vertex_indices:
-            demand_indices = np.where(d_vert_ids == destination_vertex_index)[0]
+        #for destination_vertex_index in destination_vertex_indices:
+        cdef:
+            vector[cnp.uint32_t] maybe_demand_indices
+            vector[cnp.uint32_t] maybe_demand_origins
+            vector[cnp.float64_t] maybe_demand_values
 
-            # list of origin vertices
-            demand_origins = o_vert_ids[demand_indices]
-            demand_origins = demand_origins.astype(np.uint32)
+            cnp.uint32_t[::1] indptr_view = self._indptr[:]
+            cnp.uint32_t[::1] edge_idx_view = self._edge_idx[:]
+            cnp.float64_t[::1] trav_time_view = self._trav_time[:]
+            cnp.float64_t[::1] freq_view = self._freq[:]
+            cnp.uint32_t[::1] tail_view = self._tail[:]
+            cnp.uint32_t[::1] head_view = self._head[:]
 
-            # list of demand values
-            demand_values = demand_vls[demand_indices]
-            demand_values = demand_values.astype(DATATYPE_PY)
+            cnp.float64_t[::1] edge_volume_view = edge_volume[:]
+            size_t[:] d_vert_ids_view = d_vert_ids[:]
+            size_t[:] destination_vertex_indices_view = destination_vertex_indices[:]
+            cnp.uint32_t[::1] o_vert_ids_view = o_vert_ids[:]
+            cnp.float64_t[::1] demand_vls_view = demand_vls[:]
+            size_t i, k, destination_vertex_index, vertex_count = self.vertex_count
 
-            # initialization of the edge volume vector
-            edge_volume = np.zeros_like(self._edges["volume"])
+        with nogil:
+            for i in prange(destination_vertex_indices_view.shape[0], num_threads=1):
+                destination_vertex_index = destination_vertex_indices_view[i]
+                # demand_indices = np.where(d_vert_ids == destination_vertex_index)[0]
 
-            # S&F
-            compute_SF_in(
-                self._indptr,
-                self._edge_idx,
-                self._trav_time,
-                self._freq,
-                self._tail,
-                self._head,
-                demand_origins,
-                demand_values,
-                edge_volume,
-                u_i_vec,
-                f_i_vec,
-                u_j_c_a_vec,
-                v_i_vec,
-                h_a_vec,
-                edge_indices,
-                self.vertex_count,
-                destination_vertex_index,
-            )
-            self._edges["volume"] += edge_volume
+                maybe_demand_indices.clear()
+                for k in range(d_vert_ids_view.shape[0]):
+                    if d_vert_ids_view[k] == destination_vertex_index:
+                        maybe_demand_indices.push_back(k)
+
+                # print(demand_indices, maybe_demand_indices)
+
+                # list of origin vertices
+                # demand_origins = o_vert_ids[demand_indices]
+                # demand_origins = demand_origins.astype(np.uint32)
+                maybe_demand_origins.clear()
+                for k in maybe_demand_indices:
+                    maybe_demand_origins.push_back(o_vert_ids_view[k])
+
+                # if i == 0:
+                #     print("o_vert_ids:", o_vert_ids)
+                #     print("demand_indices:", demand_indices)
+                #     print("demand_origins:", demand_origins)
+                #     print("maybe_demand_origins:", maybe_demand_origins)
+
+
+                # list of demand values
+                # demand_values = demand_vls[demand_indices]
+                # demand_values = demand_values.astype(DATATYPE_PY)
+                maybe_demand_values.clear()
+                for k in maybe_demand_indices:
+                    maybe_demand_values.push_back(demand_vls_view[k])
+
+                # if i == 0:
+                #     print("demand_vls:", demand_vls)
+                #     print("demand_indices:", demand_indices)
+                #     print("demand_values:", demand_values)
+                #     print("maybe_demand_values:", maybe_demand_values)
+
+                # initialization of the edge volume vector
+                memset(&edge_volume_view[0], 0, sizeof(cnp.float64_t) * edge_volume_view.shape[0])
+
+                # S&F
+                compute_SF_in(
+                    indptr_view,
+                    edge_idx_view,
+                    trav_time_view,
+                    freq_view,
+                    tail_view,
+                    head_view,
+                    maybe_demand_origins,
+                    maybe_demand_values,
+                    edge_volume_view,
+                    u_i_vec,
+                    f_i_vec,
+                    u_j_c_a_vec,
+                    v_i_vec,
+                    h_a_vec,
+                    edge_indices,
+                    vertex_count,
+                    destination_vertex_index,
+                )
+                # self._edges["volume"] += np.asarray(edge_volume)
 
     def _check_demand(self, demand, origin_column, destination_column, demand_column):
         if type(demand) != pd.core.frame.DataFrame:

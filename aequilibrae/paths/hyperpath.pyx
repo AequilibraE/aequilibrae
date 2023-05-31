@@ -11,7 +11,8 @@ import numpy as np
 cimport numpy as cnp
 
 from libc.stdlib cimport malloc, free
- 
+from libcpp.vector cimport vector
+
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -100,7 +101,7 @@ cdef void _coo_tocsc_uint32(
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void argsort(DATATYPE_t[::1] data, cnp.uint32_t[:] order) nogil:
+cdef void argsort(cnp.float64_t[::1] data, cnp.uint32_t[:] order) nogil:
     """
     Wrapper of the C function qsort
     source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
@@ -179,17 +180,17 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
 cpdef void compute_SF_in(
     cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
-    DATATYPE_t[::1] c_a_vec,
-    DATATYPE_t[::1] f_a_vec,
+    cnp.float64_t[::1] c_a_vec,
+    cnp.float64_t[::1] f_a_vec,
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
-    cnp.uint32_t[::1] demand_indices,
-    DATATYPE_t[::1] demand_values,
-    DATATYPE_t[::1] v_a_vec,
-    DATATYPE_t[::1] u_i_vec,
-    DATATYPE_t[::1] f_i_vec,
-    DATATYPE_t[::1] u_j_c_a_vec,
-    DATATYPE_t[::1] v_i_vec,
+    vector[cnp.uint32_t] demand_indices,
+    vector[cnp.float64_t] demand_values,
+    cnp.float64_t[::1] v_a_vec,
+    cnp.float64_t[::1] u_i_vec,
+    cnp.float64_t[::1] f_i_vec,
+    cnp.float64_t[::1] u_j_c_a_vec,
+    cnp.float64_t[::1] v_i_vec,
     cnp.uint8_t[::1] h_a_vec,
     cnp.uint32_t[::1] edge_indices,
     int vertex_count,
@@ -201,7 +202,7 @@ cpdef void compute_SF_in(
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, h_a_count
         cnp.uint32_t vert_idx 
-        int demand_size = demand_indices.shape[0]
+        int demand_size = demand_indices.size()
 
     # initialization
     for i in range(<size_t>vertex_count):
@@ -288,12 +289,12 @@ cpdef void compute_SF_in(
 cdef void _SF_in_first_pass_full(
     cnp.uint32_t[::1] csc_indptr, 
     cnp.uint32_t[::1] csc_edge_idx,
-    DATATYPE_t[::1] c_a_vec,
-    DATATYPE_t[::1] f_a_vec,
+    cnp.float64_t[::1] c_a_vec,
+    cnp.float64_t[::1] f_a_vec,
     cnp.uint32_t[::1] tail_indices,
-    DATATYPE_t[::1] u_i_vec,
-    DATATYPE_t[::1] f_i_vec,
-    DATATYPE_t[::1] u_j_c_a_vec,
+    cnp.float64_t[::1] u_i_vec,
+    cnp.float64_t[::1] f_i_vec,
+    cnp.float64_t[::1] u_j_c_a_vec,
     cnp.uint8_t[::1] h_a_vec,
     int dest_vert_index,
 ) nogil:
@@ -388,10 +389,10 @@ cdef void _SF_in_second_pass(
     cnp.uint32_t[::1] edge_indices,
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
-    DATATYPE_t[::1] v_i_vec,
-    DATATYPE_t[::1] v_a_vec,
-    DATATYPE_t[::1] f_i_vec,
-    DATATYPE_t[::1] f_a_vec,
+    cnp.float64_t[::1] v_i_vec,
+    cnp.float64_t[::1] v_a_vec,
+    cnp.float64_t[::1] f_i_vec,
+    cnp.float64_t[::1] f_a_vec,
     size_t h_a_count
 ) nogil:
 
