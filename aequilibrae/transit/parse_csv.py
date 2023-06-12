@@ -53,7 +53,14 @@ def parse_csv(file_name: str, column_order=[]):
         new_data_dt = [(f, column_order[f]) for f in col_names]
 
         if int(data.shape.__len__()) > 0:
-            return np.array(data, new_data_dt)
+            
+            # handle the case of int data given as a float string
+            for j, (_, dtype) in enumerate(new_data_dt):
+                if dtype == int:
+                    for item in data: 
+                        item[j] = item[j].split(".")[0]
+
+            return np.array(data, dtype=new_data_dt)
         else:
             return data
     else:
