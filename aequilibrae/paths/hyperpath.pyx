@@ -99,15 +99,13 @@ cdef void _coo_tocsc_uint32(
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void argsort(cnp.float64_t[::1] data, cnp.uint32_t[:] order) nogil:
+cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) nogil:
     """
     Wrapper of the C function qsort
     source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
     """
-    cdef: 
-        size_t i
-        size_t n = <size_t>data.shape[0]
-    
+    cdef size_t i
+
     # Allocate index tracking array.
     cdef IndexedElement *order_struct = <IndexedElement *> malloc(n * sizeof(IndexedElement))
     
@@ -170,7 +168,7 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
     return rs_indptr, rs_indices, rs_data
 
 
-# @cython.boundscheck(False)
+@cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
@@ -185,33 +183,33 @@ cdef void compute_SF_in(
     cnp.float64_t *demand_values,
     size_t demand_size,
     cnp.float64_t *v_a_vec,
-    cnp.float64_t[::1] u_i_vec,
-    cnp.float64_t[::1] f_i_vec,
-    cnp.float64_t[::1] u_j_c_a_vec,
-    cnp.float64_t[::1] v_i_vec,
-    cnp.uint8_t[::1] h_a_vec,
-    cnp.uint32_t[::1] edge_indices,
-    int vertex_count,
+    cnp.float64_t *u_i_vec,
+    cnp.float64_t *f_i_vec,
+    cnp.float64_t *u_j_c_a_vec,
+    cnp.float64_t *v_i_vec,
+    cnp.uint8_t *h_a_vec,
+    cnp.uint32_t *edge_indices,
+    size_t vertex_count,
     int dest_vert_index,
 ) nogil:
 
     cdef:
-        int edge_count = tail_indices.shape[0]
+        size_t edge_count = <size_t>tail_indices.shape[0]
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, h_a_count
         cnp.uint32_t vert_idx 
 
     # initialization
-    for i in range(<size_t>vertex_count):
+    for i in range(vertex_count):
         u_i_vec[i] = DATATYPE_INF
         f_i_vec[i] = 0.0
-        u_j_c_a_vec[i] = DATATYPE_INF
+        u_j_c_a_vec[i] = DATATYPE_INF  # TODO 90% sure this should not be under vertex_count but edge_count
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
-    for i in range(<size_t>edge_count):
+    for i in range(edge_count):
         h_a_vec[i] = 0
-        v_a_vec[i] = 0.0
+        v_a_vec[i] = 0.0  # TODO 90% sure this should not be under edge_count but vertex_count
 
     # first pass #
     # ---------- #
@@ -265,7 +263,7 @@ cdef void compute_SF_in(
             if h_a_vec[i] == 0:
                 u_j_c_a_vec[i] = 1.0
         
-        argsort(u_j_c_a_vec, edge_indices)
+        argsort(u_j_c_a_vec, edge_indices, edge_count)
 
         _SF_in_second_pass(
             edge_indices,
@@ -289,10 +287,10 @@ cdef void _SF_in_first_pass_full(
     cnp.float64_t[::1] c_a_vec,
     cnp.float64_t[::1] f_a_vec,
     cnp.uint32_t[::1] tail_indices,
-    cnp.float64_t[::1] u_i_vec,
-    cnp.float64_t[::1] f_i_vec,
-    cnp.float64_t[::1] u_j_c_a_vec,
-    cnp.uint8_t[::1] h_a_vec,
+    cnp.float64_t *u_i_vec,
+    cnp.float64_t *f_i_vec,
+    cnp.float64_t *u_j_c_a_vec,
+    cnp.uint8_t *h_a_vec,
     int dest_vert_index,
 ) nogil:
     """All vertices are visited."""
@@ -383,12 +381,12 @@ cdef void _SF_in_first_pass_full(
 @cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _SF_in_second_pass(
-    cnp.uint32_t[::1] edge_indices,
+    cnp.uint32_t *edge_indices,
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
-    cnp.float64_t[::1] v_i_vec,
+    cnp.float64_t *v_i_vec,
     cnp.float64_t *v_a_vec,
-    cnp.float64_t[::1] f_i_vec,
+    cnp.float64_t *f_i_vec,
     cnp.float64_t[::1] f_a_vec,
     size_t h_a_count
 ) nogil:
