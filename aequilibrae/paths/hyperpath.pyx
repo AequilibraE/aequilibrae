@@ -10,7 +10,7 @@ cimport cython
 import numpy as np
 cimport numpy as cnp
 
-from cython.parallel import parallel, threadid
+from cython.parallel import parallel, prange, threadid
 from libc.stdlib cimport malloc, calloc, free
 from libc.string cimport memset
 
@@ -173,11 +173,14 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
 # Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
 # without them the threads appear to enter a deadlock due to the shared edge_volume array. However
 # the indexing on that array and its slices should never collide.
+#
+# Optionally return the u_i_vec, however this is only possible when using a single destination.
+# The caller is responsible for managing that memory.
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void compute_SF_in_parallel(
+cdef cnp.float64_t *compute_SF_in_parallel(
     cnp.uint32_t[::1] indptr_view,
     cnp.uint32_t[::1] edge_idx_view,
     cnp.float64_t[::1] trav_time_view,
@@ -189,11 +192,16 @@ cdef void compute_SF_in_parallel(
     cnp.uint32_t[::1] o_vert_ids_view,
     cnp.float64_t[::1] demand_vls_view,
     cnp.float64_t[::1] edge_volume_view,
+    bint ouput_travel_time,
     size_t vertex_count,
     size_t edge_count,
     int num_threads,
 ) nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
+    # except ouput_travel_time when it is non-null
+    if ouput_travel_time:
+        with gil:
+            assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
     cdef:
         cnp.uint32_t *thread_demand_origins
         cnp.float64_t *thread_demand_values
@@ -211,6 +219,9 @@ cdef void compute_SF_in_parallel(
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
 
+        # We malloc this memory here, then use it as the 0th threads thread_u_i_vec to allow us to return it
+        cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
+
         size_t i, j, destination_vertex_index
 
     with parallel(num_threads=num_threads):
@@ -220,7 +231,10 @@ cdef void compute_SF_in_parallel(
         # we can safely read and write without collisions.
         thread_edge_volume    = &edge_volume[threadid() * edge_count]
 
-        thread_u_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
+        if ouput_travel_time and threadid() == 0:
+            thread_u_i_vec  = u_i_vec_out
+        else:
+            thread_u_i_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
         thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
         thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
         thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
@@ -261,7 +275,10 @@ cdef void compute_SF_in_parallel(
 
         free(thread_demand_origins)
         free(thread_demand_values)
-        free(thread_u_i_vec)
+        if ouput_travel_time and threadid() == 0:
+            pass
+        else:
+            free(thread_u_i_vec)
         free(thread_f_i_vec)
         free(thread_u_j_c_a_vec)
         free(thread_v_i_vec)
@@ -275,6 +292,7 @@ cdef void compute_SF_in_parallel(
             edge_volume_view[j] += edge_volume[i * edge_count + j]
 
     free(edge_volume)
+    return u_i_vec_out
 
 
 @cython.boundscheck(False)
