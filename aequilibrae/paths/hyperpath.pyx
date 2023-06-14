@@ -203,13 +203,14 @@ cdef void compute_SF_in(
     for i in range(vertex_count):
         u_i_vec[i] = DATATYPE_INF
         f_i_vec[i] = 0.0
-        u_j_c_a_vec[i] = DATATYPE_INF  # TODO 90% sure this should not be under vertex_count but edge_count
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     for i in range(edge_count):
+        v_a_vec[i] = 0.0
+        u_j_c_a_vec[i] = DATATYPE_INF
         h_a_vec[i] = 0
-        v_a_vec[i] = 0.0  # TODO 90% sure this should not be under edge_count but vertex_count
+
 
     # first pass #
     # ---------- #
