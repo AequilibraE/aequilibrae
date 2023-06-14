@@ -43,9 +43,7 @@ def test_SF_run_01():
 def test_SF_assign_01():
     edges = create_SF_network(dwell_time=0.0)
     hp = HyperpathGenerating(edges, check_edges=False)
-    od_matrix = pd.DataFrame(
-        data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]}
-    )
+    od_matrix = pd.DataFrame(data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
 
     hp.assign(
         od_matrix,

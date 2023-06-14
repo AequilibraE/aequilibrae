@@ -198,7 +198,6 @@ cdef cnp.float64_t *compute_SF_in_parallel(
     int num_threads,
 ) nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
-    # except ouput_travel_time when it is non-null
     if ouput_travel_time:
         with gil:
             assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
@@ -219,7 +218,7 @@ cdef cnp.float64_t *compute_SF_in_parallel(
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
 
-        # We malloc this memory here, then use it as the 0th threads thread_u_i_vec to allow us to return it
+        # We malloc this memory here, then use it as the 0th thread's thread_u_i_vec to allow us to return it
         cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
 
         size_t i, j, destination_vertex_index
