@@ -10,7 +10,9 @@ cimport cython
 import numpy as np
 cimport numpy as cnp
 
-from libc.stdlib cimport malloc, free
+from cython.parallel import parallel, threadid
+from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport memset
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -168,6 +170,113 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
     return rs_indptr, rs_indices, rs_data
 
 
+# Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
+# without them the threads appear to enter a deadlock due to the shared edge_volume array. However
+# the indexing on that array and its slices should never collide.
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(False)
+@cython.initializedcheck(False)
+cdef void compute_SF_in_parallel(
+    cnp.uint32_t[::1] indptr_view,
+    cnp.uint32_t[::1] edge_idx_view,
+    cnp.float64_t[::1] trav_time_view,
+    cnp.float64_t[::1] freq_view,
+    cnp.uint32_t[::1] tail_view,
+    cnp.uint32_t[::1] head_view,
+    cnp.uint32_t[:] d_vert_ids_view,
+    cnp.uint32_t[:] destination_vertex_indices_view,
+    cnp.uint32_t[::1] o_vert_ids_view,
+    cnp.float64_t[::1] demand_vls_view,
+    cnp.float64_t[::1] edge_volume_view,
+    size_t vertex_count,
+    size_t edge_count,
+    int num_threads,
+) nogil:
+    # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
+    cdef:
+        cnp.uint32_t *thread_demand_origins
+        cnp.float64_t *thread_demand_values
+        cnp.float64_t *thread_edge_volume
+        size_t demand_size
+
+        cnp.float64_t *thread_u_i_vec
+        cnp.float64_t *thread_f_i_vec
+        cnp.float64_t *thread_u_j_c_a_vec
+        cnp.float64_t *thread_v_i_vec
+        cnp.uint8_t *thread_h_a_vec
+        cnp.uint32_t *thread_edge_indices
+
+        # This is a shared buffer, all threads will write into seperate slices depending on their threadid.
+        # When writing all threads must increment!
+        cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
+
+        size_t i, j, destination_vertex_index
+
+    with parallel(num_threads=num_threads):
+        thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
+        thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
+        # Here we take out thread local slice of the shared buffer, each thread is assigned a unqiue id so
+        # we can safely read and write without collisions.
+        thread_edge_volume    = &edge_volume[threadid() * edge_count]
+
+        thread_u_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
+        thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
+        thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
+        thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
+        thread_h_a_vec      = <cnp.uint8_t   *> malloc(sizeof(cnp.uint8_t)   * edge_count)
+        thread_edge_indices = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * edge_count)
+
+        for i in prange(destination_vertex_indices_view.shape[0]):
+            destination_vertex_index = destination_vertex_indices_view[i]
+
+            demand_size = 0
+            for j in range(d_vert_ids_view.shape[0]):
+                if d_vert_ids_view[j] == destination_vertex_index:
+                    thread_demand_origins[demand_size] = o_vert_ids_view[j]
+                    thread_demand_values[demand_size] = demand_vls_view[j]
+                    demand_size = demand_size + 1  # demand_size += 1 is not allowed as cython believes this is a reduction
+
+            # S&F
+            compute_SF_in(
+                indptr_view,
+                edge_idx_view,
+                trav_time_view,
+                freq_view,
+                tail_view,
+                head_view,
+                thread_demand_origins,
+                thread_demand_values,
+                demand_size,
+                thread_edge_volume,
+                thread_u_i_vec,
+                thread_f_i_vec,
+                thread_u_j_c_a_vec,
+                thread_v_i_vec,
+                thread_h_a_vec,
+                thread_edge_indices,
+                vertex_count,
+                destination_vertex_index
+            )
+
+        free(thread_demand_origins)
+        free(thread_demand_values)
+        free(thread_u_i_vec)
+        free(thread_f_i_vec)
+        free(thread_u_j_c_a_vec)
+        free(thread_v_i_vec)
+        free(thread_h_a_vec)
+        free(thread_edge_indices)
+
+    # Accumulate results into output buffer. This could parellelised over the output indexes but
+    # the lose of spacial locality may not be worth it.
+    for i in range(num_threads):
+        for j in range(edge_count):
+            edge_volume_view[j] += edge_volume[i * edge_count + j]
+
+    free(edge_volume)
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
@@ -207,7 +316,7 @@ cdef void compute_SF_in(
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
     for i in range(edge_count):
-        v_a_vec[i] = 0.0
+        # v_a_vec[i] = 0.0
         u_j_c_a_vec[i] = DATATYPE_INF
         h_a_vec[i] = 0
 
@@ -407,5 +516,5 @@ cdef void _SF_in_second_pass(
 
         # update v_a
         v_a_new = v_i * f_a / f_i
-        v_a_vec[edge_idx] = v_a_new
+        v_a_vec[edge_idx] += v_a_new
         v_i_vec[<size_t>head_indices[edge_idx]] += v_a_new

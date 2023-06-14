@@ -3,11 +3,7 @@
 import pandas as pd
 import numpy as np
 cimport numpy as cnp
-from cython.parallel import prange, parallel
 cimport openmp
-from libc.stdlib cimport malloc, free
-from libc.string cimport memset
-
 
 include 'hyperpath.pyx'
 
@@ -163,95 +159,22 @@ class HyperpathGenerating:
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
 
-        edge_volume = np.empty(self._edges["volume"].shape[0], dtype=np.float64)
-
-        cdef: # All will be thread local, allocated in parallel block
-            int num_threads = <int> (openmp.omp_get_num_threads() if threads < 1 else threads)
-            cnp.uint32_t *thread_demand_origins
-            cnp.float64_t *thread_demand_values
-            cnp.float64_t *thread_edge_volume
-            size_t demand_size
-
-            cnp.float64_t *thread_u_i_vec
-            cnp.float64_t *thread_f_i_vec
-            cnp.float64_t *thread_u_j_c_a_vec
-            cnp.float64_t *thread_v_i_vec
-            cnp.uint8_t *thread_h_a_vec
-            cnp.uint32_t *thread_edge_indices
-
-            # Views of required READ-ONLY data
-            cnp.uint32_t[::1] indptr_view = self._indptr[:]
-            cnp.uint32_t[::1] edge_idx_view = self._edge_idx[:]
-            cnp.float64_t[::1] trav_time_view = self._trav_time[:]
-            cnp.float64_t[::1] freq_view = self._freq[:]
-            cnp.uint32_t[::1] tail_view = self._tail[:]
-            cnp.uint32_t[::1] head_view = self._head[:]
-            cnp.uint32_t[:] d_vert_ids_view = d_vert_ids[:]
-            cnp.uint32_t[:] destination_vertex_indices_view = destination_vertex_indices[:]
-            cnp.uint32_t[::1] o_vert_ids_view = o_vert_ids[:]
-            cnp.float64_t[::1] demand_vls_view = demand_vls[:]
-
-            size_t i, k, destination_vertex_index
-            size_t vertex_count = self.vertex_count
-            size_t edge_count = self._edges["volume"].shape[0]
-
-        with nogil, parallel(num_threads=num_threads):
-            # Allocate thread local scratch space
-            thread_demand_origins = <cnp.uint32_t *>  malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
-            thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
-            thread_edge_volume    = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
-
-            thread_u_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-            thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-            thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
-            thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-            thread_h_a_vec      = <cnp.uint8_t *>   malloc(sizeof(cnp.uint8_t)   * edge_count)
-            thread_edge_indices = <cnp.uint32_t *>  malloc(sizeof(cnp.uint32_t)  * edge_count)
-
-            for i in prange(destination_vertex_indices_view.shape[0]):
-                destination_vertex_index = destination_vertex_indices_view[i]
-
-                demand_size = 0
-                for k in range(d_vert_ids_view.shape[0]):
-                    if d_vert_ids_view[k] == destination_vertex_index:
-                        thread_demand_origins[demand_size] = o_vert_ids_view[k]
-                        thread_demand_values[demand_size] = demand_vls_view[k]
-                        demand_size = demand_size + 1  # demand_size += 1 is not allowed as cython believes this is a reduction
-
-                # S&F
-                compute_SF_in(
-                    indptr_view,
-                    edge_idx_view,
-                    trav_time_view,
-                    freq_view,
-                    tail_view,
-                    head_view,
-                    thread_demand_origins,
-                    thread_demand_values,
-                    demand_size,
-                    thread_edge_volume,
-                    thread_u_i_vec,
-                    thread_f_i_vec,
-                    thread_u_j_c_a_vec,
-                    thread_v_i_vec,
-                    thread_h_a_vec,
-                    thread_edge_indices,
-                    vertex_count,
-                    destination_vertex_index
-                )
-
-                with gil:
-                    self._edges["volume"] += np.asarray(<cnp.float64_t[:edge_count]>thread_edge_volume)
-
-            free(thread_demand_origins)
-            free(thread_demand_values)
-            free(thread_edge_volume)
-            free(thread_u_i_vec)
-            free(thread_f_i_vec)
-            free(thread_u_j_c_a_vec)
-            free(thread_v_i_vec)
-            free(thread_h_a_vec)
-            free(thread_edge_indices)
+        compute_SF_in_parallel(
+            self._indptr[:],
+            self._edge_idx[:],
+            self._trav_time[:],
+            self._freq[:],
+            self._tail[:],
+            self._head[:],
+            d_vert_ids[:],
+            destination_vertex_indices[:],
+            o_vert_ids[:],
+            demand_vls[:],
+            self._edges["volume"].values,
+            self.vertex_count,
+            self._edges["volume"].shape[0],
+            (openmp.omp_get_num_threads() if threads < 1 else threads)
+        )
 
     def _check_demand(self, demand, origin_column, destination_column, demand_column):
         if type(demand) != pd.core.frame.DataFrame:
