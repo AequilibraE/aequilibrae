@@ -15,7 +15,7 @@ def test_SF_run_01():
     hp = HyperpathGenerating(edges, check_edges=False)
     hp.run(origin=0, destination=12, volume=1.0)
 
-    assert np.allclose(edges["volume_ref"].values, hp._edges["volume"].values)
+    np.testing.assert_allclose(edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
 
     u_i_vec_ref = np.array(
         [
@@ -37,15 +37,13 @@ def test_SF_run_01():
             0.00000000e00,
         ]
     )
-    assert np.allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
+    np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
 
 
 def test_SF_assign_01():
     edges = create_SF_network(dwell_time=0.0)
     hp = HyperpathGenerating(edges, check_edges=False)
-    od_matrix = pd.DataFrame(
-        data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]}
-    )
+    od_matrix = pd.DataFrame(data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
 
     hp.assign(
         od_matrix,
@@ -55,7 +53,7 @@ def test_SF_assign_01():
         check_demand=True,
     )
 
-    assert np.allclose(edges["volume_ref"].values, hp._edges["volume"].values)
+    np.testing.assert_allclose(edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
 
 
 def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
