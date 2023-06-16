@@ -192,13 +192,13 @@ cdef cnp.float64_t *compute_SF_in_parallel(
     cnp.uint32_t[::1] o_vert_ids_view,
     cnp.float64_t[::1] demand_vls_view,
     cnp.float64_t[::1] edge_volume_view,
-    bint ouput_travel_time,
+    bint output_travel_time,
     size_t vertex_count,
     size_t edge_count,
     int num_threads,
 ) nogil:
     # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
-    if ouput_travel_time:
+    if output_travel_time:
         with gil:
             assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
     cdef:
@@ -214,7 +214,7 @@ cdef cnp.float64_t *compute_SF_in_parallel(
         cnp.uint8_t *thread_h_a_vec
         cnp.uint32_t *thread_edge_indices
 
-        # This is a shared buffer, all threads will write into seperate slices depending on their threadid.
+        # This is a shared buffer, all threads will write into separate slices depending on their threadid.
         # When writing all threads must increment!
         cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
 
@@ -227,11 +227,11 @@ cdef cnp.float64_t *compute_SF_in_parallel(
     with parallel(num_threads=num_threads):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
         thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
-        # Here we take out thread local slice of the shared buffer, each thread is assigned a unqiue id so
+        # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
         # we can safely read and write without collisions.
         thread_edge_volume    = &edge_volume[threadid() * edge_count]
 
-        if ouput_travel_time and threadid() == 0:
+        if output_travel_time and threadid() == 0:
             thread_u_i_vec  = u_i_vec_out
         else:
             thread_u_i_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
@@ -275,7 +275,7 @@ cdef cnp.float64_t *compute_SF_in_parallel(
 
         free(thread_demand_origins)
         free(thread_demand_values)
-        if ouput_travel_time and threadid() == 0:
+        if output_travel_time and threadid() == 0:
             pass
         else:
             free(thread_u_i_vec)
@@ -285,7 +285,7 @@ cdef cnp.float64_t *compute_SF_in_parallel(
         free(thread_h_a_vec)
         free(thread_edge_indices)
 
-    # Accumulate results into output buffer. This could parellelised over the output indexes but
+    # Accumulate results into output buffer. This could parallelised over the output indexes but
     # the lose of spacial locality may not be worth it.
     for i in range(num_threads):
         for j in range(edge_count):
@@ -380,7 +380,7 @@ cdef void compute_SF_in(
             u_j_c_a_vec[i] *= -1.0
             h_a_count += <size_t>h_a_vec[i]
 
-        # Sort the links with descreasing order of u_j + c_a.
+        # Sort the links with decreasing order of u_j + c_a.
         # Because the sort function sorts in increasing order, we sort a 
         # transformed array, multiplied by -1, and set the items 
         # corresponding to edges that are not in the hyperpath to a 

@@ -138,7 +138,7 @@ class HyperpathGenerating:
         destination_column="dest_vert_idx",
         demand_column="demand",
         check_demand=False,
-        threads=1
+        threads=0
     ):
         # check the input demand paramater
         if check_demand:
