@@ -221,7 +221,8 @@ cdef cnp.float64_t *compute_SF_in_parallel(
         # We malloc this memory here, then use it as the 0th thread's thread_u_i_vec to allow us to return it
         cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
 
-        size_t i, j, destination_vertex_index
+        int i  # openmp on windows requires iterator variable have signed type
+        size_t j, destination_vertex_index
 
     with parallel(num_threads=num_threads):
         thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
