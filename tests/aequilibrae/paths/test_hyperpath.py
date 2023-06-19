@@ -2,6 +2,9 @@
 Tests of the hyperpath module.
 
 py.test aequilibrae/tests/paths/test_hyperpath.py
+
+Bell's network construction by François Pacull
+https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit-assignment.html
 """
 
 import numpy as np
