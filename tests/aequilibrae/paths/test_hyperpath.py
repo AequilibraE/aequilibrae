@@ -1,59 +1,50 @@
 """
 Tests of the hyperpath module.
 
-py.test tests/test_hyperpath.py
+py.test aequilibrae/tests/paths/test_hyperpath.py
+
+Bell's network construction by François Pacull
+https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit-assignment.html
 """
 
 import numpy as np
 import pandas as pd
-
+from unittest import TestCase
 from aequilibrae.paths.public_transport import HyperpathGenerating
 
 
-def test_SF_run_01():
-    edges = create_SF_network(dwell_time=0.0)
-    hp = HyperpathGenerating(edges, check_edges=False)
-    hp.run(origin=0, destination=12, volume=1.0)
-
-    np.testing.assert_allclose(edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
-
-    u_i_vec_ref = np.array(
-        [
-            1.66500000e03,
-            1.47000000e03,
-            1.50000000e03,
-            1.14428572e03,
-            4.80000000e02,
-            1.05000000e03,
-            1.05000000e03,
-            6.90000000e02,
-            6.00000000e02,
-            2.40000000e02,
-            2.40000000e02,
-            6.90000000e02,
-            0.00000000e00,
-            0.00000000e00,
-            0.00000000e00,
-            0.00000000e00,
-        ]
-    )
-    np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
+def create_vertices(n):
+    x = np.linspace(0, 1, n)
+    y = np.linspace(0, 1, n)
+    xv, yv = np.meshgrid(x, y, indexing="xy")
+    vertices = pd.DataFrame()
+    vertices["x"] = xv.ravel()
+    vertices["y"] = yv.ravel()
+    return vertices
 
 
-def test_SF_assign_01():
-    edges = create_SF_network(dwell_time=0.0)
-    hp = HyperpathGenerating(edges, check_edges=False)
-    od_matrix = pd.DataFrame(data={"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
+def create_edges(n, seed):
+    m = 2 * n * (n - 1)
+    tail = np.zeros(m, dtype=np.uint32)
+    head = np.zeros(m, dtype=np.uint32)
+    k = 0
+    for i in range(n - 1):
+        for j in range(n):
+            tail[k] = i + j * n
+            head[k] = i + 1 + j * n
+            k += 1
+            tail[k] = j + i * n
+            head[k] = j + (i + 1) * n
+            k += 1
 
-    hp.assign(
-        od_matrix,
-        origin_column="origin_vertex_id",
-        destination_column="destination_vertex_id",
-        demand_column="demand",
-        check_demand=True,
-    )
+    edges = pd.DataFrame()
+    edges["tail"] = tail
+    edges["head"] = head
 
-    np.testing.assert_allclose(edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
+    rng = np.random.default_rng(seed=seed)
+    edges["trav_time"] = rng.uniform(0.0, 1.0, m)
+    edges["delay_base"] = rng.uniform(0.0, 1.0, m)
+    return edges
 
 
 def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
@@ -331,4 +322,109 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     # waiting time is in average half of the period
     edges["freq"] *= 2.0
 
-    return edges
+    demand = pd.DataFrame({"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
+
+    return edges, demand
+
+
+class TestHyperPath(TestCase):
+    def _setUp(self, network="bell", n=10, alpha=10.0, seed=124) -> None:
+        """
+        Use our own setup method to allow specifying args for network creation
+        """
+        if network == "bell":
+            self.vertices = create_vertices(n)
+            self.edges = create_edges(n, seed=seed)
+
+            delay_base = self.edges.delay_base.values
+            indices = np.where(delay_base == 0.0)
+            delay_base[indices] = 1.0
+            freq_base = 1.0 / delay_base
+            freq_base[indices] = np.inf
+            self.edges["freq_base"] = freq_base
+
+            if alpha == 0.0:
+                self.edges["freq"] = np.inf
+            else:
+                self.edges["freq"] = self.edges.freq_base / alpha
+
+            self.demand = pd.DataFrame(
+                {
+                    "orig_vert_idx": self.vertices.index[:10],
+                    "dest_vert_idx": np.flip(self.vertices.index[-10:]),
+                    "demand": np.full(10, 1),
+                }
+            )
+
+        elif network == "SF":
+            self.edges, self.demand = create_SF_network(dwell_time=0.0)
+
+        else:
+            raise KeyError(f'Unknown network type "{network}"')
+
+    def tearDown(self) -> None:
+        try:
+            del self.vertices, self.edges, self.demand
+        except NameError:
+            pass
+        except AttributeError:
+            pass
+
+    def test_bell_assign_parallel_agreement(self) -> None:
+        self._setUp(network="bell")
+
+        hp = HyperpathGenerating(self.edges)
+
+        results = []
+        for threads in [1, 2, 4]:
+            hp.assign(self.demand, check_demand=True, threads=threads)
+            results.append(hp._edges.copy(deep=True))
+
+        for result in results[1:]:
+            pd.testing.assert_frame_equal(results[0], result)
+
+    def test_SF_run_01(self):
+        self._setUp(network="SF")
+
+        hp = HyperpathGenerating(self.edges)
+        hp.run(origin=0, destination=12, volume=1.0)
+
+        np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
+
+        u_i_vec_ref = np.array(
+            [
+                1.66500000e03,
+                1.47000000e03,
+                1.50000000e03,
+                1.14428572e03,
+                4.80000000e02,
+                1.05000000e03,
+                1.05000000e03,
+                6.90000000e02,
+                6.00000000e02,
+                2.40000000e02,
+                2.40000000e02,
+                6.90000000e02,
+                0.00000000e00,
+                0.00000000e00,
+                0.00000000e00,
+                0.00000000e00,
+            ]
+        )
+
+        np.testing.assert_allclose(u_i_vec_ref, hp.u_i_vec, rtol=1e-08, atol=1e-08)
+
+    def test_SF_assign_01(self):
+        self._setUp(network="SF")
+
+        hp = HyperpathGenerating(self.edges)
+
+        hp.assign(
+            self.demand,
+            origin_column="origin_vertex_id",
+            destination_column="destination_vertex_id",
+            demand_column="demand",
+            check_demand=True,
+        )
+
+        np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
