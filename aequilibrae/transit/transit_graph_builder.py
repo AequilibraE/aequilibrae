@@ -88,7 +88,16 @@ class SF_graph_builder:
         self.boarding_vertices = self.boarding_vertices[self.vertex_cols]
 
     def create_alighting_vertices(self):
-        pass
+        self.alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        self.alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        self.alighting_vertices.line_seg_idx = self.alighting_vertices.line_seg_idx.astype("Int32")
+        self.alighting_vertices = pd.merge(
+            self.alighting_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
+        )
+        self.alighting_vertices["type"] = "alighting"
+        self.alighting_vertices["taz_id"] = None
+        self.alighting_vertices["vertex_id"] = 0
+        self.alighting_vertices = self.alighting_vertices[self.vertex_cols]
 
     def create_od_vertices(self):
         pass
@@ -96,7 +105,7 @@ class SF_graph_builder:
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
 
-        Vertices have the following attributes:
+        Verticealighting_verticess have the following attributes:
             - vert_idx: int
             - type (either 'stop', 'boarding', 'alighting', 'od', 'walking' or 'fictitious'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): int
@@ -109,7 +118,7 @@ class SF_graph_builder:
         self.create_line_segments()
         self.create_stop_vertices()
         self.create_boarding_vertices()
-        # df_alighting_vertices = self.create_alighting_vertices()
+        self.create_alighting_vertices()
         # df_od_vertices = self.create_od_vertices()
         # Create ids
 
