@@ -8,7 +8,7 @@ import pandas as pd
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
-    TODO: transform some of the filtering pandas operations to SQL queries.
+    TODO: transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
     """
 
     def __init__(self, conn, start=61200, end=64800, margin=0):
@@ -22,8 +22,11 @@ class SF_graph_builder:
 
         self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 
-        self.stop_vertices = None
         self.line_segments = None
+        self.stop_vertices = None
+        self.boarding_vertices = None
+        self.alighting_vertices = None
+        self.od_vertices = None
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -60,6 +63,21 @@ class SF_graph_builder:
         )
         routes["line_id"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
+        self.compute_mean_travel_time()
+
+    def compute_mean_travel_time(self):
+        tt = pd.read_sql(sql="SELECT trip_id, seq, arrival, departure FROM trips_schedule", con=self.conn)
+        tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
+        tt["last_departure"] = tt["departure"].shift(1)
+        tt["last_departure"] = tt["last_departure"].fillna(0.0)
+        tt["travel_time_s"] = tt["arrival"] - tt["last_departure"]
+        tt.loc[tt.seq == 0, "travel_time_s"] = 0.0
+        tt.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
+        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.conn)
+        tt = pd.merge(tt, trips, on="trip_id", how="left")
+        tt.drop("trip_id", axis=1, inplace=True)
+        tt = tt.groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
+        self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
 
     def create_stop_vertices(self):
         self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
