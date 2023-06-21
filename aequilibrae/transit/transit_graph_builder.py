@@ -6,7 +6,10 @@ import pandas as pd
 
 
 class SF_graph_builder:
-    """Graph builder for the transit assignment Spiess & Florian algorithm."""
+    """Graph builder for the transit assignment Spiess & Florian algorithm.
+
+    TODO: transform some of the filtering pandas operations to SQL queries.
+    """
 
     def __init__(self, conn, start=61200, end=64800, margin=0):
         """
@@ -41,7 +44,7 @@ class SF_graph_builder:
             sql=sql,
             con=conn,
         )
-        self.route_links = route_links.loc[self.route_links.pattern_id.isin(self.pattern_ids)]
+        self.route_links = route_links.loc[route_links.pattern_id.isin(self.pattern_ids)]
 
         #
         sql = "SELECT pattern_id, longname FROM routes" ""
@@ -57,6 +60,7 @@ class SF_graph_builder:
         We assume that the date has been selected when loading the GTFS file:
         transit.load_date("2016-04-13")
         """
+        pass
 
     def create_stop_vertices(self):
         df_stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
