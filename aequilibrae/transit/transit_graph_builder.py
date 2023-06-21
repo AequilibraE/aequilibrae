@@ -17,12 +17,40 @@ class SF_graph_builder:
         self.start = start  # starting time of the selected time period
         self.end = end  # ending time of the selected time period
 
+        # trip ids corresponding to the given time range
         sql = f"""SELECT DISTINCT trip_id FROM trips_schedule 
         WHERE arrival>={start-margin} AND departure<={end+margin}"""
         self.trip_ids = pd.read_sql(
             sql=sql,
             con=conn,
         ).trip_id.values
+
+        # pattern ids corresponding to the given time range
+        sql = f"""SELECT DISTINCT pattern_id FROM trips INNER JOIN 
+        (SELECT DISTINCT trip_id FROM trips_schedule 
+        WHERE departure>={start-margin} AND arrival<={end+margin}) selected_trips
+        ON trips.trip_id = selected_trips.trip_id"""
+        self.pattern_ids = pd.read_sql(
+            sql=sql,
+            con=conn,
+        ).pattern_id.values
+
+        # route links corresponding to the given time range
+        sql = "SELECT pattern_id, seq, from_stop, to_stop FROM route_links"
+        route_links = pd.read_sql(
+            sql=sql,
+            con=conn,
+        )
+        self.route_links = route_links.loc[self.route_links.pattern_id.isin(self.pattern_ids)]
+
+        #
+        sql = "SELECT pattern_id, longname FROM routes" ""
+        routes = pd.read_sql(
+            sql=sql,
+            con=conn,
+        )
+        routes["line_name"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
+        self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
 
     def filter_trip_schedules(self):
         """
