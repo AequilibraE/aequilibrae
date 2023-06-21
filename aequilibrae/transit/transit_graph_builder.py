@@ -94,9 +94,6 @@ class SF_graph_builder:
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
             - taz_id (only applies to 'od' nodes): str
-
-        Note that line_seg_idx is using a 1-based indexing.
-
         """
 
         df_stop_vertices = self.create_stop_vertices()
