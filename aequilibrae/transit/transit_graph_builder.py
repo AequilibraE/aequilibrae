@@ -8,15 +8,35 @@ import pandas as pd
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm."""
 
-    def __init__(self, conn):
+    def __init__(self, conn, start=61200, end=64800, margin=0):
+        """
+        start and end must be expressed in seconds starting from 00h00m00s,
+        e.g. 6am is 21600.
+        """
         self.conn = conn  # sqlite connection
+        self.start = start  # starting time of the selected time period
+        self.end = end  # ending time of the selected time period
+
+        sql = f"""SELECT DISTINCT trip_id FROM trips_schedule 
+        WHERE arrival>={start-margin} AND departure<={end+margin}"""
+        self.trip_ids = pd.read_sql(
+            sql=sql,
+            con=conn,
+        ).trip_id.values
+
+    def filter_trip_schedules(self):
+        """
+        We assume that the date has been selected when loading the GTFS file:
+        transit.load_date("2016-04-13")
+        """
 
     def create_stop_vertices(self):
         df_stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
+        df_stop_vertices = df_stop_vertices[df_stop_vertices.stop_id.isin(self.trip_ids)]
         df_stop_vertices["line_id"] = None
         df_stop_vertices["taz_id"] = None
         df_stop_vertices["line_seg_idx"] = np.nan
-        df_stop_vertices["line_seg_idx"] = df_stop_vertices["line_seg_idx"].astype('Int32')
+        df_stop_vertices["line_seg_idx"] = df_stop_vertices["line_seg_idx"].astype("Int32")
         df_stop_vertices["type"] = "stop"
         df_stop_vertices["vert_idx"] = np.arange(len(df_stop_vertices))
 
