@@ -46,7 +46,7 @@ class SF_graph_builder:
         )
         self.route_links = route_links.loc[route_links.pattern_id.isin(self.pattern_ids)]
 
-        #
+        # create a line segment table
         sql = "SELECT pattern_id, longname FROM routes" ""
         routes = pd.read_sql(
             sql=sql,
@@ -64,7 +64,8 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         df_stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
-        df_stop_vertices = df_stop_vertices[df_stop_vertices.stop_id.isin(self.trip_ids)]
+        stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
+        df_stop_vertices = df_stop_vertices.loc[df_stop_vertices.stop_id.isin(stops_ids)]
         df_stop_vertices["line_id"] = None
         df_stop_vertices["taz_id"] = None
         df_stop_vertices["line_seg_idx"] = np.nan
