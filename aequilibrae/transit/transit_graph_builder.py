@@ -20,7 +20,7 @@ class SF_graph_builder:
         self.start = start - margin  # starting time of the selected time period
         self.end = end + margin  # ending time of the selected time period
 
-        self.vertex_cols = ["vertex_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
+        self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 
         self.stop_vertices = None
         self.line_segments = None
@@ -70,8 +70,6 @@ class SF_graph_builder:
         self.stop_vertices["line_seg_idx"] = np.nan
         self.stop_vertices["line_seg_idx"] = self.stop_vertices["line_seg_idx"].astype("Int32")
         self.stop_vertices["type"] = "stop"
-        self.stop_vertices["vertex_id"] = 0
-        self.stop_vertices = self.stop_vertices[self.vertex_cols]
 
     def create_boarding_vertices(self):
         # df_stop_coordinates = self.data_store['transit_stop'][['object_id', 'coordinates']].copy(deep=False)
@@ -84,8 +82,6 @@ class SF_graph_builder:
         )
         self.boarding_vertices["type"] = "boarding"
         self.boarding_vertices["taz_id"] = None
-        self.boarding_vertices["vertex_id"] = 0
-        self.boarding_vertices = self.boarding_vertices[self.vertex_cols]
 
     def create_alighting_vertices(self):
         self.alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
@@ -96,8 +92,6 @@ class SF_graph_builder:
         )
         self.alighting_vertices["type"] = "alighting"
         self.alighting_vertices["taz_id"] = None
-        self.alighting_vertices["vertex_id"] = 0
-        self.alighting_vertices = self.alighting_vertices[self.vertex_cols]
 
     def create_od_vertices(self):
         pass
@@ -119,8 +113,25 @@ class SF_graph_builder:
         self.create_stop_vertices()
         self.create_boarding_vertices()
         self.create_alighting_vertices()
-        # df_od_vertices = self.create_od_vertices()
-        # Create ids
+        # self.create_od_vertices()
+
+        # stack the dataframes on top of each other
+        self.vertices = pd.concat(
+            [
+                self.stop_vertices,
+                self.boarding_vertices,
+                self.alighting_vertices,
+                # self.od_vertices
+            ],
+            axis=0,
+        )
+
+        # reset index and copy it to column
+        self.vertices.reset_index(drop=True, inplace=True)
+        self.vertices.index.name = "index"
+        self.vertices["vert_id"] = self.vertices.index
+
+        self.vertices = self.vertices[self.vertex_cols]
 
     def create_boarding_edges(self):
         pass
