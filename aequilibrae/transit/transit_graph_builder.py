@@ -15,7 +15,8 @@ class SF_graph_builder:
         df_stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
         df_stop_vertices["line_id"] = None
         df_stop_vertices["taz_id"] = None
-        df_stop_vertices["line_seg_idx"] = np.int32(-1)
+        df_stop_vertices["line_seg_idx"] = np.nan
+        df_stop_vertices["line_seg_idx"] = df_stop_vertices["line_seg_idx"].astype('Int32')
         df_stop_vertices["type"] = "stop"
         df_stop_vertices["vert_idx"] = np.arange(len(df_stop_vertices))
 
