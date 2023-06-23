@@ -30,6 +30,7 @@ class SF_graph_builder:
         self.boarding_vertices = None
         self.alighting_vertices = None
         self.od_vertices = None
+        self.on_board_edges = None
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -169,6 +170,36 @@ class SF_graph_builder:
 
         self.vertices = self.vertices[self.vertex_cols]
 
+    def create_on_board_edges(self):
+        self.on_board_edges = self.line_segments[["line_id", "seq", "travel_time_s"]].copy(deep=True)
+        self.on_board_edges.rename(columns={"seq": "line_seg_idx", "travel_time_s": "trav_time"}, inplace=True)
+
+        # get tail vertex index
+        self.on_board_edges = pd.merge(
+            self.on_board_edges,
+            self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
+            on=["line_id", "line_seg_idx"],
+            how="left",
+        )
+        self.on_board_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+
+        # get head vertex index
+        self.on_board_edges = pd.merge(
+            self.on_board_edges,
+            self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
+            on=["line_id", "line_seg_idx"],
+            how="left",
+        )
+        self.on_board_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+
+        # uniform attributes
+        self.on_board_edges["type"] = "on-board"
+        self.on_board_edges["freq"] = np.inf
+        self.on_board_edges["stop_id"] = None
+        self.on_board_edges["o_line_id"] = None
+        self.on_board_edges["d_line_id"] = None
+        self.on_board_edges["transfer_id"] = None
+
     def create_boarding_edges(self):
         pass
 
@@ -188,18 +219,12 @@ class SF_graph_builder:
         pass
 
     def create_transfer_edges(self):
-        df_inner_stop_transfer_edges = self.create_inner_stop_transfer_edges()
-        df_outer_stop_transfer_edges = self.create_outer_stop_transfer_edges()
-
-    def create_on_board_edges(self):
-        pass
-
         pass
 
     def create_walking_edges(self):
         pass
 
-    def __create_edges(self):
+    def create_edges(self):
         """Graph edges creation as a dataframe.
 
         Edges have the following attributes:
@@ -207,8 +232,8 @@ class SF_graph_builder:
             - line_id (only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges): str
             - stop_id: str
             - line_seg_idx (only applies to 'on-board', 'boarding' and 'alighting' edges): int
-            - tail_vert_idx: int
-            - head_vert_idx: int
+            - tail_vert_id: int
+            - head_vert_id: int
             - trav_time (edge travel time): float
             - freq (frequency): float
             - o_line_id: str
@@ -216,3 +241,5 @@ class SF_graph_builder:
             - transfer_id: str
 
         """
+
+        self.create_on_board_edges()
