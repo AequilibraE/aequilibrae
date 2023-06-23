@@ -8,6 +8,9 @@ import pandas as pd
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
+    ASSUMPIONS:
+    - trips dir is always 0: opposite directions is not supported
+
     TODO: transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
     """
 
@@ -66,6 +69,7 @@ class SF_graph_builder:
         self.compute_mean_travel_time()
 
     def compute_mean_travel_time(self):
+        # Compute the travel time for each trip segment
         tt = pd.read_sql(sql="SELECT trip_id, seq, arrival, departure FROM trips_schedule", con=self.conn)
         tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
@@ -73,16 +77,32 @@ class SF_graph_builder:
         tt["travel_time_s"] = tt["arrival"] - tt["last_departure"]
         tt.loc[tt.seq == 0, "travel_time_s"] = 0.0
         tt.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
+
+        # tt.seq refers to the stop sequence index
+        # Because we computed the travel time between two stops, we are now dealing
+        # with a segment sequence index.
+        tt = tt[tt.seq > 0]
+        tt.seq -= 1
+
+        # Merge pattern ids with trip_id
         trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.conn)
         tt = pd.merge(tt, trips, on="trip_id", how="left")
         tt.drop("trip_id", axis=1, inplace=True)
+
+        # Compute the mean travel time from the different trips corresponding to
+        # a given pattern/segment couple
         tt = tt.groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
 
     def create_stop_vertices(self):
+        # select all stops
         self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
+
+        # filter stops that are used on the given time range
         self.stop_vertices = self.stop_vertices.loc[self.stop_vertices.stop_id.isin(stops_ids)]
+
+        # add metadata
         self.stop_vertices["line_id"] = None
         self.stop_vertices["taz_id"] = None
         self.stop_vertices["line_seg_idx"] = np.nan
@@ -90,8 +110,6 @@ class SF_graph_builder:
         self.stop_vertices["type"] = "stop"
 
     def create_boarding_vertices(self):
-        # df_stop_coordinates = self.data_store['transit_stop'][['object_id', 'coordinates']].copy(deep=False)
-
         self.boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         self.boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
         self.boarding_vertices.line_seg_idx = self.boarding_vertices.line_seg_idx.astype("Int32")
