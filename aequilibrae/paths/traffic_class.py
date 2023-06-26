@@ -1,11 +1,12 @@
-from typing import Union, List, Tuple, Dict
-import numpy as np
-import pandas as pd
-
-from aequilibrae.paths.graph import Graph
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.results import AssignmentResults
 import warnings
+from copy import deepcopy
+from typing import Union, List, Tuple, Dict
+
+import numpy as np
+
+from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.results import AssignmentResults
 
 
 class TrafficClass:
@@ -51,7 +52,7 @@ class TrafficClass:
 
         if matrix.matrix_view.dtype != graph.default_types("float"):
             raise TypeError("Matrix's computational view need to be of type np.float64")
-
+        self.__config = {}
         self.graph = graph
         self.logger = graph.logger
         self.matrix = matrix
@@ -66,6 +67,25 @@ class TrafficClass:
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
         self.__id__ = name
+
+        graph_config = {
+            "mode": graph.mode,
+            "block_through_centroids": graph.block_centroid_flows,
+            "centroids": graph.centroids,
+            "graph.num_centroids": graph.num_zones,
+            "links": graph.num_links,
+            "nodes": graph.num_nodes,
+        }
+        self.__config["graph"] = str(graph_config)
+
+        mat_config = {
+            "source": matrix.file_path or "",
+            "matrix_cores": matrix.view_names,
+            "centroids": matrix.index,
+            "matrix_totals": {name: np.sum(matrix.matrix[name]) for name in matrix.view_names},
+            "nodes": matrix.zones,
+        }
+        self.__config["matrix"] = str(mat_config)
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -140,6 +160,12 @@ class TrafficClass:
                     else:
                         link_ids.append(comp_id)
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
+        self.__config["select_links"] = str(links)
+
+    @property
+    def info(self) -> dict:
+        config = deepcopy(self.__config)
+        return {self.__id__: config}
 
     def __setattr__(self, key, value):
         if key not in [
@@ -157,6 +183,9 @@ class TrafficClass:
             "fc_multiplier",
             "fixed_cost_field",
             "_selected_links",
+            "__config",
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
+
+        self.__config[key] = value

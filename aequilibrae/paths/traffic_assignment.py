@@ -1,4 +1,5 @@
 import importlib.util as iutil
+import logging
 import socket
 import sqlite3
 from datetime import datetime
@@ -102,6 +103,8 @@ class TrafficAssignment(object):
         """"""
 
         proj = project or get_active_project(must_exist=False)
+
+        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
         par = proj.parameters if proj else Parameters().parameters
         parameters = par["assignment"]["equilibrium"]
 
@@ -408,9 +411,15 @@ class TrafficAssignment(object):
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
-    def execute(self) -> None:
+    def execute(self, log_specification=True) -> None:
         """Processes assignment"""
+        if log_specification:
+            self.log_specification()
         self.assignment.execute()
+
+    def log_specification(self):
+        for cls in self.classes:
+            self.logger.info(str(cls.info))
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
