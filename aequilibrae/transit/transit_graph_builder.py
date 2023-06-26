@@ -1,9 +1,11 @@
 """ Create the graph used by public transport assignment algorithms.
 """
 
+from pathlib import Path
 import numpy as np
 import pandas as pd
-
+import geopandas as gpd
+import shapely
 
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
@@ -14,7 +16,7 @@ class SF_graph_builder:
     TODO: transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
     """
 
-    def __init__(self, conn, start=61200, end=64800, margin=0):
+    def __init__(self, conn, project, start=61200, end=64800, margin=0, crs="EPSG:4326"):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
         e.g. 6am is 21600.
@@ -22,6 +24,8 @@ class SF_graph_builder:
         self.conn = conn  # sqlite connection
         self.start = start - margin  # starting time of the selected time period
         self.end = end + margin  # ending time of the selected time period
+        self.project = project
+        self.crs = crs
 
         self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 
@@ -131,7 +135,24 @@ class SF_graph_builder:
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        pass
+        zoning = self.project.zoning
+
+        zones = gpd.read_file(Path(self.project.project_base_path) / "zones" / "zones.shp")
+        zones.to_crs(self.crs)
+        zones["coord"] = zones.centroid
+
+        for i, row in zones.iterrows():
+            z = zoning.new(i)
+            z.add_centroid(row["coord"])
+
+        self.od_vertices = zones.copy(deep=True)
+        self.od_vertices.drop(columns="geometry")
+        self.od_vertices["type"] = "od"
+        self.od_vertices["stop_id"] = None
+        self.od_vertices["line_id"] = None
+        self.od_vertices["line_seg_idx"] = np.nan
+        self.od_vertices.rename(columns={"zone_id": "taz_id"}, inplace=True)
+        self.od_vertices.insert(len(self.od_vertices.columns) - 1, "coord", self.od_vertices.pop("coord"))
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -150,15 +171,15 @@ class SF_graph_builder:
         self.create_stop_vertices()
         self.create_boarding_vertices()
         self.create_alighting_vertices()
-        # self.create_od_vertices()
+        self.create_od_vertices()
 
         # stack the dataframes on top of each other
         self.vertices = pd.concat(
             [
+                self.od_vertices,
                 self.stop_vertices,
                 self.boarding_vertices,
                 self.alighting_vertices,
-                # self.od_vertices
             ],
             axis=0,
         )
