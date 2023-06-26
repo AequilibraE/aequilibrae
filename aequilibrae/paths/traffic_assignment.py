@@ -104,7 +104,6 @@ class TrafficAssignment(object):
 
         proj = project or get_active_project(must_exist=False)
 
-        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
         par = proj.parameters if proj else Parameters().parameters
         parameters = par["assignment"]["equilibrium"]
 
@@ -129,6 +128,8 @@ class TrafficAssignment(object):
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
         self.__dict__["project"] = proj
+        self.__dict__["logger"] = None
+        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
 
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)

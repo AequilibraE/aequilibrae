@@ -82,7 +82,9 @@ class TrafficClass:
             "source": matrix.file_path or "",
             "matrix_cores": matrix.view_names,
             "centroids": matrix.index,
-            "matrix_totals": {name: np.sum(matrix.matrix[name]) for name in matrix.view_names},
+            "matrix_totals": {
+                name: np.sum(matrix.matrix_view) for name in matrix.view_names if name not in "matrix_totals"
+            },
             "nodes": matrix.zones,
         }
         self.__config["matrix"] = str(mat_config)
@@ -183,9 +185,7 @@ class TrafficClass:
             "fc_multiplier",
             "fixed_cost_field",
             "_selected_links",
-            "__config",
+            "_TrafficClass__config",
         ]:
             raise KeyError("Traffic Class does not have that element")
         self.__dict__[key] = value
-
-        self.__config[key] = value
