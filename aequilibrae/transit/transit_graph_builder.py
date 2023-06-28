@@ -4,7 +4,6 @@
 import numpy as np
 import pandas as pd
 
-
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
@@ -131,7 +130,17 @@ class SF_graph_builder:
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        pass
+        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
+        self.od_vertices = pd.read_sql(sql=sql, con=self.conn)
+
+        # the node_id for centroids is known to be the zone_id as well
+        self.od_vertices["taz_id"] = self.od_vertices["node_id"].copy(deep=True)
+        self.od_vertices["type"] = "od"
+        self.od_vertices["stop_id"] = None
+        self.od_vertices["line_id"] = None
+        self.od_vertices["line_seg_idx"] = np.nan
+        self.od_vertices.rename(columns={"geometry": "coord"}, inplace=True)
+        self.od_vertices.insert(len(self.od_vertices.columns) - 1, "coord", self.od_vertices.pop("coord"))
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -150,15 +159,15 @@ class SF_graph_builder:
         self.create_stop_vertices()
         self.create_boarding_vertices()
         self.create_alighting_vertices()
-        # self.create_od_vertices()
+        self.create_od_vertices()
 
         # stack the dataframes on top of each other
         self.vertices = pd.concat(
             [
+                self.od_vertices,
                 self.stop_vertices,
                 self.boarding_vertices,
                 self.alighting_vertices,
-                # self.od_vertices
             ],
             axis=0,
         )
