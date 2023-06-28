@@ -84,10 +84,12 @@ class TrafficClass:
             "matrix_cores": matrix.view_names,
         }
         if len(matrix.view_names) == 1:
-            mat_config["matrix_totals"] = {nm: np.sum(matrix.matrix_view[:, :]) for nm in matrix.view_names}
+            mat_config["matrix_totals"] = {
+                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
+            }
         else:
             mat_config["matrix_totals"] = {
-                nm: np.sum(matrix.matrix_view[:, :, i]) for i, nm in enumerate(matrix.view_names)
+                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
             }
         self.__config["matrix"] = str(mat_config)
 

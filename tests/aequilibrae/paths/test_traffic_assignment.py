@@ -19,8 +19,8 @@ class TestTrafficAssignment(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
-        proj_path = os.path.join(gettempdir(), "test_traffic_assignment_" + uuid.uuid4().hex)
-        self.project = create_example(proj_path)
+        self.proj_path = os.path.join(gettempdir(), "test_traffic_assignment_" + uuid.uuid4().hex)
+        self.project = create_example(self.proj_path)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs["c"]  # type: Graph
         self.car_graph.set_graph("free_flow_time")
@@ -210,6 +210,46 @@ class TestTrafficAssignment(TestCase):
 
         with self.assertRaises(ValueError):
             self.assignment.save_results("save_to_database")
+
+        self.assertTrue(os.path.isfile(os.path.join(self.proj_path, "aequilibrae.log")))
+        lines = []
+        with open(os.path.join(self.proj_path, "aequilibrae.log"), encoding="utf-8") as file:
+            for line in file:
+                lines.append(line)
+
+        self.assertTrue(
+            lines[8].split(";", 1)[1]
+            == lines[27].split(";", 1)[1]
+            == lines[536].split(";", 1)[1]
+            == lines[658].split(";", 1)[1]
+            == lines[713].split(";", 1)[1]
+        )
+        tclass_data = lines[8].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        self.assertEqual(
+            tclass_data[:5],
+            [
+                ' {car: {graph: "{mode: c',
+                "block_through_centroids: False",
+                "num_centroids: 24",
+                "links: 76",
+                'nodes: 24}"',
+            ],
+        )
+        self.assertEqual(tclass_data[-2:], ["matrix_cores: [matrix]", 'matrix_totals: {matrix: 360600.0}}"}}\n'])
+
+        assig_data_1 = lines[10].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_2 = lines[29].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_3 = lines[538].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_4 = lines[660].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_5 = lines[715].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        self.assertTrue(
+            assig_data_1[:5] == assig_data_2[:5] == assig_data_3[:5] == assig_data_4[:5] == assig_data_5[:5]
+        )
+        self.assertEqual(assig_data_1[-3:], ["algorithm: msa", "max_iter: 10", "target_rgap: 0.0001}\n"])
+        self.assertEqual(assig_data_2[-3:], ["algorithm: msa", "max_iter: 500", "target_rgap: 0.001}\n"])
+        self.assertEqual(assig_data_3[-3:], ["algorithm: frank-wolfe", "max_iter: 500", "target_rgap: 0.001}\n"])
+        self.assertEqual(assig_data_4[-3:], ["algorithm: cfw", "max_iter: 500", "target_rgap: 0.001}\n"])
+        self.assertEqual(assig_data_5[-3:], ["algorithm: bfw", "max_iter: 500", "target_rgap: 0.001}\n"])
 
     def test_execute_no_project(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
