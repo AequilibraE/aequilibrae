@@ -195,7 +195,7 @@ class TrafficAssignment(object):
 
         ids = set([x.__id__ for x in classes])
         if len(ids) < len(classes):
-            raise Exception("Classes need to be unique. Your list of classes has repeated items/IDs")
+            raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
 
     def add_class(self, traffic_class: TrafficClass) -> None:
@@ -208,7 +208,7 @@ class TrafficAssignment(object):
 
         ids = [x.__id__ for x in self.classes if x.__id__ == traffic_class.__id__]
         if len(ids) > 0:
-            raise Exception("Traffic class already in the assignment")
+            raise ValueError("Traffic class already in the assignment")
 
         self.classes.append(traffic_class)
 
@@ -245,7 +245,7 @@ class TrafficAssignment(object):
         if algo in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
             self.assignment = LinearApproximation(self, algo, project=self.project)
         else:
-            raise Exception("Algorithm not listed in the case selection")
+            raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
 
@@ -261,7 +261,7 @@ class TrafficAssignment(object):
 
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise Exception("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
+            raise RuntimeError("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
         self.__dict__["vdf_parameters"] = par
         pars = []
         if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
@@ -299,7 +299,7 @@ class TrafficAssignment(object):
             **cores** (:obj:`int`): Number of CPU cores to use
         """
         if not self.classes:
-            raise Exception("You need load traffic classes before overwriting the number of cores")
+            raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
         self.cores = cores
         for c in self.classes:
@@ -313,7 +313,7 @@ class TrafficAssignment(object):
             **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved
         """
         if self.classes is None:
-            raise Exception("You need to set traffic classes before turning path saving on or off")
+            raise RuntimeError("You need to set traffic classes before turning path saving on or off")
 
         # self.save_path_files = save_it
         for c in self.classes:
@@ -326,7 +326,7 @@ class TrafficAssignment(object):
             **file_format** (:obj:`str`): Name of file format to use for path files
         """
         if self.classes is None:
-            raise Exception("You need to set traffic classes before specifying path saving options")
+            raise RuntimeError("You need to set traffic classes before specifying path saving options")
 
         if file_format == "feather":
             for c in self.classes:
@@ -335,7 +335,7 @@ class TrafficAssignment(object):
             for c in self.classes:
                 c._aon_results.write_feather = False
         else:
-            raise Exception(f"Unsupported path file format {file_format} - only feather or parquet available.")
+            raise TypeError(f"Unsupported path file format {file_format} - only feather or parquet available.")
 
     def set_time_field(self, time_field: str) -> None:
         """
