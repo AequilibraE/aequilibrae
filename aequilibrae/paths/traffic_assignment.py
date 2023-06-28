@@ -1,3 +1,4 @@
+from copy import deepcopy
 import importlib.util as iutil
 import logging
 import socket
@@ -128,9 +129,11 @@ class TrafficAssignment(object):
         self.__dict__["procedure_date"] = str(datetime.today())
         self.__dict__["steps_below_needed_to_terminate"] = 1
         self.__dict__["project"] = proj
+        
+        self.__dict__["_TrafficAssignment__config"] = {}
         self.__dict__["logger"] = None
         self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
-
+        
     def __setattr__(self, instance, value) -> None:
         check, value, message = self.__check_attributes(instance, value)
         if check:
@@ -252,6 +255,9 @@ class TrafficAssignment(object):
             raise Exception("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
+        self.__config["algorithm"] = algo
+        self.__config["max_iter"] = self.assignment.max_iter
+        self.__config["target_rgap"] = self.assignment.rgap_target
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
@@ -293,6 +299,8 @@ class TrafficAssignment(object):
                         raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
+        self.__config["vdf_parameter"] = par
+        self.__config["vdf_function"] = self.vdf.function.lower()
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
@@ -367,6 +375,7 @@ class TrafficAssignment(object):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
+        self.__config["time_field"] = time_field
 
     def set_capacity_field(self, capacity_field: str) -> None:
         """
@@ -393,6 +402,8 @@ class TrafficAssignment(object):
         self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
+        self.__config["num_cores"] = c.results.cores
+        self.__config["capacity_field"] = capacity_field
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
@@ -416,9 +427,13 @@ class TrafficAssignment(object):
         """Processes assignment"""
         if log_specification:
             self.log_specification()
+            self.logger.info("Traffic Assignment specification")
+            config = deepcopy(self.__config)
+            self.logger.info(config)
         self.assignment.execute()
 
     def log_specification(self):
+        self.logger.info("Traffic Class specification")
         for cls in self.classes:
             self.logger.info(str(cls.info))
 

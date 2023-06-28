@@ -71,8 +71,7 @@ class TrafficClass:
         graph_config = {
             "mode": graph.mode,
             "block_through_centroids": graph.block_centroid_flows,
-            "centroids": graph.centroids,
-            "graph.num_centroids": graph.num_zones,
+            "num_centroids": graph.num_zones,
             "links": graph.num_links,
             "nodes": graph.num_nodes,
         }
@@ -80,13 +79,16 @@ class TrafficClass:
 
         mat_config = {
             "source": matrix.file_path or "",
-            "matrix_cores": matrix.view_names,
-            "centroids": matrix.index,
-            "matrix_totals": {
-                name: np.sum(matrix.matrix_view) for name in matrix.view_names if name not in "matrix_totals"
-            },
+            "num_centroids": matrix.index.shape[0],
             "nodes": matrix.zones,
+            "matrix_cores": matrix.view_names,
         }
+        if len(matrix.view_names) == 1:
+            mat_config["matrix_totals"] = {nm: np.sum(matrix.matrix_view[:, :]) for nm in matrix.view_names}
+        else:
+            mat_config["matrix_totals"] = {
+                nm: np.sum(matrix.matrix_view[:, :, i]) for i, nm in enumerate(matrix.view_names)
+            }
         self.__config["matrix"] = str(mat_config)
 
     def set_pce(self, pce: Union[float, int]) -> None:
