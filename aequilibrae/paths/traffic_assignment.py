@@ -261,7 +261,9 @@ class TrafficAssignment(object):
 
         """
         if self.classes is None or self.vdf.function.lower() not in all_vdf_functions:
-            raise RuntimeError("Before setting vdf parameters, you need to set traffic classes and choose a VDF function")
+            raise RuntimeError(
+                "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
+            )
         self.__dict__["vdf_parameters"] = par
         pars = []
         if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:

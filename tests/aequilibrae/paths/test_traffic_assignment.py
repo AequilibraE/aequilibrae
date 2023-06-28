@@ -14,8 +14,6 @@ from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
 
-
-
 @pytest.fixture
 def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"))
