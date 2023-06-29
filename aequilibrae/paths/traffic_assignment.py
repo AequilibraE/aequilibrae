@@ -299,7 +299,7 @@ class TrafficAssignment(object):
                         raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
-        self.__config["vdf_parameter"] = par
+        self.__config["vdf_parameter"] = pars
         self.__config["vdf_function"] = self.vdf.function.lower()
 
     def set_cores(self, cores: int) -> None:
