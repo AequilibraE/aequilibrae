@@ -69,29 +69,29 @@ class TrafficClass:
         self.__id__ = name
 
         graph_config = {
-            "mode": graph.mode,
-            "block_through_centroids": graph.block_centroid_flows,
-            "num_centroids": graph.num_zones,
-            "links": graph.num_links,
-            "nodes": graph.num_nodes,
+            "Mode": graph.mode,
+            "Block through centroids": graph.block_centroid_flows,
+            "Number of centroids": graph.num_zones,
+            "Links": graph.num_links,
+            "Nodes": graph.num_nodes,
         }
-        self.__config["graph"] = str(graph_config)
+        self.__config["Graph"] = str(graph_config)
 
         mat_config = {
-            "source": matrix.file_path or "",
-            "num_centroids": matrix.index.shape[0],
-            "nodes": matrix.zones,
-            "matrix_cores": matrix.view_names,
+            "Source": matrix.file_path or "",
+            "Number of centroids": matrix.index.shape[0],
+            "Nodes": matrix.zones,
+            "Matrix cores": matrix.view_names,
         }
         if len(matrix.view_names) == 1:
-            mat_config["matrix_totals"] = {
+            mat_config["Matrix totals"] = {
                 nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
             }
         else:
-            mat_config["matrix_totals"] = {
+            mat_config["Matrix totals"] = {
                 nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
             }
-        self.__config["matrix"] = str(mat_config)
+        self.__config["Matrix"] = str(mat_config)
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent

@@ -9,10 +9,10 @@ what the software is doing under the hood.
 
 Information such as Traffic Class and Traffic Assignment stats, and Traffic Assignment
 outputs. If you have created your project's network from OSM, you will also find
-information on the number of nodes, links, and the area being downloaded.
+information on the number of nodes, links, and the query performed to obtain the data.
 
 In this example, we'll use Sioux Falls data to check the logs, but we strongly encourage
-you to go ahead and download a place of your choice and perform a traffic assignment.
+you to go ahead and download a place of your choice and perform a traffic assignment!
 """
 # %%
 # Imports
@@ -60,12 +60,12 @@ assig.rgap_target = 0.001
 assig.execute()
 
 # %%
-# 
+#
 with open(join(fldr, "aequilibrae.log")) as file:
     for idx, line in enumerate(file):
-        print(idx+1, "-", line)
+        print(idx + 1, "-", line)
 
-#%%
+# %%
 # In lines 1-7, we receive some warnings that our fields name and lane have ``NaN`` values.
 # As they are not relevant to our example, we can move on.
 #
@@ -92,11 +92,11 @@ with open(join(fldr, "aequilibrae.log")) as file:
 # In the log there are also the number of the iteration, its relative gap, and the stepsize.
 # The outputs in lines 15-60 are exactly the same as the ones provided by the function
 # ``assig.report()``. Finally, the last line shows us that the *bfw* assignment has finished
-# after 46 iterations because its gap is smaller than the threshold we configured (0.001).7
+# after 46 iterations because its gap is smaller than the threshold we configured (0.001).
 #
 # In case you execute a new traffic assignment using different classes or changing the
 # parameters values, these new specification values would be stored in the log file as well
-# so you can always keep a record of what you have been doing. One last reminder is that 
+# so you can always keep a record of what you have been doing. One last reminder is that
 # if we had created our project from OSM, the lines on top of the log would have been
 # different to display information on the queries done to the server to obtain the data.
 #

@@ -228,14 +228,14 @@ class TestTrafficAssignment(TestCase):
         self.assertEqual(
             tclass_data[:5],
             [
-                ' {car: {graph: "{mode: c',
-                "block_through_centroids: False",
-                "num_centroids: 24",
-                "links: 76",
-                'nodes: 24}"',
+                ' {car: {Graph: "{Mode: c',
+                "Block through centroids: False",
+                "Number of centroids: 24",
+                "Links: 76",
+                'Nodes: 24}"',
             ],
         )
-        self.assertEqual(tclass_data[-2:], ["matrix_cores: [matrix]", 'matrix_totals: {matrix: 360600.0}}"}}\n'])
+        self.assertEqual(tclass_data[-2:], ["Matrix cores: [matrix]", 'Matrix totals: {matrix: 360600.0}}"}}\n'])
 
         assig_data_1 = lines[10].split(";")[2].replace("\\", "").replace("'", "").split(", ")
         assig_data_2 = lines[29].split(";")[2].replace("\\", "").replace("'", "").split(", ")
@@ -245,11 +245,13 @@ class TestTrafficAssignment(TestCase):
         self.assertTrue(
             assig_data_1[:5] == assig_data_2[:5] == assig_data_3[:5] == assig_data_4[:5] == assig_data_5[:5]
         )
-        self.assertEqual(assig_data_1[-3:], ["algorithm: msa", "max_iter: 10", "target_rgap: 0.0001}\n"])
-        self.assertEqual(assig_data_2[-3:], ["algorithm: msa", "max_iter: 500", "target_rgap: 0.001}\n"])
-        self.assertEqual(assig_data_3[-3:], ["algorithm: frank-wolfe", "max_iter: 500", "target_rgap: 0.001}\n"])
-        self.assertEqual(assig_data_4[-3:], ["algorithm: cfw", "max_iter: 500", "target_rgap: 0.001}\n"])
-        self.assertEqual(assig_data_5[-3:], ["algorithm: bfw", "max_iter: 500", "target_rgap: 0.001}\n"])
+        self.assertEqual(assig_data_1[-3:], ["Algorithm: msa", "Maximum iterations: 10", "Target RGAP: 0.0001}\n"])
+        self.assertEqual(assig_data_2[-3:], ["Algorithm: msa", "Maximum iterations: 500", "Target RGAP: 0.001}\n"])
+        self.assertEqual(
+            assig_data_3[-3:], ["Algorithm: frank-wolfe", "Maximum iterations: 500", "Target RGAP: 0.001}\n"]
+        )
+        self.assertEqual(assig_data_4[-3:], ["Algorithm: cfw", "Maximum iterations: 500", "Target RGAP: 0.001}\n"])
+        self.assertEqual(assig_data_5[-3:], ["Algorithm: bfw", "Maximum iterations: 500", "Target RGAP: 0.001}\n"])
 
     def test_execute_no_project(self):
         conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
