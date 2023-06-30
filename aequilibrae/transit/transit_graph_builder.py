@@ -49,6 +49,8 @@ class SF_graph_builder:
         self.on_board_edges = None
         self.dell_edges = None
         self.alighting_edges = None
+        self.boarding_edges = None
+        self.mean_headway = None
 
         self.global_crs = "EPSG:4326"
 
@@ -58,6 +60,7 @@ class SF_graph_builder:
         self.inf_freq = 1.0e20  # max frequency
         self.min_freq = 1.0 / self.inf_freq  # smallest frequency
         self.a_tiny_time_duration = 1.0e-08
+        self.wait_time_factor = 2.0
         self.walking_speed = 1.0
 
     def create_line_segments(self):
@@ -99,7 +102,8 @@ class SF_graph_builder:
 
     def compute_mean_travel_time(self):
         # Compute the travel time for each trip segment
-        sql = "SELECT trip_id, seq, arrival, departure FROM trips_schedule"
+        sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
+            WHERE departure>={self.start} AND arrival<={self.end}"""
         tt = pd.read_sql(sql, self.pt_conn)
         tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
@@ -123,6 +127,19 @@ class SF_graph_builder:
         # a given pattern/segment couple
         tt = tt.groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
+
+    def compute_mean_headway(self):
+        sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
+            WHERE departure>={self.start} AND arrival<={self.end}"""
+        mh = pd.read_sql(sql, self.pt_conn)
+
+        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
+        mh = pd.merge(mh, trips, on="trip_id", how="left")
+        mh.drop("trip_id", axis=1, inplace=True)
+        mh.sort_values(by=["pattern_id", "seq", "arrival"], inplace=True)
+        mh["headway"] = mh["arrival"].diff()
+
+        self.mean_headway = mh
 
     def create_stop_vertices(self):
         # select all stops
@@ -240,7 +257,28 @@ class SF_graph_builder:
         self.on_board_edges["transfer_id"] = None
 
     def create_boarding_edges(self):
-        pass
+        self.boarding_edges = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
+        self.boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+
+        # get tail vertex index (stop vertex)
+        self.boarding_edges = pd.merge(
+            self.boarding_edges,
+            self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
+            on="stop_id",
+            how="left",
+        )
+        self.boarding_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+
+        # get head vertex index (boarding vertex)
+        self.boarding_edges = pd.merge(
+            self.boarding_edges,
+            self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
+            on=["line_id", "line_seg_idx"],
+            how="left",
+        )
+        self.boarding_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+
+        # get edge frequency
 
     def create_alighting_edges(self):
         self.alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
@@ -427,4 +465,5 @@ class SF_graph_builder:
 
         self.create_on_board_edges()
         self.create_dwell_edges()
+        self.create_boarding_edges()
         self.create_alighting_edges()
