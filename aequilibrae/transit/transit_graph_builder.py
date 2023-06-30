@@ -4,6 +4,7 @@
 import numpy as np
 import pandas as pd
 import shapely
+import shapely.ops
 import pyproj
 from scipy.spatial import cKDTree
 
