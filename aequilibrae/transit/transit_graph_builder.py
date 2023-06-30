@@ -3,6 +3,10 @@
 
 import numpy as np
 import pandas as pd
+import shapely
+import pyproj
+from scipy.spatial import cKDTree
+
 
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
@@ -13,7 +17,7 @@ class SF_graph_builder:
     TODO: transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
     """
 
-    def __init__(self, conn, start=61200, end=64800, margin=0):
+    def __init__(self, conn, start=61200, end=64800, margin=0, num_threads=-1):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
         e.g. 6am is 21600.
@@ -21,6 +25,7 @@ class SF_graph_builder:
         self.conn = conn  # sqlite connection
         self.start = start - margin  # starting time of the selected time period
         self.end = end + margin  # ending time of the selected time period
+        self.num_threads = num_threads
 
         self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 
@@ -30,6 +35,9 @@ class SF_graph_builder:
         self.alighting_vertices = None
         self.od_vertices = None
         self.on_board_edges = None
+
+        self.local_crs = "EPSG:4326"
+        self.walking_speed = 1.0
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -219,7 +227,55 @@ class SF_graph_builder:
         pass
 
     def create_connector_edges(self):
-        pass
+        """Create the connector edges between each stop and the closest od."""
+        transformer = pyproj.Transformer.from_crs(
+            pyproj.CRS("EPSG:4326"), pyproj.CRS(self.local_crs), always_xy=True
+        ).transform
+
+        od_coords = self.od_vertices["coord"].apply(
+            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
+        )
+        od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
+
+        stop_coords = self.stop_vertices["coord"].apply(
+            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
+        )
+        stop_coords = np.array(list(stop_coords.apply(lambda coord: (coord.x, coord.y))))
+
+        kdTree = cKDTree(od_coords)
+
+        # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
+        distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=np.inf, workers=self.num_threads)
+        nearest_od = self.od_vertices.iloc[index]["node_id"].reset_index(drop=True)
+        trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
+        self.connector_edges = pd.concat(
+            [
+                self.stop_vertices["stop_id"].reset_index(drop=True).rename("head_vert_id"),
+                nearest_od.rename("tail_vert_id"),
+                trav_time,
+            ],
+            axis=1,
+        )
+
+        self.connector_edges = pd.concat(
+            [
+                graph.connector_edges,
+                graph.connector_edges.rename(
+                    columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, copy=False
+                ),
+            ],
+            copy=True,
+        ).reset_index(drop=True)
+
+        self.connector_edges["type"] = "connector"
+        self.connector_edges["stop_id"] = None
+        self.connector_edges["line_seg_idx"] = None
+        self.connector_edges["freq"] = np.inf
+        self.connector_edges["o_line_id"] = None
+        self.connector_edges["d_line_id"] = None
+        self.connector_edges["transfer_id"] = None
+
+        return self.connector_edges
 
     def create_inner_stop_transfer_edges(self):
         pass
