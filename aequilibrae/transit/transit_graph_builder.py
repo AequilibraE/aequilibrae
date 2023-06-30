@@ -15,9 +15,9 @@ class SF_graph_builder:
     ASSUMPIONS:
     - trips dir is always 0: opposite directions is not supported
 
-    TODO: 
+    TODO:
     - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
-    - instanciate properly using a project path, an aequilibrae project or anything else that follow the 
+    - instanciate properly using a project path, an aequilibrae project or anything else that follow the
       package guideline (without explicit public_transport_conn and project_conn)
     """
 
@@ -29,7 +29,7 @@ class SF_graph_builder:
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
-        
+
         self.proj_conn = project_conn  # sqlite connection
         self.proj_conn.enable_load_extension(True)
         self.proj_conn.load_extension("mod_spatialite")
@@ -115,7 +115,9 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.pt_conn)
+        self.stop_vertices = pd.read_sql(
+            sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.pt_conn
+        )
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
 
         # filter stops that are used on the given time range
@@ -150,17 +152,13 @@ class SF_graph_builder:
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
+        sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
         self.od_vertices = pd.read_sql(sql=sql, con=self.proj_conn)
-
-        # the node_id for centroids is known to be the zone_id as well
-        self.od_vertices["taz_id"] = self.od_vertices["node_id"].copy(deep=True)
         self.od_vertices["type"] = "od"
         self.od_vertices["stop_id"] = None
         self.od_vertices["line_id"] = None
         self.od_vertices["line_seg_idx"] = np.nan
         self.od_vertices.rename(columns={"geometry": "coord"}, inplace=True)
-        self.od_vertices.insert(len(self.od_vertices.columns) - 1, "coord", self.od_vertices.pop("coord"))
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
