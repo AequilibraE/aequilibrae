@@ -15,15 +15,25 @@ class SF_graph_builder:
     ASSUMPIONS:
     - trips dir is always 0: opposite directions is not supported
 
-    TODO: transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
+    TODO: 
+    - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
+    - instanciate properly using a project path, an aequilibrae project or anything else that follow the 
+      package guideline (without explicit public_transport_conn and project_conn)
     """
 
-    def __init__(self, conn, start=61200, end=64800, margin=0, num_threads=-1):
+    def __init__(self, public_transport_conn, project_conn, start=61200, end=64800, margin=0, num_threads=-1):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
         e.g. 6am is 21600.
         """
-        self.conn = conn  # sqlite connection
+        self.pt_conn = public_transport_conn  # sqlite connection
+        self.pt_conn.enable_load_extension(True)
+        self.pt_conn.load_extension("mod_spatialite")
+        
+        self.proj_conn = project_conn  # sqlite connection
+        self.proj_conn.enable_load_extension(True)
+        self.proj_conn.load_extension("mod_spatialite")
+
         self.start = start - margin  # starting time of the selected time period
         self.end = end + margin  # ending time of the selected time period
         self.num_threads = num_threads
@@ -46,7 +56,7 @@ class SF_graph_builder:
         WHERE arrival>={self.start} AND departure<={self.end}"""
         self.trip_ids = pd.read_sql(
             sql=sql,
-            con=self.conn,
+            con=self.pt_conn,
         ).trip_id.values
 
         # pattern ids corresponding to the given time range
@@ -56,14 +66,14 @@ class SF_graph_builder:
         ON trips.trip_id = selected_trips.trip_id"""
         pattern_ids = pd.read_sql(
             sql=sql,
-            con=self.conn,
+            con=self.pt_conn,
         ).pattern_id.values
 
         # route links corresponding to the given time range
         sql = "SELECT pattern_id, seq, from_stop, to_stop FROM route_links"
         route_links = pd.read_sql(
             sql=sql,
-            con=self.conn,
+            con=self.pt_conn,
         )
         route_links = route_links.loc[route_links.pattern_id.isin(pattern_ids)]
 
@@ -71,7 +81,7 @@ class SF_graph_builder:
         sql = "SELECT pattern_id, longname FROM routes" ""
         routes = pd.read_sql(
             sql=sql,
-            con=self.conn,
+            con=self.pt_conn,
         )
         routes["line_id"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
@@ -79,7 +89,7 @@ class SF_graph_builder:
 
     def compute_mean_travel_time(self):
         # Compute the travel time for each trip segment
-        tt = pd.read_sql(sql="SELECT trip_id, seq, arrival, departure FROM trips_schedule", con=self.conn)
+        tt = pd.read_sql(sql="SELECT trip_id, seq, arrival, departure FROM trips_schedule", con=self.pt_conn)
         tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
         tt["last_departure"] = tt["last_departure"].fillna(0.0)
@@ -94,7 +104,7 @@ class SF_graph_builder:
         tt.seq -= 1
 
         # Merge pattern ids with trip_id
-        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.conn)
+        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
         tt = pd.merge(tt, trips, on="trip_id", how="left")
         tt.drop("trip_id", axis=1, inplace=True)
 
@@ -105,7 +115,7 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.conn)
+        self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.pt_conn)
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
 
         # filter stops that are used on the given time range
@@ -140,8 +150,8 @@ class SF_graph_builder:
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM zones WHERE is_centroid = 1"""
-        self.od_vertices = pd.read_sql(sql=sql, con=self.conn)
+        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
+        self.od_vertices = pd.read_sql(sql=sql, con=self.proj_conn)
 
         # the node_id for centroids is known to be the zone_id as well
         self.od_vertices["taz_id"] = self.od_vertices["node_id"].copy(deep=True)
