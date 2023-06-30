@@ -81,7 +81,7 @@ class SF_graph_builder:
         # tt.seq refers to the stop sequence index
         # Because we computed the travel time between two stops, we are now dealing
         # with a segment sequence index.
-        tt = tt[tt.seq > 0]
+        tt = tt.loc[tt.seq > 0]
         tt.seq -= 1
 
         # Merge pattern ids with trip_id
@@ -130,7 +130,7 @@ class SF_graph_builder:
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
+        sql = """SELECT node_id, ST_AsText(geometry) AS geometry FROM zones WHERE is_centroid = 1"""
         self.od_vertices = pd.read_sql(sql=sql, con=self.conn)
 
         # the node_id for centroids is known to be the zone_id as well
