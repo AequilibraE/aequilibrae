@@ -104,7 +104,7 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord FROM stops", con=self.conn)
+        self.stop_vertices = pd.read_sql(sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.conn)
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
 
         # filter stops that are used on the given time range
@@ -115,6 +115,7 @@ class SF_graph_builder:
         self.stop_vertices["taz_id"] = None
         self.stop_vertices["line_seg_idx"] = np.nan
         self.stop_vertices["line_seg_idx"] = self.stop_vertices["line_seg_idx"].astype("Int32")
+        self.stop_vertices["parent_station"] = self.stop_vertices["parent_station"].astype("Int32")
         self.stop_vertices["type"] = "stop"
 
     def create_boarding_vertices(self):
@@ -278,7 +279,36 @@ class SF_graph_builder:
         return self.connector_edges
 
     def create_inner_stop_transfer_edges(self):
-        pass
+        stations = graph.stop_vertices[["stop_id", "parent_station"]]
+        boarding = stations[stations["stop_id"].isin(graph.boarding_vertices["stop_id"])]
+        alighting = stations[stations["stop_id"].isin(graph.alighting_vertices["stop_id"])]
+        boarding_by_station = boarding.groupby(by="parent_station")
+        alighting_by_station = alighting.groupby(by="parent_station")
+
+        dwells = []
+        transfers = []
+        for station in np.intersect1d(boarding["parent_station"].values, alighting["parent_station"].values):
+            boarding_stops = boarding_by_station.get_group(station)["stop_id"]
+            alighting_stops = alighting_by_station.get_group(station)["stop_id"]
+
+            for boarding_stop in boarding_stops:
+                for alighting_stop in alighting_stops:
+                    if boarding_stop == alighting_stop:
+                        dwells.append([boarding_stop, alighting_stop, station])
+                    else:
+                        transfers.append([boarding_stop, alighting_stop, station])
+
+        self.dwell_edges = pd.DataFrame(dwells, columns=["head_vert_id", "tail_vert_id", "station"])
+        self.inner_transfer_edges = pd.DataFrame(transfers, columns=["head_vert_id", "tail_vert_id", "station"])
+        # self.inner_transfer_edges["type"] = "transfer"
+        # self.inner_transfer_edges["stop_id"] = None
+        # self.inner_transfer_edges["line_seg_idx"] = None
+        # # self.inner_transfer_edges["freq"] = np.inf
+        # self.inner_transfer_edges["o_line_id"] = None
+        # self.inner_transfer_edges["d_line_id"] = None
+        # self.inner_transfer_edges["transfer_id"] = None
+
+        return self.inner_transfer_edges, self.dwell_edges
 
     def create_outer_stop_transfer_edges(self):
         pass
