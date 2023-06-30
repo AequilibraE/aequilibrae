@@ -13,7 +13,7 @@ class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     ASSUMPIONS:
-    - trips dir is always 0: opposite directions is not supported
+    - trips dir is always 0: opposite directions are not supported
     - all times are expressed in seconds s, all frequencies in 1/s
 
     TODO:
@@ -53,6 +53,10 @@ class SF_graph_builder:
 
         # edge weight parameters
         self.uniform_dwell_time = 30
+        self.alighting_penalty = 480
+        self.inf_freq = 1.0e20  # max frequency
+        self.min_freq = 1.0 / self.inf_freq  # smallest frequency
+        self.a_tiny_time_duration = 1.0e-08
         self.walking_speed = 1.0
 
     def create_line_segments(self):
@@ -236,7 +240,36 @@ class SF_graph_builder:
         pass
 
     def create_alighting_edges(self):
-        pass
+        self.alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        self.alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+
+        # get tail vertex index (alighting vertex)
+        self.alighting_edges = pd.merge(
+            self.alighting_edges,
+            self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
+            on=["line_id", "line_seg_idx"],
+            how="left",
+        )
+        self.alighting_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+
+        # get head vertex index (stop vertex)
+        self.alighting_edges = pd.merge(
+            self.alighting_edges,
+            self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
+            on="stop_id",
+            how="left",
+        )
+        self.alighting_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+
+        # uniform attributes
+        self.alighting_edges["type"] = "alighting"
+        self.alighting_edges["o_line_id"] = None
+        self.alighting_edges["d_line_id"] = None
+        self.alighting_edges["transfer_id"] = None
+        self.alighting_edges["freq"] = np.inf
+        self.alighting_edges["trav_time"] = (
+            0.5 * self.uniform_dwell_time + self.alighting_penalty + self.a_tiny_time_duration
+        )
 
     def create_dwell_edges(self):
         # we start by removing the first segment of each line
@@ -395,3 +428,4 @@ class SF_graph_builder:
 
         self.create_on_board_edges()
         self.create_dwell_edges()
+        self.create_alighting_edges()
