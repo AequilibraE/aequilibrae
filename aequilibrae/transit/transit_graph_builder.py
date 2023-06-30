@@ -14,6 +14,7 @@ class SF_graph_builder:
 
     ASSUMPIONS:
     - trips dir is always 0: opposite directions is not supported
+    - all times are expressed in seconds s, all frequencies in 1/s
 
     TODO:
     - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
@@ -46,8 +47,12 @@ class SF_graph_builder:
         self.alighting_vertices = None
         self.od_vertices = None
         self.on_board_edges = None
+        self.dell_edges = None
 
         self.local_crs = "EPSG:4326"
+
+        # edge weight parameters
+        self.uniform_dwell_time = 30
         self.walking_speed = 1.0
 
     def create_line_segments(self):
@@ -55,8 +60,8 @@ class SF_graph_builder:
         sql = f"""SELECT DISTINCT trip_id FROM trips_schedule 
         WHERE arrival>={self.start} AND departure<={self.end}"""
         self.trip_ids = pd.read_sql(
-            sql=sql,
-            con=self.pt_conn,
+            sql,
+            self.pt_conn,
         ).trip_id.values
 
         # pattern ids corresponding to the given time range
@@ -65,8 +70,8 @@ class SF_graph_builder:
         WHERE departure>={self.start} AND arrival<={self.end}) selected_trips
         ON trips.trip_id = selected_trips.trip_id"""
         pattern_ids = pd.read_sql(
-            sql=sql,
-            con=self.pt_conn,
+            sql,
+            self.pt_conn,
         ).pattern_id.values
 
         # route links corresponding to the given time range
@@ -89,7 +94,8 @@ class SF_graph_builder:
 
     def compute_mean_travel_time(self):
         # Compute the travel time for each trip segment
-        tt = pd.read_sql(sql="SELECT trip_id, seq, arrival, departure FROM trips_schedule", con=self.pt_conn)
+        sql = "SELECT trip_id, seq, arrival, departure FROM trips_schedule"
+        tt = pd.read_sql(sql, self.pt_conn)
         tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
         tt["last_departure"] = tt["last_departure"].fillna(0.0)
@@ -115,9 +121,8 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        self.stop_vertices = pd.read_sql(
-            sql="SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops", con=self.pt_conn
-        )
+        sql = "SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops"
+        self.stop_vertices = pd.read_sql(sql, self.pt_conn)
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
 
         # filter stops that are used on the given time range
@@ -153,7 +158,7 @@ class SF_graph_builder:
 
     def create_od_vertices(self):
         sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
-        self.od_vertices = pd.read_sql(sql=sql, con=self.proj_conn)
+        self.od_vertices = pd.read_sql(sql, self.proj_conn)
         self.od_vertices["type"] = "od"
         self.od_vertices["stop_id"] = None
         self.od_vertices["line_id"] = None
@@ -164,7 +169,7 @@ class SF_graph_builder:
         """Graph vertices creation as a dataframe.
 
         Verticealighting_verticess have the following attributes:
-            - vert_idx: int
+            - vert_id: int
             - type (either 'stop', 'boarding', 'alighting', 'od', 'walking' or 'fictitious'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): int
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
@@ -234,7 +239,48 @@ class SF_graph_builder:
         pass
 
     def create_dwell_edges(self):
-        pass
+        # we start by removing the first segment of each line
+        self.dwell_edges = self.line_segments.loc[self.line_segments.seq != 0][["line_id", "from_stop", "seq"]]
+        self.dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
+
+        # we take the first stop of the segment
+        self.dwell_edges["stop_id"] = self.dwell_edges.from_stop
+
+        # tail vertex index (alighting vertex)
+        self.dwell_edges.line_seg_idx -= 1
+        self.dwell_edges = pd.merge(
+            self.dwell_edges,
+            self.vertices[self.vertices.type == "alighting"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
+            on=["line_id", "stop_id", "line_seg_idx"],
+            how="left",
+        )
+        self.dwell_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        self.dwell_edges.line_seg_idx += 1
+
+        # head vertex index (boarding vertex)
+        self.dwell_edges = pd.merge(
+            self.dwell_edges,
+            self.vertices[self.vertices.type == "boarding"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
+            on=["line_id", "stop_id", "line_seg_idx"],
+            how="left",
+        )
+        self.dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+
+        # clean-up
+        self.dwell_edges.drop("from_stop", axis=1, inplace=True)
+
+        # uniform values
+        self.dwell_edges["line_seg_idx"] = np.nan
+        self.dwell_edges["type"] = "dwell"
+        self.dwell_edges["o_line_id"] = None
+        self.dwell_edges["d_line_id"] = None
+        self.dwell_edges["transfer_id"] = None
+
+        # frequency : inf
+        self.dwell_edges["freq"] = np.inf
+
+        # travel time : dwell_time
+        self.dwell_edges["trav_time"] = self.uniform_dwell_time
 
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
@@ -347,3 +393,4 @@ class SF_graph_builder:
         """
 
         self.create_on_board_edges()
+        self.create_dwell_edges()
