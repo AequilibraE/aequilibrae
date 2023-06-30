@@ -48,8 +48,9 @@ class SF_graph_builder:
         self.od_vertices = None
         self.on_board_edges = None
         self.dell_edges = None
+        self.alighting_edges = None
 
-        self.local_crs = "EPSG:4326"
+        self.global_crs = "EPSG:4326"
 
         # edge weight parameters
         self.uniform_dwell_time = 30
@@ -125,49 +126,50 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        sql = "SELECT stop_id, ST_AsText(geometry) coord, parent_station FROM stops"
+        sql = "SELECT stop_id, ST_AsText(geometry) coord FROM stops"
         self.stop_vertices = pd.read_sql(sql, self.pt_conn)
-        stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
 
         # filter stops that are used on the given time range
+        stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
         self.stop_vertices = self.stop_vertices.loc[self.stop_vertices.stop_id.isin(stops_ids)]
 
-        # add metadata
+        # uniform attributes
         self.stop_vertices["line_id"] = None
         self.stop_vertices["taz_id"] = None
         self.stop_vertices["line_seg_idx"] = np.nan
-        self.stop_vertices["line_seg_idx"] = self.stop_vertices["line_seg_idx"].astype("Int32")
-        self.stop_vertices["parent_station"] = self.stop_vertices["parent_station"].astype("Int32")
         self.stop_vertices["type"] = "stop"
 
     def create_boarding_vertices(self):
         self.boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         self.boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
-        self.boarding_vertices.line_seg_idx = self.boarding_vertices.line_seg_idx.astype("Int32")
         self.boarding_vertices = pd.merge(
             self.boarding_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
         )
+
+        # uniform attributes
         self.boarding_vertices["type"] = "boarding"
         self.boarding_vertices["taz_id"] = None
 
     def create_alighting_vertices(self):
         self.alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         self.alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
-        self.alighting_vertices.line_seg_idx = self.alighting_vertices.line_seg_idx.astype("Int32")
         self.alighting_vertices = pd.merge(
             self.alighting_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
         )
+
+        # uniform attributes
         self.alighting_vertices["type"] = "alighting"
         self.alighting_vertices["taz_id"] = None
 
     def create_od_vertices(self):
-        sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS geometry FROM nodes WHERE is_centroid = 1"""
+        sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
         self.od_vertices = pd.read_sql(sql, self.proj_conn)
+
+        # uniform attributes
         self.od_vertices["type"] = "od"
         self.od_vertices["stop_id"] = None
         self.od_vertices["line_id"] = None
         self.od_vertices["line_seg_idx"] = np.nan
-        self.od_vertices.rename(columns={"geometry": "coord"}, inplace=True)
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -198,6 +200,7 @@ class SF_graph_builder:
             ],
             axis=0,
         )
+        self.vertices.line_seg_idx = self.vertices.line_seg_idx.astype("Int32")
 
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
@@ -309,17 +312,13 @@ class SF_graph_builder:
         self.dwell_edges["o_line_id"] = None
         self.dwell_edges["d_line_id"] = None
         self.dwell_edges["transfer_id"] = None
-
-        # frequency : inf
         self.dwell_edges["freq"] = np.inf
-
-        # travel time : dwell_time
         self.dwell_edges["trav_time"] = self.uniform_dwell_time
 
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
         transformer = pyproj.Transformer.from_crs(
-            pyproj.CRS("EPSG:4326"), pyproj.CRS(self.local_crs), always_xy=True
+            pyproj.CRS("EPSG:4326"), pyproj.CRS(self.global_crs), always_xy=True
         ).transform
 
         od_coords = self.od_vertices["coord"].apply(
