@@ -246,7 +246,18 @@ class SF_graph_builder:
         # we take the first stop of the segment
         self.dwell_edges["stop_id"] = self.dwell_edges.from_stop
 
+        # head vertex index (boarding vertex)
+        # boarding vertices of line segments [1:segment_count+1]
+        self.dwell_edges = pd.merge(
+            self.dwell_edges,
+            self.vertices[self.vertices.type == "boarding"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
+            on=["line_id", "stop_id", "line_seg_idx"],
+            how="left",
+        )
+        self.dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+
         # tail vertex index (alighting vertex)
+        # aligthing vertices of line segments [0:segment_count]
         self.dwell_edges.line_seg_idx -= 1
         self.dwell_edges = pd.merge(
             self.dwell_edges,
@@ -255,16 +266,6 @@ class SF_graph_builder:
             how="left",
         )
         self.dwell_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
-        self.dwell_edges.line_seg_idx += 1
-
-        # head vertex index (boarding vertex)
-        self.dwell_edges = pd.merge(
-            self.dwell_edges,
-            self.vertices[self.vertices.type == "boarding"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
-            on=["line_id", "stop_id", "line_seg_idx"],
-            how="left",
-        )
-        self.dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
         # clean-up
         self.dwell_edges.drop("from_stop", axis=1, inplace=True)
