@@ -302,8 +302,8 @@ class TestTrafficAssignment:
         assert assig_data_4[-3:] == ["Algorithm: cfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
         assert assig_data_5[-3:] == ["Algorithm: bfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
 
-    def test_execute_no_project(self):
-        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
+    def test_execute_no_project(self, project: Project, assignment: TrafficAssignment, assigclass: TrafficClass):
+        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
         project.close()
