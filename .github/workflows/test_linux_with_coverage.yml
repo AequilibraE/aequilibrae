@@ -30,4 +30,4 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        python3 -m pytest --cov=./
+        python3 -m pytest --cov=aequilibrae tests/
