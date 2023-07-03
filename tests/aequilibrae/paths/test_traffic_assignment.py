@@ -186,7 +186,7 @@ class TestTrafficAssignment:
         return matrix
 
     def test_execute_and_save_results(
-            self, assignment: TrafficAssignment, assigclass: TrafficClass, car_graph: Graph, matrix
+        self, assignment: TrafficAssignment, assigclass: TrafficClass, car_graph: Graph, matrix
     ):
         conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
@@ -271,16 +271,22 @@ class TestTrafficAssignment:
             # lines = ";".join([x.rstrip() for x in file.readlines()])
             lines = [x.rstrip() for x in file.readlines()]
 
-        assert lines[8].split(";", 1)[1] == lines[27].split(";", 1)[1] == lines[536].split(";", 1)[1] == \
-               lines[658].split(";", 1)[1] == lines[713].split(";", 1)[1]
+        assert (
+            lines[8].split(";", 1)[1]
+            == lines[27].split(";", 1)[1]
+            == lines[536].split(";", 1)[1]
+            == lines[658].split(";", 1)[1]
+            == lines[713].split(";", 1)[1]
+        )
 
         tclass_data = lines[8].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assert tclass_data[:5] == [' {car: {Graph: "{Mode: c',
-                                   "Block through centroids: False",
-                                   "Number of centroids: 24",
-                                   "Links: 76",
-                                   'Nodes: 24}"',
-                                   ]
+        assert tclass_data[:5] == [
+            ' {car: {Graph: "{Mode: c',
+            "Block through centroids: False",
+            "Number of centroids: 24",
+            "Links: 76",
+            'Nodes: 24}"',
+        ]
         assert tclass_data[-2:] == ["Matrix cores: [matrix]", 'Matrix totals: {matrix: 360600.0}}"}}']
 
         assig_data_1 = lines[10].split(";")[2].replace("\\", "").replace("'", "").split(", ")
