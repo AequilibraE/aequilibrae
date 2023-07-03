@@ -1,7 +1,8 @@
-import os
 import random
 import sqlite3
 import string
+from os.path import join, isfile
+from pathlib import Path
 from random import choice
 
 import numpy as np
@@ -9,7 +10,6 @@ import pandas as pd
 import pytest
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph
-from aequilibrae.project.project import Project
 from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
@@ -186,11 +186,12 @@ class TestTrafficAssignment:
         return matrix
 
     def test_execute_and_save_results(
-        self, assignment: TrafficAssignment, assigclass: TrafficClass, car_graph: Graph, matrix
+            self, assignment: TrafficAssignment, assigclass: TrafficClass, car_graph: Graph, matrix
     ):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
+        proj = assignment.project
         assignment.add_class(assigclass)
         assignment.set_vdf("BPR")
         assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -262,8 +263,41 @@ class TestTrafficAssignment:
         with pytest.raises(ValueError):
             assignment.save_results("save_to_database")
 
+        # Let's test logging of assignment
+        log_ = Path(proj.path_to_file).parent / "aequilibrae.log"
+        assert isfile(log_)
+
+        with open(log_, encoding="utf-8") as file:
+            # lines = ";".join([x.rstrip() for x in file.readlines()])
+            lines = [x.rstrip() for x in file.readlines()]
+
+        assert lines[8].split(";", 1)[1] == lines[27].split(";", 1)[1] == lines[536].split(";", 1)[1] == \
+               lines[658].split(";", 1)[1] == lines[713].split(";", 1)[1]
+
+        tclass_data = lines[8].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assert tclass_data[:5] == [' {car: {Graph: "{Mode: c',
+                                   "Block through centroids: False",
+                                   "Number of centroids: 24",
+                                   "Links: 76",
+                                   'Nodes: 24}"',
+                                   ]
+        assert tclass_data[-2:] == ["Matrix cores: [matrix]", 'Matrix totals: {matrix: 360600.0}}"}}']
+
+        assig_data_1 = lines[10].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_2 = lines[29].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_3 = lines[538].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_4 = lines[660].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assig_data_5 = lines[715].split(";")[2].replace("\\", "").replace("'", "").split(", ")
+        assert assig_data_1[:5] == assig_data_2[:5] == assig_data_3[:5] == assig_data_4[:5] == assig_data_5[:5]
+        assert assig_data_1[-3:] == ["Algorithm: msa", "Maximum iterations: 10", "Target RGAP: 0.0001}"]
+        assert assig_data_2[-3:] == ["Algorithm: msa", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+        assert assig_data_3[-3:] == ["Algorithm: frank-wolfe", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+
+        assert assig_data_4[-3:] == ["Algorithm: cfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+        assert assig_data_5[-3:] == ["Algorithm: bfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+
     def test_execute_no_project(self):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
         project.close()
