@@ -1,5 +1,5 @@
-import numpy as np
 import multiprocessing as mp
+
 from aequilibrae.matrix.aequilibrae_matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph
 
@@ -67,29 +67,3 @@ class SkimResults:
         self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, self.num_skims)
         self.__graph_id__ = graph.__id__
         self.graph = graph
-
-    def set_cores(self, cores: int) -> None:
-        """
-        Sets number of cores (threads) to be used in computation
-
-        Value of zero sets number of threads to all available in the system, while negative values indicate the number
-        of threads to be left out of the computational effort.
-
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of cores to be used in computation
-        """
-
-        if isinstance(cores, int):
-            if cores < 0:
-                self.cores = max(1, mp.cpu_count() + cores)
-            if cores == 0:
-                self.cores = mp.cpu_count()
-            elif cores > 0:
-                cores = min(mp.cpu_count(), cores)
-                if self.cores != cores:
-                    self.cores = cores
-        else:
-            raise ValueError("Number of cores needs to be an integer")
