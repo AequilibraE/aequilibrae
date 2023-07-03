@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
 from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
@@ -303,7 +303,7 @@ class TestTrafficAssignment:
         assert assig_data_5[-3:] == ["Algorithm: bfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
 
     def test_execute_no_project(self, project: Project, assignment: TrafficAssignment, assigclass: TrafficClass):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
         project.close()
