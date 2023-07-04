@@ -108,8 +108,8 @@ class SF_graph_builder:
         tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
         tt["last_departure"] = tt["last_departure"].fillna(0.0)
-        tt["travel_time_s"] = tt["arrival"] - tt["last_departure"]
-        tt.loc[tt.seq == 0, "travel_time_s"] = 0.0
+        tt["travel_time"] = tt["arrival"] - tt["last_departure"]
+        tt.loc[tt.seq == 0, "travel_time"] = 0.0
         tt.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
 
         # tt.seq refers to the stop sequence index
@@ -269,8 +269,8 @@ class SF_graph_builder:
         self.vertices = self.vertices[self.vertex_cols]
 
     def create_on_board_edges(self):
-        self.on_board_edges = self.line_segments[["line_id", "seq", "travel_time_s"]].copy(deep=True)
-        self.on_board_edges.rename(columns={"seq": "line_seg_idx", "travel_time_s": "trav_time"}, inplace=True)
+        self.on_board_edges = self.line_segments[["line_id", "seq", "travel_time"]].copy(deep=True)
+        self.on_board_edges.rename(columns={"seq": "line_seg_idx", "travel_time": "trav_time"}, inplace=True)
 
         # get tail vertex index
         self.on_board_edges = pd.merge(
