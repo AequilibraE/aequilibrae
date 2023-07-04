@@ -14,7 +14,7 @@ class SF_graph_builder:
 
     ASSUMPIONS:
     - trips dir is always 0: opposite directions are not supported
-    - all times are expressed in seconds s, all frequencies in 1/s
+    - all times are expressed in seconds [s], all frequencies in [1/s]
 
     TODO:
     - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
@@ -129,16 +129,58 @@ class SF_graph_builder:
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
 
     def compute_mean_headway(self):
+        # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
         mh = pd.read_sql(sql, self.pt_conn)
 
+        # merge the trips schedules with pattern ids
         trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
         mh = pd.merge(mh, trips, on="trip_id", how="left")
-        mh.drop("trip_id", axis=1, inplace=True)
-        mh.sort_values(by=["pattern_id", "seq", "arrival"], inplace=True)
+        mh.sort_values(by=["pattern_id", "seq", "trip_id", "arrival"], inplace=True)
         mh["headway"] = mh["arrival"].diff()
 
+        # count the number of trips per stop
+        trip_count = mh.groupby(["pattern_id", "seq"]).size().to_frame("trip_count")
+        mh = pd.merge(mh, trip_count, on=["pattern_id", "seq"], how="left")
+
+        # compute the trip index for a given pattern & stop
+        trip_id_last = -1
+        seq_last = -1
+        pattern_id_last = -1
+        trip_idx_values = np.zeros(len(mh), dtype=int)
+        trip_idx = 0
+        i = 0
+        for row in mh.itertuples():
+            trip_id = row.trip_id
+            seq = row.seq
+            pattern_id = row.seq
+            assert (trip_id != trip_id_last) | (seq == seq_last + 1)
+
+            if seq != seq_last:
+                trip_idx = 0
+            if pattern_id != pattern_id_last:
+                trip_idx = 0
+
+            trip_id_last = trip_id
+            seq_last = seq
+            pattern_id_last = pattern_id
+
+            trip_idx_values[i] = trip_idx
+            i += 1
+            trip_idx += 1
+        mh["trip_idx"] = trip_idx_values
+
+        # deal with single trip case for a given stop
+        largest_headway = self.end - self.start
+        mh.loc[mh["trip_count"] == 1, "headway"] = largest_headway
+
+        # deal with first trip for a stop & pattern
+        mh.loc[(mh["trip_count"] > 1) & (mh["trip_idx"] == 0), "headway"] = np.nan
+        mh["headway"] = mh["headway"].fillna(method="bfill")
+
+        # take the min of a pattern headways (among the headways computed for all stops of the pattern)
+        mh = mh[["pattern_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
         self.mean_headway = mh
 
     def create_stop_vertices(self):
