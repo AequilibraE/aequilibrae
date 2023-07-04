@@ -263,44 +263,49 @@ class TestTrafficAssignment:
         with pytest.raises(ValueError):
             assignment.save_results("save_to_database")
 
+        num_cores = assignment.cores
         # Let's test logging of assignment
         log_ = Path(proj.path_to_file).parent / "aequilibrae.log"
         assert isfile(log_)
 
-        with open(log_, encoding="utf-8") as file:
-            # lines = ";".join([x.rstrip() for x in file.readlines()])
-            lines = [x.rstrip() for x in file.readlines()]
+        file_text = ""
+        with open(log_, "r", encoding="utf-8") as file:
+            for line in file.readlines():
+                file_text += line
 
-        assert (
-            lines[8].split(";", 1)[1]
-            == lines[27].split(";", 1)[1]
-            == lines[536].split(";", 1)[1]
-            == lines[658].split(";", 1)[1]
-            == lines[713].split(";", 1)[1]
+        tc_spec = "INFO ; Traffic Class specification"
+        assert file_text.count(tc_spec) > 1
+
+        tc_graph = "INFO ; {'car': {'Graph': \"{'Mode': 'c', 'Block through centroids': False, 'Number of centroids': 24, 'Links': 76, 'Nodes': 24}\","
+        assert file_text.count(tc_graph) > 1
+
+        tc_matrix = "'Number of centroids': 24, 'Nodes': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
+        assert file_text.count(tc_matrix) > 1
+
+        assig_1 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, 'Target RGAP': 0.0001}}".format(
+            num_cores
         )
+        assert assig_1 in file_text
 
-        tclass_data = lines[8].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assert tclass_data[:5] == [
-            ' {car: {Graph: "{Mode: c',
-            "Block through centroids: False",
-            "Number of centroids: 24",
-            "Links: 76",
-            'Nodes: 24}"',
-        ]
-        assert tclass_data[-2:] == ["Matrix cores: [matrix]", 'Matrix totals: {matrix: 360600.0}}"}}']
+        assig_2 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_2 in file_text
 
-        assig_data_1 = lines[10].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assig_data_2 = lines[29].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assig_data_3 = lines[538].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assig_data_4 = lines[660].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assig_data_5 = lines[715].split(";")[2].replace("\\", "").replace("'", "").split(", ")
-        assert assig_data_1[:5] == assig_data_2[:5] == assig_data_3[:5] == assig_data_4[:5] == assig_data_5[:5]
-        assert assig_data_1[-3:] == ["Algorithm: msa", "Maximum iterations: 10", "Target RGAP: 0.0001}"]
-        assert assig_data_2[-3:] == ["Algorithm: msa", "Maximum iterations: 500", "Target RGAP: 0.001}"]
-        assert assig_data_3[-3:] == ["Algorithm: frank-wolfe", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+        assig_3 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_3 in file_text
 
-        assert assig_data_4[-3:] == ["Algorithm: cfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
-        assert assig_data_5[-3:] == ["Algorithm: bfw", "Maximum iterations: 500", "Target RGAP: 0.001}"]
+        assig_4 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_4 in file_text
+
+        assig_5 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_5 in file_text
 
     def test_execute_no_project(self, project: Project, assignment: TrafficAssignment, assigclass: TrafficClass):
         conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
