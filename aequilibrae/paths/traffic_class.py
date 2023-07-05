@@ -79,8 +79,7 @@ class TrafficClass:
 
         mat_config = {
             "Source": matrix.file_path or "",
-            "Number of centroids": matrix.index.shape[0],
-            "Nodes": matrix.zones,
+            "Number of centroids": matrix.zones,
             "Matrix cores": matrix.view_names,
         }
         if len(matrix.view_names) == 1:
