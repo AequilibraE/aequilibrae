@@ -1,8 +1,6 @@
 name: Code coverage
 
-on:
-  pull_request:
-    types: [ready_for_review, merge]
+on: [pull_request]
 
 jobs:
   testing:
@@ -32,14 +30,4 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        python3 -m pytest --cov=./ --cov-report=xml
-    - name: Upload coverage to Codecov
-      if: ${{ (env.HAS_SECRETS == 'true') }}
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        yml: ./codecov.yml
-        fail_ci_if_error: true
+        python3 -m pytest --cov=aequilibrae tests/

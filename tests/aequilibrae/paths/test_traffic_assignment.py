@@ -1,15 +1,15 @@
-import os
 import random
 import sqlite3
 import string
+from os.path import join, isfile
+from pathlib import Path
 from random import choice
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
-from aequilibrae.project.project import Project
+from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
 from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
@@ -188,9 +188,10 @@ class TestTrafficAssignment:
     def test_execute_and_save_results(
         self, assignment: TrafficAssignment, assigclass: TrafficClass, car_graph: Graph, matrix
     ):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
+        proj = assignment.project
         assignment.add_class(assigclass)
         assignment.set_vdf("BPR")
         assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -262,8 +263,52 @@ class TestTrafficAssignment:
         with pytest.raises(ValueError):
             assignment.save_results("save_to_database")
 
+        num_cores = assignment.cores
+        # Let's test logging of assignment
+        log_ = Path(proj.path_to_file).parent / "aequilibrae.log"
+        assert isfile(log_)
+
+        file_text = ""
+        with open(log_, "r", encoding="utf-8") as file:
+            for line in file.readlines():
+                file_text += line
+
+        tc_spec = "INFO ; Traffic Class specification"
+        assert file_text.count(tc_spec) > 1
+
+        tc_graph = "INFO ; {'car': {'Graph': \"{'Mode': 'c', 'Block through centroids': False, 'Number of centroids': 24, 'Links': 76, 'Nodes': 24}\","
+        assert file_text.count(tc_graph) > 1
+
+        tc_matrix = "'Number of centroids': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
+        assert file_text.count(tc_matrix) > 1
+
+        assig_1 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, 'Target RGAP': 0.0001}}".format(
+            num_cores
+        )
+        assert assig_1 in file_text
+
+        assig_2 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_2 in file_text
+
+        assig_3 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'frank-wolfe', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_3 in file_text
+
+        assig_4 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'cfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_4 in file_text
+
+        assig_5 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'bfw', 'Maximum iterations': 500, 'Target RGAP': 0.001}}".format(
+            num_cores
+        )
+        assert assig_5 in file_text
+
     def test_execute_no_project(self, project: Project, assignment: TrafficAssignment, assigclass: TrafficClass):
-        conn = sqlite3.connect(os.path.join(siouxfalls_project, "project_database.sqlite"))
+        conn = sqlite3.connect(join(siouxfalls_project, "project_database.sqlite"))
         results = pd.read_sql("select volume from links order by link_id", conn)
 
         project.close()
