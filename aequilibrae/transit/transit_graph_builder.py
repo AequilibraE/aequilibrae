@@ -98,19 +98,42 @@ class SF_graph_builder:
         )
         routes["line_id"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
-        self.compute_mean_travel_time()
+        self.add_mean_travel_time_to_segments()
+        self.add_mean_headway_to_segments()
 
-    def compute_mean_travel_time(self):
-        # Compute the travel time for each trip segment
+    def add_mean_travel_time_to_segments(self):
+        # Compute the travel time for each trip segment (within the time range)
         sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
         tt = pd.read_sql(sql, self.pt_conn)
-        tt.sort_values(by=["trip_id", "seq"], ascending=True, inplace=True)
+
+        # merge the trips schedules with pattern ids
+        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
+        tt = pd.merge(tt, trips, on=["trip_id"], how="left")
+        tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
         tt["last_departure"] = tt["departure"].shift(1)
         tt["last_departure"] = tt["last_departure"].fillna(0.0)
         tt["travel_time"] = tt["arrival"] - tt["last_departure"]
         tt.loc[tt.seq == 0, "travel_time"] = 0.0
+        tt.loc[tt.travel_time < 0, "travel_time"] = np.nan
         tt.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
+
+        # Compute the travel time for each trip segment
+        sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
+        tt_full = pd.read_sql(sql, self.pt_conn)
+
+        # merge the trips schedules with pattern ids (without any time range)
+        tt_full = pd.merge(tt_full, trips, on=["trip_id"], how="left")
+        tt_full.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
+        tt_full["last_departure"] = tt_full["departure"].shift(1)
+        tt_full["last_departure"] = tt_full["last_departure"].fillna(0.0)
+        tt_full["travel_time"] = tt_full["arrival"] - tt_full["last_departure"]
+        tt_full.loc[tt_full.seq == 0, "travel_time"] = 0.0
+        tt_full.loc[tt_full.travel_time < 0, "travel_time"] = np.nan
+        tt_full.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
+
+        # fill the nan of the travel time computed with the time range constraint
+        tt.update(tt_full)
 
         # tt.seq refers to the stop sequence index
         # Because we computed the travel time between two stops, we are now dealing
@@ -120,15 +143,15 @@ class SF_graph_builder:
 
         # Merge pattern ids with trip_id
         trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
-        tt = pd.merge(tt, trips, on="trip_id", how="left")
-        tt.drop("trip_id", axis=1, inplace=True)
+        tt = pd.merge(tt, trips, on=["pattern_id", "trip_id"], how="left")
+
+        # take the min of the travel times computed among the trips of a pattern segment
+        tt = tt[["pattern_id", "seq", "travel_time"]].groupby(["pattern_id", "seq"]).min().reset_index(drop=False)
 
         # Compute the mean travel time from the different trips corresponding to
-        # a given pattern/segment couple
-        tt = tt.groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
 
-    def compute_mean_headway(self):
+    def add_mean_headway_to_segments(self):
         # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
@@ -179,9 +202,13 @@ class SF_graph_builder:
         mh.loc[(mh["trip_count"] > 1) & (mh["trip_idx"] == 0), "headway"] = np.nan
         mh["headway"] = mh["headway"].fillna(method="bfill")
 
-        # take the min of a pattern headways (among the headways computed for all stops of the pattern)
-        mh = mh[["pattern_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
-        self.mean_headway = mh
+        # take the min of the headways computed among the stops of a given trip
+        mh = mh[["pattern_id", "trip_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
+
+        # compute the mean headway computed among the trips of a given pattern
+        mh = mh[["pattern_id", "headway"]].groupby("pattern_id").mean().reset_index(drop=False)
+
+        self.line_segments = pd.merge(self.line_segments, mh, on=["pattern_id"], how="left")
 
     def create_stop_vertices(self):
         # select all stops
