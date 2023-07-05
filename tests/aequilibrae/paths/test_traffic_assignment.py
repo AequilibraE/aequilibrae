@@ -279,7 +279,7 @@ class TestTrafficAssignment:
         tc_graph = "INFO ; {'car': {'Graph': \"{'Mode': 'c', 'Block through centroids': False, 'Number of centroids': 24, 'Links': 76, 'Nodes': 24}\","
         assert file_text.count(tc_graph) > 1
 
-        tc_matrix = "'Number of centroids': 24, 'Nodes': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
+        tc_matrix = "'Number of centroids': 24, 'Matrix cores': ['matrix'], 'Matrix totals': {'matrix': 360600.0}}\"}}"
         assert file_text.count(tc_matrix) > 1
 
         assig_1 = "INFO ; {{'VDF parameters': {{'alpha': 'b', 'beta': 'power'}}, 'VDF function': 'bpr', 'Number of cores': {}, 'Capacity field': 'capacity', 'Time field': 'free_flow_time', 'Algorithm': 'msa', 'Maximum iterations': 10, 'Target RGAP': 0.0001}}".format(
