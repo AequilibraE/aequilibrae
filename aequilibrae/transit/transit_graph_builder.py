@@ -15,6 +15,7 @@ class SF_graph_builder:
     ASSUMPIONS:
     - trips dir is always 0: opposite directions are not supported
     - all times are expressed in seconds [s], all frequencies in [1/s]
+    - headways are uniform for trips of the same pattern
 
     TODO:
     - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
@@ -101,6 +102,12 @@ class SF_graph_builder:
 
         self.add_mean_travel_time_to_segments()
         self.add_mean_headway_to_segments()
+
+        # compute the frequency
+        self.line_segments["freq"] = np.inf
+        self.line_segments.loc[self.line_segments.headway > 0.0, "freq"] = (
+            1.0 / self.line_segments.loc[self.line_segments.headway > 0.0, "headway"]
+        )
 
     def compute_segment_travel_time(self, time_range=True):
         if time_range:
@@ -321,7 +328,7 @@ class SF_graph_builder:
         self.on_board_edges["transfer_id"] = None
 
     def create_boarding_edges(self):
-        self.boarding_edges = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
+        self.boarding_edges = self.line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
         self.boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (stop vertex)
@@ -342,7 +349,16 @@ class SF_graph_builder:
         )
         self.boarding_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
-        # get edge frequency
+        # frequency update : line_freq / wait_time_factor
+        wait_time_factor_inv = 1.0 / self.wait_time_factor
+        self.boarding_edges["freq"] *= wait_time_factor_inv
+
+        # uniform attributes
+        self.boarding_edges["type"] = "boarding"
+        self.boarding_edges["trav_time"] = 0.5 * self.uniform_dwell_time + self.a_tiny_time_duration
+        self.boarding_edges["o_line_id"] = None
+        self.boarding_edges["d_line_id"] = None
+        self.boarding_edges["transfer_id"] = None
 
     def create_alighting_edges(self):
         self.alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
