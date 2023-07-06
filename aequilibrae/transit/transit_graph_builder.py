@@ -23,7 +23,17 @@ class SF_graph_builder:
       package guideline (without explicit public_transport_conn and project_conn)
     """
 
-    def __init__(self, public_transport_conn, project_conn, start=61200, end=64800, margin=0, num_threads=-1):
+    def __init__(
+        self,
+        public_transport_conn,
+        project_conn,
+        start=61200,
+        end=64800,
+        margin=0,
+        global_crs="EPSG:4326",
+        projected_crs="EPSG:2154",
+        num_threads=-1,
+    ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
         e.g. 6am is 21600.
@@ -65,7 +75,8 @@ class SF_graph_builder:
         self.alighting_edges = None
         self.boarding_edges = None
 
-        self.global_crs = "EPSG:4326"
+        self.global_crs = global_crs
+        self.projected_crs = projected_crs
 
         # edge weight parameters
         self.uniform_dwell_time = 30
@@ -448,7 +459,7 @@ class SF_graph_builder:
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
         transformer = pyproj.Transformer.from_crs(
-            pyproj.CRS("EPSG:4326"), pyproj.CRS(self.global_crs), always_xy=True
+            pyproj.CRS(self.global_crs), pyproj.CRS(self.projected_crs), always_xy=True
         ).transform
 
         od_coords = self.od_vertices["coord"].apply(
