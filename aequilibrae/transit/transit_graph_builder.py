@@ -66,7 +66,7 @@ class SF_graph_builder:
     def create_line_segments(self):
         # trip ids corresponding to the given time range
         sql = f"""SELECT DISTINCT trip_id FROM trips_schedule 
-        WHERE arrival>={self.start} AND departure<={self.end}"""
+        WHERE departure>={self.start} AND arrival<={self.end}"""
         self.trip_ids = pd.read_sql(
             sql,
             self.pt_conn,
@@ -98,58 +98,53 @@ class SF_graph_builder:
         )
         routes["line_id"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
+
         self.add_mean_travel_time_to_segments()
         self.add_mean_headway_to_segments()
 
-    def add_mean_travel_time_to_segments(self):
-        # Compute the travel time for each trip segment (within the time range)
-        sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
-            WHERE departure>={self.start} AND arrival<={self.end}"""
+    def compute_segment_travel_time(self, time_range=True):
+        if time_range:
+            sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
+                WHERE departure>={self.start} AND arrival<={self.end}"""
+        else:
+            sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
         tt = pd.read_sql(sql, self.pt_conn)
 
         # merge the trips schedules with pattern ids
         trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
         tt = pd.merge(tt, trips, on=["trip_id"], how="left")
+
+        # compute the travel time on the segments
         tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
-        tt["last_departure"] = tt["departure"].shift(1)
-        tt["last_departure"] = tt["last_departure"].fillna(0.0)
+        tt["last_departure"] = tt["departure"].shift(+1)
+        tt["last_trip_id"] = tt["trip_id"].shift(+1)
+        tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
         tt["travel_time"] = tt["arrival"] - tt["last_departure"]
-        tt.loc[tt.seq == 0, "travel_time"] = 0.0
-        tt.loc[tt.travel_time < 0, "travel_time"] = np.nan
-        tt.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
+        tt.loc[tt.seq == 0, "travel_time"] = np.nan
+        tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "travel_time"] = np.nan
 
-        # Compute the travel time for each trip segment
-        sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
-        tt_full = pd.read_sql(sql, self.pt_conn)
-
-        # merge the trips schedules with pattern ids (without any time range)
-        tt_full = pd.merge(tt_full, trips, on=["trip_id"], how="left")
-        tt_full.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
-        tt_full["last_departure"] = tt_full["departure"].shift(1)
-        tt_full["last_departure"] = tt_full["last_departure"].fillna(0.0)
-        tt_full["travel_time"] = tt_full["arrival"] - tt_full["last_departure"]
-        tt_full.loc[tt_full.seq == 0, "travel_time"] = 0.0
-        tt_full.loc[tt_full.travel_time < 0, "travel_time"] = np.nan
-        tt_full.drop(["arrival", "departure", "last_departure"], axis=1, inplace=True)
-
-        # fill the nan of the travel time computed with the time range constraint
-        tt.update(tt_full)
-
-        # tt.seq refers to the stop sequence index
+        # tt.seq refers to the stop sequence index.
         # Because we computed the travel time between two stops, we are now dealing
         # with a segment sequence index.
         tt = tt.loc[tt.seq > 0]
         tt.seq -= 1
 
-        # Merge pattern ids with trip_id
-        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
-        tt = pd.merge(tt, trips, on=["pattern_id", "trip_id"], how="left")
-
         # take the min of the travel times computed among the trips of a pattern segment
-        tt = tt[["pattern_id", "seq", "travel_time"]].groupby(["pattern_id", "seq"]).min().reset_index(drop=False)
+        tt = tt[["pattern_id", "seq", "travel_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
+
+        return tt
+
+    def add_mean_travel_time_to_segments(self):
+        tt = self.compute_segment_travel_time(time_range=True)
+        tt_full = self.compute_segment_travel_time(time_range=False)
+        tt_full.rename(columns={"travel_time": "travel_time_full"}, inplace=True)
 
         # Compute the mean travel time from the different trips corresponding to
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
+        self.line_segments = pd.merge(self.line_segments, tt_full, on=["pattern_id", "seq"], how="left")
+        self.line_segments.travel_time = self.line_segments.travel_time.fillna(self.line_segments.travel_time_full)
+        self.line_segments.drop("travel_time_full", axis=1, inplace=True)
+        self.line_segments.travel_time = self.line_segments.travel_time.fillna(self.end - self.start)
 
     def add_mean_headway_to_segments(self):
         # start from the trip_schedule table
