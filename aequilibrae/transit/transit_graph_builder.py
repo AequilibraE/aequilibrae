@@ -119,9 +119,9 @@ class SF_graph_builder:
         tt["last_departure"] = tt["departure"].shift(+1)
         tt["last_trip_id"] = tt["trip_id"].shift(+1)
         tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
-        tt["travel_time"] = tt["arrival"] - tt["last_departure"]
-        tt.loc[tt.seq == 0, "travel_time"] = np.nan
-        tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "travel_time"] = np.nan
+        tt["trav_time"] = tt["arrival"] - tt["last_departure"]
+        tt.loc[tt.seq == 0, "trav_time"] = np.nan
+        tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
 
         # tt.seq refers to the stop sequence index.
         # Because we computed the travel time between two stops, we are now dealing
@@ -130,21 +130,21 @@ class SF_graph_builder:
         tt.seq -= 1
 
         # take the min of the travel times computed among the trips of a pattern segment
-        tt = tt[["pattern_id", "seq", "travel_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
+        tt = tt[["pattern_id", "seq", "trav_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
 
         return tt
 
     def add_mean_travel_time_to_segments(self):
         tt = self.compute_segment_travel_time(time_range=True)
         tt_full = self.compute_segment_travel_time(time_range=False)
-        tt_full.rename(columns={"travel_time": "travel_time_full"}, inplace=True)
+        tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
 
         # Compute the mean travel time from the different trips corresponding to
         self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
         self.line_segments = pd.merge(self.line_segments, tt_full, on=["pattern_id", "seq"], how="left")
-        self.line_segments.travel_time = self.line_segments.travel_time.fillna(self.line_segments.travel_time_full)
-        self.line_segments.drop("travel_time_full", axis=1, inplace=True)
-        self.line_segments.travel_time = self.line_segments.travel_time.fillna(self.end - self.start)
+        self.line_segments.trav_time = self.line_segments.trav_time.fillna(self.line_segments.trav_time_full)
+        self.line_segments.drop("trav_time_full", axis=1, inplace=True)
+        self.line_segments.trav_time = self.line_segments.trav_time.fillna(self.end - self.start)
 
     def add_mean_headway_to_segments(self):
         # start from the trip_schedule table
@@ -291,8 +291,8 @@ class SF_graph_builder:
         self.vertices = self.vertices[self.vertex_cols]
 
     def create_on_board_edges(self):
-        self.on_board_edges = self.line_segments[["line_id", "seq", "travel_time"]].copy(deep=True)
-        self.on_board_edges.rename(columns={"seq": "line_seg_idx", "travel_time": "trav_time"}, inplace=True)
+        self.on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
+        self.on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # get tail vertex index
         self.on_board_edges = pd.merge(
