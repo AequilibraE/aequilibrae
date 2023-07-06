@@ -41,6 +41,19 @@ class SF_graph_builder:
         self.num_threads = num_threads
 
         self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
+        self.edges_cols = [
+            "type",
+            "line_id",
+            "stop_id",
+            "line_seg_idx",
+            "tail_vert_id",
+            "head_vert_id",
+            "trav_time",
+            "freq",
+            "o_line_id",
+            "d_line_id",
+            "transfer_id",
+        ]
 
         self.line_segments = None
         self.stop_vertices = None
@@ -51,7 +64,6 @@ class SF_graph_builder:
         self.dell_edges = None
         self.alighting_edges = None
         self.boarding_edges = None
-        self.mean_headway = None
 
         self.global_crs = "EPSG:4326"
 
@@ -547,3 +559,22 @@ class SF_graph_builder:
         self.create_dwell_edges()
         self.create_boarding_edges()
         self.create_alighting_edges()
+
+        # stack the dataframes on top of each other
+        self.edges = pd.concat(
+            [
+                self.on_board_edges,
+                self.boarding_edges,
+                self.alighting_edges,
+                self.dwell_edges,
+            ],
+            axis=0,
+        )
+        self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
+
+        # reset index and copy it to column
+        self.edges.reset_index(drop=True, inplace=True)
+        self.edges.index.name = "index"
+        self.edges["edge_id"] = self.edges.index
+
+        self.edges = self.edges[self.edges_cols]
