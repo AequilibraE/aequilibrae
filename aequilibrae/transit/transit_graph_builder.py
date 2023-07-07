@@ -6,7 +6,7 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
-from scipy.spatial import cKDTree
+from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
 
 
@@ -169,7 +169,7 @@ class SF_graph_builder:
                 ON trips_schedule.trip_id = trips.trip_id
                 WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
         else:
-            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
+            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
         tt = pd.read_sql(sql, self.pt_conn)
@@ -522,67 +522,106 @@ class SF_graph_builder:
 
         self.dwell_edges = dwell_edges
 
-    def create_connector_edges(self):
-        """Create the connector edges between each stop and the closest od."""
+    def create_connector_edges(self, method="overlapping regions"):
+        """
+        Create the connector edges between each stops and ODs.
 
-        # Select/copy the od vertices and project their coordinates
-        od_vertices = self.vertices[self.vertices.type == "od"][["vert_id", "taz_id", "coord"]].copy(deep=True)
-        od_coords = od_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
+        Nearest neighbour: Creates edges between every stop and its nearest OD.
+
+        Overlapping regions: Creates edges between all stops that lying within the circle
+            centered each OD whose radius is the distance to the other nearest OD."""
+        assert method in ["overlapping regions", "nearest neighbour"]
+
+        transformer = pyproj.Transformer.from_crs(
+            pyproj.CRS(self.global_crs), pyproj.CRS(self.projected_crs), always_xy=True
+        ).transform
+
+        ods = self.vertices[self.vertices["type"] == "od"].reset_index(drop=True)
+        od_coords = ods["coord"].apply(
+            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
         )
         od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
 
-        # Select/copy the stop vertices and project their coordinates
-        stop_vertices = self.vertices[self.vertices.type == "stop"][["vert_id", "stop_id", "coord"]].copy(deep=True)
-        stop_coords = stop_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
+        stops = self.vertices[self.vertices["type"] == "stop"].reset_index(drop=True)
+        stop_coords = stops["coord"].apply(
+            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
         )
         stop_coords = np.array(list(stop_coords.apply(lambda coord: (coord.x, coord.y))))
 
-        # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
         kdTree = cKDTree(od_coords)
-        distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=np.inf, workers=self.num_threads)
-        nearest_od = od_vertices.iloc[index][["vert_id", "taz_id"]].reset_index(drop=True)
-        trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
 
-        # access connectors
-        access_connector_edges = pd.concat(
+        if method == "nearest neighbour":
+            # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
+            distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=np.inf, workers=self.num_threads)
+            nearest_od = ods.iloc[index]["taz_id"].reset_index(drop=True)
+            trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
+            self.connector_edges = pd.concat(
+                [
+                    stops["vert_id"].reset_index(drop=True).rename("head_vert_id"),
+                    nearest_od.rename("tail_vert_id"),
+                    trav_time,
+                ],
+                axis=1,
+            )
+
+        elif method == "overlapping regions":
+            # Construct a kdtree so we can lookup the 2nd closest OD to each OD (the first being itself)
+            distance, _ = kdTree.query(od_coords, k=[2], workers=self.num_threads)
+            distance = distance.reshape(-1)
+
+            # Construct a kdtree so we can query all the stops within the radius around each OD
+            stop_kdTree = cKDTree(stop_coords)
+            results = stop_kdTree.query_ball_point(od_coords, distance, workers=self.num_threads)
+
+            # Build up a list of dataframes to concat, each dataframe corrosponds to all connectors for a given OD
+            connectors = []
+            for i, verts in enumerate(results):
+                distance = minkowski_distance(od_coords[i], stop_coords[verts])
+                df = stops["vert_id"].iloc[verts].to_frame()
+                df["head_vert_id"] = ods.iloc[i]["vert_id"]
+                df["trav_time"] = distance * self.walking_speed
+
+                connectors.append(df)
+
+            self.connector_edges = pd.concat(connectors).rename(columns={"vert_id": "tail_vert_id"}).reset_index(drop=True)
+
+            # Now we need to build up the edges for the stops without connectors, something is going wrong here FIXME
+            missing = stops["vert_id"].isin(self.connector_edges["tail_vert_id"])
+            missing = missing[~missing].index
+
+            distance, index = kdTree.query(stop_coords[missing], k=1, distance_upper_bound=np.inf, workers=self.num_threads)
+            nearest_od = ods.iloc[index]["taz_id"].reset_index(drop=True)
+            trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
+            missing_edges = pd.concat(
+                [
+                    pd.Series(missing, name="head_vert_id"),
+                    nearest_od.rename("tail_vert_id"),
+                    trav_time,
+                ],
+                axis=1
+            )
+
+            self.connector_edges = pd.concat([self.connector_edges, missing_edges])
+
+        # Duplicate all edges because they are not bidirectional
+        self.connector_edges = pd.concat(
             [
-                stop_vertices[["stop_id", "vert_id"]]
-                .reset_index(drop=True)
-                .rename(columns={"vert_id": "head_vert_id"}),
-                nearest_od.rename(columns={"vert_id": "tail_vert_id"}),
-                trav_time,
+                self.connector_edges,
+                self.connector_edges.rename(
+                    columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, copy=False
+                ),
             ],
-            axis=1,
-        )
-        # uniform values
-        access_connector_edges["type"] = "access_connector"
-        access_connector_edges["line_seg_idx"] = np.nan
-        access_connector_edges["freq"] = np.inf
-        access_connector_edges["o_line_id"] = None
-        access_connector_edges["d_line_id"] = None
-        access_connector_edges["transfer_id"] = None
-
-        # egress connectors
-        egress_connector_edges = access_connector_edges.copy(deep=True)
-        egress_connector_edges.rename(
-            columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, inplace=True
-        )
+            copy=True,
+        ).reset_index(drop=True)
 
         # uniform values
-        egress_connector_edges["type"] = "egress_connector"
-        egress_connector_edges["line_seg_idx"] = np.nan
-        egress_connector_edges["freq"] = np.inf
-        egress_connector_edges["o_line_id"] = None
-        egress_connector_edges["d_line_id"] = None
-        egress_connector_edges["transfer_id"] = None
-
-        # travel time update
-        access_connector_edges.trav_time *= self.access_time_factor
-        egress_connector_edges.trav_time *= self.egress_time_factor
-
-        self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
+        self.connector_edges["type"] = "connector"
+        self.connector_edges["stop_id"] = None
+        self.connector_edges["line_seg_idx"] = None
+        self.connector_edges["freq"] = np.inf
+        self.connector_edges["o_line_id"] = None
+        self.connector_edges["d_line_id"] = None
+        self.connector_edges["transfer_id"] = None
 
     def create_inner_stop_transfer_edges(self):
         alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]].rename(
