@@ -81,11 +81,11 @@ class SF_graph_builder:
         # edge weight parameters
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
-        self.inf_freq = 1.0e20  # max frequency
-        self.min_freq = 1.0 / self.inf_freq  # smallest frequency
         self.a_tiny_time_duration = 1.0e-08
         self.wait_time_factor = 2.0
         self.walking_speed = 1.0
+        self.access_time_factor = 1.0
+        self.egress_time_factor = 1.0
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -192,7 +192,7 @@ class SF_graph_builder:
         trip_count = mh.groupby(["pattern_id", "seq"]).size().to_frame("trip_count")
         mh = pd.merge(mh, trip_count, on=["pattern_id", "seq"], how="left")
 
-        # compute the trip index for a given pattern & stop
+        # compute the trip index for a given couple pattern & stop
         trip_id_last = -1
         seq_last = -1
         pattern_id_last = -1
@@ -458,54 +458,70 @@ class SF_graph_builder:
 
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
+
+        # longlat to projected CRS transfromer
         transformer = pyproj.Transformer.from_crs(
             pyproj.CRS(self.global_crs), pyproj.CRS(self.projected_crs), always_xy=True
         ).transform
 
-        od_coords = self.od_vertices["coord"].apply(
+        # Select/copy the od vertices and project their coordinates
+        od_vertices = self.vertices[self.vertices.type == "od"][["vert_id", "taz_id", "coord"]].copy(deep=True)
+        od_coords = od_vertices["coord"].apply(
             lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
         )
         od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
 
-        stop_coords = self.stop_vertices["coord"].apply(
+        # Select/copy the stop vertices and project their coordinates
+        stop_vertices = self.vertices[self.vertices.type == "stop"][["vert_id", "stop_id", "coord"]].copy(deep=True)
+        stop_coords = stop_vertices["coord"].apply(
             lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
         )
         stop_coords = np.array(list(stop_coords.apply(lambda coord: (coord.x, coord.y))))
 
-        kdTree = cKDTree(od_coords)
-
         # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
+        kdTree = cKDTree(od_coords)
         distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=np.inf, workers=self.num_threads)
-        nearest_od = self.od_vertices.iloc[index]["node_id"].reset_index(drop=True)
+        nearest_od = od_vertices.iloc[index][["vert_id", "taz_id"]].reset_index(drop=True)
         trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
-        self.connector_edges = pd.concat(
+
+        # access connectors
+        access_connector_edges = pd.concat(
             [
-                self.stop_vertices["stop_id"].reset_index(drop=True).rename("head_vert_id"),
-                nearest_od.rename("tail_vert_id"),
+                stop_vertices[["stop_id", "vert_id"]]
+                .reset_index(drop=True)
+                .rename(columns={"vert_id": "head_vert_id"}),
+                nearest_od.rename(columns={"vert_id": "tail_vert_id"}),
                 trav_time,
             ],
             axis=1,
         )
+        # uniform values
+        access_connector_edges["type"] = "connector"
+        access_connector_edges["line_seg_idx"] = np.nan
+        access_connector_edges["freq"] = np.inf
+        access_connector_edges["o_line_id"] = None
+        access_connector_edges["d_line_id"] = None
+        access_connector_edges["transfer_id"] = None
 
-        self.connector_edges = pd.concat(
-            [
-                graph.connector_edges,
-                graph.connector_edges.rename(
-                    columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, copy=False
-                ),
-            ],
-            copy=True,
-        ).reset_index(drop=True)
+        # egress connectors
+        egress_connector_edges = access_connector_edges.copy(deep=True)
+        egress_connector_edges.rename(
+            columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, inplace=True
+        )
 
-        self.connector_edges["type"] = "connector"
-        self.connector_edges["stop_id"] = None
-        self.connector_edges["line_seg_idx"] = None
-        self.connector_edges["freq"] = np.inf
-        self.connector_edges["o_line_id"] = None
-        self.connector_edges["d_line_id"] = None
-        self.connector_edges["transfer_id"] = None
+        # uniform values
+        egress_connector_edges["type"] = "connector"
+        egress_connector_edges["line_seg_idx"] = np.nan
+        egress_connector_edges["freq"] = np.inf
+        egress_connector_edges["o_line_id"] = None
+        egress_connector_edges["d_line_id"] = None
+        egress_connector_edges["transfer_id"] = None
 
-        return self.connector_edges
+        # travel time update
+        access_connector_edges.trav_time *= self.access_time_factor
+        egress_connector_edges.trav_time *= self.egress_time_factor
+
+        self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
     def create_inner_stop_transfer_edges(self):
         stations = graph.stop_vertices[["stop_id", "parent_station"]]
@@ -570,15 +586,11 @@ class SF_graph_builder:
         self.create_dwell_edges()
         self.create_boarding_edges()
         self.create_alighting_edges()
+        self.create_connector_edges()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
-            [
-                self.on_board_edges,
-                self.boarding_edges,
-                self.alighting_edges,
-                self.dwell_edges,
-            ],
+            [self.on_board_edges, self.boarding_edges, self.alighting_edges, self.dwell_edges, self.connector_edges],
             axis=0,
         )
         self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
