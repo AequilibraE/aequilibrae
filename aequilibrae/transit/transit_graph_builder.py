@@ -134,15 +134,11 @@ class SF_graph_builder:
 
     def compute_segment_travel_time(self, time_filter=True):
         if time_filter:
-            # sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
-            #     WHERE departure>={self.start} AND arrival<={self.end}"""
-
             sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id
                 WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
         else:
-            # sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
             sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
