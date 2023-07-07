@@ -524,42 +524,73 @@ class SF_graph_builder:
         self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
     def create_inner_stop_transfer_edges(self):
-        stations = graph.stop_vertices[["stop_id", "parent_station"]]
-        boarding = stations[stations["stop_id"].isin(graph.boarding_vertices["stop_id"])]
-        alighting = stations[stations["stop_id"].isin(graph.alighting_vertices["stop_id"])]
-        boarding_by_station = boarding.groupby(by="parent_station")
-        alighting_by_station = alighting.groupby(by="parent_station")
+        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id"]].rename(
+            columns={"line_id": "o_line_id"}
+        )
+        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id"]].rename(
+            columns={"line_id": "d_line_id"}
+        )
+        inner_stop_transfer_edges = pd.merge(alighting, boarding, on="stop_id", how="inner")
 
-        dwells = []
-        transfers = []
-        for station in np.intersect1d(boarding["parent_station"].values, alighting["parent_station"].values):
-            boarding_stops = boarding_by_station.get_group(station)["stop_id"]
-            alighting_stops = alighting_by_station.get_group(station)["stop_id"]
+        # remove entries that have the same line as origin and destination
+        inner_stop_transfer_edges = inner_stop_transfer_edges.loc[
+            inner_stop_transfer_edges["o_line_id"] != inner_stop_transfer_edges["d_line_id"]
+        ]
 
-            for boarding_stop in boarding_stops:
-                for alighting_stop in alighting_stops:
-                    if boarding_stop == alighting_stop:
-                        dwells.append([boarding_stop, alighting_stop, station])
-                    else:
-                        transfers.append([boarding_stop, alighting_stop, station])
+        # get tail vertex index (alighting vertex)
+        inner_stop_transfer_edges = pd.merge(
+            inner_stop_transfer_edges,
+            self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]],
+            left_on=["o_line_id", "stop_id"],
+            right_on=["line_id", "stop_id"],
+            how="inner",
+        )
+        inner_stop_transfer_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        inner_stop_transfer_edges.drop(["line_id"], axis=1, inplace=True)
 
-        self.dwell_edges = pd.DataFrame(dwells, columns=["head_vert_id", "tail_vert_id", "station"])
-        self.inner_transfer_edges = pd.DataFrame(transfers, columns=["head_vert_id", "tail_vert_id", "station"])
-        # self.inner_transfer_edges["type"] = "transfer"
-        # self.inner_transfer_edges["stop_id"] = None
-        # self.inner_transfer_edges["line_seg_idx"] = None
-        # # self.inner_transfer_edges["freq"] = np.inf
-        # self.inner_transfer_edges["o_line_id"] = None
-        # self.inner_transfer_edges["d_line_id"] = None
-        # self.inner_transfer_edges["transfer_id"] = None
+        # get head vertex index (boarding vertex)
+        inner_stop_transfer_edges = pd.merge(
+            inner_stop_transfer_edges,
+            self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id"]],
+            left_on=["d_line_id", "stop_id"],
+            right_on=["line_id", "stop_id"],
+            how="inner",
+        )
+        inner_stop_transfer_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        inner_stop_transfer_edges.drop(["line_id"], axis=1, inplace=True)
 
-        return self.inner_transfer_edges, self.dwell_edges
+        # update the transfer edge frequency
+        inner_stop_transfer_edges = pd.merge(
+            inner_stop_transfer_edges,
+            self.line_segments[["from_stop", "line_id", "freq"]],
+            left_on=["stop_id", "d_line_id"],
+            right_on=["from_stop", "line_id"],
+            how="left",
+        )
+        inner_stop_transfer_edges.drop(["from_stop", "line_id"], axis=1, inplace=True)
+
+        # uniform attributes
+        inner_stop_transfer_edges["line_id"] = None
+        inner_stop_transfer_edges["line_seg_idx"] = np.nan
+        inner_stop_transfer_edges["type"] = "transfer"
+        inner_stop_transfer_edges["transfer_id"] = None
+
+        # frequency update : line_freq / wait_time_factor
+        wait_time_factor_inv = 1.0 / self.wait_time_factor
+        inner_stop_transfer_edges["freq"] *= wait_time_factor_inv
+
+        # travel time update : dwell_time + alighting_penalty
+        inner_stop_transfer_edges["trav_time"] = self.uniform_dwell_time + self.alighting_penalty
+
+        self.inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
         pass
 
     def create_transfer_edges(self):
-        pass
+        self.create_inner_stop_transfer_edges()
+
+        self.transfer_edges = self.inner_stop_transfer_edges
 
     def create_walking_edges(self):
         pass
@@ -587,10 +618,18 @@ class SF_graph_builder:
         self.create_boarding_edges()
         self.create_alighting_edges()
         self.create_connector_edges()
+        self.create_transfer_edges()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
-            [self.on_board_edges, self.boarding_edges, self.alighting_edges, self.dwell_edges, self.connector_edges],
+            [
+                self.on_board_edges,
+                self.boarding_edges,
+                self.alighting_edges,
+                self.dwell_edges,
+                self.connector_edges,
+                self.transfer_edges,
+            ],
             axis=0,
         )
         self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
