@@ -132,17 +132,21 @@ class SF_graph_builder:
             1.0 / self.line_segments.loc[self.line_segments.headway > 0.0, "headway"]
         )
 
-    def compute_segment_travel_time(self, time_range=True):
-        if time_range:
-            sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
-                WHERE departure>={self.start} AND arrival<={self.end}"""
-        else:
-            sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
-        tt = pd.read_sql(sql, self.pt_conn)
+    def compute_segment_travel_time(self, time_filter=True):
+        if time_filter:
+            # sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule
+            #     WHERE departure>={self.start} AND arrival<={self.end}"""
 
-        # merge the trips schedules with pattern ids
-        trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
-        tt = pd.merge(tt, trips, on=["trip_id"], how="left")
+            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
+                trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
+                ON trips_schedule.trip_id = trips.trip_id
+                WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
+        else:
+            # sql = f"""SELECT trip_id, seq, arrival, departure FROM trips_schedule"""
+            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
+                trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
+                ON trips_schedule.trip_id = trips.trip_id"""
+        tt = pd.read_sql(sql, self.pt_conn)
 
         # compute the travel time on the segments
         tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
@@ -165,8 +169,8 @@ class SF_graph_builder:
         return tt
 
     def add_mean_travel_time_to_segments(self):
-        tt = self.compute_segment_travel_time(time_range=True)
-        tt_full = self.compute_segment_travel_time(time_range=False)
+        tt = self.compute_segment_travel_time(time_filter=True)
+        tt_full = self.compute_segment_travel_time(time_filter=False)
         tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
 
         # Compute the mean travel time from the different trips corresponding to
