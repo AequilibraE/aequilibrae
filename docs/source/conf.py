@@ -74,12 +74,12 @@ sphinx_gallery_conf = {
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     'capture_repr': ('_repr_html_', '__repr__'),
     'remove_config_comments': True,
-    "plot_gallery": False,
     "subsection_order": ExplicitOrder(["examples/creating_models",
                                       "examples/editing_networks",
                                       "examples/trip_distribution",
                                       "examples/visualization",
                                       "examples/aequilibrae_without_a_model",
+                                      "examples/full_workflows",
                                       "examples/other_applications"])
 }
 

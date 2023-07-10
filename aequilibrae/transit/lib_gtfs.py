@@ -218,7 +218,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
         self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
-        self.signal.emit(["start", "master", self.day, self.__mt])
+        self.signal.emit(["start", "master", 1, self.day, self.__mt])
 
         self.save_to_disk()
 

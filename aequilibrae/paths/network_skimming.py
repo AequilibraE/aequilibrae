@@ -1,14 +1,16 @@
+import importlib.util as iutil
+import multiprocessing as mp
 import sys
 import threading
-import importlib.util as iutil
-from uuid import uuid4
-from multiprocessing.dummy import Pool as ThreadPool
 from datetime import datetime
+from multiprocessing.dummy import Pool as ThreadPool
+from uuid import uuid4
+
+from aequilibrae import global_logger
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 from aequilibrae.utils import WorkerThread
-from aequilibrae import global_logger
 
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
@@ -70,6 +72,7 @@ class NetworkSkimming(WorkerThread):
         self.project = project
         self.origins = origins
         self.graph = graph
+        self.cores = mp.cpu_count()
         self.results = SkimResults()
         self.aux_res = MultiThreadedNetworkSkimming()
         self.report = []
@@ -84,7 +87,7 @@ class NetworkSkimming(WorkerThread):
         """Runs the skimming process as specified in the graph"""
         if pyqt:
             self.skimming.emit(["zones finalized", 0])
-
+        self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
         self.aux_res.prepare(self.graph, self.results)
@@ -108,6 +111,32 @@ class NetworkSkimming(WorkerThread):
         if pyqt:
             self.skimming.emit(["text skimming", "Saving Outputs"])
             self.skimming.emit(["finished_threaded_procedure", None])
+
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
+        """
+
+        if isinstance(cores, int):
+            if cores < 0:
+                self.cores = max(1, mp.cpu_count() + cores)
+            if cores == 0:
+                self.cores = mp.cpu_count()
+            elif cores > 0:
+                cores = min(mp.cpu_count(), cores)
+                if self.cores != cores:
+                    self.cores = cores
+        else:
+            raise ValueError("Number of cores needs to be an integer")
 
     def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database

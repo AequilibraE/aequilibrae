@@ -48,39 +48,28 @@ class GMNSExporter(WorkerThread):
 
     def update_direction_field(self):
         two_way_cols = list(set([col[:-3] for col in list(self.links_df.columns) if col[-3:] in ["_ab", "_ba"]]))
-        for idx, row in self.links_df.iterrows():
-            if row.direction == 0:
-                self.links_df = pd.concat([self.links_df, self.links_df.loc[idx:idx, :]], axis=0)
-                self.links_df.reset_index(drop=True, inplace=True)
 
-                self.links_df.loc[self.links_df.index[-1], "link_id"] = max(list(self.links_df.link_id)) + 1
-                self.links_df.loc[self.links_df.index[-1], "a_node"] = row.b_node
-                self.links_df.loc[self.links_df.index[-1], "b_node"] = row.a_node
+        ab_links = pd.DataFrame(self.links_df[self.links_df.direction > -1], copy=True)
+        ba_links = pd.DataFrame(self.links_df[self.links_df.direction < 1], copy=True)
 
-                self.links_df.loc[self.links_df.index[-1], "direction"] = 1
-                self.links_df.loc[idx, "direction"] = 1
+        # treats ab_links and bi-directionals
+        if ab_links.shape[0]:
+            ab_links.loc[:, "dir_flag"] = 1
+            for col in two_way_cols:
+                ab_links.loc[:, col] = ab_links.loc[:, col + "_ab"]
 
-                self.links_df.loc[self.links_df.index[-1], "dir_flag"] = -1
-                self.links_df.loc[idx, "dir_flag"] = 1
+        # treats ba_links and bi-directionals
+        if ba_links.shape[0]:
+            ba_links.loc[:, "direction"] = 1
+            ba_links.loc[:, "dir_flag"] = -1
+            b = ba_links.b_node.to_numpy()
+            ba_links.loc[:, "b_node"] = ba_links.a_node.to_numpy()[:]
+            ba_links.loc[:, "a_node"] = b[:]
 
-                for col in two_way_cols:
-                    self.links_df.loc[idx, col] = self.links_df.loc[idx, col + "_ab"]
-                    self.links_df.loc[self.links_df.index[-1], col] = self.links_df.loc[idx, col + "_ba"]
+            for col in two_way_cols:
+                ba_links.loc[:, col] = ba_links.loc[:, col + "_ba"]
 
-            elif row.direction == -1:
-                for col in two_way_cols:
-                    self.links_df.loc[idx, col] = self.links_df.loc[idx, col + "_ba"]
-
-                self.links_df.loc[idx, "a_node"] = row.b_node
-                self.links_df.loc[idx, "b_node"] = row.a_node
-                self.links_df.loc[idx, "direction"] = 1
-                self.links_df.loc[idx, "dir_flag"] = -1
-
-            else:
-                for col in two_way_cols:
-                    self.links_df.loc[idx, col] = self.links_df.loc[idx, col + "_ab"]
-
-                self.links_df.loc[idx, "dir_flag"] = 1
+        self.links_df = pd.concat([ab_links, ba_links])
 
     def update_field_names(self):
         """
