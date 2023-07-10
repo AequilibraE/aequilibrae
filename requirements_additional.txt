@@ -1,3 +1,2 @@
 pyarrow
 PyQt5
-openmatrix
