@@ -10,6 +10,23 @@ import pyproj
 from scipy.spatial import cKDTree
 
 
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees)
+    """
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+
+    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
+
+    c = 2.0 * np.arcsin(np.sqrt(a))
+    distance_m = 6367000.0 * c
+    return distance_m
+
+
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
@@ -79,8 +96,10 @@ class SF_graph_builder:
         self.alighting_edges = None
         self.boarding_edges = None
 
-        self.global_crs = global_crs
-        self.projected_crs = projected_crs
+        # longlat to projected CRS transfromer
+        self.transformer = pyproj.Transformer.from_crs(
+            pyproj.CRS(global_crs), pyproj.CRS(projected_crs), always_xy=True
+        ).transform
 
         self.rng = np.random.default_rng(seed=seed)
         self.coord_noise = coord_noise
@@ -90,7 +109,8 @@ class SF_graph_builder:
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
         self.a_tiny_time_duration = 1.0e-08
-        self.wait_time_factor = 2.0
+        self.wait_time_factor = 1.0
+        self.walk_time_factor = 1.0
         self.walking_speed = 1.0
         self.access_time_factor = 1.0
         self.egress_time_factor = 1.0
@@ -491,22 +511,17 @@ class SF_graph_builder:
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
 
-        # longlat to projected CRS transfromer
-        transformer = pyproj.Transformer.from_crs(
-            pyproj.CRS(self.global_crs), pyproj.CRS(self.projected_crs), always_xy=True
-        ).transform
-
         # Select/copy the od vertices and project their coordinates
         od_vertices = self.vertices[self.vertices.type == "od"][["vert_id", "taz_id", "coord"]].copy(deep=True)
         od_coords = od_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
+            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
         )
         od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
 
         # Select/copy the stop vertices and project their coordinates
         stop_vertices = self.vertices[self.vertices.type == "stop"][["vert_id", "stop_id", "coord"]].copy(deep=True)
         stop_coords = stop_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(transformer, shapely.from_wkt(coord))
+            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
         )
         stop_coords = np.array(list(stop_coords.apply(lambda coord: (coord.x, coord.y))))
 
@@ -514,7 +529,7 @@ class SF_graph_builder:
         kdTree = cKDTree(od_coords)
         distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=np.inf, workers=self.num_threads)
         nearest_od = od_vertices.iloc[index][["vert_id", "taz_id"]].reset_index(drop=True)
-        trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
+        trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
 
         # access connectors
         access_connector_edges = pd.concat(
@@ -604,7 +619,7 @@ class SF_graph_builder:
         # uniform attributes
         inner_stop_transfer_edges["line_id"] = None
         inner_stop_transfer_edges["line_seg_idx"] = np.nan
-        inner_stop_transfer_edges["type"] = "transfer"
+        inner_stop_transfer_edges["type"] = "inner_transfer"
         inner_stop_transfer_edges["transfer_id"] = None
 
         # frequency update : line_freq / wait_time_factor
@@ -617,12 +632,96 @@ class SF_graph_builder:
         self.inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
-        pass
+        sql = "SELECT stop_id, parent_station FROM stops"
+        stops = pd.read_sql(sql, self.pt_conn)
+        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
-    def create_transfer_edges(self):
-        self.create_inner_stop_transfer_edges()
+        # we only keep the stations which contain at least 2 stops
+        stations = stations[stations["stop_count"] > 1]
+        station_list = stations["parent_station"].unique()
+        stops = stops[stops.parent_station.isin(station_list)]
 
-        self.transfer_edges = self.inner_stop_transfer_edges
+        # load the aligthing vertices (tail of transfer edges)
+        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id", "coord"]].rename(
+            columns={"line_id": "o_line_id", "coord": "o_coord", "vert_id": "tail_vert_id"}
+        )
+        # add the station id
+        alighting = pd.merge(alighting, stops, on="stop_id", how="inner")
+        alighting.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+
+        # load the boarding vertices (head of transfer edges)
+        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id", "coord"]].rename(
+            columns={"line_id": "d_line_id", "coord": "d_coord", "vert_id": "head_vert_id"}
+        )
+        # add the station id
+        boarding = pd.merge(boarding, stops, on="stop_id", how="inner")
+        boarding.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+
+        outer_stop_transfer_edges = pd.merge(alighting, boarding, on="parent_station", how="inner")
+        outer_stop_transfer_edges.drop("parent_station", axis=1, inplace=True)
+
+        outer_stop_transfer_edges.dropna(how="any", inplace=True)
+
+        # remove entries that share the same stop
+        outer_stop_transfer_edges = outer_stop_transfer_edges.loc[
+            outer_stop_transfer_edges["o_stop_id"] != outer_stop_transfer_edges["d_stop_id"]
+        ]
+
+        # remove entries that have the same line as origin and destination
+        outer_stop_transfer_edges = outer_stop_transfer_edges.loc[
+            outer_stop_transfer_edges["o_line_id"] != outer_stop_transfer_edges["d_line_id"]
+        ]
+
+        # update the transfer edge frequency
+        outer_stop_transfer_edges = pd.merge(
+            outer_stop_transfer_edges,
+            self.line_segments[["from_stop", "line_id", "freq"]],
+            left_on=["d_stop_id", "d_line_id"],
+            right_on=["from_stop", "line_id"],
+            how="left",
+        )
+        outer_stop_transfer_edges.drop(["o_stop_id", "d_stop_id", "from_stop", "line_id"], axis=1, inplace=True)
+
+        # uniform attributes
+        outer_stop_transfer_edges["line_id"] = None
+        outer_stop_transfer_edges["line_seg_idx"] = np.nan
+        outer_stop_transfer_edges["type"] = "outer_transfer"
+        outer_stop_transfer_edges["transfer_id"] = None
+
+        # frequency update : line_freq / wait_time_factor
+        wait_time_factor_inv = 1.0 / self.wait_time_factor
+        outer_stop_transfer_edges["freq"] *= wait_time_factor_inv
+
+        # compute the walking time
+        outer_stop_transfer_edges["o_coord_str"] = outer_stop_transfer_edges["o_coord"].str.extract(r"\((.*?)\)")
+        outer_stop_transfer_edges[["o_lon", "o_lat"]] = outer_stop_transfer_edges["o_coord_str"].str.split(
+            " ", expand=True
+        )
+        outer_stop_transfer_edges["d_coord_str"] = outer_stop_transfer_edges["d_coord"].str.extract(r"\((.*?)\)")
+        outer_stop_transfer_edges[["d_lon", "d_lat"]] = outer_stop_transfer_edges["d_coord_str"].str.split(
+            " ", expand=True
+        )
+        outer_stop_transfer_edges[["o_lon", "o_lat", "d_lon", "d_lat"]] = outer_stop_transfer_edges[
+            ["o_lon", "o_lat", "d_lon", "d_lat"]
+        ].astype(float)
+        outer_stop_transfer_edges["distance"] = haversine(
+            outer_stop_transfer_edges.o_lon.to_numpy(),
+            outer_stop_transfer_edges.o_lat.to_numpy(),
+            outer_stop_transfer_edges.d_lon.to_numpy(),
+            outer_stop_transfer_edges.d_lat.to_numpy(),
+        )
+        outer_stop_transfer_edges["trav_time"] = outer_stop_transfer_edges["distance"] / self.walking_speed
+        outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
+        outer_stop_transfer_edges["trav_time"] += self.uniform_dwell_time + self.alighting_penalty
+
+        # cleanup
+        outer_stop_transfer_edges.drop(
+            ["o_coord_str", "d_coord_str", "o_lon", "o_lat", "d_lon", "d_lat", "o_coord", "d_coord", "distance"],
+            axis=1,
+            inplace=True,
+        )
+
+        self.outer_stop_transfer_edges = outer_stop_transfer_edges
 
     def create_walking_edges(self):
         pass
@@ -631,7 +730,7 @@ class SF_graph_builder:
         """Graph edges creation as a dataframe.
 
         Edges have the following attributes:
-            - type (either 'on-board', 'boarding', 'alighting', 'dwell', 'transfer', 'connector' or 'walking'): str
+            - type (either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer', 'connector' or 'walking'): str
             - line_id (only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges): str
             - stop_id: str
             - line_seg_idx (only applies to 'on-board', 'boarding' and 'alighting' edges): int
@@ -650,7 +749,8 @@ class SF_graph_builder:
         self.create_boarding_edges()
         self.create_alighting_edges()
         self.create_connector_edges()
-        self.create_transfer_edges()
+        self.create_inner_stop_transfer_edges()
+        self.create_outer_stop_transfer_edges()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
@@ -660,7 +760,8 @@ class SF_graph_builder:
                 self.alighting_edges,
                 self.dwell_edges,
                 self.connector_edges,
-                self.transfer_edges,
+                self.inner_stop_transfer_edges,
+                self.outer_stop_transfer_edges,
             ],
             axis=0,
         )
