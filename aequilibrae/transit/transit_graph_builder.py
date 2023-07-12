@@ -109,7 +109,7 @@ class SF_graph_builder:
         # graph parameters
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
-        self.a_tiny_time_duration = 1.0e-08
+        self.a_tiny_time_duration = 1.0e-06
         self.wait_time_factor = 1.0
         self.walk_time_factor = 1.0
         self.walking_speed = 1.0
@@ -630,7 +630,7 @@ class SF_graph_builder:
 
         # we only keep the stations which contain at least 2 stops
         stations = stations[stations["stop_count"] > 1]
-        station_list = stations["parent_station"].unique()
+        station_list = stations["parent_station"].values
         stops = stops[stops.parent_station.isin(station_list)]
 
         # load the aligthing vertices (tail of transfer edges)
@@ -704,7 +704,7 @@ class SF_graph_builder:
         )
         outer_stop_transfer_edges["trav_time"] = outer_stop_transfer_edges["distance"] / self.walking_speed
         outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
-        outer_stop_transfer_edges["trav_time"] += self.uniform_dwell_time + self.alighting_penalty
+        outer_stop_transfer_edges["trav_time"] += self.alighting_penalty
 
         # cleanup
         outer_stop_transfer_edges.drop(
@@ -716,7 +716,68 @@ class SF_graph_builder:
         self.outer_stop_transfer_edges = outer_stop_transfer_edges
 
     def create_walking_edges(self):
-        pass
+        sql = "SELECT stop_id, parent_station FROM stops"
+        stops = pd.read_sql(sql, self.pt_conn)
+        stops.drop_duplicates(inplace=True)
+        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
+
+        # we only keep the stations which contain at least 2 stops
+        stations = stations[stations["stop_count"] > 1]
+        station_list = stations["parent_station"].values
+        stops = stops[stops.parent_station.isin(station_list)]
+
+        # tail vertex
+        o_walking = self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id", "coord"]].rename(
+            columns={"coord": "o_coord", "vert_id": "tail_vert_id"}
+        )
+        o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
+        o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+
+        # head vertex
+        d_walking = self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id", "coord"]].rename(
+            columns={"coord": "d_coord", "vert_id": "head_vert_id"}
+        )
+        d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
+        d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+
+        walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
+
+        # remove entries that share the same stop
+        walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
+        walking_edges.drop("parent_station", axis=1, inplace=True)
+
+        # uniform attributes
+        walking_edges["line_id"] = None
+        walking_edges["line_seg_idx"] = np.nan
+        walking_edges["type"] = "walking"
+        walking_edges["transfer_id"] = None
+        walking_edges["freq"] = np.inf
+
+        # compute the walking time
+        walking_edges["o_coord_str"] = walking_edges["o_coord"].str.extract(r"\((.*?)\)")
+        walking_edges[["o_lon", "o_lat"]] = walking_edges["o_coord_str"].str.split(" ", expand=True)
+        walking_edges["d_coord_str"] = walking_edges["d_coord"].str.extract(r"\((.*?)\)")
+        walking_edges[["d_lon", "d_lat"]] = walking_edges["d_coord_str"].str.split(" ", expand=True)
+        walking_edges[["o_lon", "o_lat", "d_lon", "d_lat"]] = walking_edges[
+            ["o_lon", "o_lat", "d_lon", "d_lat"]
+        ].astype(float)
+        walking_edges["distance"] = haversine(
+            walking_edges.o_lon.to_numpy(),
+            walking_edges.o_lat.to_numpy(),
+            walking_edges.d_lon.to_numpy(),
+            walking_edges.d_lat.to_numpy(),
+        )
+        walking_edges["trav_time"] = walking_edges["distance"] / self.walking_speed
+        walking_edges["trav_time"] *= self.walk_time_factor
+
+        # cleanup
+        walking_edges.drop(
+            ["o_coord_str", "d_coord_str", "o_lon", "o_lat", "d_lon", "d_lat", "o_coord", "d_coord", "distance"],
+            axis=1,
+            inplace=True,
+        )
+
+        self.walking_edges = walking_edges
 
     def create_edges(self):
         """Graph edges creation as a dataframe.
@@ -747,6 +808,7 @@ class SF_graph_builder:
             self.create_outer_stop_transfer_edges()
         else:
             self.outer_stop_transfer_edges = pd.DataFrame()
+        self.create_walking_edges()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
@@ -758,6 +820,7 @@ class SF_graph_builder:
                 self.connector_edges,
                 self.inner_stop_transfer_edges,
                 self.outer_stop_transfer_edges,
+                self.walking_edges,
             ],
             axis=0,
         )
