@@ -266,17 +266,19 @@ class SF_graph_builder:
     def create_stop_vertices(self):
         # select all stops
         sql = "SELECT stop_id, ST_AsText(geometry) coord FROM stops"
-        self.stop_vertices = pd.read_sql(sql, self.pt_conn)
+        stop_vertices = pd.read_sql(sql, self.pt_conn)
 
         # filter stops that are used on the given time range
         stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
-        self.stop_vertices = self.stop_vertices.loc[self.stop_vertices.stop_id.isin(stops_ids)]
+        stop_vertices = stop_vertices.loc[stop_vertices.stop_id.isin(stops_ids)]
 
         # uniform attributes
-        self.stop_vertices["line_id"] = None
-        self.stop_vertices["taz_id"] = None
-        self.stop_vertices["line_seg_idx"] = np.nan
-        self.stop_vertices["type"] = "stop"
+        stop_vertices["line_id"] = None
+        stop_vertices["taz_id"] = None
+        stop_vertices["line_seg_idx"] = np.nan
+        stop_vertices["type"] = "stop"
+
+        self.stop_vertices = stop_vertices
 
     def create_boarding_vertices(self):
         boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
@@ -326,13 +328,15 @@ class SF_graph_builder:
 
     def create_od_vertices(self):
         sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
-        self.od_vertices = pd.read_sql(sql, self.proj_conn)
+        od_vertices = pd.read_sql(sql, self.proj_conn)
 
         # uniform attributes
-        self.od_vertices["type"] = "od"
-        self.od_vertices["stop_id"] = None
-        self.od_vertices["line_id"] = None
-        self.od_vertices["line_seg_idx"] = np.nan
+        od_vertices["type"] = "od"
+        od_vertices["stop_id"] = None
+        od_vertices["line_id"] = None
+        od_vertices["line_seg_idx"] = np.nan
+
+        self.od_vertices = od_vertices
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -373,140 +377,148 @@ class SF_graph_builder:
         self.vertices = self.vertices[self.vertex_cols]
 
     def create_on_board_edges(self):
-        self.on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
-        self.on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
+        on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
+        on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # get tail vertex index
-        self.on_board_edges = pd.merge(
-            self.on_board_edges,
+        on_board_edges = pd.merge(
+            on_board_edges,
             self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        self.on_board_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        on_board_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
 
         # get head vertex index
-        self.on_board_edges = pd.merge(
-            self.on_board_edges,
+        on_board_edges = pd.merge(
+            on_board_edges,
             self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        self.on_board_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        on_board_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
         # uniform attributes
-        self.on_board_edges["type"] = "on-board"
-        self.on_board_edges["freq"] = np.inf
-        self.on_board_edges["stop_id"] = None
-        self.on_board_edges["o_line_id"] = None
-        self.on_board_edges["d_line_id"] = None
-        self.on_board_edges["transfer_id"] = None
+        on_board_edges["type"] = "on-board"
+        on_board_edges["freq"] = np.inf
+        on_board_edges["stop_id"] = None
+        on_board_edges["o_line_id"] = None
+        on_board_edges["d_line_id"] = None
+        on_board_edges["transfer_id"] = None
+
+        self.on_board_edges = on_board_edges
 
     def create_boarding_edges(self):
-        self.boarding_edges = self.line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
-        self.boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        boarding_edges = self.line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
+        boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (stop vertex)
-        self.boarding_edges = pd.merge(
-            self.boarding_edges,
+        boarding_edges = pd.merge(
+            boarding_edges,
             self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
             on="stop_id",
             how="left",
         )
-        self.boarding_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        boarding_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
 
         # get head vertex index (boarding vertex)
-        self.boarding_edges = pd.merge(
-            self.boarding_edges,
+        boarding_edges = pd.merge(
+            boarding_edges,
             self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        self.boarding_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        boarding_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
-        self.boarding_edges["freq"] *= wait_time_factor_inv
+        boarding_edges["freq"] *= wait_time_factor_inv
 
         # uniform attributes
-        self.boarding_edges["type"] = "boarding"
-        self.boarding_edges["trav_time"] = 0.5 * self.uniform_dwell_time + self.a_tiny_time_duration
-        self.boarding_edges["o_line_id"] = None
-        self.boarding_edges["d_line_id"] = None
-        self.boarding_edges["transfer_id"] = None
+        boarding_edges["type"] = "boarding"
+        boarding_edges["trav_time"] = 0.5 * self.uniform_dwell_time + self.a_tiny_time_duration
+        boarding_edges["o_line_id"] = None
+        boarding_edges["d_line_id"] = None
+        boarding_edges["transfer_id"] = None
+
+        self.boarding_edges = boarding_edges
 
     def create_alighting_edges(self):
-        self.alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        self.alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (alighting vertex)
-        self.alighting_edges = pd.merge(
-            self.alighting_edges,
+        alighting_edges = pd.merge(
+            alighting_edges,
             self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        self.alighting_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        alighting_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
 
         # get head vertex index (stop vertex)
-        self.alighting_edges = pd.merge(
-            self.alighting_edges,
+        alighting_edges = pd.merge(
+            alighting_edges,
             self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
             on="stop_id",
             how="left",
         )
-        self.alighting_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        alighting_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
         # uniform attributes
-        self.alighting_edges["type"] = "alighting"
-        self.alighting_edges["o_line_id"] = None
-        self.alighting_edges["d_line_id"] = None
-        self.alighting_edges["transfer_id"] = None
-        self.alighting_edges["freq"] = np.inf
-        self.alighting_edges["trav_time"] = (
+        alighting_edges["type"] = "alighting"
+        alighting_edges["o_line_id"] = None
+        alighting_edges["d_line_id"] = None
+        alighting_edges["transfer_id"] = None
+        alighting_edges["freq"] = np.inf
+        alighting_edges["trav_time"] = (
             0.5 * self.uniform_dwell_time + self.alighting_penalty + self.a_tiny_time_duration
         )
 
+        self.alighting_edges = alighting_edges
+
     def create_dwell_edges(self):
         # we start by removing the first segment of each line
-        self.dwell_edges = self.line_segments.loc[self.line_segments.seq != 0][["line_id", "from_stop", "seq"]]
-        self.dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
+        dwell_edges = self.line_segments.loc[self.line_segments.seq != 0][["line_id", "from_stop", "seq"]]
+        dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # we take the first stop of the segment
-        self.dwell_edges["stop_id"] = self.dwell_edges.from_stop
+        dwell_edges["stop_id"] = dwell_edges.from_stop
 
         # head vertex index (boarding vertex)
         # boarding vertices of line segments [1:segment_count+1]
-        self.dwell_edges = pd.merge(
-            self.dwell_edges,
+        dwell_edges = pd.merge(
+            dwell_edges,
             self.vertices[self.vertices.type == "boarding"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        self.dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
 
         # tail vertex index (alighting vertex)
         # aligthing vertices of line segments [0:segment_count]
-        self.dwell_edges.line_seg_idx -= 1
-        self.dwell_edges = pd.merge(
-            self.dwell_edges,
+        dwell_edges.line_seg_idx -= 1
+        dwell_edges = pd.merge(
+            dwell_edges,
             self.vertices[self.vertices.type == "alighting"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        self.dwell_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        dwell_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
 
         # clean-up
-        self.dwell_edges.drop("from_stop", axis=1, inplace=True)
+        dwell_edges.drop("from_stop", axis=1, inplace=True)
 
         # uniform values
-        self.dwell_edges["line_seg_idx"] = np.nan
-        self.dwell_edges["type"] = "dwell"
-        self.dwell_edges["o_line_id"] = None
-        self.dwell_edges["d_line_id"] = None
-        self.dwell_edges["transfer_id"] = None
-        self.dwell_edges["freq"] = np.inf
-        self.dwell_edges["trav_time"] = self.uniform_dwell_time
+        dwell_edges["line_seg_idx"] = np.nan
+        dwell_edges["type"] = "dwell"
+        dwell_edges["o_line_id"] = None
+        dwell_edges["d_line_id"] = None
+        dwell_edges["transfer_id"] = None
+        dwell_edges["freq"] = np.inf
+        dwell_edges["trav_time"] = self.uniform_dwell_time
+
+        self.dwell_edges = dwell_edges
 
     def create_connector_edges(self):
         """Create the connector edges between each stop and the closest od."""
@@ -543,7 +555,7 @@ class SF_graph_builder:
             axis=1,
         )
         # uniform values
-        access_connector_edges["type"] = "connector"
+        access_connector_edges["type"] = "access_connector"
         access_connector_edges["line_seg_idx"] = np.nan
         access_connector_edges["freq"] = np.inf
         access_connector_edges["o_line_id"] = None
@@ -557,7 +569,7 @@ class SF_graph_builder:
         )
 
         # uniform values
-        egress_connector_edges["type"] = "connector"
+        egress_connector_edges["type"] = "egress_connector"
         egress_connector_edges["line_seg_idx"] = np.nan
         egress_connector_edges["freq"] = np.inf
         egress_connector_edges["o_line_id"] = None
@@ -571,11 +583,11 @@ class SF_graph_builder:
         self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
     def create_inner_stop_transfer_edges(self):
-        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id"]].rename(
-            columns={"line_id": "o_line_id"}
+        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]].rename(
+            columns={"line_id": "o_line_id", "vert_id": "tail_vert_id"}
         )
-        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id"]].rename(
-            columns={"line_id": "d_line_id"}
+        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id"]].rename(
+            columns={"line_id": "d_line_id", "vert_id": "head_vert_id"}
         )
         inner_stop_transfer_edges = pd.merge(alighting, boarding, on="stop_id", how="inner")
 
@@ -583,28 +595,6 @@ class SF_graph_builder:
         inner_stop_transfer_edges = inner_stop_transfer_edges.loc[
             inner_stop_transfer_edges["o_line_id"] != inner_stop_transfer_edges["d_line_id"]
         ]
-
-        # get tail vertex index (alighting vertex)
-        inner_stop_transfer_edges = pd.merge(
-            inner_stop_transfer_edges,
-            self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]],
-            left_on=["o_line_id", "stop_id"],
-            right_on=["line_id", "stop_id"],
-            how="inner",
-        )
-        inner_stop_transfer_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
-        inner_stop_transfer_edges.drop(["line_id"], axis=1, inplace=True)
-
-        # get head vertex index (boarding vertex)
-        inner_stop_transfer_edges = pd.merge(
-            inner_stop_transfer_edges,
-            self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id"]],
-            left_on=["d_line_id", "stop_id"],
-            right_on=["line_id", "stop_id"],
-            how="inner",
-        )
-        inner_stop_transfer_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
-        inner_stop_transfer_edges.drop(["line_id"], axis=1, inplace=True)
 
         # update the transfer edge frequency
         inner_stop_transfer_edges = pd.merge(
@@ -730,7 +720,8 @@ class SF_graph_builder:
         """Graph edges creation as a dataframe.
 
         Edges have the following attributes:
-            - type (either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer', 'connector' or 'walking'): str
+            - type (either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer',
+              'access_connector', "egress_connector" or 'walking'): str
             - line_id (only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges): str
             - stop_id: str
             - line_seg_idx (only applies to 'on-board', 'boarding' and 'alighting' edges): int
