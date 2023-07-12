@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import shapely
 import shapely.ops
+from shapely.geometry import LineString, Point
 import pyproj
 from scipy.spatial import cKDTree
 
@@ -33,6 +34,9 @@ class SF_graph_builder:
         global_crs="EPSG:4326",
         projected_crs="EPSG:2154",
         num_threads=-1,
+        seed=124,
+        coord_noise=True,
+        noise_coef=1.0e-5,
     ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
@@ -77,6 +81,10 @@ class SF_graph_builder:
 
         self.global_crs = global_crs
         self.projected_crs = projected_crs
+
+        self.rng = np.random.default_rng(seed=seed)
+        self.coord_noise = coord_noise
+        self.noise_coef = noise_coef
 
         # edge weight parameters
         self.uniform_dwell_time = 30
@@ -251,26 +259,50 @@ class SF_graph_builder:
         self.stop_vertices["type"] = "stop"
 
     def create_boarding_vertices(self):
-        self.boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
-        self.boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
-        self.boarding_vertices = pd.merge(
-            self.boarding_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
+        boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
+        boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
+        boarding_vertices = pd.merge(
+            boarding_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
         )
 
         # uniform attributes
-        self.boarding_vertices["type"] = "boarding"
-        self.boarding_vertices["taz_id"] = None
+        boarding_vertices["type"] = "boarding"
+        boarding_vertices["taz_id"] = None
+
+        # add noise
+        if self.coord_noise:
+            boarding_vertices["x"] = boarding_vertices.coord.map(lambda c: shapely.wkt.loads(c).x)
+            boarding_vertices["y"] = boarding_vertices.coord.map(lambda c: shapely.wkt.loads(c).y)
+            n_boarding = len(boarding_vertices)
+            boarding_vertices["x"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
+            boarding_vertices["y"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
+            boarding_vertices["coord"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkt, axis=1)
+            boarding_vertices.drop(["x", "y"], axis=1, inplace=True)
+
+        self.boarding_vertices = boarding_vertices
 
     def create_alighting_vertices(self):
-        self.alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
-        self.alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
-        self.alighting_vertices = pd.merge(
-            self.alighting_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
+        alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
+        alighting_vertices = pd.merge(
+            alighting_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
         )
 
         # uniform attributes
-        self.alighting_vertices["type"] = "alighting"
-        self.alighting_vertices["taz_id"] = None
+        alighting_vertices["type"] = "alighting"
+        alighting_vertices["taz_id"] = None
+
+        # add noise
+        if self.coord_noise:
+            alighting_vertices["x"] = alighting_vertices.coord.map(lambda c: shapely.wkt.loads(c).x)
+            alighting_vertices["y"] = alighting_vertices.coord.map(lambda c: shapely.wkt.loads(c).y)
+            n_alighting = len(alighting_vertices)
+            alighting_vertices["x"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
+            alighting_vertices["y"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
+            alighting_vertices["coord"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkt, axis=1)
+            alighting_vertices.drop(["x", "y"], axis=1, inplace=True)
+
+        self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
         sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
