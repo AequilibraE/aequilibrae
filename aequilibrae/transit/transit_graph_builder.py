@@ -3,11 +3,11 @@
 
 import numpy as np
 import pandas as pd
+import pyproj
 import shapely
 import shapely.ops
-from shapely.geometry import LineString, Point
-import pyproj
 from scipy.spatial import cKDTree
+from shapely.geometry import Point
 
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -54,6 +54,7 @@ class SF_graph_builder:
         seed=124,
         coord_noise=True,
         noise_coef=1.0e-5,
+        with_outer_stop_transfers=True,
     ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
@@ -105,7 +106,7 @@ class SF_graph_builder:
         self.coord_noise = coord_noise
         self.noise_coef = noise_coef
 
-        # edge weight parameters
+        # graph parameters
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
         self.a_tiny_time_duration = 1.0e-08
@@ -114,6 +115,7 @@ class SF_graph_builder:
         self.walking_speed = 1.0
         self.access_time_factor = 1.0
         self.egress_time_factor = 1.0
+        self.with_outer_stop_transfers = with_outer_stop_transfers
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -741,7 +743,10 @@ class SF_graph_builder:
         self.create_alighting_edges()
         self.create_connector_edges()
         self.create_inner_stop_transfer_edges()
-        self.create_outer_stop_transfer_edges()
+        if self.with_outer_stop_transfers:
+            self.create_outer_stop_transfer_edges()
+        else:
+            self.outer_stop_transfer_edges = pd.DataFrame()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
