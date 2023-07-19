@@ -172,7 +172,7 @@ def build_compressed_graph(graph):
         }
     )
     max_link_id = link_id_max * 10
-    comp_lnk.loc[:, "link_id"] += max_link_id
+    comp_lnk.link_id += max_link_id
 
     df = pd.concat([df, comp_lnk])
     df = df[["id", "link_id", "a_node", "b_node", "direction"]]
@@ -193,11 +193,11 @@ def build_compressed_graph(graph):
     )
 
     crosswalk = crosswalk[crosswalk.compressed_link >= 0]
-    crosswalk.loc[:, "compressed_link"] += max_link_id
+    crosswalk.compressed_link += max_link_id
 
     cw2 = pd.DataFrame(crosswalk, copy=True)
-    cw2.loc[:, "link_direction"] *= -1
-    cw2.loc[:, "compressed_direction"] = -1
+    cw2.link_direction *= -1
+    cw2.compressed_direction = -1
 
     crosswalk = pd.concat([crosswalk, cw2])
     crosswalk = crosswalk.assign(key=crosswalk.compressed_link * crosswalk.compressed_direction)
@@ -208,7 +208,7 @@ def build_compressed_graph(graph):
     final_ids.drop(["link_id", "direction"], axis=1, inplace=True)
 
     agg_crosswalk = crosswalk.merge(final_ids, on="key")
-    agg_crosswalk.loc[:, "key"] = agg_crosswalk.link_id * agg_crosswalk.link_direction
+    agg_crosswalk.key = agg_crosswalk.link_id * agg_crosswalk.link_direction
     agg_crosswalk.drop(["link_id", "link_direction"], axis=1, inplace=True)
 
     direct_crosswalk = final_ids[final_ids.key.abs() < max_link_id]
