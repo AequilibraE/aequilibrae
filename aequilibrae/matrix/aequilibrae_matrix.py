@@ -3,6 +3,7 @@ import importlib.util as iutil
 import os
 import tempfile
 import uuid
+import warnings
 from functools import reduce
 from typing import List
 
@@ -677,6 +678,8 @@ class AequilibraeMatrix(object):
 
     def __getattr__(self, mat_name: str):
         if mat_name in object.__dict__:
+            if mat_name == "matrix" and self.__omx:
+                warnings.warn("You can't access OMX matrix cores like that")
             return self.__dict__[mat_name]
 
         if mat_name in self.names:
@@ -748,10 +751,6 @@ class AequilibraeMatrix(object):
             >>> mat2.cores
             2
         """
-
-        if self.__omx:
-            raise NotImplementedError("This operation does not make sense for OMX matrices")
-
         fname, file_extension = os.path.splitext(output_name.upper())
 
         if file_extension == ".OMX":
@@ -759,7 +758,7 @@ class AequilibraeMatrix(object):
                 raise ValueError("Open Matrix is not installed. Cannot continue")
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
-            raise ValueError("File extension {} not implemented yet".format(file_extension))
+            raise NotImplementedError(f"File extension {file_extension} not implemented yet")
 
         if cores is None:
             cores = self.names
@@ -770,8 +769,10 @@ class AequilibraeMatrix(object):
         elif file_extension == ".OMX":
             omx_export = omx.open_file(output_name, "w")
             for c in cores:
-                omx_export[c] = self.matrix[c]
-
+                if self.__omx:
+                    omx_export[c] = np.array(self.omx_file[c])
+                else:
+                    omx_export[c] = self.matrix[c]
             for i, idx in enumerate(self.index_names):
                 omx_export.create_mapping(idx, self.indices[:, i])
             omx_export.close()
@@ -779,7 +780,10 @@ class AequilibraeMatrix(object):
         elif file_extension == ".CSV":
 
             def f(name):
-                coo = coo_matrix(self.matrix[name])
+                if self.__omx:
+                    coo = np.array(self.omx_file[name])
+                else:
+                    coo = coo_matrix(self.matrix[name])
                 data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
                 return pd.DataFrame(data).set_index(["row", "column"])
 
