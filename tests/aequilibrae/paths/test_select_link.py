@@ -139,7 +139,7 @@ class TestSelectLink(TestCase):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignclass.set_select_links({"test": [(1, 1), (1, 1)]})
-        self.assertEqual(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
+        self.assertEquals(len(self.assignclass._selected_links["test"]), 1, "Did not correctly remove duplicate link")
 
     def test_link_out_of_bounds(self):
         """
