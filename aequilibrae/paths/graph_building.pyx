@@ -208,7 +208,7 @@ def build_compressed_graph(graph):
     final_ids.drop(["link_id", "direction"], axis=1, inplace=True)
 
     agg_crosswalk = crosswalk.merge(final_ids, on="key")
-    agg_crosswalk.key = agg_crosswalk.link_id * agg_crosswalk.link_direction
+    agg_crosswalk.loc[:, "key"] = agg_crosswalk.link_id * agg_crosswalk.link_direction
     agg_crosswalk.drop(["link_id", "link_direction"], axis=1, inplace=True)
 
     direct_crosswalk = final_ids[final_ids.key.abs() < max_link_id]
