@@ -1,7 +1,6 @@
 import importlib.util as iutil
-import os
 import platform
-from os.path import dirname, join
+from os.path import join
 
 import numpy as np
 from Cython.Distutils import build_ext
