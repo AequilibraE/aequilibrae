@@ -680,6 +680,7 @@ class AequilibraeMatrix(object):
         if mat_name in object.__dict__:
             if mat_name == "matrix" and self.__omx:
                 warnings.warn("You can't access OMX matrix cores like that")
+                return
             return self.__dict__[mat_name]
 
         if mat_name in self.names:
