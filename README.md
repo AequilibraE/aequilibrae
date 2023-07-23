@@ -16,7 +16,7 @@
 
 
 AequilibraE is the first comprehensive Python package for transportation modeling. It aims to provide all the
-resources not available from other open-source packages in the Python (NumPy, really) ecosystem.
+resources not available from other open-source packages in the Python ecosystem.
 
 ## Comprehensive documentation
 
