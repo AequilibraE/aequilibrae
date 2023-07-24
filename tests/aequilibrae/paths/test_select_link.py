@@ -1,13 +1,11 @@
 import os
-import pathlib
 import uuid
 import zipfile
 from os.path import join, dirname
-from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
+
 import numpy as np
-import pandas as pd
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
 from ...data import siouxfalls_project
@@ -310,45 +308,45 @@ class TestSelectLink(TestCase):
         self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
 
 
-# def create_od_mask(demand: np.array, graph: Graph, sl):
-#     res = PathResults()
-#     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
-#     graph.set_graph("free_flow_time")
-#     res.prepare(graph)
-#
-#     def g(o, d):
-#         res.compute_path(o, d)
-#         return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
-#
-#     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
-#     sl_links = []
-#     for i in range(len(sl)):
-#         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
-#         sl_links.append(node_pair)
-#     mask = dict()
-#     for origin, val in enumerate(a):
-#         for dest, path in enumerate(val):
-#             for k in range(1, len(path)):
-#                 if origin == dest:
-#                     pass
-#                 elif (path[k - 1], path[k]) in sl_links:
-#                     mask[(origin, dest)] = True
-#     sl_od = np.zeros((24, 24))
-#     for origin in range(24):
-#         for dest in range(24):
-#             if mask.get((origin, dest)):
-#                 sl_od[origin, dest] = demand[origin, dest]
-#
-#     # make link loading
-#     loading = np.zeros((76, 1))
-#     for orig, dest in mask.keys():
-#         path = a[orig][dest]
-#         for i in range(len(path) - 1):
-#             link = (
-#                     graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
-#                         "link_id"
-#                     ].values[0]
-#                     - 1
-#             )
-#             loading[link] += demand[orig, dest]
-#     return sl_od, loading
+def create_od_mask(demand: np.array, graph: Graph, sl):
+    res = PathResults()
+    # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
+    graph.set_graph("free_flow_time")
+    res.prepare(graph)
+
+    def g(o, d):
+        res.compute_path(o, d)
+        return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
+
+    a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
+    sl_links = []
+    for i in range(len(sl)):
+        node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
+        sl_links.append(node_pair)
+    mask = dict()
+    for origin, val in enumerate(a):
+        for dest, path in enumerate(val):
+            for k in range(1, len(path)):
+                if origin == dest:
+                    pass
+                elif (path[k - 1], path[k]) in sl_links:
+                    mask[(origin, dest)] = True
+    sl_od = np.zeros((24, 24))
+    for origin in range(24):
+        for dest in range(24):
+            if mask.get((origin, dest)):
+                sl_od[origin, dest] = demand[origin, dest]
+
+    # make link loading
+    loading = np.zeros((76, 1))
+    for orig, dest in mask.keys():
+        path = a[orig][dest]
+        for i in range(len(path) - 1):
+            link = (
+                    graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
+                        "link_id"
+                    ].values[0]
+                    - 1
+            )
+            loading[link] += demand[orig, dest]
+    return sl_od, loading
