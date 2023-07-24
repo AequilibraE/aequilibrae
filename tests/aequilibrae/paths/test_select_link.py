@@ -343,10 +343,10 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
         path = a[orig][dest]
         for i in range(len(path) - 1):
             link = (
-                    graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
-                        "link_id"
-                    ].values[0]
-                    - 1
+                graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
+                    "link_id"
+                ].values[0]
+                - 1
             )
             loading[link] += demand[orig, dest]
     return sl_od, loading
