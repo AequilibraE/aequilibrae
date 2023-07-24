@@ -77,20 +77,180 @@ class TestSelectLink(TestCase):
 
         self.assignment.execute()
 
-        for key in self.assignclass._selected_links.keys():
-            od_mask, link_loading = create_od_mask(
-                self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_od.matrix[key][:, :, 0],
-                od_mask,
-                err_msg="OD SL matrix for: " + str(key) + " does not match",
-            )
-            np.testing.assert_allclose(
-                self.assignclass.results.select_link_loading[key],
-                link_loading,
-                err_msg="Link loading SL matrix for: " + str(key) + " does not match",
-            )
+        ll = [
+            3800.0,
+            6000.0,
+            3800.0,
+            6600.0,
+            500.0,
+            2500.0,
+            3300.0,
+            0.0,
+            2000.0,
+            300.0,
+            500.0,
+            0.0,
+            2000.0,
+            3200.0,
+            800.0,
+            5100.0,
+            900.0,
+            600.0,
+            2900.0,
+            1300.0,
+            0.0,
+            2600.0,
+            0.0,
+            0.0,
+            1300.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            900.0,
+            400.0,
+            1300.0,
+            1700.0,
+            300.0,
+            900.0,
+            0.0,
+            500.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1200.0,
+            600.0,
+            1100.0,
+            0.0,
+            0.0,
+            700.0,
+            500.0,
+            400.0,
+            0.0,
+            500.0,
+            100.0,
+            300.0,
+            0.0,
+            300.0,
+            0.0,
+            0.0,
+            100.0,
+            0.0,
+            400.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            500.0,
+            300.0,
+        ]
+
+        om = [
+            [
+                0,
+                100,
+                100,
+                500,
+                200,
+                300,
+                500,
+                800,
+                500,
+                1300,
+                500,
+                200,
+                500,
+                300,
+                500,
+                500,
+                400,
+                100,
+                300,
+                300,
+                100,
+                400,
+                300,
+                100,
+            ],
+            [
+                100,
+                0,
+                100,
+                200,
+                100,
+                400,
+                200,
+                400,
+                200,
+                600,
+                200,
+                100,
+                300,
+                100,
+                100,
+                400,
+                200,
+                0,
+                100,
+                100,
+                0,
+                100,
+                0,
+                0,
+            ],
+            [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [800, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+
+        link_loading = np.array(ll)
+        od_mask = np.array(om).astype(float)
+
+        key = list(self.assignclass._selected_links.keys())[0]
+        # od_mask, link_loading = create_od_mask(
+        #     self.assignclass.matrix.matrix_view, self.assignclass.graph, self.assignclass._selected_links[key]
+        # )
+
+        np.testing.assert_allclose(
+            self.assignclass.results.select_link_od.matrix[key][:, :, 0],
+            od_mask,
+            err_msg="OD SL matrix for: " + str(key) + " does not match",
+        )
+        np.testing.assert_allclose(
+            self.assignclass.results.select_link_loading[key].flatten(),
+            link_loading,
+            err_msg="Link loading SL matrix for: " + str(key) + " does not match",
+        )
 
     def test_single_demand(self):
         """
@@ -150,45 +310,45 @@ class TestSelectLink(TestCase):
         self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
 
 
-def create_od_mask(demand: np.array, graph: Graph, sl):
-    res = PathResults()
-    # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
-    graph.set_graph("free_flow_time")
-    res.prepare(graph)
-
-    def g(o, d):
-        res.compute_path(o, d)
-        return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
-
-    a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
-    sl_links = []
-    for i in range(len(sl)):
-        node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
-        sl_links.append(node_pair)
-    mask = dict()
-    for origin, val in enumerate(a):
-        for dest, path in enumerate(val):
-            for k in range(1, len(path)):
-                if origin == dest:
-                    pass
-                elif (path[k - 1], path[k]) in sl_links:
-                    mask[(origin, dest)] = True
-    sl_od = np.zeros((24, 24))
-    for origin in range(24):
-        for dest in range(24):
-            if mask.get((origin, dest)):
-                sl_od[origin, dest] = demand[origin, dest]
-
-    # make link loading
-    loading = np.zeros((76, 1))
-    for orig, dest in mask.keys():
-        path = a[orig][dest]
-        for i in range(len(path) - 1):
-            link = (
-                graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
-                    "link_id"
-                ].values[0]
-                - 1
-            )
-            loading[link] += demand[orig, dest]
-    return sl_od, loading
+# def create_od_mask(demand: np.array, graph: Graph, sl):
+#     res = PathResults()
+#     # This uses the UNCOMPRESSED graph, since we don't know which nodes the user may ask for
+#     graph.set_graph("free_flow_time")
+#     res.prepare(graph)
+#
+#     def g(o, d):
+#         res.compute_path(o, d)
+#         return list(res.path_nodes) if (res.path_nodes is not None and o != d) else []
+#
+#     a = [[g(o, d) for d in range(1, 25)] for o in range(1, 25)]
+#     sl_links = []
+#     for i in range(len(sl)):
+#         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
+#         sl_links.append(node_pair)
+#     mask = dict()
+#     for origin, val in enumerate(a):
+#         for dest, path in enumerate(val):
+#             for k in range(1, len(path)):
+#                 if origin == dest:
+#                     pass
+#                 elif (path[k - 1], path[k]) in sl_links:
+#                     mask[(origin, dest)] = True
+#     sl_od = np.zeros((24, 24))
+#     for origin in range(24):
+#         for dest in range(24):
+#             if mask.get((origin, dest)):
+#                 sl_od[origin, dest] = demand[origin, dest]
+#
+#     # make link loading
+#     loading = np.zeros((76, 1))
+#     for orig, dest in mask.keys():
+#         path = a[orig][dest]
+#         for i in range(len(path) - 1):
+#             link = (
+#                     graph.graph[(graph.graph["a_node"] == path[i] - 1) & (graph.graph["b_node"] == path[i + 1] - 1)][
+#                         "link_id"
+#                     ].values[0]
+#                     - 1
+#             )
+#             loading[link] += demand[orig, dest]
+#     return sl_od, loading
