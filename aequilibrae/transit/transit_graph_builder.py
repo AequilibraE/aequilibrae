@@ -663,7 +663,11 @@ class SF_graph_builder:
         self.inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
-        sql = "SELECT stop_id, parent_station FROM stops"
+        sql = """
+        SELECT stop_id, parent_station
+        FROM stops
+        WHERE parent_station IS NOT NULL AND parent_station <> ''
+        """
         stops = pd.read_sql(sql, self.pt_conn)
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
@@ -755,7 +759,11 @@ class SF_graph_builder:
         self.outer_stop_transfer_edges = outer_stop_transfer_edges
 
     def create_walking_edges(self):
-        sql = "SELECT stop_id, parent_station FROM stops"
+        sql = """
+        SELECT stop_id, parent_station
+        FROM stops
+        WHERE parent_station IS NOT NULL AND parent_station <> ''
+        """
         stops = pd.read_sql(sql, self.pt_conn)
         stops.drop_duplicates(inplace=True)
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
