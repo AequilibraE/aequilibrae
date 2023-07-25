@@ -55,7 +55,7 @@ class SF_graph_builder:
         coord_noise=True,
         noise_coef=1.0e-5,
         with_outer_stop_transfers=True,
-        distance_upper_bound=np.inf
+        distance_upper_bound=np.inf,
     ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
@@ -536,9 +536,7 @@ class SF_graph_builder:
         assert method in ["overlapping regions", "nearest neighbour"]
 
         ods = self.vertices[self.vertices["type"] == "od"].reset_index(drop=True)
-        od_coords = ods["coord"].apply(
-            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
-        )
+        od_coords = ods["coord"].apply(lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord)))
         od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
 
         stops = self.vertices[self.vertices["type"] == "stop"].reset_index(drop=True)
@@ -551,7 +549,9 @@ class SF_graph_builder:
 
         if method == "nearest neighbour":
             # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
-            distance, index = kdTree.query(stop_coords, k=1, distance_upper_bound=self.distance_upper_bound, workers=self.num_threads)
+            distance, index = kdTree.query(
+                stop_coords, k=1, distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
+            )
             nearest_od = ods.iloc[index]["taz_id"].reset_index(drop=True)
             trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
             self.connector_edges = pd.concat(
@@ -565,7 +565,9 @@ class SF_graph_builder:
 
         elif method == "overlapping regions":
             # Construct a kdtree so we can lookup the 2nd closest OD to each OD (the first being itself)
-            distance, _ = kdTree.query(od_coords, k=[2], distance_upper_bound=self.distance_upper_bound, workers=self.num_threads)
+            distance, _ = kdTree.query(
+                od_coords, k=[2], distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
+            )
             distance = distance.reshape(-1)
 
             # Construct a kdtree so we can query all the stops within the radius around each OD
@@ -582,14 +584,18 @@ class SF_graph_builder:
 
                 connectors.append(df)
 
-            self.connector_edges = pd.concat(connectors).rename(columns={"vert_id": "tail_vert_id"}).reset_index(drop=True)
+            self.connector_edges = (
+                pd.concat(connectors).rename(columns={"vert_id": "tail_vert_id"}).reset_index(drop=True)
+            )
 
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
                 missing = stops["vert_id"].isin(self.connector_edges["tail_vert_id"])
                 missing = missing[~missing].index
 
-                distance, index = kdTree.query(stop_coords[missing], k=1, distance_upper_bound=np.inf, workers=self.num_threads)
+                distance, index = kdTree.query(
+                    stop_coords[missing], k=1, distance_upper_bound=np.inf, workers=self.num_threads
+                )
                 nearest_od = ods["vert_id"].iloc[index].reset_index(drop=True)
                 trav_time = pd.Series(distance * self.walking_speed, name="trav_time")
                 missing_edges = pd.concat(
@@ -598,7 +604,7 @@ class SF_graph_builder:
                         nearest_od.rename("head_vert_id"),
                         trav_time,
                     ],
-                    axis=1
+                    axis=1,
                 )
 
                 self.connector_edges = pd.concat([self.connector_edges, missing_edges], axis=0)
