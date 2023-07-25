@@ -533,7 +533,7 @@ class SF_graph_builder:
         Overlapping regions: Creates edges between all stops that lying within the circle
             centered each OD whose radius is the distance to the other nearest OD.
         """
-        assert method in ["overlapping regions", "nearest_neighbour"]
+        assert method in ["overlapping_regions", "nearest_neighbour"]
 
         # Select/copy the od vertices and project their coordinates
         od_vertices = self.vertices[self.vertices.type == "od"][["vert_id", "taz_id", "coord"]].copy(deep=True)
@@ -573,7 +573,7 @@ class SF_graph_builder:
                 axis=1,
             )
 
-        elif method == "overlapping regions":
+        elif method == "overlapping_regions":
             # Construct a kdtree so we can lookup the 2nd closest OD to each OD (the first being itself)
             distance, _ = kdTree.query(
                 od_coords, k=[2], distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
