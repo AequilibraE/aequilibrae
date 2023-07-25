@@ -139,7 +139,9 @@ class SF_graph_builder:
         ).pattern_id.values
 
         # route links corresponding to the given time range
-        sql = "SELECT pattern_id, seq, from_stop, to_stop FROM route_links"
+        sql = (
+            "SELECT pattern_id, seq, CAST(from_stop AS TEXT) from_stop, CAST(to_stop AS TEXT) to_stop FROM route_links"
+        )
         route_links = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
@@ -269,7 +271,7 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        sql = "SELECT stop_id, ST_AsText(geometry) coord FROM stops"
+        sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsText(geometry) coord FROM stops"
         stop_vertices = pd.read_sql(sql, self.pt_conn)
 
         # filter stops that are used on the given time range
@@ -688,8 +690,7 @@ class SF_graph_builder:
 
     def create_outer_stop_transfer_edges(self):
         sql = """
-        SELECT stop_id, parent_station
-        FROM stops
+        SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
         """
         stops = pd.read_sql(sql, self.pt_conn)
@@ -784,9 +785,8 @@ class SF_graph_builder:
 
     def create_walking_edges(self):
         sql = """
-        SELECT stop_id, parent_station
-        FROM stops
-        WHERE parent_station IS NOT NULL AND parent_station <> ''
+        SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
+        WHERE parent_station IS NOT NULL AND parent_station <> '' 
         """
         stops = pd.read_sql(sql, self.pt_conn)
         stops.drop_duplicates(inplace=True)
