@@ -149,12 +149,12 @@ class SF_graph_builder:
         route_links = route_links.loc[route_links.pattern_id.isin(pattern_ids)]
 
         # create a line segment table
-        sql = "SELECT pattern_id, longname FROM routes" ""
+        sql = "SELECT pattern_id, shortname FROM routes" ""
         routes = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
         )
-        routes["line_id"] = routes["longname"] + "_" + routes["pattern_id"].astype(str)
+        routes["line_id"] = routes["shortname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
 
         self.add_mean_travel_time_to_segments()
@@ -333,7 +333,9 @@ class SF_graph_builder:
         self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        sql = """SELECT node_id AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
+        sql = (
+            """SELECT CAST(node_id AS TEXT) AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
+        )
         od_vertices = pd.read_sql(sql, self.proj_conn)
 
         # uniform attributes
@@ -347,10 +349,10 @@ class SF_graph_builder:
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
 
-        Verticealighting_verticess have the following attributes:
+        Vertices have the following attributes:
             - vert_id: int
             - type (either 'stop', 'boarding', 'alighting', 'od', 'walking' or 'fictitious'): str
-            - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): int
+            - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
             - taz_id (only applies to 'od' nodes): str
@@ -373,14 +375,21 @@ class SF_graph_builder:
             ],
             axis=0,
         )
-        self.vertices.line_seg_idx = self.vertices.line_seg_idx.astype("Int32")
 
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
         self.vertices.index.name = "index"
         self.vertices["vert_id"] = self.vertices.index
-
         self.vertices = self.vertices[self.vertex_cols]
+
+        # data types
+        self.vertices.vert_id = self.vertices.vert_id.astype(int)
+        self.vertices["type"] = self.vertices["type"].astype("category")
+        self.vertices.stop_id = self.vertices.stop_id.astype(str)
+        self.vertices.line_id = self.vertices.line_id.astype(str)
+        self.vertices.line_seg_idx = self.vertices.line_seg_idx.astype("Int32")
+        self.vertices.taz_id = self.vertices.taz_id.astype(str)
+        self.vertices.coord = self.vertices.coord.astype(str)
 
     def create_on_board_edges(self):
         on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
@@ -895,11 +904,22 @@ class SF_graph_builder:
             ],
             axis=0,
         )
-        self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
 
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
         self.edges["edge_id"] = self.edges.index
-
         self.edges = self.edges[self.edges_cols]
+
+        # data types
+        self.edges["type"] = self.edges["type"].astype("category")
+        self.edges.line_id = self.edges.line_id.astype(str)
+        self.edges.stop_id = self.edges.stop_id.astype(str)
+        self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
+        self.edges.tail_vert_id = self.edges.tail_vert_id.astype(int)
+        self.edges.head_vert_id = self.edges.head_vert_id.astype(int)
+        self.edges.trav_time = self.edges.trav_time.astype(float)
+        self.edges.freq = self.edges.freq.astype(float)
+        self.edges.o_line_id = self.edges.o_line_id.astype(str)
+        self.edges.d_line_id = self.edges.d_line_id.astype(str)
+        self.edges.transfer_id = self.edges.transfer_id.astype(str)
