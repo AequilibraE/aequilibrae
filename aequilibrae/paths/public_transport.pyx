@@ -1,6 +1,10 @@
 # cython: language_level=3
 
 import pandas as pd
+import numpy as np
+import multiprocessing
+cimport numpy as cnp
+cimport openmp
 
 include 'hyperpath.pyx'
 
@@ -47,49 +51,48 @@ class HyperpathGenerating:
         self._edges["volume"] = 0.0
         self.u_i_vec = None
 
-        # allocation of work arrays
-        u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
-        v_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        h_a_vec = np.empty(self.edge_count, dtype=bool)
-        edge_indices = np.empty(self.edge_count, dtype=np.uint32)
-
         # input check
-        if type(volume) is not list:
-            volume = [volume]
         if type(origin) is not list:
             origin = [origin]
+        if type(volume) is not list:
+            volume = [volume]
         assert len(origin) == len(volume)
+
         for i, item in enumerate(origin):
             self._check_vertex_idx(item)
             self._check_volume(volume[i])
         self._check_vertex_idx(destination)
-        demand_indices = np.array(origin, dtype=np.uint32)
         assert isinstance(return_inf, bool)
 
-        demand_values = np.array(volume, dtype=DATATYPE_PY)
+        o_vert_ids = np.array(origin, dtype=np.uint32)
+        d_vert_ids = np.array([destination], dtype=np.uint32)
+        demand_vls = np.array(volume, dtype=DATATYPE_PY)
 
-        compute_SF_in(
-            self._indptr,
-            self._edge_idx,
-            self._trav_time,
-            self._freq,
-            self._tail,
-            self._head,
-            demand_indices,
-            demand_values,
+        destination_vertex_indices = d_vert_ids  # Only one index allowed so must be unique
+
+        cdef cnp.float64_t *u_i_vec
+
+        u_i_vec = compute_SF_in_parallel(
+            self._indptr[:],
+            self._edge_idx[:],
+            self._trav_time[:],
+            self._freq[:],
+            self._tail[:],
+            self._head[:],
+            d_vert_ids[:],
+            destination_vertex_indices[:],
+            o_vert_ids[:],
+            demand_vls[:],
             self._edges["volume"].values,
-            u_i_vec,
-            f_i_vec,
-            u_j_c_a_vec,
-            v_i_vec,
-            h_a_vec,
-            edge_indices,
+            True,
             self.vertex_count,
-            destination,
+            self._edges["volume"].shape[0],
+            1,  # Single destination so no reason to parallelise
         )
-        self.u_i_vec = u_i_vec
+
+        if u_i_vec != NULL:
+            self.u_i_vec = np.asarray(<cnp.float64_t[:self.vertex_count]> u_i_vec)
+
 
     def _check_vertex_idx(self, idx):
         assert isinstance(idx, int)
@@ -136,6 +139,7 @@ class HyperpathGenerating:
         destination_column="dest_vert_idx",
         demand_column="demand",
         check_demand=False,
+        threads=0
     ):
         # check the input demand paramater
         if check_demand:
@@ -148,57 +152,30 @@ class HyperpathGenerating:
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = None
 
-        o_vert_ids = demand[origin_column].values
-        d_vert_ids = demand[destination_column].values
-        demand_vls = demand[demand_column].values
+        o_vert_ids = demand[origin_column].values.astype(np.uint32)
+        d_vert_ids = demand[destination_column].values.astype(np.uint32)
+        demand_vls = demand[demand_column].values.astype(np.float64)
 
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
 
-        # allocation of work arrays
-        u_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        f_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        u_j_c_a_vec = np.empty(self.edge_count, dtype=DATATYPE_PY) 
-        v_i_vec = np.empty(self.vertex_count, dtype=DATATYPE_PY)
-        h_a_vec = np.empty(self.edge_count, dtype=bool)
-        edge_indices = np.empty(self.edge_count, dtype=np.uint32)
-
-        # loop on destination vertices
-        for destination_vertex_index in destination_vertex_indices:
-            demand_indices = np.where(d_vert_ids == destination_vertex_index)[0]
-
-            # list of origin vertices
-            demand_origins = o_vert_ids[demand_indices]
-            demand_origins = demand_origins.astype(np.uint32)
-
-            # list of demand values
-            demand_values = demand_vls[demand_indices]
-            demand_values = demand_values.astype(DATATYPE_PY)
-
-            # initialization of the edge volume vector
-            edge_volume = np.zeros_like(self._edges["volume"])
-
-            # S&F
-            compute_SF_in(
-                self._indptr,
-                self._edge_idx,
-                self._trav_time,
-                self._freq,
-                self._tail,
-                self._head,
-                demand_origins,
-                demand_values,
-                edge_volume,
-                u_i_vec,
-                f_i_vec,
-                u_j_c_a_vec,
-                v_i_vec,
-                h_a_vec,
-                edge_indices,
-                self.vertex_count,
-                destination_vertex_index,
-            )
-            self._edges["volume"] += edge_volume
+        compute_SF_in_parallel(
+            self._indptr[:],
+            self._edge_idx[:],
+            self._trav_time[:],
+            self._freq[:],
+            self._tail[:],
+            self._head[:],
+            d_vert_ids[:],
+            destination_vertex_indices[:],
+            o_vert_ids[:],
+            demand_vls[:],
+            self._edges["volume"].values,
+            False,
+            self.vertex_count,
+            self._edges["volume"].shape[0],
+            (multiprocessing.cpu_count() if threads < 1 else threads)
+        )
 
     def _check_demand(self, demand, origin_column, destination_column, demand_column):
         if type(demand) != pd.core.frame.DataFrame:
