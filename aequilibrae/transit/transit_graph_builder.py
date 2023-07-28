@@ -108,9 +108,12 @@ class SF_graph_builder:
         self.outer_stop_transfer_edges = pd.DataFrame()
         self.walking_edges = pd.DataFrame()
 
+        self.global_crs = pyproj.CRS(global_crs)
+        self.projected_crs = pyproj.CRS(projected_crs)
+
         # longlat to projected CRS transfromer
         self.transformer = pyproj.Transformer.from_crs(
-            pyproj.CRS(global_crs), pyproj.CRS(projected_crs), always_xy=True
+            self.global_crs, self.projected_crs, always_xy=True
         ).transform
 
         # Add some spatial noise so that stop, boarding and aligthing vertices
@@ -187,7 +190,7 @@ class SF_graph_builder:
                 ON trips_schedule.trip_id = trips.trip_id
                 WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
         else:
-            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
+            sql = """SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
         tt = pd.read_sql(sql, self.pt_conn)
@@ -943,3 +946,161 @@ class SF_graph_builder:
         self.edges.o_line_id = self.edges.o_line_id.astype(str)
         self.edges.d_line_id = self.edges.d_line_id.astype(str)
         self.edges.transfer_id = self.edges.transfer_id.astype(str)
+
+    def create_additional_db_fields(self):
+        # This graph requires some additional tables and fields inorder to store all our information.
+        # Currently it mimics what we are storing in the df
+
+        # `node_types` table: contains the different types of nodes we have. This is almost indentical to
+        # `link_types`
+        self.proj_conn.execute(
+            """
+            CREATE TABLE node_types (node_type     VARCHAR UNIQUE NOT NULL PRIMARY KEY,
+                                     node_type_id  VARCHAR UNIQUE NOT NULL,
+                                     description   VARCHAR,
+                                     lanes         NUMERIC,
+                                     lane_capacity NUMERIC,
+                                     speed         NUMERIC)
+            """
+        )
+
+        # Lets add our current node types
+        self.proj_conn.executemany(
+            """
+            INSERT INTO node_types (node_type, node_type_id, description) VALUES (?, ?, ?)
+            """,
+            [
+                ("OD", "od", "Origin/Destination"),
+                ("Stop", "stop", "Stop"),
+                ("Alighting", "alighting", "Alighting node"),
+                ("Boarding", "boarding", "Boarding node")
+            ]
+        )
+
+        # We also need to add some additional columns to the `nodes` table
+        cols = [
+            ("node_type", "TEXT", "REFERENCES link_types"),
+            ("stop_id", "TEXT", ""),
+            ("line_id", "TEXT", ""),
+            ("line_seg_idx", "INTEGER", ""),
+            ("taz_id", "TEXT", "")
+        ]
+
+        for col, node_type, constraints in cols:
+            # Can't use executemany here because we need to template the fields not values.
+            self.proj_conn.execute(f"ALTER TABLE nodes ADD COLUMN {col} {node_type} {constraints};")
+
+        # Now onto the links, we need to specifiy all our link types
+        self.proj_conn.executemany(
+            """
+            INSERT INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
+            """,
+            [
+                ("on-board", "o", "From boarding to alighting"),
+                ("boarding", "b", "From stop to boarding"),
+                ("alighting", "a", "From alighting to stop"),
+                ("dwell", "d", "From alighting to boarding"),
+                ("access_connector", "A", ""),
+                ("egress_connector", "e", ""),
+                ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
+                ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
+                ("walking", "w", "Walking, from stop or walking to stop or walking"),
+            ]
+        )
+
+        # As well as add our extra columns
+        cols = [
+            ("line_id", "TEXT", ""),
+            ("stop_id", "TEXT", ""),
+            ("line_seg_idx", "INTEGER", ""),
+            ("trav_time", "NUMERIC", ""),
+            ("freq", "NUMERIC", ""),
+            ("o_line_id", "TEXT", ""),
+            ("d_line_id", "TEXT", ""),
+            ("transfer_id", "TEXT", "")
+        ]
+        for col, type, constraints in cols:
+            self.proj_conn.execute(f"ALTER TABLE links ADD COLUMN {col} {type} {constraints};")
+
+        self.proj_conn.commit()
+
+    def save_vertices(self):
+        # FIXME: Currently can only save uniquely located nodes. Pedro has dealt with the before by repeatedly shifting
+        # the node until it is uniquely located. I think this is a restriction of the rtree used but haven't confirmed.
+        # To do that here we'd have to move away from executemany and write the loop ourselves or deal with them seperately.
+
+        # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
+        # notebook. I don't think this is a good solution but I'm not sure what do to without adding the zones and such
+        # ourselves.
+
+        # The below query is formated to guarantee the columns line up. The order of the tuples should be the same
+        # as the order of the columns.
+        #
+        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
+        #     the index and following fields being the column values.
+        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
+
+        # It should look like the below query. This is generated from
+        #
+        # from aequilibrae.project.network import Link, Node
+        # from aequilibrae.project.network.safe_class import SafeClass
+        #
+        # node = Node(verticies.iloc[0], project)
+        # data, sql = SafeClass._save_new_with_geometry(node)
+        #
+        # Insert into nodes ("node_id","node_type","stop_id","line_id","line_seg_idx","taz_id",geometry)
+        # values(?,?,?,?,?,?,GeomFromWKB(?, 4326))
+
+        # FIXME: We also nned to rename some columns, convert the geometry to wkb as well as replace the NANs with something.
+        # I think these changes should be propegated throughout but we'll leave them here for now.
+        vertices = self.vertices.rename(columns={"coord": "geometry", "vert_id": "node_id", "type": "node_type"})
+        vertices.geometry = shapely.to_wkb(shapely.from_wkt(vertices.geometry.values))
+        vertices.line_seg_idx = vertices.line_seg_idx.fillna(-1)
+
+        self.proj_conn.executemany(
+            """
+            Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
+            values(?,?,?,?,?,?,GeomFromWKB(?, {}));
+            """.format(*vertices.columns, self.global_crs.to_epsg()),
+            vertices[(vertices.node_type != "od") & (~vertices.geometry.duplicated())].itertuples(index=False, name=None)
+        )
+
+        self.proj_conn.commit()
+
+    def save_edges(self):
+        # FIXME: Just like the verticies, our edges need a little massaging as well. I think the renames, and conversions
+        # should be propegated as well.
+        edges = self.edges.rename(columns={"head_vert_id": "a_node", "tail_vert_id": "b_node", "type": "link_type"})
+        edges["link_id"] = edges.index
+        edges["modes"] = "t"
+
+        # We also need to generate the geometry for each edge, this may take a bit
+        lines = []
+        for row in edges.itertuples():
+            line = (shapely.from_wkt(self.vertices["coord"][row.a_node]), shapely.from_wkt(self.vertices["coord"][row.b_node]))
+            lines.append(shapely.LineString(line))
+
+        edges["geometry"] = lines
+
+        edges.geometry = shapely.to_wkb(lines)
+        edges.line_seg_idx = edges.line_seg_idx.fillna(-1)
+
+        # Just as with the nodes the query should look like thisThis is generated from
+        #
+        # from aequilibrae.project.network import Link, Node
+        # from aequilibrae.project.network.safe_class import SafeClass
+        #
+        # link = Link(edges.iloc[0], project)
+        # data, sql = SafeClass._save_new_with_geometry(link)
+        #
+        # Insert into links ("link_type","line_id","stop_id","line_seg_idx","b_node","a_node","trav_time","freq","o_line_id","d_line_id","transfer_id","link_id","modes",geometry)
+        # values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, 4326))
+        self.proj_conn.executemany(
+            """
+            Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
+            """.format(*edges.columns, self.global_crs.to_epsg()),
+            edges.itertuples(index=False, name=None)
+        )
+
+        self.proj_conn.commit()
