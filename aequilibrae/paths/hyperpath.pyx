@@ -10,9 +10,8 @@ cimport cython
 import numpy as np
 cimport numpy as cnp
 
-from cython.parallel import parallel, prange, threadid
-from libc.stdlib cimport malloc, calloc, free
-from libc.string cimport memset
+from libc.stdlib cimport malloc, free
+ 
 
 ctypedef cnp.float64_t DATATYPE_t
 DATATYPE_PY = np.float64
@@ -47,8 +46,9 @@ cdef struct IndexedElement:
     size_t index
     DATATYPE_t value
 
+
 cdef int _compare(const_void *a, const_void *b) noexcept:
-    cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
+    cdef DATATYPE_t v = (<IndexedElement*> a).value - (<IndexedElement*> b).value
     if v < 0: return -1
     if v >= 0: return 1
 
@@ -101,13 +101,15 @@ cdef void _coo_tocsc_uint32(
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void argsort(cnp.float64_t *data, cnp.uint32_t *order, size_t n) nogil:
+cdef void argsort(DATATYPE_t[::1] data, cnp.uint32_t[:] order) nogil:
     """
     Wrapper of the C function qsort
     source: https://github.com/jcrudy/cython-argsort/tree/master/cyargsort
     """
-    cdef size_t i
-
+    cdef: 
+        size_t i
+        size_t n = <size_t>data.shape[0]
+    
     # Allocate index tracking array.
     cdef IndexedElement *order_struct = <IndexedElement *> malloc(n * sizeof(IndexedElement))
     
@@ -170,174 +172,49 @@ cpdef convert_graph_to_csc_uint32(edges, tail, head, data, vertex_count):
     return rs_indptr, rs_indices, rs_data
 
 
-# Both boundscheck(False) and initializedcheck(False) are required for this function to operate,
-# without them the threads appear to enter a deadlock due to the shared edge_volume array. However
-# the indexing on that array and its slices should never collide.
-#
-# Optionally return the u_i_vec, however this is only possible when using a single destination.
-# The caller is responsible for managing that memory.
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(False)
-@cython.initializedcheck(False)
-cdef cnp.float64_t *compute_SF_in_parallel(
-    cnp.uint32_t[::1] indptr_view,
-    cnp.uint32_t[::1] edge_idx_view,
-    cnp.float64_t[::1] trav_time_view,
-    cnp.float64_t[::1] freq_view,
-    cnp.uint32_t[::1] tail_view,
-    cnp.uint32_t[::1] head_view,
-    cnp.uint32_t[:] d_vert_ids_view,
-    cnp.uint32_t[:] destination_vertex_indices_view,
-    cnp.uint32_t[::1] o_vert_ids_view,
-    cnp.float64_t[::1] demand_vls_view,
-    cnp.float64_t[::1] edge_volume_view,
-    bint output_travel_time,
-    size_t vertex_count,
-    size_t edge_count,
-    int num_threads,
-) nogil:
-    # Thread local variables are prefixed by "thread", anything else should be considered shared and thus read only
-    if output_travel_time:
-        with gil:
-            assert d_vert_ids_view.shape[0] == 1, "To output travel time there must only be one destination"
-    cdef:
-        cnp.uint32_t *thread_demand_origins
-        cnp.float64_t *thread_demand_values
-        cnp.float64_t *thread_edge_volume
-        size_t demand_size
-
-        cnp.float64_t *thread_u_i_vec
-        cnp.float64_t *thread_f_i_vec
-        cnp.float64_t *thread_u_j_c_a_vec
-        cnp.float64_t *thread_v_i_vec
-        cnp.uint8_t *thread_h_a_vec
-        cnp.uint32_t *thread_edge_indices
-
-        # This is a shared buffer, all threads will write into separate slices depending on their threadid.
-        # When writing all threads must increment!
-        cnp.float64_t *edge_volume = <cnp.float64_t *> calloc(num_threads, sizeof(cnp.float64_t) * edge_count)
-
-        # We malloc this memory here, then use it as the 0th thread's thread_u_i_vec to allow us to return it
-        cnp.float64_t *u_i_vec_out = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-
-        int i  # openmp on windows requires iterator variable have signed type
-        size_t j, destination_vertex_index
-
-    with parallel(num_threads=num_threads):
-        thread_demand_origins = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * d_vert_ids_view.shape[0])
-        thread_demand_values  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * d_vert_ids_view.shape[0])
-        # Here we take out thread local slice of the shared buffer, each thread is assigned a unique id so
-        # we can safely read and write without collisions.
-        thread_edge_volume    = &edge_volume[threadid() * edge_count]
-
-        if output_travel_time and threadid() == 0:
-            thread_u_i_vec  = u_i_vec_out
-        else:
-            thread_u_i_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        thread_f_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        thread_u_j_c_a_vec  = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * edge_count)
-        thread_v_i_vec      = <cnp.float64_t *> malloc(sizeof(cnp.float64_t) * vertex_count)
-        thread_h_a_vec      = <cnp.uint8_t   *> malloc(sizeof(cnp.uint8_t)   * edge_count)
-        thread_edge_indices = <cnp.uint32_t  *> malloc(sizeof(cnp.uint32_t)  * edge_count)
-
-        for i in prange(destination_vertex_indices_view.shape[0]):
-            destination_vertex_index = destination_vertex_indices_view[i]
-
-            demand_size = 0
-            for j in range(d_vert_ids_view.shape[0]):
-                if d_vert_ids_view[j] == destination_vertex_index:
-                    thread_demand_origins[demand_size] = o_vert_ids_view[j]
-                    thread_demand_values[demand_size] = demand_vls_view[j]
-                    demand_size = demand_size + 1  # demand_size += 1 is not allowed as cython believes this is a reduction
-
-            # S&F
-            compute_SF_in(
-                indptr_view,
-                edge_idx_view,
-                trav_time_view,
-                freq_view,
-                tail_view,
-                head_view,
-                thread_demand_origins,
-                thread_demand_values,
-                demand_size,
-                thread_edge_volume,
-                thread_u_i_vec,
-                thread_f_i_vec,
-                thread_u_j_c_a_vec,
-                thread_v_i_vec,
-                thread_h_a_vec,
-                thread_edge_indices,
-                vertex_count,
-                destination_vertex_index
-            )
-
-        free(thread_demand_origins)
-        free(thread_demand_values)
-        if output_travel_time and threadid() == 0:
-            pass
-        else:
-            free(thread_u_i_vec)
-        free(thread_f_i_vec)
-        free(thread_u_j_c_a_vec)
-        free(thread_v_i_vec)
-        free(thread_h_a_vec)
-        free(thread_edge_indices)
-
-    # Accumulate results into output buffer. This could parallelised over the output indexes but
-    # the lose of spacial locality may not be worth it.
-    for i in range(num_threads):
-        for j in range(edge_count):
-            edge_volume_view[j] += edge_volume[i * edge_count + j]
-
-    free(edge_volume)
-    return u_i_vec_out
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(False)
 @cython.initializedcheck(False)
-cdef void compute_SF_in(
+cpdef void compute_SF_in(
     cnp.uint32_t[::1] csc_indptr,
     cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec,
-    cnp.float64_t[::1] f_a_vec,
+    DATATYPE_t[::1] c_a_vec,
+    DATATYPE_t[::1] f_a_vec,
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
-    cnp.uint32_t *demand_indices,
-    cnp.float64_t *demand_values,
-    size_t demand_size,
-    cnp.float64_t *v_a_vec,
-    cnp.float64_t *u_i_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t *u_j_c_a_vec,
-    cnp.float64_t *v_i_vec,
-    cnp.uint8_t *h_a_vec,
-    cnp.uint32_t *edge_indices,
-    size_t vertex_count,
+    cnp.uint32_t[::1] demand_indices,
+    DATATYPE_t[::1] demand_values,
+    DATATYPE_t[::1] v_a_vec,
+    DATATYPE_t[::1] u_i_vec,
+    DATATYPE_t[::1] f_i_vec,
+    DATATYPE_t[::1] u_j_c_a_vec,
+    DATATYPE_t[::1] v_i_vec,
+    cnp.uint8_t[::1] h_a_vec,
+    cnp.uint32_t[::1] edge_indices,
+    int vertex_count,
     int dest_vert_index,
 ) nogil:
 
     cdef:
-        size_t edge_count = <size_t>tail_indices.shape[0]
+        int edge_count = tail_indices.shape[0]
         DATATYPE_t u_r, v_a_new, v_i, u_i
         size_t i, h_a_count
         cnp.uint32_t vert_idx 
+        int demand_size = demand_indices.shape[0]
 
     # initialization
-    for i in range(vertex_count):
+    for i in range(<size_t>vertex_count):
         u_i_vec[i] = DATATYPE_INF
         f_i_vec[i] = 0.0
+        u_j_c_a_vec[i] = DATATYPE_INF
         v_i_vec[i] = 0.0
     u_i_vec[<size_t>dest_vert_index] = 0.0
 
-    for i in range(edge_count):
-        # v_a_vec[i] = 0.0
-        u_j_c_a_vec[i] = DATATYPE_INF
+    for i in range(<size_t>edge_count):
         h_a_vec[i] = 0
-
+        v_a_vec[i] = 0.0
 
     # first pass #
     # ---------- #
@@ -360,7 +237,7 @@ cdef void compute_SF_in(
     # demand is loaded into all the origin vertices
     # also we compute the min travel time from all the origin vertices
     u_r = DATATYPE_INF
-    for i in range(demand_size):
+    for i in range(<size_t>demand_size):
         vert_idx = demand_indices[i]
         v_i_vec[<size_t>vert_idx] = demand_values[i]
         u_i = u_i_vec[<size_t>vert_idx]
@@ -380,7 +257,7 @@ cdef void compute_SF_in(
             u_j_c_a_vec[i] *= -1.0
             h_a_count += <size_t>h_a_vec[i]
 
-        # Sort the links with decreasing order of u_j + c_a.
+        # Sort the links with descreasing order of u_j + c_a.
         # Because the sort function sorts in increasing order, we sort a 
         # transformed array, multiplied by -1, and set the items 
         # corresponding to edges that are not in the hyperpath to a 
@@ -391,7 +268,7 @@ cdef void compute_SF_in(
             if h_a_vec[i] == 0:
                 u_j_c_a_vec[i] = 1.0
         
-        argsort(u_j_c_a_vec, edge_indices, edge_count)
+        argsort(u_j_c_a_vec, edge_indices)
 
         _SF_in_second_pass(
             edge_indices,
@@ -412,13 +289,13 @@ cdef void compute_SF_in(
 cdef void _SF_in_first_pass_full(
     cnp.uint32_t[::1] csc_indptr, 
     cnp.uint32_t[::1] csc_edge_idx,
-    cnp.float64_t[::1] c_a_vec,
-    cnp.float64_t[::1] f_a_vec,
+    DATATYPE_t[::1] c_a_vec,
+    DATATYPE_t[::1] f_a_vec,
     cnp.uint32_t[::1] tail_indices,
-    cnp.float64_t *u_i_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t *u_j_c_a_vec,
-    cnp.uint8_t *h_a_vec,
+    DATATYPE_t[::1] u_i_vec,
+    DATATYPE_t[::1] f_i_vec,
+    DATATYPE_t[::1] u_j_c_a_vec,
+    cnp.uint8_t[::1] h_a_vec,
     int dest_vert_index,
 ) nogil:
     """All vertices are visited."""
@@ -509,13 +386,13 @@ cdef void _SF_in_first_pass_full(
 @cython.cdivision(True)
 @cython.initializedcheck(False)
 cdef void _SF_in_second_pass(
-    cnp.uint32_t *edge_indices,
+    cnp.uint32_t[::1] edge_indices,
     cnp.uint32_t[::1] tail_indices,
     cnp.uint32_t[::1] head_indices,
-    cnp.float64_t *v_i_vec,
-    cnp.float64_t *v_a_vec,
-    cnp.float64_t *f_i_vec,
-    cnp.float64_t[::1] f_a_vec,
+    DATATYPE_t[::1] v_i_vec,
+    DATATYPE_t[::1] v_a_vec,
+    DATATYPE_t[::1] f_i_vec,
+    DATATYPE_t[::1] f_a_vec,
     size_t h_a_count
 ) nogil:
 
@@ -534,5 +411,5 @@ cdef void _SF_in_second_pass(
 
         # update v_a
         v_a_new = v_i * f_a / f_i
-        v_a_vec[edge_idx] += v_a_new
+        v_a_vec[edge_idx] = v_a_new
         v_i_vec[<size_t>head_indices[edge_idx]] += v_a_new
