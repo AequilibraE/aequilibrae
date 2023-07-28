@@ -47,7 +47,7 @@ cdef struct IndexedElement:
     size_t index
     DATATYPE_t value
 
-cdef int _compare(const_void *a, const_void *b):
+cdef int _compare(const_void *a, const_void *b) noexcept:
     cdef DATATYPE_t v = (<IndexedElement*> a).value-(<IndexedElement*> b).value
     if v < 0: return -1
     if v >= 0: return 1
