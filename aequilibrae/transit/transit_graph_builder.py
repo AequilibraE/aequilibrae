@@ -54,7 +54,9 @@ class SF_graph_builder:
         seed=124,
         coord_noise=True,
         noise_coef=1.0e-5,
+        with_inner_stop_transfers=True,
         with_outer_stop_transfers=True,
+        with_walking_edges=True,
         distance_upper_bound=np.inf,
     ):
         """
@@ -89,20 +91,30 @@ class SF_graph_builder:
         ]
 
         self.line_segments = None
+
+        # vertices
         self.stop_vertices = None
         self.boarding_vertices = None
         self.alighting_vertices = None
         self.od_vertices = None
+
+        # edges
         self.on_board_edges = None
-        self.dell_edges = None
+        self.dwell_edges = None
         self.alighting_edges = None
         self.boarding_edges = None
+        self.connector_edges = None
+        self.inner_stop_transfer_edges = pd.DataFrame()
+        self.outer_stop_transfer_edges = pd.DataFrame()
+        self.walking_edges = pd.DataFrame()
 
         # longlat to projected CRS transfromer
         self.transformer = pyproj.Transformer.from_crs(
             pyproj.CRS(global_crs), pyproj.CRS(projected_crs), always_xy=True
         ).transform
 
+        # Add some spatial noise so that stop, boarding and aligthing vertices
+        # are not colocated
         self.rng = np.random.default_rng(seed=seed)
         self.coord_noise = coord_noise
         self.noise_coef = noise_coef
@@ -116,7 +128,9 @@ class SF_graph_builder:
         self.walking_speed = 1.0
         self.access_time_factor = 1.0
         self.egress_time_factor = 1.0
+        self.with_inner_stop_transfers = with_inner_stop_transfers
         self.with_outer_stop_transfers = with_outer_stop_transfers
+        self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
 
     def create_line_segments(self):
@@ -333,9 +347,8 @@ class SF_graph_builder:
         self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        sql = (
-            """SELECT CAST(node_id AS TEXT) AS taz_id, ST_AsText(geometry) AS coord FROM nodes WHERE is_centroid = 1"""
-        )
+        sql = """SELECT CAST(node_id AS TEXT) AS taz_id, ST_AsText(geometry) AS coord FROM nodes 
+            WHERE is_centroid = 1"""
         od_vertices = pd.read_sql(sql, self.proj_conn)
 
         # uniform attributes
@@ -351,7 +364,7 @@ class SF_graph_builder:
 
         Vertices have the following attributes:
             - vert_id: int
-            - type (either 'stop', 'boarding', 'alighting', 'od', 'walking' or 'fictitious'): str
+            - type (either 'stop', 'boarding', 'alighting', 'od'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
@@ -659,6 +672,8 @@ class SF_graph_builder:
         self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
     def create_inner_stop_transfer_edges(self):
+        """Create transfer edges between distinct lines of each stop."""
+
         alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]].rename(
             columns={"line_id": "o_line_id", "vert_id": "tail_vert_id"}
         )
@@ -698,6 +713,8 @@ class SF_graph_builder:
         self.inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
+        """Create transfer edges between distinct lines/stops of each station."""
+
         sql = """
         SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
@@ -793,6 +810,8 @@ class SF_graph_builder:
         self.outer_stop_transfer_edges = outer_stop_transfer_edges
 
     def create_walking_edges(self):
+        """Create walking edges between distinct stops of each station."""
+
         sql = """
         SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> '' 
@@ -875,20 +894,21 @@ class SF_graph_builder:
             - o_line_id: str
             - d_line_id: str
             - transfer_id: str
-
         """
 
+        # create the graph edges
         self.create_on_board_edges()
         self.create_dwell_edges()
         self.create_boarding_edges()
         self.create_alighting_edges()
         self.create_connector_edges()
+        if self.with_inner_stop_transfers:
+            self.create_inner_stop_transfer_edges()
         self.create_inner_stop_transfer_edges()
         if self.with_outer_stop_transfers:
             self.create_outer_stop_transfer_edges()
-        else:
-            self.outer_stop_transfer_edges = pd.DataFrame()
-        self.create_walking_edges()
+        if self.with_walking_edges:
+            self.create_walking_edges()
 
         # stack the dataframes on top of each other
         self.edges = pd.concat(
