@@ -8,6 +8,7 @@ import shapely
 import shapely.ops
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
+import warnings
 
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -25,6 +26,18 @@ def haversine(lon1, lat1, lon2, lat2):
     c = 2.0 * np.arcsin(np.sqrt(a))
     distance_m = 6367000.0 * c
     return distance_m
+
+
+def shift_duplicate_geometry(df, shift=0.00001):
+    def _shift_points(group_df, shift):
+        points = shapely.from_wkb(group_df.geometry.values)
+        count = len(points)
+        for i, x in enumerate(points):
+            points[i] = shapely.Point(x.x, x.y + (i + 1) * shift / count)
+
+        group_df.geometry = shapely.to_wkb(points)
+        return group_df
+    return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
 
 
 class SF_graph_builder:
@@ -1024,11 +1037,8 @@ class SF_graph_builder:
 
         self.proj_conn.commit()
 
-    def save_vertices(self):
-        # FIXME: Currently can only save uniquely located nodes. Pedro has dealt with the before by repeatedly shifting
-        # the node until it is uniquely located. I think this is a restriction of the rtree used but haven't confirmed.
-        # To do that here we'd have to move away from executemany and write the loop ourselves or deal with them seperately.
 
+    def save_vertices(self, robust=True):
         # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
         # notebook. I don't think this is a good solution but I'm not sure what do to without adding the zones and such
         # ourselves.
@@ -1057,12 +1067,21 @@ class SF_graph_builder:
         vertices.geometry = shapely.to_wkb(shapely.from_wkt(vertices.geometry.values))
         vertices.line_seg_idx = vertices.line_seg_idx.fillna(-1)
 
+        duplicated = vertices.geometry.duplicated()
+
+        if not robust and not duplicated.empty:
+            warnings.warn("Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.", warnings.RuntimeWarning)
+
+        if robust and not duplicated.empty:
+            df = shift_duplicate_geometry(vertices[["node_id", "geometry"]][duplicated])
+            vertices.loc[df.index, "geometry"] = df.geometry
+
         self.proj_conn.executemany(
             """
             Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,GeomFromWKB(?, {}));
             """.format(*vertices.columns, self.global_crs.to_epsg()),
-            vertices[(vertices.node_type != "od") & (~vertices.geometry.duplicated())].itertuples(index=False, name=None)
+            vertices[(vertices.node_type != "od") & (True if robust else ~duplicated)].itertuples(index=False, name=None)
         )
 
         self.proj_conn.commit()
