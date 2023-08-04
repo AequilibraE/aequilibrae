@@ -408,7 +408,7 @@ class SF_graph_builder:
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
         self.vertices.index.name = "index"
-        self.vertices["vert_id"] = self.vertices.index
+        self.vertices["vert_id"] = self.vertices.index + 1
         self.vertices = self.vertices[self.vertex_cols]
 
         # data types
@@ -944,7 +944,7 @@ class SF_graph_builder:
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
-        self.edges["edge_id"] = self.edges.index
+        self.edges["edge_id"] = self.edges.index + 1
         self.edges = self.edges[self.edges_cols]
 
         # data types
@@ -1096,7 +1096,8 @@ class SF_graph_builder:
         # We also need to generate the geometry for each edge, this may take a bit
         lines = []
         for row in edges.itertuples():
-            line = (shapely.from_wkt(self.vertices["coord"][row.a_node]), shapely.from_wkt(self.vertices["coord"][row.b_node]))
+            # row.a_node - 1 because the vert_ids are the index + 1
+            line = (shapely.from_wkt(self.vertices.at[row.a_node - 1, "coord"]), shapely.from_wkt(self.vertices.at[row.b_node - 1, "coord"]))
             lines.append(shapely.LineString(line))
 
         edges["geometry"] = lines
