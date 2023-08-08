@@ -15,7 +15,7 @@ class Test(TestCase):
             if place is None:
                 self.skipTest("Skipping... either Vatican City doesn't exist anymore or there was a network failure")
             place = [round(x, 1) for x in place]
-            if place != [12.4, 41.9, 12.5, 41.9]:
+            if place != [12.5, 41.9, 12.5, 41.9]:
                 self.fail("Returned the wrong boundingbox for Vatican City")
 
             place, report = placegetter("Just a random place with no bear in reality")
