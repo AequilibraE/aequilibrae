@@ -20,7 +20,7 @@ resources not available from other open-source packages in the Python (NumPy, re
 
 ## Comprehensive documentation
 
-[AequilibraE documentation built with Sphinx ](http://www.aequilibrae.com>)
+[AequilibraE documentation built with Sphinx ](http://www.aequilibrae.com)
 
 ## What is available
 
