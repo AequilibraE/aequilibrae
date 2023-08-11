@@ -1,7 +1,12 @@
 agencies
+attribute_documentation
 fare_attributes
 fare_rules
 fare_zones
+links
+link_types
+nodes
+node_types
 pattern_mapping
 route_links
 routes

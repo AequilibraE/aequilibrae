@@ -949,47 +949,8 @@ class SF_graph_builder:
         # This graph requires some additional tables and fields inorder to store all our information.
         # Currently it mimics what we are storing in the df
 
-        # `node_types` table: contains the different types of nodes we have. This is almost indentical to
-        # `link_types`
-        self.proj_conn.execute(
-            """
-            CREATE TABLE node_types (node_type     VARCHAR UNIQUE NOT NULL PRIMARY KEY,
-                                     node_type_id  VARCHAR UNIQUE NOT NULL,
-                                     description   VARCHAR,
-                                     lanes         NUMERIC,
-                                     lane_capacity NUMERIC,
-                                     speed         NUMERIC)
-            """
-        )
-
-        # Lets add our current node types
-        self.proj_conn.executemany(
-            """
-            INSERT INTO node_types (node_type, node_type_id, description) VALUES (?, ?, ?)
-            """,
-            [
-                ("OD", "od", "Origin/Destination"),
-                ("Stop", "stop", "Stop"),
-                ("Alighting", "alighting", "Alighting node"),
-                ("Boarding", "boarding", "Boarding node")
-            ]
-        )
-
-        # We also need to add some additional columns to the `nodes` table
-        cols = [
-            ("node_type", "TEXT", "REFERENCES link_types"),
-            ("stop_id", "TEXT", ""),
-            ("line_id", "TEXT", ""),
-            ("line_seg_idx", "INTEGER", ""),
-            ("taz_id", "TEXT", "")
-        ]
-
-        for col, node_type, constraints in cols:
-            # Can't use executemany here because we need to template the fields not values.
-            self.proj_conn.execute(f"ALTER TABLE nodes ADD COLUMN {col} {node_type} {constraints};")
-
         # Now onto the links, we need to specifiy all our link types
-        self.proj_conn.executemany(
+        self.pt_conn.executemany(
             """
             INSERT INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
             """,
@@ -1006,21 +967,7 @@ class SF_graph_builder:
             ]
         )
 
-        # As well as add our extra columns
-        cols = [
-            ("line_id", "TEXT", ""),
-            ("stop_id", "TEXT", ""),
-            ("line_seg_idx", "INTEGER", ""),
-            ("trav_time", "NUMERIC", ""),
-            ("freq", "NUMERIC", ""),
-            ("o_line_id", "TEXT", ""),
-            ("d_line_id", "TEXT", ""),
-            ("transfer_id", "TEXT", "")
-        ]
-        for col, link_type, constraints in cols:
-            self.proj_conn.execute(f"ALTER TABLE links ADD COLUMN {col} {link_type} {constraints};")
-
-        self.proj_conn.commit()
+        self.pt_conn.commit()
 
 
     def save_vertices(self, robust=True):
@@ -1058,7 +1005,7 @@ class SF_graph_builder:
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
             self.vertices.loc[df.index, "geometry"] = df.geometry
 
-        self.proj_conn.executemany(
+        self.pt_conn.executemany(
             """
             Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,GeomFromWKB(?, {}));
@@ -1066,7 +1013,7 @@ class SF_graph_builder:
             self.vertices[(self.vertices.node_type != "od") & (True if robust else ~duplicated)].itertuples(index=False, name=None)
         )
 
-        self.proj_conn.commit()
+        self.pt_conn.commit()
 
     def save_edges(self):
         # FIXME: Just like the verticies, our edges need a little massaging as well
@@ -1096,7 +1043,7 @@ class SF_graph_builder:
             Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
             """.format(*self.edges.columns, self.global_crs.to_epsg())
-        self.proj_conn.executemany(
+        self.pt_conn.executemany(
             """
             Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
@@ -1104,4 +1051,4 @@ class SF_graph_builder:
             self.edges.itertuples(index=False, name=None)
         )
 
-        self.proj_conn.commit()
+        self.pt_conn.commit()
