@@ -1039,10 +1039,6 @@ class SF_graph_builder:
         #
         # Insert into links ("link_type","line_id","stop_id","line_seg_idx","b_node","a_node","trav_time","freq","o_line_id","d_line_id","transfer_id","link_id","modes",geometry)
         # values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, 4326))
-        self.edge_sql = """
-            Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
-            values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
-            """.format(*self.edges.columns, self.global_crs.to_epsg())
         self.pt_conn.executemany(
             """
             Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})

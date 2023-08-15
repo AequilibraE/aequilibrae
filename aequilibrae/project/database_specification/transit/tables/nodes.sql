@@ -31,7 +31,7 @@ CREATE TABLE if not exists nodes (ogc_fid      INTEGER PRIMARY KEY,
                                   line_seg_idx INTEGER,
                                   modes        TEXT,
                                   link_types   TEXT,
-                                  node_types   TEXT,
+                                  node_type    TEXT,
                                   taz_id       TEXT);
 
 --#
@@ -61,6 +61,6 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','link_types', 'Link types connected to the node');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','node_types', 'Node types of this node');
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','node_type', 'Node types of this node');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','taz_id', 'Transit assignemnt zone id');
