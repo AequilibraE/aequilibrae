@@ -9,6 +9,9 @@ import shapely.ops
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
 
+from aequilibrae.utils.geo_utils import haversine
+
+
 SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 SF_EDGE_COLS = [
     "type",
@@ -23,23 +26,6 @@ SF_EDGE_COLS = [
     "d_line_id",
     "transfer_id",
 ]
-
-
-def haversine(lon1, lat1, lon2, lat2):
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
-    """
-    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
-
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-
-    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
-
-    c = 2.0 * np.arcsin(np.sqrt(a))
-    distance_m = 6367000.0 * c
-    return distance_m
 
 
 class SF_graph_builder:
