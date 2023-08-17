@@ -32,7 +32,9 @@ class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     ASSUMPIONS:
-    - trips dir is always 0: opposite directions are not supported
+    - trips dir is always 0: opposite directions are not supported.
+      In the GTFS files, this corresponds to direction_id from trips.txt
+      (indicates the direction of travel for a trip)
     - all times are expressed in seconds [s], all frequencies in [1/s]
     - headways are uniform for trips of the same pattern
 
@@ -142,9 +144,8 @@ class SF_graph_builder:
         ).pattern_id.values
 
         # route links corresponding to the given time range
-        sql = (
-            "SELECT pattern_id, seq, CAST(from_stop AS TEXT) from_stop, CAST(to_stop AS TEXT) to_stop FROM route_links"
-        )
+        sql = """SELECT pattern_id, seq, CAST(from_stop AS TEXT) from_stop, CAST(to_stop AS TEXT) to_stop 
+            FROM route_links"""
         route_links = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
@@ -152,11 +153,12 @@ class SF_graph_builder:
         route_links = route_links.loc[route_links.pattern_id.isin(pattern_ids)]
 
         # create a line segment table
-        sql = "SELECT pattern_id, shortname FROM routes" ""
+        sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
         routes = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
         )
+        # we create a line id by concatenating the route short name with the pattern_id
         routes["line_id"] = routes["shortname"] + "_" + routes["pattern_id"].astype(str)
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
 
