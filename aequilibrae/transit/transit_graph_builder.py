@@ -9,6 +9,21 @@ import shapely.ops
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
 
+SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
+SF_EDGE_COLS = [
+    "type",
+    "line_id",
+    "stop_id",
+    "line_seg_idx",
+    "tail_vert_id",
+    "head_vert_id",
+    "trav_time",
+    "freq",
+    "o_line_id",
+    "d_line_id",
+    "transfer_id",
+]
+
 
 def haversine(lon1, lat1, lon2, lat2):
     """
@@ -47,7 +62,7 @@ class SF_graph_builder:
         project_conn,
         start=61200,
         end=64800,
-        margin=0,
+        time_margin=0,
         global_crs="EPSG:4326",
         projected_crs="EPSG:2154",
         num_threads=-1,
@@ -71,24 +86,12 @@ class SF_graph_builder:
         self.proj_conn.enable_load_extension(True)
         self.proj_conn.load_extension("mod_spatialite")
 
-        self.start = start - margin  # starting time of the selected time period
-        self.end = end + margin  # ending time of the selected time period
+        self.start = start - time_margin  # starting time of the selected time period
+        self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads
 
-        self.vertex_cols = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
-        self.edges_cols = [
-            "type",
-            "line_id",
-            "stop_id",
-            "line_seg_idx",
-            "tail_vert_id",
-            "head_vert_id",
-            "trav_time",
-            "freq",
-            "o_line_id",
-            "d_line_id",
-            "transfer_id",
-        ]
+        # graph components
+        # ----------------
 
         self.line_segments = None
 
@@ -393,7 +396,7 @@ class SF_graph_builder:
         self.vertices.reset_index(drop=True, inplace=True)
         self.vertices.index.name = "index"
         self.vertices["vert_id"] = self.vertices.index
-        self.vertices = self.vertices[self.vertex_cols]
+        self.vertices = self.vertices[SF_VERTEX_COLS]
 
         # data types
         self.vertices.vert_id = self.vertices.vert_id.astype(int)
@@ -929,7 +932,7 @@ class SF_graph_builder:
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
         self.edges["edge_id"] = self.edges.index
-        self.edges = self.edges[self.edges_cols]
+        self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
         self.edges["type"] = self.edges["type"].astype("category")
