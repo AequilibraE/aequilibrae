@@ -55,7 +55,7 @@ cdef struct PriorityQueue:
     Element* Elements  # array storing the elements
     DTYPE_t* keys
 
-cdef void init_heap(PriorityQueue* pqueue, size_t length) nogil:
+cdef void init_heap(PriorityQueue* pqueue, size_t length) noexcept nogil:
     """Initialize the binary heap.
 
     input
@@ -75,7 +75,7 @@ cdef void init_heap(PriorityQueue* pqueue, size_t length) nogil:
         _initialize_element(pqueue, i)
 
 
-cdef void _initialize_element(PriorityQueue* pqueue, size_t element_idx) nogil:
+cdef void _initialize_element(PriorityQueue* pqueue, size_t element_idx) noexcept nogil:
     """Initialize a single element.
 
     input
@@ -88,7 +88,7 @@ cdef void _initialize_element(PriorityQueue* pqueue, size_t element_idx) nogil:
     pqueue.Elements[element_idx].node_idx = pqueue.length
 
 
-cdef void free_heap(PriorityQueue* pqueue) nogil:
+cdef void free_heap(PriorityQueue* pqueue) noexcept nogil:
     """Free the binary heap.
 
     input
@@ -99,7 +99,7 @@ cdef void free_heap(PriorityQueue* pqueue) nogil:
     free(pqueue.Elements)
 
 
-cdef void insert(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key) nogil:
+cdef void insert(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key) noexcept nogil:
     """Insert an element into the heap and reorder the heap.
 
     input
@@ -122,7 +122,7 @@ cdef void insert(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key) nogil:
     _decrease_key_from_node_index(pqueue, node_idx, key)
 
 
-cdef void decrease_key(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key_new) nogil:
+cdef void decrease_key(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key_new) noexcept nogil:
     """Decrease the key of a element in the heap, given its element index.
 
     input
@@ -141,7 +141,7 @@ cdef void decrease_key(PriorityQueue* pqueue, size_t element_idx, DTYPE_t key_ne
         key_new)
 
 
-cdef DTYPE_t peek(PriorityQueue* pqueue) nogil:
+cdef DTYPE_t peek(PriorityQueue* pqueue) noexcept nogil:
     """Find heap min key.
 
     input
@@ -160,7 +160,7 @@ cdef DTYPE_t peek(PriorityQueue* pqueue) nogil:
     return pqueue.Elements[pqueue.A[0]].key
 
 
-cdef bint is_empty(PriorityQueue* pqueue) nogil:
+cdef bint is_empty(PriorityQueue* pqueue) noexcept nogil:
     """Check whether the heap is empty.
 
     input
@@ -175,7 +175,7 @@ cdef bint is_empty(PriorityQueue* pqueue) nogil:
     return isempty
 
 
-cdef size_t extract_min(PriorityQueue* pqueue) nogil:
+cdef size_t extract_min(PriorityQueue* pqueue) noexcept nogil:
     """Extract element with min keay from the heap,
     and return its element index.
 
@@ -209,7 +209,7 @@ cdef size_t extract_min(PriorityQueue* pqueue) nogil:
 
     return element_idx
 
-cdef void _exchange_nodes(PriorityQueue* pqueue, size_t node_i, size_t node_j) nogil:
+cdef void _exchange_nodes(PriorityQueue* pqueue, size_t node_i, size_t node_j) noexcept nogil:
     """Exchange two nodes in the heap.
 
     input
@@ -231,7 +231,7 @@ cdef void _exchange_nodes(PriorityQueue* pqueue, size_t node_i, size_t node_j) n
     pqueue.Elements[element_i].node_idx = node_j
 
 
-cdef void _min_heapify(PriorityQueue* pqueue, size_t node_idx) nogil:
+cdef void _min_heapify(PriorityQueue* pqueue, size_t node_idx) noexcept nogil:
     """Re-order sub-tree under a given node (given its node index)
     until it satisfies the heap property.
 
@@ -304,7 +304,7 @@ cdef void _min_heapify(PriorityQueue* pqueue, size_t node_idx) nogil:
             break
 
 
-cdef void _decrease_key_from_node_index(PriorityQueue* pqueue, size_t node_idx, DTYPE_t key_new) nogil:
+cdef void _decrease_key_from_node_index(PriorityQueue* pqueue, size_t node_idx, DTYPE_t key_new) noexcept nogil:
     """Decrease the key of an element in the heap, given its tree index.
 
     input
