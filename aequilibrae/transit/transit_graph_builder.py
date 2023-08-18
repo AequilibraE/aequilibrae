@@ -189,8 +189,14 @@ class SF_graph_builder:
         tt["last_trip_id"] = tt["trip_id"].shift(+1)
         tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
         tt["trav_time"] = tt["arrival"] - tt["last_departure"]
-        tt.loc[tt.seq == 0, "trav_time"] = np.nan
+        tt.dropna(how="any", inplace=True)
+        tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
+            ["last_departure", "last_trip_id", "last_pattern_id"]
+        ].astype(int)
+
         tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
+        tt.dropna(subset="trav_time", inplace=True)
+        tt = tt.copy(deep=True)
 
         # tt.seq refers to the stop sequence index.
         # Because we computed the travel time between two stops, we are now dealing
@@ -198,7 +204,7 @@ class SF_graph_builder:
         tt = tt.loc[tt.seq > 0]
         tt.seq -= 1
 
-        # take the min of the travel times computed among the trips of a pattern segment
+        # take the mean of the travel times computed among the trips of a pattern segment
         tt = tt[["pattern_id", "seq", "trav_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
 
         return tt
