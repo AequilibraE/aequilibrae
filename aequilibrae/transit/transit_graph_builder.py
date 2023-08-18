@@ -51,13 +51,12 @@ class SF_graph_builder:
     TODO:
     - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
     - instanciate properly using a project path, an aequilibrae project or anything else that follow the
-      package guideline (without explicit public_transport_conn and project_conn)
+      package guideline (without explicit public_transport_conn)
     """
 
     def __init__(
         self,
         public_transport_conn,
-        project_conn,
         start=61200,
         end=64800,
         margin=0,
@@ -79,10 +78,6 @@ class SF_graph_builder:
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
-
-        self.proj_conn = project_conn  # sqlite connection
-        self.proj_conn.enable_load_extension(True)
-        self.proj_conn.load_extension("mod_spatialite")
 
         self.start = start - margin  # starting time of the selected time period
         self.end = end + margin  # ending time of the selected time period
@@ -126,8 +121,12 @@ class SF_graph_builder:
         self.projected_crs = pyproj.CRS(projected_crs)
 
         # longlat to projected CRS transfromer
-        self.transformer = pyproj.Transformer.from_crs(
+        self.transformer_g_to_p = pyproj.Transformer.from_crs(
             self.global_crs, self.projected_crs, always_xy=True
+        ).transform
+
+        self.transformer_p_to_g = pyproj.Transformer.from_crs(
+            self.projected_crs, self.global_crs, always_xy=True
         ).transform
 
         # Add some spatial noise so that stop, boarding and aligthing vertices
@@ -149,6 +148,36 @@ class SF_graph_builder:
         self.with_outer_stop_transfers = with_outer_stop_transfers
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
+
+    def add_zones(self, zones, from_crs: str = None):
+        """
+        Add zones as ODs.
+        Assumes zone geometry is in projected crs unless `from_crs` is not None.
+        If `from_cts` is provided, the geometry will be projected to the provided projected_crs"""
+        if "zone_id" not in zones.columns or "geometry" not in zones.columns:
+            raise KeyError("zone_id and geometry must be columns in zones")
+
+        if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
+            geometry = shapely.from_wkt(zones.geometry.values)
+        # Check if the supplied zones df is from geopandas without import geopandas.
+        # We check __mro__ incase of inheritance. https://stackoverflow.com/a/63337375/14047443
+        elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__]:
+            geometry = zones.geometry.values
+        else:
+            raise TypeError("geometry is not a string, bytes, or shapely.Geometry instance")
+
+        if from_crs:
+            transformer = pyproj.Transformer.from_crs(pyproj.CRS(from_crs), self.projected_crs, always_xy=True).transform
+            geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        centroids = shapely.centroid(geometry)
+
+        self.zones = pd.DataFrame(
+            {
+                "zone_id": zones.zone_id.copy(deep=True),
+                "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
+                "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids])
+            }
+        )
 
     def create_line_segments(self):
         # trip ids corresponding to the given time range
@@ -364,9 +393,7 @@ class SF_graph_builder:
         self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        sql = """SELECT CAST(node_id AS TEXT) AS taz_id, ST_AsBinary(geometry) AS geometry FROM nodes
-            WHERE is_centroid = 1"""
-        od_vertices = pd.read_sql(sql, self.proj_conn)
+        od_vertices = self.zones[["zone_id", "centroids"]].rename(columns={"zone_id": "taz_id", "centroids": "geometry"})
 
         # uniform attributes
         od_vertices["node_type"] = "od"
@@ -580,7 +607,7 @@ class SF_graph_builder:
         od_vertices = self.vertices[self.vertices.node_type == "od"][["node_id", "taz_id", "geometry"]].copy(deep=True)
         od_vertices.reset_index(drop=True, inplace=True)
         od_geometries = od_vertices["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer, shapely.from_wkb(geometry))
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
         )
         od_geometries = np.array(list(od_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
@@ -588,7 +615,7 @@ class SF_graph_builder:
         stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(deep=True)
         stop_vertices.reset_index(drop=True, inplace=True)
         stop_geometries = stop_vertices["geometry"].apply(
-            lambda geometry: shapely.ops.transform(self.transformer, shapely.from_wkb(geometry))
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
         )
         stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
@@ -1010,7 +1037,7 @@ class SF_graph_builder:
             Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,GeomFromWKB(?, {}));
             """.format(*self.vertices.columns, self.global_crs.to_epsg()),
-            self.vertices[(self.vertices.node_type != "od") & (True if robust else ~duplicated)].itertuples(index=False, name=None)
+            (self.vertices if robust else self.vertices[~duplicated]).itertuples(index=False, name=None)
         )
 
         self.pt_conn.commit()
