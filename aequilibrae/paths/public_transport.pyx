@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import multiprocessing
 cimport numpy as cnp
 cimport openmp
 
@@ -173,7 +174,7 @@ class HyperpathGenerating:
             False,
             self.vertex_count,
             self._edges["volume"].shape[0],
-            (openmp.omp_get_num_threads() if threads < 1 else threads)
+            (multiprocessing.cpu_count() if threads < 1 else threads)
         )
 
     def _check_demand(self, demand, origin_column, destination_column, demand_column):
