@@ -34,7 +34,7 @@ cpdef void bpr2_cython(double[:] congested_time,
                     double [:] fftime,
                     double[:] alpha,
                     double [:] beta,
-                    int cores):
+                    int cores) noexcept:
     cdef long long i
     cdef long long l = congested_time.shape[0]
 
@@ -58,7 +58,7 @@ cpdef void dbpr2_cython(double[:] deltaresult,
                     double [:] fftime,
                     double[:] alpha,
                     double [:] beta,
-                    int cores):
+                    int cores) noexcept:
     cdef long long i
     cdef long long l = deltaresult.shape[0]
 

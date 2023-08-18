@@ -15,12 +15,12 @@
 [![QAequilibraE artifacts](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/build_artifacts_qgis.yml)
 
 
-AequilibraE is the first comprehensive Python package for transportation modeling, and it aims to provide all the
+AequilibraE is the first comprehensive Python package for transportation modeling. It aims to provide all the
 resources not available from other open-source packages in the Python (NumPy, really) ecosystem.
 
 ## Comprehensive documentation
 
-[AequilibraE documentation built with Sphinx ](http://www.aequilibrae.com>)
+[AequilibraE documentation built with Sphinx ](http://www.aequilibrae.com)
 
 ## What is available
 

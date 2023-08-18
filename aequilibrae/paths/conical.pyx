@@ -34,7 +34,7 @@ cpdef void conical_cython(double[:] congested_time,
                         double [:] fftime,
                         double[:] alpha,
                         double [:] beta,
-                        int cores):
+                        int cores) noexcept:
     cdef long long i
     cdef long long l = congested_time.shape[0]
 
@@ -57,7 +57,7 @@ cpdef void dconical_cython(double[:] deltaresult,
                        double [:] fftime,
                        double[:] alpha,
                        double [:] beta,
-                       int cores):
+                       int cores) noexcept:
     cdef long long i
     cdef long long l = deltaresult.shape[0]
 
