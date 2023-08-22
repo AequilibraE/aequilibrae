@@ -37,6 +37,7 @@ def shift_duplicate_geometry(df, shift=0.00001):
 
         group_df.geometry = shapely.to_wkb(points)
         return group_df
+
     return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
 
 
@@ -167,7 +168,9 @@ class SF_graph_builder:
             raise TypeError("geometry is not a string, bytes, or shapely.Geometry instance")
 
         if from_crs:
-            transformer = pyproj.Transformer.from_crs(pyproj.CRS(from_crs), self.projected_crs, always_xy=True).transform
+            transformer = pyproj.Transformer.from_crs(
+                pyproj.CRS(from_crs), self.projected_crs, always_xy=True
+            ).transform
             geometry = [shapely.ops.transform(transformer, p) for p in geometry]
         centroids = shapely.centroid(geometry)
 
@@ -175,7 +178,7 @@ class SF_graph_builder:
             {
                 "zone_id": zones.zone_id.copy(deep=True),
                 "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
-                "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids])
+                "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids]),
             }
         )
 
@@ -393,7 +396,9 @@ class SF_graph_builder:
         self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        od_vertices = self.zones[["zone_id", "centroids"]].rename(columns={"zone_id": "taz_id", "centroids": "geometry"})
+        od_vertices = self.zones[["zone_id", "centroids"]].rename(
+            columns={"zone_id": "taz_id", "centroids": "geometry"}
+        )
 
         # uniform attributes
         od_vertices["node_type"] = "od"
@@ -612,7 +617,9 @@ class SF_graph_builder:
         od_geometries = np.array(list(od_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
         # Select/copy the stop vertices and project their geometryinates
-        stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(deep=True)
+        stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(
+            deep=True
+        )
         stop_vertices.reset_index(drop=True, inplace=True)
         stop_geometries = stop_vertices["geometry"].apply(
             lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
@@ -632,9 +639,7 @@ class SF_graph_builder:
             # access connectors
             access_connector_edges = pd.concat(
                 [
-                    stop_vertices[["stop_id", "node_id"]]
-                    .reset_index(drop=True)
-                    .rename(columns={"node_id": "a_node"}),
+                    stop_vertices[["stop_id", "node_id"]].reset_index(drop=True).rename(columns={"node_id": "a_node"}),
                     nearest_od.rename(columns={"node_id": "b_node"}),
                     trav_time,
                 ],
@@ -662,9 +667,7 @@ class SF_graph_builder:
                 connectors.append(df)
 
             # access connectors
-            access_connector_edges = (
-                pd.concat(connectors).rename(columns={"node_id": "b_node"}).reset_index(drop=True)
-            )
+            access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "b_node"}).reset_index(drop=True)
 
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
@@ -697,9 +700,7 @@ class SF_graph_builder:
 
         # egress connectors
         egress_connector_edges = access_connector_edges.copy(deep=True)
-        egress_connector_edges.rename(
-            columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True
-        )
+        egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True)
 
         # uniform values
         egress_connector_edges["link_type"] = "egress_connector"
@@ -772,17 +773,17 @@ class SF_graph_builder:
         stops = stops[stops.parent_station.isin(station_list)]
 
         # load the aligthing vertices (tail of transfer edges)
-        alighting = self.vertices[self.vertices.node_type == "alighting"][["stop_id", "line_id", "node_id", "geometry"]].rename(
-            columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"}
-        )
+        alighting = self.vertices[self.vertices.node_type == "alighting"][
+            ["stop_id", "line_id", "node_id", "geometry"]
+        ].rename(columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"})
         # add the station id
         alighting = pd.merge(alighting, stops, on="stop_id", how="inner")
         alighting.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
 
         # load the boarding vertices (head of transfer edges)
-        boarding = self.vertices[self.vertices.node_type == "boarding"][["stop_id", "line_id", "node_id", "geometry"]].rename(
-            columns={"line_id": "d_line_id", "geometry": "d_geometry", "node_id": "a_node"}
-        )
+        boarding = self.vertices[self.vertices.node_type == "boarding"][
+            ["stop_id", "line_id", "node_id", "geometry"]
+        ].rename(columns={"line_id": "d_line_id", "geometry": "d_geometry", "node_id": "a_node"})
         # add the station id
         boarding = pd.merge(boarding, stops, on="stop_id", how="inner")
         boarding.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
@@ -991,11 +992,10 @@ class SF_graph_builder:
                 ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
                 ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
                 ("walking", "w", "Walking, from stop or walking to stop or walking"),
-            ]
+            ],
         )
 
         self.pt_conn.commit()
-
 
     def save_vertices(self, robust=True):
         # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
@@ -1026,7 +1026,10 @@ class SF_graph_builder:
         duplicated = self.vertices.geometry.duplicated()
 
         if not robust and not duplicated.empty:
-            warnings.warn("Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.", warnings.RuntimeWarning)
+            warnings.warn(
+                "Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.",
+                warnings.RuntimeWarning,
+            )
 
         if robust and not duplicated.empty:
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
@@ -1036,8 +1039,10 @@ class SF_graph_builder:
             """
             Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,GeomFromWKB(?, {}));
-            """.format(*self.vertices.columns, self.global_crs.to_epsg()),
-            (self.vertices if robust else self.vertices[~duplicated]).itertuples(index=False, name=None)
+            """.format(
+                *self.vertices.columns, self.global_crs.to_epsg()
+            ),
+            (self.vertices if robust else self.vertices[~duplicated]).itertuples(index=False, name=None),
         )
 
         self.pt_conn.commit()
@@ -1051,7 +1056,10 @@ class SF_graph_builder:
         lines = []
         for row in self.edges.itertuples():
             # row.a_node - 1 because the node_ids are the index + 1
-            line = (shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]), shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]))
+            line = (
+                shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
+                shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+            )
             lines.append(shapely.LineString(line))
 
         self.edges["geometry"] = shapely.to_wkb(lines)
@@ -1070,8 +1078,10 @@ class SF_graph_builder:
             """
             Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
-            """.format(*self.edges.columns, self.global_crs.to_epsg()),
-            self.edges.itertuples(index=False, name=None)
+            """.format(
+                *self.edges.columns, self.global_crs.to_epsg()
+            ),
+            self.edges.itertuples(index=False, name=None),
         )
 
         self.pt_conn.commit()
