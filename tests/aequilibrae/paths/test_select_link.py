@@ -7,6 +7,7 @@ from unittest import TestCase
 import numpy as np
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
+from aequilibrae.matrix import AequilibraeMatrix
 from ...data import siouxfalls_project
 
 
@@ -146,6 +147,75 @@ class TestSelectLink(TestCase):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
+
+    def test_kaitang(self):
+        proj_path = pathlib.Path(gettempdir()) / ("test_traffic_assignment_path_files" + uuid.uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
+
+        print(proj_path)
+
+        breakpoint()
+        link_df = pd.read_csv(proj_path / 'link.csv')
+        # link_df["link_id_old"] = link_df.link_id
+        # link_df["link_id"] = link_df.index + 1
+        node_df = pd.read_csv(proj_path / 'node.csv')
+        centroids_array = np.array([7, 8, 11])
+
+        net = link_df.copy()
+
+        g = Graph()
+        g.network = net
+        g.network_ok = True
+        g.status = 'OK'
+        g.mode = 'a'
+        g.prepare_graph(centroids_array)
+        g.set_blocked_centroid_flows(False)
+        g.set_graph('fft')
+
+        aem_mat = AequilibraeMatrix()
+        aem_mat.load(proj_path / 'demand_a.aem')
+        aem_mat.computational_view(['a'])
+
+        assign_class = TrafficClass("class_a", g, aem_mat)
+        assign_class.set_fixed_cost('a_toll')
+        assign_class.set_vot(1.1)
+        assign_class.set_select_links(links={'trace': [(9, 1)]})
+
+        assign = TrafficAssignment()
+        assign.set_classes([assign_class])
+        assign.set_vdf("BPR")
+        assign.set_vdf_parameters({"alpha": 'alpha', "beta": 'beta'})
+        assign.set_capacity_field('capacity')
+        assign.set_time_field('fft')
+        assign.set_algorithm("bfw")
+        assign.max_iter = 100
+        assign.rgap_target = 0.0001
+
+        # 4.execute
+        assign.execute()
+
+        # 5.receive results
+        assign_flow_res_df = assign.results().reset_index(drop=False)
+        select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
+
+        assign_flow_res_df.to_csv(proj_path / 'assign_flow.csv', encoding='utf_8_sig', index=False)
+        select_link_flow_df.to_csv(proj_path / 'select_link_flow.csv', encoding='utf_8_sig', index=False)
+
+        flow_res = pd.merge(link_df, assign_flow_res_df, on='link_id')
+        flow_res = pd.merge(flow_res, select_link_flow_df, on='link_id')
+
+        flow_res = flow_res[['link_id', 'a_node', 'b_node', 'direction', 'a_ab', 'a_ba',  'a_tot',
+                             'class_a_trace_a_tot', 'geometry']].copy()
+        flow_res.rename(columns={'a_ab': 'AB_a', 'a_ba': 'BA_a',
+                                 'class_a_trace_a_tot': 'a_trace'}, inplace=True)
+
+        # save_file
+        flow_res_df = pd.DataFrame(flow_res)
+        flow_res_df.to_csv(proj_path / 'flow.csv')
+        node_df.to_csv(proj_path / 'node.csv')
+
+        assert False
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
