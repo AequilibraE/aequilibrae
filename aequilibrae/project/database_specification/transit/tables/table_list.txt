@@ -13,5 +13,6 @@ route_links
 routes
 stop_connectors
 stops
+results
 trips_schedule
 trips

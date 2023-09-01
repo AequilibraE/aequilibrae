@@ -29,13 +29,13 @@ CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                    distance        NUMERIC,
                                    modes           TEXT    NOT NULL,
                                    link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
-                                   'name'          TEXT,
-                                   speed_ab        NUMERIC,
-                                   speed_ba        NUMERIC,
-                                   travel_time_ab  NUMERIC,
-                                   travel_time_ba  NUMERIC,
-                                   capacity_ab     NUMERIC,
-                                   capacity_ba     NUMERIC,
+                                   -- 'name'          TEXT, -- Not required
+                                   -- speed_ab        NUMERIC, -- Not required
+                                   -- speed_ba        NUMERIC, -- Not required
+                                   -- travel_time_ab  NUMERIC, -- Not required
+                                   -- travel_time_ba  NUMERIC, -- Not required
+                                   -- capacity_ab     NUMERIC, -- Not required
+                                   -- capacity_ba     NUMERIC, -- Not required
                                    line_id         TEXT,
                                    stop_id         INTEGER  REFERENCES stops(stop_id) ON update RESTRICT ON delete RESTRICT,
                                    line_seg_idx    INTEGER,
@@ -84,14 +84,14 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','modes', 'modes allowed on the link');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','link_type', 'Link type');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
+-- --#
+--  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','name', 'Name of the street/link');
+-- --#
+--  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','speed_*', 'Directional speeds (if allowed)');
+-- --#
+--  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','capacity_*', 'Directional link capacities (if allowed)');
+-- --#
+--  INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','travel_time_*', 'Directional free-flow travel time (if allowed)');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','line_id', 'ID of the line the link belongs to');
 --#
