@@ -9,6 +9,7 @@ import shapely.ops
 from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
+import warnings
 
 SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 SF_EDGE_COLS = [
@@ -26,6 +27,19 @@ SF_EDGE_COLS = [
 ]
 
 
+def shift_duplicate_geometry(df, shift=0.00001):
+    def _shift_points(group_df, shift):
+        points = shapely.from_wkb(group_df.geometry.values)
+        count = len(points)
+        for i, x in enumerate(points):
+            points[i] = shapely.Point(x.x, x.y + (i + 1) * shift / count)
+
+        group_df.geometry = shapely.to_wkb(points)
+        return group_df
+
+    return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
+
+
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
@@ -40,7 +54,6 @@ class SF_graph_builder:
     def __init__(
         self,
         public_transport_conn,
-        project_conn,
         start=61200,
         end=64800,
         time_margin=0,
@@ -48,7 +61,7 @@ class SF_graph_builder:
         projected_crs="EPSG:2154",
         num_threads=-1,
         seed=124,
-        coord_noise=True,
+        geometry_noise=True,
         noise_coef=1.0e-5,
         with_inner_stop_transfers=True,
         with_outer_stop_transfers=True,
@@ -73,7 +86,6 @@ class SF_graph_builder:
 
         # graph components
         # ----------------
-
         self.line_segments = None
 
         # vertices
@@ -92,15 +104,22 @@ class SF_graph_builder:
         self.outer_stop_transfer_edges = pd.DataFrame()
         self.walking_edges = pd.DataFrame()
 
-        # long-lat to projected CRS transfromer
-        self.transformer = pyproj.Transformer.from_crs(
-            pyproj.CRS(global_crs), pyproj.CRS(projected_crs), always_xy=True
+        self.global_crs = pyproj.CRS(global_crs)
+        self.projected_crs = pyproj.CRS(projected_crs)
+
+        # longlat to projected CRS transfromer
+        self.transformer_g_to_p = pyproj.Transformer.from_crs(
+            self.global_crs, self.projected_crs, always_xy=True
+        ).transform
+
+        self.transformer_p_to_g = pyproj.Transformer.from_crs(
+            self.projected_crs, self.global_crs, always_xy=True
         ).transform
 
         # Add some spatial noise so that stop, boarding and aligthing vertices
         # are not colocated
         self.rng = np.random.default_rng(seed=seed)
-        self.coord_noise = coord_noise
+        self.geometry_noise = geometry_noise
         self.noise_coef = noise_coef
 
         # graph parameters
@@ -116,6 +135,38 @@ class SF_graph_builder:
         self.with_outer_stop_transfers = with_outer_stop_transfers
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
+
+    def add_zones(self, zones, from_crs: str = None):
+        """
+        Add zones as ODs.
+        Assumes zone geometry is in projected crs unless `from_crs` is not None.
+        If `from_cts` is provided, the geometry will be projected to the provided projected_crs"""
+        if "zone_id" not in zones.columns or "geometry" not in zones.columns:
+            raise KeyError("zone_id and geometry must be columns in zones")
+
+        if zones.geometry.dtype is str or zones.geometry.dtype is bytes:
+            geometry = shapely.from_wkt(zones.geometry.values)
+        # Check if the supplied zones df is from geopandas without import geopandas.
+        # We check __mro__ incase of inheritance. https://stackoverflow.com/a/63337375/14047443
+        elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__]:
+            geometry = zones.geometry.values
+        else:
+            raise TypeError("geometry is not a string, bytes, or shapely.Geometry instance")
+
+        if from_crs:
+            transformer = pyproj.Transformer.from_crs(
+                pyproj.CRS(from_crs), self.projected_crs, always_xy=True
+            ).transform
+            geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        centroids = shapely.centroid(geometry)
+
+        self.zones = pd.DataFrame(
+            {
+                "zone_id": zones.zone_id.copy(deep=True),
+                "geometry": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in geometry]),
+                "centroids": shapely.to_wkb([shapely.ops.transform(self.transformer_p_to_g, p) for p in centroids]),
+            }
+        )
 
     def create_line_segments(self):
         """Line segments correspond to segments between two successive stops for a each line.
@@ -187,12 +238,12 @@ class SF_graph_builder:
 
     def compute_segment_travel_time(self, time_filter=True):
         if time_filter:
-            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival, 
+            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id
                 WHERE trips_schedule.departure>={self.start} AND trips_schedule.arrival<={self.end}"""
         else:
-            sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
+            sql = """SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
         tt = pd.read_sql(sql, self.pt_conn)
@@ -296,7 +347,7 @@ class SF_graph_builder:
 
     def create_stop_vertices(self):
         # select all stops
-        sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsText(geometry) coord FROM stops"
+        sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
         stop_vertices = pd.read_sql(sql, self.pt_conn)
 
         # filter stops that are used on the given time range
@@ -307,7 +358,7 @@ class SF_graph_builder:
         stop_vertices["line_id"] = None
         stop_vertices["taz_id"] = None
         stop_vertices["line_seg_idx"] = np.nan
-        stop_vertices["type"] = "stop"
+        stop_vertices["node_type"] = "stop"
 
         self.stop_vertices = stop_vertices
 
@@ -315,21 +366,21 @@ class SF_graph_builder:
         boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
         boarding_vertices = pd.merge(
-            boarding_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
+            boarding_vertices, self.stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
 
         # uniform attributes
-        boarding_vertices["type"] = "boarding"
+        boarding_vertices["node_type"] = "boarding"
         boarding_vertices["taz_id"] = None
 
         # add noise
-        if self.coord_noise:
-            boarding_vertices["x"] = boarding_vertices.coord.map(lambda c: shapely.wkt.loads(c).x)
-            boarding_vertices["y"] = boarding_vertices.coord.map(lambda c: shapely.wkt.loads(c).y)
+        if self.geometry_noise:
+            boarding_vertices["x"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
+            boarding_vertices["y"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
             n_boarding = len(boarding_vertices)
             boarding_vertices["x"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
             boarding_vertices["y"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
-            boarding_vertices["coord"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkt, axis=1)
+            boarding_vertices["geometry"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             boarding_vertices.drop(["x", "y"], axis=1, inplace=True)
 
         self.boarding_vertices = boarding_vertices
@@ -338,32 +389,32 @@ class SF_graph_builder:
         alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
         alighting_vertices = pd.merge(
-            alighting_vertices, self.stop_vertices[["stop_id", "coord"]], on="stop_id", how="left"
+            alighting_vertices, self.stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
 
         # uniform attributes
-        alighting_vertices["type"] = "alighting"
+        alighting_vertices["node_type"] = "alighting"
         alighting_vertices["taz_id"] = None
 
         # add noise
-        if self.coord_noise:
-            alighting_vertices["x"] = alighting_vertices.coord.map(lambda c: shapely.wkt.loads(c).x)
-            alighting_vertices["y"] = alighting_vertices.coord.map(lambda c: shapely.wkt.loads(c).y)
+        if self.geometry_noise:
+            alighting_vertices["x"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
+            alighting_vertices["y"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
             n_alighting = len(alighting_vertices)
             alighting_vertices["x"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
             alighting_vertices["y"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
-            alighting_vertices["coord"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkt, axis=1)
+            alighting_vertices["geometry"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             alighting_vertices.drop(["x", "y"], axis=1, inplace=True)
 
         self.alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        sql = """SELECT CAST(node_id AS TEXT) AS taz_id, ST_AsText(geometry) AS coord FROM nodes 
-            WHERE is_centroid = 1"""
-        od_vertices = pd.read_sql(sql, self.proj_conn)
+        od_vertices = self.zones[["zone_id", "centroids"]].rename(
+            columns={"zone_id": "taz_id", "centroids": "geometry"}
+        )
 
         # uniform attributes
-        od_vertices["type"] = "od"
+        od_vertices["node_type"] = "od"
         od_vertices["stop_id"] = None
         od_vertices["line_id"] = None
         od_vertices["line_seg_idx"] = np.nan
@@ -374,13 +425,13 @@ class SF_graph_builder:
         """Graph vertices creation as a dataframe.
 
         Vertices have the following attributes:
-            - vert_id: int
-            - type (either 'stop', 'boarding', 'alighting', 'od'): str
+            - node_id: int
+            - node_type (either 'stop', 'boarding', 'alighting', 'od'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
             - taz_id (only applies to 'od' nodes): str
-            - coord (WKT): str
+            - geometry (WKB): str
         """
 
         self.create_line_segments()
@@ -403,17 +454,17 @@ class SF_graph_builder:
         # reset index and copy it to column
         self.vertices.reset_index(drop=True, inplace=True)
         self.vertices.index.name = "index"
-        self.vertices["vert_id"] = self.vertices.index
+        self.vertices["node_id"] = self.vertices.index + 1
         self.vertices = self.vertices[SF_VERTEX_COLS]
 
         # data types
-        self.vertices.vert_id = self.vertices.vert_id.astype(int)
-        self.vertices["type"] = self.vertices["type"].astype("category")
+        self.vertices.node_id = self.vertices.node_id.astype(int)
+        self.vertices["node_type"] = self.vertices["node_type"].astype("category")
         self.vertices.stop_id = self.vertices.stop_id.astype(str)
         self.vertices.line_id = self.vertices.line_id.astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.astype("Int32")
         self.vertices.taz_id = self.vertices.taz_id.astype(str)
-        self.vertices.coord = self.vertices.coord.astype(str)
+        # self.vertices.geometry = self.vertices.geometry.astype(str)
 
     def create_on_board_edges(self):
         on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
@@ -422,28 +473,30 @@ class SF_graph_builder:
         # get tail vertex index
         on_board_edges = pd.merge(
             on_board_edges,
-            self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
+            self.vertices[self.vertices.node_type == "boarding"][["line_id", "line_seg_idx", "node_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        on_board_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        on_board_edges.rename(columns={"node_id": "b_node"}, inplace=True)
 
         # get head vertex index
         on_board_edges = pd.merge(
             on_board_edges,
-            self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
+            self.vertices[self.vertices.node_type == "alighting"][["line_id", "line_seg_idx", "node_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        on_board_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        on_board_edges.rename(columns={"node_id": "a_node"}, inplace=True)
 
         # uniform attributes
-        on_board_edges["type"] = "on-board"
+        on_board_edges["link_type"] = "on-board"
         on_board_edges["freq"] = np.inf
         on_board_edges["stop_id"] = None
         on_board_edges["o_line_id"] = None
         on_board_edges["d_line_id"] = None
         on_board_edges["transfer_id"] = None
+        on_board_edges["direction"] = 0
+
 
         self.on_board_edges = on_board_edges
 
@@ -454,31 +507,32 @@ class SF_graph_builder:
         # get tail vertex index (stop vertex)
         boarding_edges = pd.merge(
             boarding_edges,
-            self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
+            self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id"]],
             on="stop_id",
             how="left",
         )
-        boarding_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        boarding_edges.rename(columns={"node_id": "b_node"}, inplace=True)
 
         # get head vertex index (boarding vertex)
         boarding_edges = pd.merge(
             boarding_edges,
-            self.vertices[self.vertices.type == "boarding"][["line_id", "line_seg_idx", "vert_id"]],
+            self.vertices[self.vertices.node_type == "boarding"][["line_id", "line_seg_idx", "node_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        boarding_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        boarding_edges.rename(columns={"node_id": "a_node"}, inplace=True)
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
         boarding_edges["freq"] *= wait_time_factor_inv
 
         # uniform attributes
-        boarding_edges["type"] = "boarding"
+        boarding_edges["link_type"] = "boarding"
         boarding_edges["trav_time"] = 0.5 * self.uniform_dwell_time + self.a_tiny_time_duration
         boarding_edges["o_line_id"] = None
         boarding_edges["d_line_id"] = None
         boarding_edges["transfer_id"] = None
+        boarding_edges["direction"] = 1
 
         self.boarding_edges = boarding_edges
 
@@ -489,23 +543,23 @@ class SF_graph_builder:
         # get tail vertex index (alighting vertex)
         alighting_edges = pd.merge(
             alighting_edges,
-            self.vertices[self.vertices.type == "alighting"][["line_id", "line_seg_idx", "vert_id"]],
+            self.vertices[self.vertices.node_type == "alighting"][["line_id", "line_seg_idx", "node_id"]],
             on=["line_id", "line_seg_idx"],
             how="left",
         )
-        alighting_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        alighting_edges.rename(columns={"node_id": "b_node"}, inplace=True)
 
         # get head vertex index (stop vertex)
         alighting_edges = pd.merge(
             alighting_edges,
-            self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id"]],
+            self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id"]],
             on="stop_id",
             how="left",
         )
-        alighting_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        alighting_edges.rename(columns={"node_id": "a_node"}, inplace=True)
 
         # uniform attributes
-        alighting_edges["type"] = "alighting"
+        alighting_edges["link_type"] = "alighting"
         alighting_edges["o_line_id"] = None
         alighting_edges["d_line_id"] = None
         alighting_edges["transfer_id"] = None
@@ -513,6 +567,7 @@ class SF_graph_builder:
         alighting_edges["trav_time"] = (
             0.5 * self.uniform_dwell_time + self.alighting_penalty + self.a_tiny_time_duration
         )
+        alighting_edges["direction"] = 1
 
         self.alighting_edges = alighting_edges
 
@@ -528,34 +583,35 @@ class SF_graph_builder:
         # boarding vertices of line segments [1:segment_count+1]
         dwell_edges = pd.merge(
             dwell_edges,
-            self.vertices[self.vertices.type == "boarding"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
+            self.vertices[self.vertices.node_type == "boarding"][["line_id", "stop_id", "node_id", "line_seg_idx"]],
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        dwell_edges.rename(columns={"vert_id": "head_vert_id"}, inplace=True)
+        dwell_edges.rename(columns={"node_id": "a_node"}, inplace=True)
 
         # tail vertex index (alighting vertex)
         # aligthing vertices of line segments [0:segment_count]
         dwell_edges.line_seg_idx -= 1
         dwell_edges = pd.merge(
             dwell_edges,
-            self.vertices[self.vertices.type == "alighting"][["line_id", "stop_id", "vert_id", "line_seg_idx"]],
+            self.vertices[self.vertices.node_type == "alighting"][["line_id", "stop_id", "node_id", "line_seg_idx"]],
             on=["line_id", "stop_id", "line_seg_idx"],
             how="left",
         )
-        dwell_edges.rename(columns={"vert_id": "tail_vert_id"}, inplace=True)
+        dwell_edges.rename(columns={"node_id": "b_node"}, inplace=True)
 
         # clean-up
         dwell_edges.drop("from_stop", axis=1, inplace=True)
 
         # uniform values
         dwell_edges["line_seg_idx"] = np.nan
-        dwell_edges["type"] = "dwell"
+        dwell_edges["link_type"] = "dwell"
         dwell_edges["o_line_id"] = None
         dwell_edges["d_line_id"] = None
         dwell_edges["transfer_id"] = None
         dwell_edges["freq"] = np.inf
         dwell_edges["trav_time"] = self.uniform_dwell_time
+        dwell_edges["direction"] = 0
 
         self.dwell_edges = dwell_edges
 
@@ -570,39 +626,39 @@ class SF_graph_builder:
         """
         assert method in ["overlapping_regions", "nearest_neighbour"]
 
-        # Select/copy the od vertices and project their coordinates
-        od_vertices = self.vertices[self.vertices.type == "od"][["vert_id", "taz_id", "coord"]].copy(deep=True)
+        # Select/copy the od vertices and project their geometryinates
+        od_vertices = self.vertices[self.vertices.node_type == "od"][["node_id", "taz_id", "geometry"]].copy(deep=True)
         od_vertices.reset_index(drop=True, inplace=True)
-        od_coords = od_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
+        od_geometries = od_vertices["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
         )
-        od_coords = np.array(list(od_coords.apply(lambda coord: (coord.x, coord.y))))
+        od_geometries = np.array(list(od_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
-        # Select/copy the stop vertices and project their coordinates
-        stop_vertices = self.vertices[self.vertices.type == "stop"][["vert_id", "stop_id", "coord"]].copy(deep=True)
+        # Select/copy the stop vertices and project their geometryinates
+        stop_vertices = self.vertices[self.vertices.node_type == "stop"][["node_id", "stop_id", "geometry"]].copy(
+            deep=True
+        )
         stop_vertices.reset_index(drop=True, inplace=True)
-        stop_coords = stop_vertices["coord"].apply(
-            lambda coord: shapely.ops.transform(self.transformer, shapely.from_wkt(coord))
+        stop_geometries = stop_vertices["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
         )
-        stop_coords = np.array(list(stop_coords.apply(lambda coord: (coord.x, coord.y))))
+        stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
-        kdTree = cKDTree(od_coords)
+        kdTree = cKDTree(od_geometries)
 
         if method == "nearest_neighbour":
             # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
             distance, index = kdTree.query(
-                stop_coords, k=1, distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
+                stop_geometries, k=1, distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
             )
-            nearest_od = od_vertices.iloc[index][["vert_id", "taz_id"]].reset_index(drop=True)
+            nearest_od = od_vertices.iloc[index][["node_id", "taz_id"]].reset_index(drop=True)
             trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
 
             # access connectors
             access_connector_edges = pd.concat(
                 [
-                    stop_vertices[["stop_id", "vert_id"]]
-                    .reset_index(drop=True)
-                    .rename(columns={"vert_id": "head_vert_id"}),
-                    nearest_od.rename(columns={"vert_id": "tail_vert_id"}),
+                    stop_vertices[["stop_id", "node_id"]].reset_index(drop=True).rename(columns={"node_id": "a_node"}),
+                    nearest_od.rename(columns={"node_id": "b_node"}),
                     trav_time,
                 ],
                 axis=1,
@@ -611,42 +667,40 @@ class SF_graph_builder:
         elif method == "overlapping_regions":
             # Construct a kdtree so we can lookup the 2nd closest OD to each OD (the first being itself)
             distance, _ = kdTree.query(
-                od_coords, k=[2], distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
+                od_geometries, k=[2], distance_upper_bound=self.distance_upper_bound, workers=self.num_threads
             )
             distance = distance.reshape(-1)
 
             # Construct a kdtree so we can query all the stops within the radius around each OD
-            stop_kdTree = cKDTree(stop_coords)
-            results = stop_kdTree.query_ball_point(od_coords, distance, workers=self.num_threads)
+            stop_kdTree = cKDTree(stop_geometries)
+            results = stop_kdTree.query_ball_point(od_geometries, distance, workers=self.num_threads)
 
             # Build up a list of dataframes to concat, each dataframe corresponds to all connectors for a given OD
             connectors = []
             for i, verts in enumerate(results):
-                distance = minkowski_distance(od_coords[i], stop_coords[verts])
-                df = stop_vertices["vert_id"].iloc[verts].to_frame()
-                df["head_vert_id"] = od_vertices.iloc[i]["vert_id"]
+                distance = minkowski_distance(od_geometries[i], stop_geometries[verts])
+                df = stop_vertices["node_id"].iloc[verts].to_frame()
+                df["a_node"] = od_vertices.iloc[i]["node_id"]
                 df["trav_time"] = distance / self.walking_speed
                 connectors.append(df)
 
             # access connectors
-            access_connector_edges = (
-                pd.concat(connectors).rename(columns={"vert_id": "tail_vert_id"}).reset_index(drop=True)
-            )
+            access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "b_node"}).reset_index(drop=True)
 
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
-                missing = stop_vertices["vert_id"].isin(access_connector_edges["tail_vert_id"])
+                missing = stop_vertices["node_id"].isin(access_connector_edges["b_node"])
                 missing = missing[~missing].index
 
                 distance, index = kdTree.query(
-                    stop_coords[missing], k=1, distance_upper_bound=np.inf, workers=self.num_threads
+                    stop_geometries[missing], k=1, distance_upper_bound=np.inf, workers=self.num_threads
                 )
-                nearest_od = od_vertices["vert_id"].iloc[index].reset_index(drop=True)
+                nearest_od = od_vertices["node_id"].iloc[index].reset_index(drop=True)
                 trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
                 missing_edges = pd.concat(
                     [
-                        stop_vertices["vert_id"].iloc[missing].reset_index(drop=True).rename("tail_vert_id"),
-                        nearest_od.rename("head_vert_id"),
+                        stop_vertices["node_id"].iloc[missing].reset_index(drop=True).rename("b_node"),
+                        nearest_od.rename("a_node"),
                         trav_time,
                     ],
                     axis=1,
@@ -655,26 +709,26 @@ class SF_graph_builder:
                 access_connector_edges = pd.concat([access_connector_edges, missing_edges], axis=0)
 
         # uniform values
-        access_connector_edges["type"] = "access_connector"
+        access_connector_edges["link_type"] = "access_connector"
         access_connector_edges["line_seg_idx"] = np.nan
         access_connector_edges["freq"] = np.inf
         access_connector_edges["o_line_id"] = None
         access_connector_edges["d_line_id"] = None
         access_connector_edges["transfer_id"] = None
+        access_connector_edges["direction"] = 1
 
         # egress connectors
         egress_connector_edges = access_connector_edges.copy(deep=True)
-        egress_connector_edges.rename(
-            columns={"head_vert_id": "tail_vert_id", "tail_vert_id": "head_vert_id"}, inplace=True
-        )
+        egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True)
 
         # uniform values
-        egress_connector_edges["type"] = "egress_connector"
+        egress_connector_edges["link_type"] = "egress_connector"
         egress_connector_edges["line_seg_idx"] = np.nan
         egress_connector_edges["freq"] = np.inf
         egress_connector_edges["o_line_id"] = None
         egress_connector_edges["d_line_id"] = None
         egress_connector_edges["transfer_id"] = None
+        egress_connector_edges["direction"] = 1
 
         # travel time update
         access_connector_edges.trav_time *= self.access_time_factor
@@ -685,11 +739,11 @@ class SF_graph_builder:
     def create_inner_stop_transfer_edges(self):
         """Create transfer edges between distinct lines of each stop."""
 
-        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id"]].rename(
-            columns={"line_id": "o_line_id", "vert_id": "tail_vert_id"}
+        alighting = self.vertices[self.vertices.node_type == "alighting"][["stop_id", "line_id", "node_id"]].rename(
+            columns={"line_id": "o_line_id", "node_id": "b_node"}
         )
-        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id"]].rename(
-            columns={"line_id": "d_line_id", "vert_id": "head_vert_id"}
+        boarding = self.vertices[self.vertices.node_type == "boarding"][["stop_id", "line_id", "node_id"]].rename(
+            columns={"line_id": "d_line_id", "node_id": "a_node"}
         )
         inner_stop_transfer_edges = pd.merge(alighting, boarding, on="stop_id", how="inner")
 
@@ -711,8 +765,9 @@ class SF_graph_builder:
         # uniform attributes
         inner_stop_transfer_edges["line_id"] = None
         inner_stop_transfer_edges["line_seg_idx"] = np.nan
-        inner_stop_transfer_edges["type"] = "inner_transfer"
+        inner_stop_transfer_edges["link_type"] = "inner_transfer"
         inner_stop_transfer_edges["transfer_id"] = None
+        inner_stop_transfer_edges["direction"] = 0
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
@@ -739,17 +794,17 @@ class SF_graph_builder:
         stops = stops[stops.parent_station.isin(station_list)]
 
         # load the aligthing vertices (tail of transfer edges)
-        alighting = self.vertices[self.vertices.type == "alighting"][["stop_id", "line_id", "vert_id", "coord"]].rename(
-            columns={"line_id": "o_line_id", "coord": "o_coord", "vert_id": "tail_vert_id"}
-        )
+        alighting = self.vertices[self.vertices.node_type == "alighting"][
+            ["stop_id", "line_id", "node_id", "geometry"]
+        ].rename(columns={"line_id": "o_line_id", "geometry": "o_geometry", "node_id": "b_node"})
         # add the station id
         alighting = pd.merge(alighting, stops, on="stop_id", how="inner")
         alighting.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
 
         # load the boarding vertices (head of transfer edges)
-        boarding = self.vertices[self.vertices.type == "boarding"][["stop_id", "line_id", "vert_id", "coord"]].rename(
-            columns={"line_id": "d_line_id", "coord": "d_coord", "vert_id": "head_vert_id"}
-        )
+        boarding = self.vertices[self.vertices.node_type == "boarding"][
+            ["stop_id", "line_id", "node_id", "geometry"]
+        ].rename(columns={"line_id": "d_line_id", "geometry": "d_geometry", "node_id": "a_node"})
         # add the station id
         boarding = pd.merge(boarding, stops, on="stop_id", how="inner")
         boarding.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
@@ -782,7 +837,7 @@ class SF_graph_builder:
         # uniform attributes
         outer_stop_transfer_edges["line_id"] = None
         outer_stop_transfer_edges["line_seg_idx"] = np.nan
-        outer_stop_transfer_edges["type"] = "outer_transfer"
+        outer_stop_transfer_edges["link_type"] = "outer_transfer"
         outer_stop_transfer_edges["transfer_id"] = None
 
         # frequency update : line_freq / wait_time_factor
@@ -790,30 +845,21 @@ class SF_graph_builder:
         outer_stop_transfer_edges["freq"] *= wait_time_factor_inv
 
         # compute the walking time
-        outer_stop_transfer_edges["o_coord_str"] = outer_stop_transfer_edges["o_coord"].str.extract(r"\((.*?)\)")
-        outer_stop_transfer_edges[["o_lon", "o_lat"]] = outer_stop_transfer_edges["o_coord_str"].str.split(
-            " ", expand=True
-        )
-        outer_stop_transfer_edges["d_coord_str"] = outer_stop_transfer_edges["d_coord"].str.extract(r"\((.*?)\)")
-        outer_stop_transfer_edges[["d_lon", "d_lat"]] = outer_stop_transfer_edges["d_coord_str"].str.split(
-            " ", expand=True
-        )
-        outer_stop_transfer_edges[["o_lon", "o_lat", "d_lon", "d_lat"]] = outer_stop_transfer_edges[
-            ["o_lon", "o_lat", "d_lon", "d_lat"]
-        ].astype(float)
-        outer_stop_transfer_edges["distance"] = haversine(
-            outer_stop_transfer_edges.o_lon.to_numpy(),
-            outer_stop_transfer_edges.o_lat.to_numpy(),
-            outer_stop_transfer_edges.d_lon.to_numpy(),
-            outer_stop_transfer_edges.d_lat.to_numpy(),
-        )
-        outer_stop_transfer_edges["trav_time"] = outer_stop_transfer_edges["distance"] / self.walking_speed
+        o_geometry = shapely.from_wkb(outer_stop_transfer_edges.o_geometry.values)
+        d_geometry = shapely.from_wkb(outer_stop_transfer_edges.d_geometry.values)
+        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
+        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
+
+        distance = haversine(o_lon, o_lat, d_lon, d_lat)
+
+        outer_stop_transfer_edges["trav_time"] = distance / self.walking_speed
         outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
         outer_stop_transfer_edges["trav_time"] += self.alighting_penalty
+        outer_stop_transfer_edges["direction"] = 0
 
         # cleanup
         outer_stop_transfer_edges.drop(
-            ["o_coord_str", "d_coord_str", "o_lon", "o_lat", "d_lon", "d_lat", "o_coord", "d_coord", "distance"],
+            ["o_geometry", "d_geometry"],
             axis=1,
             inplace=True,
         )
@@ -825,7 +871,7 @@ class SF_graph_builder:
 
         sql = """
         SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
-        WHERE parent_station IS NOT NULL AND parent_station <> '' 
+        WHERE parent_station IS NOT NULL AND parent_station <> ''
         """
         stops = pd.read_sql(sql, self.pt_conn)
         stops.drop_duplicates(inplace=True)
@@ -837,15 +883,15 @@ class SF_graph_builder:
         stops = stops[stops.parent_station.isin(station_list)]
 
         # tail vertex
-        o_walking = self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id", "coord"]].rename(
-            columns={"coord": "o_coord", "vert_id": "tail_vert_id"}
+        o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+            columns={"geometry": "o_geometry", "node_id": "b_node"}
         )
         o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
         o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
 
         # head vertex
-        d_walking = self.vertices[self.vertices.type == "stop"][["stop_id", "vert_id", "coord"]].rename(
-            columns={"coord": "d_coord", "vert_id": "head_vert_id"}
+        d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+            columns={"geometry": "d_geometry", "node_id": "a_node"}
         )
         d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
         d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
@@ -859,30 +905,25 @@ class SF_graph_builder:
         # uniform attributes
         walking_edges["line_id"] = None
         walking_edges["line_seg_idx"] = np.nan
-        walking_edges["type"] = "walking"
+        walking_edges["link_type"] = "walking"
         walking_edges["transfer_id"] = None
         walking_edges["freq"] = np.inf
+        walking_edges["direction"] = 0
 
         # compute the walking time
-        walking_edges["o_coord_str"] = walking_edges["o_coord"].str.extract(r"\((.*?)\)")
-        walking_edges[["o_lon", "o_lat"]] = walking_edges["o_coord_str"].str.split(" ", expand=True)
-        walking_edges["d_coord_str"] = walking_edges["d_coord"].str.extract(r"\((.*?)\)")
-        walking_edges[["d_lon", "d_lat"]] = walking_edges["d_coord_str"].str.split(" ", expand=True)
-        walking_edges[["o_lon", "o_lat", "d_lon", "d_lat"]] = walking_edges[
-            ["o_lon", "o_lat", "d_lon", "d_lat"]
-        ].astype(float)
-        walking_edges["distance"] = haversine(
-            walking_edges.o_lon.to_numpy(),
-            walking_edges.o_lat.to_numpy(),
-            walking_edges.d_lon.to_numpy(),
-            walking_edges.d_lat.to_numpy(),
-        )
-        walking_edges["trav_time"] = walking_edges["distance"] / self.walking_speed
+        o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
+        d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
+        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
+        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
+
+        distance = haversine(o_lon, o_lat, d_lon, d_lat)
+
+        walking_edges["trav_time"] = distance / self.walking_speed
         walking_edges["trav_time"] *= self.walk_time_factor
 
         # cleanup
         walking_edges.drop(
-            ["o_coord_str", "d_coord_str", "o_lon", "o_lat", "d_lon", "d_lat", "o_coord", "d_coord", "distance"],
+            ["o_geometry", "d_geometry"],
             axis=1,
             inplace=True,
         )
@@ -898,8 +939,8 @@ class SF_graph_builder:
             - line_id (only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges): str
             - stop_id: str
             - line_seg_idx (only applies to 'on-board', 'boarding' and 'alighting' edges): int
-            - tail_vert_id: int
-            - head_vert_id: int
+            - b_node: int
+            - a_node: int
             - trav_time (edge travel time): float
             - freq (frequency): float
             - o_line_id: str
@@ -939,18 +980,150 @@ class SF_graph_builder:
         # reset index and copy it to column
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
-        self.edges["edge_id"] = self.edges.index
+        self.edges["link_id"] = self.edges.index + 1
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
-        self.edges["type"] = self.edges["type"].astype("category")
+        self.edges["link_type"] = self.edges["link_type"].astype("category")
         self.edges.line_id = self.edges.line_id.astype(str)
         self.edges.stop_id = self.edges.stop_id.astype(str)
         self.edges.line_seg_idx = self.edges.line_seg_idx.astype("Int32")
-        self.edges.tail_vert_id = self.edges.tail_vert_id.astype(int)
-        self.edges.head_vert_id = self.edges.head_vert_id.astype(int)
+        self.edges.b_node = self.edges.b_node.astype(int)
+        self.edges.a_node = self.edges.a_node.astype(int)
         self.edges.trav_time = self.edges.trav_time.astype(float)
         self.edges.freq = self.edges.freq.astype(float)
         self.edges.o_line_id = self.edges.o_line_id.astype(str)
         self.edges.d_line_id = self.edges.d_line_id.astype(str)
         self.edges.transfer_id = self.edges.transfer_id.astype(str)
+        self.edges.direction = self.edges.direction.astype("int8")
+
+    def create_additional_db_fields(self):
+        # This graph requires some additional tables and fields inorder to store all our information.
+        # Currently it mimics what we are storing in the df
+
+        # Now onto the links, we need to specifiy all our link types
+        self.pt_conn.executemany(
+            """
+            INSERT INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
+            """,
+            [
+                ("on-board", "o", "From boarding to alighting"),
+                ("boarding", "b", "From stop to boarding"),
+                ("alighting", "a", "From alighting to stop"),
+                ("dwell", "d", "From alighting to boarding"),
+                ("access_connector", "A", ""),
+                ("egress_connector", "e", ""),
+                ("inner_transfer", "t", "Transfer edge within station, from alighting to boarding"),
+                ("outer_transfer", "T", "Transfer edge outside of a station, from alighting to boarding"),
+                ("walking", "w", "Walking, from stop or walking to stop or walking"),
+            ],
+        )
+
+        self.pt_conn.commit()
+
+    def save_vertices(self, robust=True):
+        # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
+        # notebook. I don't think this is a good solution but I'm not sure what do to without adding the zones and such
+        # ourselves.
+
+        # The below query is formated to guarantee the columns line up. The order of the tuples should be the same
+        # as the order of the columns.
+        #
+        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
+        #     the index and following fields being the column values.
+        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
+
+        # It should look like the below query. This is generated from
+        #
+        # from aequilibrae.project.network import Link, Node
+        # from aequilibrae.project.network.safe_class import SafeClass
+        #
+        # node = Node(verticies.iloc[0], project)
+        # data, sql = SafeClass._save_new_with_geometry(node)
+        #
+        # Insert into nodes ("node_id","node_type","stop_id","line_id","line_seg_idx","taz_id",geometry)
+        # values(?,?,?,?,?,?,GeomFromWKB(?, 4326))
+
+        # FIXME: We also to replace the NANs with something.
+        self.vertices.line_seg_idx = self.vertices.line_seg_idx.fillna(-1)
+
+        duplicated = self.vertices.geometry.duplicated()
+
+        if not robust and not duplicated.empty:
+            warnings.warn(
+                "Duplicated geometry was detected but robust was disabled, verticies that share the same geometry will not be saved.",
+                warnings.RuntimeWarning,
+            )
+
+        if robust and not duplicated.empty:
+            df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
+            self.vertices.loc[df.index, "geometry"] = df.geometry
+
+        self.pt_conn.executemany(
+            """
+            Insert into nodes ("{}","{}","{}","{}","{}","{}",{})
+            values(?,?,?,?,?,?,GeomFromWKB(?, {}));
+            """.format(
+                *self.vertices.columns, self.global_crs.to_epsg()
+            ),
+            (self.vertices if robust else self.vertices[~duplicated]).itertuples(index=False, name=None),
+        )
+
+        self.pt_conn.commit()
+
+    def save_edges(self):
+        # FIXME: Just like the verticies, our edges need a little massaging as well
+        self.edges.line_seg_idx = self.edges.line_seg_idx.fillna(-1)
+        self.edges["modes"] = "t"
+
+        # We also need to generate the geometry for each edge, this may take a bit
+        lines = []
+        for row in self.edges.itertuples():
+            # row.a_node - 1 because the node_ids are the index + 1
+            line = (
+                shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
+                shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+            )
+            lines.append(shapely.LineString(line))
+
+        self.edges["geometry"] = shapely.to_wkb(lines)
+
+        # Just as with the nodes the query should look like thisThis is generated from
+        #
+        # from aequilibrae.project.network import Link, Node
+        # from aequilibrae.project.network.safe_class import SafeClass
+        #
+        # link = Link(self.edges.iloc[0], project)
+        # data, sql = SafeClass._save_new_with_geometry(link)
+        #
+        # Insert into links ("link_id","link_type","line_id","stop_id","line_seg_idx","b_node","a_node","trav_time","freq","o_line_id","d_line_id","transfer_id","direction","modes",geometry)
+        # values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, 4326))
+        self.pt_conn.executemany(
+            """
+            Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
+            """.format(
+                *self.edges.columns, self.global_crs.to_epsg()
+            ),
+            self.edges.itertuples(index=False, name=None),
+        )
+
+        self.pt_conn.commit()
+
+    def to_aeq_graph(self):
+        from aequilibrae.paths import Graph
+
+        g = Graph()
+        g.network = self.edges.copy(deep=True)
+        g.cost = g.network.trav_time.values
+        g.free_flow_time = g.network.trav_time.values
+
+        g.network["id"] = g.network.link_id
+        g.network_ok = True
+        g.status = "OK"
+        g.prepare_graph(self.vertices[self.vertices.node_type == "od"].node_id.values)
+        g.set_graph("trav_time")
+        g.set_blocked_centroid_flows(True)
+        g.graph.__compressed_id__ = g.graph.__compressed_id__.astype(int)
+
+        return g

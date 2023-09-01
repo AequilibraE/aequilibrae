@@ -1,10 +1,19 @@
 # cython: language_level=3
 
 import pandas as pd
+import os
+from uuid import uuid4
+from datetime import datetime
+import socket
+
 import numpy as np
 import multiprocessing
 cimport numpy as cnp
 cimport openmp
+
+from aequilibrae.project.database_connection import database_connection
+from aequilibrae.context import get_active_project
+import sqlite3
 
 include 'hyperpath.pyx'
 
@@ -45,6 +54,10 @@ class HyperpathGenerating:
         self._freq = self._edges[freq].values.astype(DATATYPE_PY)
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
+
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
+        self.description = "Hyperpath"
 
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
@@ -206,3 +219,45 @@ class HyperpathGenerating:
 
         if demand[col].min() < 0.0:
             raise ValueError(f"column '{col}' should be nonnegative")
+
+    def info(self) -> dict:
+        info = {
+            "Algorithm": "Spiess, Heinz & Florian, Michael Hyperpath generation",
+            "Computer name": socket.gethostname(),
+            "Procedure ID": self.procedure_id,
+        }
+
+        return info
+
+    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+        """Saves the assignment results to results_database.sqlite
+
+        Method fails if table exists
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table to hold this assignment result
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
+            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        """
+
+        df = self._edges
+        if not keep_zero_flows:
+            df = df[df.volume > 0]
+
+        if not project:
+            project = project or get_active_project()
+        conn = sqlite3.connect(os.path.join(project.project_base_path, "results_database.sqlite"))
+        df.to_sql(table_name, conn)
+        conn.close()
+
+        conn = database_connection("transit", project.project_base_path)
+        report = {"setup": self.info()}
+        data = [table_name, "hyperpath assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
+        conn.commit()
+        conn.close()
+
