@@ -6,26 +6,25 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
+from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
 import warnings
 
-
-def haversine(lon1, lat1, lon2, lat2):
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
-    """
-    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
-
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-
-    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
-
-    c = 2.0 * np.arcsin(np.sqrt(a))
-    distance_m = 6367000.0 * c
-    return distance_m
+SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
+SF_EDGE_COLS = [
+    "type",
+    "line_id",
+    "stop_id",
+    "line_seg_idx",
+    "tail_vert_id",
+    "head_vert_id",
+    "trav_time",
+    "freq",
+    "o_line_id",
+    "d_line_id",
+    "transfer_id",
+]
 
 
 def shift_duplicate_geometry(df, shift=0.00001):
@@ -45,14 +44,11 @@ class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     ASSUMPIONS:
-    - trips dir is always 0: opposite directions are not supported
+    - trips dir is always 0: opposite directions are not supported.
+      In the GTFS files, this corresponds to direction_id from trips.txt
+      (indicates the direction of travel for a trip)
     - all times are expressed in seconds [s], all frequencies in [1/s]
     - headways are uniform for trips of the same pattern
-
-    TODO:
-    - transform some of the filtering pandas operations to SQL queries (filter down in the SQL part).
-    - instanciate properly using a project path, an aequilibrae project or anything else that follow the
-      package guideline (without explicit public_transport_conn)
     """
 
     def __init__(
@@ -60,7 +56,7 @@ class SF_graph_builder:
         public_transport_conn,
         start=61200,
         end=64800,
-        margin=0,
+        time_margin=0,
         global_crs="EPSG:4326",
         projected_crs="EPSG:2154",
         num_threads=-1,
@@ -80,27 +76,16 @@ class SF_graph_builder:
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
 
-        self.start = start - margin  # starting time of the selected time period
-        self.end = end + margin  # ending time of the selected time period
+        self.proj_conn = project_conn  # sqlite connection
+        self.proj_conn.enable_load_extension(True)
+        self.proj_conn.load_extension("mod_spatialite")
+
+        self.start = start - time_margin  # starting time of the selected time period
+        self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads
 
-        self.vertex_cols = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
-        self.edges_cols = [
-            "link_id",
-            "link_type",
-            "line_id",
-            "stop_id",
-            "line_seg_idx",
-            "b_node",
-            "a_node",
-            "trav_time",
-            "freq",
-            "o_line_id",
-            "d_line_id",
-            "transfer_id",
-            "direction",
-        ]
-
+        # graph components
+        # ----------------
         self.line_segments = None
 
         # vertices
@@ -184,47 +169,68 @@ class SF_graph_builder:
         )
 
     def create_line_segments(self):
-        # trip ids corresponding to the given time range
-        sql = f"""SELECT DISTINCT trip_id FROM trips_schedule
-        WHERE departure>={self.start} AND arrival<={self.end}"""
-        self.trip_ids = pd.read_sql(
-            sql,
-            self.pt_conn,
-        ).trip_id.values
+        """Line segments correspond to segments between two successive stops for a each line.
 
-        # pattern ids corresponding to the given time range
-        sql = f"""SELECT DISTINCT pattern_id FROM trips INNER JOIN
-        (SELECT DISTINCT trip_id FROM trips_schedule
-        WHERE departure>={self.start} AND arrival<={self.end}) selected_trips
-        ON trips.trip_id = selected_trips.trip_id"""
-        pattern_ids = pd.read_sql(
-            sql,
-            self.pt_conn,
-        ).pattern_id.values
+        For exemple if 2 lines, L1 and L2, are going from stop A to stop B, we have 2 line segments:
+        - L1_AB
+        - L2_AB
 
-        # route links corresponding to the given time range
-        sql = (
-            "SELECT pattern_id, seq, CAST(from_stop AS TEXT) from_stop, CAST(to_stop AS TEXT) to_stop FROM route_links"
-        )
+        Here is how the line_segments table is looking eventually:
+            pattern_id  seq    from_stop      to_stop shortname         line_id  trav_time  headway      freq
+        0  10001006000    0  10000000464  10000000462        T2  T2_10001006000      150.0    240.0  0.004167
+        1  10001006000    1  10000000462  10000000459        T2  T2_10001006000      110.0    240.0  0.004167
+        2  10001006000    2  10000000459  10000000160        T2  T2_10001006000      100.0    240.0  0.004167
+        """
+
+        # we select route links for the pattern_ids in the given time range
+        sql = f"""
+            WITH pattern_ids AS  
+            (SELECT
+                DISTINCT pattern_id 
+            FROM
+                trips  
+            INNER JOIN
+            (SELECT
+                DISTINCT trip_id 
+            FROM
+                trips_schedule  
+            WHERE
+                departure>={self.start} 
+                AND arrival<={self.end}) selected_trips 
+            ON trips.trip_id = selected_trips.trip_id)        
+            SELECT
+                pattern_ids.pattern_id,
+                seq,
+                CAST(from_stop AS TEXT) from_stop,
+                CAST(to_stop AS TEXT) to_stop              
+            FROM
+                route_links         
+            INNER JOIN
+                pattern_ids         
+            ON route_links.pattern_id = pattern_ids.pattern_id"""
         route_links = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
         )
-        route_links = route_links.loc[route_links.pattern_id.isin(pattern_ids)]
 
-        # create a line segment table
-        sql = "SELECT pattern_id, shortname FROM routes" ""
+        # create a routes table
+        sql = "SELECT pattern_id, CAST(shortname AS TEXT) shortname FROM routes"
         routes = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
         )
+        # we create a line id by concatenating the route short name with the pattern_id
         routes["line_id"] = routes["shortname"] + "_" + routes["pattern_id"].astype(str)
+
+        # we create the line segments by merging the route links with the routes
+        # in order to have a route name on each segment
         self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
 
+        # we add the travel time and headway to each line segment
         self.add_mean_travel_time_to_segments()
         self.add_mean_headway_to_segments()
 
-        # compute the frequency
+        # we compute the frequency form the headway
         self.line_segments["freq"] = np.inf
         self.line_segments.loc[self.line_segments.headway > 0.0, "freq"] = (
             1.0 / self.line_segments.loc[self.line_segments.headway > 0.0, "headway"]
@@ -248,8 +254,14 @@ class SF_graph_builder:
         tt["last_trip_id"] = tt["trip_id"].shift(+1)
         tt["last_pattern_id"] = tt["pattern_id"].shift(+1)
         tt["trav_time"] = tt["arrival"] - tt["last_departure"]
-        tt.loc[tt.seq == 0, "trav_time"] = np.nan
+        tt.dropna(how="any", inplace=True)
+        tt[["last_departure", "last_trip_id", "last_pattern_id"]] = tt[
+            ["last_departure", "last_trip_id", "last_pattern_id"]
+        ].astype(int)
+
         tt.loc[(tt.last_pattern_id != tt.pattern_id) | (tt.last_trip_id != tt.trip_id), "trav_time"] = np.nan
+        tt.dropna(subset="trav_time", inplace=True)
+        tt = tt.copy(deep=True)
 
         # tt.seq refers to the stop sequence index.
         # Because we computed the travel time between two stops, we are now dealing
@@ -257,7 +269,7 @@ class SF_graph_builder:
         tt = tt.loc[tt.seq > 0]
         tt.seq -= 1
 
-        # take the min of the travel times computed among the trips of a pattern segment
+        # take the mean of the travel times computed among the trips of a pattern segment
         tt = tt[["pattern_id", "seq", "trav_time"]].groupby(["pattern_id", "seq"]).mean().reset_index(drop=False)
 
         return tt
@@ -443,7 +455,7 @@ class SF_graph_builder:
         self.vertices.reset_index(drop=True, inplace=True)
         self.vertices.index.name = "index"
         self.vertices["node_id"] = self.vertices.index + 1
-        self.vertices = self.vertices[self.vertex_cols]
+        self.vertices = self.vertices[SF_VERTEX_COLS]
 
         # data types
         self.vertices.node_id = self.vertices.node_id.astype(int)
@@ -969,7 +981,7 @@ class SF_graph_builder:
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
         self.edges["link_id"] = self.edges.index + 1
-        self.edges = self.edges[self.edges_cols]
+        self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
         self.edges["link_type"] = self.edges["link_type"].astype("category")
