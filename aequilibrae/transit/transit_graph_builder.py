@@ -98,6 +98,7 @@ class SF_graph_builder:
             "o_line_id",
             "d_line_id",
             "transfer_id",
+            "direction",
         ]
 
         self.line_segments = None
@@ -482,6 +483,8 @@ class SF_graph_builder:
         on_board_edges["o_line_id"] = None
         on_board_edges["d_line_id"] = None
         on_board_edges["transfer_id"] = None
+        on_board_edges["direction"] = 0
+
 
         self.on_board_edges = on_board_edges
 
@@ -517,6 +520,7 @@ class SF_graph_builder:
         boarding_edges["o_line_id"] = None
         boarding_edges["d_line_id"] = None
         boarding_edges["transfer_id"] = None
+        boarding_edges["direction"] = 1
 
         self.boarding_edges = boarding_edges
 
@@ -551,6 +555,7 @@ class SF_graph_builder:
         alighting_edges["trav_time"] = (
             0.5 * self.uniform_dwell_time + self.alighting_penalty + self.a_tiny_time_duration
         )
+        alighting_edges["direction"] = 1
 
         self.alighting_edges = alighting_edges
 
@@ -594,6 +599,7 @@ class SF_graph_builder:
         dwell_edges["transfer_id"] = None
         dwell_edges["freq"] = np.inf
         dwell_edges["trav_time"] = self.uniform_dwell_time
+        dwell_edges["direction"] = 0
 
         self.dwell_edges = dwell_edges
 
@@ -697,6 +703,7 @@ class SF_graph_builder:
         access_connector_edges["o_line_id"] = None
         access_connector_edges["d_line_id"] = None
         access_connector_edges["transfer_id"] = None
+        access_connector_edges["direction"] = 1
 
         # egress connectors
         egress_connector_edges = access_connector_edges.copy(deep=True)
@@ -709,6 +716,7 @@ class SF_graph_builder:
         egress_connector_edges["o_line_id"] = None
         egress_connector_edges["d_line_id"] = None
         egress_connector_edges["transfer_id"] = None
+        egress_connector_edges["direction"] = 1
 
         # travel time update
         access_connector_edges.trav_time *= self.access_time_factor
@@ -747,6 +755,7 @@ class SF_graph_builder:
         inner_stop_transfer_edges["line_seg_idx"] = np.nan
         inner_stop_transfer_edges["link_type"] = "inner_transfer"
         inner_stop_transfer_edges["transfer_id"] = None
+        inner_stop_transfer_edges["direction"] = 0
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
@@ -834,6 +843,7 @@ class SF_graph_builder:
         outer_stop_transfer_edges["trav_time"] = distance / self.walking_speed
         outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
         outer_stop_transfer_edges["trav_time"] += self.alighting_penalty
+        outer_stop_transfer_edges["direction"] = 0
 
         # cleanup
         outer_stop_transfer_edges.drop(
@@ -886,6 +896,7 @@ class SF_graph_builder:
         walking_edges["link_type"] = "walking"
         walking_edges["transfer_id"] = None
         walking_edges["freq"] = np.inf
+        walking_edges["direction"] = 0
 
         # compute the walking time
         o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
@@ -972,6 +983,7 @@ class SF_graph_builder:
         self.edges.o_line_id = self.edges.o_line_id.astype(str)
         self.edges.d_line_id = self.edges.d_line_id.astype(str)
         self.edges.transfer_id = self.edges.transfer_id.astype(str)
+        self.edges.direction = self.edges.direction.astype("int8")
 
     def create_additional_db_fields(self):
         # This graph requires some additional tables and fields inorder to store all our information.
@@ -1072,12 +1084,12 @@ class SF_graph_builder:
         # link = Link(self.edges.iloc[0], project)
         # data, sql = SafeClass._save_new_with_geometry(link)
         #
-        # Insert into links ("link_type","line_id","stop_id","line_seg_idx","b_node","a_node","trav_time","freq","o_line_id","d_line_id","transfer_id","link_id","modes",geometry)
-        # values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, 4326))
+        # Insert into links ("link_id","link_type","line_id","stop_id","line_seg_idx","b_node","a_node","trav_time","freq","o_line_id","d_line_id","transfer_id","direction","modes",geometry)
+        # values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, 4326))
         self.pt_conn.executemany(
             """
-            Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
-            values(?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
+            Insert into links ("{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}","{}",{})
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,GeomFromWKB(?, {}))
             """.format(
                 *self.edges.columns, self.global_crs.to_epsg()
             ),
@@ -1085,3 +1097,21 @@ class SF_graph_builder:
         )
 
         self.pt_conn.commit()
+
+    def to_aeq_graph(self):
+        from aequilibrae.paths import Graph
+
+        g = Graph()
+        g.network = self.edges.copy(deep=True)
+        g.cost = g.network.trav_time.values
+        g.free_flow_time = g.network.trav_time.values
+
+        g.network["id"] = g.network.link_id
+        g.network_ok = True
+        g.status = "OK"
+        g.prepare_graph(self.vertices[self.vertices.node_type == "od"].node_id.values)
+        g.set_graph("trav_time")
+        g.set_blocked_centroid_flows(True)
+        g.graph.__compressed_id__ = g.graph.__compressed_id__.astype(int)
+
+        return g
