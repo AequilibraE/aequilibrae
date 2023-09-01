@@ -179,7 +179,7 @@ class SF_graph_builder:
         self.add_mean_travel_time_to_segments()
         self.add_mean_headway_to_segments()
 
-        # we compute the frequency form the headway
+        # we compute the frequency from the headway
         self.line_segments["freq"] = np.inf
         self.line_segments.loc[self.line_segments.headway > 0.0, "freq"] = (
             1.0 / self.line_segments.loc[self.line_segments.headway > 0.0, "headway"]
