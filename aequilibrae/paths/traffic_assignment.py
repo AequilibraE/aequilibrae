@@ -687,7 +687,9 @@ class TrafficAssignment(object):
         """
         Returns a dataframe of the select link flows for each class
         """
-        sl_flows = None  # stores the df for each class
+
+        raise NotImplementedError("Select link is currently disabled. See issue #442")
+        class_flows = []  # stores the df for each class
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -699,12 +701,8 @@ class TrafficAssignment(object):
             cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
             df.set_index("link_id", inplace=True)
-            if sl_flows is None:
-                sl_flows = df
-            else:
-                sl_flows.join(df)
-        # sl_flows = pd.concat(class_flows, axis=1)
-        return sl_flows
+            class_flows.append(df)
+        return pd.concat(class_flows, axis=1)
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """
@@ -717,6 +715,7 @@ class TrafficAssignment(object):
             Defaults to the active project
         """
 
+        raise NotImplementedError("Select link is currently disabled. See issue #442")
         if not project:
             project = self.project or get_active_project()
         df = self.select_link_flows()
@@ -749,6 +748,7 @@ class TrafficAssignment(object):
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
 
+        raise NotImplementedError("Select link is currently disabled. See issue #442")
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -770,5 +770,7 @@ class TrafficAssignment(object):
         :Arguments:
             **name** (:obj:`str`): name of the matrices
         """
+
+        raise NotImplementedError("Select link is currently disabled. See issue #442")
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)

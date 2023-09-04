@@ -3,7 +3,7 @@ import uuid
 import zipfile
 from os.path import join, dirname
 from tempfile import gettempdir
-from unittest import TestCase
+from unittest import TestCase, skip
 
 import numpy as np
 
@@ -11,6 +11,7 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathRes
 from ...data import siouxfalls_project
 
 
+@skip("Select link is currently disabled. See issue #442")
 class TestSelectLink(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
@@ -49,7 +50,7 @@ class TestSelectLink(TestCase):
         Uses two examples: 2 links in one select link, and a single Selected Link
         Checks both the OD Matrix and Link Loading
         """
-        self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "5 for fun": [(5, 1)]})
+        self.assignclass.set_select_links({"sl 9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "sl 5 for fun": [(5, 1)]})
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
@@ -72,7 +73,7 @@ class TestSelectLink(TestCase):
         Tests to make sure the OD matrix works when all links surrounding one origin are selected
         Confirms the Link Loading is done correctly in this case
         """
-        self.assignclass.set_select_links({"1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
+        self.assignclass.set_select_links({"sl 1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
 
         self.assignment.execute()
 
@@ -101,7 +102,7 @@ class TestSelectLink(TestCase):
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
 
-        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
 
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
@@ -126,7 +127,7 @@ class TestSelectLink(TestCase):
         self.assignment.execute()
         non_sl_loads = self.assignclass.results.get_load_results()
         self.setUp()
-        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
         self.assignment.execute()
         sl_loads = self.assignclass.results.get_load_results()
         np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
