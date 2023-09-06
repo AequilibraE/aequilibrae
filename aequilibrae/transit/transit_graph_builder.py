@@ -1,6 +1,8 @@
 """ Create the graph used by public transport assignment algorithms.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pyproj
@@ -9,7 +11,6 @@ import shapely.ops
 from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
-import warnings
 
 SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
 SF_EDGE_COLS = [
@@ -75,10 +76,6 @@ class SF_graph_builder:
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
-
-        self.proj_conn = project_conn  # sqlite connection
-        self.proj_conn.enable_load_extension(True)
-        self.proj_conn.load_extension("mod_spatialite")
 
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
@@ -496,7 +493,6 @@ class SF_graph_builder:
         on_board_edges["d_line_id"] = None
         on_board_edges["transfer_id"] = None
         on_board_edges["direction"] = 0
-
 
         self.on_board_edges = on_board_edges
 
