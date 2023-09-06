@@ -601,7 +601,7 @@ class AequilibraeMatrix(object):
 
         # Index
         if self.__memory_only:
-            self.indices = np.zeros((self.zones, self.num_indices))
+            self.indices = np.zeros((self.zones, self.num_indices), dtype=int)
         else:
             offset += self.num_indices * INDEX_NAME_MAX_LENGTH
             self.indices = np.memmap(
@@ -1081,6 +1081,9 @@ class AequilibraeMatrix(object):
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
 
+        if self.__memory_only:
+            raise NotImplementedError("This operation does not make sense for memory only matrices")
+
         if matrix_name is not None:
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
                 matrix_name = str(matrix_name)[0:MATRIX_NAME_MAX_LENGTH]
@@ -1113,6 +1116,9 @@ class AequilibraeMatrix(object):
         """
         if self.__omx:
             raise NotImplementedError("This operation does not make sense for OMX matrices")
+
+        if self.__memory_only:
+            raise NotImplementedError("This operation does not make sense for memory only matrices")
 
         if matrix_description is not None:
             if len(str(matrix_description)) > MATRIX_DESCRIPTION_MAX_LENGTH:
