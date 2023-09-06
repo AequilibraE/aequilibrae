@@ -12,19 +12,21 @@ from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import cKDTree, minkowski_distance
 from shapely.geometry import Point
 
-SF_VERTEX_COLS = ["vert_id", "type", "stop_id", "line_id", "line_seg_idx", "taz_id", "coord"]
+SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
-    "type",
+    "link_id",
+    "link_type",
     "line_id",
     "stop_id",
     "line_seg_idx",
-    "tail_vert_id",
-    "head_vert_id",
+    "b_node",
+    "a_node",
     "trav_time",
     "freq",
     "o_line_id",
     "d_line_id",
     "transfer_id",
+    "direction",
 ]
 
 
@@ -181,29 +183,29 @@ class SF_graph_builder:
 
         # we select route links for the pattern_ids in the given time range
         sql = f"""
-            WITH pattern_ids AS  
+            WITH pattern_ids AS
             (SELECT
-                DISTINCT pattern_id 
+                DISTINCT pattern_id
             FROM
-                trips  
+                trips
             INNER JOIN
             (SELECT
-                DISTINCT trip_id 
+                DISTINCT trip_id
             FROM
-                trips_schedule  
+                trips_schedule
             WHERE
-                departure>={self.start} 
-                AND arrival<={self.end}) selected_trips 
-            ON trips.trip_id = selected_trips.trip_id)        
+                departure>={self.start}
+                AND arrival<={self.end}) selected_trips
+            ON trips.trip_id = selected_trips.trip_id)
             SELECT
                 pattern_ids.pattern_id,
                 seq,
                 CAST(from_stop AS TEXT) from_stop,
-                CAST(to_stop AS TEXT) to_stop              
+                CAST(to_stop AS TEXT) to_stop
             FROM
-                route_links         
+                route_links
             INNER JOIN
-                pattern_ids         
+                pattern_ids
             ON route_links.pattern_id = pattern_ids.pattern_id"""
         route_links = pd.read_sql(
             sql=sql,
