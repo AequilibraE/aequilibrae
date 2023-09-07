@@ -106,6 +106,10 @@ class AequilibraeData(object):
             #             raise ValueError('Data types need to be Python or Numpy data types')
 
             for field in self.fields:
+                if not type(field) is str:
+                    raise TypeError(field + " is not a string. You cannot use it as a field name")
+                if not field.isidentifier():
+                    raise Exception(field + " is a not a valid identifier name. You cannot use it as a field name")
                 if field in object.__dict__:
                     raise Exception(field + " is a reserved name. You cannot use it as a field name")
 
