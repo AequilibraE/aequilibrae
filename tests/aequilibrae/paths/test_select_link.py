@@ -1,13 +1,11 @@
 import os
-import pathlib
 import uuid
 import zipfile
 from os.path import join, dirname
-from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase, skip
+
 import numpy as np
-import pandas as pd
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
 from ...data import siouxfalls_project
