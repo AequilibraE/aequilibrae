@@ -168,13 +168,13 @@ class SF_graph_builder:
         )
 
     def create_line_segments(self):
-        """Line segments correspond to segments between two successive stops for a each line.
+        """Line segments correspond to segments between two successive stops for each line.
 
         For exemple if 2 lines, L1 and L2, are going from stop A to stop B, we have 2 line segments:
         - L1_AB
         - L2_AB
 
-        Here is how the line_segments table is looking eventually:
+        line_segments table format:
             pattern_id  seq    from_stop      to_stop shortname         line_id  trav_time  headway      freq
         0  10001006000    0  10000000464  10000000462        T2  T2_10001006000      150.0    240.0  0.004167
         1  10001006000    1  10000000462  10000000459        T2  T2_10001006000      110.0    240.0  0.004167
@@ -223,6 +223,18 @@ class SF_graph_builder:
         )
 
     def compute_segment_travel_time(self, time_filter=True):
+        """Compute the mean travel time for each line segment.
+
+            if time_filter is True, the mean travel time is computed over the [start, end] time range,
+            otherwise it is computed over all the available data (e.g. a whole day).
+
+        tt table format:
+            pattern_id  seq     trav_time
+        0   10001006000     1   114.545455
+        1   10001006000     2   100.000000
+        2   10001006000     3   180.000000
+        """
+
         if time_filter:
             sql = f"""SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
@@ -261,6 +273,12 @@ class SF_graph_builder:
         return tt
 
     def add_mean_travel_time_to_segments(self):
+        """Add a column to the line segment table with a mean travel time.
+
+        Because there might be missing values when computing the travel time on a small time range,
+        we also compute the mean travel time over all the available data in order to fill these potential
+        missing values.
+        """
         tt = self.compute_segment_travel_time(time_filter=True)
         tt_full = self.compute_segment_travel_time(time_filter=False)
         tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
@@ -273,6 +291,12 @@ class SF_graph_builder:
         self.line_segments.trav_time = self.line_segments.trav_time.fillna(self.end - self.start)
 
     def add_mean_headway_to_segments(self):
+        """Compute the mean headway for each pattern and add it to the line segment table, as headway.
+
+        When there is not enough information to comute the mean headway (e.g. a single trip), the headway is
+        given the value of the time range length.
+        """
+
         # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
