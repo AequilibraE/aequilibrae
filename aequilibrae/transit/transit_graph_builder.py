@@ -85,23 +85,25 @@ class SF_graph_builder:
 
         # graph components
         # ----------------
-        self.line_segments = None
+        self.__line_segments = None
+        self.vertices = None
+        self.edges = None
 
         # vertices
-        self.stop_vertices = None
-        self.boarding_vertices = None
-        self.alighting_vertices = None
-        self.od_vertices = None
+        self.__stop_vertices = None
+        self.__boarding_vertices = None
+        self.__alighting_vertices = None
+        self.__od_vertices = None
 
         # edges
-        self.on_board_edges = None
-        self.dwell_edges = None
-        self.alighting_edges = None
-        self.boarding_edges = None
-        self.connector_edges = None
-        self.inner_stop_transfer_edges = pd.DataFrame()
-        self.outer_stop_transfer_edges = pd.DataFrame()
-        self.walking_edges = pd.DataFrame()
+        self.__on_board_edges = None
+        self.__dwell_edges = None
+        self.__alighting_edges = None
+        self.__boarding_edges = None
+        self.__connector_edges = None
+        self.__inner_stop_transfer_edges = pd.DataFrame()
+        self.__outer_stop_transfer_edges = pd.DataFrame()
+        self.__walking_edges = pd.DataFrame()
 
         self.global_crs = pyproj.CRS(global_crs)
         self.projected_crs = pyproj.CRS(projected_crs)
@@ -184,7 +186,7 @@ class SF_graph_builder:
         # we select route links for the pattern_ids in the given time range
         sql = f"""SELECT distinct
             trips.pattern_id,
-            seq,
+            route_links.seq,
             CAST(from_stop AS TEXT) from_stop,
             CAST(to_stop AS TEXT) to_stop              
         FROM
@@ -210,16 +212,16 @@ class SF_graph_builder:
 
         # we create the line segments by merging the route links with the routes
         # in order to have a route name on each segment
-        self.line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
+        self.__line_segments = pd.merge(route_links, routes, on="pattern_id", how="left")
 
         # we add the travel time and headway to each line segment
         self.add_mean_travel_time_to_segments()
         self.add_mean_headway_to_segments()
 
         # we compute the frequency from the headway
-        self.line_segments["freq"] = np.inf
-        self.line_segments.loc[self.line_segments.headway > 0.0, "freq"] = (
-            1.0 / self.line_segments.loc[self.line_segments.headway > 0.0, "headway"]
+        self.__line_segments["freq"] = np.inf
+        self.__line_segments.loc[self.__line_segments.headway > 0.0, "freq"] = (
+            1.0 / self.__line_segments.loc[self.__line_segments.headway > 0.0, "headway"]
         )
 
     def compute_segment_travel_time(self, time_filter=True):
@@ -284,11 +286,11 @@ class SF_graph_builder:
         tt_full.rename(columns={"trav_time": "trav_time_full"}, inplace=True)
 
         # Compute the mean travel time from the different trips corresponding to
-        self.line_segments = pd.merge(self.line_segments, tt, on=["pattern_id", "seq"], how="left")
-        self.line_segments = pd.merge(self.line_segments, tt_full, on=["pattern_id", "seq"], how="left")
-        self.line_segments.trav_time = self.line_segments.trav_time.fillna(self.line_segments.trav_time_full)
-        self.line_segments.drop("trav_time_full", axis=1, inplace=True)
-        self.line_segments.trav_time = self.line_segments.trav_time.fillna(self.end - self.start)
+        self.__line_segments = pd.merge(self.__line_segments, tt, on=["pattern_id", "seq"], how="left")
+        self.__line_segments = pd.merge(self.__line_segments, tt_full, on=["pattern_id", "seq"], how="left")
+        self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.__line_segments.trav_time_full)
+        self.__line_segments.drop("trav_time_full", axis=1, inplace=True)
+        self.__line_segments.trav_time = self.__line_segments.trav_time.fillna(self.end - self.start)
 
     def add_mean_headway_to_segments(self):
         """Compute the mean headway for each pattern and add it to the line segment table, as headway.
@@ -353,7 +355,7 @@ class SF_graph_builder:
         # compute the mean headway computed among the trips of a given pattern
         mh = mh[["pattern_id", "headway"]].groupby("pattern_id").mean().reset_index(drop=False)
 
-        self.line_segments = pd.merge(self.line_segments, mh, on=["pattern_id"], how="left")
+        self.__line_segments = pd.merge(self.__line_segments, mh, on=["pattern_id"], how="left")
 
     def create_stop_vertices(self):
         # select all stops
@@ -361,7 +363,7 @@ class SF_graph_builder:
         stop_vertices = pd.read_sql(sql, self.pt_conn)
 
         # filter stops that are used on the given time range
-        stops_ids = pd.concat((self.line_segments.from_stop, self.line_segments.to_stop), axis=0).unique()
+        stops_ids = pd.concat((self.__line_segments.from_stop, self.__line_segments.to_stop), axis=0).unique()
         stop_vertices = stop_vertices.loc[stop_vertices.stop_id.isin(stops_ids)]
 
         # uniform attributes
@@ -370,13 +372,13 @@ class SF_graph_builder:
         stop_vertices["line_seg_idx"] = np.nan
         stop_vertices["node_type"] = "stop"
 
-        self.stop_vertices = stop_vertices
+        self.__stop_vertices = stop_vertices
 
     def create_boarding_vertices(self):
-        boarding_vertices = self.line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
+        boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
         boarding_vertices = pd.merge(
-            boarding_vertices, self.stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
+            boarding_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
 
         # uniform attributes
@@ -393,13 +395,13 @@ class SF_graph_builder:
             boarding_vertices["geometry"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             boarding_vertices.drop(["x", "y"], axis=1, inplace=True)
 
-        self.boarding_vertices = boarding_vertices
+        self.__boarding_vertices = boarding_vertices
 
     def create_alighting_vertices(self):
-        alighting_vertices = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
         alighting_vertices = pd.merge(
-            alighting_vertices, self.stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
+            alighting_vertices, self.__stop_vertices[["stop_id", "geometry"]], on="stop_id", how="left"
         )
 
         # uniform attributes
@@ -416,7 +418,7 @@ class SF_graph_builder:
             alighting_vertices["geometry"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             alighting_vertices.drop(["x", "y"], axis=1, inplace=True)
 
-        self.alighting_vertices = alighting_vertices
+        self.__alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
         od_vertices = self.zones[["zone_id", "centroids"]].rename(
@@ -429,7 +431,7 @@ class SF_graph_builder:
         od_vertices["line_id"] = None
         od_vertices["line_seg_idx"] = np.nan
 
-        self.od_vertices = od_vertices
+        self.__od_vertices = od_vertices
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
@@ -453,10 +455,10 @@ class SF_graph_builder:
         # stack the dataframes on top of each other
         self.vertices = pd.concat(
             [
-                self.od_vertices,
-                self.stop_vertices,
-                self.boarding_vertices,
-                self.alighting_vertices,
+                self.__od_vertices,
+                self.__stop_vertices,
+                self.__boarding_vertices,
+                self.__alighting_vertices,
             ],
             axis=0,
         )
@@ -474,10 +476,9 @@ class SF_graph_builder:
         self.vertices.line_id = self.vertices.line_id.astype(str)
         self.vertices.line_seg_idx = self.vertices.line_seg_idx.astype("Int32")
         self.vertices.taz_id = self.vertices.taz_id.astype(str)
-        # self.vertices.geometry = self.vertices.geometry.astype(str)
 
     def create_on_board_edges(self):
-        on_board_edges = self.line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
+        on_board_edges = self.__line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
         on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # get tail vertex index
@@ -507,10 +508,10 @@ class SF_graph_builder:
         on_board_edges["transfer_id"] = None
         on_board_edges["direction"] = 0
 
-        self.on_board_edges = on_board_edges
+        self.__on_board_edges = on_board_edges
 
     def create_boarding_edges(self):
-        boarding_edges = self.line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
+        boarding_edges = self.__line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
         boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (stop vertex)
@@ -543,10 +544,10 @@ class SF_graph_builder:
         boarding_edges["transfer_id"] = None
         boarding_edges["direction"] = 1
 
-        self.boarding_edges = boarding_edges
+        self.__boarding_edges = boarding_edges
 
     def create_alighting_edges(self):
-        alighting_edges = self.line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
+        alighting_edges = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
 
         # get tail vertex index (alighting vertex)
@@ -578,11 +579,11 @@ class SF_graph_builder:
         )
         alighting_edges["direction"] = 1
 
-        self.alighting_edges = alighting_edges
+        self.__alighting_edges = alighting_edges
 
     def create_dwell_edges(self):
         # we start by removing the first segment of each line
-        dwell_edges = self.line_segments.loc[self.line_segments.seq != 0][["line_id", "from_stop", "seq"]]
+        dwell_edges = self.__line_segments.loc[self.__line_segments.seq != 0][["line_id", "from_stop", "seq"]]
         dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
         # we take the first stop of the segment
@@ -622,7 +623,7 @@ class SF_graph_builder:
         dwell_edges["trav_time"] = self.uniform_dwell_time
         dwell_edges["direction"] = 0
 
-        self.dwell_edges = dwell_edges
+        self.__dwell_edges = dwell_edges
 
     def create_connector_edges(self, method="overlapping_regions", allow_missing_connections=True):
         """
@@ -743,7 +744,7 @@ class SF_graph_builder:
         access_connector_edges.trav_time *= self.access_time_factor
         egress_connector_edges.trav_time *= self.egress_time_factor
 
-        self.connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
+        self.__connector_edges = pd.concat([access_connector_edges, egress_connector_edges], axis=0)
 
     def create_inner_stop_transfer_edges(self):
         """Create transfer edges between distinct lines of each stop."""
@@ -764,7 +765,7 @@ class SF_graph_builder:
         # update the transfer edge frequency
         inner_stop_transfer_edges = pd.merge(
             inner_stop_transfer_edges,
-            self.line_segments[["from_stop", "line_id", "freq"]],
+            self.__line_segments[["from_stop", "line_id", "freq"]],
             left_on=["stop_id", "d_line_id"],
             right_on=["from_stop", "line_id"],
             how="left",
@@ -785,7 +786,7 @@ class SF_graph_builder:
         # travel time update : dwell_time + alighting_penalty
         inner_stop_transfer_edges["trav_time"] = self.uniform_dwell_time + self.alighting_penalty
 
-        self.inner_stop_transfer_edges = inner_stop_transfer_edges
+        self.__inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
         """Create transfer edges between distinct lines/stops of each station."""
@@ -836,7 +837,7 @@ class SF_graph_builder:
         # update the transfer edge frequency
         outer_stop_transfer_edges = pd.merge(
             outer_stop_transfer_edges,
-            self.line_segments[["from_stop", "line_id", "freq"]],
+            self.__line_segments[["from_stop", "line_id", "freq"]],
             left_on=["d_stop_id", "d_line_id"],
             right_on=["from_stop", "line_id"],
             how="left",
@@ -873,7 +874,7 @@ class SF_graph_builder:
             inplace=True,
         )
 
-        self.outer_stop_transfer_edges = outer_stop_transfer_edges
+        self.__outer_stop_transfer_edges = outer_stop_transfer_edges
 
     def create_walking_edges(self):
         """Create walking edges between distinct stops of each station."""
@@ -937,7 +938,7 @@ class SF_graph_builder:
             inplace=True,
         )
 
-        self.walking_edges = walking_edges
+        self.__walking_edges = walking_edges
 
     def create_edges(self):
         """Graph edges creation as a dataframe.
@@ -974,14 +975,14 @@ class SF_graph_builder:
         # stack the dataframes on top of each other
         self.edges = pd.concat(
             [
-                self.on_board_edges,
-                self.boarding_edges,
-                self.alighting_edges,
-                self.dwell_edges,
-                self.connector_edges,
-                self.inner_stop_transfer_edges,
-                self.outer_stop_transfer_edges,
-                self.walking_edges,
+                self.__on_board_edges,
+                self.__boarding_edges,
+                self.__alighting_edges,
+                self.__dwell_edges,
+                self.__connector_edges,
+                self.__inner_stop_transfer_edges,
+                self.__outer_stop_transfer_edges,
+                self.__walking_edges,
             ],
             axis=0,
         )
