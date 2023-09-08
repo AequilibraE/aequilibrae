@@ -182,31 +182,18 @@ class SF_graph_builder:
         """
 
         # we select route links for the pattern_ids in the given time range
-        sql = f"""
-            WITH pattern_ids AS
-            (SELECT
-                DISTINCT pattern_id
-            FROM
-                trips
-            INNER JOIN
-            (SELECT
-                DISTINCT trip_id
-            FROM
-                trips_schedule
-            WHERE
-                departure>={self.start}
-                AND arrival<={self.end}) selected_trips
-            ON trips.trip_id = selected_trips.trip_id)
-            SELECT
-                pattern_ids.pattern_id,
-                seq,
-                CAST(from_stop AS TEXT) from_stop,
-                CAST(to_stop AS TEXT) to_stop
-            FROM
-                route_links
-            INNER JOIN
-                pattern_ids
-            ON route_links.pattern_id = pattern_ids.pattern_id"""
+        sql = f"""SELECT distinct
+            trips.pattern_id,
+            seq,
+            CAST(from_stop AS TEXT) from_stop,
+            CAST(to_stop AS TEXT) to_stop              
+        FROM
+            route_links         
+        INNER JOIN trips ON route_links.pattern_id = trips.pattern_id
+        INNER JOIN trips_schedule ON trips.trip_id = trips_schedule.trip_id 
+        WHERE
+            departure>={self.start} 
+            AND arrival<={self.end}"""
         route_links = pd.read_sql(
             sql=sql,
             con=self.pt_conn,
