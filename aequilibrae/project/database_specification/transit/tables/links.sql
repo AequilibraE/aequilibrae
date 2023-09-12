@@ -29,15 +29,8 @@ CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                    distance        NUMERIC,
                                    modes           TEXT    NOT NULL,
                                    link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
-                                   -- 'name'          TEXT, -- Not required
-                                   -- speed_ab        NUMERIC, -- Not required
-                                   -- speed_ba        NUMERIC, -- Not required
-                                   -- travel_time_ab  NUMERIC, -- Not required
-                                   -- travel_time_ba  NUMERIC, -- Not required
-                                   -- capacity_ab     NUMERIC, -- Not required
-                                   -- capacity_ba     NUMERIC, -- Not required
                                    line_id         TEXT,
-                                   stop_id         INTEGER  REFERENCES stops(stop_id) ON update RESTRICT ON delete RESTRICT,
+                                   stop_id         TEXT    REFERENCES stops(stop) ON update RESTRICT ON delete RESTRICT,
                                    line_seg_idx    INTEGER,
                                    trav_time       NUMERIC  NOT NULL,
                                    freq            NUMERIC  NOT NULL,
