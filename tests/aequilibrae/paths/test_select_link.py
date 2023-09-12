@@ -5,7 +5,7 @@ import zipfile
 from os.path import join, dirname
 from shutil import copytree
 from tempfile import gettempdir
-from unittest import TestCase
+from unittest import TestCase, skip
 import numpy as np
 import pandas as pd
 
@@ -13,6 +13,7 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathRes
 from ...data import siouxfalls_project
 
 
+@skip("Select link is currently disabled. See issue #442")
 class TestSelectLink(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
