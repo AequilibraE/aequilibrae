@@ -668,21 +668,21 @@ class SF_graph_builder:
             stop_kdTree = cKDTree(stop_geometries)
             results = stop_kdTree.query_ball_point(od_geometries, distance, workers=self.num_threads)
 
+            # access connectors
+
             # Build up a list of dataframes to concat, each dataframe corresponds to all connectors for a given OD
             connectors = []
             for i, verts in enumerate(results):
                 distance = minkowski_distance(od_geometries[i], stop_geometries[verts])
                 df = stop_vertices["node_id"].iloc[verts].to_frame()
-                df["a_node"] = od_vertices.iloc[i]["node_id"]
+                df["b_node"] = od_vertices.iloc[i]["node_id"]  # OD is tail node of access connector
                 df["trav_time"] = distance / self.walking_speed
                 connectors.append(df)
-
-            # access connectors
-            access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "b_node"}).reset_index(drop=True)
+            access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "a_node"}).reset_index(drop=True)
 
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
-                missing = stop_vertices["node_id"].isin(access_connector_edges["b_node"])
+                missing = stop_vertices["node_id"].isin(access_connector_edges["a_node"])
                 missing = missing[~missing].index
 
                 distance, index = kdTree.query(
@@ -692,8 +692,8 @@ class SF_graph_builder:
                 trav_time = pd.Series(distance / self.walking_speed, name="trav_time")
                 missing_edges = pd.concat(
                     [
-                        stop_vertices["node_id"].iloc[missing].reset_index(drop=True).rename("b_node"),
-                        nearest_od.rename("a_node"),
+                        stop_vertices["node_id"].iloc[missing].reset_index(drop=True).rename("a_node"),
+                        nearest_od.rename("b_node"),
                         trav_time,
                     ],
                     axis=1,
