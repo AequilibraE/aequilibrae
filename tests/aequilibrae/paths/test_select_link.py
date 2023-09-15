@@ -153,12 +153,7 @@ class TestSelectLink(TestCase):
         os.mkdir(proj_path)
         zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
 
-        print(proj_path)
-
-        breakpoint()
         link_df = pd.read_csv(proj_path / 'link.csv')
-        # link_df["link_id_old"] = link_df.link_id
-        # link_df["link_id"] = link_df.index + 1
         node_df = pd.read_csv(proj_path / 'node.csv')
         centroids_array = np.array([7, 8, 11])
 
