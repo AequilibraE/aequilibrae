@@ -687,8 +687,6 @@ class TrafficAssignment(object):
         """
         Returns a dataframe of the select link flows for each class
         """
-
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         class_flows = []  # stores the df for each class
         for cls in self.classes:
             # Save OD_matrices
@@ -715,7 +713,6 @@ class TrafficAssignment(object):
             Defaults to the active project
         """
 
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         if not project:
             project = self.project or get_active_project()
         df = self.select_link_flows()
@@ -748,7 +745,6 @@ class TrafficAssignment(object):
         Saves the Select Link matrices for each TrafficClass in the current TrafficAssignment class
         """
 
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -770,7 +766,5 @@ class TrafficAssignment(object):
         :Arguments:
             **name** (:obj:`str`): name of the matrices
         """
-
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)

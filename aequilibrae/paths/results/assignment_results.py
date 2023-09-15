@@ -277,7 +277,6 @@ class AssignmentResults:
     def get_sl_results(self) -> AequilibraeData:
         # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
         # for each subclass contained in the TrafficClass
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         fields = [
             e
             for name in self._selected_links.keys()
