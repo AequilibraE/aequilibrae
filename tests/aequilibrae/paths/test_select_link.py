@@ -155,7 +155,6 @@ class TestSelectLink(TestCase):
         zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
 
         link_df = pd.read_csv(os.path.join(proj_path, "link.csv"))
-        node_df = pd.read_csv(os.path.join(proj_path, "node.csv"))
         centroids_array = np.array([7, 8, 11])
 
         net = link_df.copy()
@@ -176,7 +175,7 @@ class TestSelectLink(TestCase):
         assign_class = TrafficClass("class_a", g, aem_mat)
         assign_class.set_fixed_cost("a_toll")
         assign_class.set_vot(1.1)
-        assign_class.set_select_links(links={"trace": [(9, 1)]})
+        assign_class.set_select_links(links={"trace": [(7, 0), (13, 0)]})
 
         assign = TrafficAssignment()
         assign.set_classes([assign_class])
@@ -192,26 +191,15 @@ class TestSelectLink(TestCase):
         assign.execute()
 
         # 5.receive results
-        assign_flow_res_df = assign.results().reset_index(drop=False)
+        assign_flow_res_df = assign.results().reset_index(drop=False).fillna(0)
         select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
 
-        assign_flow_res_df.to_csv(os.path.join(proj_path, "assign_flow.csv"), encoding="utf_8_sig", index=False)
-        select_link_flow_df.to_csv(os.path.join(proj_path, "select_link_flow.csv"), encoding="utf_8_sig", index=False)
-
-        flow_res = pd.merge(link_df, assign_flow_res_df, on="link_id")
-        flow_res = pd.merge(flow_res, select_link_flow_df, on="link_id")
-
-        flow_res = flow_res[
-            ["link_id", "a_node", "b_node", "direction", "a_ab", "a_ba", "a_tot", "class_a_trace_a_tot", "geometry"]
-        ].copy()
-        flow_res.rename(columns={"a_ab": "AB_a", "a_ba": "BA_a", "class_a_trace_a_tot": "a_trace"}, inplace=True)
-
-        # save_file
-        flow_res_df = pd.DataFrame(flow_res)
-        flow_res_df.to_csv(os.path.join(proj_path, "flow.csv"))
-        node_df.to_csv(os.path.join(proj_path, "node.csv"))
-
-        assert False
+        pd.testing.assert_frame_equal(
+            assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
+            select_link_flow_df.rename(
+                columns={"class_a_trace_a_ab": "a_ab", "class_a_trace_a_ba": "a_ba", "class_a_trace_a_tot": "a_tot"}
+            ),
+        )
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
