@@ -38,7 +38,6 @@ class TestSelectLink(TestCase):
         self.assignment.set_time_field("free_flow_time")
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("msa")
-        self.assignment.set_cores(1)
 
     def tearDown(self) -> None:
         self.matrix.close()
