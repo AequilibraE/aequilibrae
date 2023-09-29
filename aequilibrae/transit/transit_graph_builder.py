@@ -12,6 +12,9 @@ from aequilibrae.utils.geo_utils import haversine
 from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
 
+from aequilibrae.paths import PathResults
+from aequilibrae.context import get_active_project
+
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
     "link_id",
@@ -1058,16 +1061,58 @@ class SF_graph_builder:
         self.edges.d_line_id = self.edges.d_line_id.fillna("").astype(str)
         self.edges.direction = self.edges.direction.astype("int8")
 
-    def create_line_geometry(self):
+    def create_line_geometry(self, method="direct"):
         """Create the LineString for each edge."""
+        assert method in ["direct", "connector project match"]
+
         lines = []
-        for row in self.edges.itertuples():
-            # row.a_node - 1 because the node_ids are the index + 1
-            line = (
-                shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+        if method == "direct":
+            for row in self.edges.itertuples():
+                # row.a_node - 1 because the node_ids are the index + 1
+                line = (
+                    shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
+                    shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+                )
+                lines.append(shapely.LineString(line))
+
+        elif method == "connector project match":
+            project = get_active_project(must_exist=True)
+            warnings.warn(
+                'In its current implementation, the "connector project match" method may take a while for large networks.'
             )
-            lines.append(shapely.LineString(line))
+
+            nodes = pd.read_sql_query("SELECT node_id, geometry FROM nodes", con=project.conn).set_index("node_id")
+
+            if len(nodes) == 0:
+                raise ValueError(
+                    "No nodes found in the project database. Connector project matching requires an existing project network."
+                )
+
+            nodes_geometries = nodes["geometry"].apply(
+                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
+            )
+            nodes_geometries = np.array(list(nodes_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
+            kdtree = KDTree(nodes_geometries)
+
+            graph = project.network.graphs["c"]
+            graph.set_graph("distance")
+            res = PathResults()
+            res.prepare(graph)
+
+            for row in self.edges.itertuples():
+                # row.a_node - 1 because the node_ids are the index + 1
+                start = shapely.from_wkb(shapely.Point(self.vertices.at[row.a_node - 1, "geometry"]))
+                end = shapely.from_wkb(shapely.Point(self.vertices.at[row.b_node - 1, "geometry"]))
+
+                if row.link_type == "access_connector" or row.link_type == "egress_connector":
+                    _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
+                    res.compute_path(*nodes.iloc[ids].index.values)
+
+                    line = [start] + [shapely.from_wkt(x) for x in nodes.loc[res.path_nodes].geometry.values] + [end]
+
+                else:
+                    line = (start, end)
+                lines.append(shapely.LineString(line))
 
         self.edges["geometry"] = shapely.to_wkb(lines)
 
