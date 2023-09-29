@@ -139,7 +139,6 @@ class TrafficClass:
         :Arguments:
             **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
              Link IDs and directions to be used in select link analysis"""
-        raise NotImplementedError("Select link is currently disabled. See issue #442")
         self._selected_links = {}
         for name, link_set in links.items():
             if len(name.split(" ")) != 1:
