@@ -9,7 +9,7 @@ import pyproj
 import shapely
 import shapely.ops
 from aequilibrae.utils.geo_utils import haversine
-from scipy.spatial import cKDTree, minkowski_distance
+from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
@@ -694,7 +694,7 @@ class SF_graph_builder:
         )
         stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
-        kdTree = cKDTree(od_geometries)
+        kdTree = KDTree(od_geometries)
 
         if method == "nearest_neighbour":
             # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
@@ -722,7 +722,7 @@ class SF_graph_builder:
             distance = distance.reshape(-1)
 
             # Construct a kdtree so we can query all the stops within the radius around each OD
-            stop_kdTree = cKDTree(stop_geometries)
+            stop_kdTree = KDTree(stop_geometries)
             results = stop_kdTree.query_ball_point(od_geometries, distance, workers=self.num_threads)
 
             # access connectors
