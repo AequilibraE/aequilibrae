@@ -762,6 +762,9 @@ class SF_graph_builder:
         # travel time update : dwell_time + alighting_penalty
         inner_stop_transfer_edges["trav_time"] = self.uniform_dwell_time + self.alighting_penalty
 
+        # remove duplicates
+        inner_stop_transfer_edges.drop_duplicates(inplace=True)
+
         self.__inner_stop_transfer_edges = inner_stop_transfer_edges
 
     def create_outer_stop_transfer_edges(self):
@@ -847,6 +850,9 @@ class SF_graph_builder:
             axis=1,
             inplace=True,
         )
+
+        # remove duplicates
+        outer_stop_transfer_edges.drop_duplicates(inplace=True)
 
         self.__outer_stop_transfer_edges = outer_stop_transfer_edges
 
