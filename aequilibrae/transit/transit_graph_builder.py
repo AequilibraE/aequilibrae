@@ -73,6 +73,7 @@ class SF_graph_builder:
         with_walking_edges=True,
         distance_upper_bound=np.inf,
         blocking_centroid_flows=True,
+        max_connectors_per_zone=-1,
     ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
@@ -141,6 +142,7 @@ class SF_graph_builder:
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
         self.blocking_centroid_flows = blocking_centroid_flows
+        self.max_connectors_per_zone = max_connectors_per_zone
 
     def add_zones(self, zones, from_crs: str = None):
         """
@@ -761,6 +763,13 @@ class SF_graph_builder:
         access_connector_edges["line_seg_idx"] = -1
         access_connector_edges["freq"] = np.inf
         access_connector_edges["direction"] = 1
+
+        if self.max_connectors_per_zone > 0:
+            # max_connectors_per_zone connectors per zone with smallest travel time are selected
+            access_connector_edges = access_connector_edges.sort_values(["b_node", "trav_time"])
+            access_connector_edges = access_connector_edges.groupby("b_node").apply(
+                lambda df: df.head(self.max_connectors_per_zone)
+            )
 
         # Create egress connectors
         # ========================
