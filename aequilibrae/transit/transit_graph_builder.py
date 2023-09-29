@@ -72,6 +72,7 @@ class SF_graph_builder:
         with_outer_stop_transfers=True,
         with_walking_edges=True,
         distance_upper_bound=np.inf,
+        blocking_centroid_flows=True,
     ):
         """
         start and end must be expressed in seconds starting from 00h00m00s,
@@ -87,9 +88,10 @@ class SF_graph_builder:
 
         # graph components
         # ----------------
-        self.__line_segments = None
         self.vertices = None
         self.edges = None
+        self.__line_segments = None
+        self.od_node_mapping = None
 
         # vertices
         self.__stop_vertices = None
@@ -129,7 +131,6 @@ class SF_graph_builder:
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
         self.a_tiny_time_duration = 1.0e-06
-        # self.a_tiny_time_duration = 1.0e-04
         self.wait_time_factor = 1.0
         self.walk_time_factor = 1.0
         self.walking_speed = 1.0
@@ -139,6 +140,7 @@ class SF_graph_builder:
         self.with_outer_stop_transfers = with_outer_stop_transfers
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
+        self.blocking_centroid_flows = blocking_centroid_flows
 
     def add_zones(self, zones, from_crs: str = None):
         """
@@ -420,27 +422,63 @@ class SF_graph_builder:
         self.__alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        origin_vertices = self.zones[["zone_id", "centroids"]].rename(
-            columns={"zone_id": "taz_id", "centroids": "geometry"}
-        )
+        if self.blocking_centroid_flows:
+            # we create both "origin" and "destination" nodes
+            origin_vertices = self.zones[["zone_id", "centroids"]].rename(
+                columns={"zone_id": "taz_id", "centroids": "geometry"}
+            )
 
-        # uniform attributes
-        origin_vertices["node_type"] = "origin"
-        origin_vertices["line_seg_idx"] = -1
+            # uniform attributes
+            origin_vertices["node_type"] = "origin"
+            origin_vertices["line_seg_idx"] = -1
 
-        destination_vertices = origin_vertices.copy(deep=True)
-        destination_vertices["node_type"] = "destination"
+            destination_vertices = origin_vertices.copy(deep=True)
+            destination_vertices["node_type"] = "destination"
 
-        od_vertices = pd.concat((origin_vertices, destination_vertices), axis=0)
+            od_vertices = pd.concat((origin_vertices, destination_vertices), axis=0)
+        else:
+            # we create only "od" nodes
+            od_vertices = self.zones[["zone_id", "centroids"]].rename(
+                columns={"zone_id": "taz_id", "centroids": "geometry"}
+            )
+
+            # uniform attributes
+            od_vertices["node_type"] = "od"
+            od_vertices["line_seg_idx"] = -1
 
         self.__od_vertices = od_vertices
+
+    def create_od_node_mapping(self):
+        """Build a dataframe mapping the cenbtroid node ids with to transport
+        assignment zone ids
+        """
+        if self.blocking_centroid_flows:
+            origin_nodes = self.vertices.loc[
+                self.vertices.node_type == "origin",
+                ["node_id", "taz_id"],
+            ]
+            origin_nodes.rename(columns={"node_id": "o_node_id"}, inplace=True)
+            destination_nodes = self.vertices.loc[
+                self.vertices.node_type == "destination",
+                ["node_id", "taz_id"],
+            ]
+            destination_nodes.rename(columns={"node_id": "d_node_id"}, inplace=True)
+            od_node_mapping = pd.merge(origin_nodes, destination_nodes, on="taz_id", how="left")[
+                ["o_node_id", "d_node_id", "taz_id"]
+            ]
+        else:
+            od_node_mapping = self.vertices.loc[
+                self.vertices.node_type == "od",
+                ["node_id", "taz_id"],
+            ]
+        self.od_node_mapping = od_node_mapping
 
     def create_vertices(self):
         """Graph vertices creation as a dataframe.
 
         Vertices have the following attributes:
             - node_id: int
-            - node_type (either 'stop', 'boarding', 'alighting', 'origin', 'destination'): str
+            - node_type (either 'stop', 'boarding', 'alighting', 'od', 'origin', 'destination'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
@@ -470,6 +508,7 @@ class SF_graph_builder:
         self.vertices.index.name = "index"
         self.vertices["node_id"] = self.vertices.index + 1
         self.vertices = self.vertices[SF_VERTEX_COLS]
+        self.create_od_node_mapping()
 
         # data types
         self.vertices.node_id = self.vertices.node_id.astype(int)
@@ -625,8 +664,18 @@ class SF_graph_builder:
         """
         assert method in ["overlapping_regions", "nearest_neighbour"]
 
+        # Create access connectors
+        # ========================
+
         # Select/copy the od vertices and project their geometry
-        od_vertices = self.vertices[self.vertices.node_type == "od"][["node_id", "taz_id", "geometry"]].copy(deep=True)
+        if self.blocking_centroid_flows:
+            node_type = "origin"
+        else:
+            node_type = "od"
+        od_vertices = self.vertices[self.vertices.node_type == node_type][["node_id", "taz_id", "geometry"]].copy(
+            deep=True
+        )
+
         od_vertices.reset_index(drop=True, inplace=True)
         od_geometries = od_vertices["geometry"].apply(
             lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
@@ -713,9 +762,22 @@ class SF_graph_builder:
         access_connector_edges["freq"] = np.inf
         access_connector_edges["direction"] = 1
 
-        # egress connectors
+        # Create egress connectors
+        # ========================
         egress_connector_edges = access_connector_edges.copy(deep=True)
         egress_connector_edges.rename(columns={"a_node": "b_node", "b_node": "a_node"}, inplace=True)
+
+        if self.blocking_centroid_flows:
+            # we need to switch the head node to a destination node instead of an origin node
+            egress_connector_edges = pd.merge(
+                egress_connector_edges,
+                self.od_node_mapping[["o_node_id", "d_node_id"]],
+                left_on="a_node",
+                right_on="o_node_id",
+                how="left",
+            )
+            egress_connector_edges.drop(["a_node", "o_node_id"], axis=1, inplace=True)
+            egress_connector_edges.rename(columns={"d_node_id": "a_node"}, inplace=True)
 
         # uniform values
         egress_connector_edges["link_type"] = "egress_connector"
