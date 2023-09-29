@@ -1190,3 +1190,36 @@ class SF_graph_builder:
         )
 
         return graph
+
+    def convert_demand_matrix_from_zone_to_node_ids(
+        self, demand_matrix, o_zone_col="origin_zone_id", d_zone_col="destination_zone", demand_col="demand"
+    ):
+        if self.blocking_centroid_flows:
+            od_matrix = pd.merge(
+                demand_matrix,
+                self.od_node_mapping[["o_node_id", "taz_id"]],
+                left_on=o_zone_col,
+                right_on="taz_id",
+            )[["o_node_id", d_zone_col, "demand"]]
+            od_matrix = pd.merge(
+                od_matrix,
+                self.od_node_mapping[["d_node_id", "taz_id"]],
+                left_on=d_zone_col,
+                right_on="taz_id",
+            )[["o_node_id", "d_node_id", "demand"]]
+        else:
+            od_matrix = pd.merge(
+                demand_matrix,
+                self.od_node_mapping[["node_id", "taz_id"]],
+                left_on=o_zone_col,
+                right_on="taz_id",
+            )[["node_id", d_zone_col, "demand"]]
+            od_matrix.rename(columns={"node_id": "o_node_id"}, inplace=True)
+            od_matrix = pd.merge(
+                od_matrix,
+                self.od_node_mapping[["node_id", "taz_id"]],
+                left_on=d_zone_col,
+                right_on="taz_id",
+            )[["o_node_id", "node_id", "demand"]]
+            od_matrix.rename(columns={"node_id": "d_node_id"}, inplace=True)
+        return od_matrix
