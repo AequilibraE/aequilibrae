@@ -46,7 +46,7 @@ class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     ASSUMPIONS:
-    - trips dir is always 0: opposite directions are not supported.
+    - opposite directions are not supported.
       In the GTFS files, this corresponds to direction_id from trips.txt
       (indicates the direction of travel for a trip)
     - all times are expressed in seconds [s], all frequencies in [1/s]
@@ -129,6 +129,7 @@ class SF_graph_builder:
         self.uniform_dwell_time = 30
         self.alighting_penalty = 480
         self.a_tiny_time_duration = 1.0e-06
+        # self.a_tiny_time_duration = 1.0e-04
         self.wait_time_factor = 1.0
         self.walk_time_factor = 1.0
         self.walking_speed = 1.0
@@ -498,7 +499,7 @@ class SF_graph_builder:
         # uniform attributes
         on_board_edges["link_type"] = "on-board"
         on_board_edges["freq"] = np.inf
-        on_board_edges["direction"] = 0
+        on_board_edges["direction"] = 1
 
         self.__on_board_edges = on_board_edges
 
@@ -604,7 +605,7 @@ class SF_graph_builder:
         dwell_edges["link_type"] = "dwell"
         dwell_edges["freq"] = np.inf
         dwell_edges["trav_time"] = self.uniform_dwell_time
-        dwell_edges["direction"] = 0
+        dwell_edges["direction"] = 1
 
         self.__dwell_edges = dwell_edges
 
@@ -752,7 +753,7 @@ class SF_graph_builder:
         # uniform attributes
         inner_stop_transfer_edges["line_seg_idx"] = -1
         inner_stop_transfer_edges["link_type"] = "inner_transfer"
-        inner_stop_transfer_edges["direction"] = 0
+        inner_stop_transfer_edges["direction"] = 1
 
         # frequency update : line_freq / wait_time_factor
         wait_time_factor_inv = 1.0 / self.wait_time_factor
@@ -838,7 +839,7 @@ class SF_graph_builder:
         outer_stop_transfer_edges["trav_time"] = distance / self.walking_speed
         outer_stop_transfer_edges["trav_time"] *= self.walk_time_factor
         outer_stop_transfer_edges["trav_time"] += self.alighting_penalty
-        outer_stop_transfer_edges["direction"] = 0
+        outer_stop_transfer_edges["direction"] = 1
 
         # cleanup
         outer_stop_transfer_edges.drop(
@@ -888,7 +889,7 @@ class SF_graph_builder:
         walking_edges["line_seg_idx"] = -1
         walking_edges["link_type"] = "walking"
         walking_edges["freq"] = np.inf
-        walking_edges["direction"] = 0
+        walking_edges["direction"] = 1
 
         # compute the walking time
         o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
@@ -973,7 +974,6 @@ class SF_graph_builder:
         self.edges.freq = self.edges.freq.astype(float)
         self.edges.o_line_id = self.edges.o_line_id.fillna("").astype(str)
         self.edges.d_line_id = self.edges.d_line_id.fillna("").astype(str)
-        # self.edges.transfer_id = self.edges.transfer_id.fillna("").astype(str)
         self.edges.direction = self.edges.direction.astype("int8")
 
     def create_line_geometry(self):
