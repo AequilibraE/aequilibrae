@@ -420,13 +420,18 @@ class SF_graph_builder:
         self.__alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
-        od_vertices = self.zones[["zone_id", "centroids"]].rename(
+        origin_vertices = self.zones[["zone_id", "centroids"]].rename(
             columns={"zone_id": "taz_id", "centroids": "geometry"}
         )
 
         # uniform attributes
-        od_vertices["node_type"] = "od"
-        od_vertices["line_seg_idx"] = -1
+        origin_vertices["node_type"] = "origin"
+        origin_vertices["line_seg_idx"] = -1
+
+        destination_vertices = origin_vertices.copy(deep=True)
+        destination_vertices["node_type"] = "destination"
+
+        od_vertices = pd.concat((origin_vertices, destination_vertices), axis=0)
 
         self.__od_vertices = od_vertices
 
@@ -435,7 +440,7 @@ class SF_graph_builder:
 
         Vertices have the following attributes:
             - node_id: int
-            - node_type (either 'stop', 'boarding', 'alighting', 'od'): str
+            - node_type (either 'stop', 'boarding', 'alighting', 'origin', 'destination'): str
             - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
             - line_id (only applies to 'boarding' and 'alighting' vertices): str
             - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
@@ -620,7 +625,7 @@ class SF_graph_builder:
         """
         assert method in ["overlapping_regions", "nearest_neighbour"]
 
-        # Select/copy the od vertices and project their geometryinates
+        # Select/copy the od vertices and project their geometry
         od_vertices = self.vertices[self.vertices.node_type == "od"][["node_id", "taz_id", "geometry"]].copy(deep=True)
         od_vertices.reset_index(drop=True, inplace=True)
         od_geometries = od_vertices["geometry"].apply(
