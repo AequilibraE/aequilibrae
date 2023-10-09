@@ -36,7 +36,12 @@ CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
                                    travel_time_ba  NUMERIC,
                                    capacity_ab     NUMERIC,
                                    capacity_ba     NUMERIC
-                                 );
+                                   CHECK(TYPEOF(link_id) == 'integer')
+                                   CHECK(TYPEOF(a_node) == 'integer')
+                                   CHECK(TYPEOF(b_node) == 'integer')
+                                   CHECK(TYPEOF(direction) == 'integer')
+                                   CHECK(LENGTH(modes)>0)
+                                   CHECK(LENGTH(direction)==1));
 
 --#
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);

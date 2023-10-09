@@ -20,7 +20,8 @@ CREATE TABLE  if not exists link_types (link_type     VARCHAR UNIQUE NOT NULL PR
                                         description   VARCHAR,
                                         lanes         NUMERIC,
                                         lane_capacity NUMERIC,
-                                        speed         NUMERIC);
+                                        speed         NUMERIC
+                                        CHECK(LENGTH(link_type_id) == 1));
 
 --#
 INSERT INTO 'link_types' (link_type, link_type_id, description, lanes, lane_capacity) VALUES('centroid_connector', 'z', 'VIRTUAL centroid connectors only', 10, 10000);
