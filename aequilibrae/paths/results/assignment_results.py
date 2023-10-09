@@ -109,6 +109,7 @@ class AssignmentResults:
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
         self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
         self.__graph_ids = graph.graph.__supernet_id__.values
+        self.__graph_compressed_ids = graph.graph.__compressed_id__.values
         self.__redim()
         self.__graph_id__ = graph.__id__
 
@@ -130,16 +131,6 @@ class AssignmentResults:
                 -1,
                 dtype=graph.default_types("int"),
             )
-            # 4d dimensions: link_set, origins, destinations, subclass
-            self.temp_sl_od_matrix = np.zeros(
-                (len(self._selected_links), graph.num_zones, graph.num_zones, self.classes["number"]),
-                dtype=graph.default_types("float"),
-            )
-            # 3d dimensions: link_set, link_id, subclass
-            self.temp_sl_link_loading = np.zeros(
-                (len(self._selected_links), graph.compact_num_links, self.classes["number"]),
-                dtype=graph.default_types("float"),
-            )
 
             sl_idx = {}
             for i, val in enumerate(self._selected_links.items()):
@@ -150,8 +141,14 @@ class AssignmentResults:
                 # Multidimensional arrays where each row has different lengths
                 self.select_links[i][: len(arr)] = arr
                 # Correctly sets the dimensions for the final output matrices
-                self.select_link_od.matrix[name] = self.temp_sl_od_matrix[i]
-                self.select_link_loading[name] = self.temp_sl_link_loading[i]
+                self.select_link_od.matrix[name] = np.zeros(
+                    (graph.num_zones, graph.num_zones, self.classes["number"]),
+                    dtype=graph.default_types("float"),
+                )
+                self.select_link_loading[name] = np.zeros(
+                    (graph.compact_num_links, self.classes["number"]),
+                    dtype=graph.default_types("float"),
+                )
 
             # Overwrites previous arrays on assignment results level with the index to access that array in Cython
             self._selected_links = sl_idx
@@ -298,7 +295,7 @@ class AssignmentResults:
             # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(link_flows, self.select_link_loading[name], self.crosswalk, self.cores)
+            assign_link_loads(link_flows, self.select_link_loading[name], self.__graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
                 res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
@@ -308,6 +305,7 @@ class AssignmentResults:
                 res.data[name + "_" + n + "_tot"] = np.nan_to_num(res.data[name + "_" + n + "_ab"]) + np.nan_to_num(
                     res.data[name + "_" + n + "_ba"]
                 )
+
         return res
 
     def save_to_disk(self, file_name=None, output="loads") -> None:

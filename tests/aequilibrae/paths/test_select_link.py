@@ -1,15 +1,14 @@
 import os
-import pathlib
 import uuid
 import zipfile
 from os.path import join, dirname
-from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
-import numpy as np
 import pandas as pd
+import numpy as np
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, PathResults
+from aequilibrae.matrix import AequilibraeMatrix
 from ...data import siouxfalls_project
 
 
@@ -50,7 +49,7 @@ class TestSelectLink(TestCase):
         Uses two examples: 2 links in one select link, and a single Selected Link
         Checks both the OD Matrix and Link Loading
         """
-        self.assignclass.set_select_links({"9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "5 for fun": [(5, 1)]})
+        self.assignclass.set_select_links({"sl 9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "sl 5 for fun": [(5, 1)]})
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
@@ -73,7 +72,7 @@ class TestSelectLink(TestCase):
         Tests to make sure the OD matrix works when all links surrounding one origin are selected
         Confirms the Link Loading is done correctly in this case
         """
-        self.assignclass.set_select_links({"1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
+        self.assignclass.set_select_links({"sl 1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
 
         self.assignment.execute()
 
@@ -102,7 +101,7 @@ class TestSelectLink(TestCase):
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
 
-        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
 
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
@@ -127,7 +126,7 @@ class TestSelectLink(TestCase):
         self.assignment.execute()
         non_sl_loads = self.assignclass.results.get_load_results()
         self.setUp()
-        self.assignclass.set_select_links({"39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
         self.assignment.execute()
         sl_loads = self.assignclass.results.get_load_results()
         np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
@@ -148,6 +147,58 @@ class TestSelectLink(TestCase):
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assertRaises(ValueError, self.assignclass.set_select_links, {"test": [(78, 1), (1, 1)]})
+
+    def test_kaitang(self):
+        proj_path = os.path.join(gettempdir(), "test_traffic_assignment_path_files" + uuid.uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
+
+        link_df = pd.read_csv(os.path.join(proj_path, "link.csv"))
+        centroids_array = np.array([7, 8, 11])
+
+        net = link_df.copy()
+
+        g = Graph()
+        g.network = net
+        g.network_ok = True
+        g.status = "OK"
+        g.mode = "a"
+        g.prepare_graph(centroids_array)
+        g.set_blocked_centroid_flows(False)
+        g.set_graph("fft")
+
+        aem_mat = AequilibraeMatrix()
+        aem_mat.load(os.path.join(proj_path, "demand_a.aem"))
+        aem_mat.computational_view(["a"])
+
+        assign_class = TrafficClass("class_a", g, aem_mat)
+        assign_class.set_fixed_cost("a_toll")
+        assign_class.set_vot(1.1)
+        assign_class.set_select_links(links={"trace": [(7, 0), (13, 0)]})
+
+        assign = TrafficAssignment()
+        assign.set_classes([assign_class])
+        assign.set_vdf("BPR")
+        assign.set_vdf_parameters({"alpha": "alpha", "beta": "beta"})
+        assign.set_capacity_field("capacity")
+        assign.set_time_field("fft")
+        assign.set_algorithm("bfw")
+        assign.max_iter = 100
+        assign.rgap_target = 0.0001
+
+        # 4.execute
+        assign.execute()
+
+        # 5.receive results
+        assign_flow_res_df = assign.results().reset_index(drop=False).fillna(0)
+        select_link_flow_df = assign.select_link_flows().reset_index(drop=False).fillna(0)
+
+        pd.testing.assert_frame_equal(
+            assign_flow_res_df[["link_id", "a_ab", "a_ba", "a_tot"]],
+            select_link_flow_df.rename(
+                columns={"class_a_trace_a_ab": "a_ab", "class_a_trace_a_ba": "a_ba", "class_a_trace_a_tot": "a_tot"}
+            ),
+        )
 
 
 def create_od_mask(demand: np.array, graph: Graph, sl):

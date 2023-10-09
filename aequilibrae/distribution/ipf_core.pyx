@@ -56,7 +56,7 @@ cdef  _fratar(double[:, :] flows,
                    double[:] attr_factor,
                    int max_iter,
                    double toler,
-                   int cpus):
+                   int cpus) noexcept:
 
     cdef double err = 1.0
     cdef int iter = 0
@@ -99,7 +99,7 @@ cdef  _fratar(double[:, :] flows,
 cpdef void _total_attra(double[:, :] flows,
                         double[:] prod_tgt,
                         double[:] attr_tot,
-                        int cpus):
+                        int cpus) noexcept:
 
     cdef long long i, j, jk
     cdef double  *local_buf
@@ -133,7 +133,7 @@ cpdef void _total_attra(double[:, :] flows,
 cpdef void _total_prods(double[:, :] flows,
                         double[:] prod_tgt,
                         double[:] prod_tot,
-                        int cpus)nogil:
+                        int cpus) noexcept nogil:
 
     cdef long long i, j
     cdef long long I = flows.shape[0]
@@ -154,7 +154,7 @@ cpdef void _total_prods(double[:, :] flows,
 cpdef double _factors(double[:] target,
                       double[:] total,
                       double[:] factor,
-                      int cpus):
+                      int cpus) noexcept:
 
     cdef long long i, I = target.shape[0]
     cdef double err = 1.0
@@ -174,7 +174,7 @@ cpdef double _factors(double[:] target,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cpdef double _calc_err(double[:] p_factor,
-                       double[:] a_factor):
+                       double[:] a_factor) noexcept:
 
     cdef long long i, I = p_factor.shape[0]
     cdef long long j, J = a_factor.shape[0]

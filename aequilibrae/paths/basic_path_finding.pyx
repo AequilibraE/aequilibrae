@@ -25,7 +25,7 @@ cpdef void network_loading(long classes,
                            long long [:] no_path,
                            long long [:] reached_first,
                            double [:, :] node_load,
-                           long found) nogil:
+                           long found) noexcept nogil:
 
     cdef long long i, j, predecessor, connector, node
     cdef long long zones = demand.shape[0]
@@ -70,7 +70,7 @@ cpdef void network_loading(long classes,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef void _copy_skims(double[:,:] skim_matrix,  #Skim matrix_procedures computed from one origin to all nodes
-                      double[:,:] final_skim_matrix) nogil:  #Skim matrix_procedures computed for one origin to all other centroids only
+                      double[:,:] final_skim_matrix) noexcept nogil:  #Skim matrix_procedures computed for one origin to all other centroids only
 
     cdef long i, j
     cdef long N = final_skim_matrix.shape[0]
@@ -81,7 +81,7 @@ cdef void _copy_skims(double[:,:] skim_matrix,  #Skim matrix_procedures computed
             final_skim_matrix[i,j]=skim_matrix[i,j]
 
 
-cdef return_an_int_view(input):
+cdef int[:] return_an_int_view(input) noexcept nogil:
     cdef int [:] critical_links_view = input
     return critical_links_view
 
@@ -97,7 +97,7 @@ cdef void sl_network_loading(
     double [:, :, :] sl_od_matrix,
     double [:, :, :] sl_link_loading,
     unsigned char [:] has_flow_mask,
-    long classes) nogil:
+    long classes) noexcept nogil:
 # VARIABLES:
 #   selected_links: 2d memoryview. Each row corresponds to a set of selected links specified by the user
 #   demand:         The input demand matrix for a given origin. The first index corresponds to destination,
@@ -169,7 +169,7 @@ cpdef void put_path_file_on_disk(unsigned int orig,
                                  long long [:] connectors,
                                  long long [:] all_nodes,
                                  unsigned int [:] origins_to_write,
-                                 unsigned int [:] nodes_to_write) nogil:
+                                 unsigned int [:] nodes_to_write) noexcept nogil:
     cdef long long i
     cdef long long k = pred.shape[0]
 
@@ -188,7 +188,7 @@ cdef void blocking_centroid_flows(int action,
                                   long long centroids,
                                   long long [:] fs,
                                   long long [:] temp_b_nodes,
-                                  long long [:] real_b_nodes) nogil:
+                                  long long [:] real_b_nodes) noexcept nogil:
     cdef long long i
 
     if action == 1: # We are unblocking
@@ -213,7 +213,7 @@ cdef void skim_single_path(long origin,
                            long long [:] conn,
                            double[:, :] graph_costs,
                            long long [:] reached_first,
-                           long found) nogil:
+                           long found) noexcept nogil:
     cdef long long i, node, predecessor, connector, j
 
     # sets all skims to infinity
@@ -250,7 +250,7 @@ cpdef void skim_multiple_fields(long origin,
                                 double[:, :] graph_costs,
                                 long long [:] reached_first,
                                 long found,
-                                double [:,:] final_skims) nogil:
+                                double [:,:] final_skims) noexcept nogil:
     cdef long long i, node, predecessor, connector, j
 
     # sets all skims to infinity
@@ -295,7 +295,7 @@ cpdef int path_finding(long origin,
                        long long [:] pred,
                        long long [:] ids,
                        long long [:] connectors,
-                       long long [:] reached_first) nogil:
+                       long long [:] reached_first) noexcept nogil:
 
     cdef unsigned int N = graph_costs.shape[0]
     cdef unsigned int M = pred.shape[0]

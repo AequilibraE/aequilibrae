@@ -19,7 +19,7 @@ cdef long long _build_compressed_graph(long long[:] link_idx,
                                   long long[:] all_links,
                                   long long[:] compressed_dir,
                                   long long[:] compressed_a_node,
-                                  long long[:] compressed_b_node) nogil:
+                                  long long[:] compressed_b_node) noexcept nogil:
     cdef:
         long long slink = 0
         long long pre_link, n, first_node, lnk, lidx, a_node, b_node
@@ -93,7 +93,7 @@ cdef long long _build_compressed_graph(long long[:] link_idx,
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef void _back_fill(long long[:] links_index, long long max_node):
+cdef void _back_fill(long long[:] links_index, long long max_node) noexcept:
     cdef Py_ssize_t i
 
     for i in range(max_node + 1, 0, -1):
@@ -172,7 +172,7 @@ def build_compressed_graph(graph):
         }
     )
     max_link_id = link_id_max * 10
-    comp_lnk.loc[:, "link_id"] += max_link_id
+    comp_lnk.link_id += max_link_id
 
     df = pd.concat([df, comp_lnk])
     df = df[["id", "link_id", "a_node", "b_node", "direction"]]
@@ -193,11 +193,11 @@ def build_compressed_graph(graph):
     )
 
     crosswalk = crosswalk[crosswalk.compressed_link >= 0]
-    crosswalk.loc[:, "compressed_link"] += max_link_id
+    crosswalk.compressed_link += max_link_id
 
     cw2 = pd.DataFrame(crosswalk, copy=True)
-    cw2.loc[:, "link_direction"] *= -1
-    cw2.loc[:, "compressed_direction"] = -1
+    cw2.link_direction *= -1
+    cw2.compressed_direction = -1
 
     crosswalk = pd.concat([crosswalk, cw2])
     crosswalk = crosswalk.assign(key=crosswalk.compressed_link * crosswalk.compressed_direction)

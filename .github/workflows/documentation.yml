@@ -29,12 +29,13 @@ jobs:
         pip install -r docs/requirements-docs.txt
         python -m pip install sphinx-gallery --user
         sudo apt update
-        sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev
+        sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Compile library
       run: |
         python setup.py build_ext --inplace
+        pip install .
 
     - name: Check history of versions
       run: |

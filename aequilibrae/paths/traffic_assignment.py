@@ -687,7 +687,7 @@ class TrafficAssignment(object):
         """
         Returns a dataframe of the select link flows for each class
         """
-        sl_flows = None  # stores the df for each class
+        class_flows = []  # stores the df for each class
         for cls in self.classes:
             # Save OD_matrices
             if cls._selected_links is None:
@@ -699,12 +699,8 @@ class TrafficAssignment(object):
             cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
             df.set_index("link_id", inplace=True)
-            if sl_flows is None:
-                sl_flows = df
-            else:
-                sl_flows.join(df)
-        # sl_flows = pd.concat(class_flows, axis=1)
-        return sl_flows
+            class_flows.append(df)
+        return pd.concat(class_flows, axis=1)
 
     def save_select_link_flows(self, table_name: str, project=None) -> None:
         """

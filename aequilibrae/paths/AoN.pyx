@@ -97,11 +97,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         bint select_link = False
 
     if result._selected_links:
-
         has_flow_mask = aux_result.has_flow_mask[curr_thread, :]
-        sl_od_matrix_view = aux_result.temp_sl_od_matrix[:, origin_index, :, :]
-        sl_link_loading_view = aux_result.temp_sl_link_loading[:, :, :]
-        link_list = aux_result.select_links[:, :]
+        sl_od_matrix_view = aux_result.temp_sl_od_matrix[curr_thread, :, origin_index, :, :]
+        sl_link_loading_view = aux_result.temp_sl_link_loading[curr_thread, :, :, :]
+        link_list = aux_result.select_links[:, :]  # Read only, don't need to slice on curr_thread
         select_link = True
     #Now we do all procedures with NO GIL
     with nogil:
