@@ -14,7 +14,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v3
@@ -51,7 +51,7 @@ jobs:
         twine upload dist/*.whl
 
     - name: Publish tar files
-      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') && (matrix.python-version == '3.9') }}
+      if: ${{ (github.event_name == 'release') && (env.HAS_SECRETS == 'true') && (matrix.python-version == '3.11') }}
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
