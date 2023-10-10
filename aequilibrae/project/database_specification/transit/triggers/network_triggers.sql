@@ -33,7 +33,7 @@ create INDEX IF NOT EXISTS nodes_node_id ON nodes (node_id);
 
 --#
 create trigger new_link_a_node before insert on links
-  when
+  when (SELECT enabled FROM trigger_settings where name = 'new_link_a_or_b_node') = TRUE AND
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
@@ -48,7 +48,7 @@ create trigger new_link_a_node before insert on links
   END;
 --#
 create trigger new_link_b_node before insert on links
-  when
+  when (SELECT enabled FROM trigger_settings where name = 'new_link_a_or_b_node') = TRUE AND
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
@@ -65,7 +65,7 @@ create trigger new_link_b_node before insert on links
 -- we use a before ordering here, as it is the only way to guarantee this will run before the nodeid update trigger.
 -- when inserting a link endpoint to empty space, create a new node
 create trigger update_link_a_node before update of geometry on links
-  when
+  when (SELECT enabled FROM trigger_settings where name = 'new_link_a_or_b_node') = TRUE AND
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = StartPoint(new.geometry) AND
@@ -80,7 +80,7 @@ create trigger update_link_a_node before update of geometry on links
   END;
 --#
 create trigger update_link_b_node before update of geometry on links
-  when
+  when (SELECT enabled FROM trigger_settings where name = 'new_link_a_or_b_node') = TRUE AND
     (SELECT count(*)
     FROM nodes
     WHERE nodes.geometry = EndPoint(new.geometry) AND
@@ -95,7 +95,7 @@ create trigger update_link_b_node before update of geometry on links
   END;
 --#
   
-create trigger new_link after insert on links
+create trigger new_link insert on links
   begin
     -- Update a/b_node AFTER creating a link.
     update links
