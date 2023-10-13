@@ -4,8 +4,8 @@ PyQt5>=5.10.1
 pyshp
 cython
 enum34>=1.1.6
-Sphinx
-pydata-sphinx-theme
+sphinx>=4.5.0
+pydata-sphinx-theme==0.13.3
 sphinx_autodoc_annotation
 nbsphinx
 pillow
