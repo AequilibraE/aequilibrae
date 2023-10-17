@@ -96,6 +96,7 @@ create trigger update_link_b_node before update of geometry on links
 --#
   
 create trigger new_link insert on links
+  when (SELECT enabled FROM trigger_settings where name = 'new_link_a_or_b_node') = TRUE
   begin
     -- Update a/b_node AFTER creating a link.
     update links
