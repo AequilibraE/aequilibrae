@@ -1082,7 +1082,7 @@ class SF_graph_builder:
                 'In its current implementation, the "connector project match" method may take a while for large networks.'
             )
 
-            nodes = pd.read_sql_query("SELECT node_id, geometry FROM nodes", con=project.conn).set_index("node_id")
+            nodes = project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1105,14 +1105,15 @@ class SF_graph_builder:
             ]
 
             # Create kdtree for fast nearest neighbour lookup on the project db nodes
-            nodes_geometries = nodes["geometry"].apply(
-                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(geometry))
+            nodes["geometry"] = nodes["geometry"].apply(
+                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+                # lambda geometry: shapely.from_wkb(geometry)
             )
-            nodes_geometries = np.array(list(nodes_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
+            nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
             kdtree = KDTree(nodes_geometries)
 
             # Prepare shortest path computation
-            graph = project.network.graphs["c"]
+            graph = project.network.graphs["w"]
             graph.set_graph("distance")
             res = PathResults()
             res.prepare(graph)
@@ -1122,37 +1123,42 @@ class SF_graph_builder:
             missing = []
             for row in self.edges[connector_rows].itertuples():
                 # row.a_node - 1 because the node_ids are the index + 1
-                start = shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]))
-                end = shapely.ops.transform(self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]))
+                start = shapely.ops.transform(
+                    self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
+                )
+                end = shapely.ops.transform(
+                    self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
+                )
+                # start = shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
+                # end = shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
 
                 _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
                 res.compute_path(*nodes.iloc[ids].index.values)
 
-                if res.path_nodes is not None:
+                if ids[0] == ids[1]:
+                    # missing.append(row.link_id)
+                    line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
+                elif res.path_nodes is not None:
                     line = shapely.LineString(
-                        [start] + [shapely.from_wkb(x) for x in nodes.loc[res.path_nodes].geometry.values] + [end]
+                        [start] + [x for x in nodes.loc[res.path_nodes].geometry.values] + [end]
                     )
-
-                    trav_time = line.length / self.walking_speed
-                    if row.link_type == "access_connector":
-                        trav_time *= self.access_time_factor
-                    else:  # row.link_type == "egress_connector"
-                        trav_time *= self.egress_time_factor
-
-                    lines.append((trav_time, line.wkb))
                 else:
                     missing.append(row.link_id)
-                    lines.append(
-                        (
-                            row.trav_time,
-                            shapely.LineString(
-                                (
-                                    shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                                    shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
-                                )
-                            ).wkb,
-                        )
-                    )
+                    line = shapely.LineString((start, end))
+
+                trav_time = line.length / self.walking_speed
+                if row.link_type == "access_connector":
+                    trav_time *= self.access_time_factor
+                else:  # row.link_type == "egress_connector"
+                    trav_time *= self.egress_time_factor
+
+                if row.link_id == 30656:
+                    print(line.wkt)
+                    breakpoint()
+                    return
+
+                lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
+
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
