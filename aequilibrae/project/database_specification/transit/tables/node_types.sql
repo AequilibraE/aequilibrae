@@ -19,6 +19,10 @@ INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('default'
 --#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('od', 'n', 'Origin/Desination node type');
 --#
+INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('origin', 'o', 'Origin node type');
+--#
+INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('destination', 'd', 'Desination node type');
+--#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('stop', 's', 'Stop node type');
 --#
 INSERT INTO 'node_types' (node_type, node_type_id, description) VALUES('alighting', 'a', 'Alighting node type');

@@ -1,24 +1,3 @@
--- Guarantees that the link_type records have a single letter for link_type_id
-
-CREATE TRIGGER link_type_single_letter_update BEFORE UPDATE OF link_type_id ON "link_types"
-WHEN
-    length(new.link_type_id)!= 1
-BEGIN
-    SELECT RAISE(ABORT, 'Link_type_id need to be a single letter');
-END;
-
---#
--- Guarantees that the link_type_id field is exactly 1 character long
-
-CREATE TRIGGER link_type_single_letter_insert BEFORE INSERT ON "link_types"
-WHEN
-    length(new.link_type_id)!= 1
-BEGIN
-    SELECT RAISE(ABORT, 'Link_type_id need to be a single letter');
-END;
-
---#
-
 -- Prevents a link_type record to be changed when it is in use for any link
 
 CREATE TRIGGER link_type_keep_if_in_use_updating BEFORE UPDATE OF link_type ON "link_types"

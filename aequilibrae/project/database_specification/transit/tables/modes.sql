@@ -22,7 +22,8 @@ CREATE TABLE if not exists modes (mode_name   VARCHAR UNIQUE NOT NULL,
                                   description VARCHAR,
                                   pce         NUMERIC        NOT NULL DEFAULT 1.0,
                                   vot         NUMERIC        NOT NULL DEFAULT 0,
-                                  ppv         NUMERIC        NOT NULL DEFAULT 1.0);
+                                  ppv         NUMERIC        NOT NULL DEFAULT 1.0
+                                  CHECK(LENGTH(mode_id)==1));
 
 --#
 INSERT INTO 'modes' (mode_name, mode_id, description) VALUES('car', 'c', 'All motorized vehicles');
