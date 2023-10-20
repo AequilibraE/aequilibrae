@@ -1083,6 +1083,7 @@ class SF_graph_builder:
             )
 
             nodes = project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = project.network.links.data[["link_id", "geometry"]].set_index("link_id")
 
             if len(nodes) == 0:
                 raise ValueError(
@@ -1107,7 +1108,9 @@ class SF_graph_builder:
             # Create kdtree for fast nearest neighbour lookup on the project db nodes
             nodes["geometry"] = nodes["geometry"].apply(
                 lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
-                # lambda geometry: shapely.from_wkb(geometry)
+            )
+            links["geometry"] = links["geometry"].apply(
+                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
             )
             nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
             kdtree = KDTree(nodes_geometries)
@@ -1136,8 +1139,12 @@ class SF_graph_builder:
                     res.compute_path(*nodes.iloc[ids].index.values)
 
                     if res.path_nodes is not None:
-                        line = shapely.LineString(
-                            [start] + [x for x in nodes.loc[res.path_nodes].geometry.values] + [end]
+                        line = shapely.ops.linemerge(
+                            (
+                                shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
+                                *links.loc[res.path].geometry,
+                                shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
+                            )
                         )
                     else:
                         line = shapely.LineString((start, end))
@@ -1151,7 +1158,6 @@ class SF_graph_builder:
                 lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
-
 
     def create_additional_db_fields(self):
         """Create the additional required entries in the tables."""
