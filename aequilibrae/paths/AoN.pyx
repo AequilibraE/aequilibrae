@@ -281,6 +281,11 @@ def path_computation(origin, destination, graph, results):
             del all_nodes
             del all_connectors
             del mileposts
+    else:
+        results.path = None
+        results.path_nodes = None
+        results.path_link_directions = None
+        results.milepost = None
 
 
 def update_path_trace(results, destination, graph):
@@ -322,6 +327,12 @@ def update_path_trace(results, destination, graph):
                 results.path_nodes = graph.all_nodes[np.asarray(all_nodes, graph.default_types('int'))][::-1]
                 mileposts.append(0)
                 results.milepost = np.cumsum(mileposts[::-1])
+        else:
+            results.path = None
+            results.path_nodes = None
+            results.path_link_directions = None
+            results.milepost = None
+
 
 def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     """
