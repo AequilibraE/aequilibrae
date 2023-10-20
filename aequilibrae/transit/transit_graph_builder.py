@@ -1120,7 +1120,6 @@ class SF_graph_builder:
 
             # Loop over connect edges, query for the clostest nodes in the project and create the relevant line string
             lines = []
-            missing = []
             for row in self.edges[connector_rows].itertuples():
                 # row.a_node - 1 because the node_ids are the index + 1
                 start = shapely.ops.transform(
@@ -1129,22 +1128,19 @@ class SF_graph_builder:
                 end = shapely.ops.transform(
                     self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
                 )
-                # start = shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
-                # end = shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
 
                 _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
-                res.compute_path(*nodes.iloc[ids].index.values)
-
                 if ids[0] == ids[1]:
-                    # missing.append(row.link_id)
                     line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
-                elif res.path_nodes is not None:
-                    line = shapely.LineString(
-                        [start] + [x for x in nodes.loc[res.path_nodes].geometry.values] + [end]
-                    )
                 else:
-                    missing.append(row.link_id)
-                    line = shapely.LineString((start, end))
+                    res.compute_path(*nodes.iloc[ids].index.values)
+
+                    if res.path_nodes is not None:
+                        line = shapely.LineString(
+                            [start] + [x for x in nodes.loc[res.path_nodes].geometry.values] + [end]
+                        )
+                    else:
+                        line = shapely.LineString((start, end))
 
                 trav_time = line.length / self.walking_speed
                 if row.link_type == "access_connector":
@@ -1152,17 +1148,10 @@ class SF_graph_builder:
                 else:  # row.link_type == "egress_connector"
                     trav_time *= self.egress_time_factor
 
-                if row.link_id == 30656:
-                    print(line.wkt)
-                    breakpoint()
-                    return
-
                 lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
-
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
-            return missing
 
     def create_additional_db_fields(self):
         """Create the additional required entries in the tables."""
