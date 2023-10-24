@@ -1062,7 +1062,17 @@ class SF_graph_builder:
         self.edges.direction = self.edges.direction.astype("int8")
 
     def create_line_geometry(self, method="direct"):
-        """Create the LineString for each edge."""
+        """
+        Create the LineString for each edge.
+
+        method must be either "direct" or "connector project match"
+
+        The direct method creates a straight line between all points.
+
+        The connect project match method uses the existing line gemeotry within the project to create more
+        accurate line strings. It creates a line string that matches the path between the shortest path
+        between the project nodes closest to either end of the access and egress connectors.
+        """
         assert method in ["direct", "connector project match"]
 
         if method == "direct":
@@ -1105,59 +1115,67 @@ class SF_graph_builder:
                 for row in self.edges[other_rows].itertuples()
             ]
 
-            # Create kdtree for fast nearest neighbour lookup on the project db nodes
-            nodes["geometry"] = nodes["geometry"].apply(
-                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
-            )
-            links["geometry"] = links["geometry"].apply(
-                lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
-            )
-            nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
-            kdtree = KDTree(nodes_geometries)
-
-            # Prepare shortest path computation
-            graph = project.network.graphs["w"]
-            graph.set_graph("distance")
-            res = PathResults()
-            res.prepare(graph)
-
-            # Loop over connect edges, query for the clostest nodes in the project and create the relevant line string
-            lines = []
-            for row in self.edges[connector_rows].itertuples():
-                # row.a_node - 1 because the node_ids are the index + 1
-                start = shapely.ops.transform(
-                    self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
-                )
-                end = shapely.ops.transform(
-                    self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
-                )
-
-                _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
-                if ids[0] == ids[1]:
-                    line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
-                else:
-                    res.compute_path(*nodes.iloc[ids].index.values)
-
-                    if res.path_nodes is not None:
-                        line = shapely.ops.linemerge(
-                            (
-                                shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
-                                *links.loc[res.path].geometry,
-                                shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
-                            )
-                        )
-                    else:
-                        line = shapely.LineString((start, end))
-
-                trav_time = line.length / self.walking_speed
-                if row.link_type == "access_connector":
-                    trav_time *= self.access_time_factor
-                else:  # row.link_type == "egress_connector"
-                    trav_time *= self.egress_time_factor
-
-                lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
+            lines = self.__connector_project_match(connector_rows, project, nodes, links)
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
+
+    def __connector_project_match(self, connector_rows, project, nodes, links):
+        # Create kdtree for fast nearest neighbour lookup on the project db nodes
+        nodes["geometry"] = nodes["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+        )
+        links["geometry"] = links["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+        )
+        nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
+        kdtree = KDTree(nodes_geometries)
+
+        # Prepare shortest path computation
+        graph = project.network.graphs["w"]
+        graph.set_graph("distance")
+        res = PathResults()
+        res.prepare(graph)
+
+        # Loop over connect edges, query for the clostest nodes in the project and create the relevant line string
+        lines = []
+        for row in self.edges[connector_rows].itertuples():
+            # row.a_node - 1 because the node_ids are the index + 1
+            start = shapely.ops.transform(
+                self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
+            )
+            end = shapely.ops.transform(
+                self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
+            )
+
+            _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
+
+            # If the ids for the closest nodes to the start and end are the same, then we make an edge between those 3
+            # If they differ we compute the shortest path between them. If no path exists we use a straight between the start and end
+            # Otherwise create a line string using the already existing link geometry.
+            if ids[0] == ids[1]:
+                line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
+            else:
+                res.compute_path(*nodes.iloc[ids].index.values)
+
+                if res.path_nodes is not None:
+                    line = shapely.ops.linemerge(
+                        (
+                            shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
+                            *links.loc[res.path].geometry,
+                            shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
+                        )
+                    )
+                else:
+                    line = shapely.LineString((start, end))
+
+            trav_time = line.length / self.walking_speed
+            if row.link_type == "access_connector":
+                trav_time *= self.access_time_factor
+            else:  # row.link_type == "egress_connector"
+                trav_time *= self.egress_time_factor
+
+            lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
+        return lines
 
     def create_additional_db_fields(self):
         """Create the additional required entries in the tables."""
