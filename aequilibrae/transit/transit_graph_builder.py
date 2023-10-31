@@ -1209,18 +1209,6 @@ class SF_graph_builder:
         Within the database nodes may not exist at the exact same point in space, provide robust=True
         to move the nodes slightly.
         """
-        # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
-        # notebook. I don't think this is a good solution but I'm not sure what do to without adding the zones and such
-        # ourselves.
-
-        # The below query is formated to guarantee the columns line up. The order of the tuples should be the same
-        # as the order of the columns.
-        #
-        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
-        #     the index and following fields being the column values.
-        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
-
-        # FIXME: We also to replace the NANs with something.
         duplicated = self.vertices.geometry.duplicated()
 
         if not robust and not duplicated.empty:
@@ -1233,6 +1221,12 @@ class SF_graph_builder:
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
             self.vertices.loc[df.index, "geometry"] = df.geometry
 
+        # The below query is formated to line the columns up The order of the tuples should be the same
+        # as the order of the columns.
+        #
+        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
+        #     the index and following fields being the column values.
+        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
         self.pt_conn.executemany(
             f"""\
             INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
@@ -1246,11 +1240,20 @@ class SF_graph_builder:
         self.pt_conn.commit()
 
     def save_edges(self, recreate_line_geometry=False):
-        # FIXME: Just like the verticies, our edges need a little massaging as well
+        """
+        Save the contents of self.edges to the public transport database.
+
+        If no geometry for the edges is present or `recreate_line_geometry` is True, direct lines will be created.
+        """
+        # Just like the verticies, our edges need a little massaging as well
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
+        # Inorder to save the line strings from connector project matching we need to disable some smart node creation.
+        # It will be restored to its previous value once we are done here.
+        val = self.pt_conn.execute("SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'").fetchone()[0]
+        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
         self.pt_conn.executemany(
             f"""\
             INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
@@ -1259,6 +1262,7 @@ class SF_graph_builder:
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
 
+        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
         self.pt_conn.commit()
 
     def save(self, robust=True):
