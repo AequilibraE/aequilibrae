@@ -21,7 +21,7 @@ register_adapter(np.int64, int)
 register_adapter(np.int32, int)
 register_adapter(np.float32, float)
 register_adapter(np.float64, float)
-register_adapter(np.object0, str)
+register_adapter(np.object_, str)
 
 
 def is_windows():

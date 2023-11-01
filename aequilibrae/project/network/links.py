@@ -72,6 +72,8 @@ class Links(BasicTable):
         """
 
         data = {key: None for key in self.__fields}
+        data["a_node"] = 0
+        data["b_node"] = 0
         data["direction"] = 0
         data["link_type"] = "default"
         data["link_id"] = self.__new_link_id()
