@@ -32,7 +32,11 @@ CREATE TABLE if not exists nodes (ogc_fid      INTEGER PRIMARY KEY,
                                   modes        TEXT,
                                   link_types   TEXT,
                                   node_type    TEXT,
-                                  taz_id       TEXT);
+                                  taz_id       TEXT
+                                  CHECK(TYPEOF(node_id) == 'integer')
+                                  CHECK(TYPEOF(is_centroid) == 'integer')
+                                  CHECK(is_centroid>=0)
+                                  CHECK(is_centroid<=1));
 
 --#
 SELECT AddGeometryColumn( 'nodes', 'geometry', 4326, 'POINT', 'XY', 1);

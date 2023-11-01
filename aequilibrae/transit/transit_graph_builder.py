@@ -9,8 +9,11 @@ import pyproj
 import shapely
 import shapely.ops
 from aequilibrae.utils.geo_utils import haversine
-from scipy.spatial import cKDTree, minkowski_distance
+from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
+
+from aequilibrae.paths import PathResults
+from aequilibrae.context import get_active_project
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -195,13 +198,13 @@ class SF_graph_builder:
             trips.pattern_id,
             route_links.seq,
             CAST(from_stop AS TEXT) from_stop,
-            CAST(to_stop AS TEXT) to_stop              
+            CAST(to_stop AS TEXT) to_stop
         FROM
-            route_links         
+            route_links
         INNER JOIN trips ON route_links.pattern_id = trips.pattern_id
-        INNER JOIN trips_schedule ON trips.trip_id = trips_schedule.trip_id 
+        INNER JOIN trips_schedule ON trips.trip_id = trips_schedule.trip_id
         WHERE
-            departure>={self.start} 
+            departure>={self.start}
             AND arrival<={self.end}"""
         route_links = pd.read_sql(
             sql=sql,
@@ -694,7 +697,7 @@ class SF_graph_builder:
         )
         stop_geometries = np.array(list(stop_geometries.apply(lambda geometry: (geometry.x, geometry.y))))
 
-        kdTree = cKDTree(od_geometries)
+        kdTree = KDTree(od_geometries)
 
         if method == "nearest_neighbour":
             # query the kdTree for the closest (k=1) od for each stop in parallel (workers=-1)
@@ -722,7 +725,7 @@ class SF_graph_builder:
             distance = distance.reshape(-1)
 
             # Construct a kdtree so we can query all the stops within the radius around each OD
-            stop_kdTree = cKDTree(stop_geometries)
+            stop_kdTree = KDTree(stop_geometries)
             results = stop_kdTree.query_ball_point(od_geometries, distance, workers=self.num_threads)
 
             # access connectors
@@ -1058,18 +1061,121 @@ class SF_graph_builder:
         self.edges.d_line_id = self.edges.d_line_id.fillna("").astype(str)
         self.edges.direction = self.edges.direction.astype("int8")
 
-    def create_line_geometry(self):
-        """Create the LineString for each edge."""
-        lines = []
-        for row in self.edges.itertuples():
-            # row.a_node - 1 because the node_ids are the index + 1
-            line = (
-                shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
-                shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
-            )
-            lines.append(shapely.LineString(line))
+    def create_line_geometry(self, method="direct"):
+        """
+        Create the LineString for each edge.
 
-        self.edges["geometry"] = shapely.to_wkb(lines)
+        method must be either "direct" or "connector project match"
+
+        The direct method creates a straight line between all points.
+
+        The connect project match method uses the existing line gemeotry within the project to create more
+        accurate line strings. It creates a line string that matches the path between the shortest path
+        between the project nodes closest to either end of the access and egress connectors.
+        """
+        assert method in ["direct", "connector project match"]
+
+        if method == "direct":
+            self.edges["geometry"] = [
+                shapely.LineString(
+                    (
+                        shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
+                        shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+                    )
+                ).wkb
+                for row in self.edges.itertuples()
+            ]
+        elif method == "connector project match":
+            # Check validity of project and nodes database
+            project = get_active_project(must_exist=True)
+            warnings.warn(
+                'In its current implementation, the "connector project match" method may take a while for large networks.'
+            )
+
+            nodes = project.network.nodes.data[["node_id", "geometry"]].set_index("node_id")
+            links = project.network.links.data[["link_id", "geometry"]].set_index("link_id")
+
+            if len(nodes) == 0:
+                raise ValueError(
+                    "No nodes found in the project database. Connector project matching requires an existing project network."
+                )
+
+            # Create indexes for access and egress connectors
+            connector_rows = (self.edges.link_type == "access_connector") | (self.edges.link_type == "egress_connector")
+            other_rows = ~connector_rows
+
+            # Create line strings for non-access and egress connectors
+            self.edges.loc[other_rows, "geometry"] = [
+                shapely.LineString(
+                    (
+                        shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"]),
+                        shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"]),
+                    )
+                ).wkb
+                for row in self.edges[other_rows].itertuples()
+            ]
+
+            lines = self.__connector_project_match(connector_rows, project, nodes, links)
+
+            self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
+
+    def __connector_project_match(self, connector_rows, project, nodes, links):
+        # Create kdtree for fast nearest neighbour lookup on the project db nodes
+        nodes["geometry"] = nodes["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+        )
+        links["geometry"] = links["geometry"].apply(
+            lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
+        )
+        nodes_geometries = np.array(list(nodes["geometry"].apply(lambda geometry: (geometry.x, geometry.y))))
+        kdtree = KDTree(nodes_geometries)
+
+        # Prepare shortest path computation
+        graph = project.network.graphs["w"]
+        graph.set_graph("distance")
+        res = PathResults()
+        res.prepare(graph)
+
+        # Loop over connect edges, query for the clostest nodes in the project and create the relevant line string
+        lines = []
+        for row in self.edges[connector_rows].itertuples():
+            # row.a_node - 1 because the node_ids are the index + 1
+            start = shapely.ops.transform(
+                self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.a_node - 1, "geometry"])
+            )
+            end = shapely.ops.transform(
+                self.transformer_g_to_p, shapely.from_wkb(self.vertices.at[row.b_node - 1, "geometry"])
+            )
+
+            _, ids = kdtree.query([[start.x, start.y], [end.x, end.y]], k=1)
+
+            # If the ids for the closest nodes to the start and end are the same, then we make an edge between those 3
+            # If they differ we compute the shortest path between them. If no path exists we use a straight between the start and end
+            # Otherwise create a line string using the already existing link geometry.
+            if ids[0] == ids[1]:
+                line = shapely.LineString((start, nodes.iloc[ids[0]].geometry, end))
+            else:
+                res.compute_path(*nodes.iloc[ids].index.values)
+
+                if res.path_nodes is not None:
+                    line = shapely.ops.linemerge(
+                        (
+                            shapely.LineString((start, nodes.loc[res.path_nodes[0]].geometry)),
+                            *links.loc[res.path].geometry,
+                            shapely.LineString((nodes.loc[res.path_nodes[-1]].geometry, end)),
+                        )
+                    )
+                else:
+                    line = shapely.LineString((start, end))
+
+            trav_time = line.length / self.walking_speed
+            if row.link_type == "access_connector":
+                trav_time *= self.access_time_factor
+            else:  # row.link_type == "egress_connector"
+                trav_time *= self.egress_time_factor
+
+            lines.append((trav_time, shapely.ops.transform(self.transformer_p_to_g, line).wkb))
+        return lines
 
     def create_additional_db_fields(self):
         """Create the additional required entries in the tables."""
@@ -1103,18 +1209,6 @@ class SF_graph_builder:
         Within the database nodes may not exist at the exact same point in space, provide robust=True
         to move the nodes slightly.
         """
-        # FIXME: We also avoid adding the nodes of type od as they are already in the db from when the zones where added in the
-        # notebook. I don't think this is a good solution but I'm not sure what do to without adding the zones and such
-        # ourselves.
-
-        # The below query is formated to guarantee the columns line up. The order of the tuples should be the same
-        # as the order of the columns.
-        #
-        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
-        #     the index and following fields being the column values.
-        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
-
-        # FIXME: We also to replace the NANs with something.
         duplicated = self.vertices.geometry.duplicated()
 
         if not robust and not duplicated.empty:
@@ -1127,6 +1221,12 @@ class SF_graph_builder:
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
             self.vertices.loc[df.index, "geometry"] = df.geometry
 
+        # The below query is formated to line the columns up The order of the tuples should be the same
+        # as the order of the columns.
+        #
+        #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
+        #     the index and following fields being the column values.
+        # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
         self.pt_conn.executemany(
             f"""\
             INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
@@ -1140,11 +1240,20 @@ class SF_graph_builder:
         self.pt_conn.commit()
 
     def save_edges(self, recreate_line_geometry=False):
-        # FIXME: Just like the verticies, our edges need a little massaging as well
+        """
+        Save the contents of self.edges to the public transport database.
+
+        If no geometry for the edges is present or `recreate_line_geometry` is True, direct lines will be created.
+        """
+        # Just like the verticies, our edges need a little massaging as well
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
+        # Inorder to save the line strings from connector project matching we need to disable some smart node creation.
+        # It will be restored to its previous value once we are done here.
+        val = self.pt_conn.execute("SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'").fetchone()[0]
+        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
         self.pt_conn.executemany(
             f"""\
             INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
@@ -1153,6 +1262,7 @@ class SF_graph_builder:
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
 
+        self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
         self.pt_conn.commit()
 
     def save(self, robust=True):
