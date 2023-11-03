@@ -399,8 +399,8 @@ class SF_graph_builder:
             boarding_vertices["x"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
             boarding_vertices["y"] = boarding_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
             n_boarding = len(boarding_vertices)
-            boarding_vertices["x"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
-            boarding_vertices["y"] += self.noise_coef * (np.random.rand(n_boarding) - 0.5)
+            boarding_vertices["x"] += self.noise_coef * (self.rng.random(n_boarding) - 0.5)
+            boarding_vertices["y"] += self.noise_coef * (self.rng.random(n_boarding) - 0.5)
             boarding_vertices["geometry"] = boarding_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             boarding_vertices.drop(["x", "y"], axis=1, inplace=True)
 
@@ -421,8 +421,8 @@ class SF_graph_builder:
             alighting_vertices["x"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).x)
             alighting_vertices["y"] = alighting_vertices.geometry.map(lambda c: shapely.wkb.loads(c).y)
             n_alighting = len(alighting_vertices)
-            alighting_vertices["x"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
-            alighting_vertices["y"] += self.noise_coef * (np.random.rand(n_alighting) - 0.5)
+            alighting_vertices["x"] += self.noise_coef * (self.rng.random(n_alighting) - 0.5)
+            alighting_vertices["y"] += self.noise_coef * (self.rng.random(n_alighting) - 0.5)
             alighting_vertices["geometry"] = alighting_vertices.apply(lambda row: Point(row.x, row.y).wkb, axis=1)
             alighting_vertices.drop(["x", "y"], axis=1, inplace=True)
 
