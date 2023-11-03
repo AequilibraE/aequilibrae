@@ -1296,7 +1296,13 @@ class SF_graph_builder:
         g.network["id"] = g.network.link_id
         g.network_ok = True
         g.status = "OK"
-        g.prepare_graph(self.vertices[self.vertices.node_type == "od"].node_id.values)
+        g.prepare_graph(
+            self.vertices[
+                (self.vertices.node_type == "origin") | (self.vertices.node_type == "destination")
+                if self.blocking_centroid_flows
+                else (self.vertices.node_type == "od")
+            ].node_id.values
+        )
         g.set_graph("trav_time")
         g.set_blocked_centroid_flows(True)
         g.graph.__compressed_id__ = g.graph.__compressed_id__.astype("int32")
