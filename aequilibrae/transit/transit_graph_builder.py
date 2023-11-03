@@ -1,5 +1,4 @@
-""" Create the graph used by public transport assignment algorithms.
-"""
+"""Create the graph used by public transport assignment algorithms."""
 
 import warnings
 
@@ -33,6 +32,8 @@ SF_EDGE_COLS = [
 
 
 def shift_duplicate_geometry(df, shift=0.00001):
+    """Shift stacked geometry by some fraction of ``shift`` vertically."""
+
     def _shift_points(group_df, shift):
         points = shapely.from_wkb(group_df.geometry.values)
         count = len(points)
@@ -48,14 +49,12 @@ def shift_duplicate_geometry(df, shift=0.00001):
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
-    ASSUMPIONS:
-    - opposite directions are not supported.
-      In the GTFS files, this corresponds to direction_id from trips.txt
-      (indicates the direction of travel for a trip)
-    - all times are expressed in seconds [s], all frequencies in [1/s]
-    - headways are uniform for trips of the same pattern
+    Assumes,
+    - opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
+    - all times are expressed in seconds [s], all frequencies in [1/s], and
+    - headways are uniform for trips of the same pattern.
 
-    NAMING CONVENTION:
+    Naming Conventions:
     - a_node/b_node is head/tail vertex
     """
 
@@ -65,8 +64,7 @@ class SF_graph_builder:
         start=61200,
         end=64800,
         time_margin=0,
-        global_crs="EPSG:4326",
-        projected_crs="EPSG:2154",
+        projected_crs="EPSG:4326",
         num_threads=-1,
         seed=124,
         geometry_noise=True,
@@ -78,9 +76,26 @@ class SF_graph_builder:
         blocking_centroid_flows=True,
         max_connectors_per_zone=-1,
     ):
-        """
-        start and end must be expressed in seconds starting from 00h00m00s,
-        e.g. 6am is 21600.
+        """SF graph builder constructor.
+
+        Start and end must be expressed in seconds starting from 00h00m00s, e.g. 6am is 21600.
+
+        :Arguments:
+           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+           **start** (:obj:`int`): Start time. Defaults to ``61200``.
+           **end** (:obj:`int`): End time. Defaults to ``64800``.
+           **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin``. Defaults to ``0``.
+           **projected_crs** (:obj:`str`): Project CRS of the network, indented for more accurate distance calculations. Defaults to ``"EPSG:4326"``, the CRS used by AequilibraE internally.
+           **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+           **seed=124** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+           **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation. Defaults to ``True``.
+           **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
+           **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``True``.
+           **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``True``.
+           **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
+           **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
+           **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
+           **max_connectors_per_zone** (:obj:`bool`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
         """
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
@@ -113,10 +128,10 @@ class SF_graph_builder:
         self.__outer_stop_transfer_edges = pd.DataFrame()
         self.__walking_edges = pd.DataFrame()
 
-        self.global_crs = pyproj.CRS(global_crs)
+        self.global_crs = pyproj.CRS("EPSG:4326")
         self.projected_crs = pyproj.CRS(projected_crs)
 
-        # longlat to projected CRS transfromer
+        # longlat to projected CRS transformer
         self.transformer_g_to_p = pyproj.Transformer.from_crs(
             self.global_crs, self.projected_crs, always_xy=True
         ).transform
@@ -148,10 +163,12 @@ class SF_graph_builder:
         self.max_connectors_per_zone = max_connectors_per_zone
 
     def add_zones(self, zones, from_crs: str = None):
+        """Add zones as ODs.
+
+        :Arguments:
+           **zones** (:obj:`pd.DataFrame`): Dataframe containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+           **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
-        Add zones as ODs.
-        Assumes zone geometry is in projected crs unless `from_crs` is not None.
-        If `from_cts` is provided, the geometry will be projected to the provided projected_crs"""
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
 
@@ -184,7 +201,7 @@ class SF_graph_builder:
     def create_line_segments(self):
         """Line segments correspond to segments between two successive stops for each line.
 
-        For exemple if 2 lines, L1 and L2, are going from stop A to stop B, we have 2 line segments:
+        For example if 2 lines, L1 and L2, are going from stop A to stop B, we have 2 line segments:
         - L1_AB
         - L2_AB
 
@@ -239,14 +256,17 @@ class SF_graph_builder:
     def compute_segment_travel_time(self, time_filter=True):
         """Compute the mean travel time for each line segment.
 
-            if time_filter is True, the mean travel time is computed over the [start, end] time range,
-            otherwise it is computed over all the available data (e.g. a whole day).
-
         tt table format:
             pattern_id  seq     trav_time
         0   10001006000     1   114.545455
         1   10001006000     2   100.000000
         2   10001006000     3   180.000000
+
+        :Arguments:
+           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day). Defaults to ``True``.
+
+        :Returns:
+           **tt** (:obj:`pd.DataFrame`): Dataframe containing the travel item for line segments.
         """
 
         if time_filter:
@@ -307,10 +327,9 @@ class SF_graph_builder:
     def add_mean_headway_to_segments(self):
         """Compute the mean headway for each pattern and add it to the line segment table, as headway.
 
-        When there is not enough information to comute the mean headway (e.g. a single trip), the headway is
+        When there is not enough information to compute the mean headway (e.g. a single trip), the headway is
         given the value of the time range length.
         """
-
         # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
@@ -370,6 +389,7 @@ class SF_graph_builder:
         self.__line_segments = pd.merge(self.__line_segments, mh, on=["pattern_id"], how="left")
 
     def create_stop_vertices(self):
+        """Create stop vertices."""
         # select all stops
         sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
         stop_vertices = pd.read_sql(sql, self.pt_conn)
@@ -385,6 +405,7 @@ class SF_graph_builder:
         self.__stop_vertices = stop_vertices
 
     def create_boarding_vertices(self):
+        """Create boarding vertices with noise, if enabled."""
         boarding_vertices = self.__line_segments[["line_id", "seq", "from_stop"]].copy(deep=True)
         boarding_vertices.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
         boarding_vertices = pd.merge(
@@ -407,6 +428,7 @@ class SF_graph_builder:
         self.__boarding_vertices = boarding_vertices
 
     def create_alighting_vertices(self):
+        """Create alighting vertices with noise, if enabled."""
         alighting_vertices = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_vertices.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
         alighting_vertices = pd.merge(
@@ -429,6 +451,11 @@ class SF_graph_builder:
         self.__alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
+        """Create OD vertices from zones.
+
+        If zones have not previously been added, add zones from the project.
+        If ``self.blocking_centroid_flow`` is ``True``, a distinction is made between ``origin`` and ``destination`` vertices. Otherwise, they are both classified as ``od``.
+        """
         if "zones" not in self.__dict__:
             project = get_active_project(True)
             self.add_zones(
@@ -465,9 +492,7 @@ class SF_graph_builder:
         self.__od_vertices = od_vertices
 
     def create_od_node_mapping(self):
-        """Build a dataframe mapping the cenbtroid node ids with to transport
-        assignment zone ids
-        """
+        """Build a dataframe mapping the centroid node ids with to transport assignment zone ids."""
         if self.blocking_centroid_flows:
             origin_nodes = self.vertices.loc[
                 self.vertices.node_type == "origin",
@@ -493,15 +518,14 @@ class SF_graph_builder:
         """Graph vertices creation as a dataframe.
 
         Vertices have the following attributes:
-            - node_id: int
-            - node_type (either 'stop', 'boarding', 'alighting', 'od', 'origin', 'destination'): str
-            - stop_id (only applies to 'stop', 'boarding' and 'alighting' vertices): str
-            - line_id (only applies to 'boarding' and 'alighting' vertices): str
-            - line_seg_idx (only applies to 'boarding' and 'alighting' vertices): int
-            - taz_id (only applies to 'od' nodes): str
-            - geometry (WKB): str
+            - node_id (:obj:`int`),
+            - node_type (:obj:`str`): Either 'stop', 'boarding', 'alighting', 'od', 'origin', or 'destination',
+            - stop_id (:obj:`str`): Only applies to 'stop', 'boarding' and 'alighting' vertices,
+            - line_id (:obj:`str`): Only applies to 'boarding' and 'alighting' vertices,
+            - line_seg_idx (:obj:`int`): Only applies to 'boarding' and 'alighting' vertices,
+            - taz_id (:obj:`str`): Only applies to 'origin', 'destination', and 'od' nodes,
+            - geometry (:obj:`str`): Geometry object in WKB (well known binary).
         """
-
         self.create_line_segments()
         self.create_stop_vertices()
         self.create_boarding_vertices()
@@ -535,6 +559,7 @@ class SF_graph_builder:
         self.vertices.taz_id = self.vertices.taz_id.fillna("").astype(str)
 
     def create_on_board_edges(self):
+        """Create on board edges."""
         on_board_edges = self.__line_segments[["line_id", "seq", "trav_time"]].copy(deep=True)
         on_board_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
 
@@ -564,6 +589,7 @@ class SF_graph_builder:
         self.__on_board_edges = on_board_edges
 
     def create_boarding_edges(self):
+        """Create boarding edges."""
         boarding_edges = self.__line_segments[["line_id", "seq", "from_stop", "freq"]].copy(deep=True)
         boarding_edges.rename(columns={"seq": "line_seg_idx", "from_stop": "stop_id"}, inplace=True)
 
@@ -597,6 +623,7 @@ class SF_graph_builder:
         self.__boarding_edges = boarding_edges
 
     def create_alighting_edges(self):
+        """Create alighting edges."""
         alighting_edges = self.__line_segments[["line_id", "seq", "to_stop"]].copy(deep=True)
         alighting_edges.rename(columns={"seq": "line_seg_idx", "to_stop": "stop_id"}, inplace=True)
 
@@ -629,6 +656,7 @@ class SF_graph_builder:
         self.__alighting_edges = alighting_edges
 
     def create_dwell_edges(self):
+        """Create dwell edges."""
         # we start by removing the first segment of each line
         dwell_edges = self.__line_segments.loc[self.__line_segments.seq != 0][["line_id", "from_stop", "seq"]]
         dwell_edges.rename(columns={"seq": "line_seg_idx"}, inplace=True)
@@ -675,8 +703,11 @@ class SF_graph_builder:
 
         Nearest neighbour: Creates edges between every stop and its nearest OD.
 
-        Overlapping regions: Creates edges between all stops that lying within the circle
-            centered each OD whose radius is the distance to the other nearest OD.
+        Overlapping regions: Creates edges between all stops that lying within the circle centred on each OD whose radius is the distance to the next nearest OD.
+
+        :Arguments:
+           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
+           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
         """
         assert method in ["overlapping_regions", "nearest_neighbour"]
 
@@ -816,7 +847,6 @@ class SF_graph_builder:
 
     def create_inner_stop_transfer_edges(self):
         """Create transfer edges between distinct lines of each stop."""
-
         alighting = self.vertices[self.vertices.node_type == "alighting"][["stop_id", "line_id", "node_id"]].rename(
             columns={"line_id": "o_line_id", "node_id": "b_node"}
         )
@@ -859,7 +889,6 @@ class SF_graph_builder:
 
     def create_outer_stop_transfer_edges(self):
         """Create transfer edges between distinct lines/stops of each station."""
-
         sql = """
         SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
@@ -1008,21 +1037,21 @@ class SF_graph_builder:
         self.__walking_edges = walking_edges
 
     def create_edges(self):
-        """Graph edges creation as a dataframe.
+        """Graph edges creation as a Dataframe.
 
         Edges have the following attributes:
-            - type (either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer',
-              'access_connector', "egress_connector" or 'walking'): str
-            - line_id (only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges): str
-            - stop_id: str
-            - line_seg_idx (only applies to 'on-board', 'boarding' and 'alighting' edges): int
-            - b_node: int
-            - a_node: int
-            - trav_time (edge travel time): float
-            - freq (frequency): float
-            - o_line_id: str
-            - d_line_id: str
-            - transfer_id: str
+            - type (:obj:`str`): Either 'on-board', 'boarding', 'alighting', 'dwell', 'inner_transfer', 'outer_transfer',
+              'access_connector', "egress_connector" or 'walking',
+            - line_id (:obj:`str`): Only applies to 'on-board', 'boarding', 'alighting' and 'dwell' edges,
+            - stop_id (:obj:`str`),
+            - line_seg_idx (:obj:`int`): Only applies to 'on-board', 'boarding' and 'alighting' edges,
+            - b_node (:obj:`int`),
+            - a_node (:obj:`int`),
+            - trav_time (:obj:`float`): Edge travel time,
+            - freq (:obj:`float`),
+            - o_line_id (:obj:`str`),
+            - d_line_id (:obj:`str`),
+            - transfer_id (:obj:`str`)
         """
         # create the graph edges
         self.create_on_board_edges()
@@ -1076,14 +1105,15 @@ class SF_graph_builder:
         """
         Create the LineString for each edge.
 
-        method: must be either "direct" or "connector project match"
-        graph: must be a key within project.network.graphs
-
         The direct method creates a straight line between all points.
 
-        The connect project match method uses the existing line gemeotry within the project to create more
+        The connect project match method uses the existing line geometry within the project to create more
         accurate line strings. It creates a line string that matches the path between the shortest path
         between the project nodes closest to either end of the access and egress connectors.
+
+        :Arguments:
+           **method** (:obj:`str`): Must be either "direct" or "connector project match",
+           **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
         assert method in ["direct", "connector project match"]
 
@@ -1132,6 +1162,15 @@ class SF_graph_builder:
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
+        """Create line string geometry for ``connector_rows`` that matches the line strings in ``project.network.graphs[graph_key]``.
+
+        :Arguments:
+           **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges`` to create line strings for.
+           **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull the graph from.
+           **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes. Must have columns ``geometry``, and an index of ``node_id``s.
+           **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links. Must have columns ``geometry``, and an index of ``link_id``s.
+           **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use for path finding.
+        """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
         nodes["geometry"] = nodes["geometry"].apply(
             lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
@@ -1148,7 +1187,7 @@ class SF_graph_builder:
         res = PathResults()
         res.prepare(graph)
 
-        # Loop over connect edges, query for the clostest nodes in the project and create the relevant line string
+        # Loop over connect edges, query for the closest nodes in the project and create the relevant line string
         lines = []
         for row in self.edges[connector_rows].itertuples():
             # row.a_node - 1 because the node_ids are the index + 1
@@ -1191,13 +1230,12 @@ class SF_graph_builder:
 
     def create_additional_db_fields(self):
         """Create the additional required entries in the tables."""
-        # This graph requires some additional tables and fields inorder to store all our information.
+        # This graph requires some additional tables and fields in order to store all our information.
         # Currently it mimics what we are storing in the df
 
-        # Now onto the links, we need to specifiy all our link types
         self.pt_conn.executemany(
             """
-            INSERT INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
+            INSERT OR IGNORE INTO link_types (link_type, link_type_id, description) VALUES (?, ?, ?)
             """,
             [
                 ("on-board", "o", "From boarding to alighting"),
@@ -1218,8 +1256,10 @@ class SF_graph_builder:
         """
         Write the vertices DataFrame to the public transport database.
 
-        Within the database nodes may not exist at the exact same point in space, provide robust=True
-        to move the nodes slightly.
+        Within the database nodes may not exist at the exact same point in space, provide ``robust=True`` to move the nodes slightly.
+
+        :Arguments:
+           **robust** (:obj:`bool`): Whether to move stack nodes slightly before saving. Defaults to ``True``.
         """
         duplicated = self.vertices.geometry.duplicated()
 
@@ -1233,7 +1273,7 @@ class SF_graph_builder:
             df = shift_duplicate_geometry(self.vertices[["node_id", "geometry"]][duplicated])
             self.vertices.loc[df.index, "geometry"] = df.geometry
 
-        # The below query is formated to line the columns up The order of the tuples should be the same
+        # The below query is formatted to line the columns up The order of the tuples should be the same
         # as the order of the columns.
         #
         #     An object to iterate over namedtuples for each row in the DataFrame with the first field possibly being
@@ -1256,13 +1296,15 @@ class SF_graph_builder:
         Save the contents of self.edges to the public transport database.
 
         If no geometry for the edges is present or `recreate_line_geometry` is True, direct lines will be created.
+
+        :Arguments:
+           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
         """
-        # Just like the verticies, our edges need a little massaging as well
         # We need to generate the geometry for each edge, this may take a bit
         if "geometry" not in self.edges.columns or recreate_line_geometry:
             self.create_line_geometry()
 
-        # Inorder to save the line strings from connector project matching we need to disable some smart node creation.
+        # In order to save the line strings from connector project matching we need to disable some smart node creation.
         # It will be restored to its previous value once we are done here.
         val = self.pt_conn.execute(
             "SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'"
@@ -1280,7 +1322,11 @@ class SF_graph_builder:
         self.pt_conn.commit()
 
     def save(self, robust=True):
-        """Save the current graph to the public transport database."""
+        """Save the current graph to the public transport database.
+
+        :Arguments:
+           **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
+        """
         self.save_vertices(robust=robust)
         self.save_edges()
 
@@ -1315,6 +1361,12 @@ class SF_graph_builder:
         Create a SF graph instance from an existing database save.
 
         Assumes the database was constructed with the provided save methods.
+        No checks are performed to see if the provided arguments are compatible with the saved graph.
+
+        All arguments are forwarded to the constructor.
+
+        :Arguments:
+           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
         graph = cls(public_transport_conn, *args, **kwargs)
 
@@ -1333,6 +1385,7 @@ class SF_graph_builder:
     def convert_demand_matrix_from_zone_to_node_ids(
         self, demand_matrix, o_zone_col="origin_zone_id", d_zone_col="destination_zone", demand_col="demand"
     ):
+        """Convert a sparse demand matrix from ``zone_id``s to the corresponding ``node_id``s."""
         if self.blocking_centroid_flows:
             od_matrix = pd.merge(
                 demand_matrix,
