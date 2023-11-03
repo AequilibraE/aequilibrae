@@ -1264,7 +1264,9 @@ class SF_graph_builder:
 
         # Inorder to save the line strings from connector project matching we need to disable some smart node creation.
         # It will be restored to its previous value once we are done here.
-        val = self.pt_conn.execute("SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'").fetchone()[0]
+        val = self.pt_conn.execute(
+            "SELECT enabled FROM trigger_settings WHERE name = 'new_link_a_or_b_node'"
+        ).fetchone()[0]
         self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
         self.pt_conn.executemany(
             f"""\
