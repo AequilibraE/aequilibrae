@@ -159,7 +159,9 @@ class SF_graph_builder:
             geometry = shapely.from_wkt(zones.geometry.values)
         # Check if the supplied zones df is from geopandas without import geopandas.
         # We check __mro__ incase of inheritance. https://stackoverflow.com/a/63337375/14047443
-        elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__]:
+        elif "GeometryDtype" in [t.__name__ for t in type(zones.geometry.dtype).__mro__] or all(
+            isinstance(x, shapely.geometry.base.BaseGeometry) for x in zones.geometry
+        ):
             geometry = zones.geometry.values
         else:
             raise TypeError("geometry is not a string, bytes, or shapely.Geometry instance")
@@ -427,6 +429,15 @@ class SF_graph_builder:
         self.__alighting_vertices = alighting_vertices
 
     def create_od_vertices(self):
+        if "zones" not in self.__dict__:
+            project = get_active_project(True)
+            self.add_zones(
+                pd.DataFrame(
+                    [(x.zone_id, x.geometry) for x in project.zoning.all_zones().values()],
+                    columns=["zone_id", "geometry"],
+                )
+            )
+
         if self.blocking_centroid_flows:
             # we create both "origin" and "destination" nodes
             origin_vertices = self.zones[["zone_id", "centroids"]].rename(
