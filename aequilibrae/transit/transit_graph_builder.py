@@ -1072,11 +1072,12 @@ class SF_graph_builder:
         self.edges.d_line_id = self.edges.d_line_id.fillna("").astype(str)
         self.edges.direction = self.edges.direction.astype("int8")
 
-    def create_line_geometry(self, method="direct"):
+    def create_line_geometry(self, method="direct", graph="w"):
         """
         Create the LineString for each edge.
 
-        method must be either "direct" or "connector project match"
+        method: must be either "direct" or "connector project match"
+        graph: must be a key within project.network.graphs
 
         The direct method creates a straight line between all points.
 
@@ -1126,11 +1127,11 @@ class SF_graph_builder:
                 for row in self.edges[other_rows].itertuples()
             ]
 
-            lines = self.__connector_project_match(connector_rows, project, nodes, links)
+            lines = self.__connector_project_match(connector_rows, project, nodes, links, graph)
 
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
-    def __connector_project_match(self, connector_rows, project, nodes, links):
+    def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
         nodes["geometry"] = nodes["geometry"].apply(
             lambda geometry: shapely.ops.transform(self.transformer_g_to_p, geometry)
@@ -1142,7 +1143,7 @@ class SF_graph_builder:
         kdtree = KDTree(nodes_geometries)
 
         # Prepare shortest path computation
-        graph = project.network.graphs["w"]
+        graph = project.network.graphs[graph_key]
         graph.set_graph("distance")
         res = PathResults()
         res.prepare(graph)
