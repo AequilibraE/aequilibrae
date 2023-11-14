@@ -114,6 +114,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
 
         w = path_finding(origin_index,
+                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
@@ -169,15 +170,17 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
     return origin
 
-def path_computation(origin, destination, graph, results):
+def path_computation(origin, destination, graph, results, early_exit = False):
     # type: (int, int, Graph, PathResults) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
+    :param early_exit: Exit Dijkstra's once the destination has been found. Constructs a partial shortest path tree.
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
+    cdef bint early_exit_c = early_exit
 
     results.origin = origin
     results.destination = destination
@@ -228,6 +231,7 @@ def path_computation(origin, destination, graph, results):
                                     original_b_nodes_view)
 
         w = path_finding(origin_index,
+                         dest_index if early_exit_c else -1,
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
@@ -285,14 +289,16 @@ def path_computation(origin, destination, graph, results):
         results.path_nodes = None
         results.path_link_directions = None
         results.milepost = None
+        results.eary_exit = False
 
 
-def update_path_trace(results, destination, graph):
+def update_path_trace(results, destination, graph, early_exit = False):
     # type: (PathResults, int, Graph) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
+    :param early_exit: Exit Dijkstra's once the destination has been found if the shortest path tree must be reconstructed.
     """
     cdef p, origin_index, dest_index, connector
 
@@ -303,9 +309,18 @@ def update_path_trace(results, destination, graph):
     else:
         dest_index = graph.nodes_to_indices[destination]
         origin_index = graph.nodes_to_indices[results.origin]
-
         results.milepost = None
         results.path_nodes = None
+
+        # If the predecessor is -1 and early exit was enabled we cannot differentiate between
+        # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
+        if results.predecessors[dest_index] == -1 and results.early_exit:
+            results.compute_path(results.origin, destination, early_exit=early_exit)
+
+        # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
+        # Dijkstra's algorithm produces the shortest path tree for all scanned nodes. That is if a node was scanned,
+        # its shortest path has been found, even if we exited early. As the un-scanned nodes are marked as unreachable this
+        # invariant holds.
         if results.predecessors[dest_index] >= 0:
             all_connectors = []
             link_directions = []
@@ -395,6 +410,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
         w = path_finding(origin_index,
+                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,

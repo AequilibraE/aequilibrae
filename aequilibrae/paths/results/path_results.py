@@ -60,6 +60,7 @@ class PathResults:
         self.origin = None
         self.destination = None
         self.graph: Graph = None
+        self.early_exit = False
         self.links = -1
         self.nodes = -1
         self.zones = -1
@@ -69,7 +70,7 @@ class PathResults:
         self.__graph_id__ = None
         self.__graph_sum = None
 
-    def compute_path(self, origin: int, destination: int) -> None:
+    def compute_path(self, origin: int, destination: int, early_exit: bool = False) -> None:
         """
         Computes the path between two nodes in the network
 
@@ -77,12 +78,16 @@ class PathResults:
             **origin** (:obj:`int`): Origin for the path
 
             **destination** (:obj:`int`): Destination for the path
+
+            **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
+                                          Doing so may cause subsequent calls to `update_trace` to recompute the tree.
         """
 
         if self.graph is None:
             raise Exception("You need to set graph skimming before you compute a path")
 
-        path_computation(origin, destination, self.graph, self)
+        self.early_exit = early_exit
+        path_computation(origin, destination, self.graph, self, early_exit)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
             self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
@@ -140,14 +145,19 @@ class PathResults:
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
 
-    def update_trace(self, destination: int) -> None:
+    def update_trace(self, destination: int, early_exit: bool = False) -> None:
         """
         Updates the path's nodes, links, skims and mileposts
 
-        It does not re-compute the path tree, so it saves most of the computation time
+        If the previously computed path had `early_exit` enabled, `update_trace` will check if the
+        `destination` has already been found, if not the shortest path tree will be recomputed with the `early_exit`
+        argument passed on.
 
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
+
+            **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
+                                          Doing so may cause subsequent calls to `update_trace` to recompute the tree.
         """
         if not isinstance(destination, int):
             raise TypeError("destination needs to be an integer")
@@ -155,4 +165,4 @@ class PathResults:
         if destination >= self.graph.nodes_to_indices.shape[0]:
             raise ValueError("destination out of the range of node numbers in the graph")
 
-        update_path_trace(self, destination, self.graph)
+        update_path_trace(self, destination, self.graph, early_exit)

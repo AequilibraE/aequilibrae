@@ -175,6 +175,44 @@ class TestBlockingTrianglePathResults(TestCase):
         self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
         self.assertEqual(list(self.r.path), [4, 1, 6])
 
+    def test_update_trace_early_exit(self):
+        self.r.compute_path(1, 6, early_exit=True)
+        self.assertEqual(list(self.r.path_nodes), [1, 3, 6])
+        self.assertEqual(list(self.r.path), [1, 6])
+
+        # Check the state of the partial shortest path tree. While Dijkstra's does explore and find the
+        # optimal cost for node 2, it can't prove it's optimal without exploring all of 6's adjacent nodes,
+        # which it doesn't do as it exists early upon finding 6
+        self.assertEqual(
+            [self.r.graph.all_nodes[x] if x != -1 else -1 for x in self.r.predecessors],
+            [1, -1, 3, -1, -1, 1, -1],  # Node ids: 4, 5, 6, 1, 2, 3, sentinel
+        )
+
+        # Updating to 2 should cause the recomputation of the tree
+        self.r.update_trace(2, early_exit=True)
+        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+        self.assertEqual(list(self.r.path), [1, 2])
+
+        # The new partial tree state should only have 1 and 5 as -1
+        self.assertEqual(
+            [self.r.graph.all_nodes[x] if x != -1 else -1 for x in self.r.predecessors],
+            [1, -1, 3, -1, 3, 1, -1],  # Node ids: 4, 5, 6, 1, 2, 3, sentinel
+        )
+
+    def test_update_trace_full(self):
+        self.r.compute_path(1, 6, early_exit=True)
+
+        # Updating to 2 should cause the recomputation of the tree
+        self.r.update_trace(2, early_exit=False)
+        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+        self.assertEqual(list(self.r.path), [1, 2])
+
+        # The new tree state should be the full tree
+        self.assertEqual(
+            [self.r.graph.all_nodes[x] if x != -1 else -1 for x in self.r.predecessors],
+            [1, 2, 3, -1, 3, 1, -1],  # Node ids: 4, 5, 6, 1, 2, 3, sentinel
+        )
+
 
 class TestCentroidsLast(TestCase):
     def test_compute_paths_centroid_last_node_id(self):
