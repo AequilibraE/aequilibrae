@@ -69,6 +69,7 @@ class PathResults:
         self.__float_type = None
         self.__graph_id__ = None
         self.__graph_sum = None
+        self._early_exit = self.early_exit
 
     def compute_path(self, origin: int, destination: int, early_exit: bool = False) -> None:
         """
@@ -86,7 +87,7 @@ class PathResults:
         if self.graph is None:
             raise Exception("You need to set graph skimming before you compute a path")
 
-        self.early_exit = early_exit
+        self.early_exit = self._early_exit = early_exit
         path_computation(origin, destination, self.graph, self, early_exit)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
@@ -145,7 +146,7 @@ class PathResults:
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
 
-    def update_trace(self, destination: int, early_exit: bool = False) -> None:
+    def update_trace(self, destination: int) -> None:
         """
         Updates the path's nodes, links, skims and mileposts
 
@@ -165,4 +166,4 @@ class PathResults:
         if destination >= self.graph.nodes_to_indices.shape[0]:
             raise ValueError("destination out of the range of node numbers in the graph")
 
-        update_path_trace(self, destination, self.graph, early_exit)
+        update_path_trace(self, destination, self.graph, self.early_exit)

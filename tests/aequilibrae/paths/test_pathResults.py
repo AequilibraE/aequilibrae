@@ -189,7 +189,8 @@ class TestBlockingTrianglePathResults(TestCase):
         )
 
         # Updating to 2 should cause the recomputation of the tree
-        self.r.update_trace(2, early_exit=True)
+        self.r.early_exit = True
+        self.r.update_trace(2)
         self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
         self.assertEqual(list(self.r.path), [1, 2])
 
@@ -203,7 +204,8 @@ class TestBlockingTrianglePathResults(TestCase):
         self.r.compute_path(1, 6, early_exit=True)
 
         # Updating to 2 should cause the recomputation of the tree
-        self.r.update_trace(2, early_exit=False)
+        self.r.early_exit = False
+        self.r.update_trace(2)
         self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
         self.assertEqual(list(self.r.path), [1, 2])
 

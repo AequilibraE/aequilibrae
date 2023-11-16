@@ -314,7 +314,7 @@ def update_path_trace(results, destination, graph, early_exit = False):
 
         # If the predecessor is -1 and early exit was enabled we cannot differentiate between
         # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
-        if results.predecessors[dest_index] == -1 and results.early_exit:
+        if results.predecessors[dest_index] == -1 and results._early_exit:
             results.compute_path(results.origin, destination, early_exit=early_exit)
 
         # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
