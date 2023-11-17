@@ -289,6 +289,7 @@ cpdef void skim_multiple_fields(long origin,
 @cython.embedsignature(True)
 @cython.boundscheck(False) # turn of bounds-checking for entire function
 cpdef int path_finding(long origin,
+                       long destination,
                        double[:] graph_costs,
                        long long [:] csr_indices,
                        long long [:] graph_fs,
@@ -307,6 +308,7 @@ cpdef int path_finding(long origin,
         PriorityQueue pqueue  # binary heap
         ElementState vert_state  # vertex state
         size_t origin_vert = <size_t>origin
+        size_t destination_vert = <size_t>destination if destination != -1 else 0
         ITYPE_t found = 0
 
     for i in range(M):
@@ -325,9 +327,19 @@ cpdef int path_finding(long origin,
     # main loop
     while pqueue.size > 0:
         tail_vert_idx = extract_min(&pqueue)
-        tail_vert_val = pqueue.Elements[tail_vert_idx].key
         reached_first[found] = tail_vert_idx
         found += 1
+
+        if destination != -1 and tail_vert_idx == destination_vert:
+            # If we wish to reuse the tree we've constructed in update_path_trace we need to mark the un-scanned
+            # nodes as unreachable. The nodes not in the heap (NOT_IN_HEAP) are already -1
+            for idx in range(pqueue.length):
+                if pqueue.Elements[idx].state == IN_HEAP:
+                    pred[idx] = -1
+                    connectors[idx] = -1
+            break
+
+        tail_vert_val = pqueue.Elements[tail_vert_idx].key
 
         # loop on outgoing edges
         for idx in range(<size_t>graph_fs[tail_vert_idx], <size_t>graph_fs[tail_vert_idx + 1]):
