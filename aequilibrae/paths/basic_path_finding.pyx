@@ -9,8 +9,9 @@ LIST OF ALL THE THINGS WE NEED TO DO TO NOT HAVE TO HAVE nodes 1..n as CENTROIDS
 - Re-write function **network_loading** on the part of loading flows to centroids
 """
 cimport cython
-from libc.math cimport isnan, INFINITY
+from libc.math cimport isnan, INFINITY, sin, cos, asin, sqrt, pi
 from libc.string cimport memset
+from libc.stdlib cimport malloc, free
 
 include 'pq_4ary_heap.pyx'
 
@@ -318,7 +319,7 @@ cpdef int path_finding(long origin,
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
-    init_heap(&pqueue, <size_t>N)
+    init_heap(&pqueue, <size_t>M)  # FIXME: should this be M or N? It was N but thats the number of links
 
     # the key is set to zero for the origin vertex,
     # which is inserted into the heap
@@ -357,4 +358,119 @@ cpdef int path_finding(long origin,
                     connectors[head_vert_idx] = ids[idx]
 
     free_heap(&pqueue)
+    return found - 1
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cdef inline double haversine_heuristic(double lat1, double lon1, double cos_lat1, double lat2, double lon2) noexcept nogil:
+    """
+    A haversine heuristic written to minimise expensive (trig) operations.
+
+    Arguments:
+        **lat1** (:obj:`double`): Latitude of destination
+        **lon1** (:obj:`double`): Longitude of destination
+        **cos_lat1** (:obj:`double`): Precomputed cos(lat1)
+        **lat2** (:obj:`double`): Latitude of node to evalutate
+        **lon2** (:obj:`double`): Longitude of node to evalutate
+
+    Returns the distance between (lat1, lon1) and (lat2, lon2).
+    """
+    cdef:
+        double dlat = lat2 - lat1
+        double dlon = lon2 - lon1
+        double sin_dlat = sin(dlat / 2)
+        double sin_dlon = sin(dlon / 2)
+        double a = sin_dlat * sin_dlat + cos_lat1 * cos(lat2) * sin_dlon * sin_dlon
+    return 2.0 * 6371000.0 * asin(sqrt(a))
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+cpdef int path_finding_a_star(long origin,
+                              long destination,
+                              double[:] graph_costs,
+                              long long [:] csr_indices,
+                              long long [:] graph_fs,
+                              long long [:] nodes_to_indices,
+                              double [:] lats,
+                              double [:] lons,
+                              long long [:] pred,
+                              long long [:] ids,
+                              long long [:] connectors,
+                              long long [:] reached_first) noexcept nogil:
+    """
+    Based on the pseudocode presented at https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode
+    The following variables have been renamed to be consistent with out Dijkstra's implementation
+     - openSet: pqueue
+     - cameFrom: pred
+     - fScore: pqueue.Elements[idx].key, for some idx
+    """
+
+    cdef unsigned int N = graph_costs.shape[0]
+    cdef unsigned int M = pred.shape[0]
+
+    cdef:
+        size_t current, neighbour, idx, neighbour_idx  # indices
+        DTYPE_t tail_vert_val, tentative_gScore  # vertex travel times
+        PriorityQueue pqueue  # binary heap
+        ElementState vert_state  # vertex state
+        size_t origin_vert = <size_t>origin
+        size_t destination_vert = <size_t>destination if destination != -1 else 0
+        ITYPE_t found = 0
+        double *gScore = <double *>malloc(M * sizeof(double))
+
+    cdef:
+        double deg2rad = pi / 180.0
+        double lat1_rad = lats[destination_vert] * deg2rad
+        double lon1_rad = lons[destination_vert] * deg2rad
+        double h, cos_lat1 = cos(lat1_rad)
+
+    for i in range(M):
+        pred[i] = -1
+        connectors[i] = -1
+        reached_first[i] = -1
+        gScore[i] = INFINITY
+
+    # initialization of the heap elements
+    # all nodes have INFINITY key and NOT_IN_HEAP state
+    init_heap(&pqueue, <size_t>M)  # FIXME: should this be M or N?
+
+    # the key is set to zero for the origin vertex,
+    # which is inserted into the heap
+    insert(&pqueue, origin_vert, 0.0)
+    gScore[origin_vert] = 0.0
+
+    # main loop
+    while pqueue.size > 0:
+        current = extract_min(&pqueue)
+        reached_first[found] = current
+        found += 1
+
+        if current == destination_vert:
+            break
+
+        # loop on outgoing edges
+        for idx in range(<size_t>graph_fs[current], <size_t>graph_fs[current + 1]):
+            neighbour = <size_t>csr_indices[idx]
+
+            tentative_gScore = gScore[current] + graph_costs[idx]
+            if tentative_gScore < gScore[neighbour]:
+                pred[neighbour] = current
+                connectors[neighbour] = ids[idx]
+                gScore[neighbour] = tentative_gScore
+
+                neighbour_idx = nodes_to_indices[neighbour + 1]
+                h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour_idx] * deg2rad, lons[neighbour_idx] * deg2rad)
+                # Unlike Dijkstra's we can remove a node from the heap and rediscover it with a cheaper path
+                if pqueue.Elements[neighbour].state != IN_HEAP:
+                    insert(&pqueue, neighbour, tentative_gScore + h)
+                else:
+                    decrease_key(&pqueue, neighbour, tentative_gScore + h)
+
+
+    free_heap(&pqueue)
+    free(gScore)
     return found - 1

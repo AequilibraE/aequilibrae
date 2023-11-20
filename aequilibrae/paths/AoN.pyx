@@ -1,5 +1,6 @@
 # cython: language_level=3
 import os
+from aequilibrae.context import get_active_project
 
 cimport numpy as np
 from libcpp cimport bool
@@ -170,7 +171,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
     return origin
 
-def path_computation(origin, destination, graph, results, early_exit = False):
+def path_computation(origin, destination, graph, results, early_exit=False, a_star=False):
     # type: (int, int, Graph, PathResults) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
@@ -219,6 +220,12 @@ def path_computation(origin, destination, graph, results, early_exit = False):
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
+    project = get_active_project(must_exist=True)
+    cdef double [:] lat_view = project.network.nodes.data.geometry.apply(lambda x: x.y).values
+    cdef double [:] lon_view = project.network.nodes.data.geometry.apply(lambda x: x.x).values
+    cdef long long [:] nodes_to_indices_view = graph.nodes_to_indices
+    cdef bint a_star_bint = a_star
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -230,15 +237,31 @@ def path_computation(origin, destination, graph, results, early_exit = False):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        w = path_finding(origin_index,
-                         dest_index if early_exit_c else -1,
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view)
+        if a_star_bint:
+            # FIXME: Is it valid to use this `found` count return value in the skimming?
+            w = path_finding_a_star(origin_index,
+                                    dest_index,
+                                    g_view,
+                                    b_nodes_view,
+                                    graph_fs_view,
+                                    nodes_to_indices_view,
+                                    lat_view,
+                                    lon_view,
+                                    predecessors_view,
+                                    ids_graph_view,
+                                    conn_view,
+                                    reached_first_view)
+        else:
+            w = path_finding(origin_index,
+                             dest_index if early_exit_c else -1,
+                             g_view,
+                             b_nodes_view,
+                             graph_fs_view,
+                             predecessors_view,
+                             ids_graph_view,
+                             conn_view,
+                             reached_first_view)
+
 
         if skims > 0:
             skim_single_path(origin_index,

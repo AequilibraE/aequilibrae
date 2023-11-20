@@ -71,7 +71,7 @@ class PathResults:
         self.__graph_sum = None
         self._early_exit = self.early_exit
 
-    def compute_path(self, origin: int, destination: int, early_exit: bool = False) -> None:
+    def compute_path(self, origin: int, destination: int, early_exit: bool = False, a_star: bool = False) -> None:
         """
         Computes the path between two nodes in the network
 
@@ -88,7 +88,7 @@ class PathResults:
             raise Exception("You need to set graph skimming before you compute a path")
 
         self.early_exit = self._early_exit = early_exit
-        path_computation(origin, destination, self.graph, self, early_exit)
+        path_computation(origin, destination, self.graph, self, early_exit, a_star)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
             self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
