@@ -116,5 +116,14 @@ class Nodes(BasicTable):
         dl = DataLoader(self.conn, "nodes")
         return dl.load_table()
 
+    @property
+    def lonlat(self) -> pd.DataFrame:
+        """Returns all nodes lon/lat coords as a Pandas DataFrame
+
+        :Returns:
+            **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
+        """
+        return pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self.conn)
+
     def __del__(self):
         self.__items.clear()

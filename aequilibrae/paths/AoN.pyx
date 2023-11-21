@@ -1,6 +1,5 @@
 # cython: language_level=3
 import os
-from aequilibrae.context import get_active_project
 
 cimport numpy as np
 from libcpp cimport bool
@@ -178,6 +177,7 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     :param early_exit: Exit Dijkstra's once the destination has been found. Constructs a partial shortest path tree.
+    :param a_star: Use A* instead of Dikjkstra's algorithm. When `True`, `early_exit` is ignore/always `True`.
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
@@ -220,12 +220,14 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
-    project = get_active_project(must_exist=True)
-    geom = project.network.nodes.data.set_index("node_id").geometry.loc[graph.all_nodes]
-    cdef double [:] lat_view = geom.apply(lambda x: x.y).values
-    cdef double [:] lon_view = geom.apply(lambda x: x.x).values
-    cdef long long [:] nodes_to_indices_view = graph.nodes_to_indices
     cdef bint a_star_bint = a_star
+    cdef double [:] lat_view
+    cdef double [:] lon_view
+    cdef long long [:] nodes_to_indices_view
+    if a_star:
+        lat_view = graph.lonlat_index.lat.values
+        lon_view = graph.lonlat_index.lon.values
+        nodes_to_indices_view = graph.nodes_to_indices
 
     #Now we do all procedures with NO GIL
     with nogil:
@@ -316,9 +318,12 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
         results.eary_exit = False
 
 
-def update_path_trace(results, destination, graph, early_exit = False):
+def update_path_trace(results, destination, graph):
     # type: (PathResults, int, Graph) -> (None)
     """
+    If `results.early_exit` is `True`, early exit will be enabled if the path is to be recomputed.
+    If `results.a_star` is `True`, A* will be used if the path is to be recomputed.
+
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
@@ -338,8 +343,10 @@ def update_path_trace(results, destination, graph, early_exit = False):
 
         # If the predecessor is -1 and early exit was enabled we cannot differentiate between
         # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
-        if results.predecessors[dest_index] == -1 and results._early_exit:
-            results.compute_path(results.origin, destination, early_exit=early_exit)
+        # If `a_star` was enabled then the stored tree has no guarantees and may not be useful due to the heuristic used
+        # TODO: revisit with heuristic specific reuse logic
+        if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
+            results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
 
         # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
         # Dijkstra's algorithm produces the shortest path tree for all scanned nodes. That is if a node was scanned,

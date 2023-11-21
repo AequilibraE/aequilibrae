@@ -52,6 +52,8 @@ class Graph(object):
         self.cost = np.array([])  # This array holds the values being used in the shortest path routine
         self.skims = None
 
+        self.lonlat_index = pd.DataFrame([])  # Holds a node_id to lon/lat coord index for nodes within this graph
+
         self.compact_all_nodes = np.array(0)  # Holds an array with all nodes in the original network
         self.compact_nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
         self.compact_fs = np.array([])  # This method will hold the forward star for the graph
@@ -89,7 +91,7 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: np.ndarray) -> None:
+    def prepare_graph(self, centroids: np.ndarray, lonlat: pd.DataFrame = None) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -102,6 +104,7 @@ class Graph(object):
 
         :Arguments:
             **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
+            **lonlat** (:obj:`pd.DataFrame`): Optional Dataframe with index `node_id` to lon/lat coords for use in A*
         """
         self.__network_error_checking__()
 
@@ -141,6 +144,9 @@ class Graph(object):
 
         self.__build_compressed_graph()
         self.compact_num_links = self.compact_graph.shape[0]
+
+        if lonlat is not None:
+            self.lonlat_index = lonlat.loc[self.all_nodes]
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)

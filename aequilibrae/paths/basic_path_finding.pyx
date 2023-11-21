@@ -389,6 +389,31 @@ cdef inline double haversine_heuristic(double lat1, double lon1, double cos_lat1
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
+@cython.cdivision(False)
+cdef inline double equirectangular_heuristic(double lat1, double lon1, double lat2, double lon2) noexcept nogil:
+    """
+    A Equirectangular approximation heuristic, useful for small distances.
+    Not admissible for large distances. A* may not return the optimal path with this heuristic.
+
+    Arguments:
+        **lat1** (:obj:`double`): Latitude of destination
+        **lon1** (:obj:`double`): Longitude of destination
+        **lat2** (:obj:`double`): Latitude of node to evalutate
+        **lon2** (:obj:`double`): Longitude of node to evalutate
+
+    Returns the distance between (lat1, lon1) and (lat2, lon2).
+
+    Reference: https://www.movable-type.co.uk/scripts/latlong.html
+    """
+    cdef:
+        double x = (lon2 - lon1) * cos((lat1 + lat2) / 2.0)
+        double y = (lat2 - lat1)
+    return 6371000.0 * sqrt(x * x + y * y)
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
 cpdef int path_finding_a_star(long origin,
                               long destination,
                               double[:] graph_costs,
@@ -463,7 +488,9 @@ cpdef int path_finding_a_star(long origin,
                 gScore[neighbour] = tentative_gScore
 
 
-                h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
+                # h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
+                h = equirectangular_heuristic(lat1_rad, lon1_rad, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
+
                 # Unlike Dijkstra's we can remove a node from the heap and rediscover it with a cheaper path
                 if pqueue.Elements[neighbour].state != IN_HEAP:
                     insert(&pqueue, neighbour, tentative_gScore + h)
