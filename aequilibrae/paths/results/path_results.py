@@ -91,7 +91,7 @@ class PathResults:
         if self.graph is None:
             raise Exception("You need to set graph skimming before you compute a path")
 
-        if a_star and self.graph.lonlat_index.empty():
+        if a_star and self.graph.lonlat_index.empty:
             raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
 
         self.early_exit = self._early_exit = early_exit or a_star
