@@ -47,7 +47,7 @@ class Graph(object):
 
         # These are the fields actually used in computing paths
         self.all_nodes = np.array(0)  # Holds an array with all nodes in the original network
-        self.nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
+        self.nodes_to_indices = np.array(0, np.int64)  # Holds the reverse of the all_nodes
         self.fs = np.array([])  # This method will hold the forward star for the graph
         self.cost = np.array([])  # This array holds the values being used in the shortest path routine
         self.skims = None
@@ -188,7 +188,7 @@ class Graph(object):
 
         num_nodes = all_nodes.shape[0]
 
-        nodes_to_indices = np.repeat(-1, int(all_nodes.max()) + 1)
+        nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
         nlist = np.arange(num_nodes)
         nodes_to_indices[all_nodes] = nlist
 
