@@ -221,8 +221,9 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
     cdef long long [:] b_nodes_view = new_b_nodes
 
     project = get_active_project(must_exist=True)
-    cdef double [:] lat_view = project.network.nodes.data.geometry.apply(lambda x: x.y).values
-    cdef double [:] lon_view = project.network.nodes.data.geometry.apply(lambda x: x.x).values
+    geom = project.network.nodes.data.set_index("node_id").geometry.loc[graph.all_nodes]
+    cdef double [:] lat_view = geom.apply(lambda x: x.y).values
+    cdef double [:] lon_view = geom.apply(lambda x: x.x).values
     cdef long long [:] nodes_to_indices_view = graph.nodes_to_indices
     cdef bint a_star_bint = a_star
 

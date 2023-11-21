@@ -413,7 +413,7 @@ cpdef int path_finding_a_star(long origin,
     cdef unsigned int M = pred.shape[0]
 
     cdef:
-        size_t current, neighbour, idx, neighbour_idx  # indices
+        size_t current, neighbour, idx # indices
         DTYPE_t tail_vert_val, tentative_gScore  # vertex travel times
         PriorityQueue pqueue  # binary heap
         ElementState vert_state  # vertex state
@@ -462,8 +462,8 @@ cpdef int path_finding_a_star(long origin,
                 connectors[neighbour] = ids[idx]
                 gScore[neighbour] = tentative_gScore
 
-                neighbour_idx = nodes_to_indices[neighbour + 1]
-                h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour_idx] * deg2rad, lons[neighbour_idx] * deg2rad)
+
+                h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
                 # Unlike Dijkstra's we can remove a node from the heap and rediscover it with a cheaper path
                 if pqueue.Elements[neighbour].state != IN_HEAP:
                     insert(&pqueue, neighbour, tentative_gScore + h)
