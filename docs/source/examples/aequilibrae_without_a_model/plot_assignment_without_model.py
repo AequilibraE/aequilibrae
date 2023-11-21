@@ -27,6 +27,8 @@ net_file = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/ma
 
 demand_file = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/master/SiouxFalls/CSV-data/SiouxFalls_od.csv"
 
+geometry_file = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/master/SiouxFalls/SiouxFalls_node.tntp"
+
 # %%
 # Let's use a temporary folder to store our data
 folder = gettempdir()
@@ -75,6 +77,14 @@ network = network.assign(direction=1)
 network["link_id"] = network.index + 1
 network = network.astype({"a_node":"int64", "b_node": "int64"})
 
+# %%
+# Now we'll import the geometry (as lon/lat) for our network, this is required if you plan to use the A* path finding, otherwise it can safely be skipped.
+geom = pd.read_csv(geometry_file, skiprows=1, sep="\t", lineterminator=";", header=None)
+geom.columns = ["newline", "lon", "lat", "terminator"]
+geom.drop(columns=["newline", "terminator"], index=[24], inplace=True)
+geom["node_id"] = geom.index + 1
+geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set_index("node_id")
+
 #%%
 # Let's build our Graph! In case you're in doubt about the Graph, `click here <aequilibrae-graphs>`
 # to read more about it.
@@ -87,7 +97,7 @@ g.free_flow_time = network['free_flow_time'].values
 g.network = network
 g.network_ok = True
 g.status = 'OK'
-g.prepare_graph(index)
+g.prepare_graph(index, lonlat=geom)
 g.set_graph("free_flow_time")
 g.cost = np.array(g.cost, copy=True)
 g.set_skimming(["free_flow_time"])
