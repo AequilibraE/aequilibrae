@@ -241,7 +241,6 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
                                     original_b_nodes_view)
 
         if a_star_bint:
-            # FIXME: Is it valid to use this `found` count return value in the skimming?
             w = path_finding_a_star(origin_index,
                                     dest_index,
                                     g_view,

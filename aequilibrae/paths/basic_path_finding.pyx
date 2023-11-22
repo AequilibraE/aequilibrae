@@ -319,7 +319,7 @@ cpdef int path_finding(long origin,
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
-    init_heap(&pqueue, <size_t>M)  # FIXME: should this be M or N? It was N but thats the number of links
+    init_heap(&pqueue, <size_t>M)
 
     # the key is set to zero for the origin vertex,
     # which is inserted into the heap
@@ -389,7 +389,6 @@ cdef inline double haversine_heuristic(double lat1, double lon1, double cos_lat1
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-@cython.cdivision(False)
 cdef inline double equirectangular_heuristic(double lat1, double lon1, double lat2, double lon2) noexcept nogil:
     """
     A Equirectangular approximation heuristic, useful for small distances.
@@ -461,7 +460,7 @@ cpdef int path_finding_a_star(long origin,
 
     # initialization of the heap elements
     # all nodes have INFINITY key and NOT_IN_HEAP state
-    init_heap(&pqueue, <size_t>M)  # FIXME: should this be M or N?
+    init_heap(&pqueue, <size_t>M)
 
     # the key is set to zero for the origin vertex,
     # which is inserted into the heap
