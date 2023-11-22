@@ -104,7 +104,6 @@ class Graph(object):
 
         :Arguments:
             **centroids** (:obj:`np.ndarray`): Array with centroid IDs. Mandatory type Int64, unique and positive
-            **lonlat** (:obj:`pd.DataFrame`): Optional Dataframe with index `node_id` to lon/lat coords for use in A*
         """
         self.__network_error_checking__()
 
