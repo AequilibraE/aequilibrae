@@ -91,7 +91,7 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: np.ndarray, lonlat: pd.DataFrame = None) -> None:
+    def prepare_graph(self, centroids: np.ndarray) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -144,9 +144,6 @@ class Graph(object):
 
         self.__build_compressed_graph()
         self.compact_num_links = self.compact_graph.shape[0]
-
-        if lonlat is not None:
-            self.lonlat_index = lonlat.loc[self.all_nodes]
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)

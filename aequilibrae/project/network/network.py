@@ -348,10 +348,11 @@ class Network(WorkerThread):
             g.mode = m
             g.network = net
             if centroids.shape[0]:
-                g.prepare_graph(centroids, lonlat=lonlat)
+                g.prepare_graph(centroids)
                 g.set_blocked_centroid_flows(True)
             else:
                 get_logger().warning("Your graph has no centroids")
+            g.lonlat_index = lonlat.loc[g.all_nodes]
             self.graphs[m] = g
 
     def set_time_field(self, time_field: str) -> None:

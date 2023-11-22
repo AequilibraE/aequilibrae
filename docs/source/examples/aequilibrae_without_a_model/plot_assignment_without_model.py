@@ -97,12 +97,13 @@ g.free_flow_time = network['free_flow_time'].values
 g.network = network
 g.network_ok = True
 g.status = 'OK'
-g.prepare_graph(index, lonlat=geom)
+g.prepare_graph(index)
 g.set_graph("free_flow_time")
 g.cost = np.array(g.cost, copy=True)
 g.set_skimming(["free_flow_time"])
 g.set_blocked_centroid_flows(False)
 g.network["id"] = g.network.link_id
+g.lonlat_index = geom.loc[g.all_nodes]
 
 # %%
 # Let's perform our assignment. Feel free to try different algorithms,
