@@ -289,8 +289,6 @@ def path_computation(origin, destination, graph, results, early_exit = False):
         results.path_nodes = None
         results.path_link_directions = None
         results.milepost = None
-        results.eary_exit = False
-
 
 def update_path_trace(results, destination, graph, early_exit = False):
     # type: (PathResults, int, Graph) -> (None)
