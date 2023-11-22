@@ -305,6 +305,8 @@ class Graph(object):
         """
         Sets the list of skims to be computed
 
+        Skimming with A* may produce results that differ from tradditional Dijkstra's due to its use a heuristic.
+
         :Arguments:
             **skim_fields** (:obj:`list`): Fields must be numeric
         """
