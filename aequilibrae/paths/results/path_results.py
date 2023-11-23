@@ -2,7 +2,7 @@ import numpy as np
 
 from aequilibrae import global_logger
 from aequilibrae.paths.graph import Graph
-from typing import Union
+from typing import Union, List
 
 try:
     from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
@@ -203,6 +203,6 @@ class PathResults:
 
         self._heuristic = heuristic
 
-    def get_heuristics(self) -> list[str]:
+    def get_heuristics(self) -> List[str]:
         """Return the availiable heuristics."""
         return list(HEURISTIC_MAP.keys())
