@@ -46,7 +46,7 @@ class TestPathResults(TestCase):
         del self.r
 
     def test_reset(self):
-        self.r.compute_path(dest, origin)
+        self.r.compute_path(dest, origin, early_exit=True, a_star=True, heuristic="haversine")
         self.r.reset()
 
         self.assertEqual(self.r.path, None, "Fail to reset the Path computation object")
@@ -61,6 +61,7 @@ class TestPathResults(TestCase):
         self.assertEqual(self.r._early_exit, False, "Fail to reset the Path computation object")
         self.assertEqual(self.r.a_star, False, "Fail to reset the Path computation object")
         self.assertEqual(self.r._a_star, False, "Fail to reset the Path computation object")
+        self.assertEqual(self.r._heuristic, "equirectangular", "Fail to reset the Path computation object")
         if self.r.skims is not None:
             self.assertEqual(self.r.skims.max(), np.inf, "Fail to reset the Path computation object")
             self.assertEqual(self.r.skims.min(), np.inf, "Fail to reset the Path computation object")
@@ -68,6 +69,15 @@ class TestPathResults(TestCase):
         new_r = PathResults()
         with self.assertRaises(ValueError):
             new_r.reset()
+
+    def test_heuristics(self):
+        self.assertEqual(self.r.get_heuristics(), ["haversine", "equirectangular"])
+
+        self.r.set_heuristic("haversine")
+        self.assertEqual(self.r._heuristic, "haversine")
+
+        self.r.set_heuristic("equirectangular")
+        self.assertEqual(self.r._heuristic, "equirectangular")
 
     def test_compute_paths(self):
         for early_exit, a_star in product([True, False], repeat=2):
