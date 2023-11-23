@@ -165,6 +165,7 @@ class PathResults:
             self.milepost = None
             self._early_exit = self.early_exit = False
             self._a_star = self.a_star = False
+            self._heuristic = "equirectangular"
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")

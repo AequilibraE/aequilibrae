@@ -90,8 +90,19 @@ res.milepost
 res.compute_path(32343, 22041, early_exit=True)
 
 # If you'd prefer to find a potentially non-optimal path to the destination faster provide `a_star=True` to use A* with a
-# equirectangular heuristic. This method is not compatible with `update_trace` and will always recompute the path.
+# heuristic. With this method `update_trace` will always recompute the path.
 res.compute_path(32343, 22041, a_star=True)
+
+
+
+# By default a equirectangular heuristic is used. We can view the available heuristics via
+res.get_heuristics()
+
+# If you'd like the more accurate, but slower, but more accurate haversine heuristic you can set it using
+res.set_heuristic("haversine")
+
+# or
+res.compute_path(32343, 22041, a_star=True, heuristic="haversine")
 
 # If we want to compute the path for a different destination and the same origin, we can just do this
 # It is way faster when you have large networks
