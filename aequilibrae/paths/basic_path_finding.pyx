@@ -360,24 +360,30 @@ cpdef int path_finding(long origin,
     free_heap(&pqueue)
     return found - 1
 
+cdef enum Heuristic:
+    HAVERSINE
+    EQUIRECTANGULAR
+
+HEURISTIC_MAP = {"haversine": HAVERSINE, "equirectangular": EQUIRECTANGULAR}
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef inline double haversine_heuristic(double lat1, double lon1, double cos_lat1, double lat2, double lon2) noexcept nogil:
+cdef inline double haversine_heuristic(double lat1, double lon1, double lat2, double lon2, void* data) noexcept nogil:
     """
     A haversine heuristic written to minimise expensive (trig) operations.
 
     Arguments:
         **lat1** (:obj:`double`): Latitude of destination
         **lon1** (:obj:`double`): Longitude of destination
-        **cos_lat1** (:obj:`double`): Precomputed cos(lat1)
         **lat2** (:obj:`double`): Latitude of node to evalutate
         **lon2** (:obj:`double`): Longitude of node to evalutate
+        **data** (:obj:`void*`): This void pointer should hold a precomputed cos(lat1) as a double
 
     Returns the distance between (lat1, lon1) and (lat2, lon2).
     """
     cdef:
+        double cos_lat1 = (<double*>data)[0]  # Cython doesn't support c-style derefs, use array notation instead
         double dlat = lat2 - lat1
         double dlon = lon2 - lon1
         double sin_dlat = sin(dlat / 2)
@@ -389,7 +395,7 @@ cdef inline double haversine_heuristic(double lat1, double lon1, double cos_lat1
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cdef inline double equirectangular_heuristic(double lat1, double lon1, double lat2, double lon2) noexcept nogil:
+cdef inline double equirectangular_heuristic(double lat1, double lon1, double lat2, double lon2, void* _data) noexcept nogil:
     """
     A Equirectangular approximation heuristic, useful for small distances.
     Not admissible for large distances. A* may not return the optimal path with this heuristic.
@@ -399,6 +405,7 @@ cdef inline double equirectangular_heuristic(double lat1, double lon1, double la
         **lon1** (:obj:`double`): Longitude of destination
         **lat2** (:obj:`double`): Latitude of node to evalutate
         **lon2** (:obj:`double`): Longitude of node to evalutate
+        **data** (:obj:`void*`): Unused void pointer, for compatibilty with other heuristics
 
     Returns the distance between (lat1, lon1) and (lat2, lon2).
 
@@ -424,7 +431,8 @@ cpdef int path_finding_a_star(long origin,
                               long long [:] pred,
                               long long [:] ids,
                               long long [:] connectors,
-                              long long [:] reached_first) noexcept nogil:
+                              long long [:] reached_first,
+                              Heuristic heuristic) noexcept nogil:
     """
     Based on the pseudocode presented at https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode
     The following variables have been renamed to be consistent with out Dijkstra's implementation
@@ -451,6 +459,16 @@ cpdef int path_finding_a_star(long origin,
         double lat1_rad = lats[destination_vert] * deg2rad
         double lon1_rad = lons[destination_vert] * deg2rad
         double h, cos_lat1 = cos(lat1_rad)
+        double (*heur)(double, double, double, double, void*) noexcept nogil
+        void* data
+
+    if heuristic == HAVERSINE:
+        heur = haversine_heuristic
+        data = <void*>&cos_lat1
+    else:  # heuristic == EQUIRECTANGULAR:
+        heur = equirectangular_heuristic
+        data = <void*>NULL
+
 
     for i in range(M):
         pred[i] = -1
@@ -486,9 +504,7 @@ cpdef int path_finding_a_star(long origin,
                 connectors[neighbour] = ids[idx]
                 gScore[neighbour] = tentative_gScore
 
-
-                # h = haversine_heuristic(lat1_rad, lon1_rad, cos_lat1, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
-                h = equirectangular_heuristic(lat1_rad, lon1_rad, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad)
+                h = heur(lat1_rad, lon1_rad, lats[neighbour] * deg2rad, lons[neighbour] * deg2rad, data)
 
                 # Unlike Dijkstra's we can remove a node from the heap and rediscover it with a cheaper path
                 if pqueue.Elements[neighbour].state != IN_HEAP:

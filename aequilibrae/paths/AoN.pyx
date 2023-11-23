@@ -170,7 +170,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
     return origin
 
-def path_computation(origin, destination, graph, results, early_exit=False, a_star=False):
+def path_computation(origin, destination, graph, results):
     # type: (int, int, Graph, PathResults) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
@@ -181,7 +181,7 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
-    cdef bint early_exit_c = early_exit
+    cdef bint early_exit_bint = results.early_exit
 
     results.origin = origin
     results.destination = destination
@@ -220,14 +220,17 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
-    cdef bint a_star_bint = a_star
+    cdef bint a_star_bint = results.a_star
     cdef double [:] lat_view
     cdef double [:] lon_view
     cdef long long [:] nodes_to_indices_view
-    if a_star:
+    cdef Heuristic heuristic
+    if results.a_star:
         lat_view = graph.lonlat_index.lat.values
         lon_view = graph.lonlat_index.lon.values
         nodes_to_indices_view = graph.nodes_to_indices
+        heuristic = HEURISTIC_MAP[results._heuristic]
+
 
     #Now we do all procedures with NO GIL
     with nogil:
@@ -252,10 +255,11 @@ def path_computation(origin, destination, graph, results, early_exit=False, a_st
                                     predecessors_view,
                                     ids_graph_view,
                                     conn_view,
-                                    reached_first_view)
+                                    reached_first_view,
+                                    heuristic)
         else:
             w = path_finding(origin_index,
-                             dest_index if early_exit_c else -1,
+                             dest_index if early_exit_bint else -1,
                              g_view,
                              b_nodes_view,
                              graph_fs_view,

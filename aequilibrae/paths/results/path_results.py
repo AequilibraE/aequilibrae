@@ -2,9 +2,10 @@ import numpy as np
 
 from aequilibrae import global_logger
 from aequilibrae.paths.graph import Graph
+from typing import Union
 
 try:
-    from aequilibrae.paths.AoN import update_path_trace, path_computation
+    from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -72,8 +73,16 @@ class PathResults:
         self.__graph_sum = None
         self._early_exit = self.early_exit
         self._a_star = self.a_star
+        self._heuristic = "equirectangular"
 
-    def compute_path(self, origin: int, destination: int, early_exit: bool = False, a_star: bool = False) -> None:
+    def compute_path(
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ) -> None:
         """
         Computes the path between two nodes in the network
 
@@ -84,8 +93,10 @@ class PathResults:
 
             **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
                                           Doing so may cause subsequent calls to `update_trace` to recompute the tree.
-            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm. When `True`,
-                                      `early_exit` is always `True`.
+                                          Default is `False`.
+            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm. When `True`, `early_exit`
+                                      is always `True`. Default is `False`.
+            **heuristic** (:obj:`str`): Heuristic to use if `a_star` is enabled. Default is `None`.
         """
 
         if self.graph is None:
@@ -96,6 +107,8 @@ class PathResults:
 
         self.early_exit = self._early_exit = early_exit or a_star
         self.a_star = self._a_star = a_star
+        if heuristic is not None:
+            self.set_heuristic(heuristic)
         path_computation(origin, destination, self.graph, self, early_exit, a_star)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
@@ -176,3 +189,19 @@ class PathResults:
             raise ValueError("destination out of the range of node numbers in the graph")
 
         update_path_trace(self, destination, self.graph)
+
+    def set_heuristic(self, heuristic: str) -> None:
+        """
+        Set the heuristics to be used in A*. Must be one of `get_heuristics()`.
+
+        :Arguments:
+            **heuristic** (:obj:`str`): Heuristic to use in A*.
+        """
+        if heuristic not in HEURISTIC_MAP.keys():
+            raise ValueError(f"heruistic must be one of {self.get_heuristics()}")
+
+        self._heuristic = heuristic
+
+    def get_heuristics(self) -> list[str]:
+        """Return the availiable heuristics."""
+        return list(HEURISTIC_MAP.keys())
