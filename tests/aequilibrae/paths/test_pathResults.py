@@ -7,6 +7,7 @@ from shutil import copytree
 from tempfile import gettempdir
 from unittest import TestCase
 from uuid import uuid4
+from itertools import product
 
 import numpy as np
 
@@ -24,6 +25,7 @@ origin = 5
 dest = 13
 
 
+# These test networks are small enough that its expected that A* and Dijkstra's algorithm return the same paths
 class TestPathResults(TestCase):
     def setUp(self) -> None:
         self.project = create_example(join(gettempdir(), "test_set_pce_" + uuid4().hex))
@@ -55,6 +57,10 @@ class TestPathResults(TestCase):
         self.assertEqual(self.r.predecessors.min(), -1, "Fail to reset the Path computation object")
         self.assertEqual(self.r.connectors.max(), -1, "Fail to reset the Path computation object")
         self.assertEqual(self.r.connectors.min(), -1, "Fail to reset the Path computation object")
+        self.assertEqual(self.r.early_exit, False, "Fail to reset the Path computation object")
+        self.assertEqual(self.r._early_exit, False, "Fail to reset the Path computation object")
+        self.assertEqual(self.r.a_star, False, "Fail to reset the Path computation object")
+        self.assertEqual(self.r._a_star, False, "Fail to reset the Path computation object")
         if self.r.skims is not None:
             self.assertEqual(self.r.skims.max(), np.inf, "Fail to reset the Path computation object")
             self.assertEqual(self.r.skims.min(), np.inf, "Fail to reset the Path computation object")
@@ -64,31 +70,57 @@ class TestPathResults(TestCase):
             new_r.reset()
 
     def test_compute_paths(self):
-        path_computation(5, 2, self.g, self.r)
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                path_computation(5, 2, self.g, self.r, early_exit=early_exit, a_star=a_star)
 
-        self.assertEqual(list(self.r.path), [12, 14], "Path computation failed. Wrong sequence of links")
-        self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path computation failed. Wrong link directions")
-        self.assertEqual(list(self.r.path_nodes), [5, 6, 2], "Path computation failed. Wrong sequence of path nodes")
-        self.assertEqual(list(self.r.milepost), [0, 4, 9], "Path computation failed. Wrong milepost results")
+                self.assertEqual(list(self.r.path), [12, 14], "Path computation failed. Wrong sequence of links")
+                self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path computation failed. Wrong link directions")
+                self.assertEqual(list(self.r.path_nodes), [5, 6, 2], "Path computation failed. Wrong sequence of path nodes")
+                self.assertEqual(list(self.r.milepost), [0, 4, 9], "Path computation failed. Wrong milepost results")
 
     def test_compute_with_skimming(self):
-        r = PathResults()
-        self.g.set_skimming("free_flow_time")
-        r.prepare(self.g)
-        r.compute_path(origin, dest)
-        self.assertEqual(r.milepost[-1], r.skims[dest], "Skims computed wrong when computing path")
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                r = PathResults()
+                self.g.set_skimming("free_flow_time")
+                r.prepare(self.g)
+                r.compute_path(origin, dest, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(r.milepost[-1], r.skims[dest], "Skims computed wrong when computing path")
 
     def test_update_trace(self):
-        self.r.compute_path(origin, 2)
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                self.r.compute_path(origin, 2, early_exit=early_exit, a_star=a_star)
 
-        self.r.update_trace(10)
-        self.assertEqual(list(self.r.path), [13, 25], "Path update failed. Wrong sequence of links")
-        self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path update failed. Wrong link directions")
-        self.assertEqual(list(self.r.path_nodes), [5, 9, 10], "Path update failed. Wrong sequence of path nodes")
-        self.assertEqual(list(self.r.milepost), [0, 5, 8], "Path update failed. Wrong milepost results")
+                self.r.update_trace(10)
+                self.assertEqual(list(self.r.path), [13, 25], "Path update failed. Wrong sequence of links")
+                self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path update failed. Wrong link directions")
+                self.assertEqual(list(self.r.path_nodes), [5, 9, 10], "Path update failed. Wrong sequence of path nodes")
+                self.assertEqual(list(self.r.milepost), [0, 5, 8], "Path update failed. Wrong milepost results")
 
 
 class TestBlockingTrianglePathResults(TestCase):
+    """
+    Triangle blocking network:
+
+                    3 <---> 6
+                    ^
+            |-------|------|
+            |              |
+            |              v
+    4 <---> 1 <----------- 2 <---> 5
+
+    Graph (link_id, cost):
+    1 --> 3: (1, 2)
+    3 <-- 2: (2, 4)
+    1 <-- 2: (3, 5)
+    1 <-> 4: (4, small)
+    2 <-> 5: (5, small)
+    6 <-> 3: (6, small)
+
+    Geographically all nodes lay on a line.
+    """
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)
@@ -108,72 +140,80 @@ class TestBlockingTrianglePathResults(TestCase):
         del self.r
 
     def test_compute_paths(self):
-        self.r.compute_path(1, 2)
-        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
-        self.assertEqual(list(self.r.path), [1, 2])
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                self.r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+                self.assertEqual(list(self.r.path), [1, 2])
 
-        self.r.compute_path(2, 1)
-        self.assertEqual(list(self.r.path_nodes), [2, 1])
-        self.assertEqual(list(self.r.path), [3])
+                self.r.compute_path(2, 1, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [2, 1])
+                self.assertEqual(list(self.r.path), [3])
 
-        self.r.compute_path(3, 1)
-        self.assertEqual(list(self.r.path_nodes), [3, 2, 1])
-        self.assertEqual(list(self.r.path), [2, 3])
+                self.r.compute_path(3, 1, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [3, 2, 1])
+                self.assertEqual(list(self.r.path), [2, 3])
 
-        self.r.compute_path(3, 2)
-        self.assertEqual(list(self.r.path_nodes), [3, 2])
-        self.assertEqual(list(self.r.path), [2])
+                self.r.compute_path(3, 2, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [3, 2])
+                self.assertEqual(list(self.r.path), [2])
 
-        self.r.compute_path(1, 3)
-        self.assertEqual(list(self.r.path_nodes), [1, 3])
-        self.assertEqual(list(self.r.path), [1])
+                self.r.compute_path(1, 3, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [1, 3])
+                self.assertEqual(list(self.r.path), [1])
 
-        self.r.compute_path(2, 3)
-        self.assertEqual(list(self.r.path_nodes), [2, 1, 3])
-        self.assertEqual(list(self.r.path), [3, 1])
+                self.r.compute_path(2, 3, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [2, 1, 3])
+                self.assertEqual(list(self.r.path), [3, 1])
 
     def test_compute_blocking_paths(self):
-        self.r.compute_path(4, 5)
-        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
-        self.assertEqual(list(self.r.path), [4, 1, 2, 5])
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                self.r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
+                self.assertEqual(list(self.r.path), [4, 1, 2, 5])
 
-        self.r.compute_path(5, 4)
-        self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 4])
-        self.assertEqual(list(self.r.path), [5, 3, 4])
+                self.r.compute_path(5, 4, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 4])
+                self.assertEqual(list(self.r.path), [5, 3, 4])
 
-        self.r.compute_path(6, 4)
-        self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 1, 4])
-        self.assertEqual(list(self.r.path), [6, 2, 3, 4])
+                self.r.compute_path(6, 4, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 1, 4])
+                self.assertEqual(list(self.r.path), [6, 2, 3, 4])
 
-        self.r.compute_path(6, 5)
-        self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 5])
-        self.assertEqual(list(self.r.path), [6, 2, 5])
+                self.r.compute_path(6, 5, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [6, 3, 2, 5])
+                self.assertEqual(list(self.r.path), [6, 2, 5])
 
-        self.r.compute_path(4, 6)
-        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
-        self.assertEqual(list(self.r.path), [4, 1, 6])
+                self.r.compute_path(4, 6, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
+                self.assertEqual(list(self.r.path), [4, 1, 6])
 
-        self.r.compute_path(5, 6)
-        self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 3, 6])
-        self.assertEqual(list(self.r.path), [5, 3, 1, 6])
+                self.r.compute_path(5, 6, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [5, 2, 1, 3, 6])
+                self.assertEqual(list(self.r.path), [5, 3, 1, 6])
 
     def test_update_trace(self):
-        self.r.compute_path(1, 2)
-        self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
-        self.assertEqual(list(self.r.path), [1, 2])
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                self.r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [1, 3, 2])
+                self.assertEqual(list(self.r.path), [1, 2])
 
-        self.r.update_trace(3)
-        self.assertEqual(list(self.r.path_nodes), [1, 3])
-        self.assertEqual(list(self.r.path), [1])
+                self.r.update_trace(3)
+                self.assertEqual(list(self.r.path_nodes), [1, 3])
+                self.assertEqual(list(self.r.path), [1])
 
     def test_update_blocking_trace(self):
-        self.r.compute_path(4, 5)
-        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
-        self.assertEqual(list(self.r.path), [4, 1, 2, 5])
+        for early_exit, a_star in product([True, False], repeat=2):
+            with self.subTest(early_exit=early_exit, a_star=a_star):
+                self.r.compute_path(4, 5, early_exit=early_exit, a_star=a_star)
+                self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 2, 5])
+                self.assertEqual(list(self.r.path), [4, 1, 2, 5])
 
-        self.r.update_trace(6)
-        self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
-        self.assertEqual(list(self.r.path), [4, 1, 6])
+                self.r.update_trace(6)
+                self.assertEqual(list(self.r.path_nodes), [4, 1, 3, 6])
+                self.assertEqual(list(self.r.path), [4, 1, 6])
 
     def test_update_trace_early_exit(self):
         self.r.compute_path(1, 6, early_exit=True)

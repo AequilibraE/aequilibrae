@@ -2,6 +2,7 @@ setuptools
 codecov
 pytest
 pytest-cov
+pytest-subtests
 coveralls
 flake8
 wheel

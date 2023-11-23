@@ -150,6 +150,8 @@ class PathResults:
             self.path_nodes = None
             self.path_link_directions = None
             self.milepost = None
+            self._early_exit = self.early_exit = False
+            self._a_star = self.a_star = False
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
