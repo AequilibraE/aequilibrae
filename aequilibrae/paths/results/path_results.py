@@ -84,7 +84,9 @@ class PathResults:
         heuristic: Union[str, None] = None,
     ) -> None:
         """
-        Computes the path between two nodes in the network
+        Computes the path between two nodes in the network.
+
+        A* heuristics are currently only valid distance cost fields.
 
         :Arguments:
             **origin** (:obj:`int`): Origin for the path
