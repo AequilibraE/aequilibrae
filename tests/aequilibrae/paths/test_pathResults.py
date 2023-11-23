@@ -75,8 +75,12 @@ class TestPathResults(TestCase):
                 path_computation(5, 2, self.g, self.r, early_exit=early_exit, a_star=a_star)
 
                 self.assertEqual(list(self.r.path), [12, 14], "Path computation failed. Wrong sequence of links")
-                self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path computation failed. Wrong link directions")
-                self.assertEqual(list(self.r.path_nodes), [5, 6, 2], "Path computation failed. Wrong sequence of path nodes")
+                self.assertEqual(
+                    list(self.r.path_link_directions), [1, 1], "Path computation failed. Wrong link directions"
+                )
+                self.assertEqual(
+                    list(self.r.path_nodes), [5, 6, 2], "Path computation failed. Wrong sequence of path nodes"
+                )
                 self.assertEqual(list(self.r.milepost), [0, 4, 9], "Path computation failed. Wrong milepost results")
 
     def test_compute_with_skimming(self):
@@ -96,7 +100,9 @@ class TestPathResults(TestCase):
                 self.r.update_trace(10)
                 self.assertEqual(list(self.r.path), [13, 25], "Path update failed. Wrong sequence of links")
                 self.assertEqual(list(self.r.path_link_directions), [1, 1], "Path update failed. Wrong link directions")
-                self.assertEqual(list(self.r.path_nodes), [5, 9, 10], "Path update failed. Wrong sequence of path nodes")
+                self.assertEqual(
+                    list(self.r.path_nodes), [5, 9, 10], "Path update failed. Wrong sequence of path nodes"
+                )
                 self.assertEqual(list(self.r.milepost), [0, 5, 8], "Path update failed. Wrong milepost results")
 
 
@@ -121,6 +127,7 @@ class TestBlockingTrianglePathResults(TestCase):
 
     Geographically all nodes lay on a line.
     """
+
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.proj_dir = os.path.join(gettempdir(), uuid.uuid4().hex)

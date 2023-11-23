@@ -42,7 +42,9 @@ class TestPathResultsDisconnected(TestCase):
                 self.r.compute_path(1, 5, early_exit=early_exit, a_star=a_star)
                 self.assertEqual(None, self.r.path, "Failed to return None for disconnected")
                 self.r.compute_path(1, 2, early_exit=early_exit, a_star=a_star)
-                self.assertEqual(len(self.r.path), 1, "Returned the wrong thing for existing path on disconnected network")
+                self.assertEqual(
+                    len(self.r.path), 1, "Returned the wrong thing for existing path on disconnected network"
+                )
 
     def test_path_disconnected_penalize_link_in_memory(self):
         for early_exit, a_star in product([True, False], repeat=2):
