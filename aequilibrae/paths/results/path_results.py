@@ -109,7 +109,7 @@ class PathResults:
         self.a_star = self._a_star = a_star
         if heuristic is not None:
             self.set_heuristic(heuristic)
-        path_computation(origin, destination, self.graph, self, early_exit, a_star)
+        path_computation(origin, destination, self.graph, self)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
             self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]

@@ -176,8 +176,6 @@ def path_computation(origin, destination, graph, results):
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
-    :param early_exit: Exit Dijkstra's once the destination has been found. Constructs a partial shortest path tree.
-    :param a_star: Use A* instead of Dikjkstra's algorithm. When `True`, `early_exit` is ignore/always `True`.
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids

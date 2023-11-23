@@ -82,7 +82,9 @@ class TestPathResults(TestCase):
     def test_compute_paths(self):
         for early_exit, a_star in product([True, False], repeat=2):
             with self.subTest(early_exit=early_exit, a_star=a_star):
-                path_computation(5, 2, self.g, self.r, early_exit=early_exit, a_star=a_star)
+                self.r.early_exit = early_exit
+                self.r.a_star = a_star
+                path_computation(5, 2, self.g, self.r)
 
                 self.assertEqual(list(self.r.path), [12, 14], "Path computation failed. Wrong sequence of links")
                 self.assertEqual(
