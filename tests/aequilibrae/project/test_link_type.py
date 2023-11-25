@@ -1,21 +1,15 @@
+import random
+import string
 from sqlite3 import IntegrityError
 from unittest import TestCase
-import string
-import random
-import os
-from shutil import copytree, rmtree
-import tempfile
-import uuid
-from aequilibrae.project import Project
-from ...data import no_triggers_project
+
+from tests.models_for_test import ModelsTest
 
 
 class TestLinkType(TestCase):
     def setUp(self) -> None:
-        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-        copytree(no_triggers_project, self.temp_proj_folder)
-        self.proj = Project()
-        self.proj.open(self.temp_proj_folder)
+        tm = ModelsTest()
+        self.proj = tm.no_triggers()
         self.curr = self.proj.conn.cursor()
 
         letters = [random.choice(string.ascii_letters + "_") for x in range(20)]
