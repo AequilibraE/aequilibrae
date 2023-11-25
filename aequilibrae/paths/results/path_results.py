@@ -2,9 +2,10 @@ import numpy as np
 
 from aequilibrae import global_logger
 from aequilibrae.paths.graph import Graph
+from typing import Union, List
 
 try:
-    from aequilibrae.paths.AoN import update_path_trace, path_computation
+    from aequilibrae.paths.AoN import update_path_trace, path_computation, HEURISTIC_MAP
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
@@ -61,6 +62,7 @@ class PathResults:
         self.destination = None
         self.graph: Graph = None
         self.early_exit = False
+        self.a_star = False
         self.links = -1
         self.nodes = -1
         self.zones = -1
@@ -70,10 +72,21 @@ class PathResults:
         self.__graph_id__ = None
         self.__graph_sum = None
         self._early_exit = self.early_exit
+        self._a_star = self.a_star
+        self._heuristic = "equirectangular"
 
-    def compute_path(self, origin: int, destination: int, early_exit: bool = False) -> None:
+    def compute_path(
+        self,
+        origin: int,
+        destination: int,
+        early_exit: bool = False,
+        a_star: bool = False,
+        heuristic: Union[str, None] = None,
+    ) -> None:
         """
-        Computes the path between two nodes in the network
+        Computes the path between two nodes in the network.
+
+        A* heuristics are currently only valid distance cost fields.
 
         :Arguments:
             **origin** (:obj:`int`): Origin for the path
@@ -82,13 +95,23 @@ class PathResults:
 
             **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
                                           Doing so may cause subsequent calls to `update_trace` to recompute the tree.
+                                          Default is `False`.
+            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm. When `True`, `early_exit`
+                                      is always `True`. Default is `False`.
+            **heuristic** (:obj:`str`): Heuristic to use if `a_star` is enabled. Default is `None`.
         """
 
         if self.graph is None:
             raise Exception("You need to set graph skimming before you compute a path")
 
-        self.early_exit = self._early_exit = early_exit
-        path_computation(origin, destination, self.graph, self, early_exit)
+        if a_star and self.graph.lonlat_index.empty:
+            raise Exception("You need to supply a lon/lat index to graph.prepare_graph to use A*")
+
+        self.early_exit = self._early_exit = early_exit or a_star
+        self.a_star = self._a_star = a_star
+        if heuristic is not None:
+            self.set_heuristic(heuristic)
+        path_computation(origin, destination, self.graph, self)
         if self.graph.skim_fields:
             self.skims.fill(np.inf)
             self.skims[self.graph.all_nodes, :] = self._skimming_array[:-1, :]
@@ -142,6 +165,9 @@ class PathResults:
             self.path_nodes = None
             self.path_link_directions = None
             self.milepost = None
+            self._early_exit = self.early_exit = False
+            self._a_star = self.a_star = False
+            self._heuristic = "equirectangular"
 
         else:
             raise ValueError("Exception: Path results object was not yet prepared/initialized")
@@ -154,11 +180,10 @@ class PathResults:
         `destination` has already been found, if not the shortest path tree will be recomputed with the `early_exit`
         argument passed on.
 
+        If the previously computed path had `a_star` enabled, `update_trace` always recompute the path.
+
         :Arguments:
             **destination** (:obj:`int`): ID of the node we are computing the path too
-
-            **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
-                                          Doing so may cause subsequent calls to `update_trace` to recompute the tree.
         """
         if not isinstance(destination, int):
             raise TypeError("destination needs to be an integer")
@@ -166,4 +191,20 @@ class PathResults:
         if destination >= self.graph.nodes_to_indices.shape[0]:
             raise ValueError("destination out of the range of node numbers in the graph")
 
-        update_path_trace(self, destination, self.graph, self.early_exit)
+        update_path_trace(self, destination, self.graph)
+
+    def set_heuristic(self, heuristic: str) -> None:
+        """
+        Set the heuristics to be used in A*. Must be one of `get_heuristics()`.
+
+        :Arguments:
+            **heuristic** (:obj:`str`): Heuristic to use in A*.
+        """
+        if heuristic not in HEURISTIC_MAP.keys():
+            raise ValueError(f"heruistic must be one of {self.get_heuristics()}")
+
+        self._heuristic = heuristic
+
+    def get_heuristics(self) -> List[str]:
+        """Return the availiable heuristics."""
+        return list(HEURISTIC_MAP.keys())

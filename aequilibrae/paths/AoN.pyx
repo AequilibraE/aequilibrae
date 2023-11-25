@@ -170,17 +170,16 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         save_path_file(origin_index, links, zones, predecessors_view, conn_view, path_file_base, path_index_file_base, write_feather)
     return origin
 
-def path_computation(origin, destination, graph, results, early_exit = False):
+def path_computation(origin, destination, graph, results):
     # type: (int, int, Graph, PathResults) -> (None)
     """
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
-    :param early_exit: Exit Dijkstra's once the destination has been found. Constructs a partial shortest path tree.
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
-    cdef bint early_exit_c = early_exit
+    cdef bint early_exit_bint = results.early_exit
 
     results.origin = origin
     results.destination = destination
@@ -219,6 +218,18 @@ def path_computation(origin, destination, graph, results, early_exit = False):
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
+    cdef bint a_star_bint = results.a_star
+    cdef double [:] lat_view
+    cdef double [:] lon_view
+    cdef long long [:] nodes_to_indices_view
+    cdef Heuristic heuristic
+    if results.a_star:
+        lat_view = graph.lonlat_index.lat.values
+        lon_view = graph.lonlat_index.lon.values
+        nodes_to_indices_view = graph.nodes_to_indices
+        heuristic = HEURISTIC_MAP[results._heuristic]
+
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -230,15 +241,31 @@ def path_computation(origin, destination, graph, results, early_exit = False):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        w = path_finding(origin_index,
-                         dest_index if early_exit_c else -1,
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view)
+        if a_star_bint:
+            w = path_finding_a_star(origin_index,
+                                    dest_index,
+                                    g_view,
+                                    b_nodes_view,
+                                    graph_fs_view,
+                                    nodes_to_indices_view,
+                                    lat_view,
+                                    lon_view,
+                                    predecessors_view,
+                                    ids_graph_view,
+                                    conn_view,
+                                    reached_first_view,
+                                    heuristic)
+        else:
+            w = path_finding(origin_index,
+                             dest_index if early_exit_bint else -1,
+                             g_view,
+                             b_nodes_view,
+                             graph_fs_view,
+                             predecessors_view,
+                             ids_graph_view,
+                             conn_view,
+                             reached_first_view)
+
 
         if skims > 0:
             skim_single_path(origin_index,
@@ -290,9 +317,12 @@ def path_computation(origin, destination, graph, results, early_exit = False):
         results.path_link_directions = None
         results.milepost = None
 
-def update_path_trace(results, destination, graph, early_exit = False):
+def update_path_trace(results, destination, graph):
     # type: (PathResults, int, Graph) -> (None)
     """
+    If `results.early_exit` is `True`, early exit will be enabled if the path is to be recomputed.
+    If `results.a_star` is `True`, A* will be used if the path is to be recomputed.
+
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
@@ -312,8 +342,10 @@ def update_path_trace(results, destination, graph, early_exit = False):
 
         # If the predecessor is -1 and early exit was enabled we cannot differentiate between
         # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
-        if results.predecessors[dest_index] == -1 and results._early_exit:
-            results.compute_path(results.origin, destination, early_exit=early_exit)
+        # If `a_star` was enabled then the stored tree has no guarantees and may not be useful due to the heuristic used
+        # TODO: revisit with heuristic specific reuse logic
+        if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
+            results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
 
         # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
         # Dijkstra's algorithm produces the shortest path tree for all scanned nodes. That is if a node was scanned,

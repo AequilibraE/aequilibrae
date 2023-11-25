@@ -4,8 +4,7 @@
 Path and skimming
 =================
 
-In this example, we show how to perform path computation and network skimming
-for the Sioux Falls example model.
+In this example, we show how to perform path computation for Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 
 # Imports
@@ -17,7 +16,7 @@ from aequilibrae.utils.create_example import create_example
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
-project = create_example(fldr)
+project = create_example(fldr, "coquimbo")
 
 # %%
 import logging
@@ -54,7 +53,7 @@ graph = project.network.graphs["c"]
 graph.set_graph("distance")
 
 # And will skim time and distance while we are at it
-graph.set_skimming(["free_flow_time", "distance"])
+graph.set_skimming(["travel_time", "distance"])
 
 # And we will allow paths to be computed going through other centroids/centroid connectors
 # required for the Sioux Falls network, as all nodes are centroids
@@ -66,8 +65,8 @@ graph.set_blocked_centroid_flows(False)
 res = PathResults()
 res.prepare(graph)
 
-# compute a path from node 8 to 13
-res.compute_path(8, 4)
+# compute a path from node 32343 to 22041, thats from near the airport to Fort Lambert, a popular location due to its views of the Coquimbo bay.
+res.compute_path(32343, 22041)
 
 # %%
 
@@ -84,11 +83,33 @@ res.path
 # We can get the mileposts for our sequence of nodes
 res.milepost
 
-# %%
+# Additionally we could also provide `early_exit=True` or `a_star=True` to `compute_path` to adjust its path finding behaviour.
+# Providing `early_exit=True` will allow the path finding to quit once it's discovered the destination, this means it will
+# perform better for ODs that are topographically close. However, exiting early may cause subsequent calls to `update_trace`
+# to recompute the tree in cases where it usually wouldn't. `a_star=True` has precedence of `early_exit=True`.
+res.compute_path(32343, 22041, early_exit=True)
+
+# If you'd prefer to find a potentially non-optimal path to the destination faster provide `a_star=True` to use A* with a
+# heuristic. With this method `update_trace` will always recompute the path.
+res.compute_path(32343, 22041, a_star=True)
+
+
+
+# By default a equirectangular heuristic is used. We can view the available heuristics via
+res.get_heuristics()
+
+# If you'd like the more accurate, but slower, but more accurate haversine heuristic you can set it using
+res.set_heuristic("haversine")
+
+# or
+res.compute_path(32343, 22041, a_star=True, heuristic="haversine")
 
 # If we want to compute the path for a different destination and the same origin, we can just do this
 # It is way faster when you have large networks
-res.update_trace(13)
+# Here we'll adjust our path to the University of La Serena. Our previous early exit and A* settings will persist with calls
+# to `update_trace`. If you'd like to adjust them for subsequent path re-computations set the `res.early_exit` and `res.a_star` attributes.
+res.a_star = False
+res.update_trace(73131)
 
 # %%
 
@@ -114,47 +135,6 @@ for lid in curr.fetchall():
 path_geometry = linemerge(links.get(lid).geometry for lid in res.path)
 plt.plot(*path_geometry.xy, color="blue", linestyle="dashed", linewidth=2)
 plt.show()
-
-#%%
-# Now to skimming
-# ---------------
-
-# %%
-from aequilibrae.paths import NetworkSkimming
-
-# %%
-# But let's say we only want a skim matrix for nodes 1, 3, 6 & 8
-import numpy as np
-
-graph.prepare_graph(np.array([1, 3, 6, 8]))
-# %%
-
-# And run the skimming
-skm = NetworkSkimming(graph)
-skm.execute()
-
-# %%
-# The result is an AequilibraEMatrix object
-skims = skm.results.skims
-
-# Which we can manipulate directly from its temp file, if we wish
-skims.matrices
-
-# %%
-
-# Or access each matrix
-skims.free_flow_time
-
-# %%
-
-# We can save it to the project if we want
-skm.save_to_project("base_skims")
-
-# We can also retrieve this skim record to write something to its description
-matrices = project.matrices
-mat_record = matrices.get_record("base_skims")
-mat_record.description = "minimized FF travel time while also skimming distance for just a few nodes"
-mat_record.save()
 
 # %%
 project.close()
