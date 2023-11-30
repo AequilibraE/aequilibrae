@@ -337,6 +337,7 @@ class Network(WorkerThread):
         valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
         curr.execute("select node_id from nodes where is_centroid=1 order by node_id;")
         centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
+        centroids = centroids if centroids.shape[0] else None
 
         lonlat = self.nodes.lonlat.set_index("node_id")
 
@@ -347,10 +348,9 @@ class Network(WorkerThread):
             g = Graph()
             g.mode = m
             g.network = net
-            if centroids.shape[0]:
-                g.prepare_graph(centroids)
-                g.set_blocked_centroid_flows(True)
-            else:
+            g.prepare_graph(centroids)
+            g.set_blocked_centroid_flows(True)
+            if centroids is None:
                 get_logger().warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
             self.graphs[m] = g
