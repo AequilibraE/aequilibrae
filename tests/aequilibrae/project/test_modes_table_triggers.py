@@ -1,23 +1,16 @@
-from unittest import TestCase
-import tempfile
 import os
-from random import choice
-from warnings import warn
-from shutil import copytree, rmtree
-from aequilibrae.project import Project
-import uuid
 import sqlite3
-from aequilibrae import logger
-from ...data import no_triggers_project
+from random import choice
+from unittest import TestCase
+from warnings import warn
+
+from tests.models_for_test import ModelsTest
 
 
 class TestProject(TestCase):
     def setUp(self) -> None:
-        os.environ["PATH"] = os.path.join(tempfile.gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-        copytree(no_triggers_project, self.temp_proj_folder)
-        self.proj = Project()
-        self.proj.open(self.temp_proj_folder)
+        tm = ModelsTest()
+        self.proj = tm.no_triggers()
         self.curr = self.proj.conn.cursor()
 
         # Modes to add
@@ -61,27 +54,15 @@ class TestProject(TestCase):
                     self.fail(f"Trigger not tested. {trigger}")
 
     def test_mode_single_letter_update(self):
-        cmd = self.__get_query("mode_single_letter_update")
-
-        sql = "UPDATE 'modes' SET mode_id= 'ttt' where mode_id='b'"
-        self.curr.execute(sql)
-
-        self.curr.execute(cmd)
-
         with self.assertRaises(sqlite3.IntegrityError):
-            sql = "UPDATE 'modes' SET mode_id= 'gg' where mode_id='w'"
+            sql = "UPDATE 'modes' SET mode_id= 'ttt' where mode_id='b'"
             self.curr.execute(sql)
 
     def test_mode_single_letter_insert(self):
-        cmd = self.__get_query("mode_single_letter_insert")
-
         sql = "INSERT INTO 'modes' (mode_name, mode_id) VALUES(?, ?)"
-        self.curr.execute(sql, ["testasdasd", "pp"])
-
-        self.curr.execute(cmd)
 
         with self.assertRaises(sqlite3.IntegrityError):
-            self.curr.execute(sql, ["test1b", "mm"])
+            self.curr.execute(sql, ["testasdasd", "pp"])
 
     def test_mode_keep_if_in_use_updating(self):
         cmd = self.__get_query("mode_keep_if_in_use_updating")
@@ -120,15 +101,9 @@ class TestProject(TestCase):
             self.curr.execute(sql)
 
     def test_modes_length_on_links_update(self):
-        cmd = self.__get_query("modes_length_on_links_update")
-
-        sql = "UPDATE 'links' SET modes= '' where modes='wb'"
-        self.curr.execute(sql)
-
-        self.curr.execute(cmd)
-
-        sql = "UPDATE 'links' SET modes= '' where modes='bw'"
         with self.assertRaises(sqlite3.IntegrityError):
+            sql = "UPDATE 'links' SET modes= '' where modes='wb'"
+
             self.curr.execute(sql)
 
     def test_modes_on_nodes_table_update_a_node(self):
@@ -236,29 +211,25 @@ class TestProject(TestCase):
                 self.curr.execute(f"insert into links values ({idx})", a)
 
     def test_modes_length_on_links_insert(self):
-        cmd = self.__get_query("modes_length_on_links_insert")
-        if self.rtree:
-            self.curr.execute("pragma table_info(links)")
-            f = self.curr.fetchall()
-            fields = {x[1]: x[0] for x in f}
+        if not self.rtree:
+            return
 
-            sql = "select * from links where link_id=70"
-            self.curr.execute(sql)
-            a = [x for x in self.curr.fetchone()]
-            a[fields["modes"]] = ""
-            a[fields["link_id"]] = 4321
-            a[fields["a_node"]] = 888
-            a[fields["b_node"]] = 999
-            a[0] = 4321
+        self.curr.execute("pragma table_info(links)")
+        f = self.curr.fetchall()
+        fields = {x[1]: x[0] for x in f}
 
-            idx = ",".join(["?"] * len(a))
+        sql = "select * from links where link_id=70"
+        self.curr.execute(sql)
+        a = [x for x in self.curr.fetchone()]
+        a[fields["modes"]] = ""
+        a[fields["link_id"]] = 4321
+        a[fields["a_node"]] = 888
+        a[fields["b_node"]] = 999
+        a[0] = 4321
+
+        idx = ",".join(["?"] * len(a))
+        with self.assertRaises(sqlite3.IntegrityError):
             self.curr.execute(f"insert into links values ({idx})", a)
-            self.curr.execute("delete from links where link_id=4321")
-
-            self.curr.execute(cmd)
-
-            with self.assertRaises(sqlite3.IntegrityError):
-                self.curr.execute(f"insert into links values ({idx})", a)
 
     def test_keep_at_least_one(self):
         cmd = self.__get_query("mode_keep_at_least_one")

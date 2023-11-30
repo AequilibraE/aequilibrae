@@ -47,10 +47,12 @@ class Graph(object):
 
         # These are the fields actually used in computing paths
         self.all_nodes = np.array(0)  # Holds an array with all nodes in the original network
-        self.nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
+        self.nodes_to_indices = np.array(0, np.int64)  # Holds the reverse of the all_nodes
         self.fs = np.array([])  # This method will hold the forward star for the graph
         self.cost = np.array([])  # This array holds the values being used in the shortest path routine
         self.skims = None
+
+        self.lonlat_index = pd.DataFrame([])  # Holds a node_id to lon/lat coord index for nodes within this graph
 
         self.compact_all_nodes = np.array(0)  # Holds an array with all nodes in the original network
         self.compact_nodes_to_indices = np.array(0)  # Holds the reverse of the all_nodes
@@ -188,12 +190,12 @@ class Graph(object):
 
         num_nodes = all_nodes.shape[0]
 
-        nodes_to_indices = np.repeat(-1, int(all_nodes.max()) + 1)
+        nodes_to_indices = np.full(int(all_nodes.max()) + 1, -1, dtype=np.int64)
         nlist = np.arange(num_nodes)
         nodes_to_indices[all_nodes] = nlist
 
-        df.loc[:, "a_node"] = nodes_to_indices[df.a_node.values][:]
-        df.loc[:, "b_node"] = nodes_to_indices[df.b_node.values][:]
+        df.a_node = nodes_to_indices[df.a_node.values]
+        df.b_node = nodes_to_indices[df.b_node.values]
         df = df.sort_values(by=["a_node", "b_node"])
         df.index = np.arange(df.shape[0])
         df["id"] = np.arange(df.shape[0])
@@ -303,6 +305,8 @@ class Graph(object):
         """
         Sets the list of skims to be computed
 
+        Skimming with A* may produce results that differ from tradditional Dijkstra's due to its use a heuristic.
+
         :Arguments:
             **skim_fields** (:obj:`list`): Fields must be numeric
         """
@@ -321,7 +325,7 @@ class Graph(object):
             raise ValueError("At least one of the skim fields does not exist in the graph: {}".format(",".join(k)))
 
         self.compact_skims = np.zeros((self.compact_num_links + 1, len(skim_fields) + 1), self.__float_type)
-        df = self.__graph_groupby.sum()[skim_fields].reset_index()
+        df = self.__graph_groupby.sum(numeric_only=True)[skim_fields].reset_index()
         for i, skm in enumerate(skim_fields):
             self.compact_skims[df.index.values, i] = df[skm].values.astype(self.__float_type)
 

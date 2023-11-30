@@ -97,11 +97,10 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
         bint select_link = False
 
     if result._selected_links:
-
         has_flow_mask = aux_result.has_flow_mask[curr_thread, :]
-        sl_od_matrix_view = aux_result.temp_sl_od_matrix[:, origin_index, :, :]
-        sl_link_loading_view = aux_result.temp_sl_link_loading[:, :, :]
-        link_list = aux_result.select_links[:, :]
+        sl_od_matrix_view = aux_result.temp_sl_od_matrix[curr_thread, :, origin_index, :, :]
+        sl_link_loading_view = aux_result.temp_sl_link_loading[curr_thread, :, :, :]
+        link_list = aux_result.select_links[:, :]  # Read only, don't need to slice on curr_thread
         select_link = True
     #Now we do all procedures with NO GIL
     with nogil:
@@ -115,6 +114,7 @@ def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
                                     original_b_nodes_view)
 
         w = path_finding(origin_index,
+                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
@@ -179,6 +179,7 @@ def path_computation(origin, destination, graph, results):
     """
     cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
+    cdef bint early_exit_bint = results.early_exit
 
     results.origin = origin
     results.destination = destination
@@ -217,6 +218,18 @@ def path_computation(origin, destination, graph, results):
     new_b_nodes = graph.graph.b_node.values.copy()
     cdef long long [:] b_nodes_view = new_b_nodes
 
+    cdef bint a_star_bint = results.a_star
+    cdef double [:] lat_view
+    cdef double [:] lon_view
+    cdef long long [:] nodes_to_indices_view
+    cdef Heuristic heuristic
+    if results.a_star:
+        lat_view = graph.lonlat_index.lat.values
+        lon_view = graph.lonlat_index.lon.values
+        nodes_to_indices_view = graph.nodes_to_indices
+        heuristic = HEURISTIC_MAP[results._heuristic]
+
+
     #Now we do all procedures with NO GIL
     with nogil:
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
@@ -228,14 +241,31 @@ def path_computation(origin, destination, graph, results):
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        w = path_finding(origin_index,
-                         g_view,
-                         b_nodes_view,
-                         graph_fs_view,
-                         predecessors_view,
-                         ids_graph_view,
-                         conn_view,
-                         reached_first_view)
+        if a_star_bint:
+            w = path_finding_a_star(origin_index,
+                                    dest_index,
+                                    g_view,
+                                    b_nodes_view,
+                                    graph_fs_view,
+                                    nodes_to_indices_view,
+                                    lat_view,
+                                    lon_view,
+                                    predecessors_view,
+                                    ids_graph_view,
+                                    conn_view,
+                                    reached_first_view,
+                                    heuristic)
+        else:
+            w = path_finding(origin_index,
+                             dest_index if early_exit_bint else -1,
+                             g_view,
+                             b_nodes_view,
+                             graph_fs_view,
+                             predecessors_view,
+                             ids_graph_view,
+                             conn_view,
+                             reached_first_view)
+
 
         if skims > 0:
             skim_single_path(origin_index,
@@ -291,9 +321,13 @@ def path_computation(origin, destination, graph, results):
 def update_path_trace(results, destination, graph):
     # type: (PathResults, int, Graph) -> (None)
     """
+    If `results.early_exit` is `True`, early exit will be enabled if the path is to be recomputed.
+    If `results.a_star` is `True`, A* will be used if the path is to be recomputed.
+
     :param graph: AequilibraE graph. Needs to have been set with number of centroids and list of skims (if any)
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
+    :param early_exit: Exit Dijkstra's once the destination has been found if the shortest path tree must be reconstructed.
     """
     cdef p, origin_index, dest_index, connector
 
@@ -304,9 +338,20 @@ def update_path_trace(results, destination, graph):
     else:
         dest_index = graph.nodes_to_indices[destination]
         origin_index = graph.nodes_to_indices[results.origin]
-
         results.milepost = None
         results.path_nodes = None
+
+        # If the predecessor is -1 and early exit was enabled we cannot differentiate between
+        # an unreachable node and one we just didn't see yet. We need to recompute the tree with the new destination
+        # If `a_star` was enabled then the stored tree has no guarantees and may not be useful due to the heuristic used
+        # TODO: revisit with heuristic specific reuse logic
+        if results.predecessors[dest_index] == -1 and results._early_exit or results._a_star:
+            results.compute_path(results.origin, destination, early_exit=results.early_exit, a_star=results.a_star)
+
+        # By the invariant hypothesis presented at https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm#Proof_of_correctness
+        # Dijkstra's algorithm produces the shortest path tree for all scanned nodes. That is if a node was scanned,
+        # its shortest path has been found, even if we exited early. As the un-scanned nodes are marked as unreachable this
+        # invariant holds.
         if results.predecessors[dest_index] >= 0:
             all_connectors = []
             link_directions = []
@@ -396,6 +441,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
                                     b_nodes_view,
                                     original_b_nodes_view)
         w = path_finding(origin_index,
+                         -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
                          graph_fs_view,
