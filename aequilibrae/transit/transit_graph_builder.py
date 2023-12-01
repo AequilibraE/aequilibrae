@@ -1329,6 +1329,7 @@ class SF_graph_builder:
         :Arguments:
            **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
         """
+        self.create_additional_db_fields()
         self.save_vertices(robust=robust)
         self.save_edges()
 
