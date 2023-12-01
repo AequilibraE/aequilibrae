@@ -1117,6 +1117,8 @@ class SF_graph_builder:
         """
         assert method in ["direct", "connector project match"]
 
+        self.edges["geometry"] = None
+
         if method == "direct":
             self.edges["geometry"] = [
                 shapely.LineString(
