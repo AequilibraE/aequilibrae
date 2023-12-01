@@ -76,7 +76,7 @@ graph.vertices.drop(columns="geometry")
 
 # %%
 graph.create_edges()
-graph.edges.drop(columns="geometry")
+graph.edges
 
 # %%
 # Connector project matching
@@ -103,7 +103,7 @@ graph_db = SF_graph_builder.from_db(pt_con)
 graph_db.vertices.drop(columns="geometry")
 
 # %%
-graph_db.edges.drop(columns="geometry")
+graph_db.edges
 
 # %%
 # Converting to a AequilibraE graph object
