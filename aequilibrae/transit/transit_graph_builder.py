@@ -1,4 +1,14 @@
-"""Create the graph used by public transport assignment algorithms."""
+"""Create the graph used by public transport assignment algorithms.
+
+Naming Conventions:
+- a_node/b_node is head/tail vertex
+
+SF_graph_builder Assumtions:
+- opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
+- all times are expressed in seconds [s], all frequencies in [1/s], and
+- headways are uniform for trips of the same pattern.
+
+"""
 
 import warnings
 
@@ -49,13 +59,36 @@ def shift_duplicate_geometry(df, shift=0.00001):
 class SF_graph_builder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
-    Assumes,
-    - opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
-    - all times are expressed in seconds [s], all frequencies in [1/s], and
-    - headways are uniform for trips of the same pattern.
+    :Arguments:
+        **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
 
-    Naming Conventions:
-    - a_node/b_node is head/tail vertex
+        **start** (:obj:`int`): Start time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``61200``.
+
+        **end** (:obj:`int`): End time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``64800``.
+
+        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin``, in order to include more trips. Defaults to ``0``.
+
+        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
+
+        **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+
+        **seed=124** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+
+        **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
+
+        **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
+
+        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
+
+        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
+
+        **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
+
+        **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
+
+        **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
+
+        **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
     """
 
     def __init__(
@@ -64,39 +97,18 @@ class SF_graph_builder:
         start=61200,
         end=64800,
         time_margin=0,
-        projected_crs="EPSG:4326",
+        projected_crs="EPSG:3857",
         num_threads=-1,
         seed=124,
         geometry_noise=True,
         noise_coef=1.0e-5,
-        with_inner_stop_transfers=True,
-        with_outer_stop_transfers=True,
+        with_inner_stop_transfers=False,
+        with_outer_stop_transfers=False,
         with_walking_edges=True,
         distance_upper_bound=np.inf,
         blocking_centroid_flows=True,
         max_connectors_per_zone=-1,
     ):
-        """SF graph builder constructor.
-
-        Start and end must be expressed in seconds starting from 00h00m00s, e.g. 6am is 21600.
-
-        :Arguments:
-           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
-           **start** (:obj:`int`): Start time. Defaults to ``61200``.
-           **end** (:obj:`int`): End time. Defaults to ``64800``.
-           **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin``. Defaults to ``0``.
-           **projected_crs** (:obj:`str`): Project CRS of the network, indented for more accurate distance calculations. Defaults to ``"EPSG:4326"``, the CRS used by AequilibraE internally.
-           **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
-           **seed=124** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
-           **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation. Defaults to ``True``.
-           **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
-           **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``True``.
-           **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``True``.
-           **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
-           **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
-           **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
-           **max_connectors_per_zone** (:obj:`bool`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
-        """
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
@@ -166,8 +178,9 @@ class SF_graph_builder:
         """Add zones as ODs.
 
         :Arguments:
-           **zones** (:obj:`pd.DataFrame`): Dataframe containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
-           **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
+            **zones** (:obj:`pd.DataFrame`): Dataframe containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+
+            **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
         if "zone_id" not in zones.columns or "geometry" not in zones.columns:
             raise KeyError("zone_id and geometry must be columns in zones")
