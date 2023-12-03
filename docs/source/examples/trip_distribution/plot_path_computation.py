@@ -1,7 +1,7 @@
 """
-.. _example_usage_paths:
+.. _example_usage_path_computation:
 
-Path and skimming
+Path computation
 =================
 
 In this example, we show how to perform path computation for Coquimbo, a city in La Serena Metropolitan Area in Chile.
