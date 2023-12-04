@@ -70,7 +70,7 @@ class TestODMESetUp(TestCase):
         print(sl_matrix)
         #print(sl_matrix.keys())
         #print(select_link_flow_df)
-
+        self.odme_solver = ODME(self.assignment, [((9,1), 10000)])
         #select_links = {"sl 6": [(6, 1)], "sl 3": [(3, 1)]}
 
         #self.assignclass.set_select_links(select_links)

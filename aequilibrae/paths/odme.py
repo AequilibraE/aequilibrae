@@ -32,7 +32,7 @@ class ODME(object):
         self.assignclass = assignment.classes[0] # - for now assume only one class
 
         # Initial demand matrix
-        self.init_demand_matrix = self.assignclass.matrix.matrix_view # May be unecessary
+        self.init_demand_matrix = self.assignclass.matrix.matrix_view # May be unecessary - if we do keep it need to make a copy
         self.demand_matrix = self.init_demand_matrix # The current demand matrix
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
         # SHOULD COPY THIS IF I WANT A COPY OF ORIGINAL IN MEMORY
@@ -43,7 +43,7 @@ class ODME(object):
         self._obs_vals = np.array(values) # \hat v_a
         # MAY WANT TO INITIALISE THESE AS np.zeros
         self._assign_vals = np.empty(len(count_volumes)) # v_a
-        self._sl_matrices = np.empty((len(count_volumes, *self._demand_dims))) # d^a/p^a - d^a rn
+        self._sl_matrices = None # Currently dictionary of proportion matrices
         # NEED TO DECIDE WHETHER TO STORE THESE AS PROPORTIONS OR NOT!!!
 
         # Set the select links:
@@ -90,9 +90,11 @@ class ODME(object):
             j = 0
             while j < self.max_iter: # INNER STOPPING CRITERION
                 self._execute_inner_iter()
+                j += 1
 
             # Reassign values at the end of each outer loop
             self._perform_assignment()
+            i += 1
 
         return self.demand_matrix
     
@@ -130,15 +132,15 @@ class ODME(object):
         self.assignment.execute()
 
         # Store reference to select link demand matrices
-        sl_matrices = self.assignclass.results.select_link_od.matrix
-        for i, link in enumerate(self._obs_links):
-            self._sl_matrices[i, :, :] = sl_matrices[f"sl_{link[0]}_{link[1]}"]
+        self._sl_matrices = self.assignclass.results.select_link_od.matrix
+        for link in self._sl_matrices:
+            self._sl_matrices[link] = np.nan_to_num(self._sl_matrices[link] / self.demand_matrix)
+        # NEED TO DECIDE WHETHER OR NOT TO MUTATE THESE
 
         # Extract and store array of assigned volumes to select links
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
         for i, link in enumerate(self._obs_links):
-            link = self._obs_links[i]
             self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == link[0], col[link[1]]].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
@@ -148,3 +150,11 @@ class ODME(object):
         """
         # NOT CURRENTLY IMPLEMENTED
         return 0.1
+
+    def _calculate_flows(self) -> None:
+        """
+        Calculates and stores link flows using current sl_matrices & demand matrix.
+        """
+        for i, link in enumerate(self._obs_links):
+            sl_matrix = self._sl_matrices[f"sl_{link[0]}_{link[1]}"]
+            self._assign_vals[i] = sum(sl_matrix * self.demand_matrix)
