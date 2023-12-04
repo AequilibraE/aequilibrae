@@ -66,13 +66,13 @@ class SF_graph_builder:
 
         **end** (:obj:`int`): End time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``64800``.
 
-        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin``, in order to include more trips. Defaults to ``0``.
+        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
 
         **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
 
         **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
 
-        **seed=124** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+        **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
 
         **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
 
