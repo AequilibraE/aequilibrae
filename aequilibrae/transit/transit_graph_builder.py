@@ -990,66 +990,71 @@ class SF_graph_builder:
 
     def _create_walking_edges(self):
         """Create walking edges between distinct stops of each station."""
-        sql = """
-        SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
-        WHERE parent_station IS NOT NULL AND parent_station <> ''
-        """
-        stops = pd.read_sql(sql=sql, con=self.pt_conn)
 
-        print(stops)
-        stops.drop_duplicates(inplace=True)
-        stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
+        sql = "SELECT COUNT(*) FROM stops WHERE parent_station IS NOT NULL AND parent_station <> ''"
+        station_count = self.pt_conn.execute(sql).fetchone()[0]
 
-        # we only keep the stations which contain at least 2 stops
-        stations = stations[stations["stop_count"] > 1]
-        station_list = stations["parent_station"].values
-        stops = stops[stops.parent_station.isin(station_list)]
+        if station_count > 0:
+            sql = """
+            SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
+            WHERE parent_station IS NOT NULL AND parent_station <> ''
+            """
+            stops = pd.read_sql(sql=sql, con=self.pt_conn)
 
-        # tail vertex
-        o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-            columns={"geometry": "o_geometry", "node_id": "b_node"}
-        )
-        o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
-        o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
+            print(stops)
+            stops.drop_duplicates(inplace=True)
+            stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
-        # head vertex
-        d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
-            columns={"geometry": "d_geometry", "node_id": "a_node"}
-        )
-        d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
-        d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
+            # we only keep the stations which contain at least 2 stops
+            stations = stations[stations["stop_count"] > 1]
+            station_list = stations["parent_station"].values
+            stops = stops[stops.parent_station.isin(station_list)]
 
-        walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
+            # tail vertex
+            o_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+                columns={"geometry": "o_geometry", "node_id": "b_node"}
+            )
+            o_walking = pd.merge(o_walking, stops, on="stop_id", how="inner")
+            o_walking.rename(columns={"stop_id": "o_stop_id"}, inplace=True)
 
-        # remove entries that share the same stop
-        walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
-        walking_edges.drop("parent_station", axis=1, inplace=True)
+            # head vertex
+            d_walking = self.vertices[self.vertices.node_type == "stop"][["stop_id", "node_id", "geometry"]].rename(
+                columns={"geometry": "d_geometry", "node_id": "a_node"}
+            )
+            d_walking = pd.merge(d_walking, stops, on="stop_id", how="inner")
+            d_walking.rename(columns={"stop_id": "d_stop_id"}, inplace=True)
 
-        # uniform attributes
-        walking_edges["line_seg_idx"] = -1
-        walking_edges["link_type"] = "walking"
-        walking_edges["freq"] = np.inf
-        walking_edges["direction"] = 1
+            walking_edges = pd.merge(o_walking, d_walking, on="parent_station", how="inner")
 
-        # compute the walking time
-        o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
-        d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
-        o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
-        d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
+            # remove entries that share the same stop
+            walking_edges = walking_edges.loc[walking_edges["o_stop_id"] != walking_edges["d_stop_id"]]
+            walking_edges.drop("parent_station", axis=1, inplace=True)
 
-        distance = haversine(o_lon, o_lat, d_lon, d_lat)
+            # uniform attributes
+            walking_edges["line_seg_idx"] = -1
+            walking_edges["link_type"] = "walking"
+            walking_edges["freq"] = np.inf
+            walking_edges["direction"] = 1
 
-        walking_edges["trav_time"] = distance / self.walking_speed
-        walking_edges["trav_time"] *= self.walk_time_factor
+            # compute the walking time
+            o_geometry = shapely.from_wkb(walking_edges.o_geometry.values)
+            d_geometry = shapely.from_wkb(walking_edges.d_geometry.values)
+            o_lon, o_lat = np.vectorize(lambda x: (x.x, x.y))(o_geometry)
+            d_lon, d_lat = np.vectorize(lambda x: (x.x, x.y))(d_geometry)
 
-        # cleanup
-        walking_edges.drop(
-            ["o_geometry", "d_geometry"],
-            axis=1,
-            inplace=True,
-        )
+            distance = haversine(o_lon, o_lat, d_lon, d_lat)
 
-        self.__walking_edges = walking_edges
+            walking_edges["trav_time"] = distance / self.walking_speed
+            walking_edges["trav_time"] *= self.walk_time_factor
+
+            # cleanup
+            walking_edges.drop(
+                ["o_geometry", "d_geometry"],
+                axis=1,
+                inplace=True,
+            )
+
+            self.__walking_edges = walking_edges
 
     def _create_edges(self):
         """Graph edges creation as a Dataframe.
