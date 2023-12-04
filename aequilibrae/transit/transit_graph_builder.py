@@ -1098,6 +1098,9 @@ class SF_graph_builder:
         self.edges.reset_index(drop=True, inplace=True)
         self.edges.index.name = "index"
         self.edges["link_id"] = self.edges.index + 1
+        for col in SF_EDGE_COLS:
+            if col not in self.edges:
+                self.edges[col] = np.nan
         self.edges = self.edges[SF_EDGE_COLS]
 
         # data types
