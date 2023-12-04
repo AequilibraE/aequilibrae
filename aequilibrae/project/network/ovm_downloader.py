@@ -1,6 +1,8 @@
 import logging
 import time
 import re
+from pathlib import Path
+
 import requests
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
@@ -13,7 +15,6 @@ import geopandas as gpd
 import subprocess
 import os
 
-
 conn = duckdb.connect()
 c = conn.cursor()
 
@@ -24,7 +25,7 @@ c.execute(
     LOAD parquet;
     SET s3_region='us-west-2';
     """
-    )
+)
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -40,21 +41,20 @@ class OVMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes, logger: logging.Logger = None):
+    def __init__(self, polygons, modes, project_path: Path, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_ovm_filter(modes)
         self.report = []
         self.gpkg = []
-        par = Parameters().parameters["ovm"]
-        self.overpass_endpoint = par["overpass_endpoint"]
-        self.timeout = par["timeout"]
-        self.sleeptime = par["sleeptime"]
+        self.__project_path = project_path
 
     def downloadPlace(self):
+
+        pth = str(self.__project_path / 'new_geopackage_pla.parquet')
         c.execute(
-            """
+            f"""
             COPY(
             SELECT
                id,
@@ -68,25 +68,13 @@ class OVMDownloader(WorkerThread):
                 AND bbox.maxx < 148.7324
                 AND bbox.miny > -20.2780
                 AND bbox.maxy < -20.2621 )
-            TO 'new_geopackage_pla.gpkg'
-            WITH (FORMAT GDAL, DRIVER 'GPKG', LAYER_CREATION_OPTIONS 'WRITE_BBOX=YES');
+            TO "{pth}";
             """
         )
 
-    def merge_geopackages(output_gpkg_path, *input_gpkg_paths):
-    # Build the ogr2ogr command to merge GeoPackages
-        ogr2ogr_command = [
-            'ogr2ogr',
-            '-f', 'GPKG',
-            output_gpkg_path,
-            *input_gpkg_paths
-        ]
-
-        # Execute the ogr2ogr command
-        subprocess.run(ogr2ogr_command)
-
     def downloadTransportation(self):
-        c.execute("""
+        pth = str(self.__project_path / 'new_geopackage_tran.parquet').replace("\\", "/")
+        c.execute(f"""
             COPY (
             SELECT
                type,
@@ -94,47 +82,14 @@ class OVMDownloader(WorkerThread):
                connectors,
                road,
                ST_GeomFromWkb(geometry) AS geometry
-            FROM read_parquet('E:/type=transportation/type=connector/*')
+            FROM read_parquet('s3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=transportation/type=*/*', filename=true, hive_partitioning=1)
             WHERE bbox.minx > 148.7077
                 AND bbox.maxx < 148.7324
                 AND bbox.miny > -20.2780
                 AND bbox.maxy < -20.2621 )
-            TO 'new_geopackage_con.gpkg'
-            WITH (FORMAT GDAL, DRIVER 'GPKG', LAYER_CREATION_OPTIONS 'WRITE_BBOX=YES');
+            TO '{pth}';
             """
-        )
-        
-        c.execute("""
-            COPY (
-            SELECT
-               id,
-               ST_GeomFromWkb(geometry) AS geometry,
-               JSON(bbox) AS bbox,
-               JSON(names) AS names,
-               contextId,
-               defaultLanguage,
-               JSON(sources) AS sources,
-               geopolDisplay,
-               JSON(connectors) AS connectors,
-               JSON(categories) AS categories,
-               JSON(addresses) AS addresses,
-            FROM read_parquet('E:/type=transportation/type=segment/*')
-            WHERE bbox.minx > 148.7077
-                AND bbox.maxx < 148.7324
-                AND bbox.miny > -20.2780
-                AND bbox.maxy < -20.2621 )
-            TO 'new_geopackage_seg.gpkg'
-            WITH (FORMAT GDAL, DRIVER 'GPKG', LAYER_CREATION_OPTIONS 'WRITE_BBOX=YES');
-            """
-        )
-
-        # Example usage
-        input_gpkg1 = 'new_geopackage_con.gpkg'
-        input_gpkg2 = 'new_geopackage_seg.gpkg'
-        output_gpkg = 'new_geopackage_tran.gpkg'
-
-        self.merge_geopackages(input_gpkg1, input_gpkg2, output_gpkg)
-
+                  )
 
     def get_ovm_filter(self, modes: list) -> str:
         """
@@ -164,9 +119,15 @@ class OVMDownloader(WorkerThread):
         filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
-
-
-# %%
-OVMDownloader.merge_geopackages('new_geopackage_con.gpkg', 'geopackage_seg.gpkg', 'geopackage_tran.gpkg')
-
-# %%
+    #
+    # def merge_geopackages(output_gpkg_path, *input_gpkg_paths):
+    #     # Build the ogr2ogr command to merge GeoPackages
+    #     ogr2ogr_command = [
+    #         'ogr2ogr',
+    #         '-f', 'GPKG',
+    #         output_gpkg_path,
+    #         *input_gpkg_paths
+    #     ]
+    #
+    #     # Execute the ogr2ogr command
+    #     subprocess.run(ogr2ogr_command)

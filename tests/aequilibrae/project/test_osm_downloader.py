@@ -39,5 +39,8 @@ class TestOSMDownloader(TestCase):
             self.fail("It found too few elements in the middle of the Grand Canyon")
 
     def should_do_work(self):
-        thresh = 1.01 if os.environ.get("GITHUB_WORKFLOW", "ERROR") == "Code coverage" else 0.02
-        return random() < thresh
+        # If we are on Github, we just don't run it
+        if "GITHUB_WORKFLOW" in os.environ:
+            return False
+        else:
+            return True
