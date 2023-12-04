@@ -440,7 +440,7 @@ project = Project()
 project.new(fldr)
 
 # %%
-project.network.create_from_osm(place_name="Nauru")
+project.network.create_from_osm(place_name="Airlie Beach")
 
 
 # %%

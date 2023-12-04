@@ -230,6 +230,95 @@ network:
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true
+  ovm:
+    all_link_types:
+    - bridleway
+    - cycleway 
+    - driveway
+    - footway
+    - livingStreet
+    - motorway
+    - parkingAisle
+    - pedestrian
+    - primary
+    - residential
+    - secondary
+    - steps
+    - tertiary
+    - track
+    - trunk
+    - unclassified
+    - unknown
+    modes:
+      bicycle:
+        link_types:
+        - primary
+        - secondary
+        - tertiary
+        - living_street
+        - parkingAisle
+        - residential
+        - cycleway
+        - corridor
+        - pedestrian
+        - path
+        - track
+        - trail
+        - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - living_street
+        - parkingAisle
+        - service
+        - escape
+        - road
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        link_types:
+        - motor
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - living_street
+        - service
+        - escape
+        - road
+        - bus_guideway
+        unknown_tags: true
+      walk:
+        link_types:
+        - cycleway
+        - footway
+        - steps
+        - corridor
+        - pedestrian
+        - elevator
+        - escalator
+        - path
+        - track
+        - trail
+        - bridleway
+        - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
   gmns:
     critical_dist: 2
     node:
@@ -403,6 +492,12 @@ osm:
     overpass_endpoint: http://overpass-api.de/api
     nominatim_endpoint: https://nominatim.openstreetmap.org/
     accept_language: "en"
+    max_attempts: 50
+    timeout: 540
+    max_query_area_size: 2500000000
+    sleeptime: 5
+
+ovm:
     max_attempts: 50
     timeout: 540
     max_query_area_size: 2500000000
