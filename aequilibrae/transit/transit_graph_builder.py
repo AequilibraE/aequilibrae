@@ -291,7 +291,7 @@ class SF_graph_builder:
             sql = """SELECT trips_schedule.trip_id, trips_schedule.seq, trips_schedule.arrival,
                 trips_schedule.departure, trips.pattern_id FROM trips_schedule LEFT JOIN trips
                 ON trips_schedule.trip_id = trips.trip_id"""
-        tt = pd.read_sql(sql, self.pt_conn)
+        tt = pd.read_sql(sql=sql, con=self.pt_conn)
 
         # compute the travel time on the segments
         tt.sort_values(by=["pattern_id", "trip_id", "seq"], ascending=True, inplace=True)
@@ -346,7 +346,7 @@ class SF_graph_builder:
         # start from the trip_schedule table
         sql = f"""SELECT trip_id, seq, arrival FROM trips_schedule
             WHERE departure>={self.start} AND arrival<={self.end}"""
-        mh = pd.read_sql(sql, self.pt_conn)
+        mh = pd.read_sql(sql=sql, con=self.pt_conn)
 
         # merge the trips schedules with pattern ids
         trips = pd.read_sql(sql="SELECT trip_id, pattern_id FROM trips", con=self.pt_conn)
@@ -405,7 +405,7 @@ class SF_graph_builder:
         """Create stop vertices."""
         # select all stops
         sql = "SELECT CAST(stop_id AS TEXT) stop_id, ST_AsBinary(geometry) AS geometry FROM stops"
-        stop_vertices = pd.read_sql(sql, self.pt_conn)
+        stop_vertices = pd.read_sql(sql=sql, con=self.pt_conn)
 
         # filter stops that are used on the given time range
         stops_ids = pd.concat((self.__line_segments.from_stop, self.__line_segments.to_stop), axis=0).unique()
@@ -906,7 +906,7 @@ class SF_graph_builder:
         SELECT CAST(stop_id as TEXT) stop_id, CAST(parent_station as TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
         """
-        stops = pd.read_sql(sql, self.pt_conn)
+        stops = pd.read_sql(sql=sql, con=self.pt_conn)
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
         # we only keep the stations which contain at least 2 stops
@@ -994,7 +994,9 @@ class SF_graph_builder:
         SELECT CAST(stop_id AS TEXT) stop_id, CAST(parent_station AS TEXT) parent_station FROM stops
         WHERE parent_station IS NOT NULL AND parent_station <> ''
         """
-        stops = pd.read_sql(sql, self.pt_conn)
+        stops = pd.read_sql(sql=sql, con=self.pt_conn)
+
+        print(stops)
         stops.drop_duplicates(inplace=True)
         stations = stops.groupby("parent_station").size().to_frame("stop_count").reset_index(drop=False)
 
@@ -1394,13 +1396,13 @@ class SF_graph_builder:
         graph = cls(public_transport_conn, *args, **kwargs)
 
         graph.vertices = pd.read_sql_query(
-            f"""SELECT {",".join(SF_VERTEX_COLS)} FROM nodes;""",
-            public_transport_conn,
+            sql=f"SELECT {','.join(SF_VERTEX_COLS)} FROM nodes;",
+            con=public_transport_conn,
         )
 
         graph.edges = pd.read_sql_query(
-            f"""SELECT {",".join(SF_EDGE_COLS)} FROM links;""",
-            public_transport_conn,
+            sql=f"SELECT {','.join(SF_EDGE_COLS)} FROM links;",
+            con=public_transport_conn,
         )
 
         return graph
