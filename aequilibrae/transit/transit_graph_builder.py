@@ -61,20 +61,19 @@ class SF_graph_builder:
     def __init__(
         self,
         public_transport_conn,
-        start=61200,
-        end=64800,
-        time_margin=0,
-        projected_crs="EPSG:4326",
-        num_threads=-1,
-        seed=124,
-        geometry_noise=True,
-        noise_coef=1.0e-5,
-        with_inner_stop_transfers=True,
-        with_outer_stop_transfers=True,
-        with_walking_edges=True,
-        distance_upper_bound=np.inf,
-        blocking_centroid_flows=True,
-        max_connectors_per_zone=-1,
+        period_id: int = 1,
+        time_margin: int = 0,
+        projected_crs: str = "EPSG:3857",
+        num_threads: int = -1,
+        seed: int = 124,
+        geometry_noise: bool = True,
+        noise_coef: float = 1.0e-5,
+        with_inner_stop_transfers: bool = True,
+        with_outer_stop_transfers: bool = True,
+        with_walking_edges: bool = True,
+        distance_upper_bound: float = np.inf,
+        blocking_centroid_flows: bool = True,
+        max_connectors_per_zone: int = -1,
     ):
         """SF graph builder constructor.
 
@@ -101,6 +100,7 @@ class SF_graph_builder:
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
 
+        start, end = self.pt_conn.execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]).fetchall()[0]
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads
@@ -1283,8 +1283,8 @@ class SF_graph_builder:
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
         self.pt_conn.executemany(
             f"""\
-            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t");
+            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_start,period_end)
+            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t",{self.start},{self.end});
             """,
             (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
                 index=False, name=None
@@ -1314,8 +1314,8 @@ class SF_graph_builder:
         self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
         self.pt_conn.executemany(
             f"""\
-            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t");
+            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_start,period_end)
+            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t",{self.start},{self.end});
             """,
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
@@ -1333,7 +1333,7 @@ class SF_graph_builder:
         self.save_vertices(robust=robust)
         self.save_edges()
 
-    def to_aeq_graph(self):
+    def to_plain_graph(self):
         """Create an AequilibraE graph object from an SF graph builder."""
         from aequilibrae.paths import Graph
 
@@ -1359,7 +1359,7 @@ class SF_graph_builder:
         return g
 
     @classmethod
-    def from_db(cls, public_transport_conn, *args, **kwargs):
+    def from_db(cls, public_transport_conn, **kwargs):
         """
         Create a SF graph instance from an existing database save.
 
@@ -1371,8 +1371,9 @@ class SF_graph_builder:
         :Arguments:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
-        graph = cls(public_transport_conn, *args, **kwargs)
+        graph = cls(public_transport_conn, **kwargs)
 
+        # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(
             f"""SELECT {",".join(SF_VERTEX_COLS)} FROM nodes;""",
             public_transport_conn,

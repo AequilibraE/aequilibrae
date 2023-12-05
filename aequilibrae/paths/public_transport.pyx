@@ -23,7 +23,7 @@ class HyperpathGenerating:
         # load the edges
         if check_edges:
             self._check_edges(edges, tail, head, trav_time, freq)
-        self._edges = edges[[tail, head, trav_time, freq]].copy(deep=True)
+        self._edges = edges[["link_id", tail, head, trav_time, freq]].copy(deep=True)
         self.edge_count = len(self._edges)
 
         # remove inf values if any, and values close to zero
@@ -247,7 +247,7 @@ class HyperpathGenerating:
         if not project:
             project = project or get_active_project()
         conn = sqlite3.connect(os.path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn)
+        df.to_sql(table_name, conn, index=False)
         conn.close()
 
         conn = database_connection("transit", project.project_base_path)

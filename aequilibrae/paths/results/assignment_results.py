@@ -29,12 +29,19 @@ class NetworkGraphIndices:
     graph_ba_idx: np.array
 
 
-class AssignmentResults:
+class AssignmentResultsBase:
+    """Assignment results base class for traffic and transit assignments."""
+    def __init__(self):
+        pass
+
+
+class AssignmentResults(AssignmentResultsBase):
     """
     Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
     """
 
     def __init__(self):
+        super().__init__()
         self.compact_link_loads = np.array([])  # Results for assignment on simplified graph
         self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
         self.link_loads = np.array([])  # The actual results for assignment
@@ -326,3 +333,12 @@ class AssignmentResults:
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
             raise NotImplementedError
+
+
+class AssignmentResultsTransit(AssignmentResultsBase):
+    """
+    Assignment result holder for a single :obj:`Transit`
+    """
+
+    def __init__(self):
+        super().__init__()

@@ -21,28 +21,32 @@
 --@ The table is indexed on **link_id** (its primary key), **node_a** and **node_b**.
 
 
-CREATE TABLE  if not exists links (ogc_fid         INTEGER PRIMARY KEY,
-                                   link_id         INTEGER NOT NULL UNIQUE,
-                                   a_node          INTEGER,
-                                   b_node          INTEGER,
-                                   direction       INTEGER NOT NULL DEFAULT 0,
-                                   distance        NUMERIC,
-                                   modes           TEXT    NOT NULL,
-                                   link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
-                                   line_id         TEXT,
-                                   stop_id         TEXT    REFERENCES stops(stop) ON update RESTRICT ON delete RESTRICT,
-                                   line_seg_idx    INTEGER,
-                                   trav_time       NUMERIC  NOT NULL,
-                                   freq            NUMERIC  NOT NULL,
-                                   o_line_id       TEXT,
-                                   d_line_id       TEXT,
-                                   transfer_id     TEXT
-                                   CHECK(TYPEOF(link_id) == 'integer')
-                                   CHECK(TYPEOF(a_node) == 'integer')
-                                   CHECK(TYPEOF(b_node) == 'integer')
-                                   CHECK(TYPEOF(direction) == 'integer')
-                                   CHECK(LENGTH(modes)>0)
-                                   CHECK(LENGTH(direction)==1));
+CREATE TABLE if not exists links (ogc_fid         INTEGER PRIMARY KEY,
+                                  link_id         INTEGER NOT NULL UNIQUE,
+                                  a_node          INTEGER,
+                                  b_node          INTEGER,
+                                  direction       INTEGER NOT NULL DEFAULT 0,
+                                  distance        NUMERIC,
+                                  modes           TEXT    NOT NULL,
+                                  link_type       TEXT    REFERENCES link_types(link_type) ON update RESTRICT ON delete RESTRICT,
+                                  line_id         TEXT,
+                                  stop_id         TEXT    REFERENCES stops(stop) ON update RESTRICT ON delete RESTRICT,
+                                  line_seg_idx    INTEGER,
+                                  trav_time       NUMERIC  NOT NULL,
+                                  freq            NUMERIC  NOT NULL,
+                                  o_line_id       TEXT,
+                                  d_line_id       TEXT,
+                                  transfer_id     TEXT,
+                                  period_start    INTEGER NOT NULL,
+                                  period_end      INTEGER NOT NULL
+                                  CHECK(TYPEOF(link_id) == 'integer')
+                                  CHECK(TYPEOF(a_node) == 'integer')
+                                  CHECK(TYPEOF(b_node) == 'integer')
+                                  CHECK(TYPEOF(direction) == 'integer')
+                                  CHECK(TYPEOF(period_start) == 'integer')
+                                  CHECK(TYPEOF(period_end) == 'integer')
+                                  CHECK(LENGTH(modes)>0)
+                                  CHECK(LENGTH(direction)==1));
 
 --#
 select AddGeometryColumn( 'links', 'geometry', 4326, 'LINESTRING', 'XY', 1);
@@ -104,3 +108,7 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','*_line_id', 'Origin/Destination line ID for transfer links');
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','transfer_id', 'Transfer link ID');
+--#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_start', 'Graph start time');
+--#
+INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('links','period_end', 'Graph end period');
