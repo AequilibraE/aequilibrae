@@ -14,7 +14,7 @@ class ODME(object):
 
     def __init__(self, 
         assignment: TrafficAssignment,
-        count_volumes: list[Tuple[Tuple, int]],
+        count_volumes: list[Tuple[Tuple, int]], # [(link, obs_vol),...]
         stop_crit=(1, 10**-2), # max_iterations, convergence criterion
         alg_spec=((1, 0),) # currently just the objective function specification
     ):
@@ -43,7 +43,8 @@ class ODME(object):
 
         # Observed Links & Associated Volumes
         ids, values = zip(*count_volumes)
-        self._obs_links = np.array(ids)  # \hat A - indexing set for all other properties of observed links
+        # SHOULD THIS BE A NUMPY ARRAY OR NOT - BROKE WHEN USING A NUMPY ARRAY!!!
+        self._obs_links = ids  # \hat A - indexing set for all other properties of observed links
         self._obs_vals = np.array(values) # \hat v_a
         # MAY WANT TO INITIALISE THESE AS np.zeros
         self._assign_vals = np.empty(len(count_volumes)) # v_a
@@ -83,12 +84,24 @@ class ODME(object):
 
         return select_links
 
+    def get_result(self): 
+        """
+        Returns current demand matrix (may be called at any point regardless 
+        of whether execution has been completed).
+        
+        Ideally can be called at any point while execution is ongoing - but
+        this more dynamic functionality is for later on - maybe this is 
+        dumb since we can reach in and grab it anyway but could be nice
+        if a gui is set up to be able to get this at any point in time 
+        safely. Also kind of dumb since user should still have the 
+        TrafficAssignment object anyway and can access it from there.
+        """
+        return self.demand_matrix
+
     def execute(self):
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
-
-        Returns the modfied demand matrix.
         """
         # Create values for SL matrices & assigned flows
         self._perform_assignment()
@@ -108,8 +121,6 @@ class ODME(object):
             # Reassign values at the end of each outer loop
             self._perform_assignment()
             outer += 1
-
-        return self.demand_matrix
     
     def _execute_inner_iter(self) -> None:
         """
@@ -140,7 +151,7 @@ class ODME(object):
         """
         # Steps:
         # 1. Construct SL-demand matrices d^a = g * p^a element-wise (g = demand)
-        # 2. For each observed flow v_a do v_a / d^a componentwise for d^a
+        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a (componentwise for d^a)
         # 3. Compute geometric mean of all matrices & return
         # NOTE - This may be slower due to holding all these matrices in memory
         # simultaneously. It is possible to do this e.g element-wise or row-wise
@@ -148,15 +159,17 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
         
         # Steps 1 & 2:
-        proportions = np.array(
+        factors = np.array(
             [
-            (self._sl_matrices[f"sl_{link[0]}_{link[1]}"] * self.demand_matrix) / self._obs_vals[i] 
+            ((self._obs_vals[i] - self._assign_vals[i]) /
+             (self._sl_matrices[f"sl_{link[0]}_{link[1]}"] * self.demand_matrix)
+            )
             for i, link in enumerate(self._obs_links)
             ]
         )
         
         # Step 3:
-        return spstats.gmean(proportions, axis=0)
+        return np.nan_to_num(spstats.gmean(factors, axis=0))
             
 
     def _perform_assignment(self) -> None:
@@ -225,4 +238,4 @@ class ODME(object):
         """
         for i, link in enumerate(self._obs_links):
             sl_matrix = self._sl_matrices[f"sl_{link[0]}_{link[1]}"]
-            self._assign_vals[i] = sum(sl_matrix * self.demand_matrix)
+            self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
