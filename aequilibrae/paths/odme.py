@@ -1,10 +1,13 @@
+"""
+Implementation of ODME algorithms:
+"""
+
 from typing import Tuple
 import numpy as np
 import scipy.stats as spstats
 import pandas as pd
 
-from aequilibrae import TrafficAssignment, Graph
-from aequilibrae.matrix import AequilibraeMatrix # Used only for writing/reading from disk - may not be relevant
+from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
@@ -114,18 +117,18 @@ class ODME(object):
         This assumes the SL matrices stay constant and modifies
         the current demand matrix.
         """
-        # Get scaling matrix
-        scaling_matrix = self._get_scaling_factor()
-
         # Element-wise multiplication of demand matrix by scaling factor
-        self.demand_matrix = self.demand_matrix * scaling_matrix
+        self.demand_matrix = self.demand_matrix * self._get_scaling_factor()
+
+        # Recalculate the link flows
+        self._calculate_flows()
 
     def _get_scaling_factor(self) -> np.ndarray:
         """
         Returns scaling matrix - depends on algorithm chosen.
         Currently implementing default as geometric mean.
         """
-        # NOT YET IMPLEMENTED
+        # Defaults to geometric mean currently - cannot yet specify choice.
         return self._geometric_mean()
 
     def _geometric_mean(self) -> np.ndarray:
@@ -178,6 +181,7 @@ class ODME(object):
         # Extract and store array of assigned volumes to select links
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
+        # NOTE - NEED TO CHECK THAT THIS NOTATION WORKS ACROSS ALL DEMAND MATRICES!!!
         for i, link in enumerate(self._obs_links):
             self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == link[0], col[link[1]]].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
