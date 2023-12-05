@@ -48,14 +48,9 @@ class TestODME(TestCase):
         self.assignment.max_iter = 1
         self.assignment.set_algorithm("bfw")
 
-        # Set up ODME solver with default stopping conditions: 
-        # NEEDS TO BE CHANGED - SHOULD BE CREATED WITHIN INDIVIDUAL TESTS
-        # Final value needs to be a data frame
-        self.odme_solver = ODME(self.assignment, [((9,1), 10000)])
-
     def tearDown(self) -> None:
         self.matrix.close()
-        self.project.close()    
+        self.project.close()
 
     def test_single_observation(self) -> None:
         """
@@ -69,23 +64,57 @@ class TestODME(TestCase):
         - When assigning new_demand_matrix we expect link volume on [9, 1] to be close to 100000
         """
         # NOT YET IMPLEMENTED
-
+        odme_solver = ODME(self.assignment, [((9,1), 10000)])
         demand_matrix = self.matrix.matrix_view
         #count_volumes = [10000]
 
-        new_demand_matrix = self.odme_solver.execute()
+        odme_solver.execute()
+        new_demand_matrix = odme_solver.get_result()
         assert(np.sum(demand_matrix) - np.sum(new_demand_matrix) <= 10^-2) # Arbitrarily chosen value for now
-        #computational_view()
+        # Likely far too stringent of a condition.
 
-    def test_bottom_left_oned(self) -> None:
+    def test_bottom_left_zeroed_default(self) -> None:
         """
         Tests whether attempting to double the bottom left link value (link 37) only changes the O-D pairs
         13-12 & 24-12 (see QGIS for visualisation).
         
-        First sets all demand to 1 (on all O-D pairs - both directions), then assigns and extracts flow on
-        link 37 from 13-12 (ba direction). Attempts to perform ODME with observation of double flow on link
-        37 and checks whether resulting demand matrix does indeed only change the expected cells.
+        First sets all demand to 0 (on all O-D pairs - both directions except for specified OD's), then assigns 
+        and extracts flow on link 37 from 13-12 (ba direction). Attempts to perform ODME with observation of
+        double flow on link 37.
+        
+        
+        Checks whether resulting demand matrix only changes the expected cells.
+        Asserts flow on  link is doubled.
+        Expect convergence for such a simple case.
         """
-        #print(type(self.matrix.matrix_view))
-        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
-        #print(self.matrix.matrix_view)
+        # Set synthetic demand matrix
+        demand = np.zeros(self.matrix.matrix_view.shape)
+        index = self.car_graph.nodes_to_indices
+        demand[index[13], index[12]] = 1
+        demand[index[24], index[12]] = 1
+        self.matrix.matrix_view = demand
+
+        # Extract assigned flow on link 37
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        old_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+
+        # Perform ODME with doubled link flow on link 37
+        # Execute with default options
+        count_volumes = [((38, 1), 2 * old_flow)]
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+        new_demand = odme.get_result()
+
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+
+        # Assert link flow is in fact doubled:
+        assert(new_flow == 2 * old_flow)
+        
+        # Assert only appropriate O-D pairs (13-12 & 24-12) have had demand changed
+        od_13_12 = new_demand[index[13], index[12]]
+        od_24_12 = new_demand[index[24], index[12]]
+        assert np.sum(new_demand) == od_13_12 + od_24_12
+        assert od_13_12 > 1 or od_24_12 > 1
