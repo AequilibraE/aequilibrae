@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Callable
 import numpy as np
 import pandas as pd
 
@@ -11,8 +11,8 @@ class ODME(object):
     def __init__(self, 
         assignment: TrafficAssignment,
         count_volumes: list[Tuple[Tuple, int]],
-        stop_crit=(1, 10**-2),
-        alg_spec=None
+        stop_crit=(1, 10**-2), # max_iterations, convergence criterion
+        alg_spec=((1, 0)) # currently just the objective function specification
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -49,13 +49,19 @@ class ODME(object):
         # Set the select links:
         self.assignclass.set_select_links(self._get_select_links())
 
+        # Not yet relevant - Algorithm Specifications:
+        self._alg_spec = alg_spec
+        self._norms = alg_spec[0]
+
+        # Initialise objective function
+        self._obj_func = None
+        self._set_objective_func()
+
         # Stopping criterion
         self.max_iter = stop_crit[0]
         self.convergence_crit = stop_crit[1]
 
-        # Not yet relevant:
-        self._alg_spec = alg_spec
-
+        # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
 
@@ -144,12 +150,45 @@ class ODME(object):
             self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == link[0], col[link[1]]].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
-    def objective_func(self) -> float:
+    def _set_objective_func(self) -> None:
         """
-        Calculates the objective function - which must be specified by the user.
+        Determines the objective function - parameters must be specified by user.
+
+        Current objective functions have 2 parts which are summed:
+            1. The p-norm raised to the power p of the error vector for observed flows.
+            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) for the demand matrix.
+        
+        (1.) must always be present, but (2.) (the regularisation term) need not be present (ie, specified as 0 by user).
+        Default currently set to l1 (manhattan) norm for (1.) and no regularisation term (input 0).
         """
-        # NOT CURRENTLY IMPLEMENTED
-        return 0.1
+        p1 = self._norms[0]
+        p2 = self._norms[1]
+
+        def reg_obj_func(self) -> float:
+            """
+            Objective function containing regularisation term.
+            """
+            obj1 = np.sum(np.abs(self._obs_vals - self._assign_vals)**p1) / p1 
+            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p2) / p2
+            return obj1 + regularisation
+
+        def obj_func(self) -> float:
+            """
+            Objective function with no regularisation term.
+            """
+            return np.sum(np.abs(self._obs_vals - self._assign_vals)**p1) / p1
+        
+        if p2:
+            self._obj_func = reg_obj_func
+        else:
+            self._obj_func = obj_func
+        
+
+    def manhattan(self) -> float:
+        """
+        l1 (Manhattan) distance function - only based on flows.
+        """
+        return np.sum(np.abs(self._obs_vals - self._assign_vals))
 
     def _calculate_flows(self) -> None:
         """

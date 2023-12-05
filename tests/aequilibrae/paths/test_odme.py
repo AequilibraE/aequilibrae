@@ -72,5 +72,5 @@ class TestODME(TestCase):
         #count_volumes = [10000]
 
         new_demand_matrix = self.odme_solver.execute()
-        assert(sum(demand_matrix) - sum(new_demand_matrix) <= 10^-2) # Arbitrarily chosen value for now
+        assert(np.sum(demand_matrix) - np.sum(new_demand_matrix) <= 10^-2) # Arbitrarily chosen value for now
         #computational_view()
