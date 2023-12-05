@@ -68,9 +68,24 @@ class TestODME(TestCase):
         - sum(demand_matrix) ~= sum(new_demand_matrix)
         - When assigning new_demand_matrix we expect link volume on [9, 1] to be close to 100000
         """
-        demand_matrix = self.matrix
+        # NOT YET IMPLEMENTED
+
+        demand_matrix = self.matrix.matrix_view
         #count_volumes = [10000]
 
         new_demand_matrix = self.odme_solver.execute()
         assert(np.sum(demand_matrix) - np.sum(new_demand_matrix) <= 10^-2) # Arbitrarily chosen value for now
         #computational_view()
+
+    def test_bottom_left_oned(self) -> None:
+        """
+        Tests whether attempting to double the bottom left link value (link 37) only changes the O-D pairs
+        13-12 & 24-12 (see QGIS for visualisation).
+        
+        First sets all demand to 1 (on all O-D pairs - both directions), then assigns and extracts flow on
+        link 37 from 13-12 (ba direction). Attempts to perform ODME with observation of double flow on link
+        37 and checks whether resulting demand matrix does indeed only change the expected cells.
+        """
+        #print(type(self.matrix.matrix_view))
+        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
+        #print(self.matrix.matrix_view)
