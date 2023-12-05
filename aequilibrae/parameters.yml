@@ -255,22 +255,18 @@ network:
         - primary
         - secondary
         - tertiary
-        - living_street
+        - livingStreet
         - parkingAisle
         - residential
         - cycleway
-        - corridor
         - pedestrian
-        - path
         - track
-        - trail
         - unclassified
         mode_filter:
           bicycle: 'no'
         unknown_tags: true
       car:
         link_types:
-        - motor
         - motorway
         - trunk
         - primary
@@ -278,17 +274,13 @@ network:
         - tertiary
         - unclassified
         - residential
-        - living_street
+        - livingStreet
         - parkingAisle
-        - service
-        - escape
-        - road
         mode_filter:
           motor_vehicle: 'no'
         unknown_tags: true
       transit:
         link_types:
-        - motor
         - motorway
         - trunk
         - primary
@@ -296,24 +288,15 @@ network:
         - tertiary
         - unclassified
         - residential
-        - living_street
-        - service
-        - escape
-        - road
-        - bus_guideway
+        - livingStreet
         unknown_tags: true
       walk:
         link_types:
         - cycleway
         - footway
         - steps
-        - corridor
         - pedestrian
-        - elevator
-        - escalator
-        - path
         - track
-        - trail
         - bridleway
         - unclassified
         mode_filter:

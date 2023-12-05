@@ -128,9 +128,7 @@ c.execute("""
           road,
           contextId,
           defaultLanguage,
-          JSON(sources) AS sources,
           geopolDisplay,
-          JSON(connectors) AS connectors,
           JSON(categories) AS categories,
           JSON(addresses) AS addresses,
         FROM read_parquet('E:/type=transportation/type=segment/*')

@@ -8,12 +8,13 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
 import gc
 import importlib.util as iutil
-from ...utils import WorkerThread
+from aequilibrae.utils import WorkerThread
 
 import duckdb
 import geopandas as gpd
 import subprocess
 import os
+from typing import Union
 
 conn = duckdb.connect()
 c = conn.cursor()
@@ -41,20 +42,26 @@ class OVMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes, project_path: Path, logger: logging.Logger = None):
+    def __init__(self, bbox, modes, project_path: Union[str, Path], logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
-        self.polygons = polygons
+        self.bbox = bbox
         self.filter = self.get_ovm_filter(modes)
         self.report = []
         self.gpkg = []
-        self.__project_path = project_path
+        self.__project_path = Path(project_path)
 
-    def downloadPlace(self):
+    def downloadPlace(self, source, local_file_path=None):
+        pth = str(self.__project_path / 'new_geopackage_pla.parquet').replace("\\", "/")
 
-        pth = str(self.__project_path / 'new_geopackage_pla.parquet')
-        c.execute(
-            f"""
+        if source == 's3':
+            data_source = 's3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=places/type=*'
+        elif source == 'local':
+            data_source = local_file_path.replace("\\", "/")
+        else:
+            raise ValueError("Invalid source. Use 's3' or provide a valid local file path.")
+        
+        sql = f"""
             COPY(
             SELECT
                id,
@@ -63,33 +70,41 @@ class OVMDownloader(WorkerThread):
                CAST(brand AS JSON) AS brand,
                CAST(addresses AS JSON) AS addresses,
                ST_GeomFromWKB(geometry) AS geom
-            FROM read_parquet('s3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=places/type=*/*', filename=true, hive_partitioning=1)
-            WHERE bbox.minx > 148.7077
-                AND bbox.maxx < 148.7324
-                AND bbox.miny > -20.2780
-                AND bbox.maxy < -20.2621 )
-            TO "{pth}";
-            """
-        )
-
-    def downloadTransportation(self):
-        pth = str(self.__project_path / 'new_geopackage_tran.parquet').replace("\\", "/")
-        c.execute(f"""
-            COPY (
-            SELECT
-               type,
-               JSON(bbox) AS bbox,
-               connectors,
-               road,
-               ST_GeomFromWkb(geometry) AS geometry
-            FROM read_parquet('s3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=transportation/type=*/*', filename=true, hive_partitioning=1)
-            WHERE bbox.minx > 148.7077
-                AND bbox.maxx < 148.7324
-                AND bbox.miny > -20.2780
-                AND bbox.maxy < -20.2621 )
+            FROM read_parquet('{data_source}/*', filename=true, hive_partitioning=1)
+            WHERE bbox.minx > '{self.bbox[0]}'
+                AND bbox.maxx < '{self.bbox[2]}'
+                AND bbox.miny > '{self.bbox[1]}'
+                AND bbox.maxy < '{self.bbox[3]}')
             TO '{pth}';
             """
-                  )
+        c.execute(sql)
+
+    def downloadTransportation(self, source, local_file_path=None):
+        pth = str(self.__project_path / 'new_geopackage_tran.parquet').replace("\\", "/")
+
+        if source == 's3':
+            data_source = 's3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=transportation/type=*'
+        elif source == 'local':
+            data_source = local_file_path.replace("\\", "/")
+        else:
+            raise ValueError("Invalid source. Use 's3' or provide a valid local file path.")
+
+        sql = f"""
+            COPY (
+            SELECT
+                type,
+                JSON(bbox) AS bbox,
+                connectors,
+                road,
+                ST_GeomFromWkb(geometry) AS geometry
+            FROM read_parquet('{data_source}/*', filename=true, hive_partitioning=1)
+            WHERE bbox.minx > '{self.bbox[0]}'
+                AND bbox.maxx < '{self.bbox[2]}'
+                AND bbox.miny > '{self.bbox[1]}'
+                AND bbox.maxy < '{self.bbox[3]}')
+            TO '{pth}';
+        """
+        c.execute(sql)
 
     def get_ovm_filter(self, modes: list) -> str:
         """
@@ -110,24 +125,13 @@ class OVMDownloader(WorkerThread):
         tags_to_keep = list(set(tags_to_keep))
 
         # Default to remove
-        service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
-        access = '["access"!~"private"]'
+        # service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
+        # access = '["access"!~"private"]'
 
         filtered = [x for x in all_tags if x not in tags_to_keep]
         filtered = "|".join(filtered)
 
-        filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
+        # filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
-    #
-    # def merge_geopackages(output_gpkg_path, *input_gpkg_paths):
-    #     # Build the ogr2ogr command to merge GeoPackages
-    #     ogr2ogr_command = [
-    #         'ogr2ogr',
-    #         '-f', 'GPKG',
-    #         output_gpkg_path,
-    #         *input_gpkg_paths
-    #     ]
-    #
-    #     # Execute the ogr2ogr command
-    #     subprocess.run(ogr2ogr_command)
+  
