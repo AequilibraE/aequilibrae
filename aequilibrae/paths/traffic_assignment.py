@@ -25,7 +25,11 @@ spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 
 
-class TrafficAssignment(object):
+class Assignment:
+    pass
+
+
+class TrafficAssignment(Assignment):
     """Traffic assignment class.
 
     For a comprehensive example on use, see the Use examples page.
@@ -768,3 +772,7 @@ class TrafficAssignment(object):
         """
         self.save_select_link_flows(name)
         self.save_select_link_matrices(name)
+
+
+class TransitAssignment(Assignment):
+    pass
