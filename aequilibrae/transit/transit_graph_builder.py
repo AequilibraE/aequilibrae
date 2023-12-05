@@ -391,7 +391,7 @@ class SF_graph_builder:
 
         # deal with first trip for a stop & pattern
         mh.loc[(mh["trip_count"] > 1) & (mh["trip_idx"] == 0), "headway"] = np.nan
-        mh["headway"] = mh["headway"].fillna(method="bfill")
+        mh["headway"] = mh["headway"].bfill()
 
         # take the min of the headways computed among the stops of a given trip
         mh = mh[["pattern_id", "trip_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
