@@ -86,3 +86,109 @@ class TestODMESetUp(TestCase):
         for sl in all_sl:
             obs_link_flows += [assign_df.loc[assign_df["link_id"] == sl[0], col[sl[1]]].values[0]]
         print(obs_link_flows)
+
+
+    # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
+    # 1) Edge Cases
+    # 2) Input Validity Checking (Ensuring API is Consistent)
+    # 3) General Test Cases (Using Synthetic Demand Matrices & Pre-determined Results)
+
+    # 1) Edge Cases
+    def test_basic_1_1(self) -> None: 
+        """
+        Check that running ODME with 0 demand does not change demand.
+        """
+        assert False
+
+    def test_basic_1_2(self) -> None:
+        """
+        Given a demand matrix with 0 demand at OD pairs I1, I2,...,
+        following ODME the new demand matrix has 0 demand at OD pairs Ii,
+        regardless of
+        """
+        assert False
+
+    def test_basic_1_3(self) -> None:
+        """
+        Given count volumes which are identical to the assigned volumes of an 
+        initial demand matrix - ODME should not change this demand matrix (since
+        we are looking for a local solution and this already provides one).
+        """
+        assert False
+
+    # 2) Input Validity
+    def test_basic_2_1_a(self) -> None:
+        """
+        Check that the ODME class does not accept input with no count volumes.
+        Current API raises (DECIDE WHICH TYPE OF) error in this case.
+
+        (NOTE - this is specific to this API, we could choose to simply return
+        the initial demand matrix with no perturbation).
+        """
+        assert False
+
+    def test_basic_2_1_b(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if negative count volumes are given.
+        """
+        assert False
+
+    def test_basic_2_1_c(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if multiple count volumes
+        are given for the same link.
+        """
+        assert False
+
+    def test_basic_2_1_d(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if a given link does not exist.
+
+        (NOTE - this may be a case of COUPLING since this error may be propagated from
+        the TrafficClass class).
+        """
+        assert False
+
+    def test_basic_2_2_a(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
+        has no classes set.
+        """
+        assert False
+
+    def test_basic_2_2_b(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
+        has no volume delay function set.
+        """
+        assert False
+
+    def test_basic_2_2_c(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
+        has no assignment algorithm set.
+        """
+        assert False
+
+    def test_basic_2_3(self) -> None:
+        """
+        Check (DECIDE WHICH TYPE OF) error is raised if input demand matrix contains 
+        negative values.
+
+        (NOTE - this may be intended to be a part of some other part of the API and shouldn't
+        be tested here).
+        """
+        assert False
+
+    # Simple Test Cases:
+    def test_basic_3_1(self) -> None:
+        """
+        Input single count volume representing OD path from node i to node j
+        along link a, with demand matrix which is 0 everywhere except on OD pair (i, j).
+        Ensure count volume is small enough that the best (i, j) path is via link a.
+
+        Check that the only OD pair that has changed is at index (i, j) and that
+        the assignment produces the required flow.
+        """
+        assert False
+        
