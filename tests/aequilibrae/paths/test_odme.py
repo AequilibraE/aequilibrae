@@ -16,6 +16,7 @@ class TestODME(TestCase):
     """
     Tests final outputs of ODME execution with various inputs.
     Runs accuracy and time tests.
+    Intended as both tests for optimisation and robustness of implementation.
     """
 
     def setUp(self) -> None:

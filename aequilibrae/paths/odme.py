@@ -14,7 +14,7 @@ class ODME(object):
 
     def __init__(self, 
         assignment: TrafficAssignment,
-        count_volumes: list[Tuple[Tuple, int]], # [(link, obs_vol),...]
+        count_volumes: pd.DataFrame, # [link_id, direction, volume, mode]
         stop_crit=(1, 10**-2), # max_iterations, convergence criterion
         alg_spec=((1, 0),) # currently just the objective function specification
     ):
@@ -31,13 +31,17 @@ class ODME(object):
             alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
                     of algorithm they choose.
         """
+        # CHANGE COUNT VOLUMES TO A PANDAS DATAFRAME
+
+
         # Parameters for assignments
         self.assignment = assignment
         self.assignclass = assignment.classes[0] # - for now assume only one class
 
-        # Initial demand matrix
-        self.init_demand_matrix = self.assignclass.matrix.matrix_view # May be unecessary - if we do keep it need to make a copy
-        self.demand_matrix = self.init_demand_matrix # The current demand matrix
+        # Demand matrices
+        self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix
+        # May be unecessary - if we do keep it need to make a copy ->
+        self.init_demand_matrix = np.copy(self.demand_matrix)
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
         # SHOULD COPY THIS IF I WANT A COPY OF ORIGINAL IN MEMORY
 
@@ -72,7 +76,7 @@ class ODME(object):
         # e.g. the derivative of link flows w.r.t. step size.
 
         # Potentially set up some sort of logging information here:
-    
+
     def _get_select_links(self) -> dict:
         """
         Creates dictionary of select links to be stored within the assignment class.
@@ -84,7 +88,7 @@ class ODME(object):
 
         return select_links
 
-    def get_result(self): 
+    def get_result(self):
         """
         Returns current demand matrix (may be called at any point regardless 
         of whether execution has been completed).
@@ -121,7 +125,7 @@ class ODME(object):
             # Reassign values at the end of each outer loop
             self._perform_assignment()
             outer += 1
-    
+
     def _execute_inner_iter(self) -> None:
         """
         Runs an inner iteration of the ODME algorithm. 
@@ -157,20 +161,20 @@ class ODME(object):
         # simultaneously. It is possible to do this e.g element-wise or row-wise
         # to save on memory usage. Need to test this later on.
         # NOTE - by not approximating step size we may over-correct massively.
-        
+
         # Steps 1 & 2:
-        factors = np.array(
+        factors = np.nan_to_num(np.array(
             [
             ((self._obs_vals[i] - self._assign_vals[i]) /
              (self._sl_matrices[f"sl_{link[0]}_{link[1]}"] * self.demand_matrix)
             )
             for i, link in enumerate(self._obs_links)
             ]
-        )
-        
+        ))
+
         # Step 3:
-        return np.nan_to_num(spstats.gmean(factors, axis=0))
-            
+        return spstats.gmean(factors, axis=0)
+
 
     def _perform_assignment(self) -> None:
         """ 
@@ -213,7 +217,7 @@ class ODME(object):
         p_1 = self._norms[0]
         p_2 = self._norms[1]
 
-        def reg_obj_func(self) -> float:
+        def _reg_obj_func(self) -> float:
             """
             Objective function containing regularisation term.
             """
@@ -221,16 +225,16 @@ class ODME(object):
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
             return obj1 + regularisation
 
-        def obj_func(self) -> float:
+        def _obj_func(self) -> float:
             """
             Objective function with no regularisation term.
             """
             return np.sum(np.abs(self._obs_vals - self._assign_vals)**p_1) / p_1
         
         if p_2:
-            self._obj_func = reg_obj_func
+            self._obj_func = _reg_obj_func
         else:
-            self._obj_func = obj_func
+            self._obj_func = _obj_func
 
     def _calculate_flows(self) -> None:
         """
