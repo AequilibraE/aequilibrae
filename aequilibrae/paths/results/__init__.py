@@ -11,6 +11,6 @@ __version__ = "1.0"
 __revision__ = "$Revision: 1 $"
 __date__ = "$Date: 2016-07-02$"
 
-from .assignment_results import AssignmentResults
+from .assignment_results import AssignmentResults, AssignmentResultsTransit
 from .path_results import PathResults
 from .skim_results import SkimResults

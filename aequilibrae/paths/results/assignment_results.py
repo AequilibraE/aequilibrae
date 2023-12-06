@@ -1,9 +1,10 @@
 import dataclasses
 import multiprocessing as mp
+from abc import ABC, abstractmethod
 
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, GraphBase
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
 from pathlib import Path
@@ -29,10 +30,123 @@ class NetworkGraphIndices:
     graph_ba_idx: np.array
 
 
-class AssignmentResultsBase:
+class AssignmentResultsBase(ABC):
     """Assignment results base class for traffic and transit assignments."""
     def __init__(self):
+        self.link_loads = np.array([])  # The actual results for assignment
+        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
+        self.no_path = None  # The list os paths
+        self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
+        p = Parameters().parameters["system"]["cpus"]
+        if not isinstance(p, int):
+            p = 0
+        self.set_cores(p)
+
+        self.classes = {"number": 1, "names": ["flow"]}
+
+        self.nodes = -1
+        self.zones = -1
+        self.links = -1
+        self.compact_links = -1
+        self.compact_nodes = -1
+
+        self.lids = None
+        self.direcs = None
+
+        # save path files. Need extra metadata for file paths
+        self.save_path_file = False
+        self.path_file_dir = None
+        self.write_feather = True  # we use feather as default, parquet is slower but with better compression
+
+    @abstractmethod
+    def prepare(self, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
         pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        pass
+
+    def total_flows(self) -> None:
+        """
+        Totals all link flows for this class into a single link load
+
+        Results are placed into *total_link_loads* class member
+        """
+        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
+
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
+        """
+
+        if not isinstance(cores, int):
+            raise ValueError("Number of cores needs to be an integer")
+
+        if cores < 0:
+            self.cores = max(1, mp.cpu_count() + cores)
+        elif cores == 0:
+            self.cores = mp.cpu_count()
+        elif cores > 0:
+            cores = min(mp.cpu_count(), cores)
+            if self.cores != cores:
+                self.cores = cores
+        if self.link_loads.shape[0]:
+            self.__redim()
+
+    def get_graph_to_network_mapping(self):
+        num_uncompressed_links = int(np.unique(self.lids).shape[0])
+        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
+        indexing[np.unique(self.lids)[:]] = np.arange(num_uncompressed_links)
+
+        graph_ab_idx = self.direcs > 0
+        graph_ba_idx = self.direcs < 0
+        network_ab_idx = indexing[self.lids[graph_ab_idx]]
+        network_ba_idx = indexing[self.lids[graph_ba_idx]]
+        return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+
+    def get_load_results(self) -> AequilibraeData:
+        """
+        Translates the assignment results from the graph format into the network format
+
+        :Returns:
+            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
+        """
+        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
+        types = [np.float64] * len(fields)
+
+        # Create a data store with a row for each uncompressed link
+        res = AequilibraeData.empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids),
+        )
+
+        # Get a mapping from the compressed graph to/from the network graph
+        m = self.get_graph_to_network_mapping()
+
+        # Link flows
+        link_flows = self.link_loads[self._graph_ids, :]
+        for i, n in enumerate(self.classes["names"]):
+            # Directional Flows
+            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+
+            # Tot Flow
+            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+
+        return res
 
 
 class AssignmentResults(AssignmentResultsBase):
@@ -44,39 +158,16 @@ class AssignmentResults(AssignmentResultsBase):
         super().__init__()
         self.compact_link_loads = np.array([])  # Results for assignment on simplified graph
         self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
-        self.link_loads = np.array([])  # The actual results for assignment
-        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
         self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
         self.skims = AequilibraeMatrix()  # The array of skims
-        self.no_path = None  # The list os paths
-        self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
-        p = Parameters().parameters["system"]["cpus"]
-        if not isinstance(p, int):
-            p = 0
-        self.set_cores(p)
-
-        self.classes = {"number": 1, "names": ["flow"]}
 
         self._selected_links = {}
         self.select_link_od = None
         self.select_link_loading = {}
 
-        self.nodes = -1
-        self.zones = -1
-        self.links = -1
-        self.compact_links = -1
-        self.compact_nodes = -1
-        self.__graph_id__ = None
+        self._graph_id = None
         self.__float_type = None
         self.__integer_type = None
-
-        self.lids = None
-        self.direcs = None
-
-        # save path files. Need extra metadata for file paths
-        self.save_path_file = False
-        self.path_file_dir = None
-        self.write_feather = True  # we use feather as default, parquet is slower but with better compression
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
@@ -197,41 +288,6 @@ class AssignmentResults(AssignmentResultsBase):
 
         self.reset()
 
-    def total_flows(self) -> None:
-        """Totals all link flows for this class into a single link load
-
-        Results are placed into *total_link_loads* class member
-        """
-        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
-
-    def set_cores(self, cores: int) -> None:
-        """
-        Sets number of cores (threads) to be used in computation
-
-        Value of zero sets number of threads to all available in the system, while negative values indicate the number
-        of threads to be left out of the computational effort.
-
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of cores to be used in computation
-        """
-
-        if not isinstance(cores, int):
-            raise ValueError("Number of cores needs to be an integer")
-
-        if cores < 0:
-            self.cores = max(1, mp.cpu_count() + cores)
-        elif cores == 0:
-            self.cores = mp.cpu_count()
-        elif cores > 0:
-            cores = min(mp.cpu_count(), cores)
-            if self.cores != cores:
-                self.cores = cores
-        if self.link_loads.shape[0]:
-            self.__redim()
-
     def get_graph_to_network_mapping(self):
         num_uncompressed_links = int(np.unique(self.lids).shape[0])
         indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
@@ -242,41 +298,6 @@ class AssignmentResults(AssignmentResultsBase):
         network_ab_idx = indexing[self.lids[graph_ab_idx]]
         network_ba_idx = indexing[self.lids[graph_ba_idx]]
         return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
-
-    def get_load_results(self) -> AequilibraeData:
-        """
-        Translates the assignment results from the graph format into the network format
-
-        :Returns:
-            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
-        """
-        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
-        types = [np.float64] * len(fields)
-
-        # Create a data store with a row for each uncompressed link
-        res = AequilibraeData.empty(
-            memory_mode=True,
-            entries=int(np.unique(self.lids).shape[0]),
-            field_names=fields,
-            data_types=types,
-            fill=np.nan,
-            index=np.unique(self.lids),
-        )
-
-        # Get a mapping from the compressed graph to/from the network graph
-        m = self.get_graph_to_network_mapping()
-
-        # Link flows
-        link_flows = self.link_loads[self.__graph_ids, :]
-        for i, n in enumerate(self.classes["names"]):
-            # Directional Flows
-            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
-
-            # Tot Flow
-            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
-
-        return res
 
     def get_sl_results(self) -> AequilibraeData:
         # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
