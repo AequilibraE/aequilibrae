@@ -37,6 +37,9 @@ class TestODMESetUp(TestCase):
         self.matrix = self.project.matrices.get_matrix("demand_omx")
         self.matrix.computational_view()
 
+        self.index = self.car_graph.nodes_to_indices
+        self.dims = self.matrix.matrix_view.shape
+
         # Initial assignment:
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
@@ -157,19 +160,209 @@ class TestODMESetUp(TestCase):
                 err_msg="0 demand matrix with many count volumes of 0 does not return 0 matrix",
         )
 
-    def test_basic_1_2(self) -> None:
+    def test_basic_1_1_d(self) -> None:
         """
-        Given a demand matrix with 0 demand at OD pairs I1, I2,...,
-        following ODME the new demand matrix has 0 demand at OD pairs Ii,
-        regardless of
+        Check that running ODME with 0 demand matrix returns 0 matrix, with
+        single non-zero count volume.
         """
-        assert False
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
+        count_volumes = [((1, 1), 10)]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        np.testing.assert_allclose(
+                np.zeros(self.matrix.matrix_view.shape),
+                odme.get_result(),
+                err_msg="0 demand matrix with single non-zero count volume does not return 0 matrix",
+        )
+
+    def test_basic_1_1_e(self) -> None: 
+        """
+        Check that running ODME with 0 demand matrix returns 0 matrix, with
+        two non-zero count volumes.
+        """
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
+        count_volumes = [((1, 1), 10), ((2, 1), 30)]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        np.testing.assert_allclose(
+                np.zeros(self.matrix.matrix_view.shape),
+                odme.get_result(),
+                err_msg="0 demand matrix with two non-zero count volumes does not return 0 matrix",
+        )
+
+    def test_basic_1_1_f(self) -> None: 
+        """
+        Check that running ODME with 0 demand matrix returns 0 matrix, with
+        many non-zero count volumes.
+        """
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
+        count_volumes = [((i, 1), (i * 30) % ((i + 3) % 7)) for i in range(2, 30, 2)]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        np.testing.assert_allclose(
+                np.zeros(self.matrix.matrix_view.shape),
+                odme.get_result(),
+                err_msg="0 demand matrix with many non-zero count volumes does not return 0 matrix",
+        )
+
+    def test_basic_1_2_a(self) -> None:
+        """
+        Given a demand matrix with 0 demand at a single OD pair,
+        following ODME the new demand matrix should have 0 demand at that OD pair
+        with single count volume.
+        """
+        # Set synthetic demand matrix & count volumes
+        demand = np.ones(self.matrix.matrix_view.shape)
+        demand[self.index[13], self.index[12]] = 0
+        self.matrix.matrix_view = demand
+
+        count_volumes = [((9, 1), 30)]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        np.testing.assert_array_equal(
+            odme.get_result()[self.index[13], self.index[12]],
+            0,
+            err_msg="Demand matrix with single 0 at OD 13-12, has non-zero demand following ODME",
+        )
+
+    def test_basic_1_2_b(self) -> None:
+        """
+        Given a demand matrix with 0 demand at a single OD pair,
+        following ODME the new demand matrix should have 0 demand at that OD pair
+        with many count volumes.
+        """
+        # Set synthetic demand matrix & count volumes
+        demand = np.ones(self.matrix.matrix_view.shape)
+        demand[self.index[18], self.index[6]] = 0
+        self.matrix.matrix_view = demand
+
+        count_volumes = [
+            ((9, 1), 30),
+            ((11, 1), 25),
+            ((35, 1), 0),
+            ((18, 1), 100),
+            ((6, 1), 2),
+            ((65, 1), 85),
+            ((23, 1), 0)
+        ]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+     
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        np.testing.assert_array_equal(
+            odme.get_result()[self.index[13], self.index[12]],
+            0,
+            err_msg="Demand matrix with single 0 at OD 18-6, has non-zero demand following ODME",
+        )
+
+    def test_basic_1_2_c(self) -> None:
+        """
+        Given a demand matrix with 0 demand at many OD pairs,
+        following ODME the new demand matrix should have 0 demand at those OD pair
+        with single count volume.
+        """
+        # Set synthetic demand matrix & count volumes
+        demand = np.ones(self.matrix.matrix_view.shape)
+        zeroes = [(18, 6), (5, 11), (11, 5), (23, 2), (13, 19), (19, 21), (19, 24), (17, 5)]
+        for o, d in zeroes:
+            demand[self.index[o], self.index[d]] = 0
+        self.matrix.matrix_view = demand
+
+        count_volumes = [
+            ((9, 1), 30),
+        ]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+     
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
+        for o, d in zeroes:
+            np.testing.assert_array_equal(
+                odme.get_result()[self.index[o], self.index[d]],
+                0,
+                err_msg=err_msg,
+            )
+        
+    def test_basic_1_2_d(self) -> None:
+        """
+        Given a demand matrix with 0 demand at many OD pairs,
+        following ODME the new demand matrix should have 0 demand at those OD pair
+        with many count volumes.
+        """
+        # Set synthetic demand matrix & count volumes
+        demand = np.ones(self.matrix.matrix_view.shape)
+        zeroes = [(18, 6), (5, 11), (11, 5), (23, 2), (13, 19), (19, 21), (19, 24), (17, 5)]
+        for o, d in zeroes:
+            demand[self.index[o], self.index[d]] = 0
+        self.matrix.matrix_view = demand
+
+        count_volumes = [
+            ((9, 1), 30),
+            ((11, 1), 2500),
+            ((35, 1), 0),
+            ((18, 1), 100),
+            ((6, 1), 2),
+            ((65, 1), 85),
+            ((23, 1), 0)
+        ]
+
+        # Run ODME algorithm.
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+     
+        # Check result:
+        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
+        err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
+        for o, d in zeroes:
+            np.testing.assert_array_equal(
+                odme.get_result()[self.index[0], self.index[d]],
+                0,
+                err_msg=err_msg,
+            )
 
     def test_basic_1_3(self) -> None:
         """
         Given count volumes which are identical to the assigned volumes of an 
         initial demand matrix - ODME should not change this demand matrix (since
         we are looking for a local solution and this already provides one).
+        """
+        assert False
+    
+    def test_basic_1_4(self) -> None:
+        """
+        Check that the shape of the resulting matrix following ODME is the same as the
+        shape of the initial demand matrix.
+        
+        Split into sections a,b,c...
         """
         assert False
 
@@ -248,3 +441,5 @@ class TestODMESetUp(TestCase):
         the assignment produces the required flow.
         """
         assert False
+
+    # Add test with multiple classes
