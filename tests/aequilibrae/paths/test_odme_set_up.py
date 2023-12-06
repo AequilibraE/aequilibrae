@@ -409,21 +409,36 @@ class TestODMESetUp(TestCase):
         Check that the shape of the resulting matrix following ODME is the same as the
         shape of the initial demand matrix.
         
-        Checks with single count volume
+        Checks with single count volume.
         """
-        assert False
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
+        count_volumes = [((5, 1), 10)]
+
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        self.assertEqual(odme.demand_matrix.shape, self.dims)
 
     def test_basic_1_4_b(self) -> None:
         """
         Check that the shape of the resulting matrix following ODME is the same as the
         shape of the initial demand matrix.
         
-        Checks with many count volume
+        Checks with many count volumes.
         """
-        assert False
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
+        links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
+        count_volumes = [((link, 1), (link * 7) % (link * 37) % 50) for link in links]
+
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        self.assertEqual(odme.demand_matrix.shape, self.dims)
 
     # 2) Input Validity
-    def test_basic_2_1_a(self) -> None:
+    def test_basic_2_1(self) -> None:
         """
         Check that the ODME class does not accept input with no count volumes.
         Current API raises (DECIDE WHICH TYPE OF) error in this case.
@@ -431,22 +446,23 @@ class TestODMESetUp(TestCase):
         (NOTE - this is specific to this API, we could choose to simply return
         the initial demand matrix with no perturbation).
         """
-        assert False
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, [])
 
-    def test_basic_2_1_b(self) -> None:
+    def test_basic_2_2(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if negative count volumes are given.
         """
         assert False
 
-    def test_basic_2_1_c(self) -> None:
+    def test_basic_2_3(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if multiple count volumes
         are given for the same link.
         """
         assert False
 
-    def test_basic_2_1_d(self) -> None:
+    def test_basic_2_4(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if a given link does not exist.
 
@@ -455,28 +471,28 @@ class TestODMESetUp(TestCase):
         """
         assert False
 
-    def test_basic_2_2_a(self) -> None:
+    def test_basic_2_5(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
         has no classes set.
         """
         assert False
 
-    def test_basic_2_2_b(self) -> None:
+    def test_basic_2_6(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
         has no volume delay function set.
         """
         assert False
 
-    def test_basic_2_2_c(self) -> None:
+    def test_basic_2_7(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
         has no assignment algorithm set.
         """
         assert False
 
-    def test_basic_2_3(self) -> None:
+    def test_basic_2_8(self) -> None:
         """
         Check (DECIDE WHICH TYPE OF) error is raised if input demand matrix contains 
         negative values.
