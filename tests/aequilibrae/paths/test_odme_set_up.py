@@ -441,7 +441,7 @@ class TestODMESetUp(TestCase):
     def test_basic_2_1(self) -> None:
         """
         Check that the ODME class does not accept input with no count volumes.
-        Current API raises (DECIDE WHICH TYPE OF) error in this case.
+        Current API raises ValueError in this case.
 
         (NOTE - this is specific to this API, we could choose to simply return
         the initial demand matrix with no perturbation).
@@ -449,11 +449,27 @@ class TestODMESetUp(TestCase):
         with self.assertRaises(ValueError):
             ODME(self.assignment, [])
 
-    def test_basic_2_2(self) -> None:
+    def test_basic_2_2_a(self) -> None:
         """
-        Check (DECIDE WHICH TYPE OF) error is raised if negative count volumes are given.
+        Check ValuError is raised if a single negative count volumes is given.
         """
-        assert False
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, [((1, 1), -1)])
+
+    def test_basic_2_2_b(self) -> None:
+        """
+        Check ValueError is raised if a many negative count volumes are given.
+        """
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, [((i, 1), -i) for i in range(1, 50)])
+
+    def test_basic_2_2_c(self) -> None:
+        """
+        Check ValueError is raised if a subset of count volumes are negative.
+        """
+        # Makes every third value a negative count volume
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, [((i, 1), i * (-1 * (i%3 == 0))) for i in range(1, 50)])
 
     def test_basic_2_3(self) -> None:
         """
