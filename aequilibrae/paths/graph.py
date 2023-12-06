@@ -3,13 +3,14 @@ import pickle
 import uuid
 from datetime import datetime
 from typing import List, Tuple
+from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_logger
 from aequilibrae.paths.AoN import build_compressed_graph
 
 
-class Graph(object):
+class GraphBase(ABC):
     """
     Graph class
     """
@@ -130,7 +131,7 @@ class Graph(object):
             }
         )
 
-        properties = self.__build_directed_graph(self.network, centroids)
+        properties = self._build_directed_graph(self.network, centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
@@ -150,7 +151,7 @@ class Graph(object):
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
-    def __build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
+    def _build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
         all_titles = list(network.columns)
 
         not_pos = network.loc[network.direction != 1, :]
@@ -481,3 +482,13 @@ class Graph(object):
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+
+class Graph(GraphBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class TransitGraph(GraphBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

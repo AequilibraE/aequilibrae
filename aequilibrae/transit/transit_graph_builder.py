@@ -13,6 +13,7 @@ from shapely.geometry import Point
 
 from aequilibrae.paths import PathResults
 from aequilibrae.context import get_active_project
+from aequilibrae.paths import TransitGraph
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -1333,11 +1334,10 @@ class SF_graph_builder:
         self.save_vertices(robust=robust)
         self.save_edges()
 
-    def to_plain_graph(self):
-        """Create an AequilibraE graph object from an SF graph builder."""
-        from aequilibrae.paths import Graph
+    def to_transit_graph(self) -> TransitGraph:
+        """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
 
-        g = Graph()
+        g = TransitGraph()
         g.network = self.edges.copy(deep=True)
         g.cost = g.network.trav_time.values
         g.free_flow_time = g.network.trav_time.values
