@@ -182,7 +182,7 @@ class TrafficClass:
             "class_flow",
             "results",
             "_aon_results",
-            "__id__",
+            "_id",
             "vot",
             "fixed_cost",
             "fc_multiplier",

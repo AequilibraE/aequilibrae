@@ -39,7 +39,7 @@ class allOrNothing(WorkerThread):
         self.report = []
         self.cumulative = 0
 
-        if results.__graph_id__ != graph.__id__:
+        if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
         elif matrix.matrix_view is None:

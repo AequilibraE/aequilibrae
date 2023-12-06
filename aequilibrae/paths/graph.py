@@ -75,7 +75,7 @@ class Graph(object):
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
         # Randomly generate a unique Graph ID randomly
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def default_types(self, tp: str):
         """
@@ -236,7 +236,7 @@ class Graph(object):
         if self.centroids is not None:
             self.prepare_graph(self.centroids)
             self.set_blocked_centroid_flows(self.block_centroid_flows)
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = [x for x in self.required_default_fields]
@@ -380,7 +380,7 @@ class Graph(object):
         mygraph["skim_fields"] = self.skim_fields
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
-        mygraph["graph_id"] = self.__id__
+        mygraph["graph_id"] = self._id
         mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
@@ -410,7 +410,7 @@ class Graph(object):
             self.skim_fields = mygraph["skim_fields"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
-            self.__id__ = mygraph["graph_id"]
+            self._id = mygraph["graph_id"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 

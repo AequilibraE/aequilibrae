@@ -187,7 +187,7 @@ def path_computation(origin, destination, graph, results):
     dest = destination
     origin_index = graph.nodes_to_indices[orig]
     dest_index = graph.nodes_to_indices[dest]
-    if results.__graph_id__ != graph.__id__:
+    if results._graph_id != graph._id:
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 
 
@@ -392,7 +392,7 @@ def skimming_single_origin(origin, graph, result, aux_result, curr_thread):
     origin_index = graph.compact_nodes_to_indices[orig]
 
     graph_fs = graph.compact_fs
-    if result.__graph_id__ != graph.__id__:
+    if result._graph_id != graph._id:
 
         raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
 

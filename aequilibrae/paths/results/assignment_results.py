@@ -115,10 +115,10 @@ class AssignmentResults(AssignmentResultsBase):
         self.direcs = graph.graph.direction.values
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
         self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
-        self.__graph_ids = graph.graph.__supernet_id__.values
-        self.__graph_compressed_ids = graph.graph.__compressed_id__.values
+        self._graph_ids = graph.graph.__supernet_id__.values
+        self._graph_compressed_ids = graph.graph.__compressed_id__.values
         self.__redim()
-        self.__graph_id__ = graph.__id__
+        self._graph_id = graph._id
 
         if self._selected_links:
             self.select_link_od = AequilibraeMatrix()
@@ -302,7 +302,7 @@ class AssignmentResults(AssignmentResultsBase):
             # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(link_flows, self.select_link_loading[name], self.__graph_compressed_ids, self.cores)
+            assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
                 res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])

@@ -43,7 +43,7 @@ class TestGraph(TestCase):
 
     def test_save_to_disk(self):
         self.graph.save_to_disk(join(path_test, "aequilibrae_test_graph.aeg"))
-        self.graph_id = self.graph.__id__
+        self.graph_id = self.graph._id
 
     def test_load_from_disk(self):
         self.test_save_to_disk()

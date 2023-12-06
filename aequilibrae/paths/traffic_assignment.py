@@ -204,7 +204,7 @@ class TrafficAssignment(Assignment):
             **classes** (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
-        ids = set([x.__id__ for x in classes])
+        ids = set([x._id for x in classes])
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
@@ -217,7 +217,7 @@ class TrafficAssignment(Assignment):
             **traffic_class** (:obj:`TrafficClass`:) Traffic class
         """
 
-        ids = [x.__id__ for x in self.classes if x.__id__ == traffic_class.__id__]
+        ids = [x._id for x in self.classes if x._id == traffic_class._id]
         if len(ids) > 0:
             raise ValueError("Traffic class already in the assignment")
 
@@ -585,7 +585,7 @@ class TrafficAssignment(Assignment):
             uclass["save_path_files"] = cls._aon_results.save_path_file
             uclass["path_file_feather_format"] = cls._aon_results.write_feather
 
-            classes[cls.__id__] = uclass
+            classes[cls._id] = uclass
 
         info = {
             "Algorithm": self.algorithm,
@@ -619,7 +619,7 @@ class TrafficAssignment(Assignment):
         mats = project.matrices
 
         for cls in self.classes:
-            file_name = f"{matrix_name}_{cls.__id__}.{mat_format}"
+            file_name = f"{matrix_name}_{cls._id}.{mat_format}"
 
             export_name = path.join(mats.fldr, file_name)
 
@@ -661,7 +661,7 @@ class TrafficAssignment(Assignment):
             out_skims.create_empty(**kwargs)
 
             out_skims.index[:] = self.classes[0].graph.centroids[:]
-            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls.__id__}"
+            out_skims.description = f"Assignment skim from procedure ID {self.procedure_id}. Class name {cls._id}"
 
             if which_ones in ["final", "all"]:
                 for core in last_skims.names:
@@ -677,10 +677,10 @@ class TrafficAssignment(Assignment):
             if mat_format == "omx":
                 out_skims.export(export_name)
 
-            out_skims.description = f"Skimming for assignment procedure. Class {cls.__id__}"
+            out_skims.description = f"Skimming for assignment procedure. Class {cls._id}"
             # Now we create the appropriate record
 
-            record = mats.new_record(f"{matrix_name}_{cls.__id__}", file_name)
+            record = mats.new_record(f"{matrix_name}_{cls._id}", file_name)
             record.procedure_id = self.procedure_id
             record.timestamp = self.procedure_date
             record.procedure = "Traffic Assignment"
@@ -700,7 +700,7 @@ class TrafficAssignment(Assignment):
             # Create Values table
             df = pd.DataFrame(df.data)
             # Remap the dataframe names to add the prefix classname for each class
-            cls_cols = {x: cls.__id__ + "_" + x if (x != "index") else "link_id" for x in df.columns}
+            cls_cols = {x: cls._id + "_" + x if (x != "index") else "link_id" for x in df.columns}
             df.rename(columns=cls_cols, inplace=True)
             df.set_index("link_id", inplace=True)
             class_flows.append(df)

@@ -69,7 +69,7 @@ class PathResults:
         self.num_skims = -1
         self.__integer_type = None
         self.__float_type = None
-        self.__graph_id__ = None
+        self._graph_id = None
         self.__graph_sum = None
         self._early_exit = self.early_exit
         self._a_star = self.a_star
@@ -145,7 +145,7 @@ class PathResults:
         else:
             self._skimming_array = np.zeros((1, 2), self.__float_type)
 
-        self.__graph_id__ = graph.__id__
+        self._graph_id = graph._id
         # We can imagine somebody creating a worst-case scenario network (imagining that turn penalties are considered)
         # where one needs to traverse all links (or almost all) in both directions.
         self.__graph_sum = 2 * graph.cost.sum()
