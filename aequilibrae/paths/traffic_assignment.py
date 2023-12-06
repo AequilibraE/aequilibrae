@@ -8,6 +8,7 @@ from os import path
 from pathlib import Path
 from typing import List, Dict
 from uuid import uuid4
+from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
@@ -18,18 +19,91 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.traffic_class import TrafficClass
+from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
+from aequilibrae.paths.public_transport import HyperpathGenerating
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 
 
-class Assignment:
-    pass
+class AssignmentBase(ABC):
+    def algorithms_available(self) -> list:
+        """
+        Returns all algorithms available for use
+
+        :Returns:
+            :obj:`list`: List of string values to be used with **set_algorithm**
+        """
+        return self.all_algorithms
+
+    @abstractmethod
+    def set_algorithm(self, algorithm: str):
+        pass
+
+    @abstractmethod
+    def set_cores(self, cores: int) -> None:
+        pass
+
+    def execute(self, log_specification=True) -> None:
+        """Processes assignment"""
+        if log_specification:
+            self.log_specification()
+        self.assignment.execute()
+
+    @abstractmethod
+    def log_specification(self):
+        pass
+
+    @abstractmethod
+    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+        pass
+
+    @abstractmethod
+    def results(self) -> pd.DataFrame:
+        pass
+
+    def report(self) -> pd.DataFrame:
+        """Returns the assignment convergence report
+
+        :Returns:
+           **DataFrame** (:obj:`pd.DataFrame`): Convergence report
+        """
+        return pd.DataFrame(self.assignment.convergence_report)
+
+    @abstractmethod
+    def info(self) -> dict:
+        pass
+
+    def set_classes(self, classes: List[TransportClassBase]) -> None:
+        """
+        Sets Transport classes to be assigned
+
+        :Arguments:
+            **classes** (:obj:`List[TransportClassBase]`:) List of TransportClass's for assignment
+        """
+
+        ids = set([x._id for x in classes])
+        if len(ids) < len(classes):
+            raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
+        self.classes = classes  # type: List[TransportClassBase]
+
+    def add_class(self, transport_class: TransportClassBase) -> None:
+        """
+        Adds a Transport class to the assignment
+
+        :Arguments:
+            **transport_class** (:obj:`TransportClassBase`:) Transport class
+        """
+
+        ids = [x._id for x in self.classes if x._id == transport_class._id]
+        if len(ids) > 0:
+            raise ValueError("Transport class already in the assignment")
+
+        self.classes.append(transport_class)
 
 
-class TrafficAssignment(Assignment):
+class TrafficAssignment(AssignmentBase):
     """Traffic assignment class.
 
     For a comprehensive example on use, see the Use examples page.
@@ -223,15 +297,6 @@ class TrafficAssignment(Assignment):
 
         self.classes.append(traffic_class)
 
-    def algorithms_available(self) -> list:
-        """
-        Returns all algorithms available for use
-
-        :Returns:
-            :obj:`list`: List of string values to be used with **set_algorithm**
-        """
-        return self.all_algorithms
-
     # TODO: Create procedure to check that travel times, capacities and vdf parameters are equal across all graphs
     # TODO: We also need procedures to check that all graphs are compatible (i.e. originated from the same network)
     def set_algorithm(self, algorithm: str):
@@ -311,7 +376,7 @@ class TrafficAssignment(Assignment):
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
 
-            Inherited from :obj:`AssignmentResults`
+            Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
@@ -429,12 +494,6 @@ class TrafficAssignment(Assignment):
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
-    def execute(self, log_specification=True) -> None:
-        """Processes assignment"""
-        if log_specification:
-            self.log_specification()
-        self.assignment.execute()
-
     def log_specification(self):
         self.logger.info("Traffic Class specification")
         for cls in self.classes:
@@ -543,14 +602,6 @@ class TrafficAssignment(Assignment):
         df = pd.concat(dfs, axis=1)
 
         return df
-
-    def report(self) -> pd.DataFrame:
-        """Returns the assignment convergence report
-
-        :Returns:
-           **DataFrame** (:obj:`pd.DataFrame`): Convergence report
-        """
-        return pd.DataFrame(self.assignment.convergence_report)
 
     def info(self) -> dict:
         """Returns information for the traffic assignment procedure
@@ -774,5 +825,44 @@ class TrafficAssignment(Assignment):
         self.save_select_link_matrices(name)
 
 
-class TransitAssignment(Assignment):
-    pass
+class TransitAssignment(AssignmentBase):
+    all_algorithms = ["spiess & florian", "sf"]
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        proj = project or get_active_project(must_exist=False)
+
+        self.parameters = proj.parameters if proj else Parameters().parameters
+
+    def set_algorithm(self, algorithm: str):
+        """
+        Chooses the assignment algorithm. Currently only 'spiess & florian' is available.
+
+        'sf' is also accepted as an alternative to 'spiess & florian'
+
+        :Arguments:
+            **algorithm** (:obj:`list`): Algorithm to be used
+        """
+        algo_dict = {i: i for i in self.all_algorithms}
+        algo_dict["sf"] = "spiess & florian"
+        algo = algo_dict.get(algorithm.lower())
+
+        if algo is None:
+            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
+
+        self.assignment = HyperpathGenerating()
+
+    def set_cores(self, cores: int) -> None:
+        """Allows one to set the number of cores to be used AFTER transit classes have been added
+
+            Inherited from :obj:`AssignmentResultsBase`
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of CPU cores to use
+        """
+        if not self.classes:
+            raise RuntimeError("You need load transit classes before overwriting the number of cores")
+
+        self.cores = cores
+        for c in self.classes:
+            c.results.set_cores(cores)
