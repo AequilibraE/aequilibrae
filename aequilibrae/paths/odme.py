@@ -198,8 +198,12 @@ class ODME(object):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
         # NOTE - NEED TO CHECK THAT THIS NOTATION WORKS ACROSS ALL DEMAND MATRICES!!!
-        for i, link in enumerate(self._obs_links):
-            self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == link[0], col[link[1]]].values[0]
+        # FIND FASTER VECTORISED WAY TO DO THIS!
+        for i, row in self._count_volumes.iterrows():
+            self._assign_vals[i] = assign_df.loc[
+                assign_df["link_id"] == row["link_id"],
+                 col[row["direction"]]
+            ].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
     def _init_objective_func(self) -> None:
@@ -242,5 +246,5 @@ class ODME(object):
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
         for i, row in self._count_volumes.iterrows():
-            sl_matrix = self._sl_matrices[f"sl_{row["link_id"]}_{row["direction"]}"]
+            sl_matrix = self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"]
             self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
