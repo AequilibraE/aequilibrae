@@ -78,12 +78,11 @@ class ODME(object):
         Creates dictionary of select links to be stored within the assignment class.
         Select links will be singletons for each link with associated observation value.
         """
-        x = {
+        return {
             f"sl_{link}_{dir}": [(link, dir)] 
             for link, dir in
             zip(self._count_volumes['link_id'], self._count_volumes['direction'])
         }
-        return x
 
     def get_result(self):
         """
@@ -220,6 +219,8 @@ class ODME(object):
         def _reg_obj_func(self) -> float:
             """
             Objective function containing regularisation term.
+
+            NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
             """
             obj1 = np.sum(np.abs(self._obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
