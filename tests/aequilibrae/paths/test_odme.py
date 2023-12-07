@@ -37,7 +37,13 @@ class TestODME(TestCase):
         self.matrix = self.project.matrices.get_matrix("demand_omx")
         self.matrix.computational_view()
 
-        # Initial assignment:
+        # Extra data specific to ODME:
+        self.index = self.car_graph.nodes_to_indices
+        self.dims = self.matrix.matrix_view.shape
+        self.count_vol_cols = ["link_id", "direction", "volume"]
+        # Still need to add mode/class name to these!!!
+
+        # Initial assignment parameters:
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignment.set_classes([self.assignclass])
@@ -102,7 +108,10 @@ class TestODME(TestCase):
 
         # Perform ODME with doubled link flow on link 37
         # Execute with default options
-        count_volumes = [((38, 1), 2 * old_flow)]
+        count_volumes = pd.DataFrame(
+            data=[[38, 1, 2 * old_flow]],
+            columns=self.count_vol_cols
+        )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
         new_demand = odme.get_result()

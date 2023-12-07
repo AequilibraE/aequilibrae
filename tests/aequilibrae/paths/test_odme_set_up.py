@@ -1,3 +1,4 @@
+import collections
 import os
 import uuid
 import zipfile
@@ -37,8 +38,11 @@ class TestODMESetUp(TestCase):
         self.matrix = self.project.matrices.get_matrix("demand_omx")
         self.matrix.computational_view()
 
+        # Extra data specific to ODME:
         self.index = self.car_graph.nodes_to_indices
         self.dims = self.matrix.matrix_view.shape
+        self.count_vol_cols = ["link_id", "direction", "volume"]
+        # Still need to add mode/name to these!!!
 
         # Initial assignment:
         self.assignment = TrafficAssignment()
@@ -104,7 +108,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((1, 1), 0)]
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 0]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -125,7 +132,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((1, 1), 0), ((5, 1), 0)]
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 0], [5, 1, 0]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -146,7 +156,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((i, 1), 0) for i in range(1, 30, 2)]
+        count_volumes = pd.DataFrame(
+            data=[[i, 1, 0] for i in range(1, 30, 2)],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -167,7 +180,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((1, 1), 10)]
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 10]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -188,7 +204,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((1, 1), 10), ((2, 1), 30)]
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 10], [2, 1, 30]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -209,7 +228,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
-        count_volumes = [((i, 1), (i * 30) % ((i + 3) % 7)) for i in range(2, 30, 2)]
+        count_volumes = pd.DataFrame(
+            data=[[i, 1, (i * 30) % ((i + 3) % 7)] for i in range(2, 30, 2)],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -234,7 +256,10 @@ class TestODMESetUp(TestCase):
         demand[self.index[13], self.index[12]] = 0
         self.matrix.matrix_view = demand
 
-        count_volumes = [((9, 1), 30)]
+        count_volumes = pd.DataFrame(
+            data=[[9, 1, 30]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -259,20 +284,22 @@ class TestODMESetUp(TestCase):
         demand[self.index[18], self.index[6]] = 0
         self.matrix.matrix_view = demand
 
-        count_volumes = [
-            ((9, 1), 30),
-            ((11, 1), 25),
-            ((35, 1), 0),
-            ((18, 1), 100),
-            ((6, 1), 2),
-            ((65, 1), 85),
-            ((23, 1), 0)
+        data = [
+            [9, 1, 30],
+            [11, 1, 25],
+            [35, 1, 0],
+            [18, 1, 100],
+            [6, 1, 2],
+            [65, 1, 85],
+            [23, 1, 0]
         ]
+
+        count_volumes = pd.DataFrame(data=data, columns=self.count_vol_cols)
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-     
+
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
@@ -294,9 +321,10 @@ class TestODMESetUp(TestCase):
             demand[self.index[o], self.index[d]] = 0
         self.matrix.matrix_view = demand
 
-        count_volumes = [
-            ((9, 1), 30),
-        ]
+        count_volumes = pd.DataFrame(
+            data=[[9, 1, 30]],
+            columns=self.count_vol_cols
+        )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -325,15 +353,16 @@ class TestODMESetUp(TestCase):
             demand[self.index[o], self.index[d]] = 0
         self.matrix.matrix_view = demand
 
-        count_volumes = [
-            ((9, 1), 30),
-            ((11, 1), 2500),
-            ((35, 1), 0),
-            ((18, 1), 100),
-            ((6, 1), 2),
-            ((65, 1), 85),
-            ((23, 1), 0)
+        data = [
+            [9, 1, 30],
+            [11, 1, 2500],
+            [35, 1, 0],
+            [18, 1, 100],
+            [6, 1, 2],
+            [65, 1, 85],
+            [23, 1, 0]
         ]
+        count_volumes = pd.DataFrame(data=data, columns=self.count_vol_cols)
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -365,7 +394,10 @@ class TestODMESetUp(TestCase):
         flow = assign_df.loc[assign_df["link_id"] == 18, "matrix_ab"].values[0]
 
         # Perform ODME with fixed count volume
-        count_volumes = [((18, 1), flow)]
+        count_volumes = pd.DataFrame(
+            data=[[18, 1, flow]],
+            columns=self.count_vol_cols
+        )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
@@ -393,7 +425,10 @@ class TestODMESetUp(TestCase):
         flows = [assign_df.loc[assign_df["link_id"] == link, "matrix_ab"].values[0] for link in links]
 
         # Perform ODME with fixed count volume
-        count_volumes = [((link, 1), flows[i]) for i, link in enumerate(links)]
+        count_volumes = pd.DataFrame(
+            data=[[link, 1, flows[i]] for i, link in enumerate(links)],
+            columns=self.count_vol_cols
+        )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
@@ -413,7 +448,10 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
-        count_volumes = [((5, 1), 10)]
+        count_volumes = pd.DataFrame(
+            data=[[5, 1, 10]],
+            columns=self.count_vol_cols
+        )
 
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
@@ -430,8 +468,11 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
         links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
-        count_volumes = [((link, 1), (link * 7) % (link * 37) % 50) for link in links]
-
+        count_volumes = pd.DataFrame(
+            data=[[link, 1, (link * 7) % (link * 37) % 50] for link in links],
+            columns=self.count_vol_cols
+        )
+        
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
@@ -447,29 +488,39 @@ class TestODMESetUp(TestCase):
         the initial demand matrix with no perturbation).
         """
         with self.assertRaises(ValueError):
-            ODME(self.assignment, [])
+            ODME(self.assignment, pd.DataFrame(columns=self.count_vol_cols))
 
     def test_basic_2_2_a(self) -> None:
         """
         Check ValuError is raised if a single negative count volumes is given.
         """
         with self.assertRaises(ValueError):
-            ODME(self.assignment, [((1, 1), -1)])
+            ODME(self.assignment, pd.DataFrame(data=[[1, 1, -1]], columns=self.count_vol_cols))
 
     def test_basic_2_2_b(self) -> None:
         """
         Check ValueError is raised if a many negative count volumes are given.
         """
+        count_volumes = pd.DataFrame(
+            data=[[i, 1, -i] for i in range(1, 50)],
+            columns=self.count_vol_cols
+        )
+
         with self.assertRaises(ValueError):
-            ODME(self.assignment, [((i, 1), -i) for i in range(1, 50)])
+            ODME(self.assignment, count_volumes)
 
     def test_basic_2_2_c(self) -> None:
         """
         Check ValueError is raised if a subset of count volumes are negative.
         """
         # Makes every third value a negative count volume
+        count_volumes = pd.DataFrame(
+            data=[[i, 1, i * (-1 * (i%3 == 0))] for i in range(1, 50)],
+            columns=self.count_vol_cols
+        )
+
         with self.assertRaises(ValueError):
-            ODME(self.assignment, [((i, 1), i * (-1 * (i%3 == 0))) for i in range(1, 50)])
+            ODME(self.assignment, count_volumes)
 
     def test_basic_2_3(self) -> None:
         """
@@ -489,14 +540,20 @@ class TestODMESetUp(TestCase):
 
     def test_basic_2_5(self) -> None:
         """
-        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
-        has no classes set.
+        Check ValueError is raised if input assignment object 
+        has no classes or volume delay function set.
+
+        Note - these tests may be bad since they are technically testing other parts of the API -
+        check with Jamie/Pedro if these are appropriate.
         """
-        assert False
+        assignment = TrafficAssignment()
+
+        with self.assertRaises(ValueError):
+            ODME(assignment, [((1, 1), 0)])
 
     def test_basic_2_6(self) -> None:
         """
-        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
+        Check ValueError is raised if input assignment object 
         has no volume delay function set.
         """
         assert False
@@ -508,15 +565,38 @@ class TestODMESetUp(TestCase):
         """
         assert False
 
-    def test_basic_2_8(self) -> None:
+    def test_basic_2_8_a(self) -> None:
         """
-        Check (DECIDE WHICH TYPE OF) error is raised if input demand matrix contains 
-        negative values.
+        Check ValueError is raised if input demand matrix contains 
+        all negative values.
 
-        (NOTE - this may be intended to be a part of some other part of the API and shouldn't
+        (NOTE - this may be intended to be a part of some other part of the API and hence shouldn't
         be tested here).
         """
-        assert False
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = -1 * np.ones(self.matrix.matrix_view.shape)   
+        count_volumes = [((1, 1), 0)]
+
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes)
+
+    def test_basic_2_8_b(self) -> None:
+        """
+        Check ValueError is raised if input demand matrix contains 
+        a single negative values.
+
+        (NOTE - this may be intended to be a part of some other part of the API and hence shouldn't
+        be tested here).
+        """
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view[1, 1] = -1
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 0]],
+            columns=self.count_vol_cols
+        )
+
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes)
 
     # Simple Test Cases:
     def test_basic_3_1(self) -> None:
@@ -525,9 +605,23 @@ class TestODMESetUp(TestCase):
         along link a, with demand matrix which is 0 everywhere except on OD pair (i, j).
         Ensure count volume is small enough that the best (i, j) path is via link a.
 
+        Here (i, j) is (1, 2) and a is 1
+
         Check that the only OD pair that has changed is at index (i, j) and that
-        the assignment produces the required flow.
+        the assignment produces flow on on link a and nowhere else.
         """
-        assert False
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.zeros(self.dims)
+        self.matrix.matrix_view[self.index[1], self.index[2]] = 10
+        count_volumes = pd.DataFrame(
+            data=[[1, 1, 100]],
+            columns=self.count_vol_cols
+        )
+
+        # Run ODME
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+
+        # Assertions:
 
     # Add test with multiple classes
