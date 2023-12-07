@@ -41,10 +41,10 @@ class TestODMESetUp(TestCase):
         # Extra data specific to ODME:
         self.index = self.car_graph.nodes_to_indices
         self.dims = self.matrix.matrix_view.shape
-        self.count_vol_cols = ["link_id", "direction", "volume"]
+        self.count_vol_cols = ["class", "link_id", "direction", "volume"]
         # Still need to add mode/name to these!!!
 
-        # Initial assignment:
+        # Initial assignment parameters:
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
         self.assignment.set_classes([self.assignclass])
@@ -109,7 +109,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 0]],
+            data=[["car", 1, 1, 0]],
             columns=self.count_vol_cols
         )
 
@@ -133,7 +133,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 0], [5, 1, 0]],
+            data=[["car", 1, 1, 0], ["car", 5, 1, 0]],
             columns=self.count_vol_cols
         )
 
@@ -157,7 +157,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[i, 1, 0] for i in range(1, 30, 2)],
+            data=[["car", i, 1, 0] for i in range(1, 30, 2)],
             columns=self.count_vol_cols
         )
 
@@ -181,7 +181,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 10]],
+            data=[["car", 1, 1, 10]],
             columns=self.count_vol_cols
         )
 
@@ -205,7 +205,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 10], [2, 1, 30]],
+            data=[["car", 1, 1, 10], [2, 1, 30]],
             columns=self.count_vol_cols
         )
 
@@ -229,7 +229,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[i, 1, (i * 30) % ((i + 3) % 7)] for i in range(2, 30, 2)],
+            data=[["car", i, 1, (i * 30) % ((i + 3) % 7)] for i in range(2, 30, 2)],
             columns=self.count_vol_cols
         )
 
@@ -257,7 +257,7 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = demand
 
         count_volumes = pd.DataFrame(
-            data=[[9, 1, 30]],
+            data=[["car", 9, 1, 30]],
             columns=self.count_vol_cols
         )
 
@@ -285,13 +285,13 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = demand
 
         data = [
-            [9, 1, 30],
-            [11, 1, 25],
-            [35, 1, 0],
-            [18, 1, 100],
-            [6, 1, 2],
-            [65, 1, 85],
-            [23, 1, 0]
+            ["car", 9, 1, 30],
+            ["car", 11, 1, 25],
+            ["car", 35, 1, 0],
+            ["car", 18, 1, 100],
+            ["car", 6, 1, 2],
+            ["car", 65, 1, 85],
+            ["car", 23, 1, 0]
         ]
 
         count_volumes = pd.DataFrame(data=data, columns=self.count_vol_cols)
@@ -322,7 +322,7 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = demand
 
         count_volumes = pd.DataFrame(
-            data=[[9, 1, 30]],
+            data=[["car", 9, 1, 30]],
             columns=self.count_vol_cols
         )
 
@@ -354,13 +354,13 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = demand
 
         data = [
-            [9, 1, 30],
-            [11, 1, 2500],
-            [35, 1, 0],
-            [18, 1, 100],
-            [6, 1, 2],
-            [65, 1, 85],
-            [23, 1, 0]
+            ["car", 9, 1, 30],
+            ["car", 11, 1, 2500],
+            ["car", 35, 1, 0],
+            ["car", 18, 1, 100],
+            ["car", 6, 1, 2],
+            ["car", 65, 1, 85],
+            ["car", 23, 1, 0]
         ]
         count_volumes = pd.DataFrame(data=data, columns=self.count_vol_cols)
 
@@ -395,7 +395,7 @@ class TestODMESetUp(TestCase):
 
         # Perform ODME with fixed count volume
         count_volumes = pd.DataFrame(
-            data=[[18, 1, flow]],
+            data=[["car", 18, 1, flow]],
             columns=self.count_vol_cols
         )
         odme = ODME(self.assignment, count_volumes)
@@ -426,7 +426,7 @@ class TestODMESetUp(TestCase):
 
         # Perform ODME with fixed count volume
         count_volumes = pd.DataFrame(
-            data=[[link, 1, flows[i]] for i, link in enumerate(links)],
+            data=[["car", link, 1, flows[i]] for i, link in enumerate(links)],
             columns=self.count_vol_cols
         )
         odme = ODME(self.assignment, count_volumes)
@@ -449,7 +449,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[[5, 1, 10]],
+            data=[["car", 5, 1, 10]],
             columns=self.count_vol_cols
         )
 
@@ -469,7 +469,7 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
         links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
         count_volumes = pd.DataFrame(
-            data=[[link, 1, (link * 7) % (link * 37) % 50] for link in links],
+            data=[["car", link, 1, (link * 7) % (link * 37) % 50] for link in links],
             columns=self.count_vol_cols
         )
         
@@ -502,7 +502,7 @@ class TestODMESetUp(TestCase):
         Check ValueError is raised if a many negative count volumes are given.
         """
         count_volumes = pd.DataFrame(
-            data=[[i, 1, -i] for i in range(1, 50)],
+            data=[["car", i, 1, -i] for i in range(1, 50)],
             columns=self.count_vol_cols
         )
 
@@ -515,7 +515,7 @@ class TestODMESetUp(TestCase):
         """
         # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
-            data=[[i, 1, i * (-1 * (i%3 == 0))] for i in range(1, 50)],
+            data=[["car", i, 1, i * (-1 * (i%3 == 0))] for i in range(1, 50)],
             columns=self.count_vol_cols
         )
 
@@ -575,8 +575,11 @@ class TestODMESetUp(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = -1 * np.ones(self.matrix.matrix_view.shape)   
-        count_volumes = [((1, 1), 0)]
-
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, 0]],
+            columns=self.count_vol_cols
+        )
+        
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes)
 
@@ -591,7 +594,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view[1, 1] = -1
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 0]],
+            data=[["car", 1, 1, 0]],
             columns=self.count_vol_cols
         )
 
@@ -614,7 +617,7 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = np.zeros(self.dims)
         self.matrix.matrix_view[self.index[1], self.index[2]] = 10
         count_volumes = pd.DataFrame(
-            data=[[1, 1, 100]],
+            data=[["car", 1, 1, 100]],
             columns=self.count_vol_cols
         )
 

@@ -40,7 +40,7 @@ class TestODME(TestCase):
         # Extra data specific to ODME:
         self.index = self.car_graph.nodes_to_indices
         self.dims = self.matrix.matrix_view.shape
-        self.count_vol_cols = ["link_id", "direction", "volume"]
+        self.count_vol_cols = ["class", "link_id", "direction", "volume"]
         # Still need to add mode/class name to these!!!
 
         # Initial assignment parameters:
@@ -71,7 +71,11 @@ class TestODME(TestCase):
         - When assigning new_demand_matrix we expect link volume on [9, 1] to be close to 100000
         """
         # NOT YET IMPLEMENTED
-        odme_solver = ODME(self.assignment, [((9,1), 10000)])
+        count_volumes = pd.DataFrame(
+            data=[["car", 9, 1, 10000]],
+            columns=self.count_vol_cols
+        )
+        odme_solver = ODME(self.assignment, count_volumes)
         demand_matrix = self.matrix.matrix_view
         #count_volumes = [10000]
 
@@ -109,7 +113,7 @@ class TestODME(TestCase):
         # Perform ODME with doubled link flow on link 37
         # Execute with default options
         count_volumes = pd.DataFrame(
-            data=[[38, 1, 2 * old_flow]],
+            data=[["car", 38, 1, 2 * old_flow]],
             columns=self.count_vol_cols
         )
         odme = ODME(self.assignment, count_volumes)
