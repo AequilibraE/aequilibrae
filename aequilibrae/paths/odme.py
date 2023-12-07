@@ -2,7 +2,6 @@
 Implementation of ODME algorithms:
 """
 
-from typing import Tuple
 import numpy as np
 import scipy.stats as spstats
 import pandas as pd
@@ -11,10 +10,11 @@ from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
+    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "volume"]
 
     def __init__(self, 
         assignment: TrafficAssignment,
-        count_volumes: pd.DataFrame, # [link_id, direction, volume, mode]
+        count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(1, 10**-2), # max_iterations, convergence criterion
         alg_spec=((1, 0),) # currently just the objective function specification
     ):
@@ -26,7 +26,8 @@ class ODME(object):
             assignment: the TrafficAssignment object - should be initialised with volume delay functions
                     and their parameters and an assignment algorithm, as well as a TrafficClass containing
                     an initial demand matrix. Doesn't need to have preset select links.
-            count_volumes: the observed links and their associated observed volumes.
+            count_volumes: a dataframe detailing the links, the class they are associated with, the direction
+                    and their observed volume. NOTE - CURRENTLY ASSUMING SINGLE CLASS
             stop_crit: the maximum number of iterations and the convergence criterion.
             alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
                     of algorithm they choose.
@@ -43,17 +44,12 @@ class ODME(object):
         # May be unecessary - if we do keep it need to make a copy ->
         self.init_demand_matrix = np.copy(self.demand_matrix)
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
-        # SHOULD COPY THIS IF I WANT A COPY OF ORIGINAL IN MEMORY
 
         # Observed Links & Associated Volumes
-        ids, values = zip(*count_volumes)
-        # SHOULD THIS BE A NUMPY ARRAY OR NOT - BROKE WHEN USING A NUMPY ARRAY!!!
-        self._obs_links = ids  # \hat A - indexing set for all other properties of observed links
-        self._obs_vals = np.array(values) # \hat v_a
-        # MAY WANT TO INITIALISE THESE AS np.zeros
+        self._count_volumes = count_volumes
+        # MAY WANT TO INITIALISE THESE AS np.zeros:
         self._assign_vals = np.empty(len(count_volumes)) # v_a
         self._sl_matrices = None # Currently dictionary of proportion matrices
-        # NEED TO DECIDE WHETHER TO STORE THESE AS PROPORTIONS OR NOT!!!
 
         # Set the select links:
         self.assignclass.set_select_links(self._get_select_links())
@@ -82,16 +78,18 @@ class ODME(object):
         Creates dictionary of select links to be stored within the assignment class.
         Select links will be singletons for each link with associated observation value.
         """
-        select_links = dict()
-        for link in self._obs_links:
-            select_links[f"sl_{link[0]}_{link[1]}"] = [link]
-
-        return select_links
+        x = {
+            f"sl_{link}_{dir}": [(link, dir)] 
+            for link, dir in
+            zip(self._count_volumes['link_id'], self._count_volumes['direction'])
+        }
+        return x
 
     def get_result(self):
         """
         Returns current demand matrix (may be called at any point regardless 
-        of whether execution has been completed).
+        of whether execution has been completed). Needs to be updated to store
+        actual statistics information and return this.
         
         Ideally can be called at any point while execution is ongoing - but
         this more dynamic functionality is for later on - maybe this is 
@@ -163,14 +161,16 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         # Steps 1 & 2:
-        factors = np.nan_to_num(np.array(
+        factors = np.nan_to_num(
+            np.array(
             [
             ((self._obs_vals[i] - self._assign_vals[i]) /
              (self._sl_matrices[f"sl_{link[0]}_{link[1]}"] * self.demand_matrix)
             )
             for i, link in enumerate(self._obs_links)
             ]
-        ))
+        )
+        )
 
         # Step 3:
         return spstats.gmean(factors, axis=0)
