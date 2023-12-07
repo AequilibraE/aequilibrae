@@ -175,7 +175,6 @@ class ODME(object):
         # Step 3:
         return spstats.gmean(factors, axis=0)
 
-
     def _perform_assignment(self) -> None:
         """ 
         Uses current demand matrix to perform an assignment, then save
@@ -188,6 +187,9 @@ class ODME(object):
 
         # Perform the assignment
         self.assignment.execute()
+        # TEMPORARY FIX - I DON'T REALLY KNOW WHY WE HAVE AN EXTRA DIMENSION NOW BUT I'LL FLATTEN
+        # IT SINCE IT ISN'T RELEVANT TO SINGLE CLASS OR SINGLE COUNT CASES
+        self.assignclass.matrix.matrix_view = self.assignclass.matrix.matrix_view.squeeze(axis=2)
 
         # Store reference to select link demand matrices as proportion matrices
         # Can completely ignore old SL matrices from this point
