@@ -152,7 +152,8 @@ class ODME(object):
         """
         # Steps:
         # 1. Construct SL-demand matrices d^a = g * p^a element-wise (g = demand)
-        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a (componentwise for d^a)
+        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a 
+        #    (componentwise for d^a)
         # 3. Compute geometric mean of all matrices & return
         # NOTE - This may be slower due to holding all these matrices in memory
         # simultaneously. It is possible to do this e.g element-wise or row-wise
@@ -188,11 +189,14 @@ class ODME(object):
         # Perform the assignment
         self.assignment.execute()
 
-        # Store reference to select link demand matrices
+        # Store reference to select link demand matrices as proportion matrices
+        # Can completely ignore old SL matrices from this point
         self._sl_matrices = self.assignclass.results.select_link_od.matrix
         for link in self._sl_matrices:
-            self._sl_matrices[link] = np.nan_to_num(self._sl_matrices[link] / self.demand_matrix)
-        # NEED TO DECIDE WHETHER OR NOT TO MUTATE THESE
+            self._sl_matrices[link] = np.nan_to_num(self._sl_matrices[link].squeeze(axis=2) / self.demand_matrix)
+        # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake), 
+        # but we only have one of each per set of select links so we can ignore this for now.
+        # In future when multiple class ODME is implemented this needs to be changed.
 
         # Extract and store array of assigned volumes to select links
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
