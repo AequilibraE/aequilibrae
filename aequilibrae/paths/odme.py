@@ -241,6 +241,6 @@ class ODME(object):
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
-        for i, link in enumerate(self._obs_links):
-            sl_matrix = self._sl_matrices[f"sl_{link[0]}_{link[1]}"]
+        for i, row in self._count_volumes.iterrows():
+            sl_matrix = self._sl_matrices[f"sl_{row["link_id"]}_{row["direction"]}"]
             self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
