@@ -161,16 +161,17 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         # Steps 1 & 2:
-        factors = np.nan_to_num(
-            np.array(
+        factors = np.array(
             [
-            ((row['volume'] - self._assign_vals[i]) /
-             (self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"] * self.demand_matrix)
+            (row['volume'] /
+            (self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"] * self.demand_matrix)
             )
-            for i, row in self._count_volumes.iterrows()
+            for _, row in self._count_volumes.iterrows()
             ]
         )
-        )
+        # Deal with division by 0 by setting these values to 0
+        # They shouldn't affect anything anyway.
+        factors = np.nan_to_num(factors, nan=0, posinf=0, neginf=0)
 
         # Step 3:
         return spstats.gmean(factors, axis=0)
