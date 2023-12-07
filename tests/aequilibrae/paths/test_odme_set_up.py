@@ -579,7 +579,7 @@ class TestODMESetUp(TestCase):
             data=[["car", 1, 1, 0]],
             columns=self.count_vol_cols
         )
-        
+
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes)
 
@@ -601,7 +601,7 @@ class TestODMESetUp(TestCase):
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes)
 
-    # Simple Test Cases:
+    # Simple Test Cases (Exact Results Expected Without Regularisation Term):
     def test_basic_3_1(self) -> None:
         """
         Input single count volume representing OD path from node i to node j
@@ -617,7 +617,7 @@ class TestODMESetUp(TestCase):
         self.matrix.matrix_view = np.zeros(self.dims)
         self.matrix.matrix_view[self.index[1], self.index[2]] = 10
         count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 100]],
+            data=[["car", 1, 1, 40]],
             columns=self.count_vol_cols
         )
 
@@ -625,6 +625,65 @@ class TestODMESetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
+        # Get Results:
+        new_demand = odme.demand_matrix
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
+
         # Assertions:
+        #   Resulting Demand Matrix:
+        #       Correct Shape:
+        self.assertEqual(new_demand.shape, self.dims, msg="Shape of output demand matrix does not match initial demand.")
+        #       Non-negative:
+        np.all(new_demand >= 0, msg="Output demand matrix contains negative values.")
+        #   Flow Matches Observation:
+        self.assertAlmostEqual(flow, 40, msg="Newly assigned flow doesn't match observed.")
+        #   Only Link 1 has Non-Zero Flow:
+        test = (assign_df["matrix_ab"] == 0) | (assign_df["link_id"] == 1)
+        self.assertTrue(test.all(), msg="Unexpected non-zero link flow.")
+
+    def test_basic_3_2(self) -> None:
+        """
+        Test for single count volume observation which is double the currently assigned flow when 
+        setting only 2 OD pairs to be non-negative (bottom left area of graph in QGIS) such that 
+        all flow enters this link.
+
+        Link is 38, and OD pairs are 13-12 & 24-12
+
+        Check that the new flow following ODME matches the observed flow.
+        """
+        # Set synthetic demand matrix
+        demand = np.zeros(self.matrix.matrix_view.shape)
+        demand[self.index[13], self.index[12]] = 1
+        demand[self.index[24], self.index[12]] = 1
+        self.matrix.matrix_view = demand
+
+        # Extract assigned flow on link 38
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        old_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+
+        # Perform ODME with doubled link flow on link 38
+        count_volumes = pd.DataFrame(
+            data=[["car", 38, 1, 2 * old_flow]],
+            columns=self.count_vol_cols
+        )
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+        new_demand = odme.demand_matrix
+
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+
+        # Assert link flow is in fact doubled:
+        self.assertAlmostEqual(new_flow, 2 * old_flow)
+        
+        # Assert only appropriate O-D pairs (13-12 & 24-12) have had demand changed
+        od_13_12 = new_demand[self.index[13], self.index[12]]
+        od_24_12 = new_demand[self.index[24], self.index[12]]
+        self.assertAlmostEqual(np.sum(new_demand), od_13_12 + od_24_12)
+        self.assertTrue(od_13_12 > 1 or od_24_12 > 1)
 
     # Add test with multiple classes
