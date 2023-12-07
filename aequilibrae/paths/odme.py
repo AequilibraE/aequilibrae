@@ -190,13 +190,13 @@ class ODME(object):
         self.assignment.execute()
         # TEMPORARY FIX - I DON'T REALLY KNOW WHY WE HAVE AN EXTRA DIMENSION NOW BUT I'LL FLATTEN
         # IT SINCE IT ISN'T RELEVANT TO SINGLE CLASS OR SINGLE COUNT CASES
-        self.assignclass.matrix.matrix_view = self.assignclass.matrix.matrix_view.squeeze(axis=2)
+        self.assignclass.matrix.matrix_view = np.squeeze(self.assignclass.matrix.matrix_view, axis=2)
 
         # Store reference to select link demand matrices as proportion matrices
         # Can completely ignore old SL matrices from this point
         self._sl_matrices = self.assignclass.results.select_link_od.matrix
         for link in self._sl_matrices:
-            self._sl_matrices[link] = np.nan_to_num(self._sl_matrices[link].squeeze(axis=2) / self.demand_matrix)
+            self._sl_matrices[link] = np.nan_to_num(np.squeeze(self._sl_matrices[link], axis=2) / self.demand_matrix)
         # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake), 
         # but we only have one of each per set of select links so we can ignore this for now.
         # In future when multiple class ODME is implemented this needs to be changed.

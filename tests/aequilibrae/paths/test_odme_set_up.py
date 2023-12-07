@@ -1,4 +1,3 @@
-import collections
 import os
 import uuid
 import zipfile
@@ -66,34 +65,14 @@ class TestODMESetUp(TestCase):
 
     def test_playground(self) -> None:
         """
-        Using this to figure out how API works
-        Currently extracting the link flows corresponding to observed links following an execution
+        Using this to figure out how API works - should be removed eventually.
         """
-        select_links = {"sl_9_1": [(9, 1)], "sl_6_0": [(6, 0)], "sl_4_1": [(4,1)]}
-        self.assignclass.set_select_links(select_links)
-        self.assignment.execute()
-        sl_matrix = self.assignclass.results.select_link_od.matrix
-        select_link_flow_df = self.assignment.select_link_flows().reset_index(drop=False).fillna(0)
-        print(sl_matrix)
-        #print(sl_matrix.keys())
-        #print(select_link_flow_df)
-        self.odme_solver = ODME(self.assignment, [((9,1), 10000)])
-        #select_links = {"sl 6": [(6, 1)], "sl 3": [(3, 1)]}
-
-        #self.assignclass.set_select_links(select_links)
-        #self.assignment.execute()
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        #print(assign_df)
-
-        all_sl = []
-        for sl in select_links.values():
-            all_sl += sl
-        col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
-        obs_link_flows = []
-        for sl in all_sl:
-            obs_link_flows += [assign_df.loc[assign_df["link_id"] == sl[0], col[sl[1]]].values[0]]
-        print(obs_link_flows)
-
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, 50], ["car", 3, 1, 50]],
+            columns=self.count_vol_cols
+        )
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
 
     # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
     # Basic tests are ran on demand matrices which produce little to no congestion.
@@ -121,8 +100,8 @@ class TestODMESetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
-                np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                np.zeros(self.matrix.matrix_view.shape), # Why has this changed to 24 x 24 x 1
+                odme.demand_matrix,
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
 
@@ -206,7 +185,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 10], [2, 1, 30]],
+            data=[["car", 1, 1, 10], ["car", 2, 1, 30]],
             columns=self.count_vol_cols
         )
 
@@ -230,7 +209,7 @@ class TestODMESetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         self.matrix.matrix_view = np.zeros(self.matrix.matrix_view.shape)
         count_volumes = pd.DataFrame(
-            data=[["car", i, 1, (i * 30) % ((i + 3) % 7)] for i in range(2, 30, 2)],
+            data=[["car", i, 1, (i * 35) % (1 + (i // 3))] for i in range(2, 30, 2)],
             columns=self.count_vol_cols
         )
 
@@ -394,6 +373,9 @@ class TestODMESetUp(TestCase):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         flow = assign_df.loc[assign_df["link_id"] == 18, "matrix_ab"].values[0]
 
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
+
         # Perform ODME with fixed count volume
         count_volumes = pd.DataFrame(
             data=[["car", 18, 1, flow]],
@@ -424,6 +406,9 @@ class TestODMESetUp(TestCase):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
         flows = [assign_df.loc[assign_df["link_id"] == link, "matrix_ab"].values[0] for link in links]
+
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
 
         # Perform ODME with fixed count volume
         count_volumes = pd.DataFrame(
@@ -489,14 +474,14 @@ class TestODMESetUp(TestCase):
         the initial demand matrix with no perturbation).
         """
         with self.assertRaises(ValueError):
-            ODME(self.assignment, pd.DataFrame(columns=self.count_vol_cols))
+            ODME(self.assignment, pd.DataFrame(data=[], columns=self.count_vol_cols))
 
     def test_basic_2_2_a(self) -> None:
         """
         Check ValuError is raised if a single negative count volumes is given.
         """
         with self.assertRaises(ValueError):
-            ODME(self.assignment, pd.DataFrame(data=[[1, 1, -1]], columns=self.count_vol_cols))
+            ODME(self.assignment, pd.DataFrame(data=[["car", 1, 1, -1]], columns=self.count_vol_cols))
 
     def test_basic_2_2_b(self) -> None:
         """
@@ -550,7 +535,7 @@ class TestODMESetUp(TestCase):
         assignment = TrafficAssignment()
 
         with self.assertRaises(ValueError):
-            ODME(assignment, [((1, 1), 0)])
+            ODME(assignment, pd.DataFrame(data=[["car", 1, 1, 0]], columns=self.count_vol_cols))
 
     def test_basic_2_6(self) -> None:
         """
@@ -678,7 +663,7 @@ class TestODMESetUp(TestCase):
         new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
         # Assert link flow is in fact doubled:
-        self.assertAlmostEqual(new_flow, 2 * old_flow)
+        self.assertAlmostEqual(new_flow, 2 * old_flow)        
         
         # Assert only appropriate O-D pairs (13-12 & 24-12) have had demand changed
         od_13_12 = new_demand[self.index[13], self.index[12]]
@@ -716,15 +701,15 @@ class TestODMESetUp(TestCase):
         flow_35 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
 
         # Assert link flows are equal:
-        self.assertAlmostEqual(flow_5, flow_35)
+        self.assertAlmostEqual(flow_5, flow_35, msg="Expected balanced flows but are unbalanced")
         # Assert link flows are balanced halfway between each other:
-        self.assertAlmostEqual(flow_5, 75)
+        self.assertAlmostEqual(flow_5, 75, msg="Expected flows to be halfway between 50 & 100")
 
         # Assert shape of new demand matrix is unchanged
-        self.assertEqual(new_demand.shape, self.dims)
+        self.assertEqual(new_demand.shape, self.dims, msg="Demand matrix dimensions have been changed")
         
         # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
-        self.assertAlmostEqual(np.sum(new_demand), od_13_1)
+        self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
 
     # Add test with multiple classes
