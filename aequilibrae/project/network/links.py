@@ -115,8 +115,7 @@ class Links(BasicTable):
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            self._curr.execute("Delete from Links where link_id=?", [link_id])
-            d = self._curr.rowcount
+            d = self.conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
             self.conn.commit()
         if d:
             self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
@@ -125,10 +124,9 @@ class Links(BasicTable):
 
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
-        self._curr.execute("select coalesce(max(link_id),0) from Links")
-        self.__max_id = self._curr.fetchone()[0]
+        self.__max_id = self.conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
         tl = TableLoader()
-        tl.load_structure(self._curr, "links")
+        tl.load_structure(self.conn, "links")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -159,8 +157,7 @@ class Links(BasicTable):
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        self._curr.execute(f"{self.sql} where link_id=?", [link_id])
-        data = self._curr.fetchone()
+        data = self.conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
             return {key: val for key, val in zip(self.__fields, data)}
         raise ValueError("Link_id does not exist on the network")

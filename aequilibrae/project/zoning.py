@@ -82,8 +82,8 @@ class Zoning(BasicTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        self._curr.execute('Select ST_asBinary("geometry") from zones;')
-        polygons = [shapely.wkb.loads(x[0]) for x in self._curr.fetchall()]
+        dt = self.conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
+        polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return unary_union(polygons)
 
     def get(self, zone_id: str) -> Zone:
@@ -128,13 +128,12 @@ class Zoning(BasicTable):
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
     def __has_zoning(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(["zone" in x[0].lower() for x in curr.fetchall()])
+        dt = self.conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+        return any(["zone" in x[0].lower() for x in dt])
 
     def __load(self):
         tl = TableLoader()
-        zones_list = tl.load_table(self._curr, "zones")
+        zones_list = tl.load_table(self.conn, "zones")
         self.__fields = deepcopy(tl.fields)
 
         existing_list = [zn["zone_id"] for zn in zones_list]

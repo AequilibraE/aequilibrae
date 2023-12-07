@@ -60,10 +60,9 @@ class LinkTypes:
         self.project = net.project
         self.logger = net.project.logger
         self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
 
         tl = TableLoader()
-        link_types_list = tl.load_table(self.curr, "link_types")
+        link_types_list = tl.load_table(self.conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
         self.__fields = [x for x in tl.fields]

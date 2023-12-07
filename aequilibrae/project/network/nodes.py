@@ -61,8 +61,7 @@ class Nodes(BasicTable):
             else:
                 self.__items[node.node_id] = self.__items.pop(node_id)
 
-        self._curr.execute(f"{self.sql} where node_id=?", [node_id])
-        data = self._curr.fetchone()
+        data = self.conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
             data = {key: val for key, val in zip(self.__fields, data)}
             node = Node(data, self.project)
@@ -74,7 +73,7 @@ class Nodes(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        tl.load_structure(self._curr, "nodes")
+        tl.load_structure(self.conn, "nodes")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -91,8 +90,8 @@ class Nodes(BasicTable):
             **node_id** (:obj:`int`): Id of the centroid to be created
         """
 
-        self._curr.execute("select count(*) from nodes where node_id=?", [node_id])
-        if self._curr.fetchone()[0] > 0:
+        ct = self.conn.execute("select count(*) from nodes where node_id=?", [node_id]).fetchone()[0]
+        if ct > 0:
             raise Exception("Node_id already exists. Failed to create it")
 
         data = {key: None for key in self.__fields}

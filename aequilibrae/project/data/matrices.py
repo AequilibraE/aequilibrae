@@ -20,7 +20,7 @@ class Matrices:
         self.conn = project.connect()
         self.curr = self.conn.cursor()
         tl = TableLoader()
-        matrices_list = tl.load_table(self.curr, "matrices")
+        matrices_list = tl.load_table(self.conn, "matrices")
         self.__fields = [x for x in tl.fields]
         if matrices_list:
             self.__properties = list(matrices_list[0].keys())
