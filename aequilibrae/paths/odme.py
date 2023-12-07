@@ -33,7 +33,7 @@ class ODME(object):
                     of algorithm they choose.
         """
         # CHANGE COUNT VOLUMES TO A PANDAS DATAFRAME
-
+        # ENSURE ORDERING (PERHAPS BY SORTING INITIALLY) IS MAINTAINED EVERYWHERE
 
         # Parameters for assignments
         self.assignment = assignment
@@ -163,10 +163,10 @@ class ODME(object):
         factors = np.nan_to_num(
             np.array(
             [
-            ((self._obs_vals[i] - self._assign_vals[i]) /
-             (self._sl_matrices[f"sl_{link[0]}_{link[1]}"] * self.demand_matrix)
+            ((row['volume'] - self._assign_vals[i]) /
+             (self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"] * self.demand_matrix)
             )
-            for i, link in enumerate(self._obs_links)
+            for i, row in self._count_volumes.iterrows()
             ]
         )
         )
