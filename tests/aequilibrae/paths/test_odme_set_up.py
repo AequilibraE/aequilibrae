@@ -96,6 +96,7 @@ class TestODMESetUp(TestCase):
 
 
     # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
+    # Basic tests are ran on demand matrices which produce little to no congestion.
     # 1) Edge Cases
     # 2) Input Validity Checking (Ensuring API is Consistent)
     # 3) General Test Cases (Using Synthetic Demand Matrices & Pre-determined Results)
@@ -608,7 +609,7 @@ class TestODMESetUp(TestCase):
         along link a, with demand matrix which is 0 everywhere except on OD pair (i, j).
         Ensure count volume is small enough that the best (i, j) path is via link a.
 
-        Here (i, j) is (1, 2) and a is 1
+        Here (i, j) is (1, 2) and a is 1 - find at top of graph in QGIS.
 
         Check that the only OD pair that has changed is at index (i, j) and that
         the assignment produces flow on on link a and nowhere else.
@@ -646,15 +647,14 @@ class TestODMESetUp(TestCase):
     def test_basic_3_2(self) -> None:
         """
         Test for single count volume observation which is double the currently assigned flow when 
-        setting only 2 OD pairs to be non-negative (bottom left area of graph in QGIS) such that 
-        all flow enters this link.
+        setting only 2 OD pairs to be non-negative such that all flow enters this link.
 
-        Link is 38, and OD pairs are 13-12 & 24-12
+        Link is 38, and OD pairs are 13-12 & 24-12 (bottom left area of graph in QGIS)
 
         Check that the new flow following ODME matches the observed flow.
         """
         # Set synthetic demand matrix
-        demand = np.zeros(self.matrix.matrix_view.shape)
+        demand = np.zeros(self.dims)
         demand[self.index[13], self.index[12]] = 1
         demand[self.index[24], self.index[12]] = 1
         self.matrix.matrix_view = demand
@@ -685,5 +685,46 @@ class TestODMESetUp(TestCase):
         od_24_12 = new_demand[self.index[24], self.index[12]]
         self.assertAlmostEqual(np.sum(new_demand), od_13_12 + od_24_12)
         self.assertTrue(od_13_12 > 1 or od_24_12 > 1)
+
+    def test_basic_3_3(self) -> None:
+        """
+        Test for two count volume observations with competing priorities for links (ie differing 
+        observed volumes). Only has 1 non-zero OD pair which influences both links.
+
+        Links are 5 & 35, and OD pair is 13-1 (see left side of graph in QGIS)
+
+        Check that error from assigned volumes and observed volumes is balanced across both links.
+        We expect flow on 5 and 35 to be equal and halfway between observed on each
+        """
+        # Set synthetic demand matrix
+        demand = np.zeros(self.dims)
+        demand[self.index[13], self.index[1]] = 10
+        self.matrix.matrix_view = demand
+
+        # Perform ODME with competing link flows on 5 & 35
+        count_volumes = pd.DataFrame(
+            data=[["car", 5, 1, 100], ["car", 35, 1, 50]],
+            columns=self.count_vol_cols
+        )
+        odme = ODME(self.assignment, count_volumes)
+        odme.execute()
+        new_demand = odme.demand_matrix
+
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
+        flow_35 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
+
+        # Assert link flows are equal:
+        self.assertAlmostEqual(flow_5, flow_35)
+        # Assert link flows are balanced halfway between each other:
+        self.assertAlmostEqual(flow_5, 75)
+
+        # Assert shape of new demand matrix is unchanged
+        self.assertEqual(new_demand.shape, self.dims)
+        
+        # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
+        od_13_1 = new_demand[self.index[13], self.index[1]]
+        self.assertAlmostEqual(np.sum(new_demand), od_13_1)
 
     # Add test with multiple classes
