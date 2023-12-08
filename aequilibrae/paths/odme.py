@@ -152,7 +152,7 @@ class ODME(object):
         """
         # Steps:
         # 1. Construct SL-demand matrices d^a = g * p^a element-wise (g = demand)
-        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a 
+        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a
         #    (componentwise for d^a)
         # 3. Compute geometric mean of all matrices & return
         # NOTE - This may be slower due to holding all these matrices in memory
@@ -171,7 +171,7 @@ class ODME(object):
         )
         # Deal with division by 0 by setting these values to 0
         # They shouldn't affect anything anyway.
-        factors = np.nan_to_num(factors, nan=0, posinf=0, neginf=0)
+        factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
         # Step 3:
         return spstats.gmean(factors, axis=0)
