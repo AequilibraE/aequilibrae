@@ -47,7 +47,7 @@ def shift_duplicate_geometry(df, shift=0.00001):
     return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
 
 
-class SF_graph_builder:
+class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     Assumes,
@@ -129,21 +129,24 @@ class SF_graph_builder:
         self.__outer_stop_transfer_edges = pd.DataFrame()
         self.__walking_edges = pd.DataFrame()
 
-        self.global_crs = pyproj.CRS("EPSG:4326")
-        self.projected_crs = pyproj.CRS(projected_crs)
+        self.global_crs = "EPSG:4326"
+        self.__global_crs = pyproj.CRS(self.global_crs)
+        self.projected_crs = projected_crs
+        self.__projected_crs = pyproj.CRS(self.projected_crs)
 
         # longlat to projected CRS transformer
         self.transformer_g_to_p = pyproj.Transformer.from_crs(
-            self.global_crs, self.projected_crs, always_xy=True
+            self.__global_crs, self.__projected_crs, always_xy=True
         ).transform
 
         self.transformer_p_to_g = pyproj.Transformer.from_crs(
-            self.projected_crs, self.global_crs, always_xy=True
+            self.__projected_crs, self.__global_crs, always_xy=True
         ).transform
 
         # Add some spatial noise so that stop, boarding and aligthing vertices
         # are not colocated
-        self.rng = np.random.default_rng(seed=seed)
+        self.seed = seed
+        self.rng = np.random.default_rng(seed=self.seed)
         self.geometry_noise = geometry_noise
         self.noise_coef = noise_coef
 
@@ -162,6 +165,30 @@ class SF_graph_builder:
         self.distance_upper_bound = distance_upper_bound
         self.blocking_centroid_flows = blocking_centroid_flows
         self.max_connectors_per_zone = max_connectors_per_zone
+
+        self.__config_attrs = [
+            "start",
+            "end",
+            "global_crs",
+            "projected_crs",
+            "seed",
+            "geometry_noise",
+            "noise_coef",
+            # "uniform_dwell_time",
+            # "alighting_penalty",
+            # "a_tiny_time_duration",
+            # "wait_time_factor",
+            # "walk_time_factor",
+            # "walking_speed",
+            # "access_time_factor",
+            # "egress_time_factor",
+            "with_inner_stop_transfers",
+            "with_outer_stop_transfers",
+            "with_walking_edges",
+            "distance_upper_bound",
+            "blocking_centroid_flows",
+            "max_connectors_per_zone",
+        ]
 
     def add_zones(self, zones, from_crs: str = None):
         """Add zones as ODs.
@@ -186,7 +213,7 @@ class SF_graph_builder:
 
         if from_crs:
             transformer = pyproj.Transformer.from_crs(
-                pyproj.CRS(from_crs), self.projected_crs, always_xy=True
+                pyproj.CRS(from_crs), self.__projected_crs, always_xy=True
             ).transform
             geometry = [shapely.ops.transform(transformer, p) for p in geometry]
         centroids = shapely.centroid(geometry)
@@ -379,7 +406,7 @@ class SF_graph_builder:
 
         # deal with first trip for a stop & pattern
         mh.loc[(mh["trip_count"] > 1) & (mh["trip_idx"] == 0), "headway"] = np.nan
-        mh["headway"] = mh["headway"].fillna(method="bfill")
+        mh["headway"] = mh["headway"].bfill()
 
         # take the min of the headways computed among the stops of a given trip
         mh = mh[["pattern_id", "trip_id", "headway"]].groupby("pattern_id").min().reset_index(drop=False)
@@ -1285,7 +1312,7 @@ class SF_graph_builder:
         self.pt_conn.executemany(
             f"""\
             INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_start,period_end)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t",{self.start},{self.end});
+            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",{self.start},{self.end});
             """,
             (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
                 index=False, name=None
@@ -1316,7 +1343,7 @@ class SF_graph_builder:
         self.pt_conn.executemany(
             f"""\
             INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_start,period_end)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t",{self.start},{self.end});
+            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",{self.start},{self.end});
             """,
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
@@ -1337,7 +1364,7 @@ class SF_graph_builder:
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
 
-        g = TransitGraph()
+        g = TransitGraph(self.config)
         g.network = self.edges.copy(deep=True)
         g.cost = g.network.trav_time.values
         g.free_flow_time = g.network.trav_time.values
@@ -1419,3 +1446,7 @@ class SF_graph_builder:
             )[["o_node_id", "node_id", "demand"]]
             od_matrix.rename(columns={"node_id": "d_node_id"}, inplace=True)
         return od_matrix
+
+    @property
+    def config(self):
+        return {k: self.__dict__[k] for k in self.__config_attrs}

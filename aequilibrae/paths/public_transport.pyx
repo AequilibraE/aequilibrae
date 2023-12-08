@@ -10,6 +10,7 @@ import numpy as np
 import multiprocessing
 cimport numpy as cnp
 cimport openmp
+from scipy import sparse
 
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.context import get_active_project
@@ -19,11 +20,34 @@ include 'hyperpath.pyx'
 
 
 class HyperpathGenerating:
-    def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq", check_edges=False):
+    tail = "a_node"
+    head = "b_node"
+    origin_column="orig_vert_idx",
+    destination_column="dest_vert_idx",
+    demand_column="demand",
+
+    def __init__(
+            self,
+            edges,
+            matrix,
+            trav_time="trav_time",
+            freq="freq",
+            check_edges=False,
+            check_demand=False,
+            threads=-1
+    ):
+        # FIXME: converting from dense to sparse to make a dataframe is horrible, this conversation may not even be correct
+        d = sparse.coo_matrix(matrix)
+        self.demand = pd.DataFrame({self.origin_column: d.row, self.destination_column: d.col, self.demand_column: d.data})
+
+        self.check_edges = check_edges
+        self.check_demand = check_demand
+        self.threads = threads
+
         # load the edges
-        if check_edges:
-            self._check_edges(edges, tail, head, trav_time, freq)
-        self._edges = edges[["link_id", tail, head, trav_time, freq]].copy(deep=True)
+        if self.check_edges:
+            self._check_edges(edges, self.tail, self.head, trav_time, freq)
+        self._edges = edges[["link_id", self.tail, self.head, trav_time, freq]].copy(deep=True)
         self.edge_count = len(self._edges)
 
         # remove inf values if any, and values close to zero
@@ -44,20 +68,16 @@ class HyperpathGenerating:
         self._edges[data_col] = self._edges.index
 
         # convert to CSC format
-        self.vertex_count = self._edges[[tail, head]].max().max() + 1
-        rs_indptr, _, rs_data = convert_graph_to_csc_uint32(self._edges, tail, head, data_col, self.vertex_count)
+        self.vertex_count = self._edges[[self.tail, self.head]].max().max() + 1
+        rs_indptr, _, rs_data = convert_graph_to_csc_uint32(self._edges, self.tail, self.head, data_col, self.vertex_count)
         self._indptr = rs_indptr.astype(np.uint32)
         self._edge_idx = rs_data.astype(np.uint32)
 
         # edge attributes
         self._trav_time = self._edges[trav_time].values.astype(DATATYPE_PY)
         self._freq = self._edges[freq].values.astype(DATATYPE_PY)
-        self._tail = self._edges[tail].values.astype(np.uint32)
-        self._head = self._edges[head].values.astype(np.uint32)
-
-        self.procedure_id = uuid4().hex
-        self.procedure_date = str(datetime.today())
-        self.description = "Hyperpath"
+        self._tail = self._edges[self.tail].values.astype(np.uint32)
+        self._head = self._edges[self.head].values.astype(np.uint32)
 
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
@@ -145,19 +165,13 @@ class HyperpathGenerating:
             if edges[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
 
-    def assign(
-        self,
-        demand,
-        origin_column="orig_vert_idx",
-        destination_column="dest_vert_idx",
-        demand_column="demand",
-        check_demand=False,
-        threads=0
-    ):
+    def execute(self, threads=None):
         # check the input demand paramater
-        if check_demand:
-            self._check_demand(demand, origin_column, destination_column, demand_column)
-        demand = demand[demand[demand_column] > 0]
+        if not threads:
+            threads = self.threads
+        if self.check_demand:
+            self._check_demand(self.demand, self.origin_column, self.destination_column, self.demand_column)
+        self.demand = self.demand[self.demand[self.demand_column] > 0]
 
         # initialize the column storing the resulting edge volumes
         self._edges["volume"] = 0.0
@@ -165,9 +179,9 @@ class HyperpathGenerating:
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = None
 
-        o_vert_ids = demand[origin_column].values.astype(np.uint32)
-        d_vert_ids = demand[destination_column].values.astype(np.uint32)
-        demand_vls = demand[demand_column].values.astype(np.float64)
+        o_vert_ids = self.demand[self.origin_column].values.astype(np.uint32)
+        d_vert_ids = self.demand[self.destination_column].values.astype(np.uint32)
+        demand_vls = self.demand[self.demand_column].values.astype(np.float64)
 
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
@@ -219,45 +233,3 @@ class HyperpathGenerating:
 
         if demand[col].min() < 0.0:
             raise ValueError(f"column '{col}' should be nonnegative")
-
-    def info(self) -> dict:
-        info = {
-            "Algorithm": "Spiess, Heinz & Florian, Michael Hyperpath generation",
-            "Computer name": socket.gethostname(),
-            "Procedure ID": self.procedure_id,
-        }
-
-        return info
-
-    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
-        """Saves the assignment results to results_database.sqlite
-
-        Method fails if table exists
-
-        :Arguments:
-            **table_name** (:obj:`str`): Name of the table to hold this assignment result
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
-        """
-
-        df = self._edges
-        if not keep_zero_flows:
-            df = df[df.volume > 0]
-
-        if not project:
-            project = project or get_active_project()
-        conn = sqlite3.connect(os.path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn, index=False)
-        conn.close()
-
-        conn = database_connection("transit", project.project_base_path)
-        report = {"setup": self.info()}
-        data = [table_name, "hyperpath assignment", self.procedure_id, str(report), self.procedure_date, self.description]
-        conn.execute(
-            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
-                                            description) Values(?,?,?,?,?,?)""",
-            data,
-        )
-        conn.commit()
-        conn.close()
-

@@ -6,12 +6,12 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.paths.results import AssignmentResults
 
 
 class TransportClassBase(ABC):
-    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix) -> None:
+    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class
 
@@ -188,7 +188,6 @@ class TrafficClass(TransportClassBase):
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
         self._config["select_links"] = str(links)
 
-    # NOTE: Maintaining this with inheritence is not fun (attribute name mangeling), is this something thats required?
     def __setattr__(self, key, value):
         if key not in [
             "graph",
@@ -212,5 +211,6 @@ class TrafficClass(TransportClassBase):
 
 
 class TransitClass(TransportClassBase):
-    def __init__(self, name: str, graph: Graph, matrix: AequilibraeMatrix):
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
         super().__init__(name, graph, matrix)
+        self._config["Graph"] = str(graph._config)

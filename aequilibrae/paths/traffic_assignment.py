@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime
 from os import path
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Union
 from uuid import uuid4
 from abc import ABC, abstractmethod
 
@@ -21,13 +21,35 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.paths.public_transport import HyperpathGenerating
+from aequilibrae.project import database_connection
+from aequilibrae.paths.spiess_and_florian import OptimalStrategies
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 
 
 class AssignmentBase(ABC):
+    def __init__(self, project=None):
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
+
+        proj = project or get_active_project(must_exist=False)
+        self.project = proj
+
+        self.parameters = proj.parameters if proj else Parameters().parameters
+        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
+
+        self.classes: List[TrafficClass] = []
+        self.algorithm: str = None
+        self.time_field: str = None
+        self.assignment: Union[LinearApproximation, OptimalStrategies] = None
+        self.free_flow_tt: np.ndarray = None
+        self.total_flow: np.ndarray = None
+        self.cores: int = None
+        self._config = {}
+
+        self.description: str = ""
+
     def algorithms_available(self) -> list:
         """
         Returns all algorithms available for use
@@ -101,6 +123,29 @@ class AssignmentBase(ABC):
             raise ValueError("Transport class already in the assignment")
 
         self.classes.append(transport_class)
+
+    def _check_field(self, field: str) -> None:
+        """Throws expection if field is invalid."""
+        if not self.classes:
+            raise ValueError("You need add at least one transport class first")
+
+        for c in self.classes:
+            if field not in c.graph.graph.columns:
+                raise ValueError(f"'{field}' not in graph for '{c._id}'")
+
+            if np.any(np.isnan(c.graph.graph[field].values)):
+                raise ValueError(f"At least one link for {field} is NaN for '{c._id}'")
+
+            if c.graph.graph[field].values.min() <= 0:
+                raise ValueError(f"There is at least one link with zero or negative {field} for '{c._id}'")
+
+    def set_time_field(self, time_field: str) -> None:
+        self._check_field(time_field)
+        c = self.classes[0]
+        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
+        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
+        self.time_field = time_field
 
 
 class TrafficAssignment(AssignmentBase):
@@ -180,44 +225,37 @@ class TrafficAssignment(AssignmentBase):
 
     def __init__(self, project=None) -> None:
         """"""
+        self.__dict__["_TrafficAssignment__initalised"] = False
+        super().__init__(project=project)
 
         proj = project or get_active_project(must_exist=False)
 
         par = proj.parameters if proj else Parameters().parameters
         parameters = par["assignment"]["equilibrium"]
 
-        self.__dict__["rgap_target"] = parameters["rgap"]
-        self.__dict__["max_iter"] = parameters["maximum_iterations"]
-        self.__dict__["vdf"] = VDF()
-        self.__dict__["classes"] = []  # type: List[TrafficClass]
-        self.__dict__["algorithm"] = None  # type: str
-        self.__dict__["vdf_parameters"] = None  # type: list
-        self.__dict__["time_field"] = None  # type: str
-        self.__dict__["capacity_field"] = None  # type: str
-        self.__dict__["assignment"] = None  # type: LinearApproximation
-        self.__dict__["capacity"] = None  # type: np.ndarray
-        self.__dict__["free_flow_tt"] = None  # type: np.ndarray
-        self.__dict__["total_flow"] = None  # type: np.ndarray
-        self.__dict__["congested_time"] = None  # type: np.ndarray
-        self.__dict__["cores"] = None  # type: int
-        self.__dict__["save_path_files"] = False  # type: bool
+        self.rgap_target = parameters["rgap"]
+        self.max_iter = parameters["maximum_iterations"]
+        self.vdf = VDF()
+        self.vdf_parameters = None  # type: list
+        self.capacity_field = None  # type: str
+        self.capacity = None  # type: np.ndarray
+        self.congested_time = None  # type: np.ndarray
+        self.save_path_files = False  # type: bool
 
-        self.__dict__["procedure_id"] = uuid4().hex
-        self.__dict__["description"] = ""
-        self.__dict__["procedure_date"] = str(datetime.today())
-        self.__dict__["steps_below_needed_to_terminate"] = 1
-        self.__dict__["project"] = proj
+        self.steps_below_needed_to_terminate = 1
 
-        self.__dict__["_TrafficAssignment__config"] = {}
-        self.__dict__["logger"] = None
-        self.logger = proj.logger if proj else logging.getLogger("aequilibrae")
+        self._config = {}
 
-    def __setattr__(self, instance, value) -> None:
-        check, value, message = self.__check_attributes(instance, value)
-        if check:
-            self.__dict__[instance] = value
-        else:
-            raise ValueError(message)
+        self.__initalised = True
+
+    def __setattr__(self, name, value) -> None:
+        # Special methods (__method__) cannot be override at runtime, instead we'll
+        # just set a variable to indicate if the checking of attributes should be performed
+        if self.__initalised:
+            check, value, message = self.__check_attributes(name, value)
+            if not check:
+                raise ValueError(message)
+        super().__setattr__(name, value)
 
     def __check_attributes(self, instance, value):
         if instance == "rgap_target":
@@ -258,7 +296,7 @@ class TrafficAssignment(AssignmentBase):
             if not isinstance(value, bool):
                 return False, value, f"Value for {instance} is not boolean"
         if instance not in self.__dict__:
-            return False, value, f"trafficAssignment class does not have property {instance}"
+            return False, value, f"TrafficAssignment class does not have property {instance}"
         return True, value, ""
 
     def set_vdf(self, vdf_function: str) -> None:
@@ -306,7 +344,7 @@ class TrafficAssignment(AssignmentBase):
         'fw' is also accepted as an alternative to 'frank-wolfe'
 
         :Arguments:
-            **algorithm** (:obj:`list`): Algorithm to be used
+            **algorithm** (:obj:`str`): Algorithm to be used
         """
 
         # First we instantiate the arrays we will be using over and over
@@ -324,9 +362,9 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("Algorithm not listed in the case selection")
 
         self.__dict__["algorithm"] = algo
-        self.__config["Algorithm"] = algo
-        self.__config["Maximum iterations"] = self.assignment.max_iter
-        self.__config["Target RGAP"] = self.assignment.rgap_target
+        self._config["Algorithm"] = algo
+        self._config["Maximum iterations"] = self.assignment.max_iter
+        self._config["Target RGAP"] = self.assignment.rgap_target
 
     def set_vdf_parameters(self, par: dict) -> None:
         """
@@ -344,7 +382,7 @@ class TrafficAssignment(AssignmentBase):
                 "Before setting vdf parameters, you need to set traffic classes and choose a VDF function"
             )
         self.__dict__["vdf_parameters"] = par
-        self.__config["VDF parameters"] = par
+        self._config["VDF parameters"] = par
         pars = []
         if self.vdf.function in ["BPR", "BPR2", "CONICAL", "INRETS"]:
             for p1 in ["alpha", "beta"]:
@@ -371,7 +409,7 @@ class TrafficAssignment(AssignmentBase):
                         raise ValueError(f"At least one {p1} is smaller than one. Results will make no sense")
 
         self.__dict__["vdf_parameters"] = pars
-        self.__config["VDF function"] = self.vdf.function.lower()
+        self._config["VDF function"] = self.vdf.function.lower()
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
@@ -428,25 +466,10 @@ class TrafficAssignment(AssignmentBase):
             **time_field** (:obj:`str`): Field name
         """
 
-        if not self.classes:
-            raise ValueError("Your need add at least one traffic classes first")
+        super()._check_time_field(time_field)
 
-        c = self.classes[0]
-        if time_field not in c.graph.graph.columns:
-            raise ValueError("Field not in graph")
-
-        if np.any(np.isnan(c.graph.graph[time_field].values)):
-            raise ValueError("At least one link free-flow time is NaN")
-
-        if c.graph.graph[time_field].values.min() <= 0:
-            raise ValueError("There is at least one link with zero or negative free-flow time")
-
-        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
-        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
-        self.time_field = time_field
-        self.__config["Time field"] = time_field
+        self._config["Time field"] = time_field
 
     def set_capacity_field(self, capacity_field: str) -> None:
         """
@@ -455,26 +478,15 @@ class TrafficAssignment(AssignmentBase):
         :Arguments:
             **capacity_field** (:obj:`str`): Field name
         """
-
-        if not self.classes:
-            raise ValueError("Your need add at least one traffic classes first")
-
+        super()._check_time_field(capacity_field)
         c = self.classes[0]
-        if capacity_field not in c.graph.graph.columns:
-            raise ValueError("Field not in graph")
-
-        if np.any(np.isnan(c.graph.graph[capacity_field].values)):
-            raise ValueError("At least one link capacity is NaN")
-
-        if c.graph.graph[capacity_field].values.min() <= 0:
-            raise ValueError("There is at least one link with zero or negative capacity")
 
         self.__dict__["cores"] = c.results.cores
         self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
         self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
-        self.__config["Number of cores"] = c.results.cores
-        self.__config["Capacity field"] = capacity_field
+        self._config["Number of cores"] = c.results.cores
+        self._config["Capacity field"] = capacity_field
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
@@ -500,7 +512,7 @@ class TrafficAssignment(AssignmentBase):
             self.logger.info(str(cls.info))
 
         self.logger.info("Traffic Assignment specification")
-        self.logger.info(self.__config)
+        self.logger.info(self._config)
 
     def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
         """Saves the assignment results to results_database.sqlite
@@ -613,7 +625,7 @@ class TrafficAssignment(AssignmentBase):
         matrix totals
 
         :Returns:
-            **info** (:obj:`dict`): Pandas dataframe with all the assignment results indexed on link_id
+            **info** (:obj:`dict`): Dictionary with summary information
         """
 
         classes = {}
@@ -826,31 +838,28 @@ class TrafficAssignment(AssignmentBase):
 
 
 class TransitAssignment(AssignmentBase):
-    all_algorithms = ["spiess & florian", "sf"]
+    all_algorithms = ["optimal-strategies", "os"]
 
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
-        proj = project or get_active_project(must_exist=False)
-
-        self.parameters = proj.parameters if proj else Parameters().parameters
 
     def set_algorithm(self, algorithm: str):
         """
-        Chooses the assignment algorithm. Currently only 'spiess & florian' is available.
+        Chooses the assignment algorithm. Currently only 'optimal-strategies' is available.
 
-        'sf' is also accepted as an alternative to 'spiess & florian'
+        'os' is also accepted as an alternative to 'optimal-strategies'
 
         :Arguments:
-            **algorithm** (:obj:`list`): Algorithm to be used
+            **algorithm** (:obj:`str`): Algorithm to be used
         """
         algo_dict = {i: i for i in self.all_algorithms}
-        algo_dict["sf"] = "spiess & florian"
+        algo_dict["os"] = "optimal-strategies"
         algo = algo_dict.get(algorithm.lower())
 
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        self.assignment = HyperpathGenerating()
+        self.assignment = OptimalStrategies(self)
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER transit classes have been added
@@ -866,3 +875,102 @@ class TransitAssignment(AssignmentBase):
         self.cores = cores
         for c in self.classes:
             c.results.set_cores(cores)
+
+    def info(self) -> dict:
+        """Returns information for the transit assignment procedure
+
+        Dictionary contains keys  'Algorithm', 'Classes', 'Computer name', 'Procedure ID'.
+
+        The classes key is also a dictionary with all the user classes per transit class and their respective
+        matrix totals
+
+        :Returns:
+            **info** (:obj:`dict`): Dictionary with summary information
+        """
+
+        classes = {}
+
+        for cls in self.classes:
+            uclass = {}
+
+            if len(cls.matrix.view_names) == 1:
+                uclass["matrix_totals"] = {nm: np.sum(cls.matrix.matrix_view[:, :]) for nm in cls.matrix.view_names}
+            else:
+                uclass["matrix_totals"] = {
+                    nm: np.sum(cls.matrix.matrix_view[:, :, i]) for i, nm in enumerate(cls.matrix.view_names)
+                }
+            uclass["network mode"] = cls.graph.mode
+
+            classes[cls._id] = uclass
+
+        info = {
+            "Algorithm": self.algorithm,
+            "Classes": classes,
+            "Computer name": socket.gethostname(),
+            "Procedure ID": self.procedure_id,
+        }
+        return info
+
+    def log_specification(self):
+        self.logger.info("Transit Class specification")
+        for cls in self.classes:
+            self.logger.info(str(cls.info))
+
+        self.logger.info("Transit Assignment specification")
+        self.logger.info(self._config)
+
+    def save_results(self, table_name: str, keep_zero_flows=True, project=None) -> None:
+        """Saves the assignment results to results_database.sqlite
+
+        Method fails if table exists
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table to hold this assignment result
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
+            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+        """
+
+        df = self._edges
+        if not keep_zero_flows:
+            df = df[df.volume > 0]
+
+        if not project:
+            project = project or get_active_project()
+        conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
+        df.to_sql(table_name, conn, index=False)
+        conn.close()
+
+        conn = database_connection("transit", project.project_base_path)
+        report = {"setup": self.info()}
+        data = [table_name, "hyperpath assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        conn.execute(
+            """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                            description) Values(?,?,?,?,?,?)""",
+            data,
+        )
+        conn.commit()
+        conn.close()
+
+    def results(self) -> pd.DataFrame:
+        pass  # TODO
+
+    def set_time_field(self, time_field: str) -> None:
+        """
+        Sets the graph field that contains free flow travel time -> e.g. 'trav_time'
+
+        :Arguments:
+            **time_field** (:obj:`str`): Field name
+        """
+
+        super().set_time_field(time_field)
+        self._config["Time field"] = time_field
+
+    def set_frequency_field(self, frequency_field: str) -> None:
+        """
+        Sets the graph field that contains the frequency -> e.g. 'freq'
+
+        :Arguments:
+            **frequency_field** (:obj:`str`): Field name
+        """
+        self._check_field(frequency_field)
+        self._config["Frequency field"] = frequency_field
