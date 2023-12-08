@@ -176,7 +176,7 @@ def build_compressed_graph(graph):
 
     df = pd.concat([df, comp_lnk])
     df = df[["id", "link_id", "a_node", "b_node", "direction"]]
-    properties = graph._build_directed_graph(df, graph.centroids)  # FIXME: Don't circumvent name mangling
+    properties = graph._build_directed_graph(df, graph.centroids)
     graph.compact_all_nodes = properties[0]
     graph.compact_num_nodes = properties[1]
     graph.compact_nodes_to_indices = properties[2]

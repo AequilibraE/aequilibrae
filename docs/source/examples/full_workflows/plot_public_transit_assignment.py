@@ -22,7 +22,7 @@ from aequilibrae.transit import Transit
 # Imports for SF transit graph construction
 import aequilibrae.transit.transit_graph_builder
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.transit_graph_builder import SF_graph_builder
+from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 from aequilibrae.project import Project
 
 # Import for the Spiess & Florian assignment
@@ -67,7 +67,7 @@ transit.save_to_disk()
 # Let's build the transit network. We'll disable `outer_stop_transfers` and `walking_edges` because Coquimbo doesn't have any parent stations.
 pt_con = database_connection("transit")
 
-graph = SF_graph_builder(pt_con, with_outer_stop_transfers=False, with_walking_edges=False, projected_crs="EPSG:4326")
+graph = TransitGraphBuilder(pt_con, with_outer_stop_transfers=False, with_walking_edges=False, projected_crs="EPSG:4326")
 
 # %%
 # Creating the verticies and edges should only take a moment. By default zoning information is pulled from the project network. If you have your own zoning information add it using `graph.add_zones(zones)` before creating the verticies. We drop gemoetry here for the sake of display
@@ -99,7 +99,7 @@ graph.save()
 # %%
 # Reading back into AequilibraE
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-graph_db = SF_graph_builder.from_db(pt_con)
+graph_db = TransitGraphBuilder.from_db(pt_con)
 graph_db.vertices.drop(columns="geometry")
 
 # %%
