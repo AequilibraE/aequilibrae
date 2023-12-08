@@ -22,7 +22,7 @@ from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project import database_connection
-from aequilibrae.paths.spiess_and_florian import OptimalStrategies
+from aequilibrae.paths.optimal_strategies import OptimalStrategies
 
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -142,9 +142,9 @@ class AssignmentBase(ABC):
     def set_time_field(self, time_field: str) -> None:
         self._check_field(time_field)
         c = self.classes[0]
-        self.__dict__["free_flow_tt"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.__dict__["free_flow_tt"][c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
-        self.__dict__["total_flow"] = np.zeros(self.free_flow_tt.shape[0], np.float64)
+        self.free_flow_tt = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.free_flow_tt[c.graph.graph.__supernet_id__] = c.graph.graph[time_field]
+        self.total_flow = np.zeros(self.free_flow_tt.shape[0], np.float64)
         self.time_field = time_field
 
 
@@ -466,7 +466,7 @@ class TrafficAssignment(AssignmentBase):
             **time_field** (:obj:`str`): Field name
         """
 
-        super()._check_time_field(time_field)
+        super().set_time_field(time_field)
 
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
         self._config["Time field"] = time_field
@@ -478,12 +478,12 @@ class TrafficAssignment(AssignmentBase):
         :Arguments:
             **capacity_field** (:obj:`str`): Field name
         """
-        super()._check_time_field(capacity_field)
+        super()._check_field(capacity_field)
         c = self.classes[0]
 
-        self.__dict__["cores"] = c.results.cores
-        self.__dict__["capacity"] = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
-        self.__dict__["capacity"][c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
+        self.cores = c.results.cores
+        self.capacity = np.zeros(c.graph.graph.shape[0], c.graph.default_types("float"))
+        self.capacity[c.graph.graph.__supernet_id__] = c.graph.graph[capacity_field]
         self.capacity_field = capacity_field
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
@@ -961,7 +961,6 @@ class TransitAssignment(AssignmentBase):
         :Arguments:
             **time_field** (:obj:`str`): Field name
         """
-
         super().set_time_field(time_field)
         self._config["Time field"] = time_field
 
