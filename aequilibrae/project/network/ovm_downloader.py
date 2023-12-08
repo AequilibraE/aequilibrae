@@ -16,17 +16,25 @@ import subprocess
 import os
 from typing import Union
 
-conn = duckdb.connect()
-c = conn.cursor()
+DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0"
 
-c.execute("""INSTALL spatial; 
-           INSTALL httpfs;""")
-c.execute(
-    """LOAD spatial;
-    LOAD parquet;
-    SET s3_region='us-west-2';
-    """
-)
+
+def initialise_duckdb_spatial():
+    conn = duckdb.connect()
+    c = conn.cursor()
+
+    c.execute(
+        """INSTALL spatial; 
+            INSTALL httpfs;"""
+    )
+    c.execute(
+        """LOAD spatial;
+        LOAD parquet;
+        SET s3_region='us-west-2';
+        """
+    )
+    return c
+
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -52,15 +60,15 @@ class OVMDownloader(WorkerThread):
         self.__project_path = Path(project_path)
 
     def downloadPlace(self, source, local_file_path=None):
-        pth = str(self.__project_path / 'new_geopackage_pla.parquet').replace("\\", "/")
+        pth = str(self.__project_path / "new_geopackage_pla.parquet").replace("\\", "/")
 
-        if source == 's3':
-            data_source = 's3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=places/type=*'
-        elif source == 'local':
+        if source == "s3":
+            data_source = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=places/type=*"
+        elif source == "local":
             data_source = local_file_path.replace("\\", "/")
         else:
             raise ValueError("Invalid source. Use 's3' or provide a valid local file path.")
-        
+
         sql = f"""
             COPY(
             SELECT
@@ -79,32 +87,45 @@ class OVMDownloader(WorkerThread):
             """
         c.execute(sql)
 
-    def downloadTransportation(self, source, local_file_path=None):
-        pth = str(self.__project_path / 'new_geopackage_tran.parquet').replace("\\", "/")
+    def downloadTransportation(self, bbox, data_source=None):
+        pth = str(self.__project_path / "downloaded_ovm_data.parquet").replace("\\", "/")
 
-        if source == 's3':
-            data_source = 's3://overturemaps-us-west-2/release/2023-11-14-alpha.0/theme=transportation/type=*'
-        elif source == 'local':
-            data_source = local_file_path.replace("\\", "/")
-        else:
-            raise ValueError("Invalid source. Use 's3' or provide a valid local file path.")
+        data_source = data_source or DEFAULT_OVM_S3_LOCATION
 
         sql = f"""
             COPY (
-            SELECT
-                type,
-                JSON(bbox) AS bbox,
-                connectors,
-                road,
-                ST_GeomFromWkb(geometry) AS geometry
-            FROM read_parquet('{data_source}/*', filename=true, hive_partitioning=1)
-            WHERE bbox.minx > '{self.bbox[0]}'
-                AND bbox.maxx < '{self.bbox[2]}'
-                AND bbox.miny > '{self.bbox[1]}'
-                AND bbox.maxy < '{self.bbox[3]}')
+            SELECT JSON(bbox) AS bbox,
+                ST_GeomFromWkb(geometry) AS geometry, 
+                road, 
+                connectors 
+            FROM read_parquet('{data_source}/theme=transportation/type=*', filename=true, hive_partitioning=1)
+            WHERE bbox.minx > '{bbox[0]}'
+                AND bbox.maxx < '{bbox[2]}'
+                AND bbox.miny > '{bbox[1]}'
+                AND bbox.maxy < '{bbox[3]}')
             TO '{pth}';
         """
+        c = initialise_duckdb_spatial()
         c.execute(sql)
+
+
+    def download_test_data(data_source, test_data_location):
+        '''This method only used to seed/bootstrap a local copy of a small test data set'''
+        airlie_bbox = [....]
+        sql = f"""
+            COPY (
+            SELECT JSON(bbox) AS bbox,
+                ST_GeomFromWkb(geometry) AS geometry, 
+                road, 
+                connectors 
+            FROM read_parquet('{data_source}/theme=transportation/type=*', filename=true, hive_partitioning=1)
+            WHERE bbox.minx > '{airlie_bbox[0]}'
+                AND bbox.maxx < '{airlie_bbox[2]}'
+                AND bbox.miny > '{airlie_bbox[1]}'
+                AND bbox.maxy < '{airlie_bbox[3]}')
+            TO '{test_data_location}';
+        """
+        initialise_duckdb_spatial().execute(sql)
 
     def get_ovm_filter(self, modes: list) -> str:
         """
@@ -134,4 +155,3 @@ class OVMDownloader(WorkerThread):
         # filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
-  

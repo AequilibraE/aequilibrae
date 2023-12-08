@@ -11,18 +11,26 @@ spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 
 
+data_dir = Path(__file__).parent.parent.parent / "data"
+
+
 class TestOVMDownloader(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.pth = Path(mkdtemp(prefix="aequilibrae"))
 
-    def test_do_work(self):
+    def test_download(self):
         # if not self.should_do_work():
         #     return
-        o = OVMDownloader([[0.0, 0.0, 0.1, 0.1]], ["car"], self.pth)
-        o.downloadTransportation()
-        if o.gpkg:
-            self.fail("It found links in the middle of the ocean")
+        bbox = [0.0, 0.0, 0.1, 0.1]
+        o = OVMDownloader(bbox, ["car"], self.pth)
+        o.downloadTransportation(bbox, data_source=data_dir / "ovm")
+
+        expected_file = self.pth / "downloaded_ovm_data.parquet"
+        assert expected_file.exists()
+
+        # if o.gpkg:
+        #     self.fail("It found links in the middle of the ocean")
 
     def test_do_work2(self):
         # if not self.should_do_work():
@@ -30,7 +38,7 @@ class TestOVMDownloader(TestCase):
 
         # LITTLE PLACE IN THE MIDDLE OF THE Grand Canyon North Rim
         o = OVMDownloader([[-112.185, 36.59, -112.179, 36.60]], ["car"], self.pth)
-        o.downloadTransportation()
+        o.load_links()
 
         if "elements" not in o.json[0]:
             self.fail
