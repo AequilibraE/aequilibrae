@@ -283,7 +283,7 @@ class TestODMESetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
-            odme.get_result()[self.index[13], self.index[12]],
+            odme.get_result()[self.index[18], self.index[6]],
             0,
             err_msg="Demand matrix with single 0 at OD 18-6, has non-zero demand following ODME",
         )
