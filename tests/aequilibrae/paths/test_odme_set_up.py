@@ -387,7 +387,7 @@ class TestODMESetUp(TestCase):
         # Check results
         np.testing.assert_allclose(
             init_demand,
-            odme.get_result(),
+            odme.demand_matrix,
             err_msg="Demand matrix changed when given single link with observed volume equal to initial assigned volume"
         )
 

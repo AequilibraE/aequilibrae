@@ -151,26 +151,29 @@ class ODME(object):
         Initial default scaling matrix:
         """
         # Steps:
-        # 1. Construct SL-demand matrices d^a = g * p^a element-wise (g = demand)
-        # 2. For each observed flow v_a and assigned flow w_a do (v_a - w_a) / d^a
-        #    (componentwise for d^a)
-        # 3. Compute geometric mean of all matrices & return
+        # 1. For each link create a factor f_a given by \hat v_a / v_a
+        # 2. Create a matrix of factors for each link where for a given OD pair i,
+        #    the factor at i is f_a if the corresponding value in the SL matrix
+        #    is non-zero, and 1 otherwise.
+        # 3. Return the geometric mean of all the factor matrices component-wise
         # NOTE - This may be slower due to holding all these matrices in memory
         # simultaneously. It is possible to do this e.g element-wise or row-wise
         # to save on memory usage. Need to test this later on.
         # NOTE - by not approximating step size we may over-correct massively.
 
         # Steps 1 & 2:
-        factors = np.array(
-            [
-            (row['volume'] /
-            (self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"] * self.demand_matrix)
-            )
-            for _, row in self._count_volumes.iterrows()
-            ]
-        )
-        # Deal with division by 0 by setting these values to 0
-        # They shouldn't affect anything anyway.
+        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
+        for i, row in self._count_volumes.iterrows():
+            # Create factor:
+            if row["volume"] != 0 and self._assign_vals[i] != 0:
+                link_factor = row['volume'] / self._assign_vals[i]
+                sl_matrix = self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"]
+                factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
+            # If assigned or observed value is 0 we cannot do anything right now
+            else:
+                factors[i, :, :] = np.ones(self._demand_dims)
+
+        # If the assigned volume was 0 (or both 0) no OD pair can have any effect 
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
         # Step 3:
@@ -183,6 +186,9 @@ class ODME(object):
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
         """
+        # Reset the assignment object so execution can be correctly recomputed.
+        self.assignment.reset()
+
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         self.assignclass.matrix.matrix_view = self.demand_matrix
 
