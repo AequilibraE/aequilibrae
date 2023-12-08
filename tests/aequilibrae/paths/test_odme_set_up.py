@@ -353,7 +353,7 @@ class TestODMESetUp(TestCase):
         err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
         for o, d in zeroes:
             np.testing.assert_array_equal(
-                odme.get_result()[self.index[0], self.index[d]],
+                odme.get_result()[self.index[o], self.index[d]],
                 0,
                 err_msg=err_msg,
             )
