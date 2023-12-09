@@ -6,7 +6,6 @@ import pandas as pd
 class DataLoader:
     def __init__(self, conn: Connection, table_name: str):
         self.conn = conn
-        self.curr = conn.cursor()
         self.table_name = table_name
 
     def load_table(self) -> pd.DataFrame:
@@ -21,8 +20,7 @@ class DataLoader:
 
     def __find_table_fields(self):
         geotypes = ["LINESTRING", "POINT", "POLYGON", "MULTIPOLYGON"]
-        self.curr.execute(f"pragma table_info({self.table_name})")
-        structure = self.curr.fetchall()
+        structure = self.conn.execute(f"pragma table_info({self.table_name})").fetchall()
         fields = [x[1].lower() for x in structure]
         geotype = geo_field = None
         for x in structure:
