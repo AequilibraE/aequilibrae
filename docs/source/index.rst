@@ -141,6 +141,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    api
    validation
    developing
+   history
 
 .. note::
 
