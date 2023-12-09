@@ -1,6 +1,8 @@
 from typing import Union
-from .safe_class import SafeClass
+
 from aequilibrae.project.network.mode import Mode
+from aequilibrae.utils.db_utils import commit_and_close
+from .safe_class import SafeClass
 
 
 class Link(SafeClass):
@@ -53,27 +55,19 @@ class Link(SafeClass):
 
     def delete(self):
         """Deletes link from database"""
-        conn = self.connect_db()
-        curr = conn.cursor()
-        curr.execute(f'DELETE FROM links where link_id="{self.link_id}"')
-        conn.commit()
+        with commit_and_close(self.connect_db()) as conn:
+            conn.execute(f'DELETE FROM links where link_id="{self.link_id}"')
         self.__stil_exists = False
 
     def save(self):
         """Saves link to database"""
-        conn = self.connect_db()
-        curr = conn.cursor()
 
-        if self.__new:
-            data, sql = self._save_new_with_geometry()
-        else:
-            data, sql = self.__save_existing_link()
+        data, sql = self._save_new_with_geometry() if self.__new else self.__save_existing_link()
 
         if data:
-            curr.execute(sql, data)
+            with commit_and_close(self.connect_db()) as conn:
+                conn.execute(sql, data)
 
-        conn.commit()
-        conn.close()
         self.__new = False
 
         for key in self.__original__.keys():
