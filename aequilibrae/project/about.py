@@ -1,7 +1,10 @@
-from os.path import join, dirname, realpath
 import string
 import uuid
+from os.path import join, dirname, realpath
+
 from aequilibrae.project.project_creation import run_queries_from_sql_file
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class About:
@@ -27,29 +30,28 @@ class About:
     def __init__(self, project):
         self.__characteristics = []
         self.__original = {}
-        self.__conn = project.conn
+        self.__path_to_file = project.path_to_file
         self.logger = project.logger
-        if self.__has_about():
-            self.__load()
+
+        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+            if self.__has_about(conn):
+                self.__load(conn)
 
     def create(self):
         """Creates the 'about' table for project files that did not previously contain it"""
 
-        if not self.__has_about():
-            qry_file = join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql")
-            run_queries_from_sql_file(self.__conn, qry_file)
+        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+            if not self.__has_about(conn):
+                qry_file = join(dirname(realpath(__file__)), "database_specification", "tables", "about.sql")
+                run_queries_from_sql_file(conn, self.logger, qry_file)
 
-        cursor = self.__conn.cursor()
-
-        sql = "SELECT count(*) as num_records from about;"
-        if self.__conn.execute(sql).fetchone()[0] == 0:
-            cursor.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
-            cursor.execute("UPDATE 'about' set infovalue='right' where infoname='driving_side'")
-            self.__conn.commit()
-
-            self.__load()
-        else:
-            self.logger.warning("About table already exists. Nothing was done")
+            sql = "SELECT count(*) as num_records from about;"
+            if conn.execute(sql).fetchone()[0] == 0:
+                conn.execute(f"UPDATE 'about' set infovalue='{uuid.uuid4().hex}' where infoname='project_ID'")
+                conn.execute("UPDATE 'about' set infovalue='right' where infoname='driving_side'")
+                self.__load(conn)
+            else:
+                self.logger.warning("About table already exists. Nothing was done")
 
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""
@@ -78,10 +80,8 @@ class About:
         if has_forbidden:
             raise ValueError(f"{info_field} is not valid as a metadata field. Should be a lower case ascii letter or _")
 
-        sql = "INSERT INTO 'about' (infoname) VALUES(?)"
-        curr = self.__conn.cursor()
-        curr.execute(sql, [info_field])
-        self.__conn.commit()
+        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+            conn.execute("INSERT INTO 'about' (infoname) VALUES(?)", [info_field])
         self.__characteristics.append(info_field)
         self.__original[info_field] = None
 
@@ -96,25 +96,21 @@ class About:
             >>> p.about.description = 'This is the example project. Do not use for forecast'
             >>> p.about.write_back()
         """
-        curr = self.__conn.cursor()
-        for k in self.__characteristics:
-            v = self.__dict__[k]
-            if v != self.__original[k]:
-                curr.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
-                self.logger.info(f"Updated {k} on About_Table to {v}")
-        self.__conn.commit()
+        with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
+            for k in self.__characteristics:
+                v = self.__dict__[k]
+                if v != self.__original[k]:
+                    conn.execute("UPDATE 'about' set infovalue = ? where infoname=?", [v, k])
+                    self.logger.info(f"Updated {k} on About_Table to {v}")
 
-    def __has_about(self):
-        curr = self.__conn.cursor()
-        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(["about" in x[0] for x in curr.fetchall()])
+    def __has_about(self, conn):
+        sql = "SELECT name FROM sqlite_master WHERE type='table';"
+        return any(["about" in x[0] for x in conn.execute(sql).fetchall()])
 
-    def __load(self):
+    def __load(self, conn):
         self.__characteristics = []
-        curr = self.__conn.cursor()
-        curr.execute("select infoname, infovalue from 'about'")
-
-        for x in curr.fetchall():
+        sql = "select infoname, infovalue from 'about'"
+        for x in conn.execute(sql).fetchall():
             self.__characteristics.append(x[0])
             self.__dict__[x[0]] = x[1]
             self.__original[x[0]] = x[1]
