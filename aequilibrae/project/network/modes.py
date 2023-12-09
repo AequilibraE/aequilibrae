@@ -1,4 +1,4 @@
-from sqlite3 import IntegrityError, Connection
+from sqlite3 import IntegrityError
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.network.mode import Mode
@@ -58,9 +58,8 @@ class Modes:
         self.__items = {}
         self.project = net.project
         self.logger = net.logger
-        self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
 
     def add(self, mode: Mode) -> None:
         """We add a mode to the project"""
