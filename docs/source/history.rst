@@ -42,7 +42,6 @@ A few distinct improvements deserve to be highlighted.
 
 * The separation of the GUI and the Python library in `two repositories <http://www.xl-optim.com/separating-the-women-from-the-girls>`_
 * Introduction of Unit Tests and automatic testing using `Travis (replaced with GitHub Actions) <https://travis-ci.org/AequilibraE/aequilibrae>`_
-* Welcome of new collaborators: Jamie Cook, Andrew O'Brien, Yu-Chu Huang & Jan Zill
 * Development of proper documentation, more software engineering with style-checking (Flake8 and Black)
 * Re-development of the the most basic algorithms (path-finding, IPF, etc) with highly parallelized code optimized for the transportation use case
 
