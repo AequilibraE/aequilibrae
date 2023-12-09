@@ -122,13 +122,13 @@ class Network(WorkerThread):
         return all_modes
 
     def create_from_osm(
-        self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
+            self,
+            west: float = None,
+            south: float = None,
+            east: float = None,
+            north: float = None,
+            place_name: str = None,
+            modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -243,12 +243,12 @@ class Network(WorkerThread):
         self.logger.info("Network built successfully")
 
     def create_from_gmns(
-        self,
-        link_file_path: str,
-        node_file_path: str,
-        use_group_path: str = None,
-        geometry_path: str = None,
-        srid: int = 4326,
+            self,
+            link_file_path: str,
+            node_file_path: str,
+            use_group_path: str = None,
+            geometry_path: str = None,
+            srid: int = 4326,
     ) -> None:
         """
         Creates AequilibraE model from links and nodes in GMNS format.
@@ -332,11 +332,11 @@ class Network(WorkerThread):
 
             sql = f"select {','.join(all_fields)} from links"
 
-        df = pd.read_sql(sql, self.conn).fillna(value=np.nan)
-        valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-        curr.execute("select node_id from nodes where is_centroid=1 order by node_id;")
-        centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
-        centroids = centroids if centroids.shape[0] else None
+            df = pd.read_sql(sql, conn).fillna(value=np.nan)
+            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+            sql = "select node_id from nodes where is_centroid=1 order by node_id;"
+            centroids = np.array([i[0] for i in conn.execute(sql).fetchall()], np.uint32)
+            centroids = centroids if centroids.shape[0] else None
 
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[valid_fields]
