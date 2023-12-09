@@ -6,6 +6,8 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.node import Node
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Nodes(BasicTable):
@@ -61,7 +63,8 @@ class Nodes(BasicTable):
             else:
                 self.__items[node.node_id] = self.__items.pop(node_id)
 
-        data = self.conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
             data = {key: val for key, val in zip(self.__fields, data)}
             node = Node(data, self.project)
@@ -73,7 +76,8 @@ class Nodes(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        tl.load_structure(self.conn, "nodes")
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            tl.load_structure(conn, "nodes")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -90,7 +94,8 @@ class Nodes(BasicTable):
             **node_id** (:obj:`int`): Id of the centroid to be created
         """
 
-        ct = self.conn.execute("select count(*) from nodes where node_id=?", [node_id]).fetchone()[0]
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            ct = conn.execute("select count(*) from nodes where node_id=?", [node_id]).fetchone()[0]
         if ct > 0:
             raise Exception("Node_id already exists. Failed to create it")
 
@@ -112,7 +117,7 @@ class Nodes(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, complete with Geometry
         """
-        dl = DataLoader(self.conn, "nodes")
+        dl = DataLoader(self.project.path_to_file, "nodes")
         return dl.load_table()
 
     @property
@@ -122,7 +127,9 @@ class Nodes(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat
         """
-        return pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", self.conn)
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            df = pd.read_sql("SELECT node_id, ST_X(geometry) AS lon, ST_Y(geometry) AS lat FROM nodes", conn)
+        return df
 
     def __del__(self):
         self.__items.clear()

@@ -2,6 +2,7 @@ import shapely.wkb
 from shapely.geometry import Polygon
 
 from aequilibrae.project.field_editor import FieldEditor
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class BasicTable:
@@ -12,7 +13,6 @@ class BasicTable:
     def __init__(self, project):
         self.project = project
         self.__table_type__ = ""
-        self.conn = project.connect()
 
     def extent(self) -> Polygon:
         """Queries the extent of thelayer  included in the model
@@ -20,18 +20,14 @@ class BasicTable:
         Returns:
             *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the layer.
         """
-        data = self.conn.execute(f'Select ST_asBinary(GetLayerExtent("{self.__table_type__}"))').fetchone()[0]
-        poly = shapely.wkb.loads(data)
-        return poly
+        with commit_and_close(self.project.connect()) as conn:
+            data = conn.execute(f'Select ST_asBinary(GetLayerExtent("{self.__table_type__}"))').fetchone()[0]
+        return shapely.wkb.loads(data)
 
     @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the zones table fields and their metadata"""
         return FieldEditor(self.project, self.__table_type__)
-
-    def refresh_connection(self):
-        """Opens a new database connection to avoid thread conflict"""
-        self.conn = self.project.connect()
 
     def __copy__(self):
         raise Exception(f"{self.__table_type__} object cannot be copied")
