@@ -1,4 +1,6 @@
 import random
+from sqlite3 import Connection
+from typing import Optional
 
 from shapely.geometry import Point, MultiPolygon
 
@@ -87,7 +89,7 @@ class Zone(SafeClass):
             data = [self.zone_id, point.wkb, self.__srid__]
             conn.execute(sql, data)
 
-    def connect_mode(self, mode_id: str, link_types="", connectors=1) -> None:
+    def connect_mode(self, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -118,6 +120,7 @@ class Zone(SafeClass):
             link_types=link_types,
             connectors=connectors,
             network=self.project.network,
+            conn_=conn,
         )
 
     def disconnect_mode(self, mode_id: str) -> None:

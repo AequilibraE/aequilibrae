@@ -1,4 +1,7 @@
 from math import pi, sqrt
+from sqlite3 import Connection
+from typing import Optional
+
 import numpy as np
 from scipy.cluster.vq import kmeans2, whiten
 from scipy.spatial.distance import cdist
@@ -9,11 +12,13 @@ from aequilibrae.utils.db_utils import commit_and_close
 INFINITE_CAPACITY = 99999
 
 
-def connector_creation(geo, zone_id: int, srid: int, mode_id: str, network, link_types="", connectors=1):
+def connector_creation(
+    geo, zone_id: int, srid: int, mode_id: str, network, link_types="", connectors=1, conn_: Optional[Connection] = None
+):
     if len(mode_id) > 1:
         raise Exception("We can only add centroid connectors for one mode at a time")
 
-    with commit_and_close(network.project.connect()) as conn:
+    with conn_ or commit_and_close(network.project.connect()) as conn:
         logger = network.project.logger
         if conn.execute("select count(*) from nodes where node_id=?", [zone_id]).fetchone() is None:
             logger.warning("This centroid does not exist. Please create it first")
