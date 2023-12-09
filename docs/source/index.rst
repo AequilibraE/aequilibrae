@@ -115,7 +115,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
          :text: Developing
          :classes: btn-block btn-secondary stretched-link
 
----
+   ---
    :column: col-lg-12 p-2
    :fa:`folder`
    **Support and sponsors**
