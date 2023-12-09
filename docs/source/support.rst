@@ -69,6 +69,6 @@ Feature sponsors
 
 2023:
 
-* GTFS import - `Outer Loop Consulting <https://www.outerloop.io>`_
-* Transit assignment - `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_
-* Select Link Analysis - `EGIS France <https://www.egis.fr/>`_
+* GTFS import - `La Fabrique des Mobilités <https://lafabriquedesmobilites.fr/>`_
+* Transit assignment - `EGIS France <https://www.egis.fr/>`_
+* Select Link Analysis - `Outer Loop Consulting <https://www.outerloop.io>`_
