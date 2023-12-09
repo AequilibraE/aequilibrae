@@ -9,10 +9,9 @@ from shapely.ops import unary_union
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.geo_index import GeoIndex
 from aequilibrae.project.zone import Zone
-
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.geo_index import GeoIndex
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
