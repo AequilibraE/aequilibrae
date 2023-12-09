@@ -9,8 +9,10 @@ from aequilibrae.utils.db_utils import commit_and_close
 class MatrixRecord(SafeClass):
     def __init__(self, data_set: dict, project):
         super().__init__(data_set, project)
-        self._exists = True
-        self.fldr = join(project.project_base_path, "matrices")
+        self._exists: bool
+        self.fldr: str
+        self.__dict__["_exists"] = True
+        self.__dict__["fldr"] = join(project.project_base_path, "matrices")
 
     def save(self):
         """Saves matrix record to the project database"""
@@ -26,7 +28,7 @@ class MatrixRecord(SafeClass):
                     v_old = self.__original__.get(key, None)
                     if value != v_old and value:
                         self.__original__[key] = value
-                        conn.execute(f"update matrices s`et '{key}'=? where name=?", [value, self.name])
+                        conn.execute(f"update matrices set '{key}'=? where name=?", [value, self.name])
 
     def delete(self):
         """Deletes this matrix record and the underlying data from disk"""
@@ -39,7 +41,7 @@ class MatrixRecord(SafeClass):
             except Exception as e:
                 self._logger.error(f"Could not remove matrix from disk: {e.args}")
 
-        self._exists = False
+        self.__dict__["_exists"] = False
 
     def update_cores(self):
         """Updates this matrix record with the matrix core count in disk"""

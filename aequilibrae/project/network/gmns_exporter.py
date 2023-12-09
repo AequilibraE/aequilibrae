@@ -3,6 +3,7 @@ from os.path import join
 from ...utils import WorkerThread
 
 from aequilibrae.parameters import Parameters
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class GMNSExporter(WorkerThread):
@@ -12,14 +13,14 @@ class GMNSExporter(WorkerThread):
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data
         self.source = net.source
-        self.conn = net.conn
         self.output_path = path
 
         self.gmns_parameters = self.p.parameters["network"]["gmns"]
         self.gmns_links = self.gmns_parameters["link"]
         self.gmns_nodes = self.gmns_parameters["node"]
 
-        cur = self.conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
+        with commit_and_close(net.project.connect()) as conn:
+            cur = conn.execute("select mode_name, mode_id, description, pce, vot, ppv from modes").fetchall()
         self.modes_df = pd.DataFrame(cur, columns=["mode_name", "mode_id", "description", "pce", "vot", "ppv"])
 
     def doWork(self):

@@ -63,7 +63,8 @@ class Modes:
 
     def add(self, mode: Mode) -> None:
         """We add a mode to the project"""
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
         if mode.mode_id in self.__all_modes:
             raise ValueError("Mode already exists in the model")
 

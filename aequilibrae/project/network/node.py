@@ -147,7 +147,7 @@ class Node(SafeClass):
             mode_id,
             link_types=link_types,
             connectors=connectors,
-            network=self._project.network,
+            network=self.project.network,
         )
 
     def __setattr__(self, instance, value) -> None:

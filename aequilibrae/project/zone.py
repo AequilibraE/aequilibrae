@@ -45,7 +45,6 @@ class Zone(SafeClass):
                         if key == "geometry":
                             sql = "update 'zones' set geometry=ST_Multi(GeomFromWKB(?, 4326)) where zone_id=?"
                             conn.execute(sql, [value.wkb, self.zone_id])
-                            self.conn
                         else:
                             conn.execute(f"update 'zones' set '{key}'=? where zone_id=?", [value, self.zone_id])
 
@@ -64,7 +63,7 @@ class Zone(SafeClass):
 
         with commit_and_close(self.connect_db()) as conn:
             if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
-                self._project.logger.warning("Centroid already exists. Failed to create it")
+                self.project.logger.warning("Centroid already exists. Failed to create it")
                 return
 
             sql = "INSERT into nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
@@ -118,7 +117,7 @@ class Zone(SafeClass):
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
-            network=self._project.network,
+            network=self.project.network,
         )
 
     def disconnect_mode(self, mode_id: str) -> None:
@@ -137,8 +136,8 @@ class Zone(SafeClass):
             row_count += conn.execute(sql, data).rowcount
 
             if row_count:
-                self._project.logger.warning(
+                self.project.logger.warning(
                     f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}"
                 )
             else:
-                self._project.warning("No centroid connectors for this mode")
+                self.project.warning("No centroid connectors for this mode")
