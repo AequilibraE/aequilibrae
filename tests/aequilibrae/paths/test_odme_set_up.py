@@ -649,6 +649,9 @@ class TestODMESetUp(TestCase):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         old_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
+
         # Perform ODME with doubled link flow on link 38
         count_volumes = pd.DataFrame(
             data=[["car", 38, 1, 2 * old_flow]],
@@ -661,6 +664,9 @@ class TestODMESetUp(TestCase):
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
 
         # Assert link flow is in fact doubled:
         self.assertAlmostEqual(new_flow, 2 * old_flow)        
@@ -699,6 +705,9 @@ class TestODMESetUp(TestCase):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
         flow_35 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
+
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
 
         # Assert link flows are equal:
         self.assertAlmostEqual(flow_5, flow_35, msg="Expected balanced flows but are unbalanced")
