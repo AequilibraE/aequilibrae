@@ -5,14 +5,16 @@ Implementation of ODME algorithms:
 import numpy as np
 import scipy.stats as spstats
 import pandas as pd
+from typing import Tuple
 
 from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "volume"]
+    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (ms)"]
 
-    def __init__(self, 
+    def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(5, 10**-2), # max_iterations, convergence criterion
@@ -32,8 +34,8 @@ class ODME(object):
             alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
                     of algorithm they choose.
         """
-        # CHANGE COUNT VOLUMES TO A PANDAS DATAFRAME
         # ENSURE ORDERING (PERHAPS BY SORTING INITIALLY) IS MAINTAINED EVERYWHERE
+        # POTENTIALLY MIGHT BE A GOOD IDEA TO ADD ASSIGNED VOLUMES AS A COLUMN TO COUNT_VOLUMES DATAFRAME
 
         # Parameters for assignments
         self.assignment = assignment
@@ -61,17 +63,27 @@ class ODME(object):
         # Initialise objective function
         self._obj_func = None
         self._init_objective_func()
+        self._last_convergence = None
 
         # Stopping criterion 
         # May need to specify this further to differentiate between inner & outer criterion
         self.max_iter = stop_crit[0]
         self.convergence_crit = stop_crit[1]
 
+        self._outer, self._inner = 0, 0
+
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
 
         # Potentially set up some sort of logging information here:
+
+        # Dataframe to log statistical information:
+        self._statistics = pd.DataFrame(columns=self.STATISTICS_COLS)
+
+        # Time data for logging information
+        self._time = None
+
 
     def _get_select_links(self) -> dict:
         """
@@ -84,7 +96,7 @@ class ODME(object):
             zip(self._count_volumes['link_id'], self._count_volumes['direction'])
         }
 
-    def get_result(self):
+    def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
         Returns current demand matrix (may be called at any point regardless 
         of whether execution has been completed). Needs to be updated to store
@@ -97,7 +109,17 @@ class ODME(object):
         safely. Also kind of dumb since user should still have the 
         TrafficAssignment object anyway and can access it from there.
         """
-        return self.demand_matrix
+        return (self.demand_matrix, self._statistics)
+    
+    def log_stats(self) -> None:
+        """
+        Adds next row to statistics dataframe.
+        """
+        to_log = [self._outer, self._inner, self._last_convergence, self._time]
+        self._statistics.loc[len(self._statistics)] = {
+            col : to_log[i]
+            for i, col in enumerate(self.STATISTICS_COLS)
+        }
 
     def execute(self):
         """ 
@@ -108,20 +130,19 @@ class ODME(object):
         self._perform_assignment()
 
         # Begin outer iteration
-        outer = 0
-        while outer < self.max_iter: # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
-        # while outer < self.max_iter && self._obj_func() > self.convergence_crit
+        # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
+        while self._outer < self.max_iter and self._obj_func(self) > self.convergence_crit:
 
             # Run inner iterations:
-            inner = 0
-            while inner < self.max_iter: # INNER STOPPING CRITERION
-            # while inner < self.max_iter && self._obj_func() > self.inner_convergence_crit
+            # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
+            # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
+            while self._inner < self.max_iter and self._obj_func(self) > self.convergence_crit:
                 self._execute_inner_iter()
-                inner += 1
+                self._inner += 1
 
             # Reassign values at the end of each outer loop
             self._perform_assignment()
-            outer += 1
+            self._outer += 1
 
     def _execute_inner_iter(self) -> None:
         """
@@ -236,7 +257,8 @@ class ODME(object):
 
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
             """
-            obj1 = np.sum(np.abs(self._obs_vals - self._assign_vals)**p_1) / p_1
+            obs_vals = self._count_volumes["volume"].to_numpy()
+            obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
             return obj1 + regularisation
 
@@ -244,7 +266,8 @@ class ODME(object):
             """
             Objective function with no regularisation term.
             """
-            return np.sum(np.abs(self._obs_vals - self._assign_vals)**p_1) / p_1
+            obs_vals = self._count_volumes["volume"].to_numpy()
+            return np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
         
         if p_2:
             self._obj_func = _reg_obj_func
