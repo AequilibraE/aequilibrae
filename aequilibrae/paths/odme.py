@@ -15,7 +15,7 @@ class ODME(object):
     def __init__(self, 
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
-        stop_crit=(1, 10**-2), # max_iterations, convergence criterion
+        stop_crit=(5, 10**-2), # max_iterations, convergence criterion
         alg_spec=((1, 0),) # currently just the objective function specification
     ):
         """
@@ -186,9 +186,6 @@ class ODME(object):
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
         """
-        # Reset the assignment object so execution can be correctly recomputed.
-        self.assignment.reset()
-
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         self.assignclass.matrix.matrix_view = self.demand_matrix
 

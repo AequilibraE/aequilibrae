@@ -430,6 +430,8 @@ class TrafficAssignment(object):
         if log_specification:
             self.log_specification()
 
+        self.prepare_execute()
+
         self.assignment.execute()
 
     def log_specification(self):
@@ -771,13 +773,16 @@ class TrafficAssignment(object):
         self.save_select_link_matrices(name)
 
 
-    def reset(self) -> None:
+    def prepare_execute(self) -> None:
         """
-        Reset's congested times to allow assignment object to be reused,
-        (ie, execution can be recomputed).
+        Reset's arrays used relating to congested times in assignment algorithm.
 
-        Should be ran for ODME each time we are recomputing the results.
+        Allows for re-use of assignment for ODME procedure.
         """
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
-        self.set_algorithm(self.algorithm)
-        
+
+        # Re-instatiate arrays for use in assignment algorithm.
+        self.assignment.congested_time = self.congested_time
+        self.assignment.vdf_der = np.array(self.congested_time, copy=True)
+        self.assignment.congested_value = np.array(self.congested_time, copy=True)
+
