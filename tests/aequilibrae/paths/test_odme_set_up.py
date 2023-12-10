@@ -40,7 +40,7 @@ class TestODMESetUp(TestCase):
         # Extra data specific to ODME:
         self.index = self.car_graph.nodes_to_indices
         self.dims = self.matrix.matrix_view.shape
-        self.count_vol_cols = ["class", "link_id", "direction", "volume"]
+        self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
         # Still need to add mode/name to these!!!
 
         # Initial assignment parameters:
@@ -67,12 +67,10 @@ class TestODMESetUp(TestCase):
         """
         Using this to figure out how API works - should be removed eventually.
         """
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 50], ["car", 3, 1, 50]],
-            columns=self.count_vol_cols
-        )
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
+        df = pd.DataFrame(data=[[-1]], columns=["Default"])
+        for i in range(5): 
+            df.loc[len(df)] = {"Default" : i}
+        print(df)
 
     # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
     # Basic tests are ran on demand matrices which produce little to no congestion.
@@ -125,7 +123,7 @@ class TestODMESetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                odme.demand_matrix,
                 err_msg="0 demand matrix with 2 count volumes of 0 does not return 0 matrix",
         )
 
@@ -149,7 +147,7 @@ class TestODMESetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                odme.demand_matrix,
                 err_msg="0 demand matrix with many count volumes of 0 does not return 0 matrix",
         )
 
@@ -173,7 +171,7 @@ class TestODMESetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                odme.demand_matrix,
                 err_msg="0 demand matrix with single non-zero count volume does not return 0 matrix",
         )
 
@@ -197,7 +195,7 @@ class TestODMESetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                odme.demand_matrix,
                 err_msg="0 demand matrix with two non-zero count volumes does not return 0 matrix",
         )
 
@@ -221,7 +219,7 @@ class TestODMESetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.get_result(),
+                odme.demand_matrix,
                 err_msg="0 demand matrix with many non-zero count volumes does not return 0 matrix",
         )
 
@@ -248,7 +246,7 @@ class TestODMESetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
-            odme.get_result()[self.index[13], self.index[12]],
+            odme.demand_matrix[self.index[13], self.index[12]],
             0,
             err_msg="Demand matrix with single 0 at OD 13-12, has non-zero demand following ODME",
         )
@@ -283,7 +281,7 @@ class TestODMESetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
-            odme.get_result()[self.index[18], self.index[6]],
+            odme.demand_matrix[self.index[18], self.index[6]],
             0,
             err_msg="Demand matrix with single 0 at OD 18-6, has non-zero demand following ODME",
         )
@@ -315,7 +313,7 @@ class TestODMESetUp(TestCase):
         err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
         for o, d in zeroes:
             np.testing.assert_array_equal(
-                odme.get_result()[self.index[o], self.index[d]],
+                odme.demand_matrix[self.index[o], self.index[d]],
                 0,
                 err_msg=err_msg,
             )
@@ -353,7 +351,7 @@ class TestODMESetUp(TestCase):
         err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
         for o, d in zeroes:
             np.testing.assert_array_equal(
-                odme.get_result()[self.index[o], self.index[d]],
+                odme.demand_matrix[self.index[o], self.index[d]],
                 0,
                 err_msg=err_msg,
             )
@@ -421,7 +419,7 @@ class TestODMESetUp(TestCase):
         # Check results
         np.testing.assert_allclose(
             init_demand,
-            odme.get_result(),
+            odme.demand_matrix,
             err_msg="Demand matrix changed when given many links with observed volume equal to initial assigned volumes"
         )
     
@@ -699,7 +697,7 @@ class TestODMESetUp(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.demand_matrix
+        new_demand, stats = odme.get_results()
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)

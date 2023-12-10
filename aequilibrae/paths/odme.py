@@ -11,8 +11,8 @@ from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
-    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "volume"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (ms)"]
+    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
+    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (units)"]
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -111,7 +111,7 @@ class ODME(object):
         """
         return (self.demand_matrix, self._statistics)
     
-    def log_stats(self) -> None:
+    def _log_stats(self) -> None:
         """
         Adds next row to statistics dataframe.
         """
@@ -132,6 +132,7 @@ class ODME(object):
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
         while self._outer < self.max_iter and self._obj_func(self) > self.convergence_crit:
+            self._log_stats()
 
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
@@ -139,10 +140,17 @@ class ODME(object):
             while self._inner < self.max_iter and self._obj_func(self) > self.convergence_crit:
                 self._execute_inner_iter()
                 self._inner += 1
+                self._log_stats()
+
+            # Set iteration values:
+            self._outer += 1
+            self._inner = 0
 
             # Reassign values at the end of each outer loop
             self._perform_assignment()
-            self._outer += 1
+        
+        # Add final stats following final assignment:
+        self._log_stats()
 
     def _execute_inner_iter(self) -> None:
         """
@@ -186,8 +194,8 @@ class ODME(object):
         factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
         for i, row in self._count_volumes.iterrows():
             # Create factor:
-            if row["volume"] != 0 and self._assign_vals[i] != 0:
-                link_factor = row['volume'] / self._assign_vals[i]
+            if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
+                link_factor = row['obs_volume'] / self._assign_vals[i]
                 sl_matrix = self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"]
                 factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
             # If assigned or observed value is 0 we cannot do anything right now
@@ -257,7 +265,7 @@ class ODME(object):
 
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
             """
-            obs_vals = self._count_volumes["volume"].to_numpy()
+            obs_vals = self._count_volumes["obs_volume"].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
             return obj1 + regularisation
@@ -266,7 +274,7 @@ class ODME(object):
             """
             Objective function with no regularisation term.
             """
-            obs_vals = self._count_volumes["volume"].to_numpy()
+            obs_vals = self._count_volumes["obs_volume"].to_numpy()
             return np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
         
         if p_2:
