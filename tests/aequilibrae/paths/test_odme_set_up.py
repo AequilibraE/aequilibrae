@@ -714,7 +714,7 @@ class TestODMESetUp(TestCase):
 
         # Assert shape of new demand matrix is unchanged
         self.assertEqual(new_demand.shape, self.dims, msg="Demand matrix dimensions have been changed")
-        
+
         # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
         self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")

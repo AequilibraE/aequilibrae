@@ -6,13 +6,14 @@ import numpy as np
 import scipy.stats as spstats
 import pandas as pd
 from typing import Tuple
+import time
 
 from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (units)"]
+    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (s)"]
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -115,7 +116,11 @@ class ODME(object):
         """
         Adds next row to statistics dataframe.
         """
-        to_log = [self._outer, self._inner, self._last_convergence, self._time]
+        old_time = self._time
+        self._time = time.time()
+        to_log = [self._outer, self._inner, self._last_convergence, self._time - old_time]
+
+        # Add row::
         self._statistics.loc[len(self._statistics)] = {
             col : to_log[i]
             for i, col in enumerate(self.STATISTICS_COLS)
@@ -126,12 +131,18 @@ class ODME(object):
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
         """
+        # Initialise timing:
+        self._time = time.time()
+
         # Create values for SL matrices & assigned flows
         self._perform_assignment()
 
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
         while self._outer < self.max_iter and self._obj_func(self) > self.convergence_crit:
+            # Set iteration values:
+            self._outer += 1
+            self._inner = 0
             self._log_stats()
 
             # Run inner iterations:
@@ -142,14 +153,12 @@ class ODME(object):
                 self._inner += 1
                 self._log_stats()
 
-            # Set iteration values:
-            self._outer += 1
-            self._inner = 0
-
             # Reassign values at the end of each outer loop
             self._perform_assignment()
         
         # Add final stats following final assignment:
+        self._outer += 1
+        self._inner = 0
         self._log_stats()
 
     def _execute_inner_iter(self) -> None:
