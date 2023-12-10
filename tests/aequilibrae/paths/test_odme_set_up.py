@@ -622,7 +622,7 @@ class TestODMESetUp(TestCase):
         #       Correct Shape:
         self.assertEqual(new_demand.shape, self.dims, msg="Shape of output demand matrix does not match initial demand.")
         #       Non-negative:
-        np.all(new_demand >= 0, msg="Output demand matrix contains negative values.")
+        self.assertTrue(np.all(new_demand >= 0), msg="Output demand matrix contains negative values.")
         #   Flow Matches Observation:
         self.assertAlmostEqual(flow, 40, msg="Newly assigned flow doesn't match observed.")
         #   Only Link 1 has Non-Zero Flow:
