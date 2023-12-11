@@ -149,7 +149,7 @@ class ODME(object):
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
-            while self._inner < self.max_iter and self._last_convergence > self.convergence_crit:
+            while self._inner < self.max_iter and self._convergence_change > self.convergence_crit:
                 self._execute_inner_iter()
                 self._inner += 1
                 self._log_stats()
