@@ -13,7 +13,7 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Convergence Change", "Time (s)"]
+    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -55,7 +55,7 @@ class ODME(object):
         self._sl_matrices = None # Currently dictionary of proportion matrices
 
         # Set the select links:
-        self.assignclass.set_select_links(self._get_select_links())
+        self.assignclass.set_select_links(self.__get_select_links())
 
         # Not yet relevant - Algorithm Specifications:
         self._alg_spec = alg_spec
@@ -63,7 +63,7 @@ class ODME(object):
 
         # Initialise objective function
         self._obj_func = None
-        self._init_objective_func()
+        self.__init_objective_func()
         self._last_convergence = None
         self._convergence_change = float('inf')
 
@@ -87,7 +87,7 @@ class ODME(object):
         self._time = None
 
 
-    def _get_select_links(self) -> dict:
+    def __get_select_links(self) -> dict:
         """
         Creates dictionary of select links to be stored within the assignment class.
         Select links will be singletons for each link with associated observation value.
@@ -113,7 +113,7 @@ class ODME(object):
         """
         return (self.demand_matrix, self._statistics)
     
-    def _log_stats(self) -> None:
+    def __log_stats(self) -> None:
         """
         Adds next row to statistics dataframe.
         """
@@ -136,7 +136,7 @@ class ODME(object):
         self._time = time.time()
 
         # Create values for SL matrices & assigned flows
-        self._perform_assignment()
+        self.__perform_assignment()
 
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
@@ -144,48 +144,48 @@ class ODME(object):
             # Set iteration values:
             self._outer += 1
             self._inner = 0
-            self._log_stats()
+            self.__log_stats()
 
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
             while self._inner < self.max_iter and self._convergence_change > self.convergence_crit:
-                self._execute_inner_iter()
+                self.__execute_inner_iter()
                 self._inner += 1
-                self._log_stats()
+                self.__log_stats()
 
             # Reassign values at the end of each outer loop
-            self._perform_assignment()
+            self.__perform_assignment()
         
         # Add final stats following final assignment:
         self._outer += 1
         self._inner = 0
-        self._log_stats()
+        self.__log_stats()
 
-    def _execute_inner_iter(self) -> None:
+    def __execute_inner_iter(self) -> None:
         """
         Runs an inner iteration of the ODME algorithm. 
         This assumes the SL matrices stay constant and modifies
         the current demand matrix.
         """
         # Element-wise multiplication of demand matrix by scaling factor
-        self.demand_matrix = self.demand_matrix * self._get_scaling_factor()
+        self.demand_matrix = self.demand_matrix * self.__get_scaling_factor()
 
         # Recalculate the link flows
-        self._calculate_flows()
+        self.__calculate_flows()
 
         # Recalculate convergence level:
         self._obj_func(self)
 
-    def _get_scaling_factor(self) -> np.ndarray:
+    def __get_scaling_factor(self) -> np.ndarray:
         """
         Returns scaling matrix - depends on algorithm chosen.
         Currently implementing default as geometric mean.
         """
         # Defaults to geometric mean currently - cannot yet specify choice.
-        return self._geometric_mean()
+        return self.__geometric_mean()
 
-    def _geometric_mean(self) -> np.ndarray:
+    def __geometric_mean(self) -> np.ndarray:
         """
         Calculates scaling factor based on geometric mean of ratio between 
         proportionally (via SL matrix) assigned flow & observed flows.
@@ -221,7 +221,7 @@ class ODME(object):
         # Step 3:
         return spstats.gmean(factors, axis=0)
 
-    def _perform_assignment(self) -> None:
+    def __perform_assignment(self) -> None:
         """ 
         Uses current demand matrix to perform an assignment, then save
         the results in the relevant fields.
@@ -261,7 +261,7 @@ class ODME(object):
         # Recalculate convergence values
         self._obj_func(self)
 
-    def _init_objective_func(self) -> None:
+    def __init_objective_func(self) -> None:
         """
         Initialises the objective function - parameters must be specified by user.
 
@@ -275,7 +275,7 @@ class ODME(object):
         p_1 = self._norms[0]
         p_2 = self._norms[1]
 
-        def _reg_obj_func(self) -> None:
+        def __reg_obj_func(self) -> None:
             """
             Objective function containing regularisation term.
 
@@ -284,21 +284,21 @@ class ODME(object):
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
-            self._set_convergence_values(obj1 + regularisation)
+            self.__set_convergence_values(obj1 + regularisation)
 
-        def _obj_func(self) -> None:
+        def __obj_func(self) -> None:
             """
             Objective function with no regularisation term.
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            self._set_convergence_values(np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1)
+            self.__set_convergence_values(np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1)
 
         if p_2:
-            self._obj_func = _reg_obj_func
+            self._obj_func = __reg_obj_func
         else:
-            self._obj_func = _obj_func
+            self._obj_func = __obj_func
 
-    def _set_convergence_values(self, new_convergence: float) -> None:
+    def __set_convergence_values(self, new_convergence: float) -> None:
         """
         Given a new convergence value calculates the difference between the previous convergence
         and new convergence, and sets appropriate values.
@@ -307,7 +307,7 @@ class ODME(object):
             self._convergence_change = abs(self._last_convergence - new_convergence)
         self._last_convergence = new_convergence 
 
-    def _calculate_flows(self) -> None:
+    def __calculate_flows(self) -> None:
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
