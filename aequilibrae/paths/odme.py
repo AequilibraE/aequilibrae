@@ -13,7 +13,7 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Time (s)"]
+    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Convergence Change", "Time (s)"]
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -65,9 +65,9 @@ class ODME(object):
         self._obj_func = None
         self._init_objective_func()
         self._last_convergence = None
-        self._convergence_change = None # IMPLEMENT THIS STARTING AT POS INF
+        self._convergence_change = float('inf')
 
-        # Stopping criterion 
+        # Stopping criterion
         # May need to specify this further to differentiate between inner & outer criterion
         self.max_iter = stop_crit[0]
         self.convergence_crit = stop_crit[1]
@@ -119,7 +119,7 @@ class ODME(object):
         """
         old_time = self._time
         self._time = time.time()
-        to_log = [self._outer, self._inner, self._last_convergence, self._time - old_time]
+        to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, self._time - old_time]
 
         # Add row::
         self._statistics.loc[len(self._statistics)] = {
@@ -258,7 +258,7 @@ class ODME(object):
             ].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
-        # Recalculate objective function
+        # Recalculate convergence values
         self._obj_func(self)
 
     def _init_objective_func(self) -> None:
@@ -284,19 +284,28 @@ class ODME(object):
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
-            self._last_convergence = obj1 + regularisation
+            self._set_convergence_values(obj1 + regularisation)
 
         def _obj_func(self) -> None:
             """
             Objective function with no regularisation term.
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            self._last_convergence = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
-        
+            self._set_convergence_values(np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1)
+
         if p_2:
             self._obj_func = _reg_obj_func
         else:
             self._obj_func = _obj_func
+
+    def _set_convergence_values(self, new_convergence: float) -> None:
+        """
+        Given a new convergence value calculates the difference between the previous convergence
+        and new convergence, and sets appropriate values.
+        """
+        if self._last_convergence:
+            self._convergence_change = abs(self._last_convergence - new_convergence)
+        self._last_convergence = new_convergence 
 
     def _calculate_flows(self) -> None:
         """
