@@ -2,11 +2,11 @@
 Implementation of ODME algorithms:
 """
 
+from typing import Tuple
+import time
 import numpy as np
 import scipy.stats as spstats
 import pandas as pd
-from typing import Tuple
-import time
 
 from aequilibrae import TrafficAssignment
 
@@ -100,16 +100,8 @@ class ODME(object):
 
     def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
-        Returns current demand matrix (may be called at any point regardless 
-        of whether execution has been completed). Needs to be updated to store
-        actual statistics information and return this.
-        
-        Ideally can be called at any point while execution is ongoing - but
-        this more dynamic functionality is for later on - maybe this is 
-        dumb since we can reach in and grab it anyway but could be nice
-        if a gui is set up to be able to get this at any point in time 
-        safely. Also kind of dumb since user should still have the 
-        TrafficAssignment object anyway and can access it from there.
+        Returns final demand matrix and a dataframe of statistics regarding
+        timing and convergence
         """
         return (self.demand_matrix, self._statistics)
     
@@ -149,6 +141,7 @@ class ODME(object):
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
+            self._convergence_change = float('inf')
             while self._inner < self.max_iter and self._convergence_change > self.convergence_crit:
                 self.__execute_inner_iter()
                 self._inner += 1
@@ -215,11 +208,12 @@ class ODME(object):
             else:
                 factors[i, :, :] = np.ones(self._demand_dims)
 
-        # If the assigned volume was 0 (or both 0) no OD pair can have any effect 
+        # If the assigned volume was 0 (or both 0) no OD pair can have any effect
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
         # Step 3:
-        return spstats.gmean(factors, axis=0)
+        x = spstats.gmean(factors, axis=0)
+        return x
 
     def __perform_assignment(self) -> None:
         """ 

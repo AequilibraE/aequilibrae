@@ -15,6 +15,7 @@ from ...data import siouxfalls_project
 class TestODME(TestCase):
     """
     Robust tests of ODME class with congested networks.
+    This test suite should test both ODME with a single user class and multiple user classes.
     """
 
     def setUp(self) -> None:
@@ -116,8 +117,8 @@ class TestODME(TestCase):
 
         # Perturb original matrix:
         np.random.seed = 0
-        perturbation_matrix = np.random.uniform(0.98, 1.02, size=self.dims)
-        self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix).astype(int)
+        perturbation_matrix = np.random.uniform(0.99, 1.01, size=self.dims)
+        self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes)
