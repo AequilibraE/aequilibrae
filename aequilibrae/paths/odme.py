@@ -65,6 +65,7 @@ class ODME(object):
         self._obj_func = None
         self._init_objective_func()
         self._last_convergence = None
+        self._convergence_change = None # IMPLEMENT THIS STARTING AT POS INF
 
         # Stopping criterion 
         # May need to specify this further to differentiate between inner & outer criterion
@@ -139,7 +140,7 @@ class ODME(object):
 
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
-        while self._outer < self.max_iter and self._obj_func(self) > self.convergence_crit:
+        while self._outer < self.max_iter and self._last_convergence > self.convergence_crit:
             # Set iteration values:
             self._outer += 1
             self._inner = 0
@@ -148,7 +149,7 @@ class ODME(object):
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
-            while self._inner < self.max_iter and self._obj_func(self) > self.convergence_crit:
+            while self._inner < self.max_iter and self._last_convergence > self.convergence_crit:
                 self._execute_inner_iter()
                 self._inner += 1
                 self._log_stats()
@@ -172,6 +173,9 @@ class ODME(object):
 
         # Recalculate the link flows
         self._calculate_flows()
+
+        # Recalculate convergence level:
+        self._obj_func(self)
 
     def _get_scaling_factor(self) -> np.ndarray:
         """
@@ -254,6 +258,9 @@ class ODME(object):
             ].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
+        # Recalculate objective function
+        self._obj_func(self)
+
     def _init_objective_func(self) -> None:
         """
         Initialises the objective function - parameters must be specified by user.
@@ -268,7 +275,7 @@ class ODME(object):
         p_1 = self._norms[0]
         p_2 = self._norms[1]
 
-        def _reg_obj_func(self) -> float:
+        def _reg_obj_func(self) -> None:
             """
             Objective function containing regularisation term.
 
@@ -277,14 +284,14 @@ class ODME(object):
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
-            return obj1 + regularisation
+            self._last_convergence = obj1 + regularisation
 
-        def _obj_func(self) -> float:
+        def _obj_func(self) -> None:
             """
             Objective function with no regularisation term.
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            return np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
+            self._last_convergence = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
         
         if p_2:
             self._obj_func = _reg_obj_func

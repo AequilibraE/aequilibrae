@@ -80,7 +80,7 @@ class TestODME(TestCase):
         #count_volumes = [10000]
 
         odme_solver.execute()
-        new_demand_matrix = odme_solver.get_result()
+        new_demand_matrix = odme_solver.demand_matrix
         assert(np.sum(demand_matrix) - np.sum(new_demand_matrix) <= 10^-2) # Arbitrarily chosen value for now
         # Likely far too stringent of a condition.
 
@@ -118,7 +118,7 @@ class TestODME(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.get_result()
+        new_demand = odme.demand_matrix
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
