@@ -430,8 +430,7 @@ class TrafficAssignment(object):
         if log_specification:
             self.log_specification()
 
-        self.prepare_execute()
-
+        self.__prepare_execute()
         self.assignment.execute()
 
     def log_specification(self):
@@ -773,7 +772,7 @@ class TrafficAssignment(object):
         self.save_select_link_matrices(name)
 
 
-    def prepare_execute(self) -> None:
+    def __prepare_execute(self) -> None:
         """
         Reset's arrays used relating to congested times in assignment algorithm.
 
