@@ -781,7 +781,8 @@ class TrafficAssignment(object):
         self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
 
         # Re-instatiate arrays for use in assignment algorithm.
-        self.assignment.congested_time = self.congested_time
-        self.assignment.vdf_der = np.array(self.congested_time, copy=True)
-        self.assignment.congested_value = np.array(self.congested_time, copy=True)
+        if self.algorithm in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
+            self.assignment = LinearApproximation(self, self.algorithm, project=self.project)
+        else:
+            raise ValueError("Algorithm not listed in the case selection")
 
