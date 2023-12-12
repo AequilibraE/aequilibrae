@@ -20,7 +20,7 @@ class ODME(object):
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
-        stop_crit=(5, 10**-2), # max_iterations, convergence criterion
+        stop_crit=(5, 5, 10**-2,10**-2), # max_iterations (inner/outer), convergence criterion
         alg_spec=((2, 0),) # currently just the objective function specification
     ):
         """
@@ -72,8 +72,10 @@ class ODME(object):
 
         # Stopping criterion
         # May need to specify this further to differentiate between inner & outer criterion
-        self.max_iter = stop_crit[0]
-        self.convergence_crit = stop_crit[1]
+        self.max_outer = stop_crit[0]
+        self.max_inner = stop_crit[1]
+        self.outer_convergence_crit = stop_crit[2]
+        self.inner_convergence_crit = stop_crit[3]
 
         self._outer, self._inner = 0, 0
 
@@ -135,7 +137,7 @@ class ODME(object):
 
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
-        while self._outer < self.max_iter and self._last_convergence > self.convergence_crit:
+        while self._outer < self.max_outer and self._last_convergence > self.outer_convergence_crit:
             # Set iteration values:
             self._outer += 1
             self._inner = 0
@@ -145,7 +147,7 @@ class ODME(object):
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
             self._convergence_change = float('inf')
-            while self._inner < self.max_iter and self._convergence_change > self.convergence_crit:
+            while self._inner < self.max_inner and self._convergence_change > self.inner_convergence_crit:
                 self.__execute_inner_iter()
                 self._inner += 1
                 self.__log_stats()
