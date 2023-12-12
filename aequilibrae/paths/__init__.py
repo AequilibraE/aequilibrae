@@ -8,6 +8,7 @@ from aequilibrae.paths.traffic_class import TrafficClass
 from aequilibrae.paths.traffic_assignment import TrafficAssignment
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.public_transport import HyperpathGenerating
 
 from aequilibrae import global_logger
 
