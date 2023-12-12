@@ -19,7 +19,7 @@ class ODME(object):
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(5, 10**-2), # max_iterations, convergence criterion
-        alg_spec=((1, 0),) # currently just the objective function specification
+        alg_spec=((2, 0),) # currently just the objective function specification
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -104,7 +104,7 @@ class ODME(object):
         timing and convergence
         """
         return (self.demand_matrix, self._statistics)
-    
+
     def __log_stats(self) -> None:
         """
         Adds next row to statistics dataframe.
@@ -212,8 +212,7 @@ class ODME(object):
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
         # Step 3:
-        x = spstats.gmean(factors, axis=0)
-        return x
+        return spstats.gmean(factors, axis=0)
 
     def __perform_assignment(self) -> None:
         """ 
