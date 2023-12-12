@@ -44,7 +44,8 @@ class ODME(object):
 
         # Demand matrices
         self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix
-        # May be unecessary - if we do keep it need to make a copy ->
+        # May be unecessary - if we do keep it need to make a copy -> 
+        # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         self.init_demand_matrix = np.copy(self.demand_matrix)
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
@@ -235,7 +236,7 @@ class ODME(object):
         self._sl_matrices = self.assignclass.results.select_link_od.matrix
         for link in self._sl_matrices:
             self._sl_matrices[link] = np.nan_to_num(np.squeeze(self._sl_matrices[link], axis=2) / self.demand_matrix)
-        # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake), 
+        # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake),
         # but we only have one of each per set of select links so we can ignore this for now.
         # In future when multiple class ODME is implemented this needs to be changed.
 

@@ -58,6 +58,23 @@ class TestODME(TestCase):
         self.matrix.close()
         self.project.close()
 
+    def test_playground(self) -> None:
+        """
+        Used for messing around with stuff and seeing how stuff works.
+
+        Should be removed later.
+        """
+        self.assignclass.set_select_links({"sl_1_1": [(1, 1)]})
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
+        sl_matrix = self.assignclass.results.select_link_od.matrix["sl_1_1"].squeeze()
+        sl_flows = self.assignment.select_link_flows().reset_index(drop=False).fillna(0)
+        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
+        print(flow)
+        calc = np.sum(sl_matrix)
+        print(calc)
+
     def test_no_changes(self) -> None:
         """
         Checks ODME does nothing to a congested network when the observed volumes

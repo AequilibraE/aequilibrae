@@ -719,4 +719,11 @@ class TestODMESingleClassSetUp(TestCase):
         # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
         self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
+
+        # Assert we have perturbed the matrix view itself (not a copy):
+        np.testing.assert_equal(
+            odme.demand_matrix,
+            self.matrix.matrix_view,
+            err_msg="ODME should perturb original matrix_view!"
+        )
         
