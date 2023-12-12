@@ -2,6 +2,8 @@
 Implementation of ODME algorithms:
 """
 
+# NOTE - Until issue with select link flows not matching assigned flows ODME should not be used with biconjugate/conjugate frank-wolfe
+
 from typing import Tuple
 import time
 import numpy as np

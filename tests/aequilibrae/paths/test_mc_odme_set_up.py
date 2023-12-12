@@ -69,8 +69,8 @@ class TestODMEMultiClassSetUp(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
 
-        self.assignment.max_iter = 20
-        self.assignment.set_algorithm("bfw")
+        self.assignment.max_iter = 5
+        self.assignment.set_algorithm("msa")
 
         # Store parameters needed for ODME/demand matrix manipulation:
         self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
@@ -127,6 +127,7 @@ class TestODMEMultiClassSetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
+        # Check for each class that the matrix is still 0's.
         for i, matrix in enumerate(self.matrices):
             np.testing.assert_allclose(
                 matrix.matrix_view,

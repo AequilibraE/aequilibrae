@@ -52,7 +52,7 @@ class TestODME(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
         self.assignment.max_iter = 5
-        self.assignment.set_algorithm("bfw")
+        self.assignment.set_algorithm("msa")
 
     def tearDown(self) -> None:
         self.matrix.close()

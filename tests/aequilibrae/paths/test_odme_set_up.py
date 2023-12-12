@@ -55,7 +55,7 @@ class TestODMESingleClassSetUp(TestCase):
         self.assignment.set_capacity_field("capacity")
         self.assignment.set_time_field("free_flow_time")
         self.assignment.max_iter = 5
-        self.assignment.set_algorithm("bfw")
+        self.assignment.set_algorithm("msa")
 
         # Set up ODME solver with default stopping conditions: 
         # NEEDS TO BE CHANGED - SHOULD BE CREATED WITHIN INDIVIDUAL TESTS
