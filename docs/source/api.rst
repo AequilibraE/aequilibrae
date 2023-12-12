@@ -106,6 +106,7 @@ Paths
     VDF
     TrafficClass
     TrafficAssignment
+    HyperpathGenerating
 
 Transit
 -------

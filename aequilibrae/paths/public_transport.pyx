@@ -19,6 +19,23 @@ include 'hyperpath.pyx'
 
 
 class HyperpathGenerating:
+    """A class for hyperpath generation.
+
+    :Arguments:
+        **edges** (:obj:`pandas.DataFrame`): The edges of the graph.
+
+        **tail** (:obj:`str`): The column name for the tail of the edge (optional, default is "tail").
+
+        **head** (:obj:`str`): The column name for the head of the edge (optional, default is "head").
+
+        **trav_time** (:obj:`str`): The column name for the travel time of the edge (optional, default is "trav_time").
+
+        **freq** (:obj:`str`): The column name for the frequency of the edge (optional, default is "freq").
+
+        **check_edges** (:obj:`bool`): If True, check the validity of the edges (optional, default is False).
+    """
+
+
     def __init__(self, edges, tail="tail", head="head", trav_time="trav_time", freq="freq", check_edges=False):
         # load the edges
         if check_edges:
@@ -154,6 +171,22 @@ class HyperpathGenerating:
         check_demand=False,
         threads=0
     ):
+        """Assigns demand to the edges of the graph.
+
+        :Arguments:
+            **demand** (:obj:`pandas.DataFrame`): The demand information.
+
+            **origin_column** (:obj:`str`): The column name for the origin vertices (optional, default is "orig_vert_idx").
+
+            **destination_column** (:obj:`str`): The column name for the destination vertices (optional, default is "dest_vert_idx").
+
+            **demand_column** (:obj:`str`): The column name for the demand values (optional, default is "demand").
+
+            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (optional, default is False).
+
+            **threads** (:obj:`int`):The number of threads to use for computation (optional, default is 0, using all available threads).
+        """
+
         # check the input demand paramater
         if check_demand:
             self._check_demand(demand, origin_column, destination_column, demand_column)
