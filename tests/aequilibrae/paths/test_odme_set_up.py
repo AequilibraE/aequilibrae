@@ -98,9 +98,8 @@ class TestODMESingleClassSetUp(TestCase):
         odme.execute()
 
         # Check result:
-        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
-                np.zeros(self.matrix.matrix_view.shape), # Why has this changed to 24 x 24 x 1
+                np.zeros(self.matrix.matrix_view.shape),
                 odme.demand_matrix,
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
