@@ -1,4 +1,4 @@
-The transit assignment graph
+The Transit assignment graph
 ============================
 
 This page is a description of a graph structure for a *transit network*,
