@@ -74,6 +74,7 @@ class TransitGraphBuilder:
         with_walking_edges: bool = True,
         distance_upper_bound: float = np.inf,
         blocking_centroid_flows: bool = True,
+        connector_method: str = "nearest_neighbour",
         max_connectors_per_zone: int = -1,
     ):
         """SF graph builder constructor.
@@ -164,6 +165,7 @@ class TransitGraphBuilder:
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
         self.blocking_centroid_flows = blocking_centroid_flows
+        self.connector_method = connector_method
         self.max_connectors_per_zone = max_connectors_per_zone
 
         self.__config_attrs = [
@@ -187,6 +189,7 @@ class TransitGraphBuilder:
             "with_walking_edges",
             "distance_upper_bound",
             "blocking_centroid_flows",
+            "connector_method",
             "max_connectors_per_zone",
         ]
 
@@ -215,7 +218,9 @@ class TransitGraphBuilder:
             transformer = pyproj.Transformer.from_crs(
                 pyproj.CRS(from_crs), self.__projected_crs, always_xy=True
             ).transform
-            geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        else:
+            transformer = self.transformer_g_to_p
+        geometry = [shapely.ops.transform(transformer, p) for p in geometry]
         centroids = shapely.centroid(geometry)
 
         self.zones = pd.DataFrame(
@@ -725,7 +730,7 @@ class TransitGraphBuilder:
 
         self.__dwell_edges = dwell_edges
 
-    def create_connector_edges(self, method="overlapping_regions", allow_missing_connections=True):
+    def create_connector_edges(self, method=None, allow_missing_connections=True):
         """
         Create the connector edges between each stops and ODs.
 
@@ -737,6 +742,11 @@ class TransitGraphBuilder:
            **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
            **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
         """
+        if method is None:
+            method = self.connector_method
+        else:
+            self.connector_method = method
+
         assert method in ["overlapping_regions", "nearest_neighbour"]
 
         # Create access connectors
@@ -809,6 +819,8 @@ class TransitGraphBuilder:
                 df["trav_time"] = distance / self.walking_speed
                 connectors.append(df)
             access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "a_node"}).reset_index(drop=True)
+
+            breakpoint()
 
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
@@ -1311,8 +1323,8 @@ class TransitGraphBuilder:
         # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.itertuples.html
         self.pt_conn.executemany(
             f"""\
-            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes,period_start,period_end)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",{self.start},{self.end});
+            INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
+            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
             """,
             (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
                 index=False, name=None
@@ -1342,8 +1354,8 @@ class TransitGraphBuilder:
         self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (False,))
         self.pt_conn.executemany(
             f"""\
-            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes,period_start,period_end)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t",{self.start},{self.end});
+            INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
+            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
             """,
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
@@ -1364,7 +1376,12 @@ class TransitGraphBuilder:
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
 
-        g = TransitGraph(self.config)
+        # TODO: Better required link type detections
+        # link_type_diff = set(self.edges.link_type.unique()) ^ {'access_connector', 'alighting', 'boarding', 'dwell', 'egress_connector', 'inner_transfer', 'on-board'}
+        # if link_type_diff:
+        #     raise ValueError(f"Not all required links have been created. Link types {link_type_diff} are missing.")
+
+        g = TransitGraph(config=self.config, od_node_mapping=self.od_node_mapping)
         g.network = self.edges.copy(deep=True)
         g.cost = g.network.trav_time.values
         g.free_flow_time = g.network.trav_time.values
@@ -1374,7 +1391,7 @@ class TransitGraphBuilder:
         g.status = "OK"
         g.prepare_graph(
             self.vertices[
-                (self.vertices.node_type == "origin") | (self.vertices.node_type == "destination")
+                (self.vertices.node_type == "origin")
                 if self.blocking_centroid_flows
                 else (self.vertices.node_type == "od")
             ].node_id.values

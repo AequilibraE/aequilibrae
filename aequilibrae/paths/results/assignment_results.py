@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.paths.graph import Graph, GraphBase
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
 from pathlib import Path
@@ -34,7 +34,6 @@ class AssignmentResultsBase(ABC):
     """Assignment results base class for traffic and transit assignments."""
     def __init__(self):
         self.link_loads = np.array([])  # The actual results for assignment
-        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
         self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
         p = Parameters().parameters["system"]["cpus"]
@@ -42,21 +41,11 @@ class AssignmentResultsBase(ABC):
             p = 0
         self.set_cores(p)
 
-        self.classes = {"number": 1, "names": ["flow"]}
-
         self.nodes = -1
         self.zones = -1
         self.links = -1
-        self.compact_links = -1
-        self.compact_nodes = -1
 
         self.lids = None
-        self.direcs = None
-
-        # save path files. Need extra metadata for file paths
-        self.save_path_file = False
-        self.path_file_dir = None
-        self.write_feather = True  # we use feather as default, parquet is slower but with better compression
 
     @abstractmethod
     def prepare(self, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
@@ -65,14 +54,6 @@ class AssignmentResultsBase(ABC):
     @abstractmethod
     def reset(self) -> None:
         pass
-
-    def total_flows(self) -> None:
-        """
-        Totals all link flows for this class into a single link load
-
-        Results are placed into *total_link_loads* class member
-        """
-        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
 
     def set_cores(self, cores: int) -> None:
         """
@@ -102,51 +83,9 @@ class AssignmentResultsBase(ABC):
         if self.link_loads.shape[0]:
             self.__redim()
 
-    def get_graph_to_network_mapping(self):
-        num_uncompressed_links = int(np.unique(self.lids).shape[0])
-        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
-        indexing[np.unique(self.lids)[:]] = np.arange(num_uncompressed_links)
-
-        graph_ab_idx = self.direcs > 0
-        graph_ba_idx = self.direcs < 0
-        network_ab_idx = indexing[self.lids[graph_ab_idx]]
-        network_ba_idx = indexing[self.lids[graph_ba_idx]]
-        return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
-
+    @abstractmethod
     def get_load_results(self) -> AequilibraeData:
-        """
-        Translates the assignment results from the graph format into the network format
-
-        :Returns:
-            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
-        """
-        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
-        types = [np.float64] * len(fields)
-
-        # Create a data store with a row for each uncompressed link
-        res = AequilibraeData.empty(
-            memory_mode=True,
-            entries=int(np.unique(self.lids).shape[0]),
-            field_names=fields,
-            data_types=types,
-            fill=np.nan,
-            index=np.unique(self.lids),
-        )
-
-        # Get a mapping from the compressed graph to/from the network graph
-        m = self.get_graph_to_network_mapping()
-
-        # Link flows
-        link_flows = self.link_loads[self._graph_ids, :]
-        for i, n in enumerate(self.classes["names"]):
-            # Directional Flows
-            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
-            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
-
-            # Tot Flow
-            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
-
-        return res
+        pass
 
 
 class AssignmentResults(AssignmentResultsBase):
@@ -160,6 +99,14 @@ class AssignmentResults(AssignmentResultsBase):
         self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
         self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
         self.skims = AequilibraeMatrix()  # The array of skims
+        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
+
+        self.compact_links = -1
+        self.compact_nodes = -1
+
+        self.direcs = None
+
+        self.classes = {"number": 1, "names": ["flow"]}
 
         self._selected_links = {}
         self.select_link_od = None
@@ -168,6 +115,11 @@ class AssignmentResults(AssignmentResultsBase):
         self._graph_id = None
         self.__float_type = None
         self.__integer_type = None
+
+        # save path files. Need extra metadata for file paths
+        self.save_path_file = False
+        self.path_file_dir = None
+        self.write_feather = True  # we use feather as default, parquet is slower but with better compression
 
     # In case we want to do by hand, we can prepare each method individually
     def prepare(self, graph: Graph, matrix: AequilibraeMatrix) -> None:
@@ -288,6 +240,14 @@ class AssignmentResults(AssignmentResultsBase):
 
         self.reset()
 
+    def total_flows(self) -> None:
+        """
+        Totals all link flows for this class into a single link load
+
+        Results are placed into *total_link_loads* class member
+        """
+        sum_axis1(self.total_link_loads, self.link_loads, self.cores)
+
     def get_graph_to_network_mapping(self):
         num_uncompressed_links = int(np.unique(self.lids).shape[0])
         indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
@@ -298,6 +258,41 @@ class AssignmentResults(AssignmentResultsBase):
         network_ab_idx = indexing[self.lids[graph_ab_idx]]
         network_ba_idx = indexing[self.lids[graph_ba_idx]]
         return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+
+    def get_load_results(self) -> AequilibraeData:
+        """
+        Translates the assignment results from the graph format into the network format
+
+        :Returns:
+            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the traffic class assignment results
+        """
+        fields = [e for n in self.classes["names"] for e in [f"{n}_ab", f"{n}_ba", f"{n}_tot"]]
+        types = [np.float64] * len(fields)
+
+        # Create a data store with a row for each uncompressed link
+        res = AequilibraeData.empty(
+            memory_mode=True,
+            entries=int(np.unique(self.lids).shape[0]),
+            field_names=fields,
+            data_types=types,
+            fill=np.nan,
+            index=np.unique(self.lids),
+        )
+
+        # Get a mapping from the compressed graph to/from the network graph
+        m = self.get_graph_to_network_mapping()
+
+        # Link flows
+        link_flows = self.link_loads[self._graph_ids, :]
+        for i, n in enumerate(self.classes["names"]):
+            # Directional Flows
+            res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
+            res.data[n + "_ba"][m.network_ba_idx] = np.nan_to_num(link_flows[m.graph_ba_idx, i])
+
+            # Tot Flow
+            res.data[n + "_tot"] = np.nan_to_num(res.data[n + "_ab"]) + np.nan_to_num(res.data[n + "_ba"])
+
+        return res
 
     def get_sl_results(self) -> AequilibraeData:
         # Set up the name for each column. Each set of select links has a column for ab, ba, total flows
@@ -356,10 +351,63 @@ class AssignmentResults(AssignmentResultsBase):
             raise NotImplementedError
 
 
-class AssignmentResultsTransit(AssignmentResultsBase):
+class TransitAssignmentResults(AssignmentResultsBase):
     """
     Assignment result holder for a single :obj:`Transit`
     """
 
     def __init__(self):
         super().__init__()
+
+        self.link_loads = np.array([])
+        # self.skims = AequilibraeMatrix()
+
+    def prepare(self, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
+        """
+        Prepares the object with dimensions corresponding to the assignment matrix and graph objects
+
+        :Arguments:
+            **graph** (:obj:`TransitGraph`): Needs to have been set with number of centroids
+
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
+             matrix.computational_view(:obj:`list`)
+        """
+        self.reset()
+        self.nodes = graph.num_nodes
+        self.zones = graph.num_zones
+        self.centroids = graph.centroids
+        self.links = graph.num_links
+        # self.num_skims = len(graph.skim_fields)
+        # self.skim_names = [x for x in graph.skim_fields]
+        self.lids = graph.graph.link_id.values
+
+    def reset(self) -> None:
+        """
+        Resets object to prepared and pre-computation state
+        """
+
+        # Since all memory for the asignment is managed by the HyperpathGenerating
+        # object we don't need to do much here
+        self.link_loads.fill(0)
+
+    def get_load_results(self) -> AequilibraeData:
+        """
+        Translates the assignment results from the graph format into the network format
+
+        :Returns:
+            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the transit class assignment results
+        """
+        if not self.link_loads.shape[0]:
+            raise ValueError("Transit assignment has not been executed yet")
+
+        res = AequilibraeData()
+        res.create_empty(
+            file_path=res.random_name(),
+            entries=self.links,
+            field_names=["volume"],
+            data_types=[np.float64],
+            index=self.lids,
+        )
+
+        res.data["volume"] = self.link_loads
+        return res

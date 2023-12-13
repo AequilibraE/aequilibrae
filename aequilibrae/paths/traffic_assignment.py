@@ -21,7 +21,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
 from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
-from aequilibrae.project import database_connection
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 
 spec = iutil.find_spec("openmatrix")
@@ -859,6 +859,8 @@ class TransitAssignment(AssignmentBase):
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
+        self.algorithm = algo
+        self._config["Algorithm"] = algo
         self.assignment = OptimalStrategies(self)
 
     def set_cores(self, cores: int) -> None:
@@ -930,19 +932,19 @@ class TransitAssignment(AssignmentBase):
             **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
-        df = self._edges
+        df = self.results()
         if not keep_zero_flows:
             df = df[df.volume > 0]
 
         if not project:
             project = project or get_active_project()
         conn = sqlite3.connect(path.join(project.project_base_path, "results_database.sqlite"))
-        df.to_sql(table_name, conn, index=False)
+        df.to_sql(table_name, conn)
         conn.close()
 
         conn = database_connection("transit", project.project_base_path)
         report = {"setup": self.info()}
-        data = [table_name, "hyperpath assignment", self.procedure_id, str(report), self.procedure_date, self.description]
+        data = [table_name, "transit assignment", self.procedure_id, str(report), self.procedure_date, self.description]
         conn.execute(
             """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
                                             description) Values(?,?,?,?,?,?)""",
@@ -952,7 +954,18 @@ class TransitAssignment(AssignmentBase):
         conn.close()
 
     def results(self) -> pd.DataFrame:
-        pass  # TODO
+        """Prepares the assignment results as a Pandas DataFrame
+
+        :Returns:
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+        """
+        assig_results = [
+            pd.DataFrame(cls.results.get_load_results().data)
+            .rename(columns={"volume": cls._id + "_volume", "index": "link_id"})
+            .set_index("link_id") for cls in self.classes
+        ]
+
+        return pd.concat(assig_results, axis=1)
 
     def set_time_field(self, time_field: str) -> None:
         """

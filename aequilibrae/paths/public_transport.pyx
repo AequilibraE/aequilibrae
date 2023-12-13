@@ -28,17 +28,21 @@ class HyperpathGenerating:
 
     def __init__(
             self,
-            edges,
+            graph,
             matrix,
-            trav_time="trav_time",
-            freq="freq",
-            check_edges=False,
-            check_demand=False,
-            threads=-1
+            assignment_config: dict,
+            check_edges: bool =False,
+            check_demand: bool =False,
+            threads: int = -1
     ):
-        # FIXME: converting from dense to sparse to make a dataframe is horrible, this conversation may not even be correct
-        d = sparse.coo_matrix(matrix)
-        self.demand = pd.DataFrame({self.origin_column: d.row, self.destination_column: d.col, self.demand_column: d.data})
+        edges = graph.graph
+        trav_time = assignment_config["Time field"]
+        freq = assignment_config["Frequency field"]
+        self._assignment_config = assignment_config
+        self.__od_node_mapping = graph.od_node_mapping
+
+        # This is a sparse representation of the AequilibraE Matrix object, the index is from od to od, *NOT* origin to destination. We'll use the od_node_mapping to convert index to node_id before the assignment
+        self.__demand = sparse.coo_matrix(matrix, dtype=np.float64)
 
         self.check_edges = check_edges
         self.check_demand = check_demand
@@ -79,7 +83,7 @@ class HyperpathGenerating:
         self._tail = self._edges[self.tail].values.astype(np.uint32)
         self._head = self._edges[self.head].values.astype(np.uint32)
 
-    def run(self, origin, destination, volume, return_inf=False):
+    def run(self, origin, destination, volume):
         # column storing the resulting edge volumes
         self._edges["volume"] = 0.0
         self.u_i_vec = None
@@ -95,7 +99,6 @@ class HyperpathGenerating:
             self._check_vertex_idx(item)
             self._check_volume(volume[i])
         self._check_vertex_idx(destination)
-        assert isinstance(return_inf, bool)
 
         o_vert_ids = np.array(origin, dtype=np.uint32)
         d_vert_ids = np.array([destination], dtype=np.uint32)
@@ -125,7 +128,6 @@ class HyperpathGenerating:
 
         if u_i_vec != NULL:
             self.u_i_vec = np.asarray(<cnp.float64_t[:self.vertex_count]> u_i_vec)
-
 
     def _check_vertex_idx(self, idx):
         assert isinstance(idx, int)
@@ -169,9 +171,9 @@ class HyperpathGenerating:
         # check the input demand paramater
         if not threads:
             threads = self.threads
-        if self.check_demand:
-            self._check_demand(self.demand, self.origin_column, self.destination_column, self.demand_column)
-        self.demand = self.demand[self.demand[self.demand_column] > 0]
+        # if self.check_demand:
+        #     self._check_demand(self.demand, self.origin_column, self.destination_column, self.demand_column)
+        # self.demand = self.demand[self.demand[self.demand_column] > 0]
 
         # initialize the column storing the resulting edge volumes
         self._edges["volume"] = 0.0
@@ -179,9 +181,13 @@ class HyperpathGenerating:
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = None
 
-        o_vert_ids = self.demand[self.origin_column].values.astype(np.uint32)
-        d_vert_ids = self.demand[self.destination_column].values.astype(np.uint32)
-        demand_vls = self.demand[self.demand_column].values.astype(np.float64)
+        if len(self.__od_node_mapping.columns) == 2:
+            o_vert_ids = self.__od_node_mapping.iloc[self.__demand.row]["node_id"].values.astype(np.uint32)
+            d_vert_ids = self.__od_node_mapping.iloc[self.__demand.col]["node_id"].values.astype(np.uint32)
+        else:
+            o_vert_ids = self.__od_node_mapping.iloc[self.__demand.row]["o_node_id"].values.astype(np.uint32)
+            d_vert_ids = self.__od_node_mapping.iloc[self.__demand.col]["d_node_id"].values.astype(np.uint32)
+        demand_vls = self.__demand.data
 
         # get the list of all destinations
         destination_vertex_indices = np.unique(d_vert_ids)
@@ -233,3 +239,6 @@ class HyperpathGenerating:
 
         if demand[col].min() < 0.0:
             raise ValueError(f"column '{col}' should be nonnegative")
+
+    def results(self):
+        return self._edges[["link_id", "a_node", "b_node", "trav_time", "freq", "volume"]].copy(deep=True)

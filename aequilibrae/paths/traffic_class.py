@@ -7,7 +7,7 @@ import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 
 class TransportClassBase(ABC):
@@ -31,7 +31,6 @@ class TransportClassBase(ABC):
         self.graph = graph
         self.logger = graph.logger
         self.matrix = matrix
-        self.results = AssignmentResults()
         self._id = name
 
         graph_config = {
@@ -110,6 +109,7 @@ class TrafficClass(TransportClassBase):
         self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
+        self.results = AssignmentResults()
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
 
@@ -214,3 +214,4 @@ class TransitClass(TransportClassBase):
     def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix):
         super().__init__(name, graph, matrix)
         self._config["Graph"] = str(graph._config)
+        self.results = TransitAssignmentResults()

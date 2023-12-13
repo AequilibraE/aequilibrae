@@ -1,5 +1,6 @@
 import os
 import shutil
+import warnings
 
 from aequilibrae.log import logger
 
@@ -80,12 +81,17 @@ class Transit:
         return graph
 
     def save_graphs(self, graphs: list[int] = None):
-        for k in (graphs if graphs else self.graphs.keys()):
-            graphs[k].save()
+        # TODO: Support multiple graph saving
+        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.")
+
+        if len(graphs) > 1:
+            raise ValueError("Multiple graphs can currently be saved.")
 
     def load(self, period_ids: list[int] = None):
-        if period_ids is None:
-            period_ids = [period[0] for period in self.pt_con.execute("SELECT period_id FROM periods;").fetchall()]
+        # TODO: Support multiple graph loading
+        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.")
 
-        for period_id in period_ids:
-            self.graphs[period_id] = TransitGraphBuilder.from_db(period_id=period_id)
+        if len(period_ids) > 1:
+            raise ValueError("Multiple graphs can currently be loaded.")
+
+        self.graphs[period_ids[0]] = TransitGraphBuilder.from_db()
