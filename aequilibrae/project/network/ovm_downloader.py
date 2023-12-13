@@ -92,27 +92,37 @@ class OVMDownloader(WorkerThread):
         c = initialise_duckdb_spatial()
         c.execute(sql)
 
-    def downloadTransportation(self, bbox, data_source):
-        # pth = str(self.__project_path / "downloaded_ovm_data.parquet").replace("\\", "/")
-
-        data_source = data_source or DEFAULT_OVM_S3_LOCATION
-
-        sql = f"""
-            COPY (
-            SELECT JSON(bbox) AS bbox,
-                ST_GeomFromWkb(geometry) AS geometry, 
-                road, 
-                connectors 
-            FROM read_parquet('{data_source}/*', union_by_name=True)
-            WHERE bbox.minx > '{bbox[0]}'
-                AND bbox.maxx < '{bbox[2]}'
-                AND bbox.miny > '{bbox[1]}'
-                AND bbox.maxy < '{bbox[3]}')
-            TO '{self.pth}/trasportation_parquet_file.parquet';
-            (FORMAT 'parquet', COMPRESSION 'ZSTD');
-        """
-        c = initialise_duckdb_spatial()
-        c.execute(sql)
+    def downloadTransportation(self, bbox, data_source, output_dir):
+        data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
+        output_dir = Path(output_dir)
+        
+        for t in ['segment','connector']:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_file = output_dir / f'transportation_data_{t}.parquet'
+            sql = f"""
+                COPY (
+                SELECT 
+                    id,
+                    JSON(bbox) AS bbox,
+                    geometry, 
+                    road, 
+                    connectors 
+                FROM read_parquet('{data_source}/*', union_by_name=True)
+                WHERE bbox.minx > '{bbox[0]}'
+                    AND bbox.maxx < '{bbox[2]}'
+                    AND bbox.miny > '{bbox[1]}'
+                    AND bbox.maxy < '{bbox[3]}')
+                TO '{output_file}'
+                (FORMAT 'parquet', COMPRESSION 'ZSTD');
+            """
+            c = initialise_duckdb_spatial()
+            c.execute(sql)
+            
+            df = pd.read_parquet(output_file)
+            geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
+            gdf = gpd.GeoDataFrame(df,geometry=geo)
+            gdf.to_parquet(output_file)
+            return gdf
   
     def download_test_data(self, l_data_source):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''
@@ -121,8 +131,6 @@ class OVMDownloader(WorkerThread):
 
 
         for t in ['segment','connector']:
-            print(self.pth)
-            print(f'type={t}')
             (Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f'type={t}').mkdir(parents=True, exist_ok=True)
             pth1 = Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f"type={t}" / f'airlie_beach_transportation_{t}.parquet'
             sql = f"""
@@ -135,16 +143,14 @@ class OVMDownloader(WorkerThread):
                     AND bbox.miny > '{airlie_bbox[1]}'
                     AND bbox.maxy < '{airlie_bbox[3]}')
                 TO '{pth1}'
-
                 (FORMAT 'parquet', COMPRESSION 'ZSTD');
             """
             c = initialise_duckdb_spatial()
             c.execute(sql)
             
-            pth2 = Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f"type={t}" / f'airlie_beach_transportation_{t}.parquet'
             df = pd.read_parquet(Path(pth1))
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
-            gpd.GeoDataFrame(df,geometry=geo).to_parquet(Path(pth2))
+            gpd.GeoDataFrame(df,geometry=geo).to_parquet(Path(pth1))
         
 
     def formatTransportation(self):

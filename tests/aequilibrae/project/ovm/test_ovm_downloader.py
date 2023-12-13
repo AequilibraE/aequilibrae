@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import gettempdir, mkdtemp
 from unittest import TestCase
 import os
+import geopandas as gpd
 from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from random import random
 
@@ -23,11 +24,21 @@ class TestOVMDownloader(TestCase):
     def test_download(self):
         # if not self.should_do_work():
         #     return
+       
         o = OVMDownloader(["car"], self.pth)
-        o.downloadTransportation([148.72095, -20.26910, 148.72405, -20.26711], data_source=data_dir)
+        with tempfile.TemporaryDirectory() as output_dir:
+            output_dir = Path(output_dir)
+            o.downloadTransportation([148.72095, -20.26910, 148.72405, -20.26711], data_source=data_dir, output_dir=output_dir)
 
-        expected_file = data_dir / r"\airlie_beach_transportation_segment.parquet"
-        assert expected_file.exists()
+            expected_file = output_dir / "transportation_data_segment.parquet"
+            assert expected_file.exists()
+
+            
+            gdf = gpd.read_parquet(expected_file)
+            assert gdf.shape[0] > 0
+
+            assert 'road' in gdf.columns
+            
 
         # if o.parquet:
         #     self.fail("It found links in the middle of the ocean")
