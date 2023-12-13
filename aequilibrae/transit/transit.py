@@ -8,7 +8,7 @@ from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
 from aequilibrae.transit.lib_gtfs import GTFSRouteSystemBuilder
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import TransitGraph
 from aequilibrae.project.database_connection import database_connection
 import sqlite3
 
@@ -25,7 +25,7 @@ class Transit:
         12: [50, 100],  # Monorail
         "other": [30, 60],
     }
-    graphs: dict[str, Graph] = {}
+    graphs: dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
     def __init__(self, project):
@@ -38,6 +38,7 @@ class Transit:
         self.project_base_path = project.project_base_path
         self.logger = logger
         self.__transit_file = os.path.join(project.project_base_path, "public_transport.sqlite")
+        self.periods = project.network.periods
 
         self.create_transit_database()
         self.pt_con = database_connection("transit")
@@ -74,24 +75,33 @@ class Transit:
             initialize_tables(self, "transit")
 
     def create_graph(self, **kwargs) -> TransitGraphBuilder:
-        graph = TransitGraphBuilder(self.pt_con, **kwargs)
+        period_id = kwargs.get("period_id", self.periods.default_period.period_id)
+        graph = TransitGraphBuilder(self.pt_con, period_id, **kwargs)
         graph.create_vertices()
         graph.create_edges()
-        self.graphs[kwargs.get("period_id", 1)] = graph
+        self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, graphs: list[int] = None):
+    def save_graphs(self, period_ids: list[int] = None):
         # TODO: Support multiple graph saving
         warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.")
+        if period_ids is None:
+            period_ids = [self.periods.default_period.period_id]
 
-        if len(graphs) > 1:
+        if len(period_ids) > 1:
             raise ValueError("Multiple graphs can currently be saved.")
+
+        for period_id in period_ids:
+            self.graphs[period_id].save()
 
     def load(self, period_ids: list[int] = None):
         # TODO: Support multiple graph loading
-        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.")
+        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored.")
+
+        if period_ids is None:
+            period_ids = [self.periods.default_period.period_id]
 
         if len(period_ids) > 1:
             raise ValueError("Multiple graphs can currently be loaded.")
 
-        self.graphs[period_ids[0]] = TransitGraphBuilder.from_db()
+        self.graphs[period_ids[0]] = TransitGraphBuilder.from_db(self.pt_con, period_ids[0])

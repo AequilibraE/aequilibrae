@@ -8,6 +8,7 @@ import pyproj
 import shapely
 import shapely.ops
 from aequilibrae.utils.geo_utils import haversine
+from aequilibrae.project.database_connection import database_connection
 from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
 
@@ -62,7 +63,7 @@ class TransitGraphBuilder:
     def __init__(
         self,
         public_transport_conn,
-        period_id: int = 1,
+        period_id: int,
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
         num_threads: int = -1,
@@ -102,7 +103,7 @@ class TransitGraphBuilder:
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
 
-        start, end = self.pt_conn.execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]).fetchall()[0]
+        start, end = database_connection("project_database").execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]).fetchall()[0]
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads
@@ -820,8 +821,6 @@ class TransitGraphBuilder:
                 connectors.append(df)
             access_connector_edges = pd.concat(connectors).rename(columns={"node_id": "a_node"}).reset_index(drop=True)
 
-            breakpoint()
-
             if not allow_missing_connections:
                 # Now we need to build up the edges for the stops without connectors
                 missing = stop_vertices["node_id"].isin(access_connector_edges["a_node"])
@@ -1403,7 +1402,7 @@ class TransitGraphBuilder:
         return g
 
     @classmethod
-    def from_db(cls, public_transport_conn, **kwargs):
+    def from_db(cls, public_transport_conn, period_id: int, **kwargs):
         """
         Create a SF graph instance from an existing database save.
 
@@ -1415,7 +1414,7 @@ class TransitGraphBuilder:
         :Arguments:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
-        graph = cls(public_transport_conn, **kwargs)
+        graph = cls(public_transport_conn, period_id, **kwargs)
 
         # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(

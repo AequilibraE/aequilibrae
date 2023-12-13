@@ -131,4 +131,4 @@ class Periods(BasicTable):
 
     @property
     def default_period(self) -> Period:
-        self.get(1)
+        return self.get(1)
