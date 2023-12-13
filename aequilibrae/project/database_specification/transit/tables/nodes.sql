@@ -32,13 +32,13 @@ CREATE TABLE if not exists nodes (ogc_fid      INTEGER PRIMARY KEY,
                                   modes        TEXT,
                                   link_types   TEXT,
                                   node_type    TEXT,
-                                  taz_id       TEXT,
-                                  period_start INTEGER,
-                                  period_end   INTEGER
+                                  taz_id       TEXT
+                                  -- period_start INTEGER,
+                                  -- period_end   INTEGER
                                   CHECK(TYPEOF(node_id) == 'integer')
                                   CHECK(TYPEOF(is_centroid) == 'integer')
-                                  CHECK(TYPEOF(period_start) == 'integer')
-                                  CHECK(TYPEOF(period_end) == 'integer')
+                                  -- CHECK(TYPEOF(period_start) == 'integer')
+                                  -- CHECK(TYPEOF(period_end) == 'integer')
                                   CHECK(is_centroid>=0)
                                   CHECK(is_centroid<=1));
 
@@ -73,6 +73,6 @@ INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALU
 --#
 INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','taz_id', 'Transit assignemnt zone id');
 --#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','period_start', 'Graph start time');
---#
-INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','period_end', 'Graph end time');
+-- INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','period_start', 'Graph start time');
+-- --#
+-- INSERT INTO 'attributes_documentation' (name_table, attribute, description) VALUES('nodes','period_end', 'Graph end time');
