@@ -784,7 +784,7 @@ class AequilibraeMatrix(object):
 
             def f(name):
                 if self.__omx:
-                    coo = np.array(self.omx_file[name])
+                    coo = coo_matrix(np.array(self.omx_file[name]))
                 else:
                     coo = coo_matrix(self.matrix[name])
                 data = {"row": self.index[coo.row], "column": self.index[coo.col], name: coo.data}
