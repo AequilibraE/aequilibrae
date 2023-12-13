@@ -17,4 +17,3 @@ results
 trigger_settings
 trips_schedule
 trips
-periods
