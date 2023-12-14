@@ -33,8 +33,24 @@ class HyperpathGenerating:
             assignment_config: dict,
             check_edges: bool =False,
             check_demand: bool =False,
-            threads: int = -1
+            threads: int = 0
     ):
+        """A class for hyperpath generation.
+
+        :Arguments:
+            **graph** (:obj:`TransitGraph`): TransitGraph object
+
+            **matrix** (:obj:`AequilibraEMatrix`): AequilbraE Matrix object for the demand
+
+            **assignment_conffig** (:obj:`dict[str, str]`): Dictionary containing the `Time field` and `Frequency field` columns names.
+
+            **check_edges** (:obj:`bool`): If True, check the validity of the edges (optional, default is False).
+
+            **check_demand** (:obj:`bool`): If True, check the validity of the demand data (optional, default is False).
+
+            **threads** (:obj:`int`): The number of threads to use for computation (optional, default is 0, using all available threads).
+        """
+
         edges = graph.graph
         trav_time = assignment_config["Time field"]
         freq = assignment_config["Frequency field"]
@@ -167,7 +183,13 @@ class HyperpathGenerating:
             if edges[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
 
-    def execute(self, threads=None):
+    def execute(self, threads=0):
+        """Assigns demand to the edges of the graph.
+
+        :Arguments:
+            **threads** (:obj:`int`):The number of threads to use for computation (optional, default is 0, using all available threads).
+        """
+
         # check the input demand paramater
         if not threads:
             threads = self.threads

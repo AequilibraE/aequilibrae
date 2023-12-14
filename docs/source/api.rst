@@ -106,6 +106,7 @@ Paths
     VDF
     TrafficClass
     TrafficAssignment
+    HyperpathGenerating
 
 Transit
 -------
@@ -115,3 +116,5 @@ Transit
    :toctree: generated/
 
     Transit
+    SF_graph_builder
+
