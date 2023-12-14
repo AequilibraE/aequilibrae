@@ -3,6 +3,7 @@ import shutil
 import warnings
 
 from aequilibrae.log import logger
+from typing import Dict, List
 
 from aequilibrae.project.project_creation import initialize_tables
 from aequilibrae.reference_files import spatialite_database
@@ -25,7 +26,7 @@ class Transit:
         12: [50, 100],  # Monorail
         "other": [30, 60],
     }
-    graphs: dict[str, TransitGraph] = {}
+    graphs: Dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
     def __init__(self, project):
@@ -81,7 +82,7 @@ class Transit:
         self.graphs[period_id] = graph
         return graph
 
-    def save_graphs(self, period_ids: list[int] = None):
+    def save_graphs(self, period_ids: List[int] = None):
         # TODO: Support multiple graph saving
         warnings.warn(
             "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release."
@@ -95,7 +96,7 @@ class Transit:
         for period_id in period_ids:
             self.graphs[period_id].save()
 
-    def load(self, period_ids: list[int] = None):
+    def load(self, period_ids: List[int] = None):
         # TODO: Support multiple graph loading
         warnings.warn(
             "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored."
