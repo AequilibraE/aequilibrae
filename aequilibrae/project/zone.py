@@ -1,8 +1,12 @@
 import random
 from sqlite3 import Connection
+from typing import Optional
+
 from shapely.geometry import Point, MultiPolygon
-from .network.safe_class import SafeClass
+
+from aequilibrae.utils.db_utils import commit_and_close
 from .network.connector_creation import connector_creation
+from .network.safe_class import SafeClass
 
 
 class Zone(SafeClass):
@@ -13,18 +17,14 @@ class Zone(SafeClass):
         self.zone_id = -1
         super().__init__(dataset, zoning.project)
         self.__zoning = zoning
-        self.conn = zoning.conn  # type: Connection
         self.__new = dataset["geometry"] is None
         self.__network_links = zoning.network.links
         self.__network_nodes = zoning.network.nodes
 
     def delete(self):
         """Removes the zone from the database"""
-        conn = self._project.connect()
-        curr = conn.cursor()
-        curr.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
-        conn.commit()
-        conn.close()
+        with commit_and_close(self.connect_db()) as conn:
+            conn.execute(f'DELETE FROM zones where zone_id="{self.zone_id}"')
         self.__zoning._remove_zone(self.zone_id)
         del self
 
@@ -34,26 +34,21 @@ class Zone(SafeClass):
         if self.zone_id != self.__original__["zone_id"]:
             raise ValueError("One cannot change the zone_id")
 
-        conn = self._project.connect()
-        curr = conn.cursor()
+        with commit_and_close(self.connect_db()) as conn:
+            if conn.execute(f'select count(*) from zones where zone_id="{self.zone_id}"').fetchone()[0] == 0:
+                data = [self.zone_id, self.geometry.wkb]
+                conn.execute("Insert into zones (zone_id, geometry) values(?, ST_Multi(GeomFromWKB(?, 4326)))", data)
 
-        curr.execute(f'select count(*) from zones where zone_id="{self.zone_id}"')
-        if curr.fetchone()[0] == 0:
-            data = [self.zone_id, self.geometry.wkb]
-            curr.execute("Insert into zones (zone_id, geometry) values(?, ST_Multi(GeomFromWKB(?, 4326)))", data)
-
-        for key, value in self.__dict__.items():
-            if key != "zone_id" and key in self.__original__:
-                v_old = self.__original__.get(key, None)
-                if value != v_old and value is not None:
-                    self.__original__[key] = value
-                    if key == "geometry":
-                        sql = "update 'zones' set geometry=ST_Multi(GeomFromWKB(?, 4326)) where zone_id=?"
-                        curr.execute(sql, [value.wkb, self.zone_id])
-                    else:
-                        curr.execute(f"update 'zones' set '{key}'=? where zone_id=?", [value, self.zone_id])
-        conn.commit()
-        conn.close()
+            for key, value in self.__dict__.items():
+                if key != "zone_id" and key in self.__original__:
+                    v_old = self.__original__.get(key, None)
+                    if value != v_old and value is not None:
+                        self.__original__[key] = value
+                        if key == "geometry":
+                            sql = "update 'zones' set geometry=ST_Multi(GeomFromWKB(?, 4326)) where zone_id=?"
+                            conn.execute(sql, [value.wkb, self.zone_id])
+                        else:
+                            conn.execute(f"update 'zones' set '{key}'=? where zone_id=?", [value, self.zone_id])
 
     def add_centroid(self, point: Point, robust=True) -> None:
         """Adds a centroid to the network file
@@ -68,36 +63,33 @@ class Zone(SafeClass):
         # This is VERY small in real-world terms (between zero and 11cm)
         shift = 0.000001
 
-        curr = self.conn.cursor()
+        with commit_and_close(self.connect_db()) as conn:
+            if conn.execute("select count(*) from nodes where node_id=?", [self.zone_id]).fetchone()[0] > 0:
+                self.project.logger.warning("Centroid already exists. Failed to create it")
+                return
 
-        curr.execute("select count(*) from nodes where node_id=?", [self.zone_id])
-        if curr.fetchone()[0] > 0:
-            self._project.logger.warning("Centroid already exists. Failed to create it")
-            return
+            sql = "INSERT into nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
 
-        sql = "INSERT into nodes (node_id, is_centroid, geometry) VALUES(?,1,GeomFromWKB(?, ?));"
+            if point is None:
+                point = self.geometry.centroid
 
-        if point is None:
-            point = self.geometry.centroid
+            if robust:
+                check_sql = """SELECT count(*) FROM nodes
+                                 WHERE  nodes.geometry = GeomFromWKB(?, 4326) AND
+                              nodes.ROWID IN (
+                               SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
+                               search_frame = GeomFromWKB(?, 4326))
+                           """
 
-        if robust:
-            check_sql = """SELECT count(*) FROM nodes
-                             WHERE  nodes.geometry = GeomFromWKB(?, 4326) AND
-                          nodes.ROWID IN (
-                           SELECT ROWID FROM SpatialIndex WHERE f_table_name = 'nodes' AND
-                           search_frame = GeomFromWKB(?, 4326))
-                       """
+                test_list = conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+                while sum(test_list):
+                    test_list = conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
+                    point = Point(point.x + random.random() * shift, point.y + random.random() * shift)
 
-            test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
-            while sum(test_list):
-                test_list = self.conn.execute(check_sql, [point.wkb, point.wkb]).fetchone()
-                point = Point(point.x + random.random() * shift, point.y + random.random() * shift)
+            data = [self.zone_id, point.wkb, self.__srid__]
+            conn.execute(sql, data)
 
-        data = [self.zone_id, point.wkb, self.__srid__]
-        self.conn.execute(sql, data)
-        self.conn.commit()
-
-    def connect_mode(self, mode_id: str, link_types="", connectors=1) -> None:
+    def connect_mode(self, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None) -> None:
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -127,7 +119,8 @@ class Zone(SafeClass):
             mode_id=mode_id,
             link_types=link_types,
             connectors=connectors,
-            network=self._project.network,
+            network=self.project.network,
+            conn_=conn,
         )
 
     def disconnect_mode(self, mode_id: str) -> None:
@@ -137,17 +130,17 @@ class Zone(SafeClass):
             **mode_id** (:obj:`str`): Mode ID we are trying to disconnect from this zone
         """
 
-        curr = self.conn.cursor()
-        data = [self.zone_id, mode_id]
-        curr.execute("Delete from links where a_node=? and modes=?", data)
-        row_count = curr.rowcount
+        with commit_and_close(self.connect_db()) as conn:
+            data = [self.zone_id, mode_id]
+            row_count = conn.execute("Delete from links where a_node=? and modes=?", data).rowcount
 
-        data = [mode_id, self.zone_id, mode_id]
-        curr.execute('Update links set modes = replace(modes, ?, "") where a_node=? and instr(modes,?) > 0', data)
-        row_count += curr.rowcount
+            data = [mode_id, self.zone_id, mode_id]
+            sql = 'Update links set modes = replace(modes, ?, "") where a_node=? and instr(modes,?) > 0'
+            row_count += conn.execute(sql, data).rowcount
 
-        if row_count:
-            self._project.logger.warning(f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}")
-        else:
-            self._project.warning("No centroid connectors for this mode")
-        self.conn.commit()
+            if row_count:
+                self.project.logger.warning(
+                    f"Deleted {row_count} connectors for mode {mode_id} for zone {self.zone_id}"
+                )
+            else:
+                self.project.warning("No centroid connectors for this mode")

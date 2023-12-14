@@ -1,6 +1,9 @@
-from sqlite3 import IntegrityError, Connection
-from aequilibrae.project.network.mode import Mode
+from sqlite3 import IntegrityError
+
 from aequilibrae.project.field_editor import FieldEditor
+from aequilibrae.project.network.mode import Mode
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Modes:
@@ -55,32 +58,33 @@ class Modes:
         self.__items = {}
         self.project = net.project
         self.logger = net.logger
-        self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
 
     def add(self, mode: Mode) -> None:
         """We add a mode to the project"""
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
         if mode.mode_id in self.__all_modes:
             raise ValueError("Mode already exists in the model")
 
-        self.curr.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
-        self.conn.commit()
-        self.logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
-        mode.save()
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            conn.execute("insert into 'modes'(mode_id, mode_name) Values(?,?)", [mode.mode_id, mode.mode_name])
+            self.logger.info(f"mode {mode.mode_name}({mode.mode_id}) was added to the project")
+            conn.commit()
+            mode.save()
+            self.__update_list_of_modes(conn)
 
     def delete(self, mode_id: str) -> None:
         """Removes the mode with *mode_id* from the project"""
-        try:
-            self.curr.execute(f'delete from modes where mode_id="{mode_id}"')
-            self.conn.commit()
-        except IntegrityError as e:
-            self.logger.error(f"Failed to remove mode {mode_id}. {e.args}")
-            raise e
-        self.logger.warning(f"Mode {mode_id} was successfully removed from the database")
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            try:
+                conn.execute(f'delete from modes where mode_id="{mode_id}"')
+            except IntegrityError as e:
+                self.logger.error(f"Failed to remove mode {mode_id}. {e.args}")
+                raise e
+            self.logger.warning(f"Mode {mode_id} was successfully removed from the database")
+            self.__update_list_of_modes(conn)
 
     @property
     def fields(self) -> FieldEditor:
@@ -89,23 +93,25 @@ class Modes:
 
     def get(self, mode_id: str) -> Mode:
         """Get a mode from the network by its *mode_id*"""
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
         if mode_id not in self.__all_modes:
             raise ValueError(f"Mode {mode_id} does not exist in the model")
         return Mode(mode_id, self.project)
 
     def get_by_name(self, mode: str) -> Mode:
         """Get a mode from the network by its *mode_name*"""
-        self.__update_list_of_modes()
-        self.curr.execute(f"select mode_id from 'modes' where mode_name='{mode}'")
-        found = self.curr.fetchone()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
+            found = conn.execute(f"select mode_id from 'modes' where mode_name='{mode}'").fetchone()
         if len(found) == 0:
             raise ValueError(f"Mode {mode} does not exist in the model")
         return Mode(found[0], self.project)
 
     def all_modes(self) -> dict:
         """Returns a dictionary with all mode objects available in the model. mode_id as key"""
-        self.__update_list_of_modes()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__update_list_of_modes(conn)
         return {x: Mode(x, self.project) for x in self.__all_modes}
 
     def new(self, mode_id: str) -> Mode:
@@ -115,9 +121,8 @@ class Modes:
 
         return Mode(mode_id, self.project)
 
-    def __update_list_of_modes(self) -> None:
-        self.curr.execute("select mode_id from 'modes'")
-        self.__all_modes = [x[0] for x in self.curr.fetchall()]
+    def __update_list_of_modes(self, conn) -> None:
+        self.__all_modes = [x[0] for x in conn.execute("select mode_id from 'modes'").fetchall()]
 
     def __copy__(self):
         raise Exception("Modes object cannot be copied")
@@ -127,8 +132,3 @@ class Modes:
 
     def __del__(self):
         self.__items.clear()
-
-    def __has_mode(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(["modes" in x[0] for x in curr.fetchall()])

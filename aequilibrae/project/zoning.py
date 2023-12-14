@@ -9,8 +9,10 @@ from shapely.ops import unary_union
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.geo_index import GeoIndex
 from aequilibrae.project.zone import Zone
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.geo_index import GeoIndex
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Zoning(BasicTable):
@@ -71,7 +73,8 @@ class Zoning(BasicTable):
 
         if not self.__has_zoning():
             qry_file = join(realpath(__file__), "database_specification", "tables", "zones.sql")
-            run_queries_from_sql_file(self.conn, qry_file)
+            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+                run_queries_from_sql_file(conn, self.project.logger, qry_file)
             self.__load()
         else:
             self.project.warning("zones table already exists. Nothing was done", Warning)
@@ -82,8 +85,9 @@ class Zoning(BasicTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        self._curr.execute('Select ST_asBinary("geometry") from zones;')
-        polygons = [shapely.wkb.loads(x[0]) for x in self._curr.fetchall()]
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
+        polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return unary_union(polygons)
 
     def get(self, zone_id: str) -> Zone:
@@ -128,13 +132,14 @@ class Zoning(BasicTable):
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
     def __has_zoning(self):
-        curr = self.conn.cursor()
-        curr.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        return any(["zone" in x[0].lower() for x in curr.fetchall()])
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+        return any(["zone" in x[0].lower() for x in dt])
 
     def __load(self):
         tl = TableLoader()
-        zones_list = tl.load_table(self._curr, "zones")
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            zones_list = tl.load_table(conn, "zones")
         self.__fields = deepcopy(tl.fields)
 
         existing_list = [zn["zone_id"] for zn in zones_list]

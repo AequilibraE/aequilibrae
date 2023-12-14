@@ -1,5 +1,8 @@
 import string
 
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
+
 
 class Mode:
     """A mode object represents a single record in the *modes* table"""
@@ -13,17 +16,14 @@ class Mode:
 
         if len(mode_id) != 1 or mode_id not in string.ascii_letters:
             raise ValueError("Mode IDs must be a single ascii character")
-        conn = self.project.connect()
-        curr = conn.cursor()
 
-        curr.execute("pragma table_info(modes)")
-        table_struct = curr.fetchall()
-        self.__fields = [x[1] for x in table_struct]
-        self.__original__ = {}
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            table_struct = conn.execute("pragma table_info(modes)").fetchall()
+            self.__fields = [x[1] for x in table_struct]
+            self.__original__ = {}
+            # data for the mode
+            dt = conn.execute(f"select * from 'modes' where mode_id='{mode_id}'").fetchone()
 
-        # data for the mode
-        curr.execute(f"select * from 'modes' where mode_id='{mode_id}'")
-        dt = curr.fetchone()
         if dt is None:
             # if the mode was not found, we return a new one
             for k in self.__fields:
@@ -35,7 +35,6 @@ class Mode:
             for k, v in zip(self.__fields, dt):
                 self.__dict__[k] = v
                 self.__original__[k] = v
-        conn.close()
 
     def __setattr__(self, instance, value) -> None:
         if instance == "mode_name" and value is None:
@@ -54,21 +53,15 @@ class Mode:
             if letter not in self.__alowed_characters:
                 raise ValueError('mode_name can only contain letters and "_"')
 
-        conn = self.project.connect()
-        curr = conn.cursor()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            if conn.execute(f'select count(*) from modes where mode_id="{self.mode_id}"').fetchone()[0] == 0:
+                raise ValueError("Mode does not exist in the model. You need to explicitly add it")
 
-        curr.execute(f'select count(*) from modes where mode_id="{self.mode_id}"')
-        if curr.fetchone()[0] == 0:
-            raise ValueError("Mode does not exist in the model. You need to explicitly add it")
+            table_struct = [x[1] for x in conn.execute("pragma table_info(modes)").fetchall()]
 
-        curr.execute("pragma table_info(modes)")
-        table_struct = [x[1] for x in curr.fetchall()]
-
-        for key, value in self.__dict__.items():
-            if key in table_struct and key != "mode_id":
-                v_old = self.__original__.get(key, None)
-                if value != v_old and value is not None:
-                    self.__original__[key] = value
-                    curr.execute(f"update 'modes' set '{key}'=? where mode_id='{self.mode_id}'", [value])
-        conn.commit()
-        conn.close()
+            for key, value in self.__dict__.items():
+                if key in table_struct and key != "mode_id":
+                    v_old = self.__original__.get(key, None)
+                    if value != v_old and value is not None:
+                        self.__original__[key] = value
+                        conn.execute(f"update 'modes' set '{key}'=? where mode_id='{self.mode_id}'", [value])
