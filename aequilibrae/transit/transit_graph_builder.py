@@ -17,6 +17,7 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
+import json
 from aequilibrae.utils.geo_utils import haversine
 from aequilibrae.project.database_connection import database_connection
 from scipy.spatial import KDTree, minkowski_distance
@@ -64,9 +65,7 @@ class TransitGraphBuilder:
     :Arguments:
         **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
 
-        **start** (:obj:`int`): Start time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``61200``.
-
-        **end** (:obj:`int`): End time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``64800``.
+        **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
         **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
 
@@ -96,7 +95,7 @@ class TransitGraphBuilder:
     def __init__(
         self,
         public_transport_conn,
-        period_id: int,
+        period_id: int = 1,
         time_margin: int = 0,
         projected_crs: str = "EPSG:3857",
         num_threads: int = -1,
@@ -115,11 +114,15 @@ class TransitGraphBuilder:
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
 
+        self.project_conn = database_connection("project_database")
+
+        self.period_id = period_id
         start, end = (
-            database_connection("project_database")
+            self.project_conn
             .execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id])
             .fetchall()[0]
         )
+
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads
@@ -186,9 +189,7 @@ class TransitGraphBuilder:
         self.max_connectors_per_zone = max_connectors_per_zone
 
         self.__config_attrs = [
-            "start",
-            "end",
-            "global_crs",
+            "period_id",
             "projected_crs",
             "seed",
             "geometry_noise",
@@ -1397,6 +1398,11 @@ class TransitGraphBuilder:
         self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
         self.pt_conn.commit()
 
+    def save_config(self):
+        sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
+        self.project_conn.execute(sql, [self.period_id, json.dumps(self.config)])
+        self.project_conn.commit()
+
     def save(self, robust=True):
         """Save the current graph to the public transport database.
 
@@ -1406,6 +1412,7 @@ class TransitGraphBuilder:
         self.create_additional_db_fields()
         self.save_vertices(robust=robust)
         self.save_edges()
+        self.save_config()
 
     def to_transit_graph(self) -> TransitGraph:
         """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
@@ -1449,7 +1456,11 @@ class TransitGraphBuilder:
         :Arguments:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
-        graph = cls(public_transport_conn, period_id, **kwargs)
+        project_conn = database_connection("project_database")
+        config = json.loads(project_conn.execute("SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]).fetchone()[0])
+        config.update(kwargs)
+
+        graph = cls(public_transport_conn, **config)
 
         # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(

@@ -31,8 +31,8 @@ class HyperpathGenerating:
             graph,
             matrix,
             assignment_config: dict,
-            check_edges: bool =False,
-            check_demand: bool =False,
+            check_edges: bool = False,
+            check_demand: bool = False,
             threads: int = 0
     ):
         """A class for hyperpath generation.
@@ -40,7 +40,7 @@ class HyperpathGenerating:
         :Arguments:
             **graph** (:obj:`TransitGraph`): TransitGraph object
 
-            **matrix** (:obj:`AequilibraEMatrix`): AequilbraE Matrix object for the demand
+            **matrix** (:obj:`np.typing.ArrayLike`): Slice of AequilibraE matrx object for the demand. Required 2d dimensional.
 
             **assignment_conffig** (:obj:`dict[str, str]`): Dictionary containing the `Time field` and `Frequency field` columns names.
 
@@ -60,8 +60,12 @@ class HyperpathGenerating:
         # This is a sparse representation of the AequilibraE Matrix object, the index is from od to od, *NOT* origin to destination. We'll use the od_node_mapping to convert index to node_id before the assignment
         self.__demand = sparse.coo_matrix(matrix, dtype=np.float64)
 
-        self.check_edges = check_edges
-        self.check_demand = check_demand
+        if check_demand:
+            self._check_demand(self.__demand)
+
+        if check_edges:
+            self._check_edges(graph, trav_time, freq)
+
         self.threads = threads
 
         # load the edges
@@ -154,34 +158,20 @@ class HyperpathGenerating:
         assert isinstance(v, float)
         assert v >= 0.0
 
-    def _check_edges(self, edges, tail, head, trav_time, freq):
-        if type(edges) != pd.core.frame.DataFrame:
-            raise TypeError("edges should be a pandas DataFrame")
-
-        for col in [tail, head, trav_time, freq]:
-            if col not in edges:
-                raise KeyError(f"edge column '{col}' not found in graph edges dataframe")
-
-        if edges[[tail, head, trav_time, freq]].isna().any().any():
-            raise ValueError(
-                " ".join(
-                    [
-                        f"edges[[{tail}, {head}, {trav_time}, {freq}]] ",
-                        "should not have any missing value",
-                    ]
-                )
-            )
-
-        for col in [tail, head]:
-            if not pd.api.types.is_integer_dtype(edges[col].dtype):
-                raise TypeError(f"column '{col}' should be of integer type")
+    def _check_edges(self, graph, trav_time, freq):
+        if "TransitGraph" not in [t.__name__ for t in type(graph).__mro__] :
+            raise TypeError("graph should be a TransitGraph")
 
         for col in [trav_time, freq]:
             if not pd.api.types.is_numeric_dtype(edges[col].dtype):
                 raise TypeError(f"column '{col}' should be of numeric type")
 
+            if any(graph.graph[col].isna()):
+                raise ValueError(f"column '{col}' should not have any missing values")
+
             if edges[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
+
 
     def execute(self, threads=0):
         """Assigns demand to the edges of the graph.
@@ -232,35 +222,9 @@ class HyperpathGenerating:
             (multiprocessing.cpu_count() if threads < 1 else threads)
         )
 
-    def _check_demand(self, demand, origin_column, destination_column, demand_column):
-        if type(demand) != pd.core.frame.DataFrame:
-            raise TypeError("demand should be a pandas DataFrame")
-
-        for col in [origin_column, destination_column, demand_column]:
-            if col not in demand:
-                raise KeyError(f"demand column '{col}' not found in demand dataframe")
-
-        if demand[[origin_column, destination_column, demand_column]].isna().any().any():
-            raise ValueError(
-                " ".join(
-                    [
-                        f"demand[[{origin_column}, {destination_column}, {demand_column}]] ",
-                        "should not have any missing value",
-                    ]
-                )
-            )
-
-        for col in [origin_column, destination_column]:
-            if not pd.api.types.is_integer_dtype(demand[col].dtype):
-                raise TypeError(f"column '{col}' should be of integer type")
-
-        col = demand_column
-
-        if not pd.api.types.is_numeric_dtype(demand[col].dtype):
-            raise TypeError(f"column '{col}' should be of numeric type")
-
-        if demand[col].min() < 0.0:
-            raise ValueError(f"column '{col}' should be nonnegative")
+    def _check_demand(self, demand):
+        if demand.min() < 0.0:
+            raise ValueError(f"column demand should be nonnegative")
 
     def results(self):
         return self._edges[["link_id", "a_node", "b_node", "trav_time", "freq", "volume"]].copy(deep=True)

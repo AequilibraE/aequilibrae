@@ -65,18 +65,21 @@ transit.save_to_disk()
 # Graph building
 # --------------
 # Let's build the transit network. We'll disable `outer_stop_transfers` and `walking_edges` because Coquimbo doesn't have any parent stations.
-pt_con = database_connection("transit")
-
-graph = TransitGraphBuilder(pt_con, with_outer_stop_transfers=False, with_walking_edges=False, projected_crs="EPSG:4326")
+# For the OD connections we'll use the `overlapping_regions` method and create some accurate line geometry later.
+# Creating the graph should only take a moment. By default zoning information is pulled from the project network. If you have your own zoning information add it using `graph.add_zones(zones)` then `graph.create_graph()`. We drop gemoetry here for the sake of display
+graph = data.create_graph(with_outer_stop_transfers=False, with_walking_edges=False, blocking_centroid_flows=False, connector_method="overlapping_regions")
 
 # %%
-# Creating the verticies and edges should only take a moment. By default zoning information is pulled from the project network. If you have your own zoning information add it using `graph.add_zones(zones)` before creating the verticies. We drop gemoetry here for the sake of display
-graph.create_vertices()
 graph.vertices.drop(columns="geometry")
 
 # %%
-graph.create_edges()
 graph.edges
+
+# %%
+# The graphs also also stored in the `Transit.graphs` dictionary. They are keyed by the `period_id` they were created for.
+# A graph for a different `period_id` can be created by providing `period_id=` in the `Transit.create_graph` call. You can view previously created periods with the `Periods` object.
+periods = project.network.periods
+periods.data
 
 # %%
 # Connector project matching
@@ -88,10 +91,15 @@ project.network.build_graphs()
 graph.create_line_geometry(method="connector project match", graph="c")
 
 # %%
-# Saving
+# Saving and reloading
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Lets save this to the `public_transport.sqlite` database.
-graph.save()
+# Lets save all graphs to the `public_transport.sqlite` database.
+data.save_graphs()
+
+# %%
+# We can reload the saved graphs with `data.load`. This will create new `TransitGraphBuilder`s based on the `period_id` of the saved graphs.
+# The graph configuration is stored in the `transit_graph_config` table in `project_database.sqlite` as serialised JSON.
+data.load()
 
 # %%
 # Links and nodes are stored in a similar manner to the `project_database.sqlite` database.
@@ -99,7 +107,8 @@ graph.save()
 # %%
 # Reading back into AequilibraE
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-graph_db = TransitGraphBuilder.from_db(pt_con)
+# You can create back in a particular graph via it's `period_id`.
+graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period)
 graph_db.vertices.drop(columns="geometry")
 
 # %%
@@ -108,7 +117,8 @@ graph_db.edges
 # %%
 # Converting to a AequilibraE graph object
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-g = graph.to_aeq_graph()
+# To perform an assignment we need to convert the graph builder into a graph.
+transit_graph = graph.to_transit_graph()
 
 # %%
 # Spiess & Florian assignment
@@ -119,36 +129,59 @@ g = graph.to_aeq_graph()
 # ~~~~~~~~~~~~~~~~~~
 # We'll create a mock demand martix with demand `1` for every zone.
 # We'll also need to convert from `zone_id`s to `node_id`s.
-demand_df = graph.zones[["zone_id"]].merge(graph.zones.zone_id, how='cross')
-demand_df["demand"] = 1.0
-demand_df = graph.convert_demand_matrix_from_zone_to_node_ids(demand_df, o_zone_col="zone_id_x", d_zone_col="zone_id_y")
-demand_df
+from aequilibrae.matrix import AequilibraeMatrix
+
+zones_in_the_model = len(transit_graph.centroids)
+
+names_list = ['pt']
+
+mat = AequilibraeMatrix()
+mat.create_empty(file_name='/tmp/path_to_matrix.aem',
+                 zones=zones_in_the_model,
+                 matrix_names=names_list,
+                 memory_only=False)
+mat.index = transit_graph.centroids[:]
+mat.computational_view()
+mat.matrix_view[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 
 # %%
 # Hyperpath generation/assignment
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# We'll create a `HyperpathGenerating` obejct, providing the `SF` graph and field keys
-hp = HyperpathGenerating(
-    graph.edges, head="a_node", tail="b_node", trav_time="trav_time", freq="freq"
-)
+# We'll create a `TransitAssignment` object as well as a `TransitClass`
+assig = TransitAssignment()
+
+# Create the assignment class
+assigclass = TransitClass(name="pt", graph=transit_graph, matrix=mat)
+assig.add_class(assigclass)
 
 # %%
-# Lets perform the assignment with the mock demand matrx
-hp.assign(
-    demand_df, origin_column="o_node_id", destination_column="d_node_id", demand_column="demand", check_demand=True
-)
+# We need to tell AequilbraE where to find the appropriate fields we want to use, as well as the assignment algorithm to use.
+assig.set_time_field("trav_time")
+assig.set_frequency_field("freq")
+
+assig.set_algorithm("os")
+
+# %%
+# When there's multiple matrix cores we'll also need to set the core to use for the demand.
+assigclass.set_demand_matrix_core("pt")
+
+# %%
+# Lets perform the assignment with the mock demand matrx for all `TransitClass`s added.
+assig.execute()
 
 # %%
 # View the results
-hp._edges
+assig.results()
+
+# %%
+# We can also access the `TransitAssignmentResults` object from the `TransitClass`
+assigclass.results
 
 # %%
 # Saving results
 # ~~~~~~~~~~~~~~
 # We'll be saving the results to another sqlite db called `results_database.sqlite`. The `results` table with `project_database.sqlite` contains some metadata about each table in `results_database.sqlite`.
-hp.save_results("hyperpath_results_demo", project=project)
-hp.save_results("hyperpath_results_demo_without_zeros", keep_zero_flows=False, project=project)
-
+assig.save_results(table_name='hyperpath example')
 # %%
 # Wrapping up
 project.close()
