@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 import re
@@ -95,19 +96,22 @@ class OVMDownloader(WorkerThread):
     def downloadTransportation(self, bbox, data_source, output_dir):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
         output_dir = Path(output_dir)
-        
+        g_dataframes = []
         for t in ['segment','connector']:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_file = output_dir / f'transportation_data_{t}.parquet'
+            
+            output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
+            output_file.parent.mkdir(parents=True, exist_ok=True)
             sql = f"""
                 COPY (
                 SELECT 
                     id,
-                    JSON(bbox) AS bbox,
-                    geometry, 
-                    road, 
-                    connectors 
-                FROM read_parquet('{data_source}/*', union_by_name=True)
+                    bbox,
+                    connectors[1] AS a_node,
+                    connectors[2] AS b_node,
+                    CAST(road AS JSON) ->>'class' AS link_type,
+                    CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
+                    geometry
+                FROM read_parquet('{data_source}/type={t}/*', union_by_name=True)
                 WHERE bbox.minx > '{bbox[0]}'
                     AND bbox.maxx < '{bbox[2]}'
                     AND bbox.miny > '{bbox[1]}'
@@ -117,13 +121,19 @@ class OVMDownloader(WorkerThread):
             """
             c = initialise_duckdb_spatial()
             c.execute(sql)
-            
+
             df = pd.read_parquet(output_file)
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
             gdf = gpd.GeoDataFrame(df,geometry=geo)
+            gdf['speed'] = gdf['speed'].apply(lambda x: json.loads(x)[0] if x else None)
+            
             gdf.to_parquet(output_file)
-            return gdf
-  
+            g_dataframes.append(gdf)
+        return g_dataframes    
+            # ast.literal_eval(road)['restrictions']['speedLimits']['maxSpeed'][0] AS 
+            # CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed
+
+
     def download_test_data(self, l_data_source):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''
         airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
@@ -147,36 +157,14 @@ class OVMDownloader(WorkerThread):
             """
             c = initialise_duckdb_spatial()
             c.execute(sql)
+            print({t})
             
             df = pd.read_parquet(Path(pth1))
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
-            gpd.GeoDataFrame(df,geometry=geo).to_parquet(Path(pth1))
-        
+            gdf = gpd.GeoDataFrame(df,geometry=geo)
+            gdf.to_parquet(Path(pth1))
+        # return gdf        
 
-    def formatTransportation(self):
-        pth1 = str(self.__project_path / 'new_geopackage_tran.parquet').replace("\\", "/")
-
-        sql = f"""
-            SELECT
-                JSON(bbox) AS bbox,
-                connectors[0] AS a_node,
-                connectors[1] AS b_node,
-                CAST(road AS JSON)->>'class' AS link_type,
-                CAST(road AS JSON)->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
-                geometry
-            FROM read_parquet('{self.pth}', filename=true, hive_partitioning=1)
-        """
-
-        # Execute the SQL query
-        result = initialise_duckdb_spatial().execute(sql)
-
-        # Fetch the data from the result
-        data = result.fetchall()
-
-        # Convert the data to a GeoDataFrame
-        self.gdf = gpd.GeoDataFrame(data, columns=['type', 'bbox', 'connectors', 'road', 'speed', 'geometry'])
-
-        return self.gdf
 
     def get_ovm_filter(self, modes: list) -> str:
         """
