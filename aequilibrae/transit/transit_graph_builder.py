@@ -761,7 +761,8 @@ class TransitGraphBuilder:
         else:
             self.connector_method = method
 
-        assert method in ["overlapping_regions", "nearest_neighbour"]
+        if method not in ["overlapping_regions", "nearest_neighbour"]:
+            raise ValueError("method must be ither 'overlapping_regions' or 'nearest_neighbour'")
 
         # Create access connectors
         # ========================
@@ -1177,11 +1178,14 @@ class TransitGraphBuilder:
         accurate line strings. It creates a line string that matches the path between the shortest path
         between the project nodes closest to either end of the access and egress connectors.
 
+        Project graphs must be built for the "connector project match" method.
+
         :Arguments:
-           **method** (:obj:`str`): Must be either "direct" or "connector project match",
+           **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
-        assert method in ["direct", "connector project match"]
+        if method not in ["direct", "connector project match"]:
+            raise ValueError("method must be either 'direct' or 'connector project match'")
 
         self.edges["geometry"] = None
 
