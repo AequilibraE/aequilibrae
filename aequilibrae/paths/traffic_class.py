@@ -226,7 +226,7 @@ class TransitClass(TransportClassBase):
         Set the matrix core to use for demand.
 
         :Arguments:
-            **core** (:obj:`str`): """
+            **core** (:obj:`str`):"""
         if core not in self.matrix.view_names:
             raise KeyError(f"'{core}' is not present in `matrix.view_names`")
         self.matrix_core = core

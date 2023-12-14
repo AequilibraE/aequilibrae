@@ -117,11 +117,9 @@ class TransitGraphBuilder:
         self.project_conn = database_connection("project_database")
 
         self.period_id = period_id
-        start, end = (
-            self.project_conn
-            .execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id])
-            .fetchall()[0]
-        )
+        start, end = self.project_conn.execute(
+            "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
+        ).fetchall()[0]
 
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
@@ -1457,7 +1455,11 @@ class TransitGraphBuilder:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
         project_conn = database_connection("project_database")
-        config = json.loads(project_conn.execute("SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]).fetchone()[0])
+        config = json.loads(
+            project_conn.execute(
+                "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
+            ).fetchone()[0]
+        )
         config.update(kwargs)
 
         graph = cls(public_transport_conn, **config)

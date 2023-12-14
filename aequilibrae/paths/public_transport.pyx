@@ -163,13 +163,13 @@ class HyperpathGenerating:
             raise TypeError("graph should be a TransitGraph")
 
         for col in [trav_time, freq]:
-            if not pd.api.types.is_numeric_dtype(edges[col].dtype):
+            if not pd.api.types.is_numeric_dtype(graph[col].dtype):
                 raise TypeError(f"column '{col}' should be of numeric type")
 
             if any(graph.graph[col].isna()):
                 raise ValueError(f"column '{col}' should not have any missing values")
 
-            if edges[col].min() < 0.0:
+            if graph[col].min() < 0.0:
                 raise ValueError(f"column '{col}' should be nonnegative")
 
 
