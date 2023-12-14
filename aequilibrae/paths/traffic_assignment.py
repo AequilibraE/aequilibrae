@@ -962,7 +962,8 @@ class TransitAssignment(AssignmentBase):
         assig_results = [
             pd.DataFrame(cls.results.get_load_results().data)
             .rename(columns={"volume": cls._id + "_volume", "index": "link_id"})
-            .set_index("link_id") for cls in self.classes
+            .set_index("link_id")
+            for cls in self.classes
         ]
 
         return pd.concat(assig_results, axis=1)

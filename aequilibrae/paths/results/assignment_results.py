@@ -32,6 +32,7 @@ class NetworkGraphIndices:
 
 class AssignmentResultsBase(ABC):
     """Assignment results base class for traffic and transit assignments."""
+
     def __init__(self):
         self.link_loads = np.array([])  # The actual results for assignment
         self.no_path = None  # The list os paths

@@ -115,7 +115,11 @@ class TransitGraphBuilder:
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
 
-        start, end = database_connection("project_database").execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]).fetchall()[0]
+        start, end = (
+            database_connection("project_database")
+            .execute("SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id])
+            .fetchall()[0]
+        )
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
         self.num_threads = num_threads

@@ -83,7 +83,9 @@ class Transit:
 
     def save_graphs(self, period_ids: list[int] = None):
         # TODO: Support multiple graph saving
-        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release.")
+        warnings.warn(
+            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release."
+        )
         if period_ids is None:
             period_ids = [self.periods.default_period.period_id]
 
@@ -95,7 +97,9 @@ class Transit:
 
     def load(self, period_ids: list[int] = None):
         # TODO: Support multiple graph loading
-        warnings.warn("Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored.")
+        warnings.warn(
+            "Currently only a single transit graph can be saved and reloaded. Multiple graph support is plan for a future release. `period_ids` argument is currently ignored."
+        )
 
         if period_ids is None:
             period_ids = [self.periods.default_period.period_id]

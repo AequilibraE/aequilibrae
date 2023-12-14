@@ -163,9 +163,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             stp_dir = self.step_direction[c._id]
             prev_dir_minus_current_sol[c._id] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol[c._id] = np.sum(
-                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
-            )
+            aon_minus_current_sol[c._id] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
             aon_minus_prev_dir[c._id] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
 
         for c_0 in self.traffic_classes:
