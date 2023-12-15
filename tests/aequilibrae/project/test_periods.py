@@ -28,21 +28,6 @@ class TestPeriods(TestCase):
         self.network = self.project.network
         self.curr = self.project.conn.cursor()
 
-        #### Patch
-        patches = [
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/periods.sql",
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/triggers/periods_triggers.sql",
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/transit_graph_configs.sql",
-        ]
-        for patch in patches:
-            with open(patch) as f:
-                for statement in f.read().split("--#"):
-                    self.project.conn.execute(statement)
-
-        self.project.conn.commit()
-        self.project.network.periods.refresh_fields()
-        #### Patch end
-
     def tearDown(self) -> None:
         self.project.close()
         del self.curr

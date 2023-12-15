@@ -28,21 +28,6 @@ class TestTransitGraphBuilder(TestCase):
 
         os.remove(os.path.join(self.temp_proj_folder, "public_transport.sqlite"))
 
-        #### Patch
-        patches = [
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/periods.sql",
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/triggers/periods_triggers.sql",
-            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/transit_graph_configs.sql",
-        ]
-        for patch in patches:
-            with open(patch) as f:
-                for statement in f.read().split("--#"):
-                    self.project.conn.execute(statement)
-
-        self.project.conn.commit()
-        self.project.network.periods.refresh_fields()
-        #### Patch end
-
         self.data = Transit(self.project)
         dest_path = join(self.temp_proj_folder, "gtfs_coquimbo.zip")
         self.transit = self.data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
