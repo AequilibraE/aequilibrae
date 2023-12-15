@@ -14,19 +14,18 @@ from uuid import uuid4
 from os import remove
 from os.path import join
 from tempfile import gettempdir
+
+from aequilibrae.paths import TransitAssignment, TransitClass
 from aequilibrae.utils.create_example import create_example
+import numpy as np
 
 # Imports for GTFS import
 from aequilibrae.transit import Transit
 
 # Imports for SF transit graph construction
-import aequilibrae.transit.transit_graph_builder
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
-from aequilibrae.project import Project
 
-# Import for the Spiess & Florian assignment
-from aequilibrae.paths.public_transport import HyperpathGenerating
 
 # %%
 # Let's create an empty project on an arbitrary folder.
@@ -109,7 +108,7 @@ data.load()
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # You can create back in a particular graph via it's `period_id`.
 pt_con = database_connection("transit")
-graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period)
+graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
 
 # %%
@@ -128,7 +127,7 @@ transit_graph = graph.to_transit_graph()
 # %%
 # Mock demand matrix
 # ~~~~~~~~~~~~~~~~~~
-# We'll create a mock demand martix with demand `1` for every zone.
+# We'll create a mock demand matrix with demand `1` for every zone.
 # We'll also need to convert from `zone_id`s to `node_id`s.
 from aequilibrae.matrix import AequilibraeMatrix
 
@@ -137,13 +136,12 @@ zones_in_the_model = len(transit_graph.centroids)
 names_list = ['pt']
 
 mat = AequilibraeMatrix()
-mat.create_empty(file_name='/tmp/path_to_matrix.aem',
-                 zones=zones_in_the_model,
+mat.create_empty(zones=zones_in_the_model,
                  matrix_names=names_list,
-                 memory_only=False)
+                 memory_only=True)
 mat.index = transit_graph.centroids[:]
+mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 mat.computational_view()
-mat.matrix_view[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 
 # %%
 # Hyperpath generation/assignment

@@ -6,6 +6,8 @@ from aequilibrae.paths.public_transport import HyperpathGenerating
 
 class OptimalStrategies:
     def __init__(self, assig_spec):
+        from aequilibrae.paths import TransitAssignment
+
         self.__assig_spec = assig_spec  # type: TransitAssignment
         self.__logger = assig_spec.logger
         self.__classes = {}
