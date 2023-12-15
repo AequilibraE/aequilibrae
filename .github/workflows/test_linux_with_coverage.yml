@@ -9,7 +9,7 @@ jobs:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     strategy:
       matrix:
-        python-version: [3.9]
+        python-version: [3.10]
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
