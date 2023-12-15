@@ -101,6 +101,8 @@ class TestTransitGraph(TestCase):
 
         self.project = create_example(self.temp_proj_folder, "coquimbo")
 
+        self.data = Transit(self.project)
+
         self.graph = self.data.create_graph(
             with_outer_stop_transfers=False,
             with_walking_edges=False,
