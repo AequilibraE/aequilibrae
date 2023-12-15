@@ -108,6 +108,7 @@ data.load()
 # Reading back into AequilibraE
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # You can create back in a particular graph via it's `period_id`.
+pt_con = database_connection("transit")
 graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period)
 graph_db.vertices.drop(columns="geometry")
 
