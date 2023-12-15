@@ -139,4 +139,3 @@ class TestTransitGraph(TestCase):
 
     def test_transit_graph_od_node_mapping(self):
         pd.testing.assert_frame_equal(self.graph.od_node_mapping, self.transit_graph.od_node_mapping)
-

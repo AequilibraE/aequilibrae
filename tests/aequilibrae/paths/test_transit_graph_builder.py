@@ -82,7 +82,9 @@ class TestTransitGraphBuilder(TestCase):
         )
 
         nearest_neighbour_connector_count = len(graph.edges[graph.edges.link_type == "access_connector"])
-        self.assertEqual(nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "egress_connector"]))
+        self.assertEqual(
+            nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "egress_connector"])
+        )
         self.assertEqual(
             nearest_neighbour_connector_count,
             len(graph.vertices[graph.vertices.node_type == "stop"]),
@@ -96,7 +98,9 @@ class TestTransitGraphBuilder(TestCase):
             connector_method=connector_method,
         )
 
-        self.assertLessEqual(nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "access_connector"]))
+        self.assertLessEqual(
+            nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "access_connector"])
+        )
         self.assertEqual(
             len(graph.edges[graph.edges.link_type == "access_connector"]),
             len(graph.edges[graph.edges.link_type == "egress_connector"]),
@@ -122,7 +126,9 @@ class TestTransitGraphBuilder(TestCase):
         )
 
         nearest_neighbour_connector_count = len(graph.edges[graph.edges.link_type == "access_connector"])
-        self.assertEqual(nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "egress_connector"]))
+        self.assertEqual(
+            nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "egress_connector"])
+        )
         self.assertEqual(
             nearest_neighbour_connector_count,
             len(graph.vertices[graph.vertices.node_type == "stop"]),
@@ -136,7 +142,9 @@ class TestTransitGraphBuilder(TestCase):
             connector_method=connector_method,
         )
 
-        self.assertLessEqual(nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "access_connector"]))
+        self.assertLessEqual(
+            nearest_neighbour_connector_count, len(graph.edges[graph.edges.link_type == "access_connector"])
+        )
         self.assertEqual(
             len(graph.edges[graph.edges.link_type == "access_connector"]),
             len(graph.edges[graph.edges.link_type == "egress_connector"]),
