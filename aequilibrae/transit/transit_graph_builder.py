@@ -765,7 +765,7 @@ class TransitGraphBuilder:
             self.connector_method = method
 
         if method not in ["overlapping_regions", "nearest_neighbour"]:
-            raise ValueError("method must be ither 'overlapping_regions' or 'nearest_neighbour'")
+            raise ValueError("method must be either 'overlapping_regions' or 'nearest_neighbour'")
 
         # Create access connectors
         # ========================

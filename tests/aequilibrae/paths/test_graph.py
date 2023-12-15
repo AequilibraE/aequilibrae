@@ -126,7 +126,7 @@ class TestTransitGraph(TestCase):
             with_outer_stop_transfers=False,
             with_walking_edges=False,
             blocking_centroid_flows=False,
-            connector_method="nearest neighbour",
+            connector_method="nearest_neighbour",
         )
 
         self.transit_graph = self.graph.to_transit_graph()

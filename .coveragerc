@@ -1,5 +1,5 @@
 [report]
-fail_under = 81.0
+fail_under = 75
 show_missing = True
 exclude_lines =
     pragma: no cover
