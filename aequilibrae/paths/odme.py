@@ -15,6 +15,7 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
+    DATA_COLS = ["Outer #", "Inner #", "class", "link_id", "direction", "obs_volume", "assign_volume"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
 
     def __init__(self,
@@ -52,7 +53,10 @@ class ODME(object):
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
-        self._count_volumes = count_volumes
+        self._count_volumes = count_volumes.copy(deep=True)
+        self._num_counts = len(self._count_volumes)
+        self._data = dict() # Contains a dataframe for each inner/outer iteration with all assigned & observed volumes.
+
         # MAY WANT TO INITIALISE THESE AS np.zeros:
         self._assign_vals = np.empty(len(count_volumes)) # v_a
         self._sl_matrices = None # Currently dictionary of proportion matrices
@@ -106,14 +110,27 @@ class ODME(object):
     def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
         Returns final demand matrix and a dataframe of statistics regarding
-        timing and convergence
+        timing and convergence.
         """
         return (self.demand_matrix, self._statistics)
 
+    def get_assignment_data(self) -> pd.DataFrame:
+        """
+        Returns dataframe of all assignment values across iterations.
+        """
+        assignment_data = pd.concat(
+            [self._data[f"data_{row['Outer Loop #']}_{row['Inner Loop #']}"]
+            for _, row in self._statistics.iterrows()
+        ],
+            ignore_index=True
+        )
+        return assignment_data
+
     def __log_stats(self) -> None:
         """
-        Adds next row to statistics dataframe.
+        Adds next row to statistics dataframe and data dictionary.
         """
+        # Statistics DataFrame:
         old_time = self._time
         self._time = time.time()
         to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, self._time - old_time]
@@ -123,6 +140,14 @@ class ODME(object):
             col : to_log[i]
             for i, col in enumerate(self.STATISTICS_COLS)
         }
+
+        # Data:
+        key = f"data_{self._outer}_{self._inner}"
+        data = self._count_volumes.copy(deep=True)
+        data["Outer"] = [self._outer for _ in range(self._num_counts)]
+        data["Inner"] = [self._inner for _ in range(self._num_counts)]
+        data["assign_volume"] = self._assign_vals
+        self._data[key] = data
 
     def execute(self):
         """ 
@@ -252,7 +277,7 @@ class ODME(object):
         for i, row in self._count_volumes.iterrows():
             self._assign_vals[i] = assign_df.loc[
                 assign_df["link_id"] == row["link_id"],
-                 col[row["direction"]]
+                col[row["direction"]]
             ].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
