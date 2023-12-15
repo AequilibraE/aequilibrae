@@ -21,7 +21,7 @@ Please note that all questions and answers in both forums are public.
 Paid support
 ------------
 
-Paid support for AequilibraE is offered by Outer Loop Consulting, and Australia-based consulting company,
+Paid support for AequilibraE is offered by Outer Loop Consulting, an Australia-based consulting company,
 with support available in English, Portuguese, German & Spanish.
 
 All support is offered in prepaid packages of a minimum of 10h of consulting by phone, email or Microsoft Teams
