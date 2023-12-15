@@ -2,6 +2,7 @@ from unittest import TestCase
 import os
 import tempfile
 import numpy as np
+import pandas as pd
 from aequilibrae.paths import Graph
 from os.path import join
 from uuid import uuid4
@@ -9,6 +10,9 @@ from .parameters_test import centroids
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
 from aequilibrae.paths.results import PathResults
+from aequilibrae.utils.create_example import create_example
+from aequilibrae.transit import Transit
+
 
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
@@ -88,3 +92,51 @@ class TestGraph(TestCase):
         r1.prepare(self.graph)
         r1.compute_path(20, 21)
         self.assertEqual(list(r1.path), [63, 69])
+
+
+class TestTransitGraph(TestCase):
+    def setUp(self) -> None:
+        os.environ["PATH"] = os.path.join(tempfile.gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+        self.temp_proj_folder = os.path.join(tempfile.gettempdir(), uuid4().hex)
+
+        self.project = create_example(self.temp_proj_folder, "coquimbo")
+
+        #### Patch
+        os.remove(os.path.join(self.temp_proj_folder, "public_transport.sqlite"))
+        patches = [
+            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/periods.sql",
+            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/triggers/periods_triggers.sql",
+            "/home/jake/Software/aequilibrae/aequilibrae/project/database_specification/network/tables/transit_graph_configs.sql",
+        ]
+        for patch in patches:
+            with open(patch) as f:
+                for statement in f.read().split("--#"):
+                    self.project.conn.execute(statement)
+
+        self.project.conn.commit()
+        self.project.network.periods.refresh_fields()
+        self.data = Transit(self.project)
+        dest_path = join(self.temp_proj_folder, "gtfs_coquimbo.zip")
+        self.transit = self.data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
+        self.transit.load_date("2016-04-13")
+        self.transit.save_to_disk()
+        #### Patch end
+
+        self.graph = self.data.create_graph(
+            with_outer_stop_transfers=False,
+            with_walking_edges=False,
+            blocking_centroid_flows=False,
+            connector_method="nearest neighbour",
+        )
+
+        self.transit_graph = self.graph.to_transit_graph()
+
+    def tearDown(self) -> None:
+        self.project.close()
+
+    def test_transit_graph_config(self):
+        self.assertEqual(self.graph.config, self.transit_graph._config)
+
+    def test_transit_graph_od_node_mapping(self):
+        pd.testing.assert_frame_equal(self.graph.od_node_mapping, self.transit_graph.od_node_mapping)
+

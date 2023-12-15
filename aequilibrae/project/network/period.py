@@ -65,6 +65,10 @@ class Period(SafeClass):
         """
 
         new_id = int(new_id)
+
+        if new_id == 1 or self.period_id == 1:
+            raise ValueError("You cannot renumber, or renumber another period to the default period.")
+
         if new_id == self.period_id:
             self._logger.warning("This is already the period number")
             return

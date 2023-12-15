@@ -21,8 +21,8 @@ class BasicTable:
         Returns:
             *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the layer.
         """
-        self.__curr.execute(f'Select ST_asBinary(GetLayerExtent("{self.__table_type__}"))')
-        poly = shapely.wkb.loads(self.__curr.fetchone()[0])
+        self._curr.execute(f'Select ST_asBinary(GetLayerExtent("{self.__table_type__}"))')
+        poly = shapely.wkb.loads(self._curr.fetchone()[0])
         return poly
 
     @property
@@ -33,7 +33,7 @@ class BasicTable:
     def refresh_connection(self):
         """Opens a new database connection to avoid thread conflict"""
         self.conn = self.project.connect()
-        self.__curr = self.conn.cursor()
+        self._curr = self.conn.cursor()
 
     def __copy__(self):
         raise Exception(f"{self.__table_type__} object cannot be copied")
