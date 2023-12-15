@@ -18,26 +18,12 @@ import subprocess
 import os
 from typing import Union
 
+from aequilibrae.utils.spatialite_utils import connect_spatialite
+
 DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0//theme=transportation"
 
 
-def initialise_duckdb_spatial():
-    conn = duckdb.connect()
-    c = conn.cursor()
 
-    c.execute(
-        """INSTALL spatial; 
-            INSTALL httpfs;
-            INSTALL parquet;
-        """
-    )
-    c.execute(
-        """LOAD spatial;
-        LOAD parquet;
-        SET s3_region='us-west-2';
-        """
-    )
-    return c
 
 
 spec = iutil.find_spec("PyQt5")
@@ -59,9 +45,27 @@ class OVMDownloader(WorkerThread):
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
         self.report = []
-        self.parquet = []
+        self.json = []
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path / 'theme=transportation').replace("\\", "/")
+
+    def initialise_duckdb_spatial(self):
+        conn = duckdb.connect()
+        c = conn.cursor()
+
+        c.execute(
+            """INSTALL spatial; 
+                INSTALL httpfs;
+                INSTALL parquet;
+            """
+        )
+        c.execute(
+            """LOAD spatial;
+            LOAD parquet;
+            SET s3_region='us-west-2';
+            """
+        )
+        return c
 
     def downloadPlace(self, source, local_file_path=None):
         pth = str(self.__project_path / "new_geopackage_pla.parquet").replace("\\", "/")
@@ -90,7 +94,7 @@ class OVMDownloader(WorkerThread):
             TO '{pth}';
             """
         
-        c = initialise_duckdb_spatial()
+        c = self.initialise_duckdb_spatial()
         c.execute(sql)
 
     def downloadTransportation(self, bbox, data_source, output_dir):
@@ -104,8 +108,7 @@ class OVMDownloader(WorkerThread):
             sql = f"""
                 COPY (
                 SELECT 
-                    id,
-                    bbox,
+                    id AS ovm_id,
                     connectors[1] AS a_node,
                     connectors[2] AS b_node,
                     CAST(road AS JSON) ->>'class' AS link_type,
@@ -119,20 +122,65 @@ class OVMDownloader(WorkerThread):
                 TO '{output_file}'
                 (FORMAT 'parquet', COMPRESSION 'ZSTD');
             """
-            c = initialise_duckdb_spatial()
+            c = self.initialise_duckdb_spatial()
             c.execute(sql)
 
             df = pd.read_parquet(output_file)
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
             gdf = gpd.GeoDataFrame(df,geometry=geo)
             gdf['speed'] = gdf['speed'].apply(lambda x: json.loads(x)[0] if x else None)
-            
+
+            # adding neccassary columns for aequilibrea data frame
+            gdf['ogc_fid'] = 1
+            gdf['link_id'] = 1
+
+            # linktags = link["tags"]
+            # (linktags.get("oneway") == "yes") * 1
+            gdf['direction'] = 0
+            gdf['distance'] = 1
+
+            print(33)
+            mode_codes, not_found_tags = self.modes_per_link_type()
+            print(44)
+            print(gdf['link_type'])
+            print(type(gdf['link_type']))
+            gdf['modes'] = gdf['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
+
+            print(55)
+            gdf['name'] = 1
+            gdf['travel_time'] = 1
+            gdf['capacity'] = 1
+            gdf['lanes'] = 1
+
+            new_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
+            gdf = gdf[new_order]
             gdf.to_parquet(output_file)
             g_dataframes.append(gdf)
+            self.json.extend(g_dataframes)
         return g_dataframes    
-            # ast.literal_eval(road)['restrictions']['speedLimits']['maxSpeed'][0] AS 
-            # CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed
 
+    def modes_per_link_type(self):
+        p = Parameters()
+        print(0)
+        modes = p.parameters["network"]["ovm"]["modes"]
+        result = [(key, key[0]) for key in modes.keys()]
+        mode_codes = {p[0]: p[1] for p in result}
+        print(mode_codes)
+        type_list = {}
+        notfound = ""
+        for mode, val in modes.items():
+            all_types = val["link_types"]
+            md = mode_codes[mode]
+            for tp in all_types:
+                type_list[tp] = "{}{}".format(type_list.get(tp, ""), md)
+            if val["unknown_tags"]:
+                notfound += md
+
+        type_list = {k: "".join(set(v)) for k, v in type_list.items()}
+        print(f'type_list: {type_list}')
+        print("{}".format(notfound))
+        print(type(type_list))
+        return type_list, "{}".format(notfound)
 
     def download_test_data(self, l_data_source):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''
@@ -155,7 +203,7 @@ class OVMDownloader(WorkerThread):
                 TO '{pth1}'
                 (FORMAT 'parquet', COMPRESSION 'ZSTD');
             """
-            c = initialise_duckdb_spatial()
+            c = self.initialise_duckdb_spatial()
             c.execute(sql)
             print({t})
             
