@@ -10,11 +10,7 @@ https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit
 import numpy as np
 import pandas as pd
 from unittest import TestCase
-import sqlite3
-import pathlib
-from tempfile import gettempdir
 from aequilibrae.paths.public_transport import HyperpathGenerating
-from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 
 
 def create_vertices(n):
@@ -42,8 +38,8 @@ def create_edges(n, seed):
             k += 1
 
     edges = pd.DataFrame()
-    edges["a_node"] = head
-    edges["b_node"] = tail
+    edges["tail"] = tail
+    edges["head"] = head
 
     rng = np.random.default_rng(seed=seed)
     edges["trav_time"] = rng.uniform(0.0, 1.0, m)
@@ -316,8 +312,8 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
 
     edges = pd.DataFrame(
         data={
-            "a_node": head,
-            "b_node": tail,
+            "tail": tail,
+            "head": head,
             "trav_time": trav_time,
             "freq": freq,
             "volume_ref": vol,
@@ -326,9 +322,7 @@ def create_SF_network(dwell_time=1.0e-6, board_alight_ratio=0.5):
     # waiting time is in average half of the period
     edges["freq"] *= 2.0
 
-    # demand = pd.DataFrame({"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
-    demand = np.zeros((len(head), len(head)))
-    demand[0, 12] = 1.0
+    demand = pd.DataFrame({"origin_vertex_id": [0], "destination_vertex_id": [12], "demand": [1.0]})
 
     return edges, demand
 
@@ -354,37 +348,19 @@ class TestHyperPath(TestCase):
             else:
                 self.edges["freq"] = self.edges.freq_base / alpha
 
-            self.demand = np.zeros((len(self.vertices), len(self.vertices)))
-            for x, y in zip(self.vertices.index[:10], np.flip(self.vertices.index[-10:])):
-                self.demand[x, y] = 1.0
+            self.demand = pd.DataFrame(
+                {
+                    "orig_vert_idx": self.vertices.index[:10],
+                    "dest_vert_idx": np.flip(self.vertices.index[-10:]),
+                    "demand": np.full(10, 1),
+                }
+            )
 
         elif network == "SF":
             self.edges, self.demand = create_SF_network(dwell_time=0.0)
 
         else:
             raise KeyError(f'Unknown network type "{network}"')
-
-        self.edges["link_id"] = self.edges.index + 1
-        self.edges["a_node"] += 1
-        self.edges["b_node"] += 1
-        self.edges["direction"] = 1
-        self.nodes = pd.DataFrame(
-            {
-                "node_id": np.unique(np.union1d(self.edges["a_node"].values, self.edges["b_node"].values)),
-            }
-        )
-        self.nodes["node_type"] = "od"
-        self.nodes["taz_id"] = self.nodes["node_id"] + self.nodes["node_id"].max()
-
-        self.con = sqlite3.connect(pathlib.Path(gettempdir()) / "test_dummy.sqlite")
-
-        self.graph = TransitGraphBuilder(self.con, period_id=None, start=0, end=0, blocking_centroid_flows=False)
-        self.graph.edges = self.edges
-        self.graph.vertices = self.nodes
-        self.graph.create_od_node_mapping()
-
-        self.transit_graph = self.graph.to_transit_graph()
-        self.config = {"Time field": "trav_time", "Frequency field": "freq"}
 
     def tearDown(self) -> None:
         try:
@@ -397,11 +373,18 @@ class TestHyperPath(TestCase):
     def test_bell_assign_parallel_agreement(self) -> None:
         self._setUp(network="bell")
 
-        hp = HyperpathGenerating(self.transit_graph, self.demand, self.config)
+        hp = HyperpathGenerating(self.edges)
 
+        # breakpoint()
         results = []
         for threads in [1, 2, 4]:
-            hp.execute(threads=threads)
+            hp.assign(
+                self.demand["orig_vert_idx"].values.astype(np.uint32),
+                self.demand["dest_vert_idx"].values.astype(np.uint32),
+                self.demand["demand"].values.astype(np.float64),
+                check_demand=True,
+                threads=threads,
+            )
             results.append(hp._edges.copy(deep=True))
 
         for result in results[1:]:
@@ -410,8 +393,8 @@ class TestHyperPath(TestCase):
     def test_SF_run_01(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(self.transit_graph, self.demand, self.config)
-        hp.run(origin=0 + 1, destination=12 + 1, volume=1.0)
+        hp = HyperpathGenerating(self.edges)
+        hp.run(origin=0, destination=12, volume=1.0)
 
         np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
 
@@ -441,9 +424,13 @@ class TestHyperPath(TestCase):
     def test_SF_assign_01(self):
         self._setUp(network="SF")
 
-        hp = HyperpathGenerating(self.transit_graph, self.demand, self.config, check_demand=True)
+        hp = HyperpathGenerating(self.edges)
 
-        hp.execute()
+        hp.assign(
+            self.demand["origin_vertex_id"].values.astype(np.uint32),
+            self.demand["destination_vertex_id"].values.astype(np.uint32),
+            self.demand["demand"].values.astype(np.float64),
+            check_demand=True,
+        )
 
-        breakpoint()
         np.testing.assert_allclose(self.edges["volume_ref"].values, hp._edges["volume"].values, rtol=1e-05, atol=1e-08)
