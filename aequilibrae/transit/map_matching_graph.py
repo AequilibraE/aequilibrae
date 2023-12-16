@@ -1,11 +1,10 @@
 import hashlib
+import importlib.util as iutil
+import math
 from contextlib import closing
 from copy import deepcopy
-import math
 from os.path import isfile, join
 from tempfile import gettempdir
-import importlib.util as iutil
-from ..utils import WorkerThread
 
 import numpy as np
 import pandas as pd
@@ -16,10 +15,11 @@ from shapely.ops import substring
 
 from aequilibrae.log import logger
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.project.zoning import GeoIndex
-from aequilibrae.transit.transit_elements import mode_correspondence
+from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
+from aequilibrae.transit.transit_elements import mode_correspondence
+from ..utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -154,17 +154,6 @@ class MMGraph(WorkerThread):
         self.df = self.df[self.df.to_remove == 0]
         fltr = self.df.speed > 0
         self.df.loc[fltr, "free_flow_time"] = self.df.distance[fltr] / self.df.speed[fltr]
-
-        # gets around AequilibraE bug
-        # https://github.com/AequilibraE/aequilibrae/issues/307
-        max_node_id = self.df[["a_node", "b_node"]].max().max()
-        rec = deepcopy(self.df.iloc[[self.df.index.values[0]]])
-        rec.a_node = max_node_id + 1
-        rec.b_node = max_node_id
-        rec.link_id = self.df.link_id.max() + 1
-        rec.direction = 1
-        self.df = pd.concat([self.df, rec], ignore_index=True)
-        # End of upstream bug treatment
 
         cols = [
             "link_id",

@@ -7,6 +7,8 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.network.link import Link
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Links(BasicTable):
@@ -115,9 +117,8 @@ class Links(BasicTable):
             link = self.__items.pop(link_id)  # type: Link
             link.delete()
         else:
-            self._curr.execute("Delete from Links where link_id=?", [link_id])
-            d = self._curr.rowcount
-            self.conn.commit()
+            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+                d = conn.execute("Delete from Links where link_id=?", [link_id]).rowcount
         if d:
             self.project.logger.warning(f"Link {link_id} was successfully removed from the project database")
         else:
@@ -125,10 +126,10 @@ class Links(BasicTable):
 
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
-        self._curr.execute("select coalesce(max(link_id),0) from Links")
-        self.__max_id = self._curr.fetchone()[0]
         tl = TableLoader()
-        tl.load_structure(self._curr, "links")
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            self.__max_id = conn.execute("select coalesce(max(link_id),0) from Links").fetchone()[0]
+            tl.load_structure(conn, "links")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -139,7 +140,7 @@ class Links(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
         """
-        dl = DataLoader(self.conn, "links")
+        dl = DataLoader(self.project.path_to_file, "links")
         return dl.load_table()
 
     def refresh(self):
@@ -159,8 +160,8 @@ class Links(BasicTable):
         raise ValueError(f"Link {link_id} does not exist in the model")
 
     def __link_data(self, link_id: int) -> dict:
-        self._curr.execute(f"{self.sql} where link_id=?", [link_id])
-        data = self._curr.fetchone()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
             return {key: val for key, val in zip(self.__fields, data)}
         raise ValueError("Link_id does not exist on the network")

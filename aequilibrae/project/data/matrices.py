@@ -1,9 +1,12 @@
 import os
 from os.path import isfile, join
+
 import pandas as pd
-from aequilibrae.project.table_loader import TableLoader
+
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
+from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.utils.db_utils import commit_and_close
 
 
 class Matrices:
@@ -17,10 +20,9 @@ class Matrices:
 
         self.fldr = os.path.join(project.project_base_path, "matrices")
 
-        self.conn = project.connect()
-        self.curr = self.conn.cursor()
         tl = TableLoader()
-        matrices_list = tl.load_table(self.curr, "matrices")
+        with commit_and_close(self.project.connect()) as conn:
+            matrices_list = tl.load_table(conn, "matrices")
         self.__fields = [x for x in tl.fields]
         if matrices_list:
             self.__properties = list(matrices_list[0].keys())
@@ -41,16 +43,16 @@ class Matrices:
     def clear_database(self) -> None:
         """Removes records from the matrices database that do not exist in disk"""
 
-        self.curr.execute("Select name, file_name from matrices;")
+        with commit_and_close(self.project.connect()) as conn:
+            mats = conn.execute("Select name, file_name from matrices;").fetchall()
 
-        remove = [nm for nm, file in self.curr.fetchall() if not isfile(join(self.fldr, file))]
+            remove = [nm for nm, file in mats if not isfile(join(self.fldr, file))]
 
-        if remove:
-            self.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
+            if remove:
+                self.logger.warning(f'Matrix records not found in disk cleaned from database: {",".join(remove)}')
 
-            remove = [[x] for x in remove]
-            self.curr.executemany("DELETE from matrices where name=?;", remove)
-            self.conn.commit()
+                remove = [[x] for x in remove]
+                conn.executemany("DELETE from matrices where name=?;", remove)
 
     def update_database(self) -> None:
         """Adds records to the matrices database for matrix files found on disk"""
@@ -96,9 +98,10 @@ class Matrices:
             else:
                 return "file missing"
 
-        df = pd.read_sql_query("Select * from matrices;", self.conn)
-        df = df.assign(status="")
-        df.status = df.file_name.apply(check_if_exists)
+        with commit_and_close(self.project.connect()) as conn:
+            df = pd.read_sql_query("Select * from matrices;", conn)
+            df = df.assign(status="")
+            df.status = df.file_name.apply(check_if_exists)
 
         return df
 

@@ -202,8 +202,7 @@ class Project:
         p.write_back()
 
         # Create actual tables
-        cursor = self.conn.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON;")
+        self.conn.execute("PRAGMA foreign_keys = ON;")
         self.conn.commit()
         initialize_tables(self, "network")
 

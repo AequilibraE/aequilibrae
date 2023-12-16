@@ -1,3 +1,6 @@
+from sqlite3 import Connection
+from typing import Optional
+
 from shapely.geometry import Polygon
 from .safe_class import SafeClass
 from .connector_creation import connector_creation
@@ -111,7 +114,7 @@ class Node(SafeClass):
         sql = f"Update Nodes set {txts}"
         return data, sql
 
-    def connect_mode(self, area: Polygon, mode_id: str, link_types="", connectors=1):
+    def connect_mode(self, area: Polygon, mode_id: str, link_types="", connectors=1, conn: Optional[Connection] = None):
         """Adds centroid connectors for the desired mode to the network file
 
         Centroid connectors are created by connecting the zone centroid to one or more nodes selected from
@@ -147,7 +150,8 @@ class Node(SafeClass):
             mode_id,
             link_types=link_types,
             connectors=connectors,
-            network=self._project.network,
+            network=self.project.network,
+            conn_=conn,
         )
 
     def __setattr__(self, instance, value) -> None:

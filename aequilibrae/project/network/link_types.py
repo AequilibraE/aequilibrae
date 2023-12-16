@@ -2,6 +2,8 @@ from sqlite3 import IntegrityError, Connection
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class LinkTypes:
@@ -59,11 +61,10 @@ class LinkTypes:
         self.__items = {}
         self.project = net.project
         self.logger = net.project.logger
-        self.conn = net.conn  # type: Connection
-        self.curr = net.conn.cursor()
 
         tl = TableLoader()
-        link_types_list = tl.load_table(self.curr, "link_types")
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
         self.__fields = [x for x in tl.fields]
@@ -92,7 +93,6 @@ class LinkTypes:
             lt = self.__items[link_type_id]  # type: LinkType
             lt.delete()
             del self.__items[link_type_id]
-            self.conn.commit()
         except IntegrityError as e:
             self.logger.error(f"Failed to remove link_type {link_type_id}. {e.args}")
             raise e
