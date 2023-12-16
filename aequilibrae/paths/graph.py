@@ -134,7 +134,7 @@ class GraphBase(ABC):
             }
         )
 
-        properties = self._build_directed_graph(self.network, centroids)
+        properties = self._build_directed_graph(self.network, self.centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
