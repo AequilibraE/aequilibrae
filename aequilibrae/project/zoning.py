@@ -10,9 +10,7 @@ from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
-from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.geo_index import GeoIndex
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Zoning(BasicTable):
@@ -73,7 +71,7 @@ class Zoning(BasicTable):
 
         if not self.__has_zoning():
             qry_file = join(realpath(__file__), "database_specification", "tables", "zones.sql")
-            with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            with self.conn as conn:
                 run_queries_from_sql_file(conn, self.project.logger, qry_file)
             self.__load()
         else:
@@ -85,7 +83,7 @@ class Zoning(BasicTable):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the zoning system.
         """
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.conn as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
         return unary_union(polygons)
@@ -132,13 +130,13 @@ class Zoning(BasicTable):
             self.__geo_index.insert(feature_id=zone_id, geometry=zone.geometry)
 
     def __has_zoning(self):
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.conn as conn:
             dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         return any(["zone" in x[0].lower() for x in dt])
 
     def __load(self):
         tl = TableLoader()
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+        with self.conn as conn:
             zones_list = tl.load_table(conn, "zones")
         self.__fields = deepcopy(tl.fields)
 

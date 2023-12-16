@@ -66,8 +66,8 @@ class Periods(BasicTable):
             else:
                 self.__items[period.period_id] = self.__items.pop(period_id)
 
-        self._curr.execute(f"{self.sql} where period_id=?", [period_id])
-        data = self._curr.fetchone()
+        with self.conn as conn:
+            data = conn.execute(f"{self.sql} where period_id=?", [period_id]).fetchone()
         if data:
             data = {key: val for key, val in zip(self.__fields, data)}
             period = Period(data, self.project)
@@ -79,7 +79,8 @@ class Periods(BasicTable):
     def refresh_fields(self) -> None:
         """After adding a field one needs to refresh all the fields recognized by the software"""
         tl = TableLoader()
-        tl.load_structure(self._curr, "periods")
+        with self.conn as conn:
+            tl.load_structure(conn, "periods")
         self.sql = tl.sql
         self.__fields = deepcopy(tl.fields)
 
@@ -99,8 +100,9 @@ class Periods(BasicTable):
             **description** (:obj:`str`): Optional human readable description of the time period e.g. '1pm - 5pm'
         """
 
-        self._curr.execute("SELECT COUNT(*) FROM periods WHERE period_id=?", [period_id])
-        if self._curr.fetchone()[0] > 0:
+        with self.conn as conn:
+            dt = conn.execute("SELECT COUNT(*) FROM periods WHERE period_id=?", [period_id]).fetchone()[0]
+        if dt[0] > 0:
             raise Exception("period_id already exists. Failed to create it")
 
         data = {key: None for key in self.__fields}
@@ -123,7 +125,8 @@ class Periods(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the periods
         """
-        dl = DataLoader(self.conn, "periods")
+        with self.conn as conn:
+            dl = DataLoader(conn, "periods")
         return dl.load_table()
 
     def __del__(self):

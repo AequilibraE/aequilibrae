@@ -1,13 +1,15 @@
-from os.path import join
 import pickle
 import uuid
+from abc import ABC
 from datetime import datetime
-from abc import ABC, abstractmethod
+from os.path import join
 from typing import List, Tuple, Optional
+
 import numpy as np
 import pandas as pd
-from aequilibrae.context import get_logger
 from aequilibrae.paths.AoN import build_compressed_graph
+
+from aequilibrae.context import get_logger
 
 
 class GraphBase(ABC):
