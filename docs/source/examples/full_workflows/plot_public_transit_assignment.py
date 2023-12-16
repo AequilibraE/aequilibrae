@@ -1,7 +1,7 @@
 """
 .. _example_gtfs_import_and_asssignment:
 
-Public transport Spiess & Florian assignment
+Public transport assignment with Optimal Strategies
 ===========
 
 In this example, we import a GTFS feed to our model, create a public transport network, create project match connectors, and perform a Spiess & Florian assignment.
