@@ -3,7 +3,6 @@ from shapely.geometry import Polygon
 
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.utils.db_utils import commit_and_close
-from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class BasicTable:
@@ -16,7 +15,7 @@ class BasicTable:
         self.__table_type__ = ""
 
     def extent(self) -> Polygon:
-        """Queries the extent of thelayer  included in the model
+        """Queries the extent of the layer  included in the model
 
         Returns:
             *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the layer.
@@ -35,6 +34,3 @@ class BasicTable:
 
     def __deepcopy__(self, memodict=None):
         raise Exception(f"{self.__table_type__} object cannot be copied")
-
-    def conn(self):
-        return commit_and_close(connect_spatialite(self.project.path_to_file))
