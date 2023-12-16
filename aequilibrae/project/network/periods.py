@@ -104,7 +104,7 @@ class Periods(BasicTable):
 
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             dt = conn.execute("SELECT COUNT(*) FROM periods WHERE period_id=?", [period_id]).fetchone()[0]
-        if dt[0] > 0:
+        if dt > 0:
             raise Exception("period_id already exists. Failed to create it")
 
         data = {key: None for key in self.__fields}
@@ -127,8 +127,7 @@ class Periods(BasicTable):
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the periods
         """
-        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
-            dl = DataLoader(conn, "periods")
+        dl = DataLoader(self.project.path_to_file, "periods")
         return dl.load_table()
 
     def __del__(self):

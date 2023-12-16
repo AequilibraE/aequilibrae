@@ -23,13 +23,11 @@ class TestPeriod(TestCase):
         self.project = Project()
         self.project.open(self.proj_dir)
         self.network = self.project.network
-        self.curr = self.project.conn.cursor()
 
         for num in range(2, 6):
             self.project.network.periods.new_period(num, num, num, "test")
 
     def tearDown(self) -> None:
-        self.curr.close()
         self.project.close()
         try:
             rmtree(self.proj_dir)
@@ -73,8 +71,7 @@ class TestPeriod(TestCase):
         period = periods.get(1)
 
         fields = sorted(period.data_fields())
-        self.curr.execute("pragma table_info(periods)")
-        dt = self.curr.fetchall()
+        dt = self.project.conn.execute("pragma table_info(periods)").fetchall()
 
         actual_fields = sorted([x[1] for x in dt if x[1] != "ogc_fid"])
 

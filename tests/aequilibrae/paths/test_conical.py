@@ -57,4 +57,3 @@ class TestConical(TestCase):
             # We check if the analytical solution matches the numerical differentiation
             dydx = (congested_times[1] - congested_times[0]) / dx
             self.assertAlmostEqual(dydx, delta[1], 6, "Problems with derivative for the conical vdf")
-            print(dydx, delta[1])

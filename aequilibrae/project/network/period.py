@@ -1,5 +1,6 @@
 from .safe_class import SafeClass
-from .connector_creation import connector_creation
+from ...utils.db_utils import commit_and_close
+from ...utils.spatialite_utils import connect_spatialite
 
 
 class Period(SafeClass):
@@ -33,18 +34,15 @@ class Period(SafeClass):
 
     def save(self):
         """Saves period to database"""
-        conn = self.connect_db()
 
-        if self.period_id != self.__original__["period_id"]:
-            raise ValueError("One cannot change the period_id")
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            if self.period_id != self.__original__["period_id"]:
+                raise ValueError("One cannot change the period_id")
 
-        data, sql = self.__save_period()
+            data, sql = self.__save_period()
 
-        if data:
-            conn.execute(sql, data)
-
-        conn.commit()
-        conn.close()
+            if data:
+                conn.execute(sql, data)
 
     def data_fields(self) -> list:
         """Lists all data fields for the period, as available in the database
@@ -73,12 +71,11 @@ class Period(SafeClass):
             self._logger.warning("This is already the period number")
             return
 
-        conn = self.connect_db()
-        try:
-            conn.execute("Update periods set period_id=? where period_id=?", [new_id, self.period_id])
-        finally:
-            conn.commit()
-            conn.close()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            try:
+                conn.execute("Update periods set period_id=? where period_id=?", [new_id, self.period_id])
+            finally:
+                conn.commit()
         self._logger.info(f"Period {self.period_id} was renumbered to {new_id}")
         self.__dict__["period_id"] = new_id
         self.__original__["period_id"] = new_id
