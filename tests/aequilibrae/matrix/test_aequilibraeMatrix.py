@@ -212,7 +212,6 @@ class TestAequilibraeMatrix(TestCase):
 
         a = AequilibraeMatrix()
         a.load(self.name_test)
-        print(np.array_equal(a.get_matrix("seed"), a.matrix["seed"]))
 
         del a
 

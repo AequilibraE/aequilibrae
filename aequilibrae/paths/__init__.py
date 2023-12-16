@@ -4,11 +4,10 @@ from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimmi
 from aequilibrae.paths.network_skimming import NetworkSkimming
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.assignment_paths import AssignmentPaths
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.paths.traffic_assignment import TrafficAssignment
+from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
+from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssignment
 from aequilibrae.paths.vdf import VDF
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.public_transport import HyperpathGenerating
+from aequilibrae.paths.graph import Graph, TransitGraph
 
 from aequilibrae import global_logger
 

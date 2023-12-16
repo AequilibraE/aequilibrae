@@ -12,15 +12,14 @@ If you have already installed AequilibraE, you can move on to the :ref:`first st
    and possible API changes often.
 
 .. note::
-   The recommendations on this page are current as of April 2023.
+   The recommendations on this page are current as of December 2023.
 
 .. index:: installation
 
 Installation
 ------------
 
-1. Install `Python 3.7, 3.8, 3.9, 3.10 or 3.11 <www.python.org>`__. We recommend Python
-   3.9 or 3.10.
+1. Install `Python 3.8, 3.9, 3.10, 3.11 or 3.12 <www.python.org>`__. We recommend Python 3.10 or 3.11
 
 2. Install AequilibraE
 

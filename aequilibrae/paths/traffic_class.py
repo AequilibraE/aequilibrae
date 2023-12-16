@@ -1,15 +1,69 @@
 import warnings
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
+from abc import ABC, abstractmethod
 
 import numpy as np
 
 from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.results import AssignmentResults
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
+from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 
-class TrafficClass:
+class TransportClassBase(ABC):
+    def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
+        """
+        Instantiates the class
+
+        :Arguments:
+            **name** (:obj:`str`): UNIQUE class name.
+
+            **graph** (:obj:`Graph`): Class/mode-specific graph
+
+            **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
+        """
+        if not np.array_equal(matrix.index, graph.centroids):
+            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
+
+        if matrix.matrix_view.dtype != graph.default_types("float"):
+            raise TypeError("Matrix's computational view need to be of type np.float64")
+        self._config = {}
+        self.graph = graph
+        self.logger = graph.logger
+        self.matrix = matrix
+        self._id = name
+
+        graph_config = {
+            "Mode": graph.mode,
+            "Block through centroids": graph.block_centroid_flows,
+            "Number of centroids": graph.num_zones,
+            "Links": graph.num_links,
+            "Nodes": graph.num_nodes,
+        }
+        self._config["Graph"] = str(graph_config)
+
+        mat_config = {
+            "Source": matrix.file_path or "",
+            "Number of centroids": matrix.zones,
+            "Matrix cores": matrix.view_names,
+        }
+        if len(matrix.view_names) == 1:
+            mat_config["Matrix totals"] = {
+                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
+            }
+        else:
+            mat_config["Matrix totals"] = {
+                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
+            }
+        self._config["Matrix"] = str(mat_config)
+
+    @property
+    def info(self) -> dict:
+        config = deepcopy(self._config)
+        return {self._id: config}
+
+
+class TrafficClass(TransportClassBase):
     """Traffic class for equilibrium traffic assignment
 
     .. code-block:: python
@@ -47,50 +101,17 @@ class TrafficClass:
 
             **matrix** (:obj:`AequilibraeMatrix`): Class/mode-specific matrix. Supports multiple user classes
         """
-        if not np.array_equal(matrix.index, graph.centroids):
-            raise ValueError("Matrix and graph do not have compatible sets of centroids.")
-
-        if matrix.matrix_view.dtype != graph.default_types("float"):
-            raise TypeError("Matrix's computational view need to be of type np.float64")
-        self.__config = {}
-        self.graph = graph
-        self.logger = graph.logger
-        self.matrix = matrix
+        super().__init__(name, graph, matrix)
         self.pce = 1.0
         self.vot = 1.0
         self.mode = graph.mode
-        self.class_flow: np.array
-        self.results = AssignmentResults()
+        self.class_flow: np.array  # FIXME: Is this ever access?
         self.fixed_cost = np.zeros(graph.graph.shape[0], graph.default_types("float"))
         self.fixed_cost_field = ""
         self.fc_multiplier = 1.0
+        self.results = AssignmentResults()
         self._aon_results = AssignmentResults()
         self._selected_links = {}  # maps human name to link_set
-        self.__id__ = name
-
-        graph_config = {
-            "Mode": graph.mode,
-            "Block through centroids": graph.block_centroid_flows,
-            "Number of centroids": graph.num_zones,
-            "Links": graph.num_links,
-            "Nodes": graph.num_nodes,
-        }
-        self.__config["Graph"] = str(graph_config)
-
-        mat_config = {
-            "Source": matrix.file_path or "",
-            "Number of centroids": matrix.zones,
-            "Matrix cores": matrix.view_names,
-        }
-        if len(matrix.view_names) == 1:
-            mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :]) for nm in matrix.view_names
-            }
-        else:
-            mat_config["Matrix totals"] = {
-                nm: np.sum(np.nan_to_num(matrix.matrix_view)[:, :, i]) for i, nm in enumerate(matrix.view_names)
-            }
-        self.__config["Matrix"] = str(mat_config)
 
     def set_pce(self, pce: Union[float, int]) -> None:
         """Sets Passenger Car equivalent
@@ -165,12 +186,7 @@ class TrafficClass:
                     else:
                         link_ids.append(comp_id)
             self._selected_links[name] = np.array(link_ids, dtype=self.graph.default_types("int"))
-        self.__config["select_links"] = str(links)
-
-    @property
-    def info(self) -> dict:
-        config = deepcopy(self.__config)
-        return {self.__id__: config}
+        self._config["select_links"] = str(links)
 
     def __setattr__(self, key, value):
         if key not in [
@@ -182,13 +198,35 @@ class TrafficClass:
             "class_flow",
             "results",
             "_aon_results",
-            "__id__",
+            "_id",
             "vot",
             "fixed_cost",
             "fc_multiplier",
             "fixed_cost_field",
             "_selected_links",
-            "_TrafficClass__config",
+            "_config",
         ]:
-            raise KeyError("Traffic Class does not have that element")
+            raise KeyError(f"Traffic Class does not have '{key}'")
         self.__dict__[key] = value
+
+
+class TransitClass(TransportClassBase):
+    def __init__(self, name: str, graph: TransitGraph, matrix: AequilibraeMatrix, matrix_core: str = None):
+        super().__init__(name, graph, matrix)
+        self._config["Graph"] = str(graph._config)
+        self.results = TransitAssignmentResults()
+
+        if len(matrix.view_names) == 1:
+            self.matrix_core = matrix.view_names[0]
+        else:
+            self.matrix_core = None
+
+    def set_demand_matrix_core(self, core: str):
+        """
+        Set the matrix core to use for demand.
+
+        :Arguments:
+            **core** (:obj:`str`):"""
+        if core not in self.matrix.view_names:
+            raise KeyError(f"'{core}' is not present in `matrix.view_names`")
+        self.matrix_core = core

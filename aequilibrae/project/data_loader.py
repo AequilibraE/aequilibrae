@@ -20,7 +20,8 @@ class DataLoader:
                 fields.append('ST_AsBinary("geometry") geometry')
             keys = ",".join(fields)
             df = pd.read_sql_query(f"select {keys} from '{self.table_name}'", conn)
-        df.geometry = df.geometry.apply(shapely.wkb.loads)
+        if geo_field is not None:
+            df.geometry = df.geometry.apply(shapely.wkb.loads)
         return df
 
     def __find_table_fields(self):
