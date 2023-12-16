@@ -72,10 +72,6 @@ class HyperpathGenerating:
         self._tail = self._edges[tail].values.astype(np.uint32)
         self._head = self._edges[head].values.astype(np.uint32)
 
-        self.procedure_id = uuid4().hex
-        self.procedure_date = str(datetime.today())
-        self.description = "Hyperpath"
-
     def run(self, origin, destination, volume, return_inf=False):
         # column storing the resulting edge volumes
         self._edges["volume"] = 0.0
@@ -123,7 +119,6 @@ class HyperpathGenerating:
         if u_i_vec != NULL:
             self.u_i_vec = np.asarray(<cnp.float64_t[:self.vertex_count]> u_i_vec)
 
-
     def _check_vertex_idx(self, idx):
         assert isinstance(idx, int)
         assert idx >= 0
@@ -164,23 +159,23 @@ class HyperpathGenerating:
 
     def assign(
         self,
-        demand,
-        origin_column="orig_vert_idx",
-        destination_column="dest_vert_idx",
-        demand_column="demand",
+        origin_column,
+        destination_column,
+        demand_column,
         check_demand=False,
-        threads=0
+        threads=None
     ):
-        """Assigns demand to the edges of the graph.
+        """
+        Assigns demand to the edges of the graph.
+
+        Assumes the ``*_column`` arguments are provided as numpy arrays that form a COO sprase matrix.
 
         :Arguments:
-            **demand** (:obj:`pandas.DataFrame`): The demand information.
+            **origin_column** (:obj:`np.ndarray`): The column for the origin vertices (optional, default is "orig_vert_idx").
 
-            **origin_column** (:obj:`str`): The column name for the origin vertices (optional, default is "orig_vert_idx").
+            **destination_column** (:obj:`np.ndarray`): The column or the destination vertices (optional, default is "dest_vert_idx").
 
-            **destination_column** (:obj:`str`): The column name for the destination vertices (optional, default is "dest_vert_idx").
-
-            **demand_column** (:obj:`str`): The column name for the demand values (optional, default is "demand").
+            **demand_column** (:obj:`np.ndarray`): The column for the demand values (optional, default is "demand").
 
             **check_demand** (:obj:`bool`): If True, check the validity of the demand data (optional, default is False).
 
@@ -189,8 +184,10 @@ class HyperpathGenerating:
 
         # check the input demand paramater
         if check_demand:
-            self._check_demand(demand, origin_column, destination_column, demand_column)
-        demand = demand[demand[demand_column] > 0]
+            self._check_demand(origin_column, destination_column, demand_column)
+
+        if threads is None:
+            threads = 0  # Default to all threads
 
         # initialize the column storing the resulting edge volumes
         self._edges["volume"] = 0.0
@@ -198,12 +195,8 @@ class HyperpathGenerating:
         # travel time is computed but not saved into an array in the following
         self.u_i_vec = None
 
-        o_vert_ids = demand[origin_column].values.astype(np.uint32)
-        d_vert_ids = demand[destination_column].values.astype(np.uint32)
-        demand_vls = demand[demand_column].values.astype(np.float64)
-
         # get the list of all destinations
-        destination_vertex_indices = np.unique(d_vert_ids)
+        destination_vertex_indices = np.unique(destination_column)
 
         compute_SF_in_parallel(
             self._indptr[:],
@@ -212,10 +205,10 @@ class HyperpathGenerating:
             self._freq[:],
             self._tail[:],
             self._head[:],
-            d_vert_ids[:],
+            destination_column[:],
             destination_vertex_indices[:],
-            o_vert_ids[:],
-            demand_vls[:],
+            origin_column[:],
+            demand_column[:],
             self._edges["volume"].values,
             False,
             self.vertex_count,
@@ -223,35 +216,23 @@ class HyperpathGenerating:
             (multiprocessing.cpu_count() if threads < 1 else threads)
         )
 
-    def _check_demand(self, demand, origin_column, destination_column, demand_column):
-        if type(demand) != pd.core.frame.DataFrame:
-            raise TypeError("demand should be a pandas DataFrame")
+    def _check_demand(self, origin_column, destination_column, demand_column):
+        for col, col_name in zip([origin_column, destination_column, demand_column], ["origin", "destination", "demand"]):
+            if not isinstance(col, (np.ndarray, np.generic)):
+                raise TypeError(f"{col_name} should be a numpy array")
 
-        for col in [origin_column, destination_column, demand_column]:
-            if col not in demand:
-                raise KeyError(f"demand column '{col}' not found in demand dataframe")
+            if np.any(np.isnan(col)):
+                raise ValueError(f"{col_name} should not have any missing value")
 
-        if demand[[origin_column, destination_column, demand_column]].isna().any().any():
-            raise ValueError(
-                " ".join(
-                    [
-                        f"demand[[{origin_column}, {destination_column}, {demand_column}]] ",
-                        "should not have any missing value",
-                    ]
-                )
-            )
+        for col, col_name in zip([origin_column, destination_column], ["origin", "destination"]):
+            if not col.dtype == np.uint32:
+                raise TypeError(f"column '{col_name}' should be of np.uint32")
 
-        for col in [origin_column, destination_column]:
-            if not pd.api.types.is_integer_dtype(demand[col].dtype):
-                raise TypeError(f"column '{col}' should be of integer type")
+        if not demand_column.dtype == np.float64:
+            raise TypeError(f"demand column should be of np.float64 type")
 
-        col = demand_column
-
-        if not pd.api.types.is_numeric_dtype(demand[col].dtype):
-            raise TypeError(f"column '{col}' should be of numeric type")
-
-        if demand[col].min() < 0.0:
-            raise ValueError(f"column '{col}' should be nonnegative")
+        if demand_column.min() < 0.0:
+            raise ValueError(f"demand column should be nonnegative")
 
     def info(self) -> dict:
         info = {

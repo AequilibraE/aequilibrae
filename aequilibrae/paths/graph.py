@@ -1,15 +1,18 @@
-from os.path import join
 import pickle
 import uuid
+from abc import ABC
 from datetime import datetime
-from typing import List, Tuple
+from os.path import join
+from typing import List, Tuple, Optional
+
 import numpy as np
 import pandas as pd
-from aequilibrae.context import get_logger
 from aequilibrae.paths.AoN import build_compressed_graph
 
+from aequilibrae.context import get_logger
 
-class Graph(object):
+
+class GraphBase(ABC):
     """
     Graph class
     """
@@ -75,7 +78,7 @@ class Graph(object):
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
         # Randomly generate a unique Graph ID randomly
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def default_types(self, tp: str):
         """
@@ -91,7 +94,7 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: np.ndarray) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray]) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -109,17 +112,18 @@ class Graph(object):
 
         # Creates the centroids
 
-        if centroids is None or not isinstance(centroids, np.ndarray):
-            raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
-        if not np.issubdtype(centroids.dtype, np.integer):
-            raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
-        if centroids.shape[0] == 0:
-            raise ValueError("You need at least one centroid")
-        if centroids.min() <= 0:
-            raise ValueError("Centroid IDs need to be positive")
-        if centroids.shape[0] != np.unique(centroids).shape[0]:
-            raise ValueError("Centroid IDs are not unique")
-        self.centroids = np.array(centroids, np.uint32)
+        if centroids is not None:
+            if not np.issubdtype(centroids.dtype, np.integer):
+                raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
+            if centroids.shape[0] == 0:
+                raise ValueError("You need at least one centroid")
+            if centroids.min() <= 0:
+                raise ValueError("Centroid IDs need to be positive")
+            if centroids.shape[0] != np.unique(centroids).shape[0]:
+                raise ValueError("Centroid IDs are not unique")
+            self.centroids = np.array(centroids, np.uint32)
+        else:
+            self.centroids = np.array([], np.uint32)
 
         self.network = self.network.astype(
             {
@@ -130,7 +134,7 @@ class Graph(object):
             }
         )
 
-        properties = self.__build_directed_graph(self.network, centroids)
+        properties = self._build_directed_graph(self.network, self.centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
@@ -141,8 +145,9 @@ class Graph(object):
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
 
-        self.__build_compressed_graph()
-        self.compact_num_links = self.compact_graph.shape[0]
+        if self.centroids.shape[0]:
+            self.__build_compressed_graph()
+            self.compact_num_links = self.compact_graph.shape[0]
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -150,7 +155,7 @@ class Graph(object):
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
-    def __build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
+    def _build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
         all_titles = list(network.columns)
 
         not_pos = network.loc[network.direction != 1, :]
@@ -236,7 +241,7 @@ class Graph(object):
         if self.centroids is not None:
             self.prepare_graph(self.centroids)
             self.set_blocked_centroid_flows(self.block_centroid_flows)
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = [x for x in self.required_default_fields]
@@ -380,7 +385,7 @@ class Graph(object):
         mygraph["skim_fields"] = self.skim_fields
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
-        mygraph["graph_id"] = self.__id__
+        mygraph["graph_id"] = self._id
         mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
@@ -410,7 +415,7 @@ class Graph(object):
             self.skim_fields = mygraph["skim_fields"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
-            self.__id__ = mygraph["graph_id"]
+            self._id = mygraph["graph_id"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 
@@ -481,3 +486,16 @@ class Graph(object):
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+
+class Graph(GraphBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class TransitGraph(GraphBase):
+    def __init__(self, config: dict = None, od_node_mapping: pd.DataFrame = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._config = config
+        self.od_node_mapping = od_node_mapping
+        self.mode = "t"

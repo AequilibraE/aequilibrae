@@ -86,7 +86,7 @@ class TestTrafficAssignmentPathFiles(TestCase):
         # would need to be performed.
         # Reference files were generated on 12/6/21, any changes to the test project will need to be applied to the
         # reference files. Also, the name given to the traffic class (see setUp above) has to be "car".
-        class_id = f"c{self.assigclass.mode}_{self.assigclass.__id__}"
+        class_id = f"c{self.assigclass.mode}_{self.assigclass._id}"
         reference_path_file_dir = pathlib.Path(siouxfalls_project) / "path_files"
 
         ref_node_correspondence = pd.read_feather(reference_path_file_dir / f"nodes_to_indices_{class_id}.feather")

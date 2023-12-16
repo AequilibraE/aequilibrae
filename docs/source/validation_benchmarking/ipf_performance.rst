@@ -31,7 +31,7 @@ speeding up the runtime in barely five times using five cores.
     :align: center
     :alt: number of cores used in IPF
 
-These tests were ran on a TreadRipper 3970x workstation with 32 cores (64 threads) @ 3.7 GHz
+These tests were ran on a Threadripper 3970x (released in 2019) workstation with 32 cores (64 threads) @ 3.7 GHz
 and 256 Gb of RAM. With 32 cores in use, performing IPF took 0.105s on a 10,000 zones matrix,
 and 0.224 seconds on a 15,000 matrix. The code is provided below for convenience
 
@@ -101,6 +101,7 @@ and 0.224 seconds on a 15,000 matrix. The code is provided below for convenience
 
             aeq_mat = deepcopy(mat1)
             t = perf_counter()
+            # We use a nonsensical negative tolerance to force it to run all iterations
             ipf_core(aeq_mat, target_prod, target_atra, max_iterations=iterations, tolerance=-5, cores=cores)
             aeqt = perf_counter() - t
 

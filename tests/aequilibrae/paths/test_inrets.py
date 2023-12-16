@@ -45,7 +45,6 @@ class TestInrets(TestCase):
             link_flows.fill(1 * 0.1001 * i)
 
             link_flows += np.arange(11) * dx
-            print(link_flows)
             inrets(congested_times, link_flows, capacity, fftime, alpha, beta, cores)
             delta_inrets(delta, link_flows, capacity, fftime, alpha, beta, cores)
 
@@ -57,4 +56,3 @@ class TestInrets(TestCase):
             for j in range(10):
                 dydx = (congested_times[j + 1] - congested_times[j]) / dx
                 self.assertAlmostEqual(dydx, delta[j + 1], 6, "Problems with derivative for the inrets vdf")
-            print(j)

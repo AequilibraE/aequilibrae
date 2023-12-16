@@ -3,7 +3,7 @@
 Naming Conventions:
 - a_node/b_node is head/tail vertex
 
-SF_graph_builder Assumtions:
+TransitGraphBuilder Assumtions:
 - opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
 - all times are expressed in seconds [s], all frequencies in [1/s], and
 - headways are uniform for trips of the same pattern.
@@ -17,12 +17,15 @@ import pandas as pd
 import pyproj
 import shapely
 import shapely.ops
+import json
 from aequilibrae.utils.geo_utils import haversine
+from aequilibrae.project.database_connection import database_connection
 from scipy.spatial import KDTree, minkowski_distance
 from shapely.geometry import Point
 
 from aequilibrae.paths import PathResults
 from aequilibrae.context import get_active_project
+from aequilibrae.paths import TransitGraph
 
 SF_VERTEX_COLS = ["node_id", "node_type", "stop_id", "line_id", "line_seg_idx", "taz_id", "geometry"]
 SF_EDGE_COLS = [
@@ -56,15 +59,13 @@ def shift_duplicate_geometry(df, shift=0.00001):
     return df.groupby(by="geometry", group_keys=False).apply(_shift_points, shift)
 
 
-class SF_graph_builder:
+class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
     :Arguments:
         **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
 
-        **start** (:obj:`int`): Start time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``61200``.
-
-        **end** (:obj:`int`): End time in seconds from 00h00m00s, e.g. 6am is 21600. Defaults to ``64800``.
+        **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
         **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
 
@@ -94,24 +95,31 @@ class SF_graph_builder:
     def __init__(
         self,
         public_transport_conn,
-        start=61200,
-        end=64800,
-        time_margin=0,
-        projected_crs="EPSG:3857",
-        num_threads=-1,
-        seed=124,
-        geometry_noise=True,
-        noise_coef=1.0e-5,
-        with_inner_stop_transfers=False,
-        with_outer_stop_transfers=False,
-        with_walking_edges=True,
-        distance_upper_bound=np.inf,
-        blocking_centroid_flows=True,
-        max_connectors_per_zone=-1,
+        period_id: int = 1,
+        time_margin: int = 0,
+        projected_crs: str = "EPSG:3857",
+        num_threads: int = -1,
+        seed: int = 124,
+        geometry_noise: bool = True,
+        noise_coef: float = 1.0e-5,
+        with_inner_stop_transfers: bool = False,
+        with_outer_stop_transfers: bool = False,
+        with_walking_edges: bool = True,
+        distance_upper_bound: float = np.inf,
+        blocking_centroid_flows: bool = True,
+        connector_method: str = "nearest_neighbour",
+        max_connectors_per_zone: int = -1,
     ):
         self.pt_conn = public_transport_conn  # sqlite connection
         self.pt_conn.enable_load_extension(True)
         self.pt_conn.load_extension("mod_spatialite")
+
+        self.project_conn = database_connection("project_database")
+
+        self.period_id = period_id
+        start, end = self.project_conn.execute(
+            "SELECT period_start, period_end FROM periods WHERE period_id = ?;", [period_id]
+        ).fetchall()[0]
 
         self.start = start - time_margin  # starting time of the selected time period
         self.end = end + time_margin  # ending time of the selected time period
@@ -140,21 +148,24 @@ class SF_graph_builder:
         self.__outer_stop_transfer_edges = pd.DataFrame()
         self.__walking_edges = pd.DataFrame()
 
-        self.global_crs = pyproj.CRS("EPSG:4326")
-        self.projected_crs = pyproj.CRS(projected_crs)
+        self.global_crs = "EPSG:4326"
+        self.__global_crs = pyproj.CRS(self.global_crs)
+        self.projected_crs = projected_crs
+        self.__projected_crs = pyproj.CRS(self.projected_crs)
 
         # longlat to projected CRS transformer
         self.transformer_g_to_p = pyproj.Transformer.from_crs(
-            self.global_crs, self.projected_crs, always_xy=True
+            self.__global_crs, self.__projected_crs, always_xy=True
         ).transform
 
         self.transformer_p_to_g = pyproj.Transformer.from_crs(
-            self.projected_crs, self.global_crs, always_xy=True
+            self.__projected_crs, self.__global_crs, always_xy=True
         ).transform
 
         # Add some spatial noise so that stop, boarding and aligthing vertices
         # are not colocated
-        self.rng = np.random.default_rng(seed=seed)
+        self.seed = seed
+        self.rng = np.random.default_rng(seed=self.seed)
         self.geometry_noise = geometry_noise
         self.noise_coef = noise_coef
 
@@ -172,7 +183,31 @@ class SF_graph_builder:
         self.with_walking_edges = with_walking_edges
         self.distance_upper_bound = distance_upper_bound
         self.blocking_centroid_flows = blocking_centroid_flows
+        self.connector_method = connector_method
         self.max_connectors_per_zone = max_connectors_per_zone
+
+        self.__config_attrs = [
+            "period_id",
+            "projected_crs",
+            "seed",
+            "geometry_noise",
+            "noise_coef",
+            # "uniform_dwell_time",
+            # "alighting_penalty",
+            # "a_tiny_time_duration",
+            # "wait_time_factor",
+            # "walk_time_factor",
+            # "walking_speed",
+            # "access_time_factor",
+            # "egress_time_factor",
+            "with_inner_stop_transfers",
+            "with_outer_stop_transfers",
+            "with_walking_edges",
+            "distance_upper_bound",
+            "blocking_centroid_flows",
+            "connector_method",
+            "max_connectors_per_zone",
+        ]
 
     def add_zones(self, zones, from_crs: str = None):
         """Add zones as ODs.
@@ -198,9 +233,11 @@ class SF_graph_builder:
 
         if from_crs:
             transformer = pyproj.Transformer.from_crs(
-                pyproj.CRS(from_crs), self.projected_crs, always_xy=True
+                pyproj.CRS(from_crs), self.__projected_crs, always_xy=True
             ).transform
-            geometry = [shapely.ops.transform(transformer, p) for p in geometry]
+        else:
+            transformer = self.transformer_g_to_p
+        geometry = [shapely.ops.transform(transformer, p) for p in geometry]
         centroids = shapely.centroid(geometry)
 
         self.zones = pd.DataFrame(
@@ -710,7 +747,7 @@ class SF_graph_builder:
 
         self.__dwell_edges = dwell_edges
 
-    def _create_connector_edges(self, method="overlapping_regions", allow_missing_connections=True):
+    def _create_connector_edges(self, method=None, allow_missing_connections=True):
         """
         Create the connector edges between each stops and ODs.
 
@@ -722,7 +759,13 @@ class SF_graph_builder:
            **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
            **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
         """
-        assert method in ["overlapping_regions", "nearest_neighbour"]
+        if method is None:
+            method = self.connector_method
+        else:
+            self.connector_method = method
+
+        if method not in ["overlapping_regions", "nearest_neighbour"]:
+            raise ValueError("method must be either 'overlapping_regions' or 'nearest_neighbour'")
 
         # Create access connectors
         # ========================
@@ -1138,11 +1181,14 @@ class SF_graph_builder:
         accurate line strings. It creates a line string that matches the path between the shortest path
         between the project nodes closest to either end of the access and egress connectors.
 
+        Project graphs must be built for the "connector project match" method.
+
         :Arguments:
-           **method** (:obj:`str`): Must be either "direct" or "connector project match",
+           **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
-        assert method in ["direct", "connector project match"]
+        if method not in ["direct", "connector project match"]:
+            raise ValueError("method must be either 'direct' or 'connector project match'")
 
         self.edges["geometry"] = None
 
@@ -1311,7 +1357,7 @@ class SF_graph_builder:
         self.pt_conn.executemany(
             f"""\
             INSERT INTO nodes ({",".join(SF_VERTEX_COLS)},modes)
-            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t");
+            VALUES({",".join("?" * (len(SF_VERTEX_COLS) - 1))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
             """,
             (self.vertices if robust else self.vertices[~duplicated])[SF_VERTEX_COLS].itertuples(
                 index=False, name=None
@@ -1342,13 +1388,18 @@ class SF_graph_builder:
         self.pt_conn.executemany(
             f"""\
             INSERT INTO links ({",".join(SF_EDGE_COLS)},geometry,modes)
-            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.global_crs.to_epsg()}),"t");
+            VALUES({",".join("?" * len(SF_EDGE_COLS))},GeomFromWKB(?, {self.__global_crs.to_epsg()}),"t");
             """,
             self.edges[SF_EDGE_COLS + ["geometry"]].itertuples(index=False, name=None),
         )
 
         self.pt_conn.execute("UPDATE trigger_settings SET enabled = ? WHERE name = 'new_link_a_or_b_node'", (val,))
         self.pt_conn.commit()
+
+    def save_config(self):
+        sql = "INSERT OR REPLACE INTO transit_graph_configs (period_id,config) VALUES (?,?)"
+        self.project_conn.execute(sql, [self.period_id, json.dumps(self.config)])
+        self.project_conn.commit()
 
     def save(self, robust=True):
         """Save the current graph to the public transport database.
@@ -1359,12 +1410,17 @@ class SF_graph_builder:
         self.create_additional_db_fields()
         self.save_vertices(robust=robust)
         self.save_edges()
+        self.save_config()
 
-    def to_aeq_graph(self):
-        """Create an AequilibraE graph object from an SF graph builder."""
-        from aequilibrae.paths import Graph
+    def to_transit_graph(self) -> TransitGraph:
+        """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
 
-        g = Graph()
+        # TODO: Better required link type detections
+        # link_type_diff = set(self.edges.link_type.unique()) ^ {'access_connector', 'alighting', 'boarding', 'dwell', 'egress_connector', 'inner_transfer', 'on-board'}
+        # if link_type_diff:
+        #     raise ValueError(f"Not all required links have been created. Link types {link_type_diff} are missing.")
+
+        g = TransitGraph(config=self.config, od_node_mapping=self.od_node_mapping)
         g.network = self.edges.copy(deep=True)
         g.cost = g.network.trav_time.values
         g.free_flow_time = g.network.trav_time.values
@@ -1374,7 +1430,7 @@ class SF_graph_builder:
         g.status = "OK"
         g.prepare_graph(
             self.vertices[
-                (self.vertices.node_type == "origin") | (self.vertices.node_type == "destination")
+                (self.vertices.node_type == "origin")
                 if self.blocking_centroid_flows
                 else (self.vertices.node_type == "od")
             ].node_id.values
@@ -1386,7 +1442,7 @@ class SF_graph_builder:
         return g
 
     @classmethod
-    def from_db(cls, public_transport_conn, *args, **kwargs):
+    def from_db(cls, public_transport_conn, period_id: int, **kwargs):
         """
         Create a SF graph instance from an existing database save.
 
@@ -1398,8 +1454,17 @@ class SF_graph_builder:
         :Arguments:
            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
         """
-        graph = cls(public_transport_conn, *args, **kwargs)
+        project_conn = database_connection("project_database")
+        config = json.loads(
+            project_conn.execute(
+                "SELECT config FROM transit_graph_configs WHERE period_id = ? LIMIT 1;", [period_id]
+            ).fetchone()[0]
+        )
+        config.update(kwargs)
 
+        graph = cls(public_transport_conn, **config)
+
+        # FIXME Load specific period_id graph from dynamic table
         graph.vertices = pd.read_sql_query(
             sql=f"SELECT {','.join(SF_VERTEX_COLS)} FROM nodes;",
             con=public_transport_conn,
@@ -1445,3 +1510,7 @@ class SF_graph_builder:
             )[["o_node_id", "node_id", "demand"]]
             od_matrix.rename(columns={"node_id": "d_node_id"}, inplace=True)
         return od_matrix
+
+    @property
+    def config(self):
+        return {k: self.__dict__[k] for k in self.__config_attrs}

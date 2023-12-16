@@ -375,9 +375,16 @@ class TestHyperPath(TestCase):
 
         hp = HyperpathGenerating(self.edges)
 
+        # breakpoint()
         results = []
         for threads in [1, 2, 4]:
-            hp.assign(self.demand, check_demand=True, threads=threads)
+            hp.assign(
+                self.demand["orig_vert_idx"].values.astype(np.uint32),
+                self.demand["dest_vert_idx"].values.astype(np.uint32),
+                self.demand["demand"].values.astype(np.float64),
+                check_demand=True,
+                threads=threads,
+            )
             results.append(hp._edges.copy(deep=True))
 
         for result in results[1:]:
@@ -420,10 +427,9 @@ class TestHyperPath(TestCase):
         hp = HyperpathGenerating(self.edges)
 
         hp.assign(
-            self.demand,
-            origin_column="origin_vertex_id",
-            destination_column="destination_vertex_id",
-            demand_column="demand",
+            self.demand["origin_vertex_id"].values.astype(np.uint32),
+            self.demand["destination_vertex_id"].values.astype(np.uint32),
+            self.demand["demand"].values.astype(np.float64),
             check_demand=True,
         )
 

@@ -41,7 +41,7 @@ A_VERY_SMALL_TIME_INTERVAL_PY = A_VERY_SMALL_TIME_INTERVAL
 cdef extern from "stdlib.h":
     ctypedef void const_void "const void"
     void qsort(void *base, int nmemb, int size,
-            int(*compar)(const_void *, const_void *)) nogil
+            int(*compar)(const_void *, const_void *)) noexcept nogil
 
 cdef struct IndexedElement:
     size_t index

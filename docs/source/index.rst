@@ -27,7 +27,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    :column: col-lg-12 p-2
    :fa:`folder`
    **Getting Started**
-   ^^^^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^^
 
    New to AequilibraE? Get started here!
 
@@ -42,7 +42,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    :column: col-lg-12 p-2
    :fa:`folder`
    **Using AequilibraE**
-   ^^^^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^^^^
 
    A series of examples on how to use AequilibraE, from building a model from scratch
    to editing an existing, performing trip distribution or traffic assignment to analyzing
@@ -58,7 +58,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    ---
    :fa:`book`
    **Modeling with AequilibraE**
-   ^^^^^^^^^^^^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
    An in-depth guide to modeling with AequilibraE, including the concepts that guide its
    development and user-experience.
@@ -74,7 +74,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
    :fa:`tools`
    **API References**
-   ^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^
 
    Reference guide to AequilibraE's API.
 
@@ -89,7 +89,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
    :fa:`check`
    **Software Validation & Benchmarking**
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
    Want to see how we test the software for correctness and performance?
 
@@ -104,7 +104,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
 
    :fa:`lightbulb`
    **Developing**
-   ^^^^^^^^^^^^
+   ^^^^^^^^^^^^^^
 
    Looking for something more than using the software? Check out the development info.
 
@@ -115,6 +115,21 @@ other open-source packages in the Python (NumPy, really) ecosystem.
          :text: Developing
          :classes: btn-block btn-secondary stretched-link
 
+   ---
+   :column: col-lg-12 p-2
+   :fa:`folder`
+   **Support and sponsors**
+   ^^^^^^^^^^^
+
+   Support for AequilibraE is available in multiple forms. Check the most adequate for your case and the list
+   of supporters here
+
+   +++++++++++++++++
+
+   .. link-button:: support
+      :type: ref
+      :text: Support and sponsors
+      :classes: btn-block btn-secondary stretched-link
 
 .. toctree::
    :hidden:
@@ -126,25 +141,7 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    api
    validation
    developing
-
-Note to users
-=============
-
-AequilibraE is developed by a small but dedicated team of professionals without
-any funding or profit from this work, so if your organization is making use of
-AequilibraE, please consider funding some of the new developments or maintenance
-of the project.
-
-**We appreciate it if you do not send questions directly to the developers**, but
-there are two alternatives for support:
-
-1. Posting your question to `GIS StackOverflow <https://gis.stackexchange.com/>`_ using the #aequilibrae tag;
-2. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
-   and sending your question there.
-
-AequilibraE **does not have paid support** but if you are looking to hire its developers
-for specific projects or to **fund AequilibraE's** development,
-please e-mail the developers at contact@aequilibrae.com.
+   history
 
 .. note::
 

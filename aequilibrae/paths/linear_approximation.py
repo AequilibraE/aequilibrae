@@ -128,7 +128,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             r = AssignmentResults()
             r.prepare(c.graph, c.matrix)
-            self.step_direction[c.__id__] = r
+            self.step_direction[c._id] = r
 
         if self.algorithm in ["cfw", "bfw"]:
             for c in self.traffic_classes:
@@ -136,19 +136,19 @@ class LinearApproximation(WorkerThread):
                 r.prepare(c.graph, c.matrix)
                 r.compact_link_loads = np.zeros([])
                 r.compact_total_link_loads = np.zeros([])
-                self.previous_step_direction[c.__id__] = r
+                self.previous_step_direction[c._id] = r
 
                 r = AssignmentResults()
                 r.prepare(c.graph, c.matrix)
                 r.compact_link_loads = np.zeros([])
                 r.compact_total_link_loads = np.zeros([])
-                self.step_direction[c.__id__] = r
+                self.step_direction[c._id] = r
 
                 r = AssignmentResults()
                 r.prepare(c.graph, c.matrix)
                 r.compact_link_loads = np.zeros([])
                 r.compact_total_link_loads = np.zeros([])
-                self.pre_previous_step_direction[c.__id__] = r
+                self.pre_previous_step_direction[c._id] = r
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
@@ -161,17 +161,15 @@ class LinearApproximation(WorkerThread):
         aon_minus_prev_dir = {}
 
         for c in self.traffic_classes:
-            stp_dir = self.step_direction[c.__id__]
-            prev_dir_minus_current_sol[c.__id__] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
-            aon_minus_current_sol[c.__id__] = np.sum(
-                c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1
-            )
-            aon_minus_prev_dir[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
+            stp_dir = self.step_direction[c._id]
+            prev_dir_minus_current_sol[c._id] = np.sum(stp_dir.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_current_sol[c._id] = np.sum(c._aon_results.link_loads[:, :] - c.results.link_loads[:, :], axis=1)
+            aon_minus_prev_dir[c._id] = np.sum(c._aon_results.link_loads[:, :] - stp_dir.link_loads[:, :], axis=1)
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
-                numerator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_current_sol[c_1.__id__]
-                denominator += prev_dir_minus_current_sol[c_0.__id__] * aon_minus_prev_dir[c_1.__id__]
+                numerator += prev_dir_minus_current_sol[c_0._id] * aon_minus_current_sol[c_1._id]
+                denominator += prev_dir_minus_current_sol[c_0._id] * aon_minus_prev_dir[c_1._id]
 
         numerator = np.sum(numerator * self.vdf_der)
         denominator = np.sum(denominator * self.vdf_der)
@@ -205,21 +203,21 @@ class LinearApproximation(WorkerThread):
         z_ = {}
 
         for c in self.traffic_classes:
-            sd = self.step_direction[c.__id__].link_loads[:, :]
-            psd = self.previous_step_direction[c.__id__].link_loads[:, :]
+            sd = self.step_direction[c._id].link_loads[:, :]
+            psd = self.previous_step_direction[c._id].link_loads[:, :]
             ll = c.results.link_loads[:, :]
 
-            x_[c.__id__] = np.sum(sd * self.stepsize + psd * (1.0 - self.stepsize) - ll, axis=1)
-            y_[c.__id__] = np.sum(c._aon_results.link_loads[:, :] - ll, axis=1)
-            z_[c.__id__] = np.sum(sd - ll, axis=1)
-            w_[c.__id__] = np.sum(psd - sd, axis=1)
+            x_[c._id] = np.sum(sd * self.stepsize + psd * (1.0 - self.stepsize) - ll, axis=1)
+            y_[c._id] = np.sum(c._aon_results.link_loads[:, :] - ll, axis=1)
+            z_[c._id] = np.sum(sd - ll, axis=1)
+            w_[c._id] = np.sum(psd - sd, axis=1)
 
         for c_0 in self.traffic_classes:
             for c_1 in self.traffic_classes:
-                mu_numerator += x_[c_0.__id__] * y_[c_1.__id__]
-                mu_denominator += x_[c_0.__id__] * w_[c_1.__id__]
-                nu_nom += z_[c_0.__id__] * y_[c_1.__id__]
-                nu_denom += z_[c_0.__id__] * z_[c_1.__id__]
+                mu_numerator += x_[c_0._id] * y_[c_1._id]
+                mu_denominator += x_[c_0._id] * w_[c_1._id]
+                nu_nom += z_[c_0._id] * y_[c_1._id]
+                nu_denom += z_[c_0._id] * z_[c_1._id]
 
         mu_numerator = np.sum(mu_numerator * self.vdf_der)
         mu_denominator = np.sum(mu_denominator * self.vdf_der)
@@ -253,7 +251,7 @@ class LinearApproximation(WorkerThread):
             self.conjugate_stepsize = 0.0
             for c in self.traffic_classes:
                 aon_res = c._aon_results
-                stp_dir_res = self.step_direction[c.__id__]
+                stp_dir_res = self.step_direction[c._id]
                 copy_two_dimensions(stp_dir_res.link_loads, aon_res.link_loads, self.cores)
                 stp_dir_res.total_flows()
                 if c.results.num_skims > 0:
@@ -265,8 +263,8 @@ class LinearApproximation(WorkerThread):
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
-                sdr = self.step_direction[c.__id__]
-                pre_previous = self.pre_previous_step_direction[c.__id__]
+                sdr = self.step_direction[c._id]
+                pre_previous = self.pre_previous_step_direction[c._id]
                 copy_two_dimensions(pre_previous.link_loads, sdr.link_loads, self.cores)
                 pre_previous.total_flows()
                 if c.results.num_skims > 0:
@@ -292,9 +290,9 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.pre_previous_step_direction[c.__id__]  # type: AssignmentResults
-                prev_stp_dir = self.previous_step_direction[c.__id__]  # type: AssignmentResults
-                stp_dir = self.step_direction[c.__id__]  # type: AssignmentResults
+                ppst = self.pre_previous_step_direction[c._id]  # type: AssignmentResults
+                prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
+                stp_dir = self.step_direction[c._id]  # type: AssignmentResults
 
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
@@ -335,11 +333,11 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             if c._aon_results.save_path_file:
                 c._aon_results.path_file_dir = os.path.join(
-                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c.__id__}"
+                    path_base_dir, f"iter{self.iter}", f"path_c{c.mode}_{c._id}"
                 )
                 Path(c._aon_results.path_file_dir).mkdir(parents=True, exist_ok=True)
                 if self.iter == 1:  # save simplified graph correspondences, this could change after assignment
-                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c.__id__)
+                    c.graph.save_compressed_correspondence(path_base_dir, c.mode, c._id)
 
     def doWork(self):
         self.execute()
@@ -428,7 +426,7 @@ class LinearApproximation(WorkerThread):
                 self.__calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
-                    stp_dir = self.step_direction[c.__id__]
+                    stp_dir = self.step_direction[c._id]
                     cls_res = c.results
                     linear_combination(
                         cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
@@ -544,7 +542,7 @@ class LinearApproximation(WorkerThread):
         for c in self.traffic_classes:
             # fixed cost is scaled by vot
             class_link_costs = sum_a_times_b_minus_c(
-                c.fixed_cost, self.step_direction[c.__id__].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
+                c.fixed_cost, self.step_direction[c._id].link_loads[:, 0], c.results.link_loads[:, 0], self.cores
             )
             class_specific_term += class_link_costs
         return class_specific_term

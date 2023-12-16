@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from sqlite3 import Connection, Cursor, connect
+from sqlite3 import Connection, connect
 from typing import Union
 
 import pandas as pd
@@ -17,12 +17,6 @@ def safe_connect(filepath: PathLike, missing_ok=False):
     if Path(filepath).exists() or missing_ok or str(filepath) == ":memory:":
         return connect(filepath)
     raise FileNotFoundError(f"Attempting to open non-existant SQLite database: {filepath}")
-
-
-def normalise_conn(curr: Union[Cursor, Connection, PathLike]):
-    if isinstance(curr, Cursor) or isinstance(curr, Connection):
-        return curr
-    return safe_connect(curr)
 
 
 class commit_and_close:
