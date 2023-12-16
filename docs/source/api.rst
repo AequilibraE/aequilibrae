@@ -49,6 +49,7 @@ Network Data
     LinkTypes
     Links
     Nodes
+    Periods
 
 Network Items
 -------------
@@ -61,6 +62,7 @@ Network Items
     LinkType
     Link
     Node
+    Period
 
 Parameters
 ----------
@@ -100,12 +102,18 @@ Paths
    :toctree: generated/
 
     Graph
+    TransitGraph
     AssignmentResults
+    TransitAssignmentResults
     SkimResults
     PathResults
     VDF
     TrafficClass
+    TransitClass
     TrafficAssignment
+    TransitAssignment
+    HyperpathGenerating
+    OptimalStrategies
 
 Transit
 -------
@@ -115,3 +123,5 @@ Transit
    :toctree: generated/
 
     Transit
+    TransitGraphBuilder
+

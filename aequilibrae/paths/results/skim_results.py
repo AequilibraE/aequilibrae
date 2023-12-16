@@ -39,7 +39,7 @@ class SkimResults:
         self.nodes = -1
         self.zones = -1
         self.num_skims = -1
-        self.__graph_id__ = None
+        self._graph_id = None
         self.graph = Graph()
 
     def prepare(self, graph: Graph):
@@ -65,5 +65,5 @@ class SkimResults:
         self.skims.index[:] = graph.centroids[:]
         self.skims.computational_view(core_list=self.skims.names)
         self.skims.matrix_view = self.skims.matrix_view.reshape(self.zones, self.zones, self.num_skims)
-        self.__graph_id__ = graph.__id__
+        self._graph_id = graph._id
         self.graph = graph

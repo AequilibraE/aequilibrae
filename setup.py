@@ -34,6 +34,7 @@ ext_mod_aon = Extension(
     language="c++",
 )
 
+
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
     [join("aequilibrae", "distribution", "ipf_core.pyx")],
@@ -43,6 +44,17 @@ ext_mod_ipf = Extension(
     include_dirs=include_dirs,
     language="c++",
 )
+
+ext_mod_put = Extension(
+    "aequilibrae.paths.public_transport",
+    [join("aequilibrae", "paths", "public_transport.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
+
 
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
@@ -80,12 +92,12 @@ if __name__ == "__main__":
         license="See license.txt",
         classifiers=[
             "Programming Language :: Python",
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
         ],
         cmdclass={"build_ext": build_ext},
-        ext_modules=[ext_mod_aon, ext_mod_ipf],
+        ext_modules=[ext_mod_aon, ext_mod_ipf, ext_mod_put],
     )

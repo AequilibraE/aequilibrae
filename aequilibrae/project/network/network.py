@@ -20,6 +20,7 @@ from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
+from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
@@ -58,6 +59,7 @@ class Network(WorkerThread):
         self.link_types = LinkTypes(self)
         self.links = Links(self)
         self.nodes = Nodes(self)
+        self.periods = Periods(self)
 
     def skimmable_fields(self):
         """

@@ -15,7 +15,7 @@ class BasicTable:
         self.__table_type__ = ""
 
     def extent(self) -> Polygon:
-        """Queries the extent of thelayer  included in the model
+        """Queries the extent of the layer  included in the model
 
         Returns:
             *model extent* (:obj:`Polygon`): Shapely polygon with the bounding box of the layer.

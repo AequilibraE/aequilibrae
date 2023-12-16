@@ -1,1 +1,4 @@
+link_type_table_triggers
+node_type_table_triggers
+network_triggers
 transit_triggers

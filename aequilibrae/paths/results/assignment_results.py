@@ -1,9 +1,10 @@
 import dataclasses
 import multiprocessing as mp
+from abc import ABC, abstractmethod
 
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
 from pathlib import Path
@@ -29,18 +30,11 @@ class NetworkGraphIndices:
     graph_ba_idx: np.array
 
 
-class AssignmentResults:
-    """
-    Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
-    """
+class AssignmentResultsBase(ABC):
+    """Assignment results base class for traffic and transit assignments."""
 
     def __init__(self):
-        self.compact_link_loads = np.array([])  # Results for assignment on simplified graph
-        self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
         self.link_loads = np.array([])  # The actual results for assignment
-        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
-        self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
-        self.skims = AequilibraeMatrix()  # The array of skims
         self.no_path = None  # The list os paths
         self.num_skims = 0  # number of skims that will be computed. Depends on the setting of the graph provided
         p = Parameters().parameters["system"]["cpus"]
@@ -48,23 +42,80 @@ class AssignmentResults:
             p = 0
         self.set_cores(p)
 
+        self.nodes = -1
+        self.zones = -1
+        self.links = -1
+
+        self.lids = None
+
+    @abstractmethod
+    def prepare(self, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        pass
+
+    def set_cores(self, cores: int) -> None:
+        """
+        Sets number of cores (threads) to be used in computation
+
+        Value of zero sets number of threads to all available in the system, while negative values indicate the number
+        of threads to be left out of the computational effort.
+
+        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
+        inputs result in values outside those limits
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of cores to be used in computation
+        """
+
+        if not isinstance(cores, int):
+            raise ValueError("Number of cores needs to be an integer")
+
+        if cores < 0:
+            self.cores = max(1, mp.cpu_count() + cores)
+        elif cores == 0:
+            self.cores = mp.cpu_count()
+        elif cores > 0:
+            cores = min(mp.cpu_count(), cores)
+            if self.cores != cores:
+                self.cores = cores
+        if self.link_loads.shape[0]:
+            self.__redim()
+
+    @abstractmethod
+    def get_load_results(self) -> AequilibraeData:
+        pass
+
+
+class AssignmentResults(AssignmentResultsBase):
+    """
+    Assignment result holder for a single :obj:`TrafficClass` with multiple user classes
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.compact_link_loads = np.array([])  # Results for assignment on simplified graph
+        self.compact_total_link_loads = np.array([])  # Results for all user classes summed on simplified graph
+        self.crosswalk = np.array([])  # crosswalk between compact graph link IDs and actual link IDs
+        self.skims = AequilibraeMatrix()  # The array of skims
+        self.total_link_loads = np.array([])  # The result of the assignment for all user classes summed
+
+        self.compact_links = -1
+        self.compact_nodes = -1
+
+        self.direcs = None
+
         self.classes = {"number": 1, "names": ["flow"]}
 
         self._selected_links = {}
         self.select_link_od = None
         self.select_link_loading = {}
 
-        self.nodes = -1
-        self.zones = -1
-        self.links = -1
-        self.compact_links = -1
-        self.compact_nodes = -1
-        self.__graph_id__ = None
+        self._graph_id = None
         self.__float_type = None
         self.__integer_type = None
-
-        self.lids = None
-        self.direcs = None
 
         # save path files. Need extra metadata for file paths
         self.save_path_file = False
@@ -108,10 +159,10 @@ class AssignmentResults:
         self.direcs = graph.graph.direction.values
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)
         self.crosswalk[graph.graph.__supernet_id__.values] = graph.graph.__compressed_id__.values
-        self.__graph_ids = graph.graph.__supernet_id__.values
-        self.__graph_compressed_ids = graph.graph.__compressed_id__.values
+        self._graph_ids = graph.graph.__supernet_id__.values
+        self._graph_compressed_ids = graph.graph.__compressed_id__.values
         self.__redim()
-        self.__graph_id__ = graph.__id__
+        self._graph_id = graph._id
 
         if self._selected_links:
             self.select_link_od = AequilibraeMatrix()
@@ -191,39 +242,12 @@ class AssignmentResults:
         self.reset()
 
     def total_flows(self) -> None:
-        """Totals all link flows for this class into a single link load
+        """
+        Totals all link flows for this class into a single link load
 
         Results are placed into *total_link_loads* class member
         """
         sum_axis1(self.total_link_loads, self.link_loads, self.cores)
-
-    def set_cores(self, cores: int) -> None:
-        """
-        Sets number of cores (threads) to be used in computation
-
-        Value of zero sets number of threads to all available in the system, while negative values indicate the number
-        of threads to be left out of the computational effort.
-
-        Resulting number of cores will be adjusted to a minimum of zero or the maximum available in the system if the
-        inputs result in values outside those limits
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of cores to be used in computation
-        """
-
-        if not isinstance(cores, int):
-            raise ValueError("Number of cores needs to be an integer")
-
-        if cores < 0:
-            self.cores = max(1, mp.cpu_count() + cores)
-        elif cores == 0:
-            self.cores = mp.cpu_count()
-        elif cores > 0:
-            cores = min(mp.cpu_count(), cores)
-            if self.cores != cores:
-                self.cores = cores
-        if self.link_loads.shape[0]:
-            self.__redim()
 
     def get_graph_to_network_mapping(self):
         num_uncompressed_links = int(np.unique(self.lids).shape[0])
@@ -260,7 +284,7 @@ class AssignmentResults:
         m = self.get_graph_to_network_mapping()
 
         # Link flows
-        link_flows = self.link_loads[self.__graph_ids, :]
+        link_flows = self.link_loads[self._graph_ids, :]
         for i, n in enumerate(self.classes["names"]):
             # Directional Flows
             res.data[n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
@@ -295,7 +319,7 @@ class AssignmentResults:
             # Link flows initialised
             link_flows = np.full((self.links, self.classes["number"]), np.nan)
             # maps link flows from the compressed graph to the uncompressed graph
-            assign_link_loads(link_flows, self.select_link_loading[name], self.__graph_compressed_ids, self.cores)
+            assign_link_loads(link_flows, self.select_link_loading[name], self._graph_compressed_ids, self.cores)
             for i, n in enumerate(self.classes["names"]):
                 # Directional Flows
                 res.data[name + "_" + n + "_ab"][m.network_ab_idx] = np.nan_to_num(link_flows[m.graph_ab_idx, i])
@@ -326,3 +350,65 @@ class AssignmentResults:
         # TODO: Re-factor the exporting of the path file within the AequilibraeData format
         elif output == "path_file":
             raise NotImplementedError
+
+
+class TransitAssignmentResults(AssignmentResultsBase):
+    """
+    Assignment result holder for a single :obj:`Transit`
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.link_loads = np.array([])
+        # self.skims = AequilibraeMatrix()
+
+    def prepare(self, graph: TransitGraph, matrix: AequilibraeMatrix) -> None:
+        """
+        Prepares the object with dimensions corresponding to the assignment matrix and graph objects
+
+        :Arguments:
+            **graph** (:obj:`TransitGraph`): Needs to have been set with number of centroids
+
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
+             matrix.computational_view(:obj:`list`)
+        """
+        self.reset()
+        self.nodes = graph.num_nodes
+        self.zones = graph.num_zones
+        self.centroids = graph.centroids
+        self.links = graph.num_links
+        # self.num_skims = len(graph.skim_fields)
+        # self.skim_names = [x for x in graph.skim_fields]
+        self.lids = graph.graph.link_id.values
+
+    def reset(self) -> None:
+        """
+        Resets object to prepared and pre-computation state
+        """
+
+        # Since all memory for the asignment is managed by the HyperpathGenerating
+        # object we don't need to do much here
+        self.link_loads.fill(0)
+
+    def get_load_results(self) -> AequilibraeData:
+        """
+        Translates the assignment results from the graph format into the network format
+
+        :Returns:
+            **dataset** (:obj:`AequilibraeData`): AequilibraE data with the transit class assignment results
+        """
+        if not self.link_loads.shape[0]:
+            raise ValueError("Transit assignment has not been executed yet")
+
+        res = AequilibraeData()
+        res.create_empty(
+            file_path=res.random_name(),
+            entries=self.links,
+            field_names=["volume"],
+            data_types=[np.float64],
+            index=self.lids,
+        )
+
+        res.data["volume"] = self.link_loads
+        return res

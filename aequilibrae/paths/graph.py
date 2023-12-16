@@ -1,15 +1,18 @@
-from os.path import join
 import pickle
 import uuid
+from abc import ABC
 from datetime import datetime
+from os.path import join
 from typing import List, Tuple, Optional
+
 import numpy as np
 import pandas as pd
-from aequilibrae.context import get_logger
 from aequilibrae.paths.AoN import build_compressed_graph
 
+from aequilibrae.context import get_logger
 
-class Graph(object):
+
+class GraphBase(ABC):
     """
     Graph class
     """
@@ -75,7 +78,7 @@ class Graph(object):
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
         # Randomly generate a unique Graph ID randomly
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def default_types(self, tp: str):
         """
@@ -131,7 +134,7 @@ class Graph(object):
             }
         )
 
-        properties = self.__build_directed_graph(self.network)
+        properties = self._build_directed_graph(self.network, self.centroids)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
@@ -152,7 +155,7 @@ class Graph(object):
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
-    def __build_directed_graph(self, network: pd.DataFrame):
+    def _build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
         all_titles = list(network.columns)
 
         not_pos = network.loc[network.direction != 1, :]
@@ -187,8 +190,8 @@ class Graph(object):
 
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
-        nodes = np.setdiff1d(nodes, self.centroids, assume_unique=True)
-        all_nodes = np.hstack((self.centroids, nodes)).astype(self.__integer_type)
+        nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
+        all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
 
         num_nodes = all_nodes.shape[0]
 
@@ -238,7 +241,7 @@ class Graph(object):
         if self.centroids is not None:
             self.prepare_graph(self.centroids)
             self.set_blocked_centroid_flows(self.block_centroid_flows)
-        self.__id__ = uuid.uuid4().hex
+        self._id = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
         fields = [x for x in self.required_default_fields]
@@ -382,7 +385,7 @@ class Graph(object):
         mygraph["skim_fields"] = self.skim_fields
         mygraph["block_centroid_flows"] = self.block_centroid_flows
         mygraph["centroids"] = self.centroids
-        mygraph["graph_id"] = self.__id__
+        mygraph["graph_id"] = self._id
         mygraph["mode"] = self.mode
 
         with open(filename, "wb") as f:
@@ -412,7 +415,7 @@ class Graph(object):
             self.skim_fields = mygraph["skim_fields"]
             self.block_centroid_flows = mygraph["block_centroid_flows"]
             self.centroids = mygraph["centroids"]
-            self.__id__ = mygraph["graph_id"]
+            self._id = mygraph["graph_id"]
             self.mode = mygraph["mode"]
         self.__build_derived_properties()
 
@@ -483,3 +486,16 @@ class Graph(object):
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+
+class Graph(GraphBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class TransitGraph(GraphBase):
+    def __init__(self, config: dict = None, od_node_mapping: pd.DataFrame = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._config = config
+        self.od_node_mapping = od_node_mapping
+        self.mode = "t"
