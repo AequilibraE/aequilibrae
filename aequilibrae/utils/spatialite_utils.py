@@ -99,12 +99,11 @@ def _download_and_extract_spatialite(directory: os.PathLike) -> None:
 
 
 def spatialize_db(conn, logger=None):
-    logger = logging.getLogger("aequilibrae")
+    logger = logger or logging.getLogger("aequilibrae")
     logger.info("Adding Spatialite infrastructure to the database")
-    curr = conn.cursor()
     if not inside_qgis and not is_spatialite(conn):
         try:
-            curr.execute("SELECT InitSpatialMetaData();")
+            conn.execute("SELECT InitSpatialMetaData();")
             conn.commit()
         except Exception as e:
             logger.error("Problem with spatialite", e.args)

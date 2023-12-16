@@ -1,10 +1,10 @@
 """
-.. _example_usage_paths:
+.. _example_usage_skimming:
 
-Path and skimming
+Network skimming
 =================
 
-In this example, we show how to performnetwork skimming for Coquimbo, a city in La Serena Metropolitan Area in Chile.
+In this example, we show how to perform network skimming for Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 
 # Imports

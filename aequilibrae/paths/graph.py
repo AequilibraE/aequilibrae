@@ -2,7 +2,7 @@ from os.path import join
 import pickle
 import uuid
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import numpy as np
 import pandas as pd
 from aequilibrae.context import get_logger
@@ -91,7 +91,7 @@ class Graph(object):
         else:
             raise ValueError("It must be either a int or a float")
 
-    def prepare_graph(self, centroids: np.ndarray) -> None:
+    def prepare_graph(self, centroids: Optional[np.ndarray]) -> None:
         """
         Prepares the graph for a computation for a certain set of centroids
 
@@ -109,17 +109,18 @@ class Graph(object):
 
         # Creates the centroids
 
-        if centroids is None or not isinstance(centroids, np.ndarray):
-            raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
-        if not np.issubdtype(centroids.dtype, np.integer):
-            raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
-        if centroids.shape[0] == 0:
-            raise ValueError("You need at least one centroid")
-        if centroids.min() <= 0:
-            raise ValueError("Centroid IDs need to be positive")
-        if centroids.shape[0] != np.unique(centroids).shape[0]:
-            raise ValueError("Centroid IDs are not unique")
-        self.centroids = np.array(centroids, np.uint32)
+        if centroids is not None:
+            if not np.issubdtype(centroids.dtype, np.integer):
+                raise ValueError("Centroids need to be a NumPy array of integers 64 bits")
+            if centroids.shape[0] == 0:
+                raise ValueError("You need at least one centroid")
+            if centroids.min() <= 0:
+                raise ValueError("Centroid IDs need to be positive")
+            if centroids.shape[0] != np.unique(centroids).shape[0]:
+                raise ValueError("Centroid IDs are not unique")
+            self.centroids = np.array(centroids, np.uint32)
+        else:
+            self.centroids = np.array([], np.uint32)
 
         self.network = self.network.astype(
             {
@@ -130,7 +131,7 @@ class Graph(object):
             }
         )
 
-        properties = self.__build_directed_graph(self.network, centroids)
+        properties = self.__build_directed_graph(self.network)
         self.all_nodes, self.num_nodes, self.nodes_to_indices, self.fs, self.graph = properties
 
         # We generate IDs that we KNOW will be constant across modes
@@ -141,8 +142,9 @@ class Graph(object):
         self.num_links = self.graph.shape[0]
         self.__build_derived_properties()
 
-        self.__build_compressed_graph()
-        self.compact_num_links = self.compact_graph.shape[0]
+        if self.centroids.shape[0]:
+            self.__build_compressed_graph()
+            self.compact_num_links = self.compact_graph.shape[0]
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -150,7 +152,7 @@ class Graph(object):
         # We build a groupby to save time later
         self.__graph_groupby = self.graph.groupby(["__compressed_id__"])
 
-    def __build_directed_graph(self, network: pd.DataFrame, centroids: np.ndarray):
+    def __build_directed_graph(self, network: pd.DataFrame):
         all_titles = list(network.columns)
 
         not_pos = network.loc[network.direction != 1, :]
@@ -185,8 +187,8 @@ class Graph(object):
 
         # Now we take care of centroids
         nodes = np.unique(np.hstack((df.a_node.values, df.b_node.values))).astype(self.__integer_type)
-        nodes = np.setdiff1d(nodes, centroids, assume_unique=True)
-        all_nodes = np.hstack((centroids, nodes)).astype(self.__integer_type)
+        nodes = np.setdiff1d(nodes, self.centroids, assume_unique=True)
+        all_nodes = np.hstack((self.centroids, nodes)).astype(self.__integer_type)
 
         num_nodes = all_nodes.shape[0]
 

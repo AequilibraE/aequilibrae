@@ -24,6 +24,8 @@ from aequilibrae.project.network.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -48,7 +50,6 @@ class Network(WorkerThread):
         from aequilibrae.paths import Graph
 
         WorkerThread.__init__(self, None)
-        self.conn = project.conn  # type: sqlc
         self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
@@ -65,11 +66,11 @@ class Network(WorkerThread):
         :Returns:
             :obj:`list`: List of all fields that can be skimmed
         """
-        curr = self.conn.cursor()
-        curr.execute("PRAGMA table_info(links);")
-        field_names = curr.fetchall()
-        ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
 
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            field_names = conn.execute("PRAGMA table_info(links);").fetchall()
+
+        ignore_fields = ["ogc_fid", "geometry"] + self.req_link_flds
         skimmable = [
             "INT",
             "INTEGER",
@@ -115,9 +116,10 @@ class Network(WorkerThread):
         :Returns:
             :obj:`list`: List of all modes
         """
-        curr = self.conn.cursor()
-        curr.execute("""select mode_id from modes""")
-        return [x[0] for x in curr.fetchall()]
+
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
+        return all_modes
 
     def create_from_osm(
         self,
@@ -173,10 +175,9 @@ class Network(WorkerThread):
         if self.count_links() > 0:
             raise FileExistsError("You can only import an OSM network into a brand new model file")
 
-        curr = self.conn.cursor()
-        curr.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
-        curr.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
-        self.conn.commit()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            conn.execute("""ALTER TABLE links ADD COLUMN osm_id integer""")
+            conn.execute("""ALTER TABLE nodes ADD COLUMN osm_id integer""")
 
         if isinstance(modes, (tuple, list)):
             modes = list(modes)
@@ -313,33 +314,31 @@ class Network(WorkerThread):
         """
         from aequilibrae.paths import Graph
 
-        curr = self.conn.cursor()
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            if fields is None:
+                field_names = conn.execute("PRAGMA table_info(links);").fetchall()
 
-        if fields is None:
-            curr.execute("PRAGMA table_info(links);")
-            field_names = curr.fetchall()
+                ignore_fields = ["ogc_fid", "geometry"]
+                all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
+            else:
+                fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
+                all_fields = list(set(fields))
 
-            ignore_fields = ["ogc_fid", "geometry"]
-            all_fields = [f[1] for f in field_names if f[1] not in ignore_fields]
-        else:
-            fields.extend(["link_id", "a_node", "b_node", "direction", "modes"])
-            all_fields = list(set(fields))
+            if modes is None:
+                modes = conn.execute("select mode_id from modes;").fetchall()
+                modes = [m[0] for m in modes]
+            elif isinstance(modes, str):
+                modes = [modes]
 
-        if modes is None:
-            modes = curr.execute("select mode_id from modes;").fetchall()
-            modes = [m[0] for m in modes]
-        elif isinstance(modes, str):
-            modes = [modes]
+            sql = f"select {','.join(all_fields)} from links"
 
-        sql = f"select {','.join(all_fields)} from links"
-
-        df = pd.read_sql(sql, self.conn).fillna(value=np.nan)
-        valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
-        curr.execute("select node_id from nodes where is_centroid=1 order by node_id;")
-        centroids = np.array([i[0] for i in curr.fetchall()], np.uint32)
+            df = pd.read_sql(sql, conn).fillna(value=np.nan)
+            valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
+            sql = "select node_id from nodes where is_centroid=1 order by node_id;"
+            centroids = np.array([i[0] for i in conn.execute(sql).fetchall()], np.uint32)
+            centroids = centroids if centroids.shape[0] else None
 
         lonlat = self.nodes.lonlat.set_index("node_id")
-
         data = df[valid_fields]
         for m in modes:
             net = pd.DataFrame(data, copy=True)
@@ -347,10 +346,9 @@ class Network(WorkerThread):
             g = Graph()
             g.mode = m
             g.network = net
-            if centroids.shape[0]:
-                g.prepare_graph(centroids)
-                g.set_blocked_centroid_flows(True)
-            else:
+            g.prepare_graph(centroids)
+            g.set_blocked_centroid_flows(True)
+            if centroids is None:
                 get_logger().warning("Your graph has no centroids")
             g.lonlat_index = lonlat.loc[g.all_nodes]
             self.graphs[m] = g
@@ -402,9 +400,8 @@ class Network(WorkerThread):
         :Returns:
             **model extent** (:obj:`Polygon`): Shapely polygon with the bounding box of the model network.
         """
-        curr = self.conn.cursor()
-        curr.execute('Select ST_asBinary(GetLayerExtent("Links"))')
-        poly = shapely.wkb.loads(curr.fetchone()[0])
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            poly = shapely.wkb.loads(conn.execute('Select ST_asBinary(GetLayerExtent("Links"))').fetchone()[0])
         return poly
 
     def convex_hull(self) -> Polygon:
@@ -413,15 +410,12 @@ class Network(WorkerThread):
         :Returns:
             **model coverage** (:obj:`Polygon`): Shapely (Multi)polygon of the model network.
         """
-        curr = self.conn.cursor()
-        curr.execute('Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;')
-        links = [shapely.wkb.loads(x[0]) for x in curr.fetchall()]
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
+            links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
         return unary_union(links).convex_hull
 
-    def refresh_connection(self):
-        """Opens a new database connection to avoid thread conflict"""
-        self.conn = self.project.connect()
-
     def __count_items(self, field: str, table: str, condition: str) -> int:
-        c = self.conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
+        with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
+            c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c

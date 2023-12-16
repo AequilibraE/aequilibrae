@@ -11,6 +11,8 @@ from ...utils import WorkerThread
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
+from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class GMNSBuilder(WorkerThread):
@@ -23,7 +25,7 @@ class GMNSBuilder(WorkerThread):
         self.nodes = net.nodes
         self.link_types = net.link_types
         self.modes = net.modes
-        self.conn = net.conn
+        self.__pth_file = net.project.path_to_file
 
         self.link_df = pd.read_csv(link_path).fillna("")
         self.node_df = pd.read_csv(node_path).fillna("")
@@ -378,9 +380,10 @@ class GMNSBuilder(WorkerThread):
         mode_ids_list = [x for x in modes_list]
 
         saved_modes = list(self.modes.all_modes())
-        modes_df = pd.DataFrame(
-            self.conn.execute("select mode_name, mode_id from modes").fetchall(), columns=["name", "id"]
-        )
+        with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
+            modes_df = pd.DataFrame(
+                conn.execute("select mode_name, mode_id from modes").fetchall(), columns=["name", "id"]
+            )
         for mode in list(dict.fromkeys(modes_list)):
             if mode in groups_dict.keys():
                 modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
@@ -494,16 +497,15 @@ class GMNSBuilder(WorkerThread):
         )
         n_params_list = aeq_nodes_df.to_records(index=False)
 
-        self.conn.executemany(n_query, n_params_list)
-        self.conn.commit()
+        with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
+            conn.executemany(n_query, n_params_list)
 
-        l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"
-        l_query += (
-            " values("
-            + ", ".join(["GeomFromTEXT(?,4326)" if x == "geometry" else "?" for x in list(links_fields.keys())])
-            + ")"
-        )
-        l_params_list = aeq_links_df.to_records(index=False)
+            l_query = "insert into links(" + ", ".join(list(links_fields.keys())) + ")"
+            l_query += (
+                " values("
+                + ", ".join(["GeomFromTEXT(?,4326)" if x == "geometry" else "?" for x in list(links_fields.keys())])
+                + ")"
+            )
+            l_params_list = aeq_links_df.to_records(index=False)
 
-        self.conn.executemany(l_query, l_params_list)
-        self.conn.commit()
+            conn.executemany(l_query, l_params_list)
