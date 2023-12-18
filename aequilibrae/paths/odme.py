@@ -160,7 +160,7 @@ class ODME(object):
         self._time = time.time()
         to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, self._time - old_time]
 
-        # Add row::
+        # Add row:
         self._statistics.loc[len(self._statistics)] = {
             col : to_log[i]
             for i, col in enumerate(self.STATISTICS_COLS)
@@ -205,7 +205,7 @@ class ODME(object):
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
         while self._outer < self.max_outer and self._last_convergence > self.outer_convergence_crit:
             # Set iteration values:
-            self._increment_outer()
+            self.__increment_outer()
             self.__log_stats()
 
             # Run inner iterations:
@@ -214,7 +214,7 @@ class ODME(object):
             self._convergence_change = float('inf')
             while self._inner < self.max_inner and self._convergence_change > self.inner_convergence_crit:
                 self.__execute_inner_iter()
-                self._increment_inner()
+                self.__increment_inner()
                 self.__log_stats()
 
             # Reassign values at the end of each outer loop
