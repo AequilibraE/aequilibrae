@@ -15,7 +15,7 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    DATA_COLS = ["Outer Loop #", "Inner Loop #", "class", "link_id", "direction", "obs_volume", "Assigned Volume"]
+    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "class", "link_id", "direction", "obs_volume", "Assigned Volume"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
 
     def __init__(self,
@@ -43,7 +43,7 @@ class ODME(object):
 
         # Parameters for assignments
         self.assignment = assignment
-        self.classes = assignment.classes 
+        self.classes = assignment.classes
         self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
         # Demand matrices
@@ -66,8 +66,8 @@ class ODME(object):
         self._sl_matrices = None # Currently dictionary of proportion matrices
         
         # Set all select links:
-        self.assignclass.set_select_links(self.__get_select_links())
-        #self.__set_select_links()
+        #self.assignclass.set_select_links(self.__get_select_links())
+        self.__set_select_links()
 
         # Not yet relevant - Algorithm Specifications:
         self._alg_spec = alg_spec
@@ -86,7 +86,7 @@ class ODME(object):
         self.outer_convergence_crit = stop_crit[2]
         self.inner_convergence_crit = stop_crit[3]
 
-        self._outer, self._inner = 0, 0
+        self._total_iter, self._total_inner, self._outer, self._inner = 0, 0, 0, 0
 
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
@@ -104,26 +104,15 @@ class ODME(object):
         """
         Sets all select links for each class and for each observation.
         """
+        cv = self._count_volumes
         for user_class in self.classes:
             user_class.set_select_links(
                 {
-                    self.__get_sl_key(row): [(row['link_id'], row['direction'])] 
+                    self.__get_sl_key(row): [(row['link_id'], row['direction'])]
                     for _, row in
-                    self._count_volumes["link_id" == id(user_class)].iterrows()
+                    cv[cv['class'] == user_class.__id__].iterrows()
                 }
             )
-
-
-    def __get_select_links(self) -> dict:
-        """
-        Creates dictionary of select links to be stored within the assignment class.
-        Select links will be singletons for each link with associated observation value.
-        """
-        return {
-            self.__get_sl_key(row): [(row['link_id'], row['direction'])] 
-            for _, row in
-            self._count_volumes.iterrows()
-        }
 
     def __get_sl_key(self, row: pd.Series) -> str:
         """
@@ -146,7 +135,6 @@ class ODME(object):
         """
         Returns dataframe of all assignment values across iterations.
         """
-        # Currently fudging this to make the types the same
         assignment_data = pd.concat(
             [self._data[self.__get_data_key(row['Outer Loop #'], row['Inner Loop #'])]
             for _, row in self._statistics.iterrows()
@@ -160,7 +148,8 @@ class ODME(object):
         Returns a key for a particular set of assignment data corresponding
         to a particular outer/inner iteration.
         """
-        return f"data_{outer}_{inner}"
+        # Currently fudging this to make the types the same always
+        return f"data_{int(outer)}_{int(inner)}"
 
     def __log_stats(self) -> None:
         """
@@ -179,10 +168,27 @@ class ODME(object):
 
         # Data:
         data = self._count_volumes.copy(deep=True)
+        data["Total Iteration #"] = [self._total_iter for _ in range(self._num_counts)]
         data["Outer Loop #"] = [self._outer for _ in range(self._num_counts)]
         data["Inner Loop #"] = [self._inner for _ in range(self._num_counts)]
         data["Assigned Volume"] = self._assign_vals
         self._data[self.__get_data_key(self._outer, self._inner)] = data
+    
+    def __increment_outer(self) -> None:
+        """
+        Increments outer iteration number, increments total iterations and zeros inner iteration number.
+        """
+        self._outer += 1
+        self._inner = 0
+        self._total_iter += 1
+
+    def __increment_inner(self) -> None:
+        """
+        Increments inner iteration number and total iteration and total inner iteration number.
+        """
+        self._inner += 1
+        self._total_iter += 1
+        self._total_inner += 1
 
     def execute(self):
         """ 
@@ -199,8 +205,7 @@ class ODME(object):
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
         while self._outer < self.max_outer and self._last_convergence > self.outer_convergence_crit:
             # Set iteration values:
-            self._outer += 1
-            self._inner = 0
+            self._increment_outer()
             self.__log_stats()
 
             # Run inner iterations:
@@ -209,7 +214,7 @@ class ODME(object):
             self._convergence_change = float('inf')
             while self._inner < self.max_inner and self._convergence_change > self.inner_convergence_crit:
                 self.__execute_inner_iter()
-                self._inner += 1
+                self._increment_inner()
                 self.__log_stats()
 
             # Reassign values at the end of each outer loop
