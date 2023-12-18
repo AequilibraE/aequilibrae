@@ -133,14 +133,62 @@ class TestODME(TestCase):
         original_demand = np.copy(self.matrix.matrix_view)
 
         # Perturb original matrix:
-        np.random.seed = 0
+        np.random.seed(0)
         perturbation_matrix = np.random.uniform(0.99, 1.01, size=self.dims)
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, stop_crit=(300, 10, 10, 10))
         odme.execute()
         new_demand, stats = odme.get_results()
+        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/stats_all_vols.csv")
+
+        # Check results:
+        np.testing.assert_allclose(
+            original_demand,
+            new_demand,
+            err_msg="Original matrix was not obtained after perturbing slightly and running ODME!"
+        )
+
+    def test_3_volumes_given(self) -> None:
+        """
+        Takes original Sioux Falls network demand matrix and perturbs it slightly.
+        Then executes ODME on this with all original flows from Sioux Falls network
+        and the perturbed matrix.
+
+        Checks we recover the original matrix.
+
+        TAKES ONLY 3 VOLUMES - NEED TO CLEAN UP TESTS LATER ON!!!
+        """
+        # Get original flows:
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
+        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
+
+        # Set the observed count volumes:
+        flow = lambda i: assign_df.loc[assign_df["link_id"] == i, "matrix_ab"].values[0]
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, flow(1)], ["car", 30, 1, flow(30)], ["car", 52, 1, flow(52)]],
+            columns=self.count_vol_cols
+        )
+
+        # Store original matrix
+        original_demand = np.copy(self.matrix.matrix_view)
+
+        # Perturb original matrix:
+        np.random.seed(0)
+        perturbation_matrix = np.random.uniform(0.99, 1.01, size=self.dims)
+        self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
+
+        np.savetxt('/workspaces/aequilibrae/pert_matrix.csv', perturbation_matrix, delimiter=',')
+        np.savetxt('/workspaces/aequilibrae/matrix.csv', np.round(self.matrix.matrix_view).astype(int), delimiter=',', fmt='%d')
+
+        # Perform ODME:
+        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 10, 0.001, 1))
+        odme.execute()
+        new_demand, stats = odme.get_results()
+        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/stats_3_vols.csv")
 
         # Check results:
         np.testing.assert_allclose(
