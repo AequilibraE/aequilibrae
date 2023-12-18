@@ -18,6 +18,8 @@ class ODME(object):
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
         "class", "link_id", "direction", "obs_volume", "Assigned Volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
+    FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
+        'min', 'max']
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -98,6 +100,9 @@ class ODME(object):
         # Dataframe to log statistical information:
         self._statistics = pd.DataFrame(columns=self.STATISTICS_COLS)
 
+        # Stats on scaling matrices
+        self._factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
+
         # Time data for logging information
         self._total_time = 0
         self._time = None
@@ -130,8 +135,15 @@ class ODME(object):
         timing and convergence.
 
         CURRENTLY ONLY WORKS FOR SINGLE CLASS!!!
+        NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
         """
         return (self.demand_matrix, self._statistics)
+    
+    def get_factor_stats(self) -> pd.DataFrame:
+        """
+        Returns a dataframe on statistics of factors for every iteration.
+        """
+        return self._factor_stats
 
     def get_assignment_data(self) -> pd.DataFrame:
         """
@@ -249,13 +261,38 @@ class ODME(object):
         # Recalculate convergence level:
         self._obj_func(self)
 
+    def ___record_factor_stats(self, factors: np.ndarray) -> None:
+        """
+        Logs information on the current scaling matrix.
+        """
+        factor_stats = [
+            self._outer,
+            self._inner,
+            self._total_inner,
+            np.mean(factors),
+            np.median(factors),
+            np.std(factors),
+            np.var(factors),
+            np.sum(factors),
+            np.min(factors),
+            np.max(factors),
+        ]
+
+        # Add row:
+        self._factor_stats.loc[len(self._factor_stats)] = {
+            col : factor_stats[i]
+            for i, col in enumerate(self.FACTOR_COLS)
+        }
+
     def __get_scaling_factor(self) -> np.ndarray:
         """
         Returns scaling matrix - depends on algorithm chosen.
         Currently implementing default as geometric mean.
         """
         # Defaults to geometric mean currently - cannot yet specify choice.
-        return self.__geometric_mean()
+        scaling_factor = self.__geometric_mean()
+        self.___record_factor_stats(scaling_factor)
+        return scaling_factor
 
     def __geometric_mean(self) -> np.ndarray:
         """
