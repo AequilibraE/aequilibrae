@@ -15,7 +15,7 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    DATA_COLS = ["Outer #", "Inner #", "class", "link_id", "direction", "obs_volume", "assign_volume"]
+    DATA_COLS = ["Outer Loop #", "Inner Loop #", "class", "link_id", "direction", "obs_volume", "Assigned Volume"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
 
     def __init__(self,
@@ -43,13 +43,17 @@ class ODME(object):
 
         # Parameters for assignments
         self.assignment = assignment
-        self.assignclass = assignment.classes[0] # - for now assume only one class
+        self.classes = assignment.classes 
+        self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
         # Demand matrices
-        self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix
+        self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes] # The current demand matrices
+        self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix TEMPORARY SINGLE CLASS
         # May be unecessary - if we do keep it need to make a copy -> 
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
+        self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
         self.init_demand_matrix = np.copy(self.demand_matrix)
+        self._demands_dims = [matrix.shape for matrix in self.demand_matrices]
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
@@ -60,9 +64,10 @@ class ODME(object):
         # MAY WANT TO INITIALISE THESE AS np.zeros:
         self._assign_vals = np.empty(len(count_volumes)) # v_a
         self._sl_matrices = None # Currently dictionary of proportion matrices
-
-        # Set the select links:
+        
+        # Set all select links:
         self.assignclass.set_select_links(self.__get_select_links())
+        #self.__set_select_links()
 
         # Not yet relevant - Algorithm Specifications:
         self._alg_spec = alg_spec
@@ -95,6 +100,19 @@ class ODME(object):
         # Time data for logging information
         self._time = None
 
+    def __set_select_links(self) -> None:
+        """
+        Sets all select links for each class and for each observation.
+        """
+        for user_class in self.classes:
+            user_class.set_select_links(
+                {
+                    self.__get_sl_key(row): [(row['link_id'], row['direction'])] 
+                    for _, row in
+                    self._count_volumes["link_id" == id(user_class)].iterrows()
+                }
+            )
+
 
     def __get_select_links(self) -> dict:
         """
@@ -102,15 +120,25 @@ class ODME(object):
         Select links will be singletons for each link with associated observation value.
         """
         return {
-            f"sl_{link}_{dir}": [(link, dir)] 
-            for link, dir in
-            zip(self._count_volumes['link_id'], self._count_volumes['direction'])
+            self.__get_sl_key(row): [(row['link_id'], row['direction'])] 
+            for _, row in
+            self._count_volumes.iterrows()
         }
+
+    def __get_sl_key(self, row: pd.Series) -> str:
+        """
+        Given a particular row from the observervations (count_volumes) returns
+        a key corresponding to it for use in all select link extraction.
+        """
+        return f"sl_{row['class']}_{row['link_id']}_{row['direction']}"
+
 
     def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
         Returns final demand matrix and a dataframe of statistics regarding
         timing and convergence.
+
+        CURRENTLY ONLY WORKS FOR SINGLE CLASS!!!
         """
         return (self.demand_matrix, self._statistics)
 
@@ -118,13 +146,21 @@ class ODME(object):
         """
         Returns dataframe of all assignment values across iterations.
         """
+        # Currently fudging this to make the types the same
         assignment_data = pd.concat(
-            [self._data[f"data_{row['Outer Loop #']}_{row['Inner Loop #']}"]
+            [self._data[self.__get_data_key(row['Outer Loop #'], row['Inner Loop #'])]
             for _, row in self._statistics.iterrows()
         ],
             ignore_index=True
         )
         return assignment_data
+    
+    def __get_data_key(self, outer: int, inner: int) -> str:
+        """
+        Returns a key for a particular set of assignment data corresponding
+        to a particular outer/inner iteration.
+        """
+        return f"data_{outer}_{inner}"
 
     def __log_stats(self) -> None:
         """
@@ -142,12 +178,11 @@ class ODME(object):
         }
 
         # Data:
-        key = f"data_{self._outer}_{self._inner}"
         data = self._count_volumes.copy(deep=True)
-        data["Outer"] = [self._outer for _ in range(self._num_counts)]
-        data["Inner"] = [self._inner for _ in range(self._num_counts)]
-        data["assign_volume"] = self._assign_vals
-        self._data[key] = data
+        data["Outer Loop #"] = [self._outer for _ in range(self._num_counts)]
+        data["Inner Loop #"] = [self._inner for _ in range(self._num_counts)]
+        data["Assigned Volume"] = self._assign_vals
+        self._data[self.__get_data_key(self._outer, self._inner)] = data
 
     def execute(self):
         """ 
@@ -232,7 +267,7 @@ class ODME(object):
             # Create factor:
             if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
                 link_factor = row['obs_volume'] / self._assign_vals[i]
-                sl_matrix = self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"]
+                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
                 factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
             # If assigned or observed value is 0 we cannot do anything right now
             else:
@@ -275,10 +310,8 @@ class ODME(object):
         # NOTE - NEED TO CHECK THAT THIS NOTATION WORKS ACROSS ALL DEMAND MATRICES!!!
         # FIND FASTER VECTORISED WAY TO DO THIS!
         for i, row in self._count_volumes.iterrows():
-            self._assign_vals[i] = assign_df.loc[
-                assign_df["link_id"] == row["link_id"],
-                col[row["direction"]]
-            ].values[0]
+            self._assign_vals[i] = assign_df.loc[ assign_df["link_id"] == row["link_id"],
+                col[row["direction"]]].values[0]
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
         # Recalculate convergence values
@@ -335,5 +368,5 @@ class ODME(object):
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
         for i, row in self._count_volumes.iterrows():
-            sl_matrix = self._sl_matrices[f"sl_{row['link_id']}_{row['direction']}"]
+            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
