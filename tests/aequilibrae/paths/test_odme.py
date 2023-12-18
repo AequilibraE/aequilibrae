@@ -181,9 +181,6 @@ class TestODME(TestCase):
         perturbation_matrix = np.random.uniform(0.99, 1.01, size=self.dims)
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
-        np.savetxt('/workspaces/aequilibrae/pert_matrix.csv', perturbation_matrix, delimiter=',')
-        np.savetxt('/workspaces/aequilibrae/matrix.csv', np.round(self.matrix.matrix_view).astype(int), delimiter=',', fmt='%d')
-
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes, stop_crit=(100, 10, 0.001, 1))
         odme.execute()
