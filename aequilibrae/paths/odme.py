@@ -15,7 +15,8 @@ from aequilibrae import TrafficAssignment
 class ODME(object):
     """ODME algorithm."""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "class", "link_id", "direction", "obs_volume", "Assigned Volume"]
+    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
+        "class", "link_id", "direction", "obs_volume", "Assigned Volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
 
     def __init__(self,
@@ -98,6 +99,7 @@ class ODME(object):
         self._statistics = pd.DataFrame(columns=self.STATISTICS_COLS)
 
         # Time data for logging information
+        self._total_time = 0
         self._time = None
 
     def __set_select_links(self) -> None:
@@ -158,7 +160,9 @@ class ODME(object):
         # Statistics DataFrame:
         old_time = self._time
         self._time = time.time()
-        to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, self._time - old_time]
+        loop_time = self._time - old_time
+        self._total_time += loop_time
+        to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, loop_time]
 
         # Add row:
         self._statistics.loc[len(self._statistics)] = {
@@ -168,10 +172,15 @@ class ODME(object):
 
         # Data:
         data = self._count_volumes.copy(deep=True)
+        data["Loop Time (s)"] = [loop_time for _ in range(self._num_counts)]
+        data["Total Run Time (s)"] = [self._total_time for _ in range(self._num_counts)]
+        data["Convergence"] = [self._last_convergence for _ in range(self._num_counts)]
+        data["Inner Convergence"] = [self._convergence_change for _ in range(self._num_counts)]
         data["Total Iteration #"] = [self._total_iter for _ in range(self._num_counts)]
         data["Outer Loop #"] = [self._outer for _ in range(self._num_counts)]
         data["Inner Loop #"] = [self._inner for _ in range(self._num_counts)]
         data["Assigned Volume"] = self._assign_vals
+        data["Assigned - Observed"] = self._assign_vals - self._count_volumes["obs_volume"].to_numpy()
         self._data[self.__get_data_key(self._outer, self._inner)] = data
     
     def __increment_outer(self) -> None:

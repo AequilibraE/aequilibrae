@@ -138,10 +138,10 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(300, 10, 10, 10))
+        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 10, 0.0001, 5))
         odme.execute()
         new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/stats_all_vols.csv")
+        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_vols.csv")
 
         # Check results:
         np.testing.assert_allclose(
@@ -182,10 +182,10 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 10, 0.001, 1))
+        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001))
         odme.execute()
         new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/stats_3_vols.csv")
+        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
 
         # Check results:
         np.testing.assert_allclose(
