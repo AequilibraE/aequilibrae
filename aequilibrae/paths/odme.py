@@ -29,7 +29,7 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
-        algorithm="spiess" # currently defaults to geometric mean
+        algorithm="gmean" # currently defaults to geometric mean
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -58,6 +58,7 @@ class ODME(object):
         # May be unecessary - if we do keep it need to make a copy ->
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
+        self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
         self._demands_dims = {class_name: self.demand_matrices[class_name].shape for class_name in self.demand_matrices}
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
@@ -208,8 +209,20 @@ class ODME(object):
     def get_factor_stats(self) -> pd.DataFrame:
         """
         Returns a dataframe on statistics of factors for every iteration.
+
+        ONLY IMPLEMENTED FOR SINGLE CLASS!!!
         """
         return self._factor_stats
+
+    def get_cumulative_factor_stats(self) -> pd.DataFrame:
+        """
+        Return statistics on cumulative factor (ratio of final to initial matrix)
+        distribution.
+
+        ONLY IMPLEMENTED FOR SINGLE CLASS
+        """
+        cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix)
+        return cumulative_factors.describe()
 
     def get_assignment_data(self) -> pd.DataFrame:
         """
