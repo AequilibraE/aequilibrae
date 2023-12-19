@@ -47,16 +47,17 @@ class ODME(object):
         # Parameters for assignments
         self.assignment = assignment
         self.classes = assignment.classes
+        self.class_names = [user_class.__id__ for user_class in self.classes]
         self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
         # Demand matrices
-        self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes] # The current demand matrices
+        # The current demand matrices
+        self.demand_matrices = {user_class.__id__: user_class.matrix.matrix_view for user_class in self.classes}
         self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix TEMPORARY SINGLE CLASS
-        # May be unecessary - if we do keep it need to make a copy -> 
+        # May be unecessary - if we do keep it need to make a copy ->
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
-        self.init_demand_matrix = np.copy(self.demand_matrix)
-        self._demands_dims = [matrix.shape for matrix in self.demand_matrices]
+        self._demands_dims = {class_name: self.demand_matrices[class_name].shape for class_name in self.demand_matrices}
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
@@ -133,6 +134,7 @@ class ODME(object):
         CURRENTLY ONLY WORKS FOR SINGLE CLASS!!!
         NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
         """
+        # return (self.demand_matrices, self._statistics)
         return (self.demand_matrix, self._statistics)
 
     def get_factor_stats(self) -> pd.DataFrame:
@@ -373,15 +375,14 @@ class ODME(object):
 
             NOT YET GENERALISED FOR MULTI-CLASS!!!
             """
+            # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
             return assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
 
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: extract_flow(row),
             axis=1
-        )        
-
-        # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
+        )      
 
         # Recalculate convergence values
         self._obj_func(self)
