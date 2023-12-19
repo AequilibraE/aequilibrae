@@ -540,10 +540,10 @@ class ODME(object):
         if np.any(upper_mask):
             upper_lim = 1 / np.min(gradient[upper_mask])
         else:
-            upper_lim = 0
+            upper_lim = float('inf')
         if np.any(lower_mask):
             lower_lim = 1 / np.max(gradient[lower_mask])
         else:
-            lower_lim = 0
+            lower_lim = float('-inf')
 
         return (upper_lim, lower_lim)
