@@ -2,7 +2,8 @@
 Implementation of ODME algorithms:
 """
 
-# NOTE - Until issue with select link flows not matching assigned flows ODME should not be used with biconjugate/conjugate frank-wolfe
+# NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
+# with biconjugate/conjugate frank-wolfe
 
 from typing import Tuple
 import time
@@ -26,7 +27,8 @@ class ODME(object):
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
-        alg_spec=((2, 0),) # currently just the objective function specification
+        obj_func=(2, 0), # currently just the objective function specification
+        algorithm="gmean" # currently defaults to geometric mean
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -42,9 +44,6 @@ class ODME(object):
             alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
                     of algorithm they choose.
         """
-        # ENSURE ORDERING (PERHAPS BY SORTING INITIALLY) IS MAINTAINED EVERYWHERE
-        # POTENTIALLY MIGHT BE A GOOD IDEA TO ADD ASSIGNED VOLUMES AS A COLUMN TO COUNT_VOLUMES DATAFRAME
-
         # Parameters for assignments
         self.assignment = assignment
         self.classes = assignment.classes
@@ -72,8 +71,7 @@ class ODME(object):
         self.__set_select_links()
 
         # Not yet relevant - Algorithm Specifications:
-        self._alg_spec = alg_spec
-        self._norms = alg_spec[0]
+        self._norms = obj_func
 
         # Initialise objective function
         self._obj_func = None
@@ -127,7 +125,6 @@ class ODME(object):
         """
         return f"sl_{row['class']}_{row['link_id']}_{row['direction']}"
 
-
     def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
         Returns final demand matrix and a dataframe of statistics regarding
@@ -137,7 +134,7 @@ class ODME(object):
         NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
         """
         return (self.demand_matrix, self._statistics)
-    
+
     def get_factor_stats(self) -> pd.DataFrame:
         """
         Returns a dataframe on statistics of factors for every iteration.
@@ -194,7 +191,7 @@ class ODME(object):
             self._count_volumes["obs_volume"].to_numpy())
 
         self._data[self.__get_data_key(self._outer, self._inner)] = data
-    
+
     def __increment_outer(self) -> None:
         """
         Increments outer iteration number, increments total iterations and zeros inner iteration number.
@@ -454,4 +451,3 @@ class ODME(object):
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: __calculate_flow(self, row),
             axis=1)
-
