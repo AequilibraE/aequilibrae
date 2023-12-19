@@ -534,7 +534,7 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
         upper_mask = np.logical_and(self.demand_matrix > 0, gradient > 0)
-        lower_mask = np.logical_and(self.demand_matrix < 0, gradient > 0)
+        lower_mask = np.logical_and(self.demand_matrix > 0, gradient < 0)
 
         # Account for either mask being empty
         if np.any(upper_mask):
