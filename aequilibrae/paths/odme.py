@@ -341,8 +341,13 @@ class ODME(object):
         Returns scaling matrix - depends on algorithm chosen.
         Currently implementing default as geometric mean.
         """
-        # Defaults to geometric mean currently - cannot yet specify choice.
-        scaling_factor = self.__geometric_mean()
+        if self._algorithm == "gmean":
+            scaling_factor = self.__geometric_mean()
+        elif self._algorithm == "spiess":
+            scaling_factor = self.__spiess()
+        else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
+            scaling_factor = np.ones(self._demand_dims)
+
         self.___record_factor_stats(scaling_factor)
         return scaling_factor
 
@@ -467,25 +472,65 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
         gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
-        step_size = self.__get_step_size_spiess() # Get optimum step size for current iteration
+        step_size = self.__get_step_size_spiess(gradient_matrix) # Get optimum step size for current iteration
         return 1 - (step_size * gradient_matrix)
     
     def __get_derivative_matrix_spiess(self) -> np.ndarray:
         """
         Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
 
-        NOT YET IMPLEMENTED
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        # Initially default ones matrix
-        return np.ones(self._demand_dims)
+        # There are probably some numpy/cython ways to do this in parallel and
+        # without storing too many things in memory.
+        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
+        for i, row in self._count_volumes.iterrows():
+            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+            factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['observe_volume'])
 
-    def __get_step_size_spiess(self) -> float:
+        return np.sum(factors, axis=0)
+
+    def __get_step_size_spiess(self, gradient: np.ndarray) -> float:
         """
         Returns estimate of optimal step size (see Spiess (1990) - REFERENCE HERE)
 
-        NOT YET IMPLEMENTED
+        Parameters:
+            gradient: The currently calculating gradient matrix - required for calculating 
+                derivative of link flows with respect to step size.
+
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        # Initially returns 1
-        return 1
+        upper_lim, lower_lim = self.__get_step_size_limits_spiess(gradient)
+
+        # Calculating link flow derivatives:
+        flow_derivatives = np.empty(self._num_counts)
+        for i, row in self._count_volumes.iterrows():
+            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+            flow_derivatives[i] = -np.sum(self.demand_matrix * sl_matrix * gradient)
+        
+        # Calculate minimising step length:
+        errors = self._count_volumes['assign_volume'].to_numpy() - self._count_volumes['obs_volume'].to_numpy()
+        min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
+
+        if min_lambda > upper_lim:
+            return upper_lim
+        elif min_lambda < lower_lim:
+            return lower_lim
+        else: # Minimum step size does not violate addition step size constraints
+            return min_lambda
+
+    def __get_step_size_limits_spiess(self, gradient: np.ndarray) -> Tuple[float, float]:
+        """
+        Returns bounds for step size in order of upper bound, then lower bound (see Spiess
+        (1990) - REFERENCE HERE)
+
+        Parameters:
+            gradient: The currently calculating gradient matrix - required for calculating 
+                derivative of link flows with respect to step size.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        """
+        upper_mask = np.logical_and(self.demand_matrix > 0, gradient > 0)
+        lower_mask = np.logical_and(self.demand_matrix < 0, gradient > 0)
+
+        return (np.min(gradient[upper_mask]), np.max(gradient[lower_mask]))
