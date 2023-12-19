@@ -14,12 +14,13 @@ from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
-    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volumes"]
+    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
-        "class", "link_id", "direction", "obs_volume", "Assigned Volume", "Assigned - Observed"]
+        "class", "link_id", "direction", "obs_volume", "assign_volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
     FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
         'min', 'max']
+    GMEAN_LIMIT = 0.001 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -182,7 +183,7 @@ class ODME(object):
             for i, col in enumerate(self.STATISTICS_COLS)
         }
 
-        # Data:
+        # Create Data:
         data = self._count_volumes.copy(deep=True)
         data["Loop Time (s)"] = [loop_time for _ in range(self._num_counts)]
         data["Total Run Time (s)"] = [self._total_time for _ in range(self._num_counts)]
@@ -191,8 +192,9 @@ class ODME(object):
         data["Total Iteration #"] = [self._total_iter for _ in range(self._num_counts)]
         data["Outer Loop #"] = [self._outer for _ in range(self._num_counts)]
         data["Inner Loop #"] = [self._inner for _ in range(self._num_counts)]
-        data["Assigned Volume"] = self._assign_vals
-        data["Assigned - Observed"] = self._assign_vals - self._count_volumes["obs_volume"].to_numpy()
+        data["Assigned - Observed"] = (self._count_volumes['assign_volume'].to_numpy() -
+            self._count_volumes["obs_volume"].to_numpy())
+
         self._data[self.__get_data_key(self._outer, self._inner)] = data
     
     def __increment_outer(self) -> None:
@@ -316,8 +318,10 @@ class ODME(object):
         factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
         for i, row in self._count_volumes.iterrows():
             # Create factor:
-            if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
-                link_factor = (row['obs_volume'] / self._assign_vals[i]) - 1
+            #if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
+            #    link_factor = (row['obs_volume'] / self._assign_vals[i]) - 1
+            if row["obs_volume"] != 0 and row['assign_volume'] != 0:
+                link_factor = (row['obs_volume'] / row['assign_volume']) - 1
                 sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
                 factors[i, :, :] = (sl_matrix * link_factor) + 1
                 #factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
@@ -365,7 +369,7 @@ class ODME(object):
             self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
 
-        '''
+        
         def extract_flow(row) -> None:
             """
             Extracts flow corresponding to particular link (from row) and return it.
@@ -373,13 +377,10 @@ class ODME(object):
             return assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
 
-        self._count_volumes['assign_volumes'] = self._count_volumes.apply(
-            extract_flow(row),
+        self._count_volumes['assign_volume'] = self._count_volumes.apply(
+            lambda row: extract_flow(row),
             axis=1
-        )
-
-        np.testing.assert_array_equal(self._count_volumes['assign_volumes'].to_numpy(), self._assign_vals)
-        '''
+        )        
 
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
@@ -407,7 +408,8 @@ class ODME(object):
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            obj1 = np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1
+            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
             self.__set_convergence_values(obj1 + regularisation)
 
@@ -416,7 +418,8 @@ class ODME(object):
             Objective function with no regularisation term.
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            self.__set_convergence_values(np.sum(np.abs(obs_vals - self._assign_vals)**p_1) / p_1)
+            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            self.__set_convergence_values(np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1)
 
         if p_2:
             self._obj_func = __reg_obj_func
@@ -436,20 +439,22 @@ class ODME(object):
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
+        for i, row in self._count_volumes.iterrows():
+            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+            self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
 
         def __calculate_flow(self, row: pd.Series) -> float:
             """
             Given a single row of the count volumes dataframe, 
             calculates the appropriate corresponding assigned 
             value.
+
+            NOT YET GENERALISED TO MULTI-CLASS - NEED TO INCLUDE CLASS MATRICES
             """
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             return np.sum(sl_matrix * self.demand_matrix)
 
-        self._count_volumes['assign_volumes'] = self._count_volumes.apply(
+        self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: __calculate_flow(self, row),
             axis=1)
 
-        for i, row in self._count_volumes.iterrows():
-            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
