@@ -22,6 +22,7 @@ class ODME(object):
     FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
         'min', 'max']
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
+    ALL_ALGORITHMS = ["gmean", "spiess"]
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -105,6 +106,7 @@ class ODME(object):
         self._total_time = 0
         self._time = None
 
+    # Utilities:
     def __set_select_links(self) -> None:
         """
         Sets all select links for each class and for each observation.
@@ -126,6 +128,71 @@ class ODME(object):
         """
         return f"sl_{row['class']}_{row['link_id']}_{row['direction']}"
 
+    def __increment_outer(self) -> None:
+        """
+        Increments outer iteration number, increments total iterations and zeros inner iteration number.
+        """
+        self._outer += 1
+        self._inner = 0
+        self._total_iter += 1
+
+    def __increment_inner(self) -> None:
+        """
+        Increments inner iteration number and total iteration and total inner iteration number.
+        """
+        self._inner += 1
+        self._total_iter += 1
+        self._total_inner += 1
+
+    def __set_convergence_values(self, new_convergence: float) -> None:
+        """
+        Given a new convergence value calculates the difference between the previous convergence
+        and new convergence, and sets appropriate values.
+        """
+        if self._last_convergence:
+            self._convergence_change = abs(self._last_convergence - new_convergence)
+        self._last_convergence = new_convergence
+
+    def __init_objective_func(self) -> None:
+        """
+        Initialises the objective function - parameters must be specified by user.
+
+        Current objective functions have 2 parts which are summed:
+            1. The p-norm raised to the power p of the error vector for observed flows.
+            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) for the demand matrix.
+        
+        (1.) must always be present, but (2.) (the regularisation term) need not be present (ie, specified as 0 by user).
+        Default currently set to l1 (manhattan) norm for (1.) with no regularisation term (p2 = 0).
+        """
+        p_1 = self._norms[0]
+        p_2 = self._norms[1]
+
+        def __reg_obj_func(self) -> None:
+            """
+            Objective function containing regularisation term.
+
+            NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
+            """
+            obs_vals = self._count_volumes["obs_volume"].to_numpy()
+            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
+            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
+            self.__set_convergence_values(obj1 + regularisation)
+
+        def __obj_func(self) -> None:
+            """
+            Objective function with no regularisation term.
+            """
+            obs_vals = self._count_volumes["obs_volume"].to_numpy()
+            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            self.__set_convergence_values(np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1)
+
+        if p_2:
+            self._obj_func = __reg_obj_func
+        else:
+            self._obj_func = __obj_func
+
+    # Output/Results/Statistics:
     def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
         Returns final demand matrix and a dataframe of statistics regarding
@@ -154,7 +221,7 @@ class ODME(object):
             ignore_index=True
         )
         return assignment_data
-    
+
     def __get_data_key(self, outer: int, inner: int) -> str:
         """
         Returns a key for a particular set of assignment data corresponding
@@ -194,23 +261,31 @@ class ODME(object):
 
         self._data[self.__get_data_key(self._outer, self._inner)] = data
 
-    def __increment_outer(self) -> None:
+    def ___record_factor_stats(self, factors: np.ndarray) -> None:
         """
-        Increments outer iteration number, increments total iterations and zeros inner iteration number.
+        Logs information on the current scaling matrix.
         """
-        self._outer += 1
-        self._inner = 0
-        self._total_iter += 1
+        factor_stats = [
+            self._outer,
+            self._inner,
+            self._total_inner,
+            np.mean(factors),
+            np.median(factors),
+            np.std(factors),
+            np.var(factors),
+            np.sum(factors),
+            np.min(factors),
+            np.max(factors),
+        ]
 
-    def __increment_inner(self) -> None:
-        """
-        Increments inner iteration number and total iteration and total inner iteration number.
-        """
-        self._inner += 1
-        self._total_iter += 1
-        self._total_inner += 1
+        # Add row:
+        self._factor_stats.loc[len(self._factor_stats)] = {
+            col : factor_stats[i]
+            for i, col in enumerate(self.FACTOR_COLS)
+        }
 
-    def execute(self):
+    # Generic Algorithm Structure:
+    def execute(self) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
@@ -260,29 +335,6 @@ class ODME(object):
         # Recalculate convergence level:
         self._obj_func(self)
 
-    def ___record_factor_stats(self, factors: np.ndarray) -> None:
-        """
-        Logs information on the current scaling matrix.
-        """
-        factor_stats = [
-            self._outer,
-            self._inner,
-            self._total_inner,
-            np.mean(factors),
-            np.median(factors),
-            np.std(factors),
-            np.var(factors),
-            np.sum(factors),
-            np.min(factors),
-            np.max(factors),
-        ]
-
-        # Add row:
-        self._factor_stats.loc[len(self._factor_stats)] = {
-            col : factor_stats[i]
-            for i, col in enumerate(self.FACTOR_COLS)
-        }
-
     def __get_scaling_factor(self) -> np.ndarray:
         """
         Returns scaling matrix - depends on algorithm chosen.
@@ -292,53 +344,6 @@ class ODME(object):
         scaling_factor = self.__geometric_mean()
         self.___record_factor_stats(scaling_factor)
         return scaling_factor
-
-    def __geometric_mean(self) -> np.ndarray:
-        """
-        Calculates scaling factor based on geometric mean of ratio between 
-        proportionally (via SL matrix) assigned flow & observed flows.
-
-        Initial default scaling matrix:
-        """
-        # Steps:
-        # 1. For each link create a factor f_a given by \hat v_a / v_a
-        # 2. Create a matrix of factors for each link where for a given OD pair i,
-        #    the factor at i is f_a if the corresponding value in the SL matrix
-        #    is non-zero, and 1 otherwise.
-        # 3. Return the geometric mean of all the factor matrices component-wise
-        # NOTE - This may be slower due to holding all these matrices in memory
-        # simultaneously. It is possible to do this e.g element-wise or row-wise
-        # to save on memory usage. Need to test this later on.
-        # NOTE - by not approximating step size we may over-correct massively.
-
-        # Steps 1 & 2:
-        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
-        for i, row in self._count_volumes.iterrows():
-            # Create factor matrix:
-            if row["obs_volume"] != 0 and row['assign_volume'] != 0:
-
-                # Modulate factor by select link dependency:
-                link_factor = (row['obs_volume'] / row['assign_volume']) - 1
-                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-                factor_matrix = (sl_matrix * link_factor)
-
-                # Apply factor limiting:
-                # factor_matrix = np.clip(factor_matrix, -self.GMEAN_LIMIT, self.GMEAN_LIMIT)
-
-                # Center factors at 1:
-                factor_matrix = factor_matrix + 1
-
-            # If assigned or observed value is 0 we cannot do anything right now
-            else:
-                factor_matrix = np.ones(self._demand_dims)
-            
-            factors[i, :, :] = factor_matrix
-
-        # If the assigned volume was 0 (or both 0) no OD pair can have any effect
-        factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
-
-        # Step 3:
-        return spstats.gmean(factors, axis=0)
 
     def __perform_assignment(self) -> None:
         """ 
@@ -387,54 +392,6 @@ class ODME(object):
         # Recalculate convergence values
         self._obj_func(self)
 
-    def __init_objective_func(self) -> None:
-        """
-        Initialises the objective function - parameters must be specified by user.
-
-        Current objective functions have 2 parts which are summed:
-            1. The p-norm raised to the power p of the error vector for observed flows.
-            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) for the demand matrix.
-        
-        (1.) must always be present, but (2.) (the regularisation term) need not be present (ie, specified as 0 by user).
-        Default currently set to l1 (manhattan) norm for (1.) with no regularisation term (p2 = 0).
-        """
-        p_1 = self._norms[0]
-        p_2 = self._norms[1]
-
-        def __reg_obj_func(self) -> None:
-            """
-            Objective function containing regularisation term.
-
-            NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
-            """
-            obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            assign_vals = self._count_volumes['assign_volume'].to_numpy()
-            obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
-            self.__set_convergence_values(obj1 + regularisation)
-
-        def __obj_func(self) -> None:
-            """
-            Objective function with no regularisation term.
-            """
-            obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            assign_vals = self._count_volumes['assign_volume'].to_numpy()
-            self.__set_convergence_values(np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1)
-
-        if p_2:
-            self._obj_func = __reg_obj_func
-        else:
-            self._obj_func = __obj_func
-
-    def __set_convergence_values(self, new_convergence: float) -> None:
-        """
-        Given a new convergence value calculates the difference between the previous convergence
-        and new convergence, and sets appropriate values.
-        """
-        if self._last_convergence:
-            self._convergence_change = abs(self._last_convergence - new_convergence)
-        self._last_convergence = new_convergence 
-
     def __calculate_flows(self) -> None:
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
@@ -452,3 +409,51 @@ class ODME(object):
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: __calculate_flow(self, row),
             axis=1)
+
+    # Algorithm Specific Functions:
+    def __geometric_mean(self) -> np.ndarray:
+        """
+        Calculates scaling factor based on geometric mean of ratio between 
+        proportionally (via SL matrix) assigned flow & observed flows.
+
+        Initial default scaling matrix:
+        """
+        # Steps:
+        # 1. For each link create a factor f_a given by \hat v_a / v_a
+        # 2. Create a matrix of factors for each link where for a given OD pair i,
+        #    the factor at i is f_a if the corresponding value in the SL matrix
+        #    is non-zero, and 1 otherwise.
+        # 3. Return the geometric mean of all the factor matrices component-wise
+        # NOTE - This may be slower due to holding all these matrices in memory
+        # simultaneously. It is possible to do this e.g element-wise or row-wise
+        # to save on memory usage. Need to test this later on.
+        # NOTE - by not approximating step size we may over-correct massively.
+
+        # Steps 1 & 2:
+        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
+        for i, row in self._count_volumes.iterrows():
+            # Create factor matrix:
+            if row["obs_volume"] != 0 and row['assign_volume'] != 0:
+
+                # Modulate factor by select link dependency:
+                link_factor = (row['obs_volume'] / row['assign_volume']) - 1
+                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                factor_matrix = (sl_matrix * link_factor)
+
+                # Apply factor limiting:
+                # factor_matrix = np.clip(factor_matrix, -self.GMEAN_LIMIT, self.GMEAN_LIMIT)
+
+                # Center factors at 1:
+                factor_matrix = factor_matrix + 1
+
+            # If assigned or observed value is 0 we cannot do anything right now
+            else:
+                factor_matrix = np.ones(self._demand_dims)
+            
+            factors[i, :, :] = factor_matrix
+
+        # If the assigned volume was 0 (or both 0) no OD pair can have any effect
+        factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
+
+        # Step 3:
+        return spstats.gmean(factors, axis=0)
