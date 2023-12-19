@@ -21,6 +21,7 @@ class ODME(object):
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
     FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
         'min', 'max']
+    CUMULATIVE_FACTOR_COLS = ["class", "mean", "median", "standard deviation", "variance", "min", "max", "sum", "# of factors"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
@@ -214,15 +215,28 @@ class ODME(object):
         """
         return self._factor_stats
 
-    def get_cumulative_factor_stats(self) -> pd.DataFrame:
+    def get_cumulative_factor_stats(self) -> Tuple[pd.DataFrame, np.ndarray]:
         """
         Return statistics on cumulative factor (ratio of final to initial matrix)
-        distribution.
+        distribution, as well as all the cumulative factors.
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
         """
+        # Possibly center these around 0 and do distribution for size of factors rather than
+        # just min/max as well.
         cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix)
-        return cumulative_factors.describe()
+        data = dict()
+        data["class"] = self.assignclass.__id__
+        data["mean"] = np.mean(cumulative_factors)
+        data["median"] = np.median(cumulative_factors)
+        data["standard deviation"] = np.std(cumulative_factors)
+        data["variance"] = np.var(cumulative_factors)
+        data["min"] = np.min(cumulative_factors)
+        data["max"] = np.max(cumulative_factors) # Maybe split max into pos/neg, and same for min
+
+        cumulative_data = pd.DataFrame(data)
+
+        return (cumulative_data, cumulative_factors)
 
     def get_assignment_data(self) -> pd.DataFrame:
         """
