@@ -511,6 +511,9 @@ class ODME(object):
         # Calculate minimising step length:
         errors = self._count_volumes['assign_volume'].to_numpy() - self._count_volumes['obs_volume'].to_numpy()
         min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
+         # Can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
+        if np.isnan(min_lambda):
+            min_lambda = 0
 
         if min_lambda > upper_lim:
             return upper_lim
@@ -533,12 +536,11 @@ class ODME(object):
         upper_mask = np.logical_and(self.demand_matrix > 0, gradient > 0)
         lower_mask = np.logical_and(self.demand_matrix < 0, gradient > 0)
 
-        # Provided there are
+        # Account for either mask being empty
         if np.any(upper_mask):
             upper_lim = 1 / np.min(gradient[upper_mask])
         else:
             upper_lim = 0
-        
         if np.any(lower_mask):
             lower_lim = 1 / np.max(gradient[lower_mask])
         else:
