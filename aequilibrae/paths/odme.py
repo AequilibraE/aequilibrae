@@ -29,7 +29,7 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
-        algorithm="gmean" # currently defaults to geometric mean
+        algorithm="spiess" # currently defaults to geometric mean
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -486,7 +486,7 @@ class ODME(object):
         factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['observe_volume'])
+            factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
 
         return np.sum(factors, axis=0)
 
@@ -533,4 +533,15 @@ class ODME(object):
         upper_mask = np.logical_and(self.demand_matrix > 0, gradient > 0)
         lower_mask = np.logical_and(self.demand_matrix < 0, gradient > 0)
 
-        return (np.min(gradient[upper_mask]), np.max(gradient[lower_mask]))
+        # Provided there are
+        if np.any(upper_mask):
+            upper_lim = 1 / np.min(gradient[upper_mask])
+        else:
+            upper_lim = 0
+        
+        if np.any(lower_mask):
+            lower_lim = 1 / np.max(gradient[lower_mask])
+        else:
+            lower_lim = 0
+
+        return (upper_lim, lower_lim)
