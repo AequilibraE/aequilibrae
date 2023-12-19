@@ -74,6 +74,7 @@ class ODME(object):
 
         # Not yet relevant - Algorithm Specifications:
         self._norms = obj_func
+        self._algorithm = algorithm
 
         # Initialise objective function
         self._obj_func = None
@@ -416,7 +417,7 @@ class ODME(object):
         Calculates scaling factor based on geometric mean of ratio between 
         proportionally (via SL matrix) assigned flow & observed flows.
 
-        Initial default scaling matrix:
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
         # Steps:
         # 1. For each link create a factor f_a given by \hat v_a / v_a
@@ -457,3 +458,34 @@ class ODME(object):
 
         # Step 3:
         return spstats.gmean(factors, axis=0)
+
+    def __spiess(self) -> np.ndarray:
+        """
+        Calculates scaling factor based on gradient descent method via SL matrix,
+        assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        """
+        gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
+        step_size = self.__get_step_size_spiess() # Get optimum step size for current iteration
+        return 1 - (step_size * gradient_matrix)
+    
+    def __get_derivative_matrix_spiess(self) -> np.ndarray:
+        """
+        Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
+
+        NOT YET IMPLEMENTED
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        """
+        # Initially default ones matrix
+        return np.ones(self._demand_dims)
+
+    def __get_step_size_spiess(self) -> float:
+        """
+        Returns estimate of optimal step size (see Spiess (1990) - REFERENCE HERE)
+
+        NOT YET IMPLEMENTED
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        """
+        # Initially returns 1
+        return 1
