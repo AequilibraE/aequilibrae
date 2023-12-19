@@ -509,7 +509,7 @@ class ODME(object):
             flow_derivatives[i] = -np.sum(self.demand_matrix * sl_matrix * gradient)
         
         # Calculate minimising step length:
-        errors = self._count_volumes['assign_volume'].to_numpy() - self._count_volumes['obs_volume'].to_numpy()
+        errors = self._count_volumes['obs_volume'].to_numpy() - self._count_volumes['assign_volume'].to_numpy()
         min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
          # Can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
         if np.isnan(min_lambda):
