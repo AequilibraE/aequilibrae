@@ -221,10 +221,12 @@ class ODME(object):
         distribution, as well as all the cumulative factors.
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
-        """
         # Possibly center these around 0 and do distribution for size of factors rather than
         # just min/max as well.
+        """
         cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix)
+
+        # Generate statistics
         data = dict()
         data["class"] = self.assignclass.__id__
         data["mean"] = np.mean(cumulative_factors)
@@ -233,7 +235,6 @@ class ODME(object):
         data["variance"] = np.var(cumulative_factors)
         data["min"] = np.min(cumulative_factors)
         data["max"] = np.max(cumulative_factors) # Maybe split max into pos/neg, and same for min
-
         cumulative_data = pd.DataFrame(data)
 
         return (cumulative_data, cumulative_factors)
