@@ -215,16 +215,16 @@ class ODME(object):
         """
         return self._factor_stats
 
-    def get_cumulative_factor_stats(self) -> Tuple[pd.DataFrame, np.ndarray]:
+    def get_cumulative_factor_stats(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Return statistics on cumulative factor (ratio of final to initial matrix)
-        distribution, as well as all the cumulative factors.
+        distribution, as well as all the cumulative factors in a dataframe.
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
         # Possibly center these around 0 and do distribution for size of factors rather than
         # just min/max as well.
         """
-        cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix)
+        cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix, nan=1)
 
         # Generate statistics
         data = dict()
@@ -235,9 +235,12 @@ class ODME(object):
         data["variance"] = np.var(cumulative_factors)
         data["min"] = np.min(cumulative_factors)
         data["max"] = np.max(cumulative_factors) # Maybe split max into pos/neg, and same for min
-        cumulative_data = pd.DataFrame(data)
+        cumulative_stats = pd.DataFrame([data])
 
-        return (cumulative_data, cumulative_factors)
+        # Put factors in dataframe
+        cumulative_factors_df = pd.DataFrame({"Factors": cumulative_factors.ravel()})
+
+        return (cumulative_stats, cumulative_factors_df)
 
     def get_assignment_data(self) -> pd.DataFrame:
         """
