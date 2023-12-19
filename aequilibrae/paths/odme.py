@@ -14,7 +14,7 @@ from aequilibrae import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
-    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
+    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volumes"]
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
         "class", "link_id", "direction", "obs_volume", "Assigned Volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
@@ -317,9 +317,10 @@ class ODME(object):
         for i, row in self._count_volumes.iterrows():
             # Create factor:
             if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
-                link_factor = row['obs_volume'] / self._assign_vals[i]
+                link_factor = (row['obs_volume'] / self._assign_vals[i]) - 1
                 sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-                factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
+                factors[i, :, :] = (sl_matrix * link_factor) + 1
+                #factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
             # If assigned or observed value is 0 we cannot do anything right now
             else:
                 factors[i, :, :] = np.ones(self._demand_dims)
@@ -361,8 +362,25 @@ class ODME(object):
         # NOTE - NEED TO CHECK THAT THIS NOTATION WORKS ACROSS ALL DEMAND MATRICES!!!
         # FIND FASTER VECTORISED WAY TO DO THIS!
         for i, row in self._count_volumes.iterrows():
-            self._assign_vals[i] = assign_df.loc[ assign_df["link_id"] == row["link_id"],
+            self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
+
+        '''
+        def extract_flow(row) -> None:
+            """
+            Extracts flow corresponding to particular link (from row) and return it.
+            """
+            return assign_df.loc[assign_df["link_id"] == row["link_id"],
+                col[row["direction"]]].values[0]
+
+        self._count_volumes['assign_volumes'] = self._count_volumes.apply(
+            extract_flow(row),
+            axis=1
+        )
+
+        np.testing.assert_array_equal(self._count_volumes['assign_volumes'].to_numpy(), self._assign_vals)
+        '''
+
         # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
         # Recalculate convergence values
@@ -418,6 +436,20 @@ class ODME(object):
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
+
+        def __calculate_flow(self, row: pd.Series) -> float:
+            """
+            Given a single row of the count volumes dataframe, 
+            calculates the appropriate corresponding assigned 
+            value.
+            """
+            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+            return np.sum(sl_matrix * self.demand_matrix)
+
+        self._count_volumes['assign_volumes'] = self._count_volumes.apply(
+            lambda row: __calculate_flow(self, row),
+            axis=1)
+
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
