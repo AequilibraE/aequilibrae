@@ -20,12 +20,12 @@ class ODME(object):
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
     FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
         'min', 'max']
-    GMEAN_LIMIT = 0.001 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
+    GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
 
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
-        stop_crit=(5, 5, 10**-2,10**-2), # max_iterations (inner/outer), convergence criterion
+        stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         alg_spec=((2, 0),) # currently just the objective function specification
     ):
         """
@@ -317,13 +317,23 @@ class ODME(object):
         for i, row in self._count_volumes.iterrows():
             # Create factor matrix:
             if row["obs_volume"] != 0 and row['assign_volume'] != 0:
+
+                # Modulate factor by select link dependency:
                 link_factor = (row['obs_volume'] / row['assign_volume']) - 1
                 sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-                factors[i, :, :] = (sl_matrix * link_factor) + 1
+                factor_matrix = (sl_matrix * link_factor)
+
+                # Apply factor limiting:
+                # factor_matrix = np.clip(factor_matrix, -self.GMEAN_LIMIT, self.GMEAN_LIMIT)
+
+                # Center factors at 1:
+                factor_matrix = factor_matrix + 1
 
             # If assigned or observed value is 0 we cannot do anything right now
             else:
-                factors[i, :, :] = np.ones(self._demand_dims)
+                factor_matrix = np.ones(self._demand_dims)
+            
+            factors[i, :, :] = factor_matrix
 
         # If the assigned volume was 0 (or both 0) no OD pair can have any effect
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
@@ -363,6 +373,8 @@ class ODME(object):
         def extract_flow(row) -> None:
             """
             Extracts flow corresponding to particular link (from row) and return it.
+
+            NOT YET GENERALISED FOR MULTI-CLASS!!!
             """
             return assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
@@ -435,8 +447,6 @@ class ODME(object):
             Given a single row of the count volumes dataframe, 
             calculates the appropriate corresponding assigned 
             value.
-
-            NOT YET GENERALISED TO MULTI-CLASS - NEED TO INCLUDE CLASS MATRICES
             """
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             return np.sum(sl_matrix * self.demand_matrix)
