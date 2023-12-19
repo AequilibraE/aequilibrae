@@ -65,7 +65,6 @@ class ODME(object):
         self._num_counts = len(self._count_volumes)
         self._data = dict() # Contains a dataframe for each inner/outer iteration with all assigned & observed volumes.
 
-        #self._assign_vals = np.empty(len(count_volumes)) # v_a
         self._sl_matrices = None # Currently dictionary of proportion matrices
         
         # Set all select links:
@@ -316,14 +315,12 @@ class ODME(object):
         # Steps 1 & 2:
         factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
         for i, row in self._count_volumes.iterrows():
-            # Create factor:
-            #if row["obs_volume"] != 0 and self._assign_vals[i] != 0:
-            #    link_factor = (row['obs_volume'] / self._assign_vals[i]) - 1
+            # Create factor matrix:
             if row["obs_volume"] != 0 and row['assign_volume'] != 0:
                 link_factor = (row['obs_volume'] / row['assign_volume']) - 1
                 sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
                 factors[i, :, :] = (sl_matrix * link_factor) + 1
-                #factors[i, :, :] = np.where(sl_matrix == 0, 1, link_factor)
+
             # If assigned or observed value is 0 we cannot do anything right now
             else:
                 factors[i, :, :] = np.ones(self._demand_dims)
@@ -362,12 +359,6 @@ class ODME(object):
         # Extract and store array of assigned volumes to select links
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
-        # NOTE - NEED TO CHECK THAT THIS NOTATION WORKS ACROSS ALL DEMAND MATRICES!!!
-        # FIND FASTER VECTORISED WAY TO DO THIS!
-        #for i, row in self._count_volumes.iterrows():
-        #    self._assign_vals[i] = assign_df.loc[assign_df["link_id"] == row["link_id"],
-        #        col[row["direction"]]].values[0]
-
         
         def extract_flow(row) -> None:
             """
@@ -438,9 +429,6 @@ class ODME(object):
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
         """
-        #for i, row in self._count_volumes.iterrows():
-        #    sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-        #    self._assign_vals[i] = np.sum(sl_matrix * self.demand_matrix)
 
         def __calculate_flow(self, row: pd.Series) -> float:
             """
