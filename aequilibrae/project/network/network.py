@@ -23,7 +23,7 @@ from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.osm_builder import OSMBuilder
-from aequilibrae.project.network.ovm_builder import OVMBuilder
+# from aequilibrae.project.network.ovm_builder import OVMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread

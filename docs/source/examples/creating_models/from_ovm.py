@@ -20,13 +20,17 @@ project.new(fldr)
 
 # We can create from a bounding box or a named place.
 # For the sake of this example, we will choose the small nation of Nauru.
-project.network.create_from_ovm(west=148.7077, south=-20.2780, east=148.7324, north=-20.2621, data_source=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
-# ovm_downloader_instance = OVMDownloader(["car", "transit", "bicycle", "walk"],r'C:\Users\penny\git\Aequilibrae')
-# download = ovm_downloader_instance.downloadTransportation([148.7077, -20.2780, 148.7324, -20.2621 ], r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
-# nodes = download[1]
-# links = download[0]
-# links
-# %%
+# project.network.create_from_ovm(west=148.7077, south=-20.2780, east=148.7324, north=-20.2621, data_source=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
+ovm_downloader_instance = OVMDownloader(["car", "transit", "bicycle", "walk"],r'C:\Users\penny\git\Aequilibrae')
+download = ovm_downloader_instance.downloadTransportation([148.7077, -20.2780, 148.7324, -20.2621 ], r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
+
+links = download[0]
+nodes = download[1]
+
+# nodes
+# new = download[2]
+# new
+ # %%
 links = project.network.links.data
 links
 
