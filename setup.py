@@ -89,7 +89,8 @@ if __name__ == "__main__":
         author="Pedro Camargo",
         author_email="c@margo.co",
         url="https://github.com/AequilibraE/aequilibrae",
-        license="See license.txt",
+        license="See LICENSE.TXT",
+        license_files=('LICENSE.TXT',),
         classifiers=[
             "Programming Language :: Python",
             "Programming Language :: Python :: 3.8",
