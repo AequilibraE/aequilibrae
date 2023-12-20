@@ -358,9 +358,10 @@ class ODME(object):
         """
         # Element-wise multiplication of demand matrix by scaling factor
         scaling_factor = self.__get_scaling_factor()
-        self.demand_matrix = self.demand_matrix * scaling_factor
+        #self.demand_matrix = self.demand_matrix * scaling_factor
         for i in range(self.num_classes):
             self.demand_matrices[i] = self.demand_matrices[i] * scaling_factor
+        self.demand_matrix = self.demand_matrices[0]
 
         np.testing.assert_array_equal(self.demand_matrix, self.demand_matrices[0],
             err_msg="matrices not same")
