@@ -57,7 +57,7 @@ class OSMBuilder(WorkerThread):
             self.__worksetup()
             node_count = self.data_structures()
             self.importing_links(node_count, conn)
-            self.__emit_all(["finished_threaded_procedure", 0])
+        self.__emit_all(["finished_threaded_procedure", 0])
 
     def data_structures(self):
         self.logger.info("Separating nodes and links")
