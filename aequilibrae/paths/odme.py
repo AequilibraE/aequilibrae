@@ -63,8 +63,8 @@ class ODME(object):
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
         self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
-        self._demands_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
-        self._demand_dims = self.demand_matrix.shape # Matrix is n x n
+        self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
+        self._dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
         self._count_volumes = count_volumes.copy(deep=True)
@@ -382,9 +382,9 @@ class ODME(object):
         elif self._algorithm == "spiess":
             scaling_factors = self.__spiess()
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
-            scaling_factors = np.ones(self._demand_dims)
+            scaling_factors = np.ones(self._dims)
 
-        self.___record_factor_stats(scaling_factors)
+        self.___record_factor_stats(scaling_factors[0]) # TEMPORARY FOR SINGLE CLASS USE!
         return scaling_factors
 
     def __perform_assignment(self) -> None:
@@ -480,7 +480,7 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         # Steps 1 & 2:
-        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
+        factors = np.empty((len(self._count_volumes), *(self._dims)))
         for i, row in self._count_volumes.iterrows():
             # Create factor matrix:
             if row["obs_volume"] != 0 and row['assign_volume'] != 0:
@@ -498,15 +498,17 @@ class ODME(object):
 
             # If assigned or observed value is 0 we cannot do anything right now
             else:
-                factor_matrix = np.ones(self._demand_dims)
+                factor_matrix = np.ones(self._dims)
             
             factors[i, :, :] = factor_matrix
 
         # If the assigned volume was 0 (or both 0) no OD pair can have any effect
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
-        # Step 3:
-        return [spstats.gmean(factors, axis=0)]
+        # Step 3: TEMPORARILY ONLY RETURNING SINGLE CLASS
+        ret = [np.ones(dims) for dims in self._demand_dims]
+        ret[0] = spstats.gmean(factors, axis=0)
+        return ret
 
     # spiess (Gradient Descent - Objective Function (2,0))
     def __spiess(self) -> np.ndarray:
@@ -518,7 +520,10 @@ class ODME(object):
         """
         gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
         step_size = self.__get_step_size_spiess(gradient_matrix) # Get optimum step size for current iteration
-        return [1 - (step_size * gradient_matrix)]
+        # TEMPORARY FOR SINGLE CLASS STUFF:
+        ret = [np.ones(dims) for dims in self._demand_dims]
+        ret[0] = 1 - (step_size * gradient_matrix)
+        return ret
 
     def __get_derivative_matrix_spiess(self) -> np.ndarray:
         """
@@ -528,7 +533,7 @@ class ODME(object):
         """
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
-        factors = np.empty((len(self._count_volumes), *(self._demand_dims)))
+        factors = np.empty((len(self._count_volumes), *(self._dims)))
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
