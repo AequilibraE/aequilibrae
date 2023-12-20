@@ -116,6 +116,8 @@ class TestODME(TestCase):
 
         Checks we recover the original matrix.
         """
+        algorithm = "gmean"
+
         # Get original flows:
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
@@ -139,13 +141,13 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm="spiess")
+        odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm=algorithm)
         odme.execute()
         new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_vols_spiess.csv")
-        odme.get_factor_stats().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_factors_spiess.csv")
+        odme.get_assignment_data().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")
+        odme.get_factor_stats().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_factors_{algorithm}.csv")
         cumulative_factors = odme.get_cumulative_factors()
-        cumulative_factors.to_csv("/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_spiess.csv")
+        cumulative_factors.to_csv(f"/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_{algorithm}.csv")
 
         # Check results:
         np.testing.assert_allclose(
