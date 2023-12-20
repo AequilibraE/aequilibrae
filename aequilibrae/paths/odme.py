@@ -51,18 +51,19 @@ class ODME(object):
         # Parameters for assignments
         self.assignment = assignment
         self.classes = assignment.classes
+        self.num_classes = len(self.classes)
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
         # Demand matrices
         # The current demand matrices
-        self.demand_matrices = {user_class.__id__: user_class.matrix.matrix_view for user_class in self.classes}
+        self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
         self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix TEMPORARY SINGLE CLASS
         # May be unecessary - if we do keep it need to make a copy ->
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
         self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
-        self._demands_dims = {class_name: self.demand_matrices[class_name].shape for class_name in self.demand_matrices}
+        self._demands_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
         self._demand_dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
@@ -356,7 +357,13 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         # Element-wise multiplication of demand matrix by scaling factor
-        self.demand_matrix = self.demand_matrix * self.__get_scaling_factor()
+        scaling_factor = self.__get_scaling_factor()
+        self.demand_matrix = self.demand_matrix * scaling_factor
+        for i in range(self.num_classes):
+            self.demand_matrices[i] = self.demand_matrices[i] * scaling_factor
+
+        np.testing.assert_array_equal(self.demand_matrix, self.demand_matrices[0],
+            err_msg="matrices not same")
 
         # Recalculate the link flows
         self.__calculate_flows()
