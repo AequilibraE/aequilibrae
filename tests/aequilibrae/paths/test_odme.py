@@ -134,14 +134,18 @@ class TestODME(TestCase):
 
         # Perturb original matrix:
         np.random.seed(0)
-        perturbation_matrix = np.random.uniform(0.99, 1.01, size=self.dims)
+        perturbation = 5 # %
+        perturbation_matrix = np.random.uniform(1 - perturbation/100, 1 + perturbation/100, size=self.dims)
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 10, 0.0001, 5))
+        odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm="spiess")
         odme.execute()
         new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_vols.csv")
+        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_vols_spiess.csv")
+        odme.get_factor_stats().to_csv("/workspaces/aequilibrae/odme_stats/stats_all_factors_spiess.csv")
+        cumulative_factors = odme.get_cumulative_factors()
+        cumulative_factors.to_csv("/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_spiess.csv")
 
         # Check results:
         np.testing.assert_allclose(
@@ -182,10 +186,11 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001))
+        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001), algorithm="spiess")
         odme.execute()
         new_demand, stats = odme.get_results()
         odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
+        odme.get_factor_stats().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_factors.csv")
 
         # Check results:
         np.testing.assert_allclose(

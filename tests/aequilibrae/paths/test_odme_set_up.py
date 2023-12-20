@@ -659,6 +659,8 @@ class TestODMESingleClassSetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
         new_demand = odme.demand_matrix
+        factor_stats = odme.get_factor_stats()
+        assignment_data = odme.get_assignment_data()
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
