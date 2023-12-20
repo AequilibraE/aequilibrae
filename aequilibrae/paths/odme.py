@@ -352,15 +352,14 @@ class ODME(object):
         """
         Runs an inner iteration of the ODME algorithm. 
         This assumes the SL matrices stay constant and modifies
-        the current demand matrix.
+        the current demand matrices.
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
-        # Element-wise multiplication of demand matrix by scaling factor
-        scaling_factor = self.__get_scaling_factor()
-        #self.demand_matrix = self.demand_matrix * scaling_factor
-        for i in range(self.num_classes):
-            self.demand_matrices[i] = self.demand_matrices[i] * scaling_factor
+        # Element-wise multiplication of demand matrices by scaling factors
+        factors = self.__get_scaling_factors()
+        for i, factor in enumerate(factors):
+            self.demand_matrices[i] = self.demand_matrices[i] * factor
         self.demand_matrix = self.demand_matrices[0]
 
         np.testing.assert_array_equal(self.demand_matrix, self.demand_matrices[0],
@@ -372,21 +371,21 @@ class ODME(object):
         # Recalculate convergence level:
         self._obj_func(self)
 
-    def __get_scaling_factor(self) -> np.ndarray:
+    def __get_scaling_factors(self) -> np.ndarray:
         """
-        Returns scaling matrix - depending on algorithm chosen.
+        Returns scaling matrices for each user class - depending on algorithm chosen.
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         if self._algorithm == "gmean":
-            scaling_factor = self.__geometric_mean()
+            scaling_factors = self.__geometric_mean()
         elif self._algorithm == "spiess":
-            scaling_factor = self.__spiess()
+            scaling_factors = self.__spiess()
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
-            scaling_factor = np.ones(self._demand_dims)
+            scaling_factors = np.ones(self._demand_dims)
 
-        self.___record_factor_stats(scaling_factor)
-        return scaling_factor
+        self.___record_factor_stats(scaling_factors)
+        return [scaling_factors]
 
     def __perform_assignment(self) -> None:
         """ 
