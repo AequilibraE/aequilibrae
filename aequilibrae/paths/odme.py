@@ -45,6 +45,8 @@ class ODME(object):
             stop_crit: the maximum number of iterations and the convergence criterion.
             alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
                     of algorithm they choose.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS (MULTI-CLASS UNDER DEVELOPMENT)
         """
         # Parameters for assignments
         self.assignment = assignment
@@ -118,9 +120,11 @@ class ODME(object):
         for user_class in self.classes:
             user_class.set_select_links(
                 {
-                    self.__get_sl_key(row): [(row['link_id'], row['direction'])]
-                    for _, row in
-                    cv[cv['class'] == user_class.__id__].iterrows()
+                    self.__get_sl_key(row): [
+                        (row['link_id'], row['direction'])]
+                        for _, row in
+                        cv[cv['class'] == user_class.__id__
+                    ].iterrows()
                 }
             )
 
@@ -166,6 +170,8 @@ class ODME(object):
         
         (1.) must always be present, but (2.) (the regularisation term) need not be present (ie, specified as 0 by user).
         Default currently set to l1 (manhattan) norm for (1.) with no regularisation term (p2 = 0).
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         p_1 = self._norms[0]
         p_2 = self._norms[1]
@@ -201,7 +207,7 @@ class ODME(object):
         Returns final demand matrix and a dataframe of statistics regarding
         timing and convergence.
 
-        CURRENTLY ONLY WORKS FOR SINGLE CLASS!!!
+        CURRENTLY ONLY WORKS FOR SINGLE CLASS!
         NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
         """
         # return (self.demand_matrices, self._statistics)
@@ -220,8 +226,6 @@ class ODME(object):
         Return the cumulative factor (ratio of final to initial matrix) in a dataframe
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
-        # Possibly center these around 0 and do distribution for size of factors rather than
-        # just min/max as well.
         """
         # Get cumulative factors
         cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix, nan=1)
@@ -285,6 +289,8 @@ class ODME(object):
     def ___record_factor_stats(self, factors: np.ndarray) -> None:
         """
         Logs information on the current scaling matrix.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         factor_stats = [
             self._outer,
@@ -327,7 +333,7 @@ class ODME(object):
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
-            self._convergence_change = float('inf')
+            self._convergence_change = float('inf') # Ensures at least 1 inner convergence is run per loop
             while self._inner < self.max_inner and self._convergence_change > self.inner_convergence_crit:
                 self.__execute_inner_iter()
                 self.__increment_inner()
@@ -346,6 +352,8 @@ class ODME(object):
         Runs an inner iteration of the ODME algorithm. 
         This assumes the SL matrices stay constant and modifies
         the current demand matrix.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         # Element-wise multiplication of demand matrix by scaling factor
         self.demand_matrix = self.demand_matrix * self.__get_scaling_factor()
@@ -358,8 +366,9 @@ class ODME(object):
 
     def __get_scaling_factor(self) -> np.ndarray:
         """
-        Returns scaling matrix - depends on algorithm chosen.
-        Currently implementing default as geometric mean.
+        Returns scaling matrix - depending on algorithm chosen.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
         if self._algorithm == "gmean":
             scaling_factor = self.__geometric_mean()
@@ -377,6 +386,8 @@ class ODME(object):
         the results in the relevant fields.
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS IN DEVELOPMENT)
         """
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         self.assignclass.matrix.matrix_view = self.demand_matrix
@@ -421,8 +432,11 @@ class ODME(object):
     def __calculate_flows(self) -> None:
         """
         Calculates and stores link flows using current sl_matrices & demand matrix.
+
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
 
+        # Calculate a single flow:
         def __calculate_flow(self, row: pd.Series) -> float:
             """
             Given a single row of the count volumes dataframe, 
@@ -432,11 +446,14 @@ class ODME(object):
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             return np.sum(sl_matrix * self.demand_matrix)
 
+        # Calculate flows for all rows:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: __calculate_flow(self, row),
             axis=1)
 
     # Algorithm Specific Functions:
+
+    # gmean (Geometric Mean):
     def __geometric_mean(self) -> np.ndarray:
         """
         Calculates scaling factor based on geometric mean of ratio between 
@@ -484,6 +501,7 @@ class ODME(object):
         # Step 3:
         return spstats.gmean(factors, axis=0)
 
+    # spiess (Gradient Descent - Objective Function (2,0))
     def __spiess(self) -> np.ndarray:
         """
         Calculates scaling factor based on gradient descent method via SL matrix,
@@ -494,7 +512,7 @@ class ODME(object):
         gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
         step_size = self.__get_step_size_spiess(gradient_matrix) # Get optimum step size for current iteration
         return 1 - (step_size * gradient_matrix)
-    
+
     def __get_derivative_matrix_spiess(self) -> np.ndarray:
         """
         Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
