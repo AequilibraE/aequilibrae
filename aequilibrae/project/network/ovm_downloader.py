@@ -153,53 +153,15 @@ class OVMDownloader(WorkerThread):
             """
             c.execute(sql_node)
 
-            # creating links geodataframe
+            # Creating links GeoDataFrame
             df_link = pd.read_parquet(output_file_link)
             geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
             gdf_link = gpd.GeoDataFrame(df_link,geometry=geo_link)
 
-            # creating nodes geodataframe
+            # Creating nodes GeoDataFrame
             df_node = pd.read_parquet(output_file_node)
             geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
             gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
-
-            
-            # print(f"node geo: {gdf_node['geometry']}")
-            # print(f"node geo: {gdf_link['geometry']}")
-
-            # line = LineString (148.7165748 -20.2730668, 148.7165148 -20.273062, 148.7164585 -20.2730418, 148.7164104 -20.2730078)
-            # line_segments = self.segments(line)
-            # # resultt = split(gdf_node['geometry']}")
-            gdf_link['a_node'] = None
-            gdf_link['b_node'] = None
-            gdf_link['num_node'] = None
-            split_lines = []
-            n = 0
-            # for connector in gdf_link['connectors']:
-            #     # for goems in gdf_link['geometry']:
-            #     #     segmentize(ids,2)
-            #         # print(count_coordinates(ids))
-            #     print(np.size(connector))
-            #     print(connector)
-
-                
-            #     # for i in range(count_coordinates(ids) - 1):
-            #     # if np.size(connector) >2:
-                
-            #     for i in range(np.size(connector) - 1):
-            #         link_segments = self.segments(gdf_link['geometry'][n])
-            #         print(f'link_segment: {link_segments}')
-            #         for segment in link_segments:
-            #             gdf_link['a_node'][n] = connector[i]
-            #             gdf_link.loc[n, 'b_node'] = connector[i + 1]
-            #             gdf_link.loc[n, 'geometry'] = segment
-            #             print(f'segment: {segment} - {n}')
-            #             gdf_link.loc[n, 'num_node'] = np.size(connector) 
-            #             n += 1
-            #     print(f'n: {n}')
-            #     print()
-            # print(f'n: {n}')
-                # n += 1
                     
             # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
@@ -222,7 +184,6 @@ class OVMDownloader(WorkerThread):
                         rows.append(new_row)
                     processed_df = gpd.GeoDataFrame(rows)
                 elif np.size(connectors) == 2:
-                    # For cases where 'Connectors' has 2 elements
                     processed_df = gpd.GeoDataFrame({'a_node': connectors[0], 'b_node': connectors[-1], 'link_type': link_type, 'speed': speed, 'ovm_id': ovm_id, 'geometry': geometry}, index=[0])
                 else:
                     raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
@@ -235,58 +196,39 @@ class OVMDownloader(WorkerThread):
                 processed_df = process_row(row)
                 result_dfs.append(processed_df)
 
-
             # Concatenate the resulting DataFrames into a final GeoDataFrame
             final_result = pd.concat(result_dfs, ignore_index=True)
-
-            
-
-
 
             # adding neccassary columns for aequilibrea data frame
             final_result['ogc_fid'] = 1
             final_result['link_id'] = 1
-
-          
             final_result['direction'] = 0
             final_result['distance'] = 1
-
-
-            mode_codes, not_found_tags = self.modes_per_link_type()
-            final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
-
-
             final_result['name'] = 1
             final_result['travel_time'] = 1
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-
-            
-
+            mode_codes, not_found_tags = self.modes_per_link_type()
+            final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
 
             gdf_node['ogc_fid'] = 1
             gdf_node['node_id'] = 1
             gdf_node['is_centroid'] = 0
-            gdf_node['modes'] = 1
-            gdf_node['link_types'] = 1
 
             common_nodes = final_result['a_node'].isin(gdf_node['ovm_id'])
             # Check if any common nodes exist
-            if common_nodes.any():
-                # At least one common node is found
-                print("Common nodes exist.")
-                
-                # You can access the DataFrame of matched rows using boolean indexing
+            if common_nodes.any():                
+                # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
                 matched_rows = final_result[common_nodes]
+
+                # Create the 'link_types' and 'modes' columns for the 'gdf_node' DataFrame
                 gdf_node['link_types'] = matched_rows['link_type']
                 gdf_node['modes'] = matched_rows['modes']
             else:
                 # No common nodes found
-                print("No common nodes.")
-                # gdf_node['link_types'] = gdf_link['link_type']
-                # gdf_node['modes'] = gdf_link['modes']
-
+                raise ValueError("No common nodes.")
+                
 
             link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
             final_result = final_result[link_order]
