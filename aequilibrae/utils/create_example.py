@@ -1,6 +1,9 @@
 import zipfile
 import os
 from os.path import dirname, join
+from pathlib import Path
+from typing import List
+
 from aequilibrae.project import Project
 
 
@@ -26,3 +29,8 @@ def create_example(path: str, from_model="sioux_falls") -> Project:
     proj = Project()
     proj.open(path)
     return proj
+
+
+def list_examples() -> List[str]:
+    pth = Path(__file__).parent.parent / "reference_files"
+    return [str(x.stem) for x in pth.glob("*.zip")]

@@ -25,12 +25,15 @@ from os.path import join
 from math import sqrt
 from shapely.geometry import Point
 import shapely.wkb
-from aequilibrae.utils.create_example import create_example
+from aequilibrae.utils.create_example import create_example, list_examples
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
+
+# We can print the list of examples that ship with AequilibraE
+print(list_examples())
 
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
