@@ -354,7 +354,7 @@ class ODME(object):
         This assumes the SL matrices stay constant and modifies
         the current demand matrices.
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS UNDER DEVELOPMENT)
         """
         # Element-wise multiplication of demand matrices by scaling factors
         factors = self.__get_scaling_factors()
@@ -371,7 +371,7 @@ class ODME(object):
         # Recalculate convergence level:
         self._obj_func(self)
 
-    def __get_scaling_factors(self) -> np.ndarray:
+    def __get_scaling_factors(self) -> list[np.ndarray]:
         """
         Returns scaling matrices for each user class - depending on algorithm chosen.
 
@@ -385,7 +385,7 @@ class ODME(object):
             scaling_factors = np.ones(self._demand_dims)
 
         self.___record_factor_stats(scaling_factors)
-        return [scaling_factors]
+        return scaling_factors
 
     def __perform_assignment(self) -> None:
         """ 
@@ -506,7 +506,7 @@ class ODME(object):
         factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
 
         # Step 3:
-        return spstats.gmean(factors, axis=0)
+        return [spstats.gmean(factors, axis=0)]
 
     # spiess (Gradient Descent - Objective Function (2,0))
     def __spiess(self) -> np.ndarray:
@@ -518,7 +518,7 @@ class ODME(object):
         """
         gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
         step_size = self.__get_step_size_spiess(gradient_matrix) # Get optimum step size for current iteration
-        return 1 - (step_size * gradient_matrix)
+        return [1 - (step_size * gradient_matrix)]
 
     def __get_derivative_matrix_spiess(self) -> np.ndarray:
         """
