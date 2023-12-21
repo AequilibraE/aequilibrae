@@ -100,7 +100,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Check result:
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
 
@@ -124,7 +124,7 @@ class TestODMESingleClassSetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with 2 count volumes of 0 does not return 0 matrix",
         )
 
@@ -148,7 +148,7 @@ class TestODMESingleClassSetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with many count volumes of 0 does not return 0 matrix",
         )
 
@@ -172,7 +172,7 @@ class TestODMESingleClassSetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with single non-zero count volume does not return 0 matrix",
         )
 
@@ -196,7 +196,7 @@ class TestODMESingleClassSetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with two non-zero count volumes does not return 0 matrix",
         )
 
@@ -220,7 +220,7 @@ class TestODMESingleClassSetUp(TestCase):
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_allclose(
                 np.zeros(self.matrix.matrix_view.shape),
-                odme.demand_matrix,
+                odme.get_demands(),
                 err_msg="0 demand matrix with many non-zero count volumes does not return 0 matrix",
         )
 
@@ -247,7 +247,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
-            odme.demand_matrix[self.index[13], self.index[12]],
+            odme.get_demands()[self.index[13], self.index[12]],
             0,
             err_msg="Demand matrix with single 0 at OD 13-12, has non-zero demand following ODME",
         )
@@ -282,7 +282,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
         np.testing.assert_array_equal(
-            odme.demand_matrix[self.index[18], self.index[6]],
+            odme.get_demands()[self.index[18], self.index[6]],
             0,
             err_msg="Demand matrix with single 0 at OD 18-6, has non-zero demand following ODME",
         )
@@ -314,7 +314,7 @@ class TestODMESingleClassSetUp(TestCase):
         err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
         for o, d in zeroes:
             np.testing.assert_array_equal(
-                odme.demand_matrix[self.index[o], self.index[d]],
+                odme.get_demands()[self.index[o], self.index[d]],
                 0,
                 err_msg=err_msg,
             )
@@ -352,7 +352,7 @@ class TestODMESingleClassSetUp(TestCase):
         err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
         for o, d in zeroes:
             np.testing.assert_array_equal(
-                odme.demand_matrix[self.index[o], self.index[d]],
+                odme.get_demands()[self.index[o], self.index[d]],
                 0,
                 err_msg=err_msg,
             )
@@ -386,7 +386,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Check results
         np.testing.assert_allclose(
             init_demand,
-            odme.demand_matrix,
+            odme.get_demands(),
             err_msg="Demand matrix changed when given single link with observed volume equal to initial assigned volume"
         )
 
@@ -420,7 +420,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Check results
         np.testing.assert_allclose(
             init_demand,
-            odme.demand_matrix,
+            odme.get_demands(),
             err_msg="Demand matrix changed when given many links with observed volume equal to initial assigned volumes"
         )
     
@@ -441,7 +441,7 @@ class TestODMESingleClassSetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
-        self.assertEqual(odme.demand_matrix.shape, self.dims)
+        self.assertEqual(odme.get_demands().shape, self.dims)
 
     def test_basic_1_4_b(self) -> None:
         """
@@ -461,7 +461,7 @@ class TestODMESingleClassSetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
 
-        self.assertEqual(odme.demand_matrix.shape, self.dims)
+        self.assertEqual(odme.get_demands().shape, self.dims)
 
     # 2) Input Validity
     def test_basic_2_1(self) -> None:
@@ -611,7 +611,7 @@ class TestODMESingleClassSetUp(TestCase):
         odme.execute()
 
         # Get Results:
-        new_demand = odme.demand_matrix
+        new_demand = odme.get_demands()
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
@@ -658,9 +658,9 @@ class TestODMESingleClassSetUp(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.demand_matrix
-        factor_stats = odme.get_factor_stats()
-        assignment_data = odme.get_assignment_data()
+        new_demand = odme.get_demands()
+        factor_stats = odme.get_iteration_factors()
+        assignment_data = odme.get_all_statistics()
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
@@ -700,7 +700,7 @@ class TestODMESingleClassSetUp(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand, stats = odme.get_results()
+        new_demand = odme.get_demands()
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
@@ -724,7 +724,7 @@ class TestODMESingleClassSetUp(TestCase):
 
         # Assert we have perturbed the matrix view itself (not a copy):
         np.testing.assert_equal(
-            odme.demand_matrix,
+            odme.get_demands(),
             self.matrix.matrix_view,
             err_msg="ODME should perturb original matrix_view!"
         )

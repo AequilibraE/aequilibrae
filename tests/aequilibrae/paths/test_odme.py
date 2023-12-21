@@ -99,7 +99,7 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand, stats = odme.get_results()
+        new_demand = odme.get_demands()
 
         # Check results:
         np.testing.assert_allclose(
@@ -116,7 +116,7 @@ class TestODME(TestCase):
 
         Checks we recover the original matrix.
         """
-        algorithm = "gmean"
+        algorithm = "spiess"
 
         # Get original flows:
         self.assignment.execute()
@@ -143,11 +143,10 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm=algorithm)
         odme.execute()
-        new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")
-        odme.get_factor_stats().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_factors_{algorithm}.csv")
-        cumulative_factors = odme.get_cumulative_factors()
-        cumulative_factors.to_csv(f"/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_{algorithm}.csv")
+        new_demand = odme.get_demands()
+        odme.get_all_statistics().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")
+        odme.get_iteration_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_factors_{algorithm}.csv")
+        odme.get_cumulative_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_{algorithm}.csv")
 
         # Check results:
         np.testing.assert_allclose(
@@ -190,9 +189,9 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001), algorithm="spiess")
         odme.execute()
-        new_demand, stats = odme.get_results()
-        odme.get_assignment_data().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
-        odme.get_factor_stats().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_factors.csv")
+        new_demand = odme.get_demands()
+        odme.get_all_statistics().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
+        odme.get_iteration_factors().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_factors.csv")
 
         # Check results:
         np.testing.assert_allclose(

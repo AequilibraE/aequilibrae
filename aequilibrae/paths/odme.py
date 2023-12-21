@@ -102,8 +102,7 @@ class ODME(object):
         # Potentially set up some sort of logging information here:
 
         # Dataframe to log statistical information:
-        self._statistics = pd.DataFrame(columns=self.STATISTICS_COLS)
-        self._stats = []
+        self._statistics = []
 
         # Stats on scaling matrices
         self._factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
@@ -203,20 +202,18 @@ class ODME(object):
             self._obj_func = __obj_func
 
     # Output/Results/Statistics:
-    def get_results(self) -> Tuple[np.ndarray, pd.DataFrame]:
+    def get_demands(self) -> Tuple[np.ndarray, pd.DataFrame]:
         """
-        Returns final demand matrix and a dataframe of statistics regarding
-        timing and convergence.
+        Returns demand matrices (can be called before or after execution).
 
         CURRENTLY ONLY WORKS FOR SINGLE CLASS!
         NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
         """
-        # return (self.demand_matrices, self._statistics)
-        return (self.demand_matrix, self._statistics)
+        return self.demand_matrices[0] # Remove [0] when generalising to multi-class
 
-    def get_factor_stats(self) -> pd.DataFrame:
+    def get_iteration_factors(self) -> pd.DataFrame:
         """
-        Returns a dataframe on statistics of factors for every iteration.
+        Returns a dataframe on statistics of factors for each iteration.
 
         ONLY IMPLEMENTED FOR SINGLE CLASS!!!
         """
@@ -224,7 +221,7 @@ class ODME(object):
 
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
-        Return the cumulative factor (ratio of final to initial matrix) in a dataframe
+        Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
         """
@@ -236,28 +233,23 @@ class ODME(object):
 
         return cumulative_factors_df
 
-    def get_assignment_data(self) -> pd.DataFrame:
+    def get_all_statistics(self) -> pd.DataFrame:
         """
-        Returns dataframe of all assignment values across iterations.
+        Returns dataframe of all assignment values across iterations,
+        along with other statistical information (see self.FACTOR_COLS) 
+        per iteration, per count volume.
         """
-        return pd.concat(self._stats, ignore_index=True)
+        return pd.concat(self._statistics, ignore_index=True)
 
     def __log_stats(self) -> None:
         """
-        Adds next row to statistics dataframe and data dictionary.
+        Computes statistics regarding previous iteration and stores them in the statistics list.
         """
-        # Statistics DataFrame:
+        # Compute Statistics:
         old_time = self._time
         self._time = time.time()
         loop_time = self._time - old_time
         self._total_time += loop_time
-        to_log = [self._outer, self._inner, self._last_convergence, self._convergence_change, loop_time]
-
-        # Add row:
-        self._statistics.loc[len(self._statistics)] = {
-            col : to_log[i]
-            for i, col in enumerate(self.STATISTICS_COLS)
-        }
 
         # Create Data:
         data = self._count_volumes.copy(deep=True)
@@ -271,7 +263,8 @@ class ODME(object):
         data["Assigned - Observed"] = (self._count_volumes['assign_volume'].to_numpy() -
             self._count_volumes["obs_volume"].to_numpy())
 
-        self._stats.append(data)
+        # Add data to current list of dataframes
+        self._statistics.append(data)
 
     def ___record_factor_stats(self, factors: np.ndarray) -> None:
         """
