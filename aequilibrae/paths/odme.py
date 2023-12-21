@@ -242,14 +242,6 @@ class ODME(object):
         """
         return pd.concat(self._stats, ignore_index=True)
 
-    def __get_data_key(self, outer: int, inner: int) -> str:
-        """
-        Returns a key for a particular set of assignment data corresponding
-        to a particular outer/inner iteration.
-        """
-        # Currently fudging this to make the types the same always
-        return f"data_{int(outer)}_{int(inner)}"
-
     def __log_stats(self) -> None:
         """
         Adds next row to statistics dataframe and data dictionary.
