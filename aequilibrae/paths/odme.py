@@ -69,7 +69,6 @@ class ODME(object):
         # Observed Links & Associated Volumes
         self._count_volumes = count_volumes.copy(deep=True)
         self._num_counts = len(self._count_volumes)
-        self._data = dict() # Contains a dataframe for each inner/outer iteration with all assigned & observed volumes.
 
         self._sl_matrices = None # Currently dictionary of proportion matrices
         
@@ -104,6 +103,7 @@ class ODME(object):
 
         # Dataframe to log statistical information:
         self._statistics = pd.DataFrame(columns=self.STATISTICS_COLS)
+        self._stats = []
 
         # Stats on scaling matrices
         self._factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
@@ -240,13 +240,7 @@ class ODME(object):
         """
         Returns dataframe of all assignment values across iterations.
         """
-        assignment_data = pd.concat(
-            [self._data[self.__get_data_key(row['Outer Loop #'], row['Inner Loop #'])]
-            for _, row in self._statistics.iterrows()
-        ],
-            ignore_index=True
-        )
-        return assignment_data
+        return pd.concat(self._stats, ignore_index=True)
 
     def __get_data_key(self, outer: int, inner: int) -> str:
         """
@@ -285,7 +279,7 @@ class ODME(object):
         data["Assigned - Observed"] = (self._count_volumes['assign_volume'].to_numpy() -
             self._count_volumes["obs_volume"].to_numpy())
 
-        self._data[self.__get_data_key(self._outer, self._inner)] = data
+        self._stats.append(data)
 
     def ___record_factor_stats(self, factors: np.ndarray) -> None:
         """
@@ -361,9 +355,6 @@ class ODME(object):
         for i, factor in enumerate(factors):
             self.demand_matrices[i] = self.demand_matrices[i] * factor
         self.demand_matrix = self.demand_matrices[0]
-
-        np.testing.assert_array_equal(self.demand_matrix, self.demand_matrices[0],
-            err_msg="matrices not same")
 
         # Recalculate the link flows
         self.__calculate_flows()
