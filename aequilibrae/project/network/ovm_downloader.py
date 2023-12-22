@@ -51,6 +51,7 @@ class OVMDownloader(WorkerThread):
         self.report = []
         self.json = []
         self.nodes = {}
+        self.node_ids = {}
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path / 'theme=transportation').replace("\\", "/")
 
@@ -172,7 +173,6 @@ class OVMDownloader(WorkerThread):
             gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node['node_id']) + 1)))
             gdf_node['is_centroid'] = 0
 
-            print(self.nodes['8f9d0e12872ea89-177FE3F1D32C0C41']['node_id'])
 
             # Function to process each row and create a new GeoDataFrame
             def process_row(gdf_link):
@@ -214,9 +214,35 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-            # all_nodes = [list(final_result['a_node'][x],final_result['a_node'][x]) for x in range(ii, jj + 1)]
-            # geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
-            # geometry = "LINESTRING ({})".format(", ".join(geometry))
+            # print(f'node_ids: {self.node_ids}')
+            # print(f'nodes: {self.nodes}')
+            # print()
+                
+            print(final_result['geometry'][2])
+            print(final_result['a_node'][2])
+            print(final_result['b_node'][2])
+            print(gdf_node['geometry'][final_result['a_node'][2] -10000])
+            print(gdf_node['geometry'][final_result['b_node'][2] -10000])
+            print()
+
+            geometry = []
+            all_nodes = [list((self.node_ids[final_result['a_node'][x]], self.node_ids[final_result['b_node'][x]])) for x in range(len(final_result['b_node']))]
+            for lists in all_nodes:
+                geo = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in lists]
+                geometry.append("LINESTRING ({})".format(", ".join(geo)))
+            final_result['geometry'] = pd.Series(geometry)
+            geo_link = gpd.GeoSeries.from_wkt(final_result.geometry, crs=4326)
+            # print(geo_link)
+            final_result = gpd.GeoDataFrame(final_result,geometry=geo_link)
+
+                
+            print(final_result['geometry'][2])
+            print(final_result['a_node'][2])
+            print(final_result['b_node'][2])
+            print(gdf_node['geometry'][final_result['a_node'][2] -10000])
+            print(gdf_node['geometry'][final_result['b_node'][2] -10000])
+            print()
+
 
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
@@ -234,7 +260,7 @@ class OVMDownloader(WorkerThread):
             else:
                 # No common nodes found
                 raise ValueError("No common nodes.")
-                
+
 
             link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
             final_result = final_result[link_order]
@@ -252,11 +278,15 @@ class OVMDownloader(WorkerThread):
         return g_dataframes    
 
     def create_node_ids(self, data_frame):
+        '''
+        Creates node_ids as well as the self.nodes and self.node_ids dictories
+        '''
         node_ids = []
         data_frame['node_id'] = 1
         for i in range(len(data_frame['ovm_id'])):
             node_count = i + self.node_start
             node_ids.append(node_count)
+            self.node_ids[node_count] = data_frame['ovm_id'][i]
             self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x}
         data_frame['node_id'] = pd.Series(node_ids)
         return data_frame['node_id']
