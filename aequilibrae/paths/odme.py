@@ -64,7 +64,6 @@ class ODME(object):
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
         self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
         self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
-        self._dims = self.demand_matrix.shape # Matrix is n x n
 
         # Observed Links & Associated Volumes
         self._count_volumes = count_volumes.copy(deep=True)
@@ -224,8 +223,6 @@ class ODME(object):
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
         Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
-
-        ONLY IMPLEMENTED FOR SINGLE CLASS
         """
         # Get cumulative factors for each demand matrix
         cumulative_factors = []
@@ -366,7 +363,7 @@ class ODME(object):
         elif self._algorithm == "spiess":
             scaling_factors = self.__spiess()
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
-            scaling_factors = np.ones(self._dims)
+            scaling_factors = [np.ones(dims) for dims in self._demand_dims]
 
         self.___record_factor_stats(scaling_factors)
         return scaling_factors
@@ -464,7 +461,7 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         # Steps 1 & 2:
-        factors = np.empty((len(self._count_volumes), *(self._dims)))
+        factors = np.empty((len(self._count_volumes), *(self._demand_dims[0])))
         for i, row in self._count_volumes.iterrows():
             # Create factor matrix:
             if row["obs_volume"] != 0 and row['assign_volume'] != 0:
@@ -482,7 +479,7 @@ class ODME(object):
 
             # If assigned or observed value is 0 we cannot do anything right now
             else:
-                factor_matrix = np.ones(self._dims)
+                factor_matrix = np.ones(self._demand_dims[0])
             
             factors[i, :, :] = factor_matrix
 
@@ -517,7 +514,7 @@ class ODME(object):
         """
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
-        factors = np.empty((len(self._count_volumes), *(self._dims)))
+        factors = np.empty((len(self._count_volumes), *(self._demand_dims[0])))
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
