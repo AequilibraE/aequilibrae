@@ -6,12 +6,12 @@ Implementation of ODME algorithms:
 # with biconjugate/conjugate frank-wolfe
 
 # NOTE - Functions which are still Single Class Only include:
-#           Initialiser
-#           Objective Function
+#           Initialiser - extraction of pce's & use of class to indices?
+#           Objective Function - Check how this works with pce
 #           Inner Execution
 #           Perform Assignment
-#           Extraction of Flows
-#           Calculation of Flows
+#           Extraction of Flows - Check how this works with pce
+#           Calculation of Flows - Check how this works with pce
 #
 #               All the actual algorithms (but these should be done separately
 #               and moved to a different class where they can interact with
@@ -72,12 +72,11 @@ class ODME(object):
 
         # Current demand matrices:
         self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
-        self.demand_matrix = self.demand_matrices[0]  # The current demand matrix TEMPORARY SINGLE CLASS
         # May be unecessary - if we do keep it need to make a copy ->
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         # Initial demand matrices:
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
-        self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
+        self.init_demand_matrix = np.copy(self.demand_matrices[0]) # - for now assume only one class TEMPORARY SINGLE CLASS
         self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
 
         # Observed Links & Associated Volumes
@@ -201,7 +200,7 @@ class ODME(object):
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             assign_vals = self._count_volumes['assign_volume'].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrix)**p_2) / p_2
+            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrices[0])**p_2) / p_2
             self.__set_convergence_values(obj1 + regularisation)
 
         def __obj_func(self) -> None:
@@ -354,7 +353,6 @@ class ODME(object):
         factors = self.__get_scaling_factors()
         for i, factor in enumerate(factors):
             self.demand_matrices[i] = self.demand_matrices[i] * factor
-        self.demand_matrix = self.demand_matrices[0]
 
         # Recalculate the link flows
         self.__calculate_flows()
@@ -467,7 +465,7 @@ class ODME(object):
             value.
             """
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            return np.sum(sl_matrix * self.demand_matrix)
+            return np.sum(sl_matrix * self.demand_matrices[0])
 
         # Calculate flows for all rows:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
@@ -573,7 +571,7 @@ class ODME(object):
         flow_derivatives = np.empty(self._num_counts)
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            flow_derivatives[i] = -np.sum(self.demand_matrix * sl_matrix * gradient)
+            flow_derivatives[i] = -np.sum(self.demand_matrices[0] * sl_matrix * gradient)
 
         # Calculate minimising step length:
         errors = self._count_volumes['obs_volume'].to_numpy() - self._count_volumes['assign_volume'].to_numpy()
@@ -600,8 +598,8 @@ class ODME(object):
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        upper_mask = np.logical_and(self.demand_matrix > 0, gradient > 0)
-        lower_mask = np.logical_and(self.demand_matrix > 0, gradient < 0)
+        upper_mask = np.logical_and(self.demand_matrices[0] > 0, gradient > 0)
+        lower_mask = np.logical_and(self.demand_matrices[0] > 0, gradient < 0)
 
         # Account for either mask being empty
         if np.any(upper_mask):
