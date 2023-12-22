@@ -371,7 +371,11 @@ class ODME(object):
     def __perform_assignment(self) -> None:
         """ 
         Uses current demand matrix to perform an assignment, then save
-        the results in the relevant fields.
+        the assigned flows and select link matrices. Also recalculates the 
+        objective function following an assignment.
+
+        IS THIS FUNCTION DOING TOO MUCH?
+
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
 
@@ -395,16 +399,28 @@ class ODME(object):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
                 self._sl_matrices[link] = np.nan_to_num(
-                    np.squeeze(sl_matrices[link], axis=2) / self.demand_matrices[i]
-                )
+                    np.squeeze(sl_matrices[link], axis=2) / self.demand_matrices[i])
         # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake),
         # but we only have one of each per set of select links so we can ignore this for now.
         # In future when multiple class ODME is implemented this needs to be checked/changed.
 
-        # Extract and store array of assigned volumes to select links
+        # Extract and store array of assigned volumes to the select links
+        self.__extract_flows()
+
+        # Recalculate convergence values
+        self._obj_func(self)
+
+    def __extract_flows(self) -> None:
+        """
+        Extracts and stores assigned flows (corresponding for those for which we have
+        observations - ie count volumes).
+
+        ONLY IMPLEMENTED FOR SINGLE CLASS!
+        """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
-        
+
+        # For extracting a single assigned flow:
         def extract_flow(row) -> None:
             """
             Extracts flow corresponding to particular link (from row) and return it.
@@ -414,14 +430,12 @@ class ODME(object):
             # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
             return assign_df.loc[assign_df["link_id"] == row["link_id"],
                 col[row["direction"]]].values[0]
-
+        
+        # Extract a flow for each count volume:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
-            lambda row: extract_flow(row),
+            extract_flow,
             axis=1
         )      
-
-        # Recalculate convergence values
-        self._obj_func(self)
 
     def __calculate_flows(self) -> None:
         """
@@ -444,6 +458,7 @@ class ODME(object):
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             lambda row: __calculate_flow(self, row),
             axis=1)
+
 
     # Algorithm Specific Functions:
 
