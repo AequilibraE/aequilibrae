@@ -53,6 +53,7 @@ class ODME(object):
         self.classes = assignment.classes
         self.num_classes = len(self.classes)
         self.class_names = [user_class.__id__ for user_class in self.classes]
+        self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
         self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
         # Demand matrices
@@ -72,7 +73,6 @@ class ODME(object):
         self._sl_matrices = None # Currently dictionary of proportion matrices
         
         # Set all select links:
-        #self.assignclass.set_select_links(self.__get_select_links())
         self.__set_select_links()
 
         # Not yet relevant - Algorithm Specifications:
@@ -171,6 +171,8 @@ class ODME(object):
         Default currently set to l1 (manhattan) norm for (1.) with no regularisation term (p2 = 0).
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
+        NOT YET COMPLETED FOR SINGLE CLASS - STILL UNDER DEVELOPMENT!
+        HOW DO I GENERALISE THIS TO MULTI-CLASS
         """
         p_1 = self._norms[0]
         p_2 = self._norms[1]
@@ -378,7 +380,8 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS IN DEVELOPMENT)
         """
         # Change matrix.matrix_view to the current demand matrix (as np.array)
-        self.assignclass.matrix.matrix_view = self.demand_matrix
+        for i, assignclass in enumerate(self.classes):
+            assignclass.matrix.matrix_view = self.demand_matrices[i]
 
         # Perform the assignment
         self.assignment.execute()
