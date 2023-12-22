@@ -7,8 +7,8 @@ Implementation of ODME algorithms:
 
 # NOTE - Functions which are still Single Class Only include:
 #           Initialiser - extraction of pce's & use of class to indices?
+#               -> Needs to be seriously cleaned up.
 #           Objective Function - Check how this works with pce
-#           Inner Execution
 #           Perform Assignment
 #           Extraction of Flows - Check how this works with pce
 #           Calculation of Flows - Check how this works with pce
@@ -76,7 +76,6 @@ class ODME(object):
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         # Initial demand matrices:
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
-        self.init_demand_matrix = np.copy(self.demand_matrices[0]) # - for now assume only one class TEMPORARY SINGLE CLASS
         self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
 
         # Observed Links & Associated Volumes
@@ -185,6 +184,7 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
         NOT YET COMPLETED FOR SINGLE CLASS - STILL UNDER DEVELOPMENT!
         HOW DO I GENERALISE THIS TO MULTI-CLASS
+        NEED TO CHECK HOW PCE AFFECTS THIS!
         """
         p_1 = self._norms[0]
         p_2 = self._norms[1]
@@ -200,7 +200,7 @@ class ODME(object):
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             assign_vals = self._count_volumes['assign_volume'].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            regularisation = np.sum(np.abs(self.init_demand_matrix - self.demand_matrices[0])**p_2) / p_2
+            regularisation = np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
             self.__set_convergence_values(obj1 + regularisation)
 
         def __obj_func(self) -> None:
@@ -346,8 +346,6 @@ class ODME(object):
         Runs an inner iteration of the ODME algorithm. 
         This assumes the SL matrices stay constant and modifies
         the current demand matrices.
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS UNDER DEVELOPMENT)
         """
         # Element-wise multiplication of demand matrices by scaling factors
         factors = self.__get_scaling_factors()
@@ -429,6 +427,7 @@ class ODME(object):
         observations - ie count volumes).
 
         ONLY IMPLEMENTED FOR SINGLE CLASS!
+        NEED TO CHECK HOW PCE AFFECTS THIS!
         """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
@@ -455,6 +454,7 @@ class ODME(object):
         Calculates and stores link flows using current sl_matrices & demand matrix.
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
+        NEED TO CHECK HOW PCE AFFECTS THIS!
         """
 
         # Calculate a single flow:
