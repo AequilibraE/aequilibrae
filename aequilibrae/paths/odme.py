@@ -52,6 +52,7 @@ class ODME(object):
         self.assignment = assignment
         self.classes = assignment.classes
         self.num_classes = len(self.classes)
+        # Everything is implicitly ordered by this:
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
@@ -424,18 +425,18 @@ class ODME(object):
         def extract_flow(row) -> None:
             """
             Extracts flow corresponding to particular link (from row) and return it.
+            For inner iterations need to calculate this via sum sl_matrix * demand_matrix
 
             NOT YET GENERALISED FOR MULTI-CLASS!!!
             """
-            # ^For inner iterations need to calculate this via sum sl_matrix * demand_matrix
-            return assign_df.loc[assign_df["link_id"] == row["link_id"],
+            return assign_df.loc[assign_df["link_id"] == row["link_id"], 
                 col[row["direction"]]].values[0]
         
         # Extract a flow for each count volume:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             extract_flow,
             axis=1
-        )      
+        )
 
     def __calculate_flows(self) -> None:
         """
@@ -559,7 +560,7 @@ class ODME(object):
         for i, row in self._count_volumes.iterrows():
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             flow_derivatives[i] = -np.sum(self.demand_matrix * sl_matrix * gradient)
-        
+
         # Calculate minimising step length:
         errors = self._count_volumes['obs_volume'].to_numpy() - self._count_volumes['assign_volume'].to_numpy()
         min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
