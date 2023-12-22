@@ -5,6 +5,21 @@ Implementation of ODME algorithms:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
+# NOTE - Functions which are still Single Class Only include:
+#           Initialiser
+#           Objective Function
+#           Get demands
+#           Inner Execution
+#           Perform Assignment
+#           Extraction of Flows
+#           Calculation of Flows
+#               
+#               All the actual algorithms (but these should be done separately
+#               and moved to a different class where they can interact with
+#               Cython and be ran far more efficiently). I also need to re-derive
+#               and very carefully go through the assumptions when finding the generalisation
+#               of these algorithms to multi-class.
+
 from typing import Tuple
 import time
 import numpy as np
@@ -216,8 +231,6 @@ class ODME(object):
     def get_iteration_factors(self) -> pd.DataFrame:
         """
         Returns a dataframe on statistics of factors for each iteration.
-
-        ONLY IMPLEMENTED FOR SINGLE CLASS!!!
         """
         return self._factor_stats
 
@@ -271,10 +284,10 @@ class ODME(object):
         # Add data to current list of dataframes
         self._statistics.append(data)
 
-    def ___record_factor_stats(self, factors: list[np.ndarray]) -> None:
+    def __record_factor_stats(self, factors: list[np.ndarray]) -> None:
         """
         Logs information on the current scaling matrix (ie
-        factor statistics per iteration).
+        factor statistics per iteration per class).
         """
         # Create statistics on all new factors:
         data = []
@@ -358,6 +371,11 @@ class ODME(object):
         Returns scaling matrices for each user class - depending on algorithm chosen.
         Note: we expect any algorithm to return a list of factor matrices in order of the
         stored user classes.
+
+        NOTE - In future we should separate the algorithms from this class, and this function
+        will be the only one which ever needs to interact with the algorithms, and simply needs
+        to receive a list of scaling factors after initialising an algorithm and passing it the current
+        state of this ODME object.
         """
         if self._algorithm == "gmean":
             scaling_factors = self.__geometric_mean()
@@ -366,7 +384,7 @@ class ODME(object):
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
             scaling_factors = [np.ones(dims) for dims in self._demand_dims]
 
-        self.___record_factor_stats(scaling_factors)
+        self.__record_factor_stats(scaling_factors)
         return scaling_factors
 
     def __perform_assignment(self) -> None:
