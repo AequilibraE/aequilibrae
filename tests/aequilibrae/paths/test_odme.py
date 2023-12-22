@@ -99,7 +99,7 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.get_demands()
+        new_demand = odme.get_demands()[0]
 
         # Check results:
         np.testing.assert_allclose(
@@ -143,7 +143,7 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm=algorithm)
         odme.execute()
-        new_demand = odme.get_demands()
+        new_demand = odme.get_demands()[0]
         odme.get_all_statistics().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")
         odme.get_iteration_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_factors_{algorithm}.csv")
         odme.get_cumulative_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_{algorithm}.csv")
@@ -189,7 +189,7 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001), algorithm="spiess")
         odme.execute()
-        new_demand = odme.get_demands()
+        new_demand = odme.get_demands()[0]
         odme.get_all_statistics().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
         odme.get_iteration_factors().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_factors.csv")
 

@@ -8,12 +8,11 @@ Implementation of ODME algorithms:
 # NOTE - Functions which are still Single Class Only include:
 #           Initialiser
 #           Objective Function
-#           Get demands
 #           Inner Execution
 #           Perform Assignment
 #           Extraction of Flows
 #           Calculation of Flows
-#               
+#
 #               All the actual algorithms (but these should be done separately
 #               and moved to a different class where they can interact with
 #               Cython and be ran far more efficiently). I also need to re-derive
@@ -219,14 +218,11 @@ class ODME(object):
             self._obj_func = __obj_func
 
     # Output/Results/Statistics:
-    def get_demands(self) -> Tuple[np.ndarray, pd.DataFrame]:
+    def get_demands(self) -> list[np.ndarray]:
         """
-        Returns demand matrices (can be called before or after execution).
-
-        CURRENTLY ONLY WORKS FOR SINGLE CLASS!
-        NEED TO CHANGE ALL OF THESE TO BE MORE COHERENT
+        Returns all demand matrices (can be called before or after execution).
         """
-        return self.demand_matrices[0] # Remove [0] when generalising to multi-class
+        return self.demand_matrices
 
     def get_iteration_factors(self) -> pd.DataFrame:
         """
