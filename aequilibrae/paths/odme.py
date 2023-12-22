@@ -54,14 +54,13 @@ class ODME(object):
         self.num_classes = len(self.classes)
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
-        self.assignclass = self.classes[0] # - for now assume only one class TEMPORARY SINGLE CLASS
 
-        # Demand matrices
-        # The current demand matrices
+        # Current demand matrices:
         self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
-        self.demand_matrix = self.assignclass.matrix.matrix_view  # The current demand matrix TEMPORARY SINGLE CLASS
+        self.demand_matrix = self.demand_matrices[0]  # The current demand matrix TEMPORARY SINGLE CLASS
         # May be unecessary - if we do keep it need to make a copy ->
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
+        # Initial demand matrices:
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
         self.init_demand_matrix = np.copy(self.demand_matrix) # - for now assume only one class TEMPORARY SINGLE CLASS
         self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
@@ -70,7 +69,7 @@ class ODME(object):
         self._count_volumes = count_volumes.copy(deep=True)
         self._num_counts = len(self._count_volumes)
 
-        self._sl_matrices = None # Currently dictionary of proportion matrices
+        self._sl_matrices = dict() # Dictionary of proportion matrices
         
         # Set all select links:
         self.__set_select_links()
@@ -119,10 +118,9 @@ class ODME(object):
         for user_class in self.classes:
             user_class.set_select_links(
                 {
-                    self.__get_sl_key(row): [
-                        (row['link_id'], row['direction'])]
-                        for _, row in
-                        cv[cv['class'] == user_class.__id__
+                    self.__get_sl_key(row):
+                    [(row['link_id'], row['direction'])]
+                    for _, row in cv[cv['class'] == user_class.__id__
                     ].iterrows()
                 }
             )
@@ -385,18 +383,23 @@ class ODME(object):
 
         # Perform the assignment
         self.assignment.execute()
+        
         # TEMPORARY FIX - I DON'T REALLY KNOW WHY WE HAVE AN EXTRA DIMENSION NOW BUT I'LL FLATTEN
         # IT SINCE IT ISN'T RELEVANT TO SINGLE CLASS OR SINGLE COUNT CASES
-        self.assignclass.matrix.matrix_view = np.squeeze(self.assignclass.matrix.matrix_view, axis=2)
+        for assignclass in self.classes:
+            assignclass.matrix.matrix_view = np.squeeze(assignclass.matrix.matrix_view, axis=2)
 
         # Store reference to select link demand matrices as proportion matrices
-        # Can completely ignore old SL matrices from this point
-        self._sl_matrices = self.assignclass.results.select_link_od.matrix
-        for link in self._sl_matrices:
-            self._sl_matrices[link] = np.nan_to_num(np.squeeze(self._sl_matrices[link], axis=2) / self.demand_matrix)
+        # MULTI-CLASS GENERALISATION REQUIRES TESTING IN FUTURE!!!
+        for i, assignclass in enumerate(self.classes):
+            sl_matrices = assignclass.results.select_link_od.matrix
+            for link in sl_matrices:
+                self._sl_matrices[link] = np.nan_to_num(
+                    np.squeeze(sl_matrices[link], axis=2) / self.demand_matrices[i]
+                )
         # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake),
         # but we only have one of each per set of select links so we can ignore this for now.
-        # In future when multiple class ODME is implemented this needs to be changed.
+        # In future when multiple class ODME is implemented this needs to be checked/changed.
 
         # Extract and store array of assigned volumes to select links
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
