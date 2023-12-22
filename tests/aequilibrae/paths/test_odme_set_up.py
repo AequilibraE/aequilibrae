@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, ODME
-from aequilibrae.matrix import AequilibraeMatrix
 from ...data import siouxfalls_project
 
 
