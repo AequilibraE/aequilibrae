@@ -5,11 +5,13 @@ Implementation of ODME algorithms:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
+# NOTE - Lots of squeezing of matrices happens after assignment due to the functionality of select 
+# link analysis and assignment with regards to traffic assignment.
+
 # NOTE - Functions which are still Single Class Only include:
 #           Initialiser - extraction of pce's & use of class to indices?
 #               -> Needs to be seriously cleaned up.
 #           Objective Function - Check how this works with pce
-#           Perform Assignment
 #           Extraction of Flows - Check how this works with pce
 #           Calculation of Flows - Check how this works with pce
 #
