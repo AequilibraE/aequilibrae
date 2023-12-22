@@ -19,8 +19,8 @@ class ODME(object):
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
         "class", "link_id", "direction", "obs_volume", "assign_volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
-    FACTOR_COLS = ['Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 'std_deviation', 'variance', 'sum',
-        'min', 'max']
+    FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 
+        'std_deviation', 'variance', 'sum', 'min', 'max']
     CUMULATIVE_FACTOR_COLS = ["class", "mean", "median", "standard deviation", "variance", "min", "max", "sum", "# of factors"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
     ALL_ALGORITHMS = ["gmean", "spiess"]
@@ -30,7 +30,7 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
-        algorithm="gmean" # currently defaults to geometric mean
+        algorithm="spiess" # currently defaults to spiess
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -181,6 +181,8 @@ class ODME(object):
             Objective function containing regularisation term.
 
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
+
+            ONLY IMPLEMENTED FOR SINGLE CLASS!
             """
             obs_vals = self._count_volumes["obs_volume"].to_numpy()
             assign_vals = self._count_volumes['assign_volume'].to_numpy()
@@ -225,13 +227,14 @@ class ODME(object):
 
         ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        # Get cumulative factors
-        cumulative_factors = np.nan_to_num(self.demand_matrix / self.init_demand_matrix, nan=1)
+        # Get cumulative factors for each demand matrix
+        cumulative_factors = []
+        for i, demand_matrix in self.demand_matrices:
+            factors = np.nan_to_num(demand_matrix / self.init_demand_matrices[i], nan=1)
+            factors_df = pd.DataFrame({"Factors": factors.ravel()})
+            factors_df['class'] = [self.class_names[i] for _ in range(len(factors_df))]
 
-        # Put factors in dataframe
-        cumulative_factors_df = pd.DataFrame({"Factors": cumulative_factors.ravel()})
-
-        return cumulative_factors_df
+        return pd.concat(cumulative_factors, ignore_index=True)
 
     def get_all_statistics(self) -> pd.DataFrame:
         """
@@ -266,30 +269,31 @@ class ODME(object):
         # Add data to current list of dataframes
         self._statistics.append(data)
 
-    def ___record_factor_stats(self, factors: np.ndarray) -> None:
+    def ___record_factor_stats(self, factors: list[np.ndarray]) -> None:
         """
-        Logs information on the current scaling matrix.
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
+        Logs information on the current scaling matrix (ie
+        factor statistics per iteration).
         """
-        factor_stats = [
-            self._outer,
-            self._inner,
-            self._total_inner,
-            np.mean(factors),
-            np.median(factors),
-            np.std(factors),
-            np.var(factors),
-            np.sum(factors),
-            np.min(factors),
-            np.max(factors),
-        ]
+        # Create statistics on all new factors:
+        data = []
+        for i, factor in enumerate(factors):
+            data.append([
+                self.class_names[i],
+                self._outer,
+                self._inner,
+                self._total_inner,
+                np.mean(factor),
+                np.median(factor),
+                np.std(factor),
+                np.var(factor),
+                np.sum(factor),
+                np.min(factor),
+                np.max(factor)
+            ])
+        new_stats = pd.DataFrame(data, columns=self.FACTOR_COLS)
 
-        # Add row:
-        self._factor_stats.loc[len(self._factor_stats)] = {
-            col : factor_stats[i]
-            for i, col in enumerate(self.FACTOR_COLS)
-        }
+        # Add the new data to the current list of factor statistics
+        self._factor_stats = pd.concat([self._factor_stats, new_stats], ignore_index=True)
 
     # Generic Algorithm Structure:
     def execute(self) -> None:
@@ -350,8 +354,8 @@ class ODME(object):
     def __get_scaling_factors(self) -> list[np.ndarray]:
         """
         Returns scaling matrices for each user class - depending on algorithm chosen.
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
+        Note: we expect any algorithm to return a list of factor matrices in order of the
+        stored user classes.
         """
         if self._algorithm == "gmean":
             scaling_factors = self.__geometric_mean()
@@ -360,7 +364,7 @@ class ODME(object):
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
             scaling_factors = np.ones(self._dims)
 
-        self.___record_factor_stats(scaling_factors[0]) # TEMPORARY FOR SINGLE CLASS USE!
+        self.___record_factor_stats(scaling_factors)
         return scaling_factors
 
     def __perform_assignment(self) -> None:
