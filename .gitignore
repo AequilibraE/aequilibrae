@@ -96,3 +96,5 @@ build/
 coverage.xml
 
 #### End snippet
+tests/data/ovm/type=transportation/type=segment/ovm.parquet
+tests/data/ovm/type=transportation/type=segment/part-00232-8d133ca6-6cbd-48b8-87d5-a0850a2ba489.c003.zstd.parquet
