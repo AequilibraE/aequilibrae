@@ -247,7 +247,7 @@ class OSMBuilder(WorkerThread):
                 for x, y in zip(all_nodes[1:], all_nodes[:-1])
             ]
         )
-
+        print(type(all_nodes))
         geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
         geometry = "LINESTRING ({})".format(", ".join(geometry))
 

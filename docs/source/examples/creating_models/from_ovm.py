@@ -26,10 +26,7 @@ download = ovm_downloader_instance.downloadTransportation([148.7077, -20.2780, 1
 
 links = download[0]
 nodes = download[1]
-
-# nodes
-# new = download[2]
-# new
+links
  # %%
 links = project.network.links.data
 links

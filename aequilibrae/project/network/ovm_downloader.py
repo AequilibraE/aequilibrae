@@ -43,12 +43,14 @@ class OVMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None):
+    def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None, node_start=10000):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
+        self.node_start = node_start
         self.report = []
         self.json = []
+        self.nodes = {}
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path / 'theme=transportation').replace("\\", "/")
 
@@ -165,6 +167,12 @@ class OVMDownloader(WorkerThread):
                     
             # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
+            
+            gdf_node['node_id'] = self.create_node_ids(gdf_node)
+            gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node['node_id']) + 1)))
+            gdf_node['is_centroid'] = 0
+
+            print(self.nodes['8f9d0e12872ea89-177FE3F1D32C0C41']['node_id'])
 
             # Function to process each row and create a new GeoDataFrame
             def process_row(gdf_link):
@@ -172,23 +180,20 @@ class OVMDownloader(WorkerThread):
                 ovm_id = gdf_link['ovm_id']
                 connectors = gdf_link['connectors']
                 link_type = gdf_link['link_type']
-                speed = gdf_link['speed']
                 geometry = gdf_link['geometry']
 
                 # Check if 'Connectors' has more than 2 elements
-                if np.size(connectors) > 2:
+                if np.size(connectors) >= 2:
                     # Split the DataFrame into multiple rows
                     rows = []
                     for i in range(len(connectors) - 1):
-                        new_row = {'a_node': connectors[i], 'b_node': connectors[i + 1], 'link_type': link_type, 'speed': speed, 'ovm_id': ovm_id, 'geometry': geometry}
+                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 'link_type': link_type, 'speed': gdf_link['speed'], 'ovm_id': ovm_id, 'geometry': geometry}
                         rows.append(new_row)
                     processed_df = gpd.GeoDataFrame(rows)
-                elif np.size(connectors) == 2:
-                    processed_df = gpd.GeoDataFrame({'a_node': connectors[0], 'b_node': connectors[-1], 'link_type': link_type, 'speed': speed, 'ovm_id': ovm_id, 'geometry': geometry}, index=[0])
                 else:
                     raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
                 return processed_df
-
+            
             # Iterate over rows using iterrows()
             result_dfs = []
             for index, row in gdf_link.iterrows():
@@ -200,8 +205,8 @@ class OVMDownloader(WorkerThread):
             final_result = pd.concat(result_dfs, ignore_index=True)
 
             # adding neccassary columns for aequilibrea data frame
-            final_result['ogc_fid'] = 1
             final_result['link_id'] = 1
+            final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result['link_id']) + 1)))
             final_result['direction'] = 0
             final_result['distance'] = 1
             final_result['name'] = 1
@@ -209,14 +214,15 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
+            # all_nodes = [list(final_result['a_node'][x],final_result['a_node'][x]) for x in range(ii, jj + 1)]
+            # geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
+            # geometry = "LINESTRING ({})".format(", ".join(geometry))
+
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
 
-            gdf_node['ogc_fid'] = 1
-            gdf_node['node_id'] = 1
-            gdf_node['is_centroid'] = 0
 
-            common_nodes = final_result['a_node'].isin(gdf_node['ovm_id'])
+            common_nodes = final_result['a_node'].isin(gdf_node['node_id'])
             # Check if any common nodes exist
             if common_nodes.any():                
                 # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
@@ -244,6 +250,16 @@ class OVMDownloader(WorkerThread):
             g_dataframes.append(gdf_node)
             self.json.extend(g_dataframes)
         return g_dataframes    
+
+    def create_node_ids(self, data_frame):
+        node_ids = []
+        data_frame['node_id'] = 1
+        for i in range(len(data_frame['ovm_id'])):
+            node_count = i + self.node_start
+            node_ids.append(node_count)
+            self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x}
+        data_frame['node_id'] = pd.Series(node_ids)
+        return data_frame['node_id']
 
     def modes_per_link_type(self):
         p = Parameters()
