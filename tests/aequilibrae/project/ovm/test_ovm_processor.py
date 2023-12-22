@@ -1,5 +1,6 @@
 from pathlib import Path
 import geopandas as gpd
+from shapely.ops import substring
 import shapely
 
 
@@ -16,8 +17,17 @@ def test_link_geo_trimmer():
     def trim_geometry(node_lu, row):
         lat_long_a = node_lu[row["a_node"]]
         lat_long_b = node_lu[row["b_node"]]
-        return shapely.LineString([x for x in row.geometry.coords if x == lat_long_a or x == lat_long_b])
 
+        for i, coord in enumerate(row.geometry.coords):
+            if lat_long_a == coord:
+                new_list = row.geometry.coords[i:]
+                if lat_long_b == coord:
+                    new_list[:i]
+        return shapely.LineString(new_list)
+      
     node_lu = {1: node1, 2: node2}  # node_gdf[...].set_index(...).to_dict()
     new_geom = trim_geometry(node_lu, link_gdf.iloc[0, :])
+
     assert len(new_geom.coords) == 3
+
+    assert new_geom == shapely.LineString([node1, (148.7164585, -20.2730418), node2])
