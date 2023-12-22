@@ -231,8 +231,12 @@ class ODME(object):
         cumulative_factors = []
         for i, demand_matrix in self.demand_matrices:
             factors = np.nan_to_num(demand_matrix / self.init_demand_matrices[i], nan=1)
-            factors_df = pd.DataFrame({"Factors": factors.ravel()})
-            factors_df['class'] = [self.class_names[i] for _ in range(len(factors_df))]
+            cumulative_factors.append(
+                pd.DataFrame({
+                    "class": [self.class_names[i] for _ in range(demand_matrix.size)],
+                    "Factors": factors.ravel()
+                })
+            )
 
         return pd.concat(cumulative_factors, ignore_index=True)
 
