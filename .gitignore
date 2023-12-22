@@ -99,5 +99,5 @@ coverage.xml
 .DS_Store
 
 # Images
-.png
-odme_plots/plot_5.png
+*.png
+*.csv
