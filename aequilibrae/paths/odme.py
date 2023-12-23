@@ -27,7 +27,7 @@ import numpy as np
 import scipy.stats as spstats
 import pandas as pd
 
-from aequilibrae import TrafficAssignment
+from aequilibrae.paths import TrafficAssignment
 
 class ODME(object):
     """ODME algorithm."""
