@@ -225,38 +225,6 @@ class TestODMESingleClassSetUp(TestCase):
         """
         Given a demand matrix with 0 demand at many OD pairs,
         following ODME the new demand matrix should have 0 demand at those OD pair
-        with single count volume.
-        """
-        # Set synthetic demand matrix & count volumes
-        demand = np.ones(self.matrix.matrix_view.shape)
-        zeroes = [(18, 6), (5, 11), (11, 5), (23, 2), (13, 19), (19, 21), (19, 24), (17, 5)]
-        for o, d in zeroes:
-            demand[self.index[o], self.index[d]] = 0
-        self.matrix.matrix_view = demand
-
-        count_volumes = pd.DataFrame(
-            data=[["car", 9, 1, 30]],
-            columns=self.count_vol_cols
-        )
-
-        # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-     
-        # Check result:
-        # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
-        err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
-        for o, d in zeroes:
-            np.testing.assert_array_equal(
-                odme.get_demands()[0][self.index[o], self.index[d]],
-                0,
-                err_msg=err_msg,
-            )
-        
-    def test_basic_1_2_c(self) -> None:
-        """
-        Given a demand matrix with 0 demand at many OD pairs,
-        following ODME the new demand matrix should have 0 demand at those OD pair
         with many count volumes.
         """
         # Set synthetic demand matrix & count volumes
