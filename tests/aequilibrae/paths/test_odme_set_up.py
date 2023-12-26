@@ -258,12 +258,18 @@ class TestODMESingleClassSetUp(TestCase):
                 0,
                 err_msg=err_msg,
             )
+        
+        # Check shape of resulting matrix matches initial demand matrix:
+        self.assertEqual(odme.get_demands()[0].shape, self.dims)
 
     def test_basic_1_3(self) -> None:
         """
         Given count volumes which are identical to the assigned volumes of an 
         initial demand matrix - ODME should not change this demand matrix (since
         we are looking for a local solution and this already provides one).
+        
+        Also checks that the shape of the resulting matrix matches the intial
+        demand matrix.
 
         Checks with many count volumes.
         """
@@ -292,44 +298,8 @@ class TestODMESingleClassSetUp(TestCase):
             odme.get_demands()[0],
             err_msg="Demand matrix changed when given many links with observed volume equal to initial assigned volumes"
         )
-    
-    def test_basic_1_4_a(self) -> None:
-        """
-        Check that the shape of the resulting matrix following ODME is the same as the
-        shape of the initial demand matrix.
-        
-        Checks with single count volume.
-        """
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
-        count_volumes = pd.DataFrame(
-            data=[["car", 5, 1, 10]],
-            columns=self.count_vol_cols
-        )
 
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-
-        self.assertEqual(odme.get_demands()[0].shape, self.dims)
-
-    def test_basic_1_4_b(self) -> None:
-        """
-        Check that the shape of the resulting matrix following ODME is the same as the
-        shape of the initial demand matrix.
-        
-        Checks with many count volumes.
-        """
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view = np.ones(self.matrix.matrix_view.shape)
-        links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
-        count_volumes = pd.DataFrame(
-            data=[["car", link, 1, (link * 7) % (link * 37) % 50] for link in links],
-            columns=self.count_vol_cols
-        )
-        
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-
+        # Check shape of resulting matrix:
         self.assertEqual(odme.get_demands()[0].shape, self.dims)
 
     # 2) Input Validity
