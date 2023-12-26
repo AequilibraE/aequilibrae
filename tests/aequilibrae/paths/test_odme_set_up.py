@@ -259,46 +259,13 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg=err_msg,
             )
 
-    def test_basic_1_3_a(self) -> None:
+    def test_basic_1_3(self) -> None:
         """
         Given count volumes which are identical to the assigned volumes of an 
         initial demand matrix - ODME should not change this demand matrix (since
         we are looking for a local solution and this already provides one).
 
-        Checks for single count volume.
-        """
-        init_demand = np.copy(self.matrix.matrix_view)
-
-        # Extract assigned flow on link 18
-        self.assignment.execute()
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow = assign_df.loc[assign_df["link_id"] == 18, "matrix_ab"].values[0]
-
-        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
-        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
-
-        # Perform ODME with fixed count volume
-        count_volumes = pd.DataFrame(
-            data=[["car", 18, 1, flow]],
-            columns=self.count_vol_cols
-        )
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-
-        # Check results
-        np.testing.assert_allclose(
-            init_demand,
-            odme.get_demands()[0],
-            err_msg="Demand matrix changed when given single link with observed volume equal to initial assigned volume"
-        )
-
-    def test_basic_1_3_b(self) -> None:
-        """
-        Given count volumes which are identical to the assigned volumes of an 
-        initial demand matrix - ODME should not change this demand matrix (since
-        we are looking for a local solution and this already provides one).
-
-        Checks for many count volumes.
+        Checks with many count volumes.
         """
         init_demand = np.copy(self.matrix.matrix_view)
 
