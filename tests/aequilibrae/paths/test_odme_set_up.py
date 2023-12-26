@@ -105,7 +105,7 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
 
-    def test_basic_1_1_c(self) -> None: 
+    def test_basic_1_1_b(self) -> None: 
         """
         Check that running ODME with 0 demand matrix returns 0 matrix, with
         many count volumes of 0.
@@ -129,7 +129,7 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg="0 demand matrix with many count volumes of 0 does not return 0 matrix",
         )
 
-    def test_basic_1_1_d(self) -> None:
+    def test_basic_1_1_c(self) -> None:
         """
         Check that running ODME with 0 demand matrix returns 0 matrix, with
         single non-zero count volume.
@@ -153,7 +153,7 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg="0 demand matrix with single non-zero count volume does not return 0 matrix",
         )
 
-    def test_basic_1_1_f(self) -> None: 
+    def test_basic_1_1_d(self) -> None: 
         """
         Check that running ODME with 0 demand matrix returns 0 matrix, with
         many non-zero count volumes.
@@ -177,25 +177,6 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg="0 demand matrix with many non-zero count volumes does not return 0 matrix",
         )
 
-    def test_basic_1_2_a(self) -> None:
-        """
-        Given a demand matrix with 0 demand at a single OD pair,
-        following ODME the new demand matrix should have 0 demand at that OD pair
-        with single count volume.
-        """
-        # Set synthetic demand matrix & count volumes
-        demand = np.ones(self.matrix.matrix_view.shape)
-        demand[self.index[13], self.index[12]] = 0
-        self.matrix.matrix_view = demand
-
-        count_volumes = pd.DataFrame(
-            data=[["car", 9, 1, 30]],
-            columns=self.count_vol_cols
-        )
-
-        # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
 
         # Check result:
         # SHOULD I BE TESTING EXACTNESS HERE? IE. USE SOMETHING OTHER THAN allclose??
@@ -205,7 +186,7 @@ class TestODMESingleClassSetUp(TestCase):
             err_msg="Demand matrix with single 0 at OD 13-12, has non-zero demand following ODME",
         )
 
-    def test_basic_1_2_b(self) -> None:
+    def test_basic_1_2_a(self) -> None:
         """
         Given a demand matrix with 0 demand at a single OD pair,
         following ODME the new demand matrix should have 0 demand at that OD pair
@@ -240,7 +221,7 @@ class TestODMESingleClassSetUp(TestCase):
             err_msg="Demand matrix with single 0 at OD 18-6, has non-zero demand following ODME",
         )
 
-    def test_basic_1_2_c(self) -> None:
+    def test_basic_1_2_b(self) -> None:
         """
         Given a demand matrix with 0 demand at many OD pairs,
         following ODME the new demand matrix should have 0 demand at those OD pair
@@ -272,7 +253,7 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg=err_msg,
             )
         
-    def test_basic_1_2_d(self) -> None:
+    def test_basic_1_2_c(self) -> None:
         """
         Given a demand matrix with 0 demand at many OD pairs,
         following ODME the new demand matrix should have 0 demand at those OD pair
