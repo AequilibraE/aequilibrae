@@ -68,10 +68,12 @@ class ODME(object):
         self.assignment = assignment
         self.classes = assignment.classes
         self.num_classes = len(self.classes)
+        self.single_class = (self.num_classes == 1) # If we are doing single class ODME
         # Everything is implicitly ordered by this:
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
+        self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         # Current demand matrices:
         self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
         # May be unecessary - if we do keep it need to make a copy ->
@@ -387,12 +389,10 @@ class ODME(object):
         the assigned flows and select link matrices. Also recalculates the 
         objective function following an assignment.
 
-        IS THIS FUNCTION DOING TOO MUCH?
-
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS IN DEVELOPMENT)
+        NOTE - Need to check how matrix dimensions will work for multi-class.
         """
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         for i, assignclass in enumerate(self.classes):
@@ -428,23 +428,28 @@ class ODME(object):
         Extracts and stores assigned flows (corresponding for those for which we have
         observations - ie count volumes).
 
-        ONLY IMPLEMENTED FOR SINGLE CLASS!
-        NEED TO CHECK HOW PCE AFFECTS THIS!
+        ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS UNDER DEVELOPMENT)
+        IS CURRENTLY AFFECTED BY IMPLEMENTATION OF ASSIGNMENT AND THE THINGS REGARDING EACH TRAFFICCLASS
+        HAVING 1 USER CLASS VS MULTIPLE USER CLASSES.
+        DOES PCE AFFECTS THIS?!?!?!?!?!?
         """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        col = {1: "matrix_ab", -1: "matrix_ba", 0: "matrix_tot"}
+        # DECIDE WHETHER TO PUT THIS IN INITIALISER OR NOT!!!
+        # Dictionary to select correct column of results dataframe
+        col = dict()
+        for i, cls_name in enumerate(self.class_names):
+            name = self.aequilibrae_matrices[i].view_names[0]
+            col[cls_name] = {1: f"{name}_ab", -1: f"{name}_ba", 0: f"{name}_tot"}
 
         # For extracting a single assigned flow:
         def extract_flow(row) -> None:
             """
             Extracts flow corresponding to particular link (from row) and return it.
             For inner iterations need to calculate this via sum sl_matrix * demand_matrix
-
-            NOT YET GENERALISED FOR MULTI-CLASS!!!
             """
-            return assign_df.loc[assign_df["link_id"] == row["link_id"], 
-                col[row["direction"]]].values[0]
-        
+            return assign_df.loc[assign_df['link_id'] == row['link_id'],
+                col[row['class']][row['direction']]].values[0]
+
         # Extract a flow for each count volume:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
             extract_flow,
