@@ -146,6 +146,7 @@ class TestODME(TestCase):
         odme.get_all_statistics().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")
         odme.get_iteration_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_factors_{algorithm}.csv")
         odme.get_cumulative_factors().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_cumulative_factors_{algorithm}.csv")
+        pd.DataFrame({"Demands": new_demand.ravel()}).to_csv(f"/workspaces/aequilibrae/odme_stats/new_demand_matrix_{algorithm}.csv")
 
         # Check results:
         np.testing.assert_allclose(
