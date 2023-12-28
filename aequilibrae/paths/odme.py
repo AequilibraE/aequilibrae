@@ -489,7 +489,7 @@ class ODME(object):
         Calculates scaling factor based on geometric mean of ratio between 
         proportionally (via SL matrix) assigned flow & observed flows.
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        MULTI-CLASS UNDER DEVELOPMENT (REQUIRES TESTING)
         """
         # Steps:
         # 1. For each link create a factor f_a given by \hat v_a / v_a
@@ -503,10 +503,10 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         scaling_factors = []
-        cv = self._count_volumes
+        c_v = self._count_volumes
         # Steps 1 & 2:
         for i, name in enumerate(self.class_names):
-            observed = cv[cv['class'] == name]
+            observed = c_v[c_v['class'] == name]
 
             # If there are no observations leave matrix unchanged
             if len(observed) == 0:
