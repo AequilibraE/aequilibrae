@@ -46,7 +46,7 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
-        algorithm="spiess" # currently defaults to spiess
+        algorithm="gmean" # currently defaults to spiess
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -379,6 +379,7 @@ class ODME(object):
             scaling_factors = self.__spiess()
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
             scaling_factors = [np.ones(dims) for dims in self._demand_dims]
+            raise ValueError("Unsupported Algorithm!")
 
         self.__record_factor_stats(scaling_factors)
         return scaling_factors
@@ -501,36 +502,50 @@ class ODME(object):
         # to save on memory usage. Need to test this later on.
         # NOTE - by not approximating step size we may over-correct massively.
 
+        scaling_factors = []
+        cv = self._count_volumes
         # Steps 1 & 2:
-        factors = np.empty((len(self._count_volumes), *(self._demand_dims[0])))
-        for i, row in self._count_volumes.iterrows():
-            # Create factor matrix:
-            if row["obs_volume"] != 0 and row['assign_volume'] != 0:
+        for i, name in enumerate(self.class_names):
+            observed = cv[cv['class'] == name]
 
-                # Modulate factor by select link dependency:
-                link_factor = (row['obs_volume'] / row['assign_volume']) - 1
-                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-                factor_matrix = (sl_matrix * link_factor)
+            # If there are no observations leave matrix unchanged
+            if len(observed) == 0:
+                scaling_factors.append(np.ones(self._demand_dims[i]))
+                continue
 
-                # Apply factor limiting:
-                # factor_matrix = np.clip(factor_matrix, -self.GMEAN_LIMIT, self.GMEAN_LIMIT)
+            factors = np.empty((len(observed), *(self._demand_dims[i])))
+            for j, row in self._count_volumes.iterrows():
+                # Create factor matrix:
+                if row["obs_volume"] != 0 and row['assign_volume'] != 0:
 
-                # Center factors at 1:
-                factor_matrix = factor_matrix + 1
+                    # Modulate factor by select link dependency:
+                    link_factor = (row['obs_volume'] / row['assign_volume']) - 1
+                    sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                    factor_matrix = (sl_matrix * link_factor)
 
-            # If assigned or observed value is 0 we cannot do anything right now
-            else:
-                factor_matrix = np.ones(self._demand_dims[0])
-            
-            factors[i, :, :] = factor_matrix
+                    # Apply factor limiting:
+                    # factor_matrix = np.clip(factor_matrix, -self.GMEAN_LIMIT, self.GMEAN_LIMIT)
 
-        # If the assigned volume was 0 (or both 0) no OD pair can have any effect
-        factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
+                    # Center factors at 1:
+                    factor_matrix = factor_matrix + 1
+
+                # If assigned or observed value is 0 we cannot do anything right now
+                else:
+                    factor_matrix = np.ones(self._demand_dims[i])
+                
+                # Add factor matrix
+                factors[j, :, :] = factor_matrix
+
+            # If the assigned volume was 0 (or both 0) no OD pair can have any effect
+            factors = np.nan_to_num(factors, nan=1, posinf=1, neginf=1)
+
+        # Add the factors for this class to the array:
+        scaling_factors.append(spstats.gmean(factors, axis=0))
 
         # Step 3: TEMPORARILY ONLY RETURNING SINGLE CLASS
-        ret = [np.ones(dims) for dims in self._demand_dims]
-        ret[0] = spstats.gmean(factors, axis=0)
-        return ret
+        #ret = [np.ones(dims) for dims in self._demand_dims]
+        #ret[0] = spstats.gmean(factors, axis=0)
+        return scaling_factors
 
     # spiess (Gradient Descent - Objective Function (2,0))
     def __spiess(self) -> np.ndarray:
