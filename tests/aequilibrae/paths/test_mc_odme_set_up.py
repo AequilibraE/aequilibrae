@@ -134,3 +134,5 @@ class TestODMEMultiClassSetUp(TestCase):
                 np.zeros(self.user_class_dims[i]),
                 err_msg=f"The {self.user_class_names[i]} matrix was changed from 0 when initially a 0 matrix!"
             )
+
+    # Will need a test checking everything works fine if you do not include count volumes for a particular class
