@@ -358,7 +358,7 @@ class ODME(object):
             self.demand_matrices[i] = self.demand_matrices[i] * factor
 
         # Recalculate the link flows
-        self.__calculate_flows()
+        self.__calculate_volumes()
 
         # Recalculate convergence level:
         self._obj_func(self)
@@ -420,19 +420,15 @@ class ODME(object):
         # In future when multiple class ODME is implemented this needs to be checked/changed.
 
         # Extract and store array of assigned volumes to the select links
-        self.__extract_flows()
+        self.__extract_volumes()
 
         # Recalculate convergence values
         self._obj_func(self)
 
-    def __extract_flows(self) -> None:
+    def __extract_volumes(self) -> None:
         """
-        Extracts and stores assigned flows (corresponding for those for which we have
+        Extracts and stores assigned volumes (corresponding for those for which we have
         observations - ie count volumes). 
-        
-        Flows are given in terms of pce (standard car equivalent flow) i.e, if trucks have 
-        a pce of 2.5, and there are 10 trucks on a particular link, then the corresponding 
-        flow is given as 25.
         """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         # DECIDE WHETHER TO PUT THIS IN INITIALISER OR NOT!!!
@@ -443,46 +439,39 @@ class ODME(object):
             col[cls_name] = {1: f"{name}_ab", -1: f"{name}_ba", 0: f"{name}_tot"}
 
         # For extracting a single assigned flow:
-        def extract_flow(row) -> None:
+        def extract_volume(row) -> None:
             """
-            Extracts flow corresponding to particular link (from row) and return it.
+            Extracts volume corresponding to particular link (from row) and return it.
             For inner iterations need to calculate this via sum sl_matrix * demand_matrix
             """
-            # Get flow in terms of number of vehicles:
-            num_vehicles = assign_df.loc[assign_df['link_id'] == row['link_id'],
+            return assign_df.loc[assign_df['link_id'] == row['link_id'],
                 col[row['class']][row['direction']]].values[0]
-            
-            # Return flow in terms of car equivalent:
-            pce = self.classes[self.names_to_indices[row['class']]].pce
-            return num_vehicles * pce
 
         # Extract a flow for each count volume:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
-            extract_flow,
+            extract_volume,
             axis=1
         )
 
-    def __calculate_flows(self) -> None:
+    def __calculate_volumes(self) -> None:
         """
-        Calculates and stores link flows using current sl_matrices & demand matrices,
-        in terms of standard car equivalent flow.
+        Calculates and stores link volumes using current sl_matrices & demand matrices.
         """
 
         # Calculate a single flow:
-        def __calculate_flow(self, row: pd.Series) -> float:
+        def __calculate_volume(self, row: pd.Series) -> float:
             """
             Given a single row of the count volumes dataframe, 
             calculates the appropriate corresponding assigned 
-            flow (in terms of standard car equivalents).
+            volume.
             """
             sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
             demand_matrix = self.demand_matrices[self.names_to_indices[row['class']]]
-            pce = self.classes[self.names_to_indices[row['class']]].pce
-            return pce * np.sum(sl_matrix * demand_matrix)
+            return np.sum(sl_matrix * demand_matrix)
 
         # Calculate flows for all rows:
         self._count_volumes['assign_volume'] = self._count_volumes.apply(
-            lambda row: __calculate_flow(self, row),
+            lambda row: __calculate_volume(self, row),
             axis=1)
 
 
@@ -555,7 +544,11 @@ class ODME(object):
         """
         Calculates scaling factor based on gradient descent method via SL matrix,
         assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
+
+        MULTI-CLASS UNDER DEVELOPMENT!
         """
+        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
+
         gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrices for spiess algorithm
         step_sizes = self.__get_step_sizes_spiess(gradient_matrices) # Get optimum step sizes for current iteration
         # TEMPORARY FOR SINGLE CLASS STUFF:
@@ -565,7 +558,11 @@ class ODME(object):
     def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
         """
         Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
+
+        MULTI-CLASS UNDER DEVELOPMENT!
         """
+        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
+
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
         derivatives = []
@@ -590,8 +587,10 @@ class ODME(object):
             gradients: The previously calculated gradient matrices - required for calculating 
                 derivative of link flows with respect to step size.
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        MULTI-CLASS UNDER DEVELOPMENT!
         """
+        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
+
         bounds = self.__get_step_size_limits_spiess(gradients)
         upper_lim, lower_lim = bounds[0]
 
@@ -636,7 +635,10 @@ class ODME(object):
         Parameters:
             gradient: The currently calculating gradient matrix - required for calculating 
                 derivative of link flows with respect to step size.
+
+        MULTI-CLASS UNDER DEVELOPMENT!
         """
+        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
         bounds = []
         # Create each bound and check for edge cases with empty sets:
         for i, gradient in enumerate(gradients):
