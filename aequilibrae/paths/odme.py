@@ -554,10 +554,11 @@ class ODME(object):
         Calculates scaling factor based on gradient descent method via SL matrix,
         assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
+        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS UNDER DEVELOPMENT!)
+        AS OF RIGHT NOW I'M ASSUMING THE PCE IS FACTORED IN WHEN WE LOOK AT THE FLOWS FOR EACH CLASS
         """
         gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrix for spiess algorithm
-        step_size = self.__get_step_size_spiess(gradient_matrices[0]) # Get optimum step size for current iteration
+        step_size = self.__get_step_size_spiess(gradient_matrices) # Get optimum step size for current iteration
         # TEMPORARY FOR SINGLE CLASS STUFF:
         gradient_matrices[0] = 1 - (step_size * gradient_matrices[0])
         return gradient_matrices
@@ -582,17 +583,19 @@ class ODME(object):
 
         return derivatives
 
-    def __get_step_size_spiess(self, gradient: np.ndarray) -> float:
+    def __get_step_size_spiess(self, gradients: list[np.ndarray]) -> float:
         """
         Returns estimate of optimal step size (see Spiess (1990) - REFERENCE HERE)
 
         Parameters:
-            gradient: The currently calculating gradient matrix - required for calculating 
+            gradients: The previously calculated gradient matrices - required for calculating 
                 derivative of link flows with respect to step size.
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        upper_lim, lower_lim = self.__get_step_size_limits_spiess(gradient)
+        gradient = gradients[0]
+        bounds = self.__get_step_size_limits_spiess(gradients)
+        upper_lim, lower_lim = bounds[0]
 
         # Calculating link flow derivatives:
         flow_derivatives = np.empty(self._num_counts)
@@ -614,28 +617,32 @@ class ODME(object):
         else: # Minimum step size does not violate addition step size constraints
             return min_lambda
 
-    def __get_step_size_limits_spiess(self, gradient: np.ndarray) -> Tuple[float, float]:
+    def __get_step_size_limits_spiess(self, gradients: list[np.ndarray]) -> list[Tuple[float, float]]:
         """
         Returns bounds for step size in order of upper bound, then lower bound (see Spiess
-        (1990) - REFERENCE HERE)
+        (1990) - REFERENCE HERE) for each gradient matrix.
 
         Parameters:
             gradient: The currently calculating gradient matrix - required for calculating 
                 derivative of link flows with respect to step size.
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        upper_mask = np.logical_and(self.demand_matrices[0] > 0, gradient > 0)
-        lower_mask = np.logical_and(self.demand_matrices[0] > 0, gradient < 0)
+        bounds = []
+        # Create each bound and check for edge cases with empty sets:
+        for i, gradient in enumerate(gradients):
+            # Upper bound:
+            upper_mask = np.logical_and(self.demand_matrices[i] > 0, gradient > 0)
+            if np.any(upper_mask):
+                upper_lim = 1 / np.min(gradient[upper_mask])
+            else:
+                upper_lim = float('inf')   
 
-        # Account for either mask being empty
-        if np.any(upper_mask):
-            upper_lim = 1 / np.min(gradient[upper_mask])
-        else:
-            upper_lim = float('inf')
-        if np.any(lower_mask):
-            lower_lim = 1 / np.max(gradient[lower_mask])
-        else:
-            lower_lim = float('-inf')
+            # Lower bound:
+            lower_mask = np.logical_and(self.demand_matrices[i] > 0, gradient < 0)
+            if np.any(lower_mask):
+                lower_lim = 1 / np.max(gradient[lower_mask])
+            else:
+                lower_lim = float('-inf')
 
-        return (upper_lim, lower_lim)
+            bounds.append((upper_lim, lower_lim)) # Tuple[float, float]
+
+        return bounds
