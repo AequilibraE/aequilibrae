@@ -464,7 +464,8 @@ class ODME(object):
 
     def __calculate_flows(self) -> None:
         """
-        Calculates and stores link flows using current sl_matrices & demand matrix.
+        Calculates and stores link flows using current sl_matrices & demand matrices,
+        in terms of standard car equivalent flow.
         """
 
         # Calculate a single flow:
@@ -554,16 +555,12 @@ class ODME(object):
         """
         Calculates scaling factor based on gradient descent method via SL matrix,
         assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS! (MULTI-CLASS UNDER DEVELOPMENT!)
-        AS OF RIGHT NOW I'M ASSUMING THE PCE IS FACTORED IN WHEN WE LOOK AT THE FLOWS FOR EACH CLASS
-        THIS MAY NOT BE TRUE
         """
-        gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrix for spiess algorithm
-        step_size = self.__get_step_size_spiess(gradient_matrices) # Get optimum step size for current iteration
+        gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrices for spiess algorithm
+        step_sizes = self.__get_step_sizes_spiess(gradient_matrices) # Get optimum step sizes for current iteration
         # TEMPORARY FOR SINGLE CLASS STUFF:
-        gradient_matrices[0] = 1 - (step_size * gradient_matrices[0])
-        return gradient_matrices
+        scaling_factors = [1 - (step_sizes[i] * gradient_matrices[i]) for i in range(self.num_classes)]
+        return scaling_factors
 
     def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
         """
@@ -585,7 +582,7 @@ class ODME(object):
 
         return derivatives
 
-    def __get_step_size_spiess(self, gradients: list[np.ndarray]) -> float:
+    def __get_step_sizes_spiess(self, gradients: list[np.ndarray]) -> list[float]:
         """
         Returns estimate of optimal step size (see Spiess (1990) - REFERENCE HERE)
 
@@ -595,32 +592,43 @@ class ODME(object):
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        gradient = gradients[0]
         bounds = self.__get_step_size_limits_spiess(gradients)
         upper_lim, lower_lim = bounds[0]
 
-        # Calculating link flow derivatives:
-        flow_derivatives = np.empty(self._num_counts)
-        for i, row in self._count_volumes.iterrows():
-            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            flow_derivatives[i] = -np.sum(self.demand_matrices[0] * sl_matrix * gradient)
+        # SOME MINOR OPTIMISATIONS CAN BE DONE HERE IN TERMS OF WHAT PRECISELY TO CALCULATE:
+        # Calculate step-sizes (lambdas) for each gradient matrix:
+        lambdas = []
+        for i, user_class in enumerate(self.class_names):
+            class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
 
-        # Calculate minimising step length:
-        errors = self._count_volumes['obs_volume'].to_numpy() - self._count_volumes['assign_volume'].to_numpy()
-        min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
-         # Can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
-        if np.isnan(min_lambda):
-            min_lambda = 0
+            # Calculating link flow derivatives:
+            pce = self.classes[self.names_to_indices[user_class]].pce
+            flow_derivatives = np.empty(len(class_counts))
+            for j, row in class_counts.iterrows():
+                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                flow_derivatives[j] = -(pce * np.sum(self.demand_matrices[i] * sl_matrix * gradients[i]))
 
-        if min_lambda > upper_lim:
-            return upper_lim
-        elif min_lambda < lower_lim:
-            return lower_lim
-        else: # Minimum step size does not violate addition step size constraints
-            return min_lambda
+            # Calculate minimising step length:
+            errors = class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
+            min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
+
+            # This can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
+            if np.isnan(min_lambda):
+                min_lambda = 0
+
+            # Check minimising lambda is within bounds:
+            upper_lim, lower_lim = bounds[i]
+            if min_lambda > upper_lim:
+                lambdas.append(upper_lim)
+            elif min_lambda < lower_lim:
+                lambdas.append(lower_lim)
+            else: # Minimum step size does not violate addition step size constraints
+                lambdas.append(min_lambda)
+        
+        return lambdas
 
     def __get_step_size_limits_spiess(self,
-        gradients: list[np.ndarray]) -> list[Tuple[float, float]]:
+            gradients: list[np.ndarray]) -> list[Tuple[float, float]]:
         """
         Returns bounds for step size in order of upper bound, then lower bound (see Spiess
         (1990) - REFERENCE HERE) for each gradient matrix.
