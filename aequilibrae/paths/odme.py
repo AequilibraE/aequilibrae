@@ -549,9 +549,13 @@ class ODME(object):
         """
         # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
 
-        gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrices for spiess algorithm
-        step_sizes = self.__get_step_sizes_spiess(gradient_matrices) # Get optimum step sizes for current iteration
-        # TEMPORARY FOR SINGLE CLASS STUFF:
+        # Derivative matrices for spiess algorithm:
+        gradient_matrices = self.__get_derivative_matrices_spiess()
+
+        # Get optimum step sizes for current iteration:
+        step_sizes = self.__get_step_sizes_spiess(gradient_matrices)
+
+        # Get scaling factors:
         scaling_factors = [1 - (step_sizes[i] * gradient_matrices[i]) for i in range(self.num_classes)]
         return scaling_factors
 
@@ -601,11 +605,10 @@ class ODME(object):
             class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
 
             # Calculating link flow derivatives:
-            pce = self.classes[self.names_to_indices[user_class]].pce
             flow_derivatives = np.empty(len(class_counts))
             for j, row in class_counts.iterrows():
                 sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-                flow_derivatives[j] = -(pce * np.sum(self.demand_matrices[i] * sl_matrix * gradients[i]))
+                flow_derivatives[j] = -np.sum(self.demand_matrices[i] * sl_matrix * gradients[i])
 
             # Calculate minimising step length:
             errors = class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
