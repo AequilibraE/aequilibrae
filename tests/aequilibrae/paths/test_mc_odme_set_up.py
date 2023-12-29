@@ -43,21 +43,24 @@ class TestODMEMultiClassSetUp(TestCase):
         # Open matrices:
         self.car_matrix = self.project.matrices.get_matrix("demand_mc")
         self.car_matrix.computational_view(["car"])
+        self.car_index = self.car_graph.nodes_to_indices
 
         self.truck_matrix = self.project.matrices.get_matrix("demand_mc")
         self.truck_matrix.computational_view(["trucks"])
+        self.truck_index = self.truck_graph.nodes_to_indices
 
         self.moto_matrix = self.project.matrices.get_matrix("demand_mc")
         self.moto_matrix.computational_view(["motorcycle"])
+        self.moto_index = self.moto_graph.nodes_to_indices
 
         # Create assignment object and assign classes
         self.assignment = TrafficAssignment()
         self.carclass = TrafficClass("car", self.car_graph, self.car_matrix)
         self.carclass.set_pce(1.0)
         self.motoclass = TrafficClass("motorcycle", self.moto_graph, self.moto_matrix)
-        self.carclass.set_pce(0.2)
+        self.motoclass.set_pce(0.2)
         self.truckclass = TrafficClass("truck", self.truck_graph, self.truck_matrix)
-        self.carclass.set_pce(2.5)
+        self.truckclass.set_pce(2.5)
 
         self.assignment.set_classes([self.carclass, self.truckclass, self.motoclass])
 
@@ -98,10 +101,19 @@ class TestODMEMultiClassSetUp(TestCase):
 
         Should be removed later!
         """
-        self.assignment.execute()   
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        #print("Assignment Columns: ", assign_df.columns)
-        print(assign_df[["link_id", "car_ab", "trucks_ab", "motorcycle_ab"]].head())
+        self.car_matrix.matrix_view = np.zeros(self.user_class_dims[0])
+        self.car_matrix.matrix_view[self.car_index[1], self.car_index[2]] = 10
+
+        self.truck_matrix.matrix_view = np.zeros(self.user_class_dims[1])
+        self.truck_matrix.matrix_view[self.truck_index[1], self.truck_index[2]] = 10
+
+        self.moto_matrix.matrix_view = np.zeros(self.user_class_dims[2])
+        self.moto_matrix.matrix_view[self.moto_index[1], self.moto_index[2]] = 10
+
+        self.assignment.execute()
+        df = self.assignment.results().reset_index(drop=False).fillna(0)
+        print(df.columns)
+        #df[['link_id', 'car_ab', 'trucks_ab', 'motorcycle_ab', 'PCE_AB', 'PCE_BA', 'PCE_tot']]
 
     # Basic tests for multi-class ODME
     # These are similar to the basic tests for single-class ODME
