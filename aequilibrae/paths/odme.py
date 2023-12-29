@@ -46,7 +46,7 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
-        algorithm="gmean" # currently defaults to spiess
+        algorithm="spiess" # currently defaults to spiess
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -83,11 +83,12 @@ class ODME(object):
         self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
 
         # Observed Links & Associated Volumes
+        # MAYBE I SHOULD SPLIT THIS INTO ONE DATAFRAME PER CLASS
         self._count_volumes = count_volumes.copy(deep=True)
         self._num_counts = len(self._count_volumes)
 
         self._sl_matrices = dict() # Dictionary of proportion matrices
-        
+
         # Set all select links:
         self.__set_select_links()
 
@@ -548,34 +549,38 @@ class ODME(object):
         return scaling_factors
 
     # spiess (Gradient Descent - Objective Function (2,0))
-    def __spiess(self) -> np.ndarray:
+    def __spiess(self) -> list[np.ndarray]:
         """
         Calculates scaling factor based on gradient descent method via SL matrix,
         assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
-        gradient_matrix = self.__get_derivative_matrix_spiess() # Derivative matrix for spiess algorithm
-        step_size = self.__get_step_size_spiess(gradient_matrix) # Get optimum step size for current iteration
+        gradient_matrices = self.__get_derivative_matrices_spiess() # Derivative matrix for spiess algorithm
+        step_size = self.__get_step_size_spiess(gradient_matrices[0]) # Get optimum step size for current iteration
         # TEMPORARY FOR SINGLE CLASS STUFF:
-        ret = [np.ones(dims) for dims in self._demand_dims]
-        ret[0] = 1 - (step_size * gradient_matrix)
-        return ret
+        gradient_matrices[0] = 1 - (step_size * gradient_matrices[0])
+        return gradient_matrices
 
-    def __get_derivative_matrix_spiess(self) -> np.ndarray:
+    def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
         """
         Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS
         """
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
-        factors = np.empty((len(self._count_volumes), *(self._demand_dims[0])))
-        for i, row in self._count_volumes.iterrows():
-            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
-            factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
+        derivatives = []
+        # Create a derivative matrix for each user class:
+        for i, user_class in enumerate(self.class_names):
+            observed = self._count_volumes[self._count_volumes['class'] == user_class]
+            factors = np.empty((len(observed), *(self._demand_dims[i])))
+            for i, row in observed.iterrows():
+                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
 
-        return np.sum(factors, axis=0)
+            # Add derivative matrix to list of derivatives:
+            derivatives.append(np.sum(factors, axis=0))
+
+        return derivatives
 
     def __get_step_size_spiess(self, gradient: np.ndarray) -> float:
         """
