@@ -75,6 +75,9 @@ pkg_data = {
 }
 loose_modules = ["__version__", "parameters"]
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
@@ -86,6 +89,7 @@ if __name__ == "__main__":
         package_data=pkg_data,
         zip_safe=False,
         description="A package for transportation modeling",
+        long_description=long_description,
         author="Pedro Camargo",
         author_email="c@margo.co",
         url="https://github.com/AequilibraE/aequilibrae",
