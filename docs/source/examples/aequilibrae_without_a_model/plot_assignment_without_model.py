@@ -95,8 +95,6 @@ g.capacity = network['capacity'].values
 g.free_flow_time = network['free_flow_time'].values
 
 g.network = network
-g.network_ok = True
-g.status = 'OK'
 g.prepare_graph(index)
 g.set_graph("free_flow_time")
 g.cost = np.array(g.cost, copy=True)
