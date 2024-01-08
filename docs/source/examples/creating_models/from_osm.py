@@ -55,6 +55,8 @@ for i, row in links.iterrows():
 curr = project.conn.cursor()
 curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
+print(long)
+print(lat)
 
 # %%
 map_osm = folium.Map(location=[lat, long], zoom_start=14)

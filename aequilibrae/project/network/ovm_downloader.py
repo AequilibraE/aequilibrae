@@ -50,6 +50,7 @@ class OVMDownloader(WorkerThread):
         self.filter = self.get_ovm_filter(modes)
         self.node_start = node_start
         self.report = []
+        self.conn = None
         self.GeoDataFrame = []
         self.nodes = {}
         self.node_ids = {}
@@ -113,6 +114,9 @@ class OVMDownloader(WorkerThread):
 
 
     def downloadTransportation(self, bbox, data_source, output_dir):
+        # self.conn = connect_spatialite(output_dir)
+        # self.curr = self.conn.cursor()
+
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
         output_dir = Path(output_dir)
         g_dataframes = []
@@ -192,7 +196,7 @@ class OVMDownloader(WorkerThread):
                 else:
                     raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
                 return processed_df
-            
+
             # Iterate over rows using iterrows()
             result_dfs = []
             for index, row in gdf_link.iterrows():
@@ -213,16 +217,21 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-            def trim_geometry(node_lu, row, position):           
-                lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]
-                lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]
-            
+            # [11:58] Jamie Cook
+            def trim_geometry(node_lu, row, position):          
+                lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]['coord']
+                lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]['coord']
+                
+                start,end = -1, -1
                 for j, coord in enumerate(row.geometry[position].coords):
-                    if lat_long_a['coord'] == coord:
-                        new_list = row.geometry[position].coords[j:]
-                        if lat_long_b['coord'] == coord:
-                            new_list[:j]
-                return shapely.LineString(new_list)
+                    if lat_long_a == coord:
+                        start = j
+                    if lat_long_b == coord:
+                        end = j
+                if start < 0 or end < 0:
+                    raise RuntimeError("Couldn't find the start end coords in the given linestring")
+                return shapely.LineString(row.geometry[position].coords[start:end+1])
+ 
             for i in range(1, len(final_result['link_id'])):
                 final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)    
 
