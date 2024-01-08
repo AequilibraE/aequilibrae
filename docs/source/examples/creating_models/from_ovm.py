@@ -32,7 +32,7 @@ links
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier
-links = project.network.links.data
+# links = project.network.links.data
 
 # We create a Folium layer
 network_links = folium.FeatureGroup("links")

@@ -2,7 +2,14 @@
     "python.testing.pytestArgs": [
         "tests"
     ],
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "julia.environmentPath": "c:\\Users\\penny\\git\\Aequilibrae"
+    "python.testing.unittestEnabled": true,
+    "python.testing.pytestEnabled": false,
+    "julia.environmentPath": "c:\\Users\\penny\\git\\Aequilibrae",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "*test.py"
+    ]
 }

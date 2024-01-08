@@ -12,6 +12,7 @@ import importlib.util as iutil
 from aequilibrae.utils import WorkerThread
 
 import duckdb
+import shapely
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -49,7 +50,7 @@ class OVMDownloader(WorkerThread):
         self.filter = self.get_ovm_filter(modes)
         self.node_start = node_start
         self.report = []
-        self.json = []
+        self.GeoDataFrame = []
         self.nodes = {}
         self.node_ids = {}
         self.__project_path = Path(project_path)
@@ -165,7 +166,9 @@ class OVMDownloader(WorkerThread):
             df_node = pd.read_parquet(output_file_node)
             geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
             gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
-                    
+            print('vers 1')
+            print(gdf_link['geometry'][1])
+            print(gdf_link['geometry'][2])
             # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
             
@@ -177,23 +180,24 @@ class OVMDownloader(WorkerThread):
             # Function to process each row and create a new GeoDataFrame
             def process_row(gdf_link):
                 # Extract necessary information from the row
-                ovm_id = gdf_link['ovm_id']
                 connectors = gdf_link['connectors']
-                link_type = gdf_link['link_type']
-                geometry = gdf_link['geometry']
 
                 # Check if 'Connectors' has more than 2 elements
                 if np.size(connectors) >= 2:
                     # Split the DataFrame into multiple rows
                     rows = []
                     for i in range(len(connectors) - 1):
-                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 'link_type': link_type, 'speed': gdf_link['speed'], 'ovm_id': ovm_id, 'geometry': geometry}
+                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 'link_type': gdf_link['link_type'], 
+                                   'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry']}
                         rows.append(new_row)
                     processed_df = gpd.GeoDataFrame(rows)
                 else:
                     raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
                 return processed_df
             
+            print('vers 2')
+            print(gdf_link['geometry'][1])
+            print(gdf_link['geometry'][2])
             # Iterate over rows using iterrows()
             result_dfs = []
             for index, row in gdf_link.iterrows():
@@ -214,35 +218,42 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-            # print(f'node_ids: {self.node_ids}')
-            # print(f'nodes: {self.nodes}')
+           
+            # print('vers 3')
+            # print(final_result['geometry'][1])
+            # # print(final_result['geometry'][2])
+            # geo_link = gpd.GeoSeries.from_wkt(final_result.geometry, crs=4326)
+            # # print(geo_link)
+            # final_result = gpd.GeoDataFrame(final_result,geometry=geo_link)
+
+            # print(self.nodes['8f9d0e1286130e9-16FFE0823C83BFB7']['coord'])
+
+            # print(f'a_node : {final_result["a_node"]}')
             # print()
-                
-            print(final_result['geometry'][2])
-            print(final_result['a_node'][2])
-            print(final_result['b_node'][2])
-            print(gdf_node['geometry'][final_result['a_node'][2] -10000])
-            print(gdf_node['geometry'][final_result['b_node'][2] -10000])
-            print()
+            # print(self.nodes)
+            # print(f'lat : {self.nodes["8f9d0e1286130e9-16FFE0823C83BFB7"]["coord"]}')
 
-            geometry = []
-            all_nodes = [list((self.node_ids[final_result['a_node'][x]], self.node_ids[final_result['b_node'][x]])) for x in range(len(final_result['b_node']))]
-            for lists in all_nodes:
-                geo = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in lists]
-                geometry.append("LINESTRING ({})".format(", ".join(geo)))
-            final_result['geometry'] = pd.Series(geometry)
-            geo_link = gpd.GeoSeries.from_wkt(final_result.geometry, crs=4326)
-            # print(geo_link)
-            final_result = gpd.GeoDataFrame(final_result,geometry=geo_link)
-
-                
-            print(final_result['geometry'][2])
-            print(final_result['a_node'][2])
-            print(final_result['b_node'][2])
-            print(gdf_node['geometry'][final_result['a_node'][2] -10000])
-            print(gdf_node['geometry'][final_result['b_node'][2] -10000])
-            print()
-
+            # print(final_result[['a_node','b_node','geometry']])
+            def trim_geometry(node_lu, row, position):    
+                print(position)            
+                lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]
+                lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]
+                print(f'a: {lat_long_a["coord"]}')
+                print(f'b: {lat_long_b["coord"]}')
+                print(row.geometry[position])
+                print(list(row.geometry[position].coords))
+                print()
+                for j, coord in enumerate(row.geometry[position].coords):
+                    if lat_long_a['coord'] == coord:
+                        new_list = row.geometry[position].coords[j:]
+                        if lat_long_b['coord'] == coord:
+                            new_list[:j]
+                print(new_list)
+                return shapely.LineString(new_list)
+            for i in range(1, len(final_result['link_id'])):
+                final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)
+            print(final_result[['a_node','b_node','geometry']])
+    
 
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
@@ -267,14 +278,14 @@ class OVMDownloader(WorkerThread):
 
             final_result.to_parquet(output_file_link)
             g_dataframes.append(final_result)
-            self.json.extend(g_dataframes)
+            self.GeoDataFrame.append(g_dataframes)
 
             node_order = ['ogc_fid', 'node_id', 'is_centroid', 'modes', 'link_types', 'ovm_id', 'geometry']
             gdf_node = gdf_node[node_order]
 
             gdf_node.to_parquet(output_file_node)
             g_dataframes.append(gdf_node)
-            self.json.extend(g_dataframes)
+            self.GeoDataFrame.append(g_dataframes)
         return g_dataframes    
 
     def create_node_ids(self, data_frame):
@@ -287,7 +298,7 @@ class OVMDownloader(WorkerThread):
             node_count = i + self.node_start
             node_ids.append(node_count)
             self.node_ids[node_count] = data_frame['ovm_id'][i]
-            self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x}
+            self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y)}
         data_frame['node_id'] = pd.Series(node_ids)
         return data_frame['node_id']
 
