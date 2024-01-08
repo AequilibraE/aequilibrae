@@ -166,9 +166,7 @@ class OVMDownloader(WorkerThread):
             df_node = pd.read_parquet(output_file_node)
             geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
             gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
-            print('vers 1')
-            print(gdf_link['geometry'][1])
-            print(gdf_link['geometry'][2])
+
             # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
             
@@ -195,9 +193,6 @@ class OVMDownloader(WorkerThread):
                     raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
                 return processed_df
             
-            print('vers 2')
-            print(gdf_link['geometry'][1])
-            print(gdf_link['geometry'][2])
             # Iterate over rows using iterrows()
             result_dfs = []
             for index, row in gdf_link.iterrows():
@@ -218,42 +213,18 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-           
-            # print('vers 3')
-            # print(final_result['geometry'][1])
-            # # print(final_result['geometry'][2])
-            # geo_link = gpd.GeoSeries.from_wkt(final_result.geometry, crs=4326)
-            # # print(geo_link)
-            # final_result = gpd.GeoDataFrame(final_result,geometry=geo_link)
-
-            # print(self.nodes['8f9d0e1286130e9-16FFE0823C83BFB7']['coord'])
-
-            # print(f'a_node : {final_result["a_node"]}')
-            # print()
-            # print(self.nodes)
-            # print(f'lat : {self.nodes["8f9d0e1286130e9-16FFE0823C83BFB7"]["coord"]}')
-
-            # print(final_result[['a_node','b_node','geometry']])
-            def trim_geometry(node_lu, row, position):    
-                print(position)            
+            def trim_geometry(node_lu, row, position):           
                 lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]
                 lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]
-                print(f'a: {lat_long_a["coord"]}')
-                print(f'b: {lat_long_b["coord"]}')
-                print(row.geometry[position])
-                print(list(row.geometry[position].coords))
-                print()
+            
                 for j, coord in enumerate(row.geometry[position].coords):
                     if lat_long_a['coord'] == coord:
                         new_list = row.geometry[position].coords[j:]
                         if lat_long_b['coord'] == coord:
                             new_list[:j]
-                print(new_list)
                 return shapely.LineString(new_list)
             for i in range(1, len(final_result['link_id'])):
-                final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)
-            print(final_result[['a_node','b_node','geometry']])
-    
+                final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)    
 
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
