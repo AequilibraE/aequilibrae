@@ -9,6 +9,7 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
 import gc
 import importlib.util as iutil
+from aequilibrae.project.network import haversine
 from aequilibrae.utils import WorkerThread
 
 import duckdb
@@ -114,9 +115,6 @@ class OVMDownloader(WorkerThread):
 
 
     def downloadTransportation(self, bbox, data_source, output_dir):
-        # self.conn = connect_spatialite(output_dir)
-        # self.curr = self.conn.cursor()
-
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
         output_dir = Path(output_dir)
         g_dataframes = []
@@ -210,27 +208,25 @@ class OVMDownloader(WorkerThread):
             # adding neccassary columns for aequilibrea data frame
             final_result['link_id'] = 1
             final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result['link_id']) + 1)))
-            final_result['direction'] = 0
-            final_result['distance'] = 1
+            final_result["direction"] = 0
+            # print(self.node_ids[final_result['b_node'][1]])
+            # print(gdf_link['connectors'][2])
+            # print(gdf_link['connectors'][3])
+            final_result["distance"] = 1
+            # final_result["distance"] = sum(
+            #     [
+            #         haversine(self.nodes[self.node_ids[x]]["lon"], self.nodes[self.node_ids[x]]["lat"], self.nodes[self.node_ids[y]]["lon"], self.nodes[self.node_ids[y]]["lat"])
+            #         for i in range(1, len(gdf_link['connectors']))
+            #             for x, y in zip(gdf_link['connectors'][i][1:], gdf_link['connectors'][i][:-1])
+            #     ]
+            # )
+            
             final_result['name'] = 1
             final_result['travel_time'] = 1
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-            # [11:58] Jamie Cook
-            def trim_geometry(node_lu, row, position):          
-                lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]['coord']
-                lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]['coord']
-                
-                start,end = -1, -1
-                for j, coord in enumerate(row.geometry[position].coords):
-                    if lat_long_a == coord:
-                        start = j
-                    if lat_long_b == coord:
-                        end = j
-                if start < 0 or end < 0:
-                    raise RuntimeError("Couldn't find the start end coords in the given linestring")
-                return shapely.LineString(row.geometry[position].coords[start:end+1])
+            
  
             for i in range(1, len(final_result['link_id'])):
                 final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)    
@@ -328,8 +324,21 @@ class OVMDownloader(WorkerThread):
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
             gdf = gpd.GeoDataFrame(df,geometry=geo)
             gdf.to_parquet(Path(pth1))
-        # return gdf        
-
+        # return gdf    
+                
+    def trim_geometry(self, node_lu, row, position):          
+        lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]['coord']
+        lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]['coord']
+        
+        start,end = -1, -1
+        for j, coord in enumerate(row.geometry[position].coords):
+            if lat_long_a == coord:
+                start = j
+            if lat_long_b == coord:
+                end = j
+        if start < 0 or end < 0:
+            raise RuntimeError("Couldn't find the start end coords in the given linestring")
+        return shapely.LineString(row.geometry[position].coords[start:end+1])
 
     def get_ovm_filter(self, modes: list) -> str:
         """
