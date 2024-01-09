@@ -198,40 +198,14 @@ class Network(WorkerThread):
                 if "PLACE FOUND" in i:
                     self.logger.info(i)
 
-        # Need to compute the size of the bounding box to not exceed it too much
-        height = haversine((east + west) / 2, south, (east + west) / 2, north)
-        width = haversine(east, (north + south) / 2, west, (north + south) / 2)
-        area = height * width
-
-        par = Parameters().parameters["ovm"]
-        max_query_area_size = par["max_query_area_size"]
-
-        if area < max_query_area_size:
-            polygons = [bbox]
-        else:
-            polygons = []
-            parts = math.ceil(area / max_query_area_size)
-            horizontal = math.ceil(math.sqrt(parts))
-            vertical = math.ceil(parts / horizontal)
-            dx = (east - west) / horizontal
-            dy = (north - south) / vertical
-            for i in range(horizontal):
-                xmin = max(-180, west + i * dx)
-                xmax = min(180, west + (i + 1) * dx)
-                for j in range(vertical):
-                    ymin = max(-90, south + j * dy)
-                    ymax = min(90, south + (j + 1) * dy)
-                    box = [xmin, ymin, xmax, ymax]
-                    polygons.append(box)
         self.logger.info("Downloading data")
-        self.downloader = OVMDownloader(modes, output_dir, logger=self.logger)
+        self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
         if pyqt:
             self.downloader.downloading.connect(self.signal_handler)
-        print(polygons[0])
-        downloaded = self.downloader.downloadTransportation(polygons[0],data_source,output_dir)
-        self.project.network.links.data = downloaded[1]
-        print('links after download')
-        print(self.project.network.links.data)     
+        
+        downloaded = self.downloader.downloadTransportation(bbox,data_source,output_dir)
+        self.links = downloaded[0]
+        self.nodes = downloaded[1]
 
         self.logger.info("Network built successfully")
 
