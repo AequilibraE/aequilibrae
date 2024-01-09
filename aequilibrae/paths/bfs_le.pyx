@@ -119,7 +119,7 @@ cdef class RouteChoice:
             RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_depth)
 
 
-    cdef void generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_depth) nogil:
+    cdef void generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_depth) noexcept nogil:
         """Main method for route set generation, thread safe."""
         cdef long connector
 

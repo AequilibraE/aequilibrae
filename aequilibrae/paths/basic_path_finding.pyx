@@ -431,7 +431,7 @@ cpdef void path_finding_a_star(long origin,
                               long long [:] pred,
                               long long [:] ids,
                               long long [:] connectors,
-                              Heuristic heuristic) nogil:
+                              Heuristic heuristic) noexcept nogil:
     """
     Based on the pseudocode presented at https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode
     The following variables have been renamed to be consistent with out Dijkstra's implementation
