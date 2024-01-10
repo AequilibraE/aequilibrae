@@ -2,14 +2,17 @@
 Implementation of ODME Algorithms (to obtain scaling matrices):
 """
 
+# EITHER PREFIX FILE OR CREATE SUBMODULE
+
 from typing import Tuple
 import numpy as np
 import scipy.stats as spstats
 
 class ScalingFactors(object):
-    """ ODME Algorithms (Scaling Factor Generation)"""
+    """ ODME Algorithms (Scaling Factor Generation) """
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
+    # FIGURE OUT DOCSTRING FOR ODME
     def __init__(self, odme, algorithm: str) -> None:
         """
         """
@@ -36,7 +39,7 @@ class ScalingFactors(object):
         elif self.algo_name == "spiess":
             self._algorithm = self.__spiess
         
-        else: 
+        else:
             raise ValueError(
                 f"Invalid algorithm name: {self.algo_name}"
                 "Valid algorithms are: "
