@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.paths import TrafficAssignment
-from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEStats
+from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -365,11 +365,6 @@ class ODME(object):
         Returns scaling matrices for each user class - depending on algorithm chosen.
         Note: we expect any algorithm to return a list of factor matrices in order of the
         stored user classes.
-
-        NOTE - In future we should separate the algorithms from this class, and this function
-        will be the only one which ever needs to interact with the algorithms, and simply needs
-        to receive a list of scaling factors after initialising an algorithm and passing it the current
-        state of this ODME object.
         """
         algorithm = ScalingFactors(self, self._algorithm)
         factors = algorithm.generate()

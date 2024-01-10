@@ -12,4 +12,4 @@ __revision__ = "$Revision: 1 $"
 __date__ = "$Date: 2024-10-01$"
 
 from .scaling_factors import ScalingFactors
-from .statistics import ODMEStats
+from .results import ODMEResults
