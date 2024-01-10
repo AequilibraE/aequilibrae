@@ -13,6 +13,13 @@ class ScalingFactors(object):
     # FIGURE OUT DOCSTRING FOR ODME
     def __init__(self, odme, algorithm: str) -> None:
         """
+        Initialises necessary fields from odme object in order to generate
+        a set of scaling matrices for the current iteration of the odme 
+        procedure.
+        
+        Parameters:
+            odme: the ODME object containing all fields pertaining to the odme procedure
+            algorithm: the algorithm to use to generate scaling factors.
         """
         self.algo_name = algorithm
         self.__set_algorithm()
