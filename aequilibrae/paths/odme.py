@@ -1,5 +1,5 @@
 """
-Implementation of ODME algorithms:
+Implementation of ODME Infrastructure:
 """
 
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
@@ -30,12 +30,12 @@ import pandas as pd
 from aequilibrae.paths import TrafficAssignment
 
 class ODME(object):
-    """ODME algorithm."""
+    """ODME Infrastructure"""
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
         "class", "link_id", "direction", "obs_volume", "assign_volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
-    FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median', 
+    FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median',
         'std_deviation', 'variance', 'sum', 'min', 'max']
     CUMULATIVE_FACTOR_COLS = ["class", "mean", "median", "standard deviation", "variance", "min", "max", "sum", "# of factors"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
@@ -136,14 +136,14 @@ class ODME(object):
         for user_class in self.classes:
             user_class.set_select_links(
                 {
-                    self.__get_sl_key(row):
+                    self.get_sl_key(row):
                     [(row['link_id'], row['direction'])]
                     for _, row in cv[cv['class'] == user_class.__id__
                     ].iterrows()
                 }
             )
 
-    def __get_sl_key(self, row: pd.Series) -> str:
+    def get_sl_key(self, row: pd.Series) -> str:
         """
         Given a particular row from the observervations (count_volumes) returns
         a key corresponding to it for use in all select link extraction.
@@ -428,13 +428,19 @@ class ODME(object):
     def __extract_volumes(self) -> None:
         """
         Extracts and stores assigned volumes (corresponding for those for which we have
-        observations - ie count volumes). 
+        observations - ie count volumes).
+        
+        NOTE - this does not take into account pce, ie this is the number of vehicles, not
+        'flow'.
         """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         # DECIDE WHETHER TO PUT THIS IN INITIALISER OR NOT!!!
         # Dictionary to select correct column of results dataframe
         col = dict()
         for i, cls_name in enumerate(self.class_names):
+            # NOTE - due to the design change of the TrafficClass to only hold one
+            # user class, this should not be necessary, however this is still a remnant
+            # piece of code which uses the names from the aequilibrae matrix itself.
             name = self.aequilibrae_matrices[i].view_names[0]
             col[cls_name] = {1: f"{name}_ab", -1: f"{name}_ba", 0: f"{name}_tot"}
 
@@ -442,7 +448,7 @@ class ODME(object):
         def extract_volume(row) -> None:
             """
             Extracts volume corresponding to particular link (from row) and return it.
-            For inner iterations need to calculate this via sum sl_matrix * demand_matrix
+            For inner iterations need to calculate this via __calculate_volumes
             """
             return assign_df.loc[assign_df['link_id'] == row['link_id'],
                 col[row['class']][row['direction']]].values[0]
@@ -514,7 +520,7 @@ class ODME(object):
 
                     # Modulate factor by select link dependency:
                     link_factor = (row['obs_volume'] / row['assign_volume']) - 1
-                    sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                    sl_matrix = self._sl_matrices[self.get_sl_key(row)]
                     factor_matrix = (sl_matrix * link_factor)
 
                     # Apply factor limiting:
@@ -575,7 +581,7 @@ class ODME(object):
             observed = self._count_volumes[self._count_volumes['class'] == user_class]
             factors = np.empty((len(observed), *(self._demand_dims[i])))
             for i, row in observed.iterrows():
-                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                sl_matrix = self._sl_matrices[self.get_sl_key(row)]
                 factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
 
             # Add derivative matrix to list of derivatives:
@@ -607,7 +613,7 @@ class ODME(object):
             # Calculating link flow derivatives:
             flow_derivatives = np.empty(len(class_counts))
             for j, row in class_counts.iterrows():
-                sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+                sl_matrix = self._sl_matrices[self.get_sl_key(row)]
                 flow_derivatives[j] = -np.sum(self.demand_matrices[i] * sl_matrix * gradients[i])
 
             # Calculate minimising step length:
@@ -650,7 +656,7 @@ class ODME(object):
             if np.any(upper_mask):
                 upper_lim = 1 / np.min(gradient[upper_mask])
             else:
-                upper_lim = float('inf') 
+                upper_lim = float('inf')
 
             # Lower bound:
             lower_mask = np.logical_and(self.demand_matrices[i] > 0, gradient < 0)
