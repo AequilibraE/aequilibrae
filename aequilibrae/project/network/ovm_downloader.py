@@ -9,7 +9,7 @@ from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
 import gc
 import importlib.util as iutil
-from aequilibrae.project.network import haversine
+from aequilibrae.project.network.haversine import haversine
 from aequilibrae.utils import WorkerThread
 
 import duckdb
@@ -131,6 +131,7 @@ class OVMDownloader(WorkerThread):
                     id AS ovm_id,
                     connectors,
                     CAST(road AS JSON) ->>'class' AS link_type,
+                    CAST(road AS JSON) ->>'roadNames' AS name,
                     CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
                     geometry
                 FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
@@ -173,7 +174,7 @@ class OVMDownloader(WorkerThread):
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
             
             gdf_node['node_id'] = self.create_node_ids(gdf_node)
-            gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node['node_id']) + 1)))
+            gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
             gdf_node['is_centroid'] = 0
 
 
@@ -188,7 +189,7 @@ class OVMDownloader(WorkerThread):
                     rows = []
                     for i in range(len(connectors) - 1):
                         new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 'link_type': gdf_link['link_type'], 
-                                   'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry']}
+                                   'name': gdf_link['name'], 'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry']}
                         rows.append(new_row)
                     processed_df = gpd.GeoDataFrame(rows)
                 else:
@@ -206,31 +207,30 @@ class OVMDownloader(WorkerThread):
             final_result = pd.concat(result_dfs, ignore_index=True)
 
             # adding neccassary columns for aequilibrea data frame
-            final_result['link_id'] = 1
-            final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result['link_id']) + 1)))
+            print(len(final_result))
+            final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
+            final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
             final_result["direction"] = 0
-            # print(self.node_ids[final_result['b_node'][1]])
-            # print(gdf_link['connectors'][2])
-            # print(gdf_link['connectors'][3])
             final_result["distance"] = 1
-            # final_result["distance"] = sum(
-            #     [
-            #         haversine(self.nodes[self.node_ids[x]]["lon"], self.nodes[self.node_ids[x]]["lat"], self.nodes[self.node_ids[y]]["lon"], self.nodes[self.node_ids[y]]["lat"])
-            #         for i in range(1, len(gdf_link['connectors']))
-            #             for x, y in zip(gdf_link['connectors'][i][1:], gdf_link['connectors'][i][:-1])
-            #     ]
-            # )
+            final_result['geometry'] = [self.trim_geometry(self.node_ids, row) for e, row in final_result[['a_node','b_node','geometry']].iterrows()]
             
-            final_result['name'] = 1
             final_result['travel_time'] = 1
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
             
- 
+            print(self.node_ids)
+            print(final_result[['a_node','b_node','geometry']])
             for i in range(1, len(final_result['link_id'])):
-                final_result['geometry'][i] = trim_geometry(self.nodes, final_result[['a_node','b_node','geometry']], i)    
+                
+                final_result["distance"][i] = sum(
+                [
+                    haversine(self.node_ids[x]["lon"], self.node_ids[x]["lat"], self.node_ids[y]["lon"], self.node_ids[y]["lat"])
+                    for x, y in [(final_result['a_node'][i], final_result['b_node'][i])]
 
+                ]  
+            )
+                
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
 
@@ -270,10 +270,10 @@ class OVMDownloader(WorkerThread):
         '''
         node_ids = []
         data_frame['node_id'] = 1
-        for i in range(len(data_frame['ovm_id'])):
+        for i in range(len(data_frame)):
             node_count = i + self.node_start
             node_ids.append(node_count)
-            self.node_ids[node_count] = data_frame['ovm_id'][i]
+            self.node_ids[node_count] = {'ovm_id': data_frame['ovm_id'][i], 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y)}
             self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y)}
         data_frame['node_id'] = pd.Series(node_ids)
         return data_frame['node_id']
@@ -326,19 +326,22 @@ class OVMDownloader(WorkerThread):
             gdf.to_parquet(Path(pth1))
         # return gdf    
                 
-    def trim_geometry(self, node_lu, row, position):          
-        lat_long_a = node_lu[self.node_ids[row["a_node"][position]]]['coord']
-        lat_long_b = node_lu[self.node_ids[row["b_node"][position]]]['coord']
-        
+    def trim_geometry(self, node_lu, row):
+        lat_long_a = node_lu[row["a_node"]]['coord']
+        lat_long_b = node_lu[row["b_node"]]['coord']
+        print('h')
+        print(lat_long_a)
         start,end = -1, -1
-        for j, coord in enumerate(row.geometry[position].coords):
+        for j, coord in enumerate(row.geometry.coords):
+            print(coord)
             if lat_long_a == coord:
                 start = j
             if lat_long_b == coord:
                 end = j
         if start < 0 or end < 0:
             raise RuntimeError("Couldn't find the start end coords in the given linestring")
-        return shapely.LineString(row.geometry[position].coords[start:end+1])
+        print(shapely.LineString(row.geometry.coords[start:end+1]))
+        return shapely.LineString(row.geometry.coords[start:end+1])
 
     def get_ovm_filter(self, modes: list) -> str:
         """
