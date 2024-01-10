@@ -80,12 +80,12 @@ class ODME(object):
         # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
         # Initial demand matrices:
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
-        self._demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
+        self.demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
 
         # Observed Links & Associated Volumes
         # MAYBE I SHOULD SPLIT THIS INTO ONE DATAFRAME PER CLASS
-        self._count_volumes = count_volumes.copy(deep=True)
-        self._num_counts = len(self._count_volumes)
+        self.count_volumes = count_volumes.copy(deep=True)
+        self.num_counts = len(self.count_volumes)
 
         self._sl_matrices = dict() # Dictionary of proportion matrices
 
@@ -132,7 +132,7 @@ class ODME(object):
         """
         Sets all select links for each class and for each observation.
         """
-        cv = self._count_volumes
+        cv = self.count_volumes
         for user_class in self.classes:
             user_class.set_select_links(
                 {
@@ -270,16 +270,16 @@ class ODME(object):
         self._total_time += loop_time
 
         # Create Data:
-        data = self._count_volumes.copy(deep=True)
-        data["Loop Time (s)"] = [loop_time for _ in range(self._num_counts)]
-        data["Total Run Time (s)"] = [self._total_time for _ in range(self._num_counts)]
-        data["Convergence"] = [self._last_convergence for _ in range(self._num_counts)]
-        data["Inner Convergence"] = [self._convergence_change for _ in range(self._num_counts)]
-        data["Total Iteration #"] = [self._total_iter for _ in range(self._num_counts)]
-        data["Outer Loop #"] = [self._outer for _ in range(self._num_counts)]
-        data["Inner Loop #"] = [self._inner for _ in range(self._num_counts)]
-        data["Assigned - Observed"] = (self._count_volumes['assign_volume'].to_numpy() -
-            self._count_volumes["obs_volume"].to_numpy())
+        data = self.count_volumes.copy(deep=True)
+        data["Loop Time (s)"] = [loop_time for _ in range(self.num_counts)]
+        data["Total Run Time (s)"] = [self._total_time for _ in range(self.num_counts)]
+        data["Convergence"] = [self._last_convergence for _ in range(self.num_counts)]
+        data["Inner Convergence"] = [self._convergence_change for _ in range(self.num_counts)]
+        data["Total Iteration #"] = [self._total_iter for _ in range(self.num_counts)]
+        data["Outer Loop #"] = [self._outer for _ in range(self.num_counts)]
+        data["Inner Loop #"] = [self._inner for _ in range(self.num_counts)]
+        data["Assigned - Observed"] = (self.count_volumes['assign_volume'].to_numpy() -
+            self.count_volumes["obs_volume"].to_numpy())
 
         # Add data to current list of dataframes
         self._statistics.append(data)
@@ -379,7 +379,7 @@ class ODME(object):
         elif self._algorithm == "spiess":
             scaling_factors = self.__spiess()
         else: # SHOULD NEVER HAPPEN - RAISE ERROR HERE LATER AND ERROR SHOULD HAVE BEEN RAISED EARLIER!!!
-            scaling_factors = [np.ones(dims) for dims in self._demand_dims]
+            scaling_factors = [np.ones(dims) for dims in self.demand_dims]
             raise ValueError("Unsupported Algorithm!")
 
         self.__record_factor_stats(scaling_factors)
@@ -454,7 +454,7 @@ class ODME(object):
                 col[row['class']][row['direction']]].values[0]
 
         # Extract a flow for each count volume:
-        self._count_volumes['assign_volume'] = self._count_volumes.apply(
+        self.count_volumes['assign_volume'] = self.count_volumes.apply(
             extract_volume,
             axis=1
         )
@@ -476,7 +476,7 @@ class ODME(object):
             return np.sum(sl_matrix * demand_matrix)
 
         # Calculate flows for all rows:
-        self._count_volumes['assign_volume'] = self._count_volumes.apply(
+        self.count_volumes['assign_volume'] = self.count_volumes.apply(
             lambda row: __calculate_volume(self, row),
             axis=1)
 
@@ -503,18 +503,18 @@ class ODME(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         scaling_factors = []
-        c_v = self._count_volumes
+        c_v = self.count_volumes
         # Steps 1 & 2:
         for i, name in enumerate(self.class_names):
             observed = c_v[c_v['class'] == name]
 
             # If there are no observations leave matrix unchanged
             if len(observed) == 0:
-                scaling_factors.append(np.ones(self._demand_dims[i]))
+                scaling_factors.append(np.ones(self.demand_dims[i]))
                 continue
 
-            factors = np.empty((len(observed), *(self._demand_dims[i])))
-            for j, row in self._count_volumes.iterrows():
+            factors = np.empty((len(observed), *(self.demand_dims[i])))
+            for j, row in self.count_volumes.iterrows():
                 # Create factor matrix:
                 if row["obs_volume"] != 0 and row['assign_volume'] != 0:
 
@@ -531,7 +531,7 @@ class ODME(object):
 
                 # If assigned or observed value is 0 we cannot do anything right now
                 else:
-                    factor_matrix = np.ones(self._demand_dims[i])
+                    factor_matrix = np.ones(self.demand_dims[i])
                 
                 # Add factor matrix
                 factors[j, :, :] = factor_matrix
@@ -578,8 +578,8 @@ class ODME(object):
         derivatives = []
         # Create a derivative matrix for each user class:
         for i, user_class in enumerate(self.class_names):
-            observed = self._count_volumes[self._count_volumes['class'] == user_class]
-            factors = np.empty((len(observed), *(self._demand_dims[i])))
+            observed = self.count_volumes[self.count_volumes['class'] == user_class]
+            factors = np.empty((len(observed), *(self.demand_dims[i])))
             for i, row in observed.iterrows():
                 sl_matrix = self._sl_matrices[self.get_sl_key(row)]
                 factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
@@ -608,7 +608,7 @@ class ODME(object):
         # Calculate step-sizes (lambdas) for each gradient matrix:
         lambdas = []
         for i, user_class in enumerate(self.class_names):
-            class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
+            class_counts = self.count_volumes[self.count_volumes['class'] == user_class]
 
             # Calculating link flow derivatives:
             flow_derivatives = np.empty(len(class_counts))

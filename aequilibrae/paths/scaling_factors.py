@@ -3,14 +3,10 @@ Implementation of ODME Algorithms (to obtain scaling matrices):
 """
 
 from typing import Tuple
-#import time
 import numpy as np
 import scipy.stats as spstats
-#import pandas as pd
 
-#from aequilibrae.paths import TrafficAssignment
-
-class ODMEAlgorithms(object):
+class ScalingFactors(object):
     """ ODME Algorithms (Scaling Factor Generation)"""
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
@@ -20,7 +16,7 @@ class ODMEAlgorithms(object):
         self.algo_name = algorithm
         self.__set_algorithm()
 
-        self._count_volumes = odme._count_volumes
+        self._count_volumes = odme.count_volumes
         self.class_names = odme.class_names
         self.num_classes = len(self.class_names)
         self._demand_dims = odme._demand_dims
@@ -32,14 +28,22 @@ class ODMEAlgorithms(object):
 
     def __set_algorithm(self) -> None:
         """
+        Set the algorithm to be used to obtain scaling factors.
         """
         if self.algo_name == "gmean":
             self._algorithm = self.__geometric_mean
 
         elif self.algo_name == "spiess":
             self._algorithm = self.__spiess
+        
+        else: 
+            raise ValueError(
+                f"Invalid algorithm name: {self.algo_name}"
+                "Valid algorithms are: "
+                '\n'.join(self.ALL_ALGORITHMS)
+            )
 
-    def execute(self):
+    def generate(self):
         """
         Returns scaling factors for this iteration of the ODME procedure.
         """
