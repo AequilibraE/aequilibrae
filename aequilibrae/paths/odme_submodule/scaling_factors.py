@@ -1,8 +1,6 @@
 """
-Implementation of ODME Algorithms (to obtain scaling matrices):
+Implementation of ODME algorithms to obtain scaling matrices at each iteration:
 """
-
-# EITHER PREFIX FILE OR CREATE SUBMODULE
 
 from typing import Tuple
 import numpy as np
@@ -22,7 +20,7 @@ class ScalingFactors(object):
         self._count_volumes = odme.count_volumes
         self.class_names = odme.class_names
         self.num_classes = len(self.class_names)
-        self._demand_dims = odme._demand_dims
+        self._demand_dims = odme.demand_dims
         self._sl_matrices = odme._sl_matrices
         self.demand_matrices = odme.demand_matrices
         self.init_demand_matrices = odme.demand_matrices
@@ -46,14 +44,14 @@ class ScalingFactors(object):
                 '\n'.join(self.ALL_ALGORITHMS)
             )
 
-    def generate(self):
+    def generate(self) -> list[np.ndarray]:
         """
         Returns scaling factors for this iteration of the ODME procedure.
         """
         return self._algorithm()
 
     # gmean (Geometric Mean):
-    def __geometric_mean(self) -> np.ndarray:
+    def __geometric_mean(self) -> list[np.ndarray]:
         """
         Calculates scaling factor based on geometric mean of ratio between 
         proportionally (via SL matrix) assigned flow & observed flows.

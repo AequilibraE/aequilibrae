@@ -9,6 +9,8 @@ from aequilibrae.paths.traffic_assignment import TrafficAssignment
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph
 
+from aequilibrae.paths.odme import ODME
+
 from aequilibrae import global_logger
 
 

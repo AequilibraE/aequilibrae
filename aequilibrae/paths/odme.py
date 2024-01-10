@@ -23,7 +23,8 @@ import time
 import numpy as np
 import pandas as pd
 
-from aequilibrae.paths import TrafficAssignment, ScalingFactors
+from aequilibrae.paths import TrafficAssignment
+from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEStats
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -198,8 +199,8 @@ class ODME(object):
 
             ONLY IMPLEMENTED FOR SINGLE CLASS!
             """
-            obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            obs_vals = self.count_volumes["obs_volume"].to_numpy()
+            assign_vals = self.count_volumes['assign_volume'].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
             self.__set_convergence_values(obj1 + regularisation)
@@ -208,8 +209,8 @@ class ODME(object):
             """
             Objective function with no regularisation term.
             """
-            obs_vals = self._count_volumes["obs_volume"].to_numpy()
-            assign_vals = self._count_volumes['assign_volume'].to_numpy()
+            obs_vals = self.count_volumes["obs_volume"].to_numpy()
+            assign_vals = self.count_volumes['assign_volume'].to_numpy()
             self.__set_convergence_values(np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1)
 
         if p_2:
@@ -461,7 +462,7 @@ class ODME(object):
             calculates the appropriate corresponding assigned 
             volume.
             """
-            sl_matrix = self._sl_matrices[self.__get_sl_key(row)]
+            sl_matrix = self._sl_matrices[self.get_sl_key(row)]
             demand_matrix = self.demand_matrices[self.names_to_indices[row['class']]]
             return np.sum(sl_matrix * demand_matrix)
 
