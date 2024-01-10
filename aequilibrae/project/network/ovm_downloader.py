@@ -207,7 +207,6 @@ class OVMDownloader(WorkerThread):
             final_result = pd.concat(result_dfs, ignore_index=True)
 
             # adding neccassary columns for aequilibrea data frame
-            print(len(final_result))
             final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
             final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
             final_result["direction"] = 0
@@ -218,11 +217,7 @@ class OVMDownloader(WorkerThread):
             final_result['capacity'] = 1
             final_result['lanes'] = 1
 
-            
-            print(self.node_ids)
-            print(final_result[['a_node','b_node','geometry']])
             for i in range(1, len(final_result['link_id'])):
-                
                 final_result["distance"][i] = sum(
                 [
                     haversine(self.node_ids[x]["lon"], self.node_ids[x]["lat"], self.node_ids[y]["lon"], self.node_ids[y]["lat"])
@@ -329,18 +324,14 @@ class OVMDownloader(WorkerThread):
     def trim_geometry(self, node_lu, row):
         lat_long_a = node_lu[row["a_node"]]['coord']
         lat_long_b = node_lu[row["b_node"]]['coord']
-        print('h')
-        print(lat_long_a)
         start,end = -1, -1
         for j, coord in enumerate(row.geometry.coords):
-            print(coord)
             if lat_long_a == coord:
                 start = j
             if lat_long_b == coord:
                 end = j
         if start < 0 or end < 0:
             raise RuntimeError("Couldn't find the start end coords in the given linestring")
-        print(shapely.LineString(row.geometry.coords[start:end+1]))
         return shapely.LineString(row.geometry.coords[start:end+1])
 
     def get_ovm_filter(self, modes: list) -> str:

@@ -480,12 +480,6 @@ osm:
     max_query_area_size: 2500000000
     sleeptime: 5
 
-ovm:
-    max_attempts: 50
-    timeout: 540
-    max_query_area_size: 2500000000
-    sleeptime: 5
-
 system:
   cpus: 0
   default_directory: C:\
