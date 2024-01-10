@@ -131,7 +131,7 @@ class OVMDownloader(WorkerThread):
                     id AS ovm_id,
                     connectors,
                     CAST(road AS JSON) ->>'class' AS link_type,
-                    CAST(road AS JSON) ->>'roadNames' AS name,
+                    CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                     CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
                     geometry
                 FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
@@ -172,7 +172,8 @@ class OVMDownloader(WorkerThread):
 
             # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
             gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
-            
+            gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
+
             gdf_node['node_id'] = self.create_node_ids(gdf_node)
             gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
             gdf_node['is_centroid'] = 0
@@ -220,9 +221,9 @@ class OVMDownloader(WorkerThread):
             for i in range(1, len(final_result['link_id'])):
                 final_result["distance"][i] = sum(
                 [
-                    haversine(self.node_ids[x]["lon"], self.node_ids[x]["lat"], self.node_ids[y]["lon"], self.node_ids[y]["lat"])
-                    for x, y in [(final_result['a_node'][i], final_result['b_node'][i])]
-
+                    haversine(x[0], x[1], y[0], y[1])
+                    for x, y in zip(list(final_result['geometry'][i].coords)[1:], list(final_result['geometry'][i].coords)[:-1])
+                    
                 ]  
             )
                 
