@@ -63,30 +63,9 @@ from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from libcpp.iterator cimport back_inserter
-from libcpp.algorithm cimport sample
 from cython.operator cimport dereference as deref, preincrement as inc
 
 import numpy as np
-
-
-from libc.stdint cimport uint_fast32_t, uint_fast64_t
-
-cdef extern from "<random>" namespace "std" nogil:
-    cdef cppclass random_device:
-        ctypedef uint_fast32_t result_type
-        random_device() except +
-        result_type operator()() except +
-
-    cdef cppclass minstd_rand:
-        ctypedef uint_fast32_t result_type
-        minstd_rand() except +
-        minstd_rand(result_type seed) except +
-        result_type operator()() except +
-        result_type min() except +
-        result_type max() except +
-        void discard(size_t z) except +
-        void seed(result_type seed) except +
 
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
@@ -124,26 +103,22 @@ cdef class RouteChoice:
         """
         pass
 
-    def run(self, origin, destination, max_routes=0, max_depth=0, seed=0):
+    def run(self, origin, destination, max_routes=0, max_depth=0):
         cdef:
             long origin_index = self.nodes_to_indices_view[origin]
             long dest_index = self.nodes_to_indices_view[destination]
             unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
-            unsigned int c_seed = seed
             double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
             unordered_set[vector[long long] *] *results
             unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
         with nogil:
-            results = RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_routes, c_max_depth, c_seed, scratch_cost)
+            results = RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_routes, c_max_depth, scratch_cost)
 
         res = []
         for x in deref(results):
             res.append(list(deref(x)))
-            # res[frozenset(deref(x.first))] = tuple(deref(x.second))
-            # del x.first
-            # del x.second
-            # del x
+            del x
 
         return res
 
@@ -163,8 +138,7 @@ cdef class RouteChoice:
             EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
         )
 
-    # cdef unordered_map[unordered_set[long long] *, vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
-    cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, unsigned int seed_value, double [:] scratch_cost) nogil:
+    cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
         """Main method for route set generation"""
         cdef:
             unordered_map[unordered_set[long long] *, vector[long long] *] *working_set
@@ -177,13 +151,11 @@ cdef class RouteChoice:
             vector[long long] *vec
             pair[unordered_set[long long] *, vector[long long] *] *pair_tmp
             pair[unordered_set[long long] *, vector[long long] *] x
-            minstd_rand rng
             long long p, connector
 
         queue.push_back(new unordered_set[long long]()) # Start with no edges banned
         working_set = new unordered_map[unordered_set[long long] *, vector[long long] *]()
         route_set = new unordered_set[vector[long long] *]()
-        rng.seed(seed_value)
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
         for depth in range(max_depth):
@@ -215,13 +187,13 @@ cdef class RouteChoice:
                 else:
                     pass  # Node was unreachable
 
-            printf("%d + %d >= %d\n", working_set.size(), route_set.size(), max_routes)
+            printf("%ld + %ld >= %d\n", working_set.size(), route_set.size(), max_routes)
             if working_set.size() + route_set.size() >= max_routes:
                 printf("route set full (or close to full)\n")
                 # Randomly insert enough elements to fill our route_set, we don't need to add anything else to our queue since we're done now
                 # FIXME: Horrible assumption, never do this
                 # The iteration order of the working set is probably close enough to random, let's just grab the first max_routes - route_set.size() elements
-                printf("yeeting %d entries\n", working_set.size() - (max_routes - route_set.size()))
+                printf("yeeting %ld entries\n", working_set.size() - (max_routes - route_set.size()))
 
                 # Skipp the elements we wish to save
                 set_iter = working_set.cbegin()
