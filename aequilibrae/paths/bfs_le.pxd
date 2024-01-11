@@ -17,5 +17,4 @@ cdef class RouteChoice:
         long long [:] ids_graph_view
         long long [:] conn_view
     cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost) noexcept nogil
-    # cdef unordered_map[unordered_set[long long] *, vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil
     cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil
