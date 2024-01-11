@@ -29,6 +29,7 @@ bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
 # nodes = download[1]
  # %%
 links = project.network.links
+nodes = project.network.nodes
 links
 
 # %%

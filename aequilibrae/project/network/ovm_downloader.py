@@ -130,9 +130,11 @@ class OVMDownloader(WorkerThread):
                 SELECT 
                     id AS ovm_id,
                     connectors,
+                    CAST(lanes AS JSON) ->> 'direction' AS direction,
                     CAST(road AS JSON) ->>'class' AS link_type,
                     CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                     CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
+                    lanes,
                     geometry
                 FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
                 WHERE bbox.minx > '{bbox[0]}'
@@ -189,8 +191,9 @@ class OVMDownloader(WorkerThread):
                     # Split the DataFrame into multiple rows
                     rows = []
                     for i in range(len(connectors) - 1):
-                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 'link_type': gdf_link['link_type'], 
-                                   'name': gdf_link['name'], 'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry']}
+                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
+                                   'direction': gdf_link['direction'], 'link_type': gdf_link['link_type'], 'name': gdf_link['name'], 
+                                   'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry'], 'lanes': gdf_link['lanes']}
                         rows.append(new_row)
                     processed_df = gpd.GeoDataFrame(rows)
                 else:
@@ -210,22 +213,21 @@ class OVMDownloader(WorkerThread):
             # adding neccassary columns for aequilibrea data frame
             final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
             final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
-            final_result["direction"] = 0
-            final_result["distance"] = 1
             final_result['geometry'] = [self.trim_geometry(self.node_ids, row) for e, row in final_result[['a_node','b_node','geometry']].iterrows()]
             
             final_result['travel_time'] = 1
             final_result['capacity'] = 1
-            final_result['lanes'] = 1
 
-            for i in range(1, len(final_result['link_id'])):
-                final_result["distance"][i] = sum(
-                [
+            distance_list = []
+            for i in range(0, len(final_result)):
+                distance = sum(
+                    [
                     haversine(x[0], x[1], y[0], y[1])
-                    for x, y in zip(list(final_result['geometry'][i].coords)[1:], list(final_result['geometry'][i].coords)[:-1])
-                    
-                ]  
-            )
+                    for x, y in zip(list(final_result['geometry'][i].coords)[1:], list(final_result['geometry'][i].coords)[:-1])  
+                    ]  
+                )
+                distance_list.append(distance)
+            final_result["distance"] = distance_list
                 
             mode_codes, not_found_tags = self.modes_per_link_type()
             final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
