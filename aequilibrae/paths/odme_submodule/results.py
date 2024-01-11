@@ -9,7 +9,6 @@ import pandas as pd
 class ODMEResults(object):
     """ Results and statistics of an ODME procedure """
     # Columns for various dataframes:
-    # FIGURE OUT WHICH ONES OF THESE ARE ACTUALLY NECESSARY
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)",
         "Loop Time (s)", "Convergence", "Inner Convergence", "class", "link_id", "direction",
         "obs_volume", "assign_volume", "Assigned - Observed"]
@@ -38,9 +37,6 @@ class ODMEResults(object):
         # ODME object:
         self.odme = odme
 
-        # Set up statistics structures
-        # Move statistic recording functions to this class
-        # Move results objects to this class
         # Clean up stuff
         # From here to continue decide how to more appropriately record results and statistics
         # and make sure the two classes have as little coupling as possible

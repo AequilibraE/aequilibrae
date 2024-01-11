@@ -8,16 +8,16 @@ Implementation of ODME Infrastructure:
 # NOTE - Lots of squeezing of matrices happens after assignment due to the functionality of select
 # link analysis and assignment with regards to traffic assignment.
 
-# NOTE - Functions which are still Single Class Only include:
-#           Initialiser - extraction of pce's & use of class to indices?
-#               -> Needs to be seriously cleaned up.
-#           Objective Function - Check how this works with pce
-#           Extraction of Flows - Check how this works with pce
-#           Calculation of Flows - Check how this works with pce
-#
-#               All the actual algorithms (but these should be done separately
-#               and moved to a different class where they can interact with
-#               Cython and be ran far more efficiently).
+# NOTE - We need to use matrix.view_names[0] to access the appropriate results rather than the class
+# __id__, due to some artifacts of previous design choices/changes.
+
+# NOTE - To Do:
+#       Initialiser -> Needs to be seriously cleaned up.
+#       Objective Function -> Needs to be updated to allowed for regularisation term
+
+# Ideally in future this class should act as an entirely top level class for user interaction.
+# I.e, the user should be able to intialise, set parameters, call execute and get various results
+# but this class does not need to hold any of the actual algorithms or statistics itself.
 
 import time
 import numpy as np
