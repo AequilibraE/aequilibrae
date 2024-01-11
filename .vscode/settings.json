@@ -1,7 +1,5 @@
 {
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
+    "python.testing.pytestArgs": [],
     "python.testing.unittestEnabled": true,
     "python.testing.pytestEnabled": false,
     "julia.environmentPath": "c:\\Users\\penny\\git\\Aequilibrae",
@@ -10,6 +8,6 @@
         "-s",
         "./tests",
         "-p",
-        "*test.py"
+        "test*.py"
     ]
 }
