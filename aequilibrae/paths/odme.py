@@ -23,7 +23,6 @@ Implementation of ODME Infrastructure:
 # It probably should also do any checking of user input that is required
 # (ie no client classes should have to check)
 
-import time
 import numpy as np
 import pandas as pd
 
@@ -36,11 +35,13 @@ class ODME(object):
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
+    # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         obj_func=(2, 0), # currently just the objective function specification
+        alpha_beta=None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
         algorithm="gmean" # currently defaults to spiess
     ):
         """
@@ -102,6 +103,11 @@ class ODME(object):
         self.max_inner = stop_crit[1]
         self.outer_convergence_crit = stop_crit[2]
         self.inner_convergence_crit = stop_crit[3]
+
+        # Hyper-parameters for regularisation:
+        if alpha_beta:
+            self.alpha = alpha_beta[0]
+            self.beta = alpha_beta[1]
 
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
@@ -168,6 +174,7 @@ class ODME(object):
             Objective function containing regularisation term.
 
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
+            NEED TO DECIDE WHETHER I WANT TO SOMEHOW NORMALISE THE ALPHA/BETA WEIGHTS
 
             ONLY IMPLEMENTED FOR SINGLE CLASS!
             """
@@ -175,7 +182,7 @@ class ODME(object):
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
             obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
             regularisation = np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
-            self.__set_convergence_values(obj1 + regularisation)
+            self.__set_convergence_values((self.alpha * obj1) + (self.beta * regularisation))
 
         def __obj_func(self) -> None:
             """
