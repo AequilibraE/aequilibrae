@@ -56,8 +56,8 @@ ext_mod_put = Extension(
 )
 
 ext_mod_bfs_le = Extension(
-    "aequilibrae.paths.bfs_le",
-    [join("aequilibrae", "paths", "bfs_le.pyx")],
+    "aequilibrae.paths.route_choice",
+    [join("aequilibrae", "paths", "route_choice.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],

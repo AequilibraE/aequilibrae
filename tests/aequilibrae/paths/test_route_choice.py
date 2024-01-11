@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 from aequilibrae import Graph, Project
-from aequilibrae.paths.bfs_le import RouteChoice
+from aequilibrae.paths.route_choice import RouteChoice
 from ...data import siouxfalls_project
 
 
