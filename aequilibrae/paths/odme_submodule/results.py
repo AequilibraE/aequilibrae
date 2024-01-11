@@ -16,7 +16,7 @@ class ODMEResults(object):
         'mean', 'median', 'std_deviation', 'variance', 'sum', 'min', 'max']
 
     # For logging different iterations:
-    OUTER, INNER = 1, 0
+    INNER, OUTER, FINAL_LOG = 0, 1, 2
 
     # FIGURE OUT HOW TO DO TYPEHINT PROPERLY
     def __init__(self, odme) -> None:
@@ -30,9 +30,8 @@ class ODMEResults(object):
         # Stats on scaling matrices
         self.factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
 
-        # Time data for logging information:
-        #self._total_time = 0
-        #self._time = None
+        # Iteration number data:
+        self.total_iter, self.total_inner, self.outer, self.inner = 0, 0, 0, 0
 
         # ODME object:
         self.odme = odme
@@ -67,6 +66,27 @@ class ODMEResults(object):
         """
         return pd.concat(self.statistics, ignore_index=True)
 
+    def log_iter(self, iter_type: int) -> None:
+        """
+        Logs statistics for a given iteration type (inner/outer/final log).
+
+        Parameters:
+            iter_type: the type of iteration to log
+        """
+        if iter_type == self.INNER:
+            self.__increment_outer()
+        elif iter_type == self.OUTER:
+            self.__increment_inner()
+        elif iter_type == self.FINAL_LOG:
+            self.outer += 1
+            self.inner = 0
+        else:
+            raise ValueError(
+                f"\'{iter_type}\' is not a valid type of iteration!"
+            )
+
+        self.log_stats()
+
     def log_stats(self) -> None:
         """
         Computes statistics regarding previous iteration and stores them in the statistics list.
@@ -83,9 +103,15 @@ class ODMEResults(object):
         data["Total Run Time (s)"] = [self.odme.total_time for _ in range(self.odme.num_counts)]
         data["Convergence"] = [self.odme.last_convergence for _ in range(self.odme.num_counts)]
         data["Inner Convergence"] = [self.odme.convergence_change for _ in range(self.odme.num_counts)]
-        data["Total Iteration #"] = [self.odme.total_iter for _ in range(self.odme.num_counts)]
-        data["Outer Loop #"] = [self.odme.outer for _ in range(self.odme.num_counts)]
-        data["Inner Loop #"] = [self.odme.inner for _ in range(self.odme.num_counts)]
+
+        # data["Total Iteration #"] = [self.odme.total_iter for _ in range(self.odme.num_counts)]
+        # data["Outer Loop #"] = [self.odme.outer for _ in range(self.odme.num_counts)]
+        # data["Inner Loop #"] = [self.odme.inner for _ in range(self.odme.num_counts)]
+
+        data["Total Iteration #"] = [self.total_iter for _ in range(self.odme.num_counts)]
+        data["Outer Loop #"] = [self.outer for _ in range(self.odme.num_counts)]
+        data["Inner Loop #"] = [self.inner for _ in range(self.odme.num_counts)]
+
         data["Assigned - Observed"] = (
             self.odme.count_volumes['assign_volume'].to_numpy() -
             self.odme.count_volumes["obs_volume"].to_numpy()
@@ -104,9 +130,9 @@ class ODMEResults(object):
         for i, factor in enumerate(factors):
             data.append([
                 self.odme.class_names[i],
-                self.odme.outer,
-                self.odme.inner,
-                self.odme.total_inner,
+                self.outer,
+                self.inner,
+                self.total_inner,
                 np.mean(factor),
                 np.median(factor),
                 np.std(factor),
@@ -119,3 +145,22 @@ class ODMEResults(object):
 
         # Add the new data to the current list of factor statistics
         self.factor_stats = pd.concat([self.factor_stats, new_stats], ignore_index=True)
+
+    # Extra Utilities:
+
+    def __increment_outer(self) -> None:
+        """
+        Increments outer iteration number, increments total iterations and zeros inner
+        iteration number.
+        """
+        self.outer += 1
+        self.inner = 0
+        self.total_iter += 1
+
+    def __increment_inner(self) -> None:
+        """
+        Increments inner iteration number and total iteration and total inner iteration number.
+        """
+        self.inner += 1
+        self.total_iter += 1
+        self.total_inner += 1

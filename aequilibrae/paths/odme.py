@@ -14,10 +14,14 @@ Implementation of ODME Infrastructure:
 # NOTE - To Do:
 #       Initialiser -> Needs to be seriously cleaned up.
 #       Objective Function -> Needs to be updated to allowed for regularisation term
+#                          -> May be useful to consider normalising alpha/beta 
+#       Execution -> Need to work later on a better way to automate inner stopping criterion
 
 # Ideally in future this class should act as an entirely top level class for user interaction.
 # I.e, the user should be able to intialise, set parameters, call execute and get various results
 # but this class does not need to hold any of the actual algorithms or statistics itself.
+# It probably should also do any checking of user input that is required 
+# (ie no client classes should have to check)
 
 import time
 import numpy as np
@@ -99,8 +103,6 @@ class ODME(object):
         self.outer_convergence_crit = stop_crit[2]
         self.inner_convergence_crit = stop_crit[3]
 
-        self.total_iter, self.total_inner, self.outer, self.inner = 0, 0, 0, 0
-
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
@@ -117,39 +119,25 @@ class ODME(object):
         """
         Sets all select links for each class and for each observation.
         """
-        cv = self.count_volumes
+        c_v = self.count_volumes
         for user_class in self.classes:
             user_class.set_select_links(
                 {
                     self.get_sl_key(row):
                     [(row['link_id'], row['direction'])]
-                    for _, row in cv[cv['class'] == user_class.__id__
+                    for _, row in c_v[c_v['class'] == user_class.__id__
                     ].iterrows()
                 }
             )
 
-    def get_sl_key(self, row: pd.Series) -> str:
+    # NOTE - THIS FUNCTION DOESN'T DEPEND ON self - SHOULD I MAKE IT A CLASS FUNCTION?
+    @staticmethod
+    def get_sl_key(row: pd.Series) -> str:
         """
         Given a particular row from the observervations (count_volumes) returns
         a key corresponding to it for use in all select link extraction.
         """
         return f"sl_{row['class']}_{row['link_id']}_{row['direction']}"
-
-    def __increment_outer(self) -> None:
-        """
-        Increments outer iteration number, increments total iterations and zeros inner iteration number.
-        """
-        self.outer += 1
-        self.inner = 0
-        self.total_iter += 1
-
-    def __increment_inner(self) -> None:
-        """
-        Increments inner iteration number and total iteration and total inner iteration number.
-        """
-        self.inner += 1
-        self.total_iter += 1
-        self.total_inner += 1
 
     def __set_convergence_values(self, new_convergence: float) -> None:
         """
@@ -268,60 +256,26 @@ class ODME(object):
         self.__perform_assignment()
 
         # Begin outer iteration
-        # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
-        while self.outer < self.max_outer and self.last_convergence > self.outer_convergence_crit:
-            # Set iteration values:
-            self.__increment_outer()
-            #self.__log_stats()
-            self.results.log_stats()
+        outer = 0
+        while outer < self.max_outer and self.last_convergence > self.outer_convergence_crit:
+            # Log stats before running algorithm:
+            outer += 1
+            self.results.log_iter(ODMEResults.OUTER)
 
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
-            # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
             self.convergence_change = float('inf') # Ensures at least 1 inner convergence is run per loop
-            while self.inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
+            inner = 0
+            while inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
+                inner += 1
                 self.__execute_inner_iter()
-                self.__increment_inner()
-                #self.__log_stats()
-                self.results.log_stats()
+                self.results.log_iter(ODMEResults.INNER)
 
             # Reassign values at the end of each outer loop
             self.__perform_assignment()
         
         # Add final stats following final assignment:
-        self.outer += 1
-        self.inner = 0
-        #self.__log_stats()
-        self.results.log_stats()
-
-    def __execute_inner_iter(self) -> None:
-        """
-        Runs an inner iteration of the ODME algorithm. 
-        This assumes the SL matrices stay constant and modifies
-        the current demand matrices.
-        """
-        # Element-wise multiplication of demand matrices by scaling factors
-        factors = self.__get_scaling_factors()
-        for i, factor in enumerate(factors):
-            self.demand_matrices[i] = self.demand_matrices[i] * factor
-
-        # Recalculate the link flows
-        self.__calculate_volumes()
-
-        # Recalculate convergence level:
-        self._obj_func(self)
-
-    def __get_scaling_factors(self) -> list[np.ndarray]:
-        """
-        Returns scaling matrices for each user class - depending on algorithm chosen.
-        Note: we expect any algorithm to return a list of factor matrices in order of the
-        stored user classes.
-        """
-        algorithm = ScalingFactors(self, self._algorithm)
-        factors = algorithm.generate()
-        #self.__record_factor_stats(factors)
-        self.results.record_factor_stats(factors)
-        return factors
+        self.results.log_iter(ODMEResults.FINAL_LOG)
 
     def __perform_assignment(self) -> None:
         """ 
@@ -396,6 +350,36 @@ class ODME(object):
             extract_volume,
             axis=1
         )
+
+    # WE COULD POTENTIALLY MOVE EVERYTHING BELOW HERE TO THE SCALINGFACTORS CLASS AND RENAME IT
+    def __execute_inner_iter(self) -> None:
+        """
+        Runs an inner iteration of the ODME algorithm. 
+        This assumes the SL matrices stay constant and modifies
+        the current demand matrices.
+        """
+        # Element-wise multiplication of demand matrices by scaling factors
+        factors = self.__get_scaling_factors()
+        for i, factor in enumerate(factors):
+            self.demand_matrices[i] = self.demand_matrices[i] * factor
+
+        # Recalculate the link flows
+        self.__calculate_volumes()
+
+        # Recalculate convergence level:
+        self._obj_func(self)
+
+    def __get_scaling_factors(self) -> list[np.ndarray]:
+        """
+        Returns scaling matrices for each user class - depending on algorithm chosen.
+        Note: we expect any algorithm to return a list of factor matrices in order of the
+        stored user classes.
+        """
+        algorithm = ScalingFactors(self, self._algorithm)
+        factors = algorithm.generate()
+        #self.__record_factor_stats(factors)
+        self.results.record_factor_stats(factors)
+        return factors
 
     def __calculate_volumes(self) -> None:
         """
