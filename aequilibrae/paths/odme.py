@@ -15,6 +15,7 @@ Implementation of ODME Infrastructure:
 #       Initialiser -> Needs to be seriously cleaned up.
 #       Objective Function -> Needs to be updated to allowed for regularisation term
 #                          -> May be useful to consider normalising alpha/beta
+#                          -> Needs to be updated to include pce
 #       Execution -> Need to work later on a better way to automate inner stopping criterion
 
 # Ideally in future this class should act as an entirely top level class for user interaction.
@@ -177,6 +178,7 @@ class ODME(object):
             NEED TO DECIDE WHETHER I WANT TO SOMEHOW NORMALISE THE ALPHA/BETA WEIGHTS
 
             ONLY IMPLEMENTED FOR SINGLE CLASS!
+            NEEDS TO INCLUDE PCE!
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
@@ -187,6 +189,8 @@ class ODME(object):
         def __obj_func(self) -> None:
             """
             Objective function with no regularisation term.
+
+            NEEDS TO INCLUDE PCE!
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()

@@ -158,7 +158,6 @@ class ODMEResults(object):
         """
         self.time = time.time()
 
-
     def __increment_outer(self) -> None:
         """
         Increments outer iteration number, increments total iterations and zeros inner
