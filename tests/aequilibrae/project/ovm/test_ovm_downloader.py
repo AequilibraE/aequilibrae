@@ -37,15 +37,16 @@ class TestOVMDownloader(TestCase):
                 expected_file = output_dir / f"type={t}" / f"transportation_data_{t}.parquet"
                 assert expected_file.exists()
 
-                
-                # gdf = gpd.read_parquet(expected_file)[list_element]
                 gdf = list_gdf[list_element]
+                gdf_link = list_gdf[0]
+                gdf_node = list_gdf[1]
+
                 assert gdf.shape[0] > 0
 
-                assert 'link_type' in gdf.columns
+                assert 'link_type' in gdf_link.columns
+                assert 'is_centroid' in gdf_node.columns
                 
-                
-                assert ['unknown', 'secondary', 'residential', 'parkingAisle', None] == list(list_gdf[0]['link_type'].unique())
+                assert ['unknown', 'secondary', 'residential', 'parkingAisle'] == list(list_gdf[0]['link_type'].unique())
 
                 list_element+=1
 

@@ -118,148 +118,160 @@ class OVMDownloader(WorkerThread):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
         output_dir = Path(output_dir)
         g_dataframes = []
-        for t in ['segment','connector']:
+        # for t in ['segment','connector']:
             
-            output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
-            output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file_link = output_dir  / f'type=segment' / f'transportation_data_segment.parquet'
+        output_file_node = output_dir  / f'type=connector' / f'transportation_data_connector.parquet'
+            # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
+        output_file_link.parent.mkdir(parents=True, exist_ok=True)
+        output_file_node.parent.mkdir(parents=True, exist_ok=True)
 
-            output_file_link = output_dir  / f'type=segment' / f'transportation_data_segment.parquet'
-            output_file_node = output_dir  / f'type=connector' / f'transportation_data_connector.parquet'
-            sql_link = f"""
-                COPY (
-                SELECT 
-                    id AS ovm_id,
-                    connectors,
-                    CAST(lanes AS JSON) ->> 'direction' AS direction,
-                    CAST(road AS JSON) ->>'class' AS link_type,
-                    CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
-                    CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
-                    lanes,
-                    geometry
-                FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
-                WHERE bbox.minx > '{bbox[0]}'
-                    AND bbox.maxx < '{bbox[2]}'
-                    AND bbox.miny > '{bbox[1]}'
-                    AND bbox.maxy < '{bbox[3]}')
-                TO '{output_file_link}'
-                (FORMAT 'parquet', COMPRESSION 'ZSTD');
-            """
-            c = self.initialise_duckdb_spatial()
-            c.execute(sql_link)
+        
+        # sql = f"""
+        #     DESCRIBE
+        #     SELECT 
+        #         road
+        #     FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
+        # """
+        # c = self.initialise_duckdb_spatial()
+        # g = c.execute(sql)
+        # print(g.df())
+        
+        sql_link = f"""
+            COPY (
+            SELECT 
+                id AS ovm_id,
+                connectors,
+                CAST(road AS JSON) ->>'lanes' AS direction,
+                CAST(road AS JSON) ->>'class' AS link_type,
+                CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
+                CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
+                CAST(road AS JSON) ->>'lanes' AS lanes,
+                geometry
+            FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
+            WHERE bbox.minx > '{bbox[0]}'
+                AND bbox.maxx < '{bbox[2]}'
+                AND bbox.miny > '{bbox[1]}'
+                AND bbox.maxy < '{bbox[3]}')
+            TO '{output_file_link}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD');
+        """
+        c = self.initialise_duckdb_spatial()
+        c.execute(sql_link)
 
-            sql_node = f"""
-                COPY (
-                SELECT 
-                    id AS ovm_id,
-                    geometry
-                FROM read_parquet('{data_source}/type=connector/*', union_by_name=True)
-                WHERE bbox.minx > '{bbox[0]}'
-                    AND bbox.maxx < '{bbox[2]}'
-                    AND bbox.miny > '{bbox[1]}'
-                    AND bbox.maxy < '{bbox[3]}')
-                TO '{output_file_node}'
-                (FORMAT 'parquet', COMPRESSION 'ZSTD');
-            """
-            c.execute(sql_node)
+        sql_node = f"""
+            COPY (
+            SELECT 
+                id AS ovm_id,
+                geometry
+            FROM read_parquet('{data_source}/type=connector/*', union_by_name=True)
+            WHERE bbox.minx > '{bbox[0]}'
+                AND bbox.maxx < '{bbox[2]}'
+                AND bbox.miny > '{bbox[1]}'
+                AND bbox.maxy < '{bbox[3]}')
+            TO '{output_file_node}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD');
+        """
+        c.execute(sql_node)
 
-            # Creating links GeoDataFrame
-            df_link = pd.read_parquet(output_file_link)
-            geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
-            gdf_link = gpd.GeoDataFrame(df_link,geometry=geo_link)
+        # Creating links GeoDataFrame
+        df_link = pd.read_parquet(output_file_link)
+        geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
+        gdf_link = gpd.GeoDataFrame(df_link,geometry=geo_link)
 
-            # Creating nodes GeoDataFrame
-            df_node = pd.read_parquet(output_file_node)
-            geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
-            gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
+        # Creating nodes GeoDataFrame
+        df_node = pd.read_parquet(output_file_node)
+        geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
+        gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
 
-            # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
-            gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
-            gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
+        # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
+        gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
+        gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
 
-            gdf_node['node_id'] = self.create_node_ids(gdf_node)
-            gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
-            gdf_node['is_centroid'] = 0
-
-
-            # Function to process each row and create a new GeoDataFrame
-            def process_row(gdf_link):
-                # Extract necessary information from the row
-                connectors = gdf_link['connectors']
-
-                # Check if 'Connectors' has more than 2 elements
-                if np.size(connectors) >= 2:
-                    # Split the DataFrame into multiple rows
-                    rows = []
-                    for i in range(len(connectors) - 1):
-                        new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
-                                   'direction': gdf_link['direction'], 'link_type': gdf_link['link_type'], 'name': gdf_link['name'], 
-                                   'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry'], 'lanes': gdf_link['lanes']}
-                        rows.append(new_row)
-                    processed_df = gpd.GeoDataFrame(rows)
-                else:
-                    raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
-                return processed_df
-
-            # Iterate over rows using iterrows()
-            result_dfs = []
-            for index, row in gdf_link.iterrows():
-                # Process each row and append the resulting GeoDataFrame to the list
-                processed_df = process_row(row)
-                result_dfs.append(processed_df)
-
-            # Concatenate the resulting DataFrames into a final GeoDataFrame
-            final_result = pd.concat(result_dfs, ignore_index=True)
-
-            # adding neccassary columns for aequilibrea data frame
-            final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
-            final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
-            final_result['geometry'] = [self.trim_geometry(self.node_ids, row) for e, row in final_result[['a_node','b_node','geometry']].iterrows()]
-            
-            final_result['travel_time'] = 1
-            final_result['capacity'] = 1
-
-            distance_list = []
-            for i in range(0, len(final_result)):
-                distance = sum(
-                    [
-                    haversine(x[0], x[1], y[0], y[1])
-                    for x, y in zip(list(final_result['geometry'][i].coords)[1:], list(final_result['geometry'][i].coords)[:-1])  
-                    ]  
-                )
-                distance_list.append(distance)
-            final_result["distance"] = distance_list
-                
-            mode_codes, not_found_tags = self.modes_per_link_type()
-            final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
+        gdf_node['node_id'] = self.create_node_ids(gdf_node)
+        gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
+        gdf_node['is_centroid'] = 0
 
 
-            common_nodes = final_result['a_node'].isin(gdf_node['node_id'])
-            # Check if any common nodes exist
-            if common_nodes.any():                
-                # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
-                matched_rows = final_result[common_nodes]
+        # Function to process each row and create a new GeoDataFrame
+        def process_row(gdf_link):
+            # Extract necessary information from the row
+            connectors = gdf_link['connectors']
 
-                # Create the 'link_types' and 'modes' columns for the 'gdf_node' DataFrame
-                gdf_node['link_types'] = matched_rows['link_type']
-                gdf_node['modes'] = matched_rows['modes']
+            # Check if 'Connectors' has more than 2 elements
+            if np.size(connectors) >= 2:
+                # Split the DataFrame into multiple rows
+                rows = []
+                for i in range(len(connectors) - 1):
+                    new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
+                                'direction': gdf_link['direction'], 'link_type': gdf_link['link_type'], 'name': gdf_link['name'], 
+                                'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry'], 'lanes': gdf_link['lanes']}
+                    rows.append(new_row)
+                processed_df = gpd.GeoDataFrame(rows)
             else:
-                # No common nodes found
-                raise ValueError("No common nodes.")
+                raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
+            return processed_df
+
+        # Iterate over rows using iterrows()
+        result_dfs = []
+        for index, row in gdf_link.iterrows():
+            # Process each row and append the resulting GeoDataFrame to the list
+            processed_df = process_row(row)
+            result_dfs.append(processed_df)
+
+        # Concatenate the resulting DataFrames into a final GeoDataFrame
+        final_result = pd.concat(result_dfs, ignore_index=True)
+
+        # adding neccassary columns for aequilibrea data frame
+        final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
+        final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
+        final_result['geometry'] = [self.trim_geometry(self.node_ids, row) for e, row in final_result[['a_node','b_node','geometry']].iterrows()]
+        
+        final_result['travel_time'] = 1
+        final_result['capacity'] = 1
+
+        distance_list = []
+        for i in range(0, len(final_result)):
+            distance = sum(
+                [
+                haversine(x[0], x[1], y[0], y[1])
+                for x, y in zip(list(final_result['geometry'][i].coords)[1:], list(final_result['geometry'][i].coords)[:-1])  
+                ]  
+            )
+            distance_list.append(distance)
+        final_result["distance"] = distance_list
+            
+        mode_codes, not_found_tags = self.modes_per_link_type()
+        final_result['modes'] = final_result['link_type'].apply(lambda x: mode_codes.get(x, not_found_tags))
 
 
-            link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
-            final_result = final_result[link_order]
+        common_nodes = final_result['a_node'].isin(gdf_node['node_id'])
+        # Check if any common nodes exist
+        if common_nodes.any():                
+            # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
+            matched_rows = final_result[common_nodes]
 
-            final_result.to_parquet(output_file_link)
-            g_dataframes.append(final_result)
-            self.GeoDataFrame.append(g_dataframes)
+            # Create the 'link_types' and 'modes' columns for the 'gdf_node' DataFrame
+            gdf_node['link_types'] = matched_rows['link_type']
+            gdf_node['modes'] = matched_rows['modes']
+        else:
+            # No common nodes found
+            raise ValueError("No common nodes.")
 
-            node_order = ['ogc_fid', 'node_id', 'is_centroid', 'modes', 'link_types', 'ovm_id', 'geometry']
-            gdf_node = gdf_node[node_order]
 
-            gdf_node.to_parquet(output_file_node)
-            g_dataframes.append(gdf_node)
-            self.GeoDataFrame.append(g_dataframes)
+        link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
+        final_result = final_result[link_order]
+
+        final_result.to_parquet(output_file_link)
+        g_dataframes.append(final_result)
+        self.GeoDataFrame.append(g_dataframes)
+
+        node_order = ['ogc_fid', 'node_id', 'is_centroid', 'modes', 'link_types', 'ovm_id', 'geometry']
+        gdf_node = gdf_node[node_order]
+
+        gdf_node.to_parquet(output_file_node)
+        g_dataframes.append(gdf_node)
+        self.GeoDataFrame.append(g_dataframes)
         return g_dataframes    
 
     def create_node_ids(self, data_frame):
@@ -297,6 +309,7 @@ class OVMDownloader(WorkerThread):
     def download_test_data(self, l_data_source):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''
         airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+        # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
         data_source = l_data_source.replace("\\", "/")
 
 
@@ -317,7 +330,7 @@ class OVMDownloader(WorkerThread):
             """
             c = self.initialise_duckdb_spatial()
             c.execute(sql)
-            
+
             df = pd.read_parquet(Path(pth1))
             geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
             gdf = gpd.GeoDataFrame(df,geometry=geo)
