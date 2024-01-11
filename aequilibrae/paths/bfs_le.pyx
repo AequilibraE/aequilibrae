@@ -42,15 +42,21 @@ Thoughts:
       We could also nest the hash sets, essientially building up a hash set of previously seen hashes.
 
     - Hash functions: We're looking for a "incremental (multi)set hash function", because we don't need it to be secure
-      at all some commutative binary operation should work e.g. +, *, ^. Whether or not they make good hash functions remains to be
-      seen.
+      at all some commutative binary operation should work e.g. +, *, ^. Whether or not they make good hash functions
+      remains to be seen.
 
     - Graph modification: Actually removing a link from the graph would require modification of the existing
       methods. Instead we can just require that the cost of a like is float or double and set it to INFINITY, that way
       the algorithms will never consider the link as viable.
 
-Current front runner: Hash/tree set of removed link with index to a noe in the path set suffix trie. Whether its worth incrementally
-building the trie or not should be tested.
+Current front runner: Suffix trie of (reversed) paths, each node will store a pointer to the parent node allowing
+traversal up the tree to reconstruct the path.
+Removed link set stored as a sorted prefix trie of sorts. Haven't flushed out the full idea for this but I think it
+could work. Each node would store a pointer to a node in the route set tree that represents the path found with that
+set of removed links.
+
+Current implementation: Hash maps, hash sets, and whatever it took to get somethihng working. Implementation is naive
+and ineffiecent, data is copied all over the place.
 
 """
 
