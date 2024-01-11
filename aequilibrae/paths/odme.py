@@ -107,10 +107,6 @@ class ODME(object):
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
 
-        # # Time data for logging information
-        # self.total_time = 0
-        # self.time = None
-
         # RESULTS & STATISTICS (NEW VERSION)
         self.results = ODMEResults(self)
 
@@ -250,7 +246,6 @@ class ODME(object):
         or the convergence criterion has been met.
         """
         # Initialise timing:
-        # self.time = time.time()
         self.results.init_timer()
 
         # Create values for SL matrices & assigned flows
