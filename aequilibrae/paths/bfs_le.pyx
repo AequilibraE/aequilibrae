@@ -49,23 +49,47 @@ Thoughts:
       methods. Instead we can just require that the cost of a like is float or double and set it to INFINITY, that way
       the algorithms will never consider the link as viable.
 
-Current front runner: Hash/tree set of removed link with prefix code to path set trie. Whether its worth incrementally
+Current front runner: Hash/tree set of removed link with index to a noe in the path set suffix trie. Whether its worth incrementally
 building the trie or not should be tested.
 
 """
 
 from aequilibrae import Graph
 from aequilibrae.paths.results import PathResults
-from libc.stdio cimport printf, fprintf, stderr
 from libc.math cimport INFINITY
+from libc.string cimport memcpy
+from libc.stdio cimport printf
+from libcpp.vector cimport vector
+from libcpp.unordered_set cimport unordered_set
+from libcpp.unordered_map cimport unordered_map
+from libcpp.utility cimport pair
+from libcpp.iterator cimport back_inserter
+from libcpp.algorithm cimport sample
+from cython.operator cimport dereference as deref, preincrement as inc
 
 import numpy as np
 
-# It would really be nice if these were modules. The 'include' syntax is long deprecated
-include 'basic_path_finding.pyx'
 
-cpdef float cube(float x):
-    return x * x * x
+from libc.stdint cimport uint_fast32_t, uint_fast64_t
+
+cdef extern from "<random>" namespace "std" nogil:
+    cdef cppclass random_device:
+        ctypedef uint_fast32_t result_type
+        random_device() except +
+        result_type operator()() except +
+
+    cdef cppclass minstd_rand:
+        ctypedef uint_fast32_t result_type
+        minstd_rand() except +
+        minstd_rand(result_type seed) except +
+        result_type operator()() except +
+        result_type min() except +
+        result_type max() except +
+        void discard(size_t z) except +
+        void seed(result_type seed) except +
+
+# It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
+include 'basic_path_finding.pyx'
 
 cdef class RouteChoice:
     """
@@ -76,12 +100,9 @@ cdef class RouteChoice:
     # cdef int num
     def __cinit__(self):
         """C level init. For C memory allocation and initalisation. Called exactly once per object."""
-        print("cinit called")
-
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
-        print("init called")
         self.res = PathResults()
         self.res.prepare(graph)
 
@@ -92,69 +113,149 @@ cdef class RouteChoice:
         self.nodes_to_indices_view = graph.nodes_to_indices
         self.lat_view = graph.lonlat_index.lat.values
         self.lon_view = graph.lonlat_index.lon.values
-        self.predecessors_view = self.res.predecessors
+        self.predecessors_view = np.empty(graph.num_nodes + 1, dtype=np.int64)
         self.ids_graph_view = graph.graph.id.values
-        self.conn_view = self.res.connectors
+        self.conn_view = np.empty(graph.num_nodes + 1, dtype=np.int64)
 
     def __dealloc__(self):
         """
         C level deallocation. For freeing memeory allocated by this object. *Must* have GIL, `self` may be in a
         partially deallocated state already.
         """
-        print("Deallocating!")
+        pass
 
-    cdef void c_helloworld(RouteChoice self) noexcept nogil:
-        printf("Hello world\n")
-
-    cpdef helloworld(self):
-        with nogil:
-            RouteChoice.c_helloworld(self)
-
-    def run(self, origin, destination, max_depth=0):
+    def run(self, origin, destination, max_routes=0, max_depth=0, seed=0):
         cdef:
             long origin_index = self.nodes_to_indices_view[origin]
             long dest_index = self.nodes_to_indices_view[destination]
+            unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
+            unsigned int c_seed = seed
+            double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
+            unordered_set[vector[long long] *] *results
+            unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
         with nogil:
-            RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_depth)
+            results = RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_routes, c_max_depth, c_seed, scratch_cost)
 
+        res = []
+        for x in deref(results):
+            res.append(list(deref(x)))
+            # res[frozenset(deref(x.first))] = tuple(deref(x.second))
+            # del x.first
+            # del x.second
+            # del x
 
-    cdef void generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_depth) noexcept nogil:
-        """Main method for route set generation, thread safe."""
-        cdef long connector
+        return res
 
+    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost) noexcept nogil:
+        path_finding_a_star(
+            origin_index,
+            dest_index,
+            scratch_cost,
+            self.b_nodes_view,
+            self.graph_fs_view,
+            self.nodes_to_indices_view,
+            self.lat_view,
+            self.lon_view,
+            self.predecessors_view,
+            self.ids_graph_view,
+            self.conn_view,
+            EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
+        )
+
+    # cdef unordered_map[unordered_set[long long] *, vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
+    cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, unsigned int seed_value, double [:] scratch_cost) nogil:
+        """Main method for route set generation"""
+        cdef:
+            unordered_map[unordered_set[long long] *, vector[long long] *] *working_set
+            unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator set_iter
+            vector[unordered_set[long long] *] queue
+            vector[unordered_set[long long] *] next_queue
+            unordered_set[long long] *banned
+            unordered_set[long long] *new_banned
+            unordered_set[vector[long long] *] *route_set
+            vector[long long] *vec
+            pair[unordered_set[long long] *, vector[long long] *] *pair_tmp
+            pair[unordered_set[long long] *, vector[long long] *] x
+            minstd_rand rng
+            long long p, connector
+
+        queue.push_back(new unordered_set[long long]()) # Start with no edges banned
+        working_set = new unordered_map[unordered_set[long long] *, vector[long long] *]()
+        route_set = new unordered_set[vector[long long] *]()
+        rng.seed(seed_value)
+
+        # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
         for depth in range(max_depth):
-            path_finding_a_star(
-                origin_index,
-                dest_index,
-                self.cost_view,
-                self.b_nodes_view,
-                self.graph_fs_view,
-                self.nodes_to_indices_view,
-                self.lat_view,
-                self.lon_view,
-                self.predecessors_view,
-                self.ids_graph_view,
-                self.conn_view,
-                EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
-            )
-            if self.predecessors_view[dest_index] >= 0:
-                printf("%ld is still reachable from %ld at depth %d\n", dest_index, origin_index, depth)
-                connector = self.conn_view[dest_index]
-                self.cost_view[connector] = INFINITY
-                printf("%ld has been banned\n", connector)
+            for banned in queue:
+                memcpy(&scratch_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
-                with gil:
-                    p = n = dest_index
-                    all_connectors = []
-                    if p != origin_index:
-                        while p != origin_index:
-                            p = self.predecessors_view[p]
-                            connector = self.conn_view[n]
-                            all_connectors.append(connector + 1)
-                            n = p
-                    print("(", ", ".join(str(x) for x in all_connectors[::-1]), ")")
+                for connector in deref(banned):
+                    scratch_cost[connector] = INFINITY
 
-            else:
-                printf("%ld is unreachable from %ld at depth %d\n", dest_index, origin_index, depth)
+                RouteChoice.path_find(self, origin_index, dest_index, scratch_cost)
+
+                vec = new vector[long long]()
+                if self.predecessors_view[dest_index] >= 0:
+                    # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
+                    p = dest_index
+                    while p != origin_index:
+                        connector = self.conn_view[p]
+                        p = self.predecessors_view[p]
+                        vec.push_back(connector)
+
+                    # This element is already in our set, skip it
+                    if route_set.find(vec) != route_set.end():
+                        continue
+
+                    pair_tmp = new pair[unordered_set[long long] *, vector[long long] *](banned, vec)
+                    working_set.insert(deref(pair_tmp))  # We'll keep this route around for (potential) insertion later
+                    del pair_tmp
+
+                else:
+                    pass  # Node was unreachable
+
+            printf("%d + %d >= %d\n", working_set.size(), route_set.size(), max_routes)
+            if working_set.size() + route_set.size() >= max_routes:
+                printf("route set full (or close to full)\n")
+                # Randomly insert enough elements to fill our route_set, we don't need to add anything else to our queue since we're done now
+                # FIXME: Horrible assumption, never do this
+                # The iteration order of the working set is probably close enough to random, let's just grab the first max_routes - route_set.size() elements
+                printf("yeeting %d entries\n", working_set.size() - (max_routes - route_set.size()))
+
+                # Skipp the elements we wish to save
+                set_iter = working_set.cbegin()
+                for _ in range(max_routes - route_set.size()):
+                    inc(set_iter)
+
+                # Destrory the remaining elements
+                working_set.erase(set_iter, working_set.cend())
+
+                # From the top, add what's left
+                for x in deref(working_set):
+                    vec = x.second
+                    route_set.insert(vec)
+
                 break
+            else:
+                printf("route set not full (or close)\n")
+                for x in deref(working_set):
+                    banned = x.first
+                    vec = x.second
+
+                    route_set.insert(vec)
+                    # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
+                    for edge in deref(vec):
+                        new_banned = new unordered_set[long long](deref(banned))
+                        new_banned.insert(edge)
+                        next_queue.push_back(new_banned)
+
+            queue.swap(next_queue)
+            next_queue.clear()
+            working_set.clear()
+
+        # We may have added more banned link sets to the queue then found out we hit the max depth, we should free those
+        for banned in queue:
+            del banned
+
+        return route_set
