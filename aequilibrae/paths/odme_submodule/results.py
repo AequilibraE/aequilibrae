@@ -36,6 +36,10 @@ class ODMEResults(object):
         # ODME object:
         self.odme = odme
 
+        # Time data for logging information
+        self.total_time = 0
+        self.time = None
+
         # Clean up stuff
         # From here to continue decide how to more appropriately record results and statistics
         # and make sure the two classes have as little coupling as possible
@@ -92,15 +96,15 @@ class ODMEResults(object):
         Computes statistics regarding previous iteration and stores them in the statistics list.
         """
         # Compute Statistics:
-        old_time = self.odme.time
-        self.odme.time = time.time()
-        loop_time = self.odme.time - old_time
-        self.odme.total_time += loop_time
+        old_time = self.time
+        self.time = time.time()
+        loop_time = self.time - old_time
+        self.total_time += loop_time
 
         # Create Data:
         data = self.odme.count_volumes.copy(deep=True)
         data["Loop Time (s)"] = [loop_time for _ in range(self.odme.num_counts)]
-        data["Total Run Time (s)"] = [self.odme.total_time for _ in range(self.odme.num_counts)]
+        data["Total Run Time (s)"] = [self.total_time for _ in range(self.odme.num_counts)]
         data["Convergence"] = [self.odme.last_convergence for _ in range(self.odme.num_counts)]
         data["Inner Convergence"] = [self.odme.convergence_change for _ in range(self.odme.num_counts)]
 
@@ -147,6 +151,13 @@ class ODMEResults(object):
         self.factor_stats = pd.concat([self.factor_stats, new_stats], ignore_index=True)
 
     # Extra Utilities:
+
+    def init_timer(self) -> None:
+        """
+        Initialises the internal times (for statistics purposes).
+        """
+        self.time = time.time()
+
 
     def __increment_outer(self) -> None:
         """

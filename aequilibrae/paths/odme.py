@@ -14,13 +14,13 @@ Implementation of ODME Infrastructure:
 # NOTE - To Do:
 #       Initialiser -> Needs to be seriously cleaned up.
 #       Objective Function -> Needs to be updated to allowed for regularisation term
-#                          -> May be useful to consider normalising alpha/beta 
+#                          -> May be useful to consider normalising alpha/beta
 #       Execution -> Need to work later on a better way to automate inner stopping criterion
 
 # Ideally in future this class should act as an entirely top level class for user interaction.
 # I.e, the user should be able to intialise, set parameters, call execute and get various results
 # but this class does not need to hold any of the actual algorithms or statistics itself.
-# It probably should also do any checking of user input that is required 
+# It probably should also do any checking of user input that is required
 # (ie no client classes should have to check)
 
 import time
@@ -107,9 +107,9 @@ class ODME(object):
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
 
-        # Time data for logging information
-        self.total_time = 0
-        self.time = None
+        # # Time data for logging information
+        # self.total_time = 0
+        # self.time = None
 
         # RESULTS & STATISTICS (NEW VERSION)
         self.results = ODMEResults(self)
@@ -250,7 +250,8 @@ class ODME(object):
         or the convergence criterion has been met.
         """
         # Initialise timing:
-        self.time = time.time()
+        # self.time = time.time()
+        self.results.init_timer()
 
         # Create values for SL matrices & assigned flows
         self.__perform_assignment()
