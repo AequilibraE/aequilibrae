@@ -78,9 +78,9 @@ class ODMEResults(object):
             iter_type: the type of iteration to log
         """
         if iter_type == self.INNER:
-            self.__increment_outer()
-        elif iter_type == self.OUTER:
             self.__increment_inner()
+        elif iter_type == self.OUTER:
+            self.__increment_outer()
         elif iter_type == self.FINAL_LOG:
             self.outer += 1
             self.inner = 0
