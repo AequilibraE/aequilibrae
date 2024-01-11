@@ -29,13 +29,7 @@ from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 class ODME(object):
     """ ODME Infrastructure """
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
-    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)", "Loop Time (s)", "Convergence", "Inner Convergence",
-        "class", "link_id", "direction", "obs_volume", "assign_volume", "Assigned - Observed"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
-    FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median',
-        'std_deviation', 'variance', 'sum', 'min', 'max']
-    CUMULATIVE_FACTOR_COLS = ["class", "mean", "median", "standard deviation", "variance", "min", "max", "sum", "# of factors"]
-    GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES
+    GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
     def __init__(self,
@@ -110,14 +104,6 @@ class ODME(object):
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
         # e.g. the derivative of link flows w.r.t. step size.
-
-        # Potentially set up some sort of logging information here:
-
-        # Dataframes to log statistical information:
-        self._statistics = []
-
-        # Stats on scaling matrices
-        self._factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
 
         # Time data for logging information
         self.total_time = 0

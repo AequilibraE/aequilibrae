@@ -13,12 +13,8 @@ class ODMEResults(object):
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)",
         "Loop Time (s)", "Convergence", "Inner Convergence", "class", "link_id", "direction",
         "obs_volume", "assign_volume", "Assigned - Observed"]
-    STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence",
-        "Time (s)"]
     FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #',
         'mean', 'median', 'std_deviation', 'variance', 'sum', 'min', 'max']
-    CUMULATIVE_FACTOR_COLS = ["class", "mean", "median", "standard deviation", "variance",
-        "min", "max", "sum", "# of factors"]
 
     # For logging different iterations:
     OUTER, INNER = 1, 0
@@ -46,7 +42,7 @@ class ODMEResults(object):
         # Move statistic recording functions to this class
         # Move results objects to this class
         # Clean up stuff
-        # From here to continue decide how to more appropriately record results and statistics 
+        # From here to continue decide how to more appropriately record results and statistics
         # and make sure the two classes have as little coupling as possible
 
     # Statistics:
@@ -94,8 +90,10 @@ class ODMEResults(object):
         data["Total Iteration #"] = [self.odme.total_iter for _ in range(self.odme.num_counts)]
         data["Outer Loop #"] = [self.odme.outer for _ in range(self.odme.num_counts)]
         data["Inner Loop #"] = [self.odme.inner for _ in range(self.odme.num_counts)]
-        data["Assigned - Observed"] = (self.odme.count_volumes['assign_volume'].to_numpy() -
-            self.odme.count_volumes["obs_volume"].to_numpy())
+        data["Assigned - Observed"] = (
+            self.odme.count_volumes['assign_volume'].to_numpy() -
+            self.odme.count_volumes["obs_volume"].to_numpy()
+            )
 
         # Add data to current list of dataframes
         self.statistics.append(data)
