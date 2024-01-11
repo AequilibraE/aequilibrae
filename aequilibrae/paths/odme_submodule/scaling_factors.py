@@ -10,7 +10,7 @@ class ScalingFactors(object):
     """ ODME Algorithms (Scaling Factor Generation) """
     ALL_ALGORITHMS = ["gmean", "spiess"]
 
-    # FIGURE OUT DOCSTRING FOR ODME
+    # FIGURE OUT TYPEHINT FOR ODME
     def __init__(self, odme, algorithm: str) -> None:
         """
         Initialises necessary fields from odme object in order to generate

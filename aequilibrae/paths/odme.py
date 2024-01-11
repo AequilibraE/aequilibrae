@@ -5,7 +5,7 @@ Implementation of ODME Infrastructure:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
-# NOTE - Lots of squeezing of matrices happens after assignment due to the functionality of select 
+# NOTE - Lots of squeezing of matrices happens after assignment due to the functionality of select
 # link analysis and assignment with regards to traffic assignment.
 
 # NOTE - Functions which are still Single Class Only include:
@@ -29,7 +29,7 @@ from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 class ODME(object):
     """ ODME Infrastructure """
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
-    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)" "Loop Time (s)", "Convergence", "Inner Convergence",
+    DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)", "Loop Time (s)", "Convergence", "Inner Convergence",
         "class", "link_id", "direction", "obs_volume", "assign_volume", "Assigned - Observed"]
     STATISTICS_COLS = ["Outer Loop #", "Inner Loop #", "Convergence", "Inner Convergence", "Time (s)"]
     FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #', 'mean', 'median',
@@ -47,7 +47,6 @@ class ODME(object):
     ):
         """
         For now see description in pdf file in SMP internship team folder
-        Assume for now we only have a single car graph - can be generalised later
 
         Parameters:
             assignment: the TrafficAssignment object - should be initialised with volume delay functions
@@ -96,8 +95,8 @@ class ODME(object):
         # Initialise objective function
         self._obj_func = None
         self.__init_objective_func()
-        self._last_convergence = None
-        self._convergence_change = float('inf')
+        self.last_convergence = None
+        self.convergence_change = float('inf')
 
         # Stopping criterion
         # May need to specify this further to differentiate between inner & outer criterion
@@ -106,7 +105,7 @@ class ODME(object):
         self.outer_convergence_crit = stop_crit[2]
         self.inner_convergence_crit = stop_crit[3]
 
-        self._total_iter, self._total_inner, self._outer, self._inner = 0, 0, 0, 0
+        self.total_iter, self.total_inner, self.outer, self.inner = 0, 0, 0, 0
 
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
@@ -114,15 +113,18 @@ class ODME(object):
 
         # Potentially set up some sort of logging information here:
 
-        # Dataframe to log statistical information:
+        # Dataframes to log statistical information:
         self._statistics = []
 
         # Stats on scaling matrices
         self._factor_stats = pd.DataFrame(columns=self.FACTOR_COLS)
 
         # Time data for logging information
-        self._total_time = 0
-        self._time = None
+        self.total_time = 0
+        self.time = None
+
+        # RESULTS & STATISTICS (NEW VERSION)
+        self.results = ODMEResults(self)
 
     # Utilities:
     def __set_select_links(self) -> None:
@@ -151,26 +153,26 @@ class ODME(object):
         """
         Increments outer iteration number, increments total iterations and zeros inner iteration number.
         """
-        self._outer += 1
-        self._inner = 0
-        self._total_iter += 1
+        self.outer += 1
+        self.inner = 0
+        self.total_iter += 1
 
     def __increment_inner(self) -> None:
         """
         Increments inner iteration number and total iteration and total inner iteration number.
         """
-        self._inner += 1
-        self._total_iter += 1
-        self._total_inner += 1
+        self.inner += 1
+        self.total_iter += 1
+        self.total_inner += 1
 
     def __set_convergence_values(self, new_convergence: float) -> None:
         """
         Given a new convergence value calculates the difference between the previous convergence
         and new convergence, and sets appropriate values.
         """
-        if self._last_convergence:
-            self._convergence_change = abs(self._last_convergence - new_convergence)
-        self._last_convergence = new_convergence
+        if self.last_convergence:
+            self.convergence_change = abs(self.last_convergence - new_convergence)
+        self.last_convergence = new_convergence
 
     def __init_objective_func(self) -> None:
         """
@@ -218,7 +220,7 @@ class ODME(object):
         else:
             self._obj_func = __obj_func
 
-    # Output/Results/Statistics:
+    # Output/Results:
     def get_demands(self) -> list[np.ndarray]:
         """
         Returns all demand matrices (can be called before or after execution).
@@ -229,24 +231,25 @@ class ODME(object):
         """
         Returns a dataframe on statistics of factors for each iteration.
         """
-        return self._factor_stats
+        return self.results.factor_stats
 
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
         Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
         """
         # Get cumulative factors for each demand matrix
-        cumulative_factors = []
-        for i, demand_matrix in enumerate(self.demand_matrices):
-            factors = np.nan_to_num(demand_matrix / self.init_demand_matrices[i], nan=1)
-            cumulative_factors.append(
-                pd.DataFrame({
-                    "class": [self.class_names[i] for _ in range(demand_matrix.size)],
-                    "Factors": factors.ravel()
-                })
-            )
+        # cumulative_factors = []
+        # for i, demand_matrix in enumerate(self.demand_matrices):
+        #     factors = np.nan_to_num(demand_matrix / self.init_demand_matrices[i], nan=1)
+        #     cumulative_factors.append(
+        #         pd.DataFrame({
+        #             "class": [self.class_names[i] for _ in range(demand_matrix.size)],
+        #             "Factors": factors.ravel()
+        #         })
+        #     )
 
-        return pd.concat(cumulative_factors, ignore_index=True)
+        # return pd.concat(cumulative_factors, ignore_index=True)
+        return self.results.get_cumulative_factors()
 
     def get_all_statistics(self) -> pd.DataFrame:
         """
@@ -254,94 +257,56 @@ class ODME(object):
         along with other statistical information (see self.FACTOR_COLS) 
         per iteration, per count volume.
         """
-        return pd.concat(self._statistics, ignore_index=True)
-
-    def __log_stats(self) -> None:
-        """
-        Computes statistics regarding previous iteration and stores them in the statistics list.
-        """
-        # Compute Statistics:
-        old_time = self._time
-        self._time = time.time()
-        loop_time = self._time - old_time
-        self._total_time += loop_time
-
-        # Create Data:
-        data = self.count_volumes.copy(deep=True)
-        data["Loop Time (s)"] = [loop_time for _ in range(self.num_counts)]
-        data["Total Run Time (s)"] = [self._total_time for _ in range(self.num_counts)]
-        data["Convergence"] = [self._last_convergence for _ in range(self.num_counts)]
-        data["Inner Convergence"] = [self._convergence_change for _ in range(self.num_counts)]
-        data["Total Iteration #"] = [self._total_iter for _ in range(self.num_counts)]
-        data["Outer Loop #"] = [self._outer for _ in range(self.num_counts)]
-        data["Inner Loop #"] = [self._inner for _ in range(self.num_counts)]
-        data["Assigned - Observed"] = (self.count_volumes['assign_volume'].to_numpy() -
-            self.count_volumes["obs_volume"].to_numpy())
-
-        # Add data to current list of dataframes
-        self._statistics.append(data)
-
-    def __record_factor_stats(self, factors: list[np.ndarray]) -> None:
-        """
-        Logs information on the current scaling matrix (ie
-        factor statistics per iteration per class).
-        """
-        # Create statistics on all new factors:
-        data = []
-        for i, factor in enumerate(factors):
-            data.append([
-                self.class_names[i],
-                self._outer,
-                self._inner,
-                self._total_inner,
-                np.mean(factor),
-                np.median(factor),
-                np.std(factor),
-                np.var(factor),
-                np.sum(factor),
-                np.min(factor),
-                np.max(factor)
-            ])
-        new_stats = pd.DataFrame(data, columns=self.FACTOR_COLS)
-
-        # Add the new data to the current list of factor statistics
-        self._factor_stats = pd.concat([self._factor_stats, new_stats], ignore_index=True)
+        return pd.concat(self.results.statistics, ignore_index=True)
 
     # Generic Algorithm Structure:
+    # Should everything that isn't top level be moved to scaling factors?
+    # I.e. execute just calls another class which acts independently?
+    # And then this class just has to initialise, set variables, call execute and
+    # load/save results?
+    # ScalingFactors can then be turned into a class which runs the actual algorithm
+    # (similar to LinearApproximation) and results can just hold all the statistics
+    # and final results?
+    # In addition, perhaps we should have a thread per class since if they are considered
+    # independent they can all be done in parallel? This may not work with all different types of
+    # algorithms.
     def execute(self) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
         """
         # Initialise timing:
-        self._time = time.time()
+        self.time = time.time()
 
         # Create values for SL matrices & assigned flows
         self.__perform_assignment()
 
         # Begin outer iteration
         # OUTER STOPPING CRITERION - CURRENTLY TEMPORARY VALUE
-        while self._outer < self.max_outer and self._last_convergence > self.outer_convergence_crit:
+        while self.outer < self.max_outer and self.last_convergence > self.outer_convergence_crit:
             # Set iteration values:
             self.__increment_outer()
-            self.__log_stats()
+            #self.__log_stats()
+            self.results.log_stats()
 
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
             # MAYBE BASED ON DIFFERENCE IN CONVERGENCE
-            self._convergence_change = float('inf') # Ensures at least 1 inner convergence is run per loop
-            while self._inner < self.max_inner and self._convergence_change > self.inner_convergence_crit:
+            self.convergence_change = float('inf') # Ensures at least 1 inner convergence is run per loop
+            while self.inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
                 self.__execute_inner_iter()
                 self.__increment_inner()
-                self.__log_stats()
+                #self.__log_stats()
+                self.results.log_stats()
 
             # Reassign values at the end of each outer loop
             self.__perform_assignment()
         
         # Add final stats following final assignment:
-        self._outer += 1
-        self._inner = 0
-        self.__log_stats()
+        self.outer += 1
+        self.inner = 0
+        #self.__log_stats()
+        self.results.log_stats()
 
     def __execute_inner_iter(self) -> None:
         """
@@ -368,7 +333,8 @@ class ODME(object):
         """
         algorithm = ScalingFactors(self, self._algorithm)
         factors = algorithm.generate()
-        self.__record_factor_stats(factors)
+        #self.__record_factor_stats(factors)
+        self.results.record_factor_stats(factors)
         return factors
 
     def __perform_assignment(self) -> None:
