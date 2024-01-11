@@ -7,10 +7,6 @@ from libcpp.unordered_map cimport unordered_map
 
 cdef class RouteChoice:
     cdef:
-        int num
-        readonly object res
-        unsigned int depth
-
         double [:] cost_view
         long long [:] graph_fs_view
         long long [:] b_nodes_view

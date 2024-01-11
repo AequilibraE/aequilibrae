@@ -88,9 +88,6 @@ cdef class RouteChoice:
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
-        self.res = PathResults()
-        self.res.prepare(graph)
-
         # self.heuristic = HEURISTIC_MAP[self.res._heuristic]
         self.cost_view = graph.cost
         self.graph_fs_view = graph.fs
