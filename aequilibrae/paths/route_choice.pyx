@@ -65,6 +65,7 @@ from aequilibrae.paths.results import PathResults
 from libc.math cimport INFINITY
 from libc.string cimport memcpy
 from libc.stdio cimport printf
+from libc.limits cimport UINT_MAX
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
@@ -106,17 +107,15 @@ cdef class RouteChoice:
         """
         pass
 
-    def run(self, origin, destination, max_routes=0, max_depth=0):
+    def run(self, long origin, long destination, unsigned int max_routes=0, unsigned int max_depth=0):
         cdef:
             long origin_index = self.nodes_to_indices_view[origin]
             long dest_index = self.nodes_to_indices_view[destination]
-            unsigned int c_max_routes = max_routes
-            unsigned int c_max_depth = max_depth
             double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
             unordered_set[vector[long long] *] *results
             unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
         with nogil:
-            results = RouteChoice.generate_route_set(self, origin_index, dest_index, c_max_routes, c_max_depth, scratch_cost)
+            results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost)
 
         res = []
         for x in deref(results):
@@ -141,6 +140,10 @@ cdef class RouteChoice:
             EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
         )
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
     cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
         """Main method for route set generation"""
         cdef:
@@ -155,6 +158,9 @@ cdef class RouteChoice:
             pair[unordered_set[long long] *, vector[long long] *] *pair_tmp
             pair[unordered_set[long long] *, vector[long long] *] x
             long long p, connector
+
+        max_routes = max_routes if max_routes != 0 else UINT_MAX
+        max_depth = max_depth if max_depth != 0 else UINT_MAX
 
         queue.push_back(new unordered_set[long long]()) # Start with no edges banned
         working_set = new unordered_map[unordered_set[long long] *, vector[long long] *]()
@@ -186,7 +192,6 @@ cdef class RouteChoice:
                     pair_tmp = new pair[unordered_set[long long] *, vector[long long] *](banned, vec)
                     working_set.insert(deref(pair_tmp))  # We'll keep this route around for (potential) insertion later
                     del pair_tmp
-
                 else:
                     pass  # Node was unreachable
 
