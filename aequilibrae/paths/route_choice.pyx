@@ -90,15 +90,15 @@ cdef class RouteChoice:
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
         # self.heuristic = HEURISTIC_MAP[self.res._heuristic]
-        self.cost_view = graph.cost
-        self.graph_fs_view = graph.fs
-        self.b_nodes_view = graph.graph.b_node.values  # FIXME: Why does path_computation copy this?
-        self.nodes_to_indices_view = graph.nodes_to_indices
+        self.cost_view = graph.compact_cost
+        self.graph_fs_view = graph.compact_fs
+        self.b_nodes_view = graph.compact_graph.b_node.values  # FIXME: Why does path_computation copy this?
+        self.nodes_to_indices_view = graph.compact_nodes_to_indices
         self.lat_view = graph.lonlat_index.lat.values
         self.lon_view = graph.lonlat_index.lon.values
-        self.predecessors_view = np.empty(graph.num_nodes + 1, dtype=np.int64)
-        self.ids_graph_view = graph.graph.id.values
-        self.conn_view = np.empty(graph.num_nodes + 1, dtype=np.int64)
+        self.predecessors_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
+        self.ids_graph_view = graph.compact_graph.id.values
+        self.conn_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
 
     def __dealloc__(self):
         """
