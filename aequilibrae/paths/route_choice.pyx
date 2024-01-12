@@ -60,8 +60,9 @@ and ineffiecent, data is copied all over the place.
 
 """
 
-from aequilibrae import Graph
 from aequilibrae.paths.results import PathResults
+import numpy as np
+
 from libc.math cimport INFINITY
 from libc.string cimport memcpy
 from libc.stdio cimport printf
@@ -74,6 +75,31 @@ from cython.operator cimport dereference as deref, preincrement as inc
 
 import numpy as np
 
+# std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
+# from libcpp.random cimport minstd_rand
+from libc.stdint cimport uint_fast32_t, uint_fast64_t
+
+cdef extern from "<random>" namespace "std" nogil:
+    cdef cppclass random_device:
+        ctypedef uint_fast32_t result_type
+        random_device() except +
+        result_type operator()() except +
+
+    cdef cppclass minstd_rand:
+        ctypedef uint_fast32_t result_type
+        minstd_rand() except +
+        minstd_rand(result_type seed) except +
+        result_type operator()() except +
+        result_type min() except +
+        result_type max() except +
+        void discard(size_t z) except +
+        void seed(result_type seed) except +
+
+# std::shuffle is not available in the Cython libcpp.algorithm shim. We'll import it ourselves
+# from libcpp.algorithm cimport shuffle
+cdef extern from "<algorithm>" namespace "std" nogil:
+    void shuffle[RandomIt, URBG](RandomIt first, RandomIt last, URBG&& g) except +
+
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
 
@@ -83,7 +109,6 @@ cdef class RouteChoice:
     Balmer, and Axhausen, 'Route Choice Sets for Very High-Resolution Data'
     """
 
-    # cdef int num
     def __cinit__(self):
         """C level init. For C memory allocation and initalisation. Called exactly once per object."""
 
@@ -119,7 +144,7 @@ cdef class RouteChoice:
 
         res = []
         for x in deref(results):
-            res.append(list(deref(x)))
+            res.append(np.array(deref(x)))
             del x
 
         return res
@@ -158,6 +183,7 @@ cdef class RouteChoice:
             pair[unordered_set[long long] *, vector[long long] *] *pair_tmp
             pair[unordered_set[long long] *, vector[long long] *] x
             long long p, connector
+            minstd_rand rng
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -165,9 +191,16 @@ cdef class RouteChoice:
         queue.push_back(new unordered_set[long long]()) # Start with no edges banned
         working_set = new unordered_map[unordered_set[long long] *, vector[long long] *]()
         route_set = new unordered_set[vector[long long] *]()
+        rng.seed(0)
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
         for depth in range(max_depth):
+            # If we could potentially fill the route_set after this depth, shuffle the queue
+            if queue.size() + route_set.size() >= max_routes:
+                printf("%ld + %ld >= %d, ", queue.size(), route_set.size(), max_routes)
+                printf("route set full (or close to full), shuffling queue\n")
+                shuffle(queue.begin(), queue.end(), rng)
+
             for banned in queue:
                 memcpy(&scratch_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
@@ -192,43 +225,22 @@ cdef class RouteChoice:
                     pair_tmp = new pair[unordered_set[long long] *, vector[long long] *](banned, vec)
                     working_set.insert(deref(pair_tmp))  # We'll keep this route around for (potential) insertion later
                     del pair_tmp
+
+                    if working_set.size() + route_set.size() >= max_routes:
+                        break
                 else:
                     pass  # Node was unreachable
 
-            printf("%ld + %ld >= %d\n", working_set.size(), route_set.size(), max_routes)
-            if working_set.size() + route_set.size() >= max_routes:
-                printf("route set full (or close to full)\n")
-                # Randomly insert enough elements to fill our route_set, we don't need to add anything else to our queue since we're done now
-                # FIXME: Horrible assumption, never do this
-                # The iteration order of the working set is probably close enough to random, let's just grab the first max_routes - route_set.size() elements
-                printf("yeeting %ld entries\n", working_set.size() - (max_routes - route_set.size()))
+            for x in deref(working_set):
+                banned = x.first
+                vec = x.second
 
-                # Skipp the elements we wish to save
-                set_iter = working_set.cbegin()
-                for _ in range(max_routes - route_set.size()):
-                    inc(set_iter)
-
-                # Destrory the remaining elements
-                working_set.erase(set_iter, working_set.cend())
-
-                # From the top, add what's left
-                for x in deref(working_set):
-                    vec = x.second
-                    route_set.insert(vec)
-
-                break
-            else:
-                printf("route set not full (or close)\n")
-                for x in deref(working_set):
-                    banned = x.first
-                    vec = x.second
-
-                    route_set.insert(vec)
-                    # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
-                    for edge in deref(vec):
-                        new_banned = new unordered_set[long long](deref(banned))
-                        new_banned.insert(edge)
-                        next_queue.push_back(new_banned)
+                route_set.insert(vec)
+                # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
+                for edge in deref(vec):
+                    new_banned = new unordered_set[long long](deref(banned))
+                    new_banned.insert(edge)
+                    next_queue.push_back(new_banned)
 
             queue.swap(next_queue)
             next_queue.clear()
