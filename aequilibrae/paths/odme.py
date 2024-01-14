@@ -26,6 +26,7 @@ Implementation of ODME Infrastructure:
 
 import numpy as np
 import pandas as pd
+from typing import Tuple
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
@@ -34,16 +35,15 @@ class ODME(object):
     """ ODME Infrastructure """
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
-    ALL_ALGORITHMS = ["gmean", "spiess"]
+    ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
 
     # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
-        obj_func=(2, 0), # currently just the objective function specification
-        alpha_beta=None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
-        algorithm="gmean" # currently defaults to spiess
+        alpha=None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
+        algorithm="spiess" # currently defaults to spiess
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -89,7 +89,7 @@ class ODME(object):
         self.__set_select_links()
 
         # Not yet relevant - Algorithm Specifications:
-        self._norms = obj_func
+        self._norms = self.__get_norms(algorithm)
         self._algorithm = algorithm
 
         # Initialise objective function
@@ -106,9 +106,11 @@ class ODME(object):
         self.inner_convergence_crit = stop_crit[3]
 
         # Hyper-parameters for regularisation:
-        if alpha_beta:
-            self.alpha = alpha_beta[0]
-            self.beta = alpha_beta[1]
+        if alpha:
+            if alpha > 1 or alpha < 0:
+                raise ValueError("Hyper-parameter alpha should be between 0 and 1")
+            self.alpha = alpha
+            self.beta = 1 - alpha
 
         # May also want to save the last convergence value.
         # We may also want to store other variables dependent on the algorithm used,
@@ -118,6 +120,17 @@ class ODME(object):
         self.results = ODMEResults(self)
 
     # Utilities:
+    def __get_norms(self, algo: str) -> Tuple[int, int]:
+        """
+        Sets the specifications for the objective function for the algorithm chosen.
+
+        SHOULD REALLY MAKE ALL THIS OBJECTIVE FUNCTION STUFF MAKE MORE SENSE
+        """
+        if algo in ["gmean", "spiess"]:
+            return (2, 0)
+        elif algo in ["reg_spiess"]:
+            return (2, 2)
+
     def __set_select_links(self) -> None:
         """
         Sets all select links for each class and for each observation.
@@ -177,8 +190,11 @@ class ODME(object):
             NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
             NEED TO DECIDE WHETHER I WANT TO SOMEHOW NORMALISE THE ALPHA/BETA WEIGHTS
 
+            NOTE - IT'S POSSIBLE TO ONLY USE 1 HYPER-PARAMETER INTERNALLY BY USING 
+            GAMMA = ALPHA/(1-ALPHA) - BUT THIS MIGHT HAVE FLOATING POINT ERRORS.
+
             ONLY IMPLEMENTED FOR SINGLE CLASS!
-            NEEDS TO INCLUDE PCE!
+            NEEDS TO INCLUDE PCE FOR MULTI-CLASS!
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
