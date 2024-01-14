@@ -1,4 +1,4 @@
-numpy
+numpy<1.9.9
 pyaml
 PyQt5
 pyshp
