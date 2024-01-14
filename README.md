@@ -46,8 +46,8 @@ Frank-Wolfe as well as the state-of-the-art Bi-conjugate Frank-Wolfe.
 
 AequilibraE's support for public transport includes a GTFS importer that can 
 map-match routes into the model network and an optimized version of the
-traditional Optimal-Strategies transit assignment, although AequilibraE's data 
-model in disk provides full support for schedule-based assignments in the future.
+traditional "Optimal-Strategies" transit assignment, and full support in the data 
+model for other schedule-based assignments to be implemented in the future.
 
 State-of-the-art computational performance and full multi-threading can be 
 expected from all key algorithms in AequilibraE, from cache-optimized IPF, 
