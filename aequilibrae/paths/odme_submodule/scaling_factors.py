@@ -188,10 +188,11 @@ class ScalingFactors(object):
             class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
 
             # Calculating link flow derivatives:
-            flow_derivatives = np.empty(len(class_counts))
-            for j, row in class_counts.iterrows():
-                sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
-                flow_derivatives[j] = -np.sum(self.demand_matrices[i] * sl_matrix * gradients[i])
+            flow_derivatives = self.__get_flow_derivatives_spiess(
+                user_class,
+                self.demand_matrices[i],
+                gradients[i]
+            )
 
             # Calculate minimising step length:
             errors = class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
@@ -205,6 +206,30 @@ class ScalingFactors(object):
             lambdas.append(self.__enforce_bounds(min_lambda, *bounds[i]))
 
         return lambdas
+
+    def __get_flow_derivatives_spiess(self,
+        user_class: str,
+        gradient: np.ndarray,
+        demand: np.ndarray) -> np.ndarray:
+        """
+        Returns an array of flow derivatives (v_a' in paper in SMP Teams)
+        for the particular class.
+
+        Parameters:
+            user_class: the name of the class from which to find flow derivatives
+            gradient: the gradient for the relevant class
+            demand: the demand matrix for this class
+        """
+        class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
+
+        # Calculating link flow derivatives:
+        flow_derivatives = np.empty(len(class_counts))
+        for j, row in class_counts.iterrows():
+            sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
+            flow_derivatives[j] = -np.sum(demand * sl_matrix * gradient)
+        
+        return flow_derivatives
+
 
     def __enforce_bounds(self, value: float, upper: float, lower: float) -> float:
         """
