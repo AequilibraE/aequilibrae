@@ -8,7 +8,7 @@ import scipy.stats as spstats
 
 class ScalingFactors(object):
     """ ODME Algorithms (Scaling Factor Generation) """
-    ALL_ALGORITHMS = ["gmean", "spiess"]
+    ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
 
     # FIGURE OUT TYPEHINT FOR ODME
     def __init__(self, odme, algorithm: str) -> None:
@@ -31,6 +31,9 @@ class ScalingFactors(object):
         self._sl_matrices = odme._sl_matrices
         self.demand_matrices = odme.demand_matrices
         self.init_demand_matrices = odme.demand_matrices
+        if algorithm in ["reg_spiess"]:
+            self._alpha = odme.alpha
+            self._beta = 1 - odme.alpha
 
         self.odme = odme
 
@@ -43,6 +46,9 @@ class ScalingFactors(object):
 
         elif self.algo_name == "spiess":
             self._algorithm = self.__spiess
+
+        elif self.algo_name == "reg_spiess":
+            self._algorithm = self.__reg_spiess
         
         else:
             raise ValueError(
@@ -127,8 +133,6 @@ class ScalingFactors(object):
 
         MULTI-CLASS UNDER DEVELOPMENT!
         """
-        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
-
         # Derivative matrices for spiess algorithm:
         gradient_matrices = self.__get_derivative_matrices_spiess()
 
@@ -206,8 +210,28 @@ class ScalingFactors(object):
                 lambdas.append(lower_lim)
             else: # Minimum step size does not violate addition step size constraints
                 lambdas.append(min_lambda)
-        
+    
         return lambdas
+
+    def __enforce_bounds(self, value, upper, lower) -> float:
+        """
+        Given a value, and an upper and lower bounds returns the value
+        if it sits between the bounds, and otherwise whichever bounds was
+        violated.
+
+        E.g. self.__enforce_bounds(1.1, 10, 2) = 2
+
+        Parameters:
+            value: the values to check
+            upper: the upper bound
+            lower: the lower bound
+        """
+        if value > upper:
+            return upper # Upper Bound Violated
+        elif value < lower:
+            return lower # Lower Bound Violated
+        else: # Bounds Not Violated
+            return value
 
     def __get_step_size_limits_spiess(self,
             gradients: list[np.ndarray]) -> list[Tuple[float, float]]:
@@ -242,3 +266,42 @@ class ScalingFactors(object):
             bounds.append((upper_lim, lower_lim)) # Tuple[float, float]
 
         return bounds
+
+    # regularised spiess (Gradient Descent - Objective Function (2,2))
+    def __reg_spiess(self) -> list[np.ndarray]:
+        """
+        Calculates scaling factor based on gradient descent method via SL matrix,
+        assigned flow & observed flows for the algorithm by Spiess with a
+        regularisation term attached.
+
+        NOT YET IMPLEMENTED!
+        CURRENTLY ONLY IMPLEMENTING FOR SINGLE CLASS!
+        MULTI-CLASS NOT YET IMPLEMENTED!
+        """
+        # Derivative matrices for spiess algorithm:
+        gradient_matrices = self.__get_derivative_matrices_reg_spiess()
+
+        # Get optimum step sizes for current iteration:
+        step_sizes = self.__get_step_sizes_spiess(gradient_matrices)
+
+        # Get scaling factors:
+        scaling_factors = [1 - (step_sizes[i] * gradient_matrices[i]) for i in range(self.num_classes)]
+        return scaling_factors
+
+    def __get_derivative_matrices_reg_spiess(self) -> list[np.ndarray]:
+        """
+        Returns derivative matrix (see notes in SMP Teams)
+
+        NOT YET IMPLEMENTED!
+        CURRENTLY ONLY IMPLEMENTING FOR SINGLE CLASS!
+        MULTI-CLASS NOT YET IMPLEMENTED!
+        NOTE - THIS RETURNS A LIST OF GRADIENT MATRICES, BUT IT HAS NOT BEEN DERIVED THAT THIS
+        IS THE APPROPRIATE GRADIENT FOR MULTI-CLASS (EVEN IF IT LIKELY IS THE CASE)
+        """
+        spiess_grads = self.__get_derivative_matrices_spiess()
+        g_hat = self.init_demand_matrices
+        reg_grads = [demand - g_hat[i] for i, demand in enumerate(self.demand_matrices)]
+        return [
+            (self._alpha * spiess) + (self._beta * reg_grads[i]) 
+            for i, spiess in enumerate(spiess_grads)
+            ]
