@@ -26,6 +26,7 @@ class ScalingFactors(object):
 
         self._count_volumes = odme.count_volumes
         self.class_names = odme.class_names
+        self.names_to_indices = odme.names_to_indices
         self.num_classes = len(self.class_names)
         self._demand_dims = odme.demand_dims
         self._sl_matrices = odme._sl_matrices
@@ -33,7 +34,7 @@ class ScalingFactors(object):
         self.init_demand_matrices = odme.demand_matrices
         if algorithm in ["reg_spiess"]:
             self._alpha = odme.alpha
-            self._beta = 1 - odme.alpha
+            self._beta = odme.beta
 
         self.odme = odme
 
@@ -140,7 +141,10 @@ class ScalingFactors(object):
         step_sizes = self.__get_step_sizes_spiess(gradient_matrices)
 
         # Get scaling factors:
-        scaling_factors = [1 - (step_sizes[i] * gradient_matrices[i]) for i in range(self.num_classes)]
+        scaling_factors = [
+            1 - (step_sizes[i] * gradient_matrices[i])
+            for i in range(self.num_classes)
+        ]
         return scaling_factors
 
     def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
@@ -177,8 +181,6 @@ class ScalingFactors(object):
 
         MULTI-CLASS UNDER DEVELOPMENT!
         """
-        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
-
         bounds = self.__get_step_size_limits_spiess(gradients)
 
         # SOME MINOR OPTIMISATIONS CAN BE DONE HERE IN TERMS OF WHAT PRECISELY TO CALCULATE:
@@ -188,7 +190,6 @@ class ScalingFactors(object):
             # Calculating link flow derivatives:
             flow_derivatives = self.__get_flow_derivatives_spiess(
                 user_class,
-                self.demand_matrices[i],
                 gradients[i]
             )
 
@@ -196,7 +197,7 @@ class ScalingFactors(object):
             errors = self.__get_flow_errors(user_class)
             min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
 
-            # This can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
+            # If all flow derivatives are 0 we should not perturb matrix (i.e, step-size = 0)
             if np.isnan(min_lambda):
                 min_lambda = 0
 
@@ -207,8 +208,7 @@ class ScalingFactors(object):
 
     def __get_flow_derivatives_spiess(self,
         user_class: str,
-        gradient: np.ndarray,
-        demand: np.ndarray) -> np.ndarray:
+        gradient: np.ndarray) -> np.ndarray:
         """
         Returns an array of flow derivatives (v_a' in paper in SMP Teams)
         for the particular class.
@@ -216,24 +216,24 @@ class ScalingFactors(object):
         Parameters:
             user_class: the name of the class from which to find flow derivatives
             gradient: the gradient for the relevant class
-            demand: the demand matrix for this class
 
         NOTE - THINK ABOUT RENAMING FOR CONSISTENCY
         """
         class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
+        demand = self.demand_matrices[self.names_to_indices[user_class]]
 
         # Calculating link flow derivatives:
         flow_derivatives = np.empty(len(class_counts))
         for j, row in class_counts.iterrows():
             sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
             flow_derivatives[j] = -np.sum(demand * sl_matrix * gradient)
-        
+
         return flow_derivatives
 
     def __get_flow_errors(self, user_class: str) -> np.ndarray:
         """
         For a particular class returns an array of errors
-        of the form (assigned - observed,...) for each count
+        of the form (observed - assigned,...) for each count
         volume given for that class.
         """
         class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
@@ -300,6 +300,8 @@ class ScalingFactors(object):
         assigned flow & observed flows for the algorithm by Spiess with a
         regularisation term attached.
 
+        NOTE - I SHOULD REALLY CHECK WHETHER THE BOUNDS ARE REALLY UNCHANGING!
+
         NOT YET IMPLEMENTED!
         CURRENTLY ONLY IMPLEMENTING FOR SINGLE CLASS!
         MULTI-CLASS NOT YET IMPLEMENTED!
@@ -308,26 +310,103 @@ class ScalingFactors(object):
         gradient_matrices = self.__get_derivative_matrices_reg_spiess()
 
         # Get optimum step sizes for current iteration:
-        step_sizes = self.__get_step_sizes_spiess(gradient_matrices)
+        step_sizes = self.__get_step_sizes_reg_spiess(gradient_matrices)
 
         # Get scaling factors:
-        scaling_factors = [1 - (step_sizes[i] * gradient_matrices[i]) for i in range(self.num_classes)]
+        scaling_factors = [
+            1 - (step_sizes[i] * gradient_matrices[i])
+            for i in range(self.num_classes)
+        ]
+
         return scaling_factors
 
     def __get_derivative_matrices_reg_spiess(self) -> list[np.ndarray]:
         """
         Returns derivative matrix (see notes in SMP Teams)
 
-        NOT YET IMPLEMENTED!
         CURRENTLY ONLY IMPLEMENTING FOR SINGLE CLASS!
         MULTI-CLASS NOT YET IMPLEMENTED!
         NOTE - THIS RETURNS A LIST OF GRADIENT MATRICES, BUT IT HAS NOT BEEN DERIVED THAT THIS
         IS THE APPROPRIATE GRADIENT FOR MULTI-CLASS (EVEN IF IT LIKELY IS THE CASE)
         """
         spiess_grads = self.__get_derivative_matrices_spiess()
-        g_hat = self.init_demand_matrices
-        reg_grads = [demand - g_hat[i] for i, demand in enumerate(self.demand_matrices)]
+        g_hats = self.init_demand_matrices
+        reg_grads = [
+            demand - g_hat 
+            for demand, g_hat in zip(self.demand_matrices, g_hats)
+        ]
+
         return [
-            (self._alpha * spiess) + (self._beta * reg_grads[i]) 
+            (self._alpha * spiess) + (self._beta * reg_grads[i])
             for i, spiess in enumerate(spiess_grads)
             ]
+
+    def __get_step_sizes_reg_spiess(self, gradients: list[np.ndarray]) -> list[float]:
+        """
+        Returns estimate of optimal step size (see paper in SMP Teams Chat)
+
+        Parameters:
+            gradients: The previously calculated gradient matrices - required for calculating 
+                derivative of link flows with respect to step size and finding 'eta' term
+                (see same paper - basically rate of change of objective w.r.t. change in demand
+                across iteration application of 'f').
+
+        REQUIRES TESTING FOR SINGLE CLASS
+        MULTI-CLASS UNDER DEVELOPMENT!
+        """
+        # THIS IS THE SAME BOUNDS AS REGULAR SPIESS, MAY WANT TO CONFIRM THIS IS CORRECT
+        bounds = self.__get_step_size_limits_spiess(gradients)
+
+        # NOT FULLY IMPLEMENTED BELOW THIS!!!
+        # Calculate step-sizes (lambdas) for each gradient matrix:
+        lambdas = []
+        for i, user_class in enumerate(self.class_names):
+            # Calculating flow components for step size:
+            flow_derivatives = self.__get_flow_derivatives_spiess(
+                user_class,
+                gradients[i]
+            )
+            flow_errors = self.__get_flow_errors(user_class)
+
+            # Calculate demand components of step size
+            demand_errors = self.__get_demand_errors(user_class)
+            demand_derivative = self.__get_demand_derivative(user_class, gradients[i])
+
+            # Calculate minimising step length: MAY WANT TO MAKE THIS A SEPARATE FUNCTION
+            min_lambda = (
+                (
+                    (self._alpha * np.sum(flow_derivatives * flow_errors)) +
+                    (self._beta * np.sum(demand_errors * demand_derivative))
+                ) /
+                (
+                    (self._alpha *  np.sum(np.square(flow_derivatives))) +
+                    (self._beta * np.sum(np.square(demand_derivative)))
+                )
+            )
+
+            # If all flow derivatives are 0 we should not perturb matrix (i.e, step-size = 0)
+            if np.isnan(min_lambda):
+                min_lambda = 0
+
+            # Check minimising lambda is within bounds:
+            lambdas.append(self.__enforce_bounds(min_lambda, *bounds[i]))
+
+        return lambdas
+
+    def __get_demand_errors(self, user_class:str) -> np.ndarray:
+        """
+        Returns array of errors between current and initial demand matrices
+        of the form (initial - current,...)
+        """
+        index = self.names_to_indices[user_class]
+        return self.init_demand_matrices[index] - self.demand_matrices[index]
+
+    def __get_demand_derivative(self,
+        user_class:str,
+        gradient: np.ndarray) -> np.ndarray:
+        """
+        Returns array of 'eta' terms (see paper in SMP Teams chat)
+        for a given class.
+        """
+        demand = self.demand_matrices[self.names_to_indices[user_class]]
+        return -(demand * gradient)
