@@ -180,7 +180,6 @@ class ScalingFactors(object):
         # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
 
         bounds = self.__get_step_size_limits_spiess(gradients)
-        upper_lim, lower_lim = bounds[0]
 
         # SOME MINOR OPTIMISATIONS CAN BE DONE HERE IN TERMS OF WHAT PRECISELY TO CALCULATE:
         # Calculate step-sizes (lambdas) for each gradient matrix:
@@ -203,17 +202,11 @@ class ScalingFactors(object):
                 min_lambda = 0
 
             # Check minimising lambda is within bounds:
-            upper_lim, lower_lim = bounds[i]
-            if min_lambda > upper_lim:
-                lambdas.append(upper_lim)
-            elif min_lambda < lower_lim:
-                lambdas.append(lower_lim)
-            else: # Minimum step size does not violate addition step size constraints
-                lambdas.append(min_lambda)
-    
+            lambdas.append(self.__enforce_bounds(min_lambda, *bounds[i]))
+
         return lambdas
 
-    def __enforce_bounds(self, value, upper, lower) -> float:
+    def __enforce_bounds(self, value: float, upper: float, lower: float) -> float:
         """
         Given a value, and an upper and lower bounds returns the value
         if it sits between the bounds, and otherwise whichever bounds was
