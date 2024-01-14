@@ -3,9 +3,9 @@ pyaml
 PyQt5
 pyshp
 cython
-enum34>=1.1.6
+enum34
 sphinx
-pydata-sphinx-theme==0.13.3
+pydata-sphinx-theme
 sphinx_autodoc_annotation
 nbsphinx
 pillow
