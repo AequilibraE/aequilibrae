@@ -185,8 +185,6 @@ class ScalingFactors(object):
         # Calculate step-sizes (lambdas) for each gradient matrix:
         lambdas = []
         for i, user_class in enumerate(self.class_names):
-            class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
-
             # Calculating link flow derivatives:
             flow_derivatives = self.__get_flow_derivatives_spiess(
                 user_class,
@@ -195,7 +193,7 @@ class ScalingFactors(object):
             )
 
             # Calculate minimising step length:
-            errors = class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
+            errors = self.__get_flow_errors(user_class)
             min_lambda = np.sum(flow_derivatives * errors) / np.sum(np.square(flow_derivatives))
 
             # This can only happen if all flow derivatives are 0 - ie we should not bother perturbing matrix
@@ -219,6 +217,8 @@ class ScalingFactors(object):
             user_class: the name of the class from which to find flow derivatives
             gradient: the gradient for the relevant class
             demand: the demand matrix for this class
+
+        NOTE - THINK ABOUT RENAMING FOR CONSISTENCY
         """
         class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
 
@@ -230,6 +230,14 @@ class ScalingFactors(object):
         
         return flow_derivatives
 
+    def __get_flow_errors(self, user_class: str) -> np.ndarray:
+        """
+        For a particular class returns an array of errors
+        of the form (assigned - observed,...) for each count
+        volume given for that class.
+        """
+        class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
+        return class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
 
     def __enforce_bounds(self, value: float, upper: float, lower: float) -> float:
         """
