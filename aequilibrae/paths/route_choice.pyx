@@ -61,6 +61,7 @@ and ineffiecent, data is copied all over the place.
 """
 
 from aequilibrae.paths.results import PathResults
+from aequilibrae import Graph
 import numpy as np
 
 from libc.math cimport INFINITY
@@ -74,31 +75,6 @@ from libcpp.utility cimport pair
 from cython.operator cimport dereference as deref, preincrement as inc
 
 import numpy as np
-
-# std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
-# from libcpp.random cimport minstd_rand
-from libc.stdint cimport uint_fast32_t, uint_fast64_t
-
-cdef extern from "<random>" namespace "std" nogil:
-    cdef cppclass random_device:
-        ctypedef uint_fast32_t result_type
-        random_device() except +
-        result_type operator()() except +
-
-    cdef cppclass minstd_rand:
-        ctypedef uint_fast32_t result_type
-        minstd_rand() except +
-        minstd_rand(result_type seed) except +
-        result_type operator()() except +
-        result_type min() except +
-        result_type max() except +
-        void discard(size_t z) except +
-        void seed(result_type seed) except +
-
-# std::shuffle is not available in the Cython libcpp.algorithm shim. We'll import it ourselves
-# from libcpp.algorithm cimport shuffle
-cdef extern from "<algorithm>" namespace "std" nogil:
-    void shuffle[RandomIt, URBG](RandomIt first, RandomIt last, URBG&& g) except +
 
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
@@ -137,14 +113,14 @@ cdef class RouteChoice:
             long origin_index = self.nodes_to_indices_view[origin]
             long dest_index = self.nodes_to_indices_view[destination]
             double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
-            unordered_set[vector[long long] *] *results
+            RouteSet_t *results
             unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
         with nogil:
             results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost)
 
         res = []
         for x in deref(results):
-            res.append(np.array(deref(x)))
+            res.append(tuple(deref(x)))
             del x
 
         return res
@@ -169,36 +145,35 @@ cdef class RouteChoice:
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    cdef unordered_set[vector[long long] *] *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
+    cdef RouteSet_t *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
         """Main method for route set generation"""
         cdef:
-            unordered_map[unordered_set[long long] *, vector[long long] *] *working_set
-            unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator set_iter
+            RouteSet_t *route_set
+            LinkSet_t removed_links
+            RouteMap_t working_set
+            minstd_rand rng
+
+            # Scatch objects
             vector[unordered_set[long long] *] queue
             vector[unordered_set[long long] *] next_queue
             unordered_set[long long] *banned
             unordered_set[long long] *new_banned
-            unordered_set[vector[long long] *] *route_set
             vector[long long] *vec
-            pair[unordered_set[long long] *, vector[long long] *] *pair_tmp
-            pair[unordered_set[long long] *, vector[long long] *] x
             long long p, connector
-            minstd_rand rng
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
 
         queue.push_back(new unordered_set[long long]()) # Start with no edges banned
-        working_set = new unordered_map[unordered_set[long long] *, vector[long long] *]()
-        route_set = new unordered_set[vector[long long] *]()
+        route_set = new RouteSet_t()
         rng.seed(0)
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
         for depth in range(max_depth):
             # If we could potentially fill the route_set after this depth, shuffle the queue
             if queue.size() + route_set.size() >= max_routes:
-                printf("%ld + %ld >= %d, ", queue.size(), route_set.size(), max_routes)
-                printf("route set full (or close to full), shuffling queue\n")
+                # printf("%ld + %ld >= %d, ", queue.size(), route_set.size(), max_routes)
+                # printf("route set full (or close to full), shuffling queue\n")
                 shuffle(queue.begin(), queue.end(), rng)
 
             for banned in queue:
@@ -218,29 +193,36 @@ cdef class RouteChoice:
                         p = self.predecessors_view[p]
                         vec.push_back(connector)
 
-                    # This element is already in our set, skip it
+                    # Mark this set of banned links as seen
+                    removed_links.insert(banned)
+
+                    # This element is already in our route set, skip it
                     if route_set.find(vec) != route_set.end():
                         continue
 
-                    pair_tmp = new pair[unordered_set[long long] *, vector[long long] *](banned, vec)
-                    working_set.insert(deref(pair_tmp))  # We'll keep this route around for (potential) insertion later
-                    del pair_tmp
-
+                    working_set.push_back(make_pair(banned, vec))
                     if working_set.size() + route_set.size() >= max_routes:
                         break
-                else:
-                    pass  # Node was unreachable
 
-            for x in deref(working_set):
+            for x in working_set:
                 banned = x.first
                 vec = x.second
 
                 route_set.insert(vec)
+
                 # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
                 for edge in deref(vec):
+                    # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
+                    # then add a single element. An incremental set hash function could be of use. However, the since of this set is
+                    # directly dependent on the current depth. As the route set size grows so incredibly fast the depth will rarely get
+                    # high enough for this to matter.
                     new_banned = new unordered_set[long long](deref(banned))
                     new_banned.insert(edge)
-                    next_queue.push_back(new_banned)
+                    # If we've already seen this set of removed links before we already know what the path is and its in our route set
+                    if removed_links.find(new_banned) != removed_links.end():
+                        del new_banned
+                    else:
+                        next_queue.push_back(new_banned)
 
             queue.swap(next_queue)
             next_queue.clear()
