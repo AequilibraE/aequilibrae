@@ -184,8 +184,8 @@ cdef class RouteChoice:
 
                 RouteChoice.path_find(self, origin_index, dest_index, scratch_cost)
 
-                vec = new vector[long long]()
                 if self.predecessors_view[dest_index] >= 0:
+                    vec = new vector[long long]()
                     # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
                     p = dest_index
                     while p != origin_index:
