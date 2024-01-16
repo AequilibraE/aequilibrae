@@ -25,9 +25,9 @@ Thoughts:
       Another option is hash maps, just throw hash maps at it. Upsides of this is they are much more generic, no special
       methods required and we'll likely be able to use something off the shelf. Downsides are that their performance is
       largely dependent on the hash function. We'll need to use the set of removed edges as the key, which the path as
-      the value. This means we can't compresse the paths. Choosing a good hash function may be tough, because link/node
+      the value. This means we can't compress the paths. Choosing a good hash function may be tough, because link/node
       ids can be arbitrarily large we'll have to consider overflows, though an non-naive function should handle this
-      fine. We'll also want to avoid modulo, wikipedia says using a multiply-shift scheme with a Mersenne prime like
+      fine. We'll also want to avoid modulo, Wikipedia says using a multiply-shift scheme with a Mersenne prime like
       2^61 - 1 should work well. Although we have variable length paths, fixed length vector hashing can be applied and
       padded to blocks of our paths.
 
@@ -36,10 +36,10 @@ Thoughts:
       tree set using sorted node/link ids could work.
 
       Another option is a bit map. For a million link network, the bitmap would "only" be 125kB. Membership checks and
-      addition and removal from this set would be incredily fast, faster than anything else, however comparison may
+      addition and removal from this set would be incredibly fast, faster than anything else, however comparison may
       suffer. We could hash this bitmap but if we're hashing it we might as well just hash the removal set.
 
-      We could also nest the hash sets, essientially building up a hash set of previously seen hashes.
+      We could also nest the hash sets, essentially building up a hash set of previously seen hashes.
 
     - Hash functions: We're looking for a "incremental (multi)set hash function", because we don't need it to be secure
       at all some commutative binary operation should work e.g. +, *, ^. Whether or not they make good hash functions
@@ -55,8 +55,8 @@ Removed link set stored as a sorted prefix trie of sorts. Haven't flushed out th
 could work. Each node would store a pointer to a node in the route set tree that represents the path found with that
 set of removed links.
 
-Current implementation: Hash maps, hash sets, and whatever it took to get somethihng working. Implementation is naive
-and ineffiecent, data is copied all over the place.
+Current implementation: Hash maps, hash sets, and whatever it took to get something working. Implementation is naive
+and inefficient, data is copied all over the place.
 
 """
 
@@ -86,7 +86,7 @@ cdef class RouteChoice:
     """
 
     def __cinit__(self):
-        """C level init. For C memory allocation and initalisation. Called exactly once per object."""
+        """C level init. For C memory allocation and initialisation. Called exactly once per object."""
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
@@ -103,7 +103,7 @@ cdef class RouteChoice:
 
     def __dealloc__(self):
         """
-        C level deallocation. For freeing memeory allocated by this object. *Must* have GIL, `self` may be in a
+        C level deallocation. For freeing memory allocated by this object. *Must* have GIL, `self` may be in a
         partially deallocated state already.
         """
         pass
