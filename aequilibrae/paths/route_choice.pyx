@@ -95,8 +95,9 @@ cdef class RouteChoice:
         self.graph_fs_view = graph.compact_fs
         self.b_nodes_view = graph.compact_graph.b_node.values  # FIXME: Why does path_computation copy this?
         self.nodes_to_indices_view = graph.compact_nodes_to_indices
-        self.lat_view = graph.lonlat_index.lat.values
-        self.lon_view = graph.lonlat_index.lon.values
+        tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
+        self.lat_view = tmp.lat.values
+        self.lon_view = tmp.lon.values
         self.predecessors_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
         self.ids_graph_view = graph.compact_graph.id.values
         self.conn_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
@@ -115,6 +116,12 @@ cdef class RouteChoice:
             double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
             RouteSet_t *results
             unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
+
+        if origin_index == -1:
+            raise ValueError(f"Origin {origin} is not present within the compact graph")
+        if dest_index == -1:
+            raise ValueError(f"Destination {destination} is not present within the compact graph")
+
         with nogil:
             results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost)
 
