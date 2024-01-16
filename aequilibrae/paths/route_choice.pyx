@@ -172,8 +172,6 @@ cdef class RouteChoice:
         for depth in range(max_depth):
             # If we could potentially fill the route_set after this depth, shuffle the queue
             if queue.size() + route_set.size() >= max_routes:
-                # printf("%ld + %ld >= %d, ", queue.size(), route_set.size(), max_routes)
-                # printf("route set full (or close to full), shuffling queue\n")
                 shuffle(queue.begin(), queue.end(), rng)
 
             for banned in queue:
