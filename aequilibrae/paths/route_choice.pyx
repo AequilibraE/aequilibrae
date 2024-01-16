@@ -170,6 +170,9 @@ cdef class RouteChoice:
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
         for depth in range(max_depth):
+            if route_set.size() >= max_routes:
+                break
+
             # If we could potentially fill the route_set after this depth, shuffle the queue
             if queue.size() + route_set.size() >= max_routes:
                 shuffle(queue.begin(), queue.end(), rng)
