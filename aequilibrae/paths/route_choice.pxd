@@ -58,16 +58,13 @@ cdef extern from * nogil:
     struct OrderedVectorPointerHasher {
         size_t operator()(const std::vector<long long> *V) const {
             size_t seed = V->size();
-            // printf("Vector at %p, [", V);
             long long x;
             for(auto &i : *V) {
                 x = ((i >> 16) ^ i) * 0x45d9f3b;
                 x = ((x >> 16) ^ x) * 0x45d9f3b;
                 x = (x >> 16) ^ x;
                 seed ^= x + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-                // printf("%lld, ", i);
             }
-            // printf("] has hash: %zu\\n", seed);
             return seed;
         }
     };
@@ -77,14 +74,10 @@ cdef extern from * nogil:
     struct UnorderedSetPointerHasher {
         size_t operator()(const std::unordered_set<long long> *S) const {
             size_t hash = 1;
-            // printf("Set at %p, [", S);
             for(auto &i : *S) {
                 hash *= 1779033703 + 2 * i;
-                // printf("%lld, ", i);
             }
-            hash /= 2;
-            // printf("] has hash: %zu\\n", hash);
-            return hash;
+            return hash / 2;
         }
     };
 
