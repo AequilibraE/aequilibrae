@@ -22,9 +22,9 @@ project.new(fldr)
 # For the sake of this example, we will choose the small nation of Nauru.
 project.network.create_from_ovm(west=148.7077, south=-20.2780, east=148.7324, north=-20.2621, data_source=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
 bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
-# ovm_downloader_instance = OVMDownloader(["car", "transit", "bicycle", "walk"],r'C:\Users\penny\git\Aequilibrae')
-# download = ovm_downloader_instance.downloadTransportation(bbox, r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
 
+# project.network.create_from_ovm(west=153.1771, south=-27.6851, east=153.2018, north=-27.6703, data_source=r'C:\Users\penny\git\data\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
+# brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
 # links = download[0]
 # nodes = download[1]
  # %%
@@ -55,6 +55,8 @@ for i, row in links.iterrows():
 # We get the center of the region we are working with some SQL magic
 long = (bbox[0]+bbox[2])/2
 lat = (bbox[1]+bbox[3])/2
+# long = (brisbane_bbox[0]+brisbane_bbox[2])/2
+# lat = (brisbane_bbox[1]+brisbane_bbox[3])/2
 
 # %%
 map_osm = folium.Map(location=[lat, long], zoom_start=14)
