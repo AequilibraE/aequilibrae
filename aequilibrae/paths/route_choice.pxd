@@ -112,9 +112,18 @@ cdef class RouteChoice:
         long long [:] nodes_to_indices_view
         double [:] lat_view
         double [:] lon_view
-        long long [:] predecessors_view
         long long [:] ids_graph_view
-        long long [:] conn_view
         long long [:] compressed_link_ids
-    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost) noexcept nogil
-    cdef RouteSet_t *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil
+        long long num_nodes
+    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil
+    cdef RouteSet_t *generate_route_set(
+        RouteChoice self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        unsigned int seed
+    ) noexcept nogil

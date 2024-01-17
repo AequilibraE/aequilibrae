@@ -63,6 +63,7 @@ and inefficient, data is copied all over the place.
 from aequilibrae.paths.results import PathResults
 from aequilibrae import Graph
 import numpy as np
+from typing import List, Tuple
 
 from libc.math cimport INFINITY
 from libc.string cimport memcpy
@@ -73,6 +74,7 @@ from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
 from cython.operator cimport dereference as deref, preincrement as inc
+from cython.parallel cimport parallel, prange, threadid
 
 import numpy as np
 
@@ -98,9 +100,8 @@ cdef class RouteChoice:
         tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
         self.lat_view = tmp.lat.values
         self.lon_view = tmp.lon.values
-        self.predecessors_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
         self.ids_graph_view = graph.compact_graph.id.values
-        self.conn_view = np.empty(graph.compact_num_nodes + 1, dtype=np.int64)
+        self.num_nodes = graph.compact_num_nodes
 
     def __dealloc__(self):
         """
@@ -109,21 +110,24 @@ cdef class RouteChoice:
         """
         pass
 
-    def run(self, long origin, long destination, unsigned int max_routes=0, unsigned int max_depth=0):
+    def run(self, long origin, long destination, unsigned int max_routes=0, unsigned int max_depth=0, unsigned int seed=0):
         cdef:
             long origin_index = self.nodes_to_indices_view[origin]
             long dest_index = self.nodes_to_indices_view[destination]
             double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
+            long long [:] scratch_predecessor = np.empty(self.num_nodes + 1, dtype=np.int64)
+            long long [:] scratch_conn = np.empty(self.num_nodes + 1, dtype=np.int64)
             RouteSet_t *results
-            unordered_map[unordered_set[long long] *, vector[long long] *].const_iterator results_iter
 
         if origin_index == -1:
             raise ValueError(f"Origin {origin} is not present within the compact graph")
         if dest_index == -1:
             raise ValueError(f"Destination {destination} is not present within the compact graph")
+        print(origin_index, dest_index)
+        assert False
 
         with nogil:
-            results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost)
+            results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost, scratch_predecessor, scratch_conn, seed)
 
         res = []
         for x in deref(results):
@@ -132,19 +136,61 @@ cdef class RouteChoice:
 
         return res
 
-    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost) noexcept nogil:
+    def batched(self, ods: List[Tuple[int, int]], unsigned int max_routes=0, unsigned int max_depth=0, unsigned int seed=0, unsigned int cores=1):
+        cdef:
+            vector[pair[long long, long long]] c_ods = ods
+
+            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
+            double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)  # allocation of new memory view required gil
+            long long [:, :] predecessors_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
+
+            vector[RouteSet_t *] *results = new vector[RouteSet_t *](len(ods))
+            long origin_index
+            long dest_index
+            long long i
+
+        with nogil, parallel(num_threads=cores):
+            for i in prange(c_ods.size()):
+                origin_index = self.nodes_to_indices_view[c_ods[i].first]
+                dest_index = self.nodes_to_indices_view[c_ods[i].second]
+                deref(results)[i] = RouteChoice.generate_route_set(
+                    self,
+                    origin_index,
+                    dest_index,
+                    max_routes,
+                    max_depth,
+                    cost_matrix[threadid()],
+                    predecessors_matrix[threadid()],
+                    conn_matrix[threadid()],
+                    seed
+                )
+
+        # Build results into python objects using Cythons auto-conversion from vector[long long] to list then to tuple (for set operations)
+        res = []
+        for result in deref(results):
+            links = []
+            for route in deref(result):
+                links.append(tuple(deref(route)))
+                del route
+            res.append(links)
+
+        del results
+        return dict(zip(ods, res))
+
+    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
         path_finding_a_star(
             origin_index,
             dest_index,
-            scratch_cost,
+            thread_cost,
             self.b_nodes_view,
             self.graph_fs_view,
             self.nodes_to_indices_view,
             self.lat_view,
             self.lon_view,
-            self.predecessors_view,
+            thread_predecessors,
             self.ids_graph_view,
-            self.conn_view,
+            thread_conn,
             EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
         )
 
@@ -152,7 +198,17 @@ cdef class RouteChoice:
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    cdef RouteSet_t *generate_route_set(RouteChoice self, long origin_index, long dest_index, unsigned int max_routes, unsigned int max_depth, double [:] scratch_cost) noexcept nogil:
+    cdef RouteSet_t *generate_route_set(
+        RouteChoice self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        unsigned int seed
+    ) noexcept nogil:
         """Main method for route set generation"""
         cdef:
             RouteSet_t *route_set
@@ -172,7 +228,7 @@ cdef class RouteChoice:
 
         queue.push_back(new unordered_set[long long]()) # Start with no edges banned
         route_set = new RouteSet_t()
-        rng.seed(0)
+        rng.seed(seed)
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned edges to consider
         for depth in range(max_depth):
@@ -185,24 +241,24 @@ cdef class RouteChoice:
 
             for banned in queue:
                 # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and reverse them as well
-                memcpy(&scratch_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
+                memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
                 for connector in deref(banned):
-                    scratch_cost[connector] = INFINITY
+                    thread_cost[connector] = INFINITY
 
-                RouteChoice.path_find(self, origin_index, dest_index, scratch_cost)
+                RouteChoice.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn)
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)
 
                 # If the destination is reachable we must build the path and readd
-                if self.predecessors_view[dest_index] >= 0:
+                if thread_predecessors[dest_index] >= 0:
                     vec = new vector[long long]()
                     # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
                     p = dest_index
                     while p != origin_index:
-                        connector = self.conn_view[p]
-                        p = self.predecessors_view[p]
+                        connector = thread_conn[p]
+                        p = thread_predecessors[p]
                         vec.push_back(connector)
 
                     for connector in deref(vec):
@@ -231,7 +287,7 @@ cdef class RouteChoice:
         for banned in queue:
             del banned
 
-        printf("Depth: %d\n", depth)
-        printf("Routes: %zu\n", route_set.size())
+        # printf("Depth: %d\n", depth)
+        # printf("Routes: %zu\n", route_set.size())
 
         return route_set
