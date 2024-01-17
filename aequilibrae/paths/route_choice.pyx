@@ -157,10 +157,9 @@ cdef class RouteChoice:
         cdef:
             RouteSet_t *route_set
             LinkSet_t removed_links
-            RouteMap_t working_set
             minstd_rand rng
 
-            # Scatch objects
+            # Scratch objects
             vector[unordered_set[long long] *] queue
             vector[unordered_set[long long] *] next_queue
             unordered_set[long long] *banned
@@ -175,7 +174,7 @@ cdef class RouteChoice:
         route_set = new RouteSet_t()
         rng.seed(0)
 
-        # We'll go at most `max_depth` iterations down, at each depth we maintain a deque of the next set of banned edges to consider
+        # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned edges to consider
         for depth in range(max_depth):
             if route_set.size() >= max_routes:
                 break
@@ -185,6 +184,7 @@ cdef class RouteChoice:
                 shuffle(queue.begin(), queue.end(), rng)
 
             for banned in queue:
+                # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and reverse them as well
                 memcpy(&scratch_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
                 for connector in deref(banned):
@@ -192,6 +192,10 @@ cdef class RouteChoice:
 
                 RouteChoice.path_find(self, origin_index, dest_index, scratch_cost)
 
+                # Mark this set of banned links as seen
+                removed_links.insert(banned)
+
+                # If the destination is reachable we must build the path and readd
                 if self.predecessors_view[dest_index] >= 0:
                     vec = new vector[long long]()
                     # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
@@ -201,43 +205,33 @@ cdef class RouteChoice:
                         p = self.predecessors_view[p]
                         vec.push_back(connector)
 
-                    # Mark this set of banned links as seen
-                    removed_links.insert(banned)
+                    for connector in deref(vec):
+                        # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
+                        # then add a single element. An incremental set hash function could be of use. However, the since of this set is
+                        # directly dependent on the current depth. As the route set size grows so incredibly fast the depth will rarely get
+                        # high enough for this to matter.
+                        # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
+                        new_banned = new unordered_set[long long](deref(banned))
+                        new_banned.insert(connector)
+                        # If we've already seen this set of removed links before we already know what the path is and its in our route set
+                        if removed_links.find(new_banned) != removed_links.end():
+                            del new_banned
+                        else:
+                            next_queue.push_back(new_banned)
 
-                    # This element is already in our route set, skip it
-                    if route_set.find(vec) != route_set.end():
-                        continue
-
-                    working_set.push_back(make_pair(banned, vec))
-                    if working_set.size() + route_set.size() >= max_routes:
+                    # The deduplication of routes occurs here
+                    route_set.insert(vec)
+                    if route_set.size() >= max_routes:
                         break
-
-            for x in working_set:
-                banned = x.first
-                vec = x.second
-
-                route_set.insert(vec)
-
-                # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
-                for edge in deref(vec):
-                    # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
-                    # then add a single element. An incremental set hash function could be of use. However, the since of this set is
-                    # directly dependent on the current depth. As the route set size grows so incredibly fast the depth will rarely get
-                    # high enough for this to matter.
-                    new_banned = new unordered_set[long long](deref(banned))
-                    new_banned.insert(edge)
-                    # If we've already seen this set of removed links before we already know what the path is and its in our route set
-                    if removed_links.find(new_banned) != removed_links.end():
-                        del new_banned
-                    else:
-                        next_queue.push_back(new_banned)
 
             queue.swap(next_queue)
             next_queue.clear()
-            working_set.clear()
 
         # We may have added more banned link sets to the queue then found out we hit the max depth, we should free those
         for banned in queue:
             del banned
+
+        printf("Depth: %d\n", depth)
+        printf("Routes: %zu\n", route_set.size())
 
         return route_set
