@@ -1,13 +1,9 @@
 import json
 import logging
-import time
-import re
 from pathlib import Path
 
-import requests
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
-import gc
 import importlib.util as iutil
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.utils import WorkerThread
@@ -17,25 +13,15 @@ import shapely
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-import subprocess
-import os
 from typing import Union
-from shapely import count_coordinates, segmentize
-from shapely.geometry import LineString
-
-from aequilibrae.utils.spatialite_utils import connect_spatialite
+from shapely.geometry import LineString, Point
 
 DEFAULT_OVM_S3_LOCATION = "s3://overturemaps-us-west-2/release/2023-11-14-alpha.0//theme=transportation"
-
-
-
-
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
-
 
 class OVMDownloader(WorkerThread):
     if pyqt:
@@ -106,13 +92,6 @@ class OVMDownloader(WorkerThread):
         c = self.initialise_duckdb_spatial()
         c.execute(sql)
 
-    '''
-    from stack overflow
-    https://stackoverflow.com/questions/62053253/how-to-split-a-linestring-to-segments
-    '''
-    def segments(self, curve):
-        return list(map(LineString, zip(curve.coords[:-1], curve.coords[1:])))
-
 
     def downloadTransportation(self, bbox, data_source, output_dir):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
@@ -145,7 +124,7 @@ class OVMDownloader(WorkerThread):
                 CAST(road AS JSON) ->>'lanes' AS direction,
                 CAST(road AS JSON) ->>'class' AS link_type,
                 CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
-                CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' ->> 'maxSpeed' AS speed,
+                CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
                 CAST(road AS JSON) ->>'lanes' AS lanes,
                 geometry
             FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
@@ -185,38 +164,25 @@ class OVMDownloader(WorkerThread):
         gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
 
         # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
-        gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
+        # print(gdf_link['speed'])
+        # gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
         gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
-
+        
         gdf_node['node_id'] = self.create_node_ids(gdf_node)
         gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
         gdf_node['is_centroid'] = 0
 
-
-        # Function to process each row and create a new GeoDataFrame
-        def process_row(gdf_link):
-            # Extract necessary information from the row
-            connectors = gdf_link['connectors']
-
-            # Check if 'Connectors' has more than 2 elements
-            if np.size(connectors) >= 2:
-                # Split the DataFrame into multiple rows
-                rows = []
-                for i in range(len(connectors) - 1):
-                    new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
-                                'direction': gdf_link['direction'], 'link_type': gdf_link['link_type'], 'name': gdf_link['name'], 
-                                'speed': gdf_link['speed'], 'ovm_id': gdf_link['ovm_id'], 'geometry': gdf_link['geometry'], 'lanes': gdf_link['lanes']}
-                    rows.append(new_row)
-                processed_df = gpd.GeoDataFrame(rows)
-            else:
-                raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
-            return processed_df
-
         # Iterate over rows using iterrows()
         result_dfs = []
+        # print('table')
+        # print(self.get_speed(gdf_link)['speed'])
+        # print()
         for index, row in gdf_link.iterrows():
+            # print(index)
             # Process each row and append the resulting GeoDataFrame to the list
-            processed_df = process_row(row)
+            processed_df = self.split_connectors(row)
+
+            # processed_df = split_speeds(row)
             result_dfs.append(processed_df)
 
         # Concatenate the resulting DataFrames into a final GeoDataFrame
@@ -259,7 +225,7 @@ class OVMDownloader(WorkerThread):
             raise ValueError("No common nodes.")
 
 
-        link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
+        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
         final_result = final_result[link_order]
 
         final_result.to_parquet(output_file_link)
@@ -378,3 +344,81 @@ class OVMDownloader(WorkerThread):
         # filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
+    
+    # Function to process each row and create a new GeoDataFrame
+    def split_connectors(self, row):
+        # Extract necessary information from the row        
+        connectors = row['connectors']
+
+        # Check if 'Connectors' has more than 2 elements
+        if np.size(connectors) >= 2:
+            # Split the DataFrame into multiple rows
+            
+
+            rows = []
+            for i in range(len(connectors) - 1):
+                # print('in split_con')
+                # print(row['restrictions'])
+                
+                # print(self.get_speed(row['speed']))
+                # print(type(self.get_speed(row['speed'])))
+                # print()
+                new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
+                            'direction': row['direction'], 'link_type': row['link_type'], 'name': row['name'], 
+                            'speed': self.get_speed(row['speed']), 'ovm_id': row['ovm_id'], 'geometry': row['geometry'], 'lanes': row['lanes'],
+                            'restrictions': row['speed']}
+                rows.append(new_row)
+            processed_df = gpd.GeoDataFrame(rows)
+        else:
+            raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
+        return processed_df
+
+    def get_speed(self, speed_row):
+        new_list = []
+        
+        if speed_row == None:
+            new_list.append(speed_row)
+        else:
+            speed = json.loads(speed_row)
+            if type(speed) == dict:
+                new_list.append(speed['maxSpeed'][0])
+            elif type(speed) == list and len(speed) >= 1:
+                # Extract the 'at' list from each dictionary
+                # eg [[0.0, 0.064320774], [0.064320774, 1.0]]
+                at_values_list = [entry['at'] for entry in speed]
+
+                # Calculate differences between consecutive numbers in each 'at' list. This list iterates through each 'at' 
+                # list in at_values_list and calculates the difference between consecutive elements using (at[i + 1] - at[i]).
+                # The result is a flat list of differences for all 'at' lists.
+                # eg [0.064320774, 0.935679226]
+                differences = [diff for at in at_values_list for diff in (at[i + 1] - at[i] for i in range(len(at) - 1))]
+                
+                # Create a dictionary with keys as flat_differences and values as at_values_list
+                result_dict = dict(zip(differences, at_values_list))
+        
+                max_difference = max(differences)
+
+                if max_difference >= 0.7:
+                    # Find the index of the value in the differences list
+                    index = differences.index(max_difference)
+
+                    # Access the corresponding entry in the original 'data' list to access the 'maxSpeed' value
+                    max_speed = speed[index]['maxSpeed'][0]
+
+                    new_list.append(max_speed)
+                else:
+                    # print('split')
+                    # print(speed)
+                    for element in differences:
+                        # Find the index of the value in the differences list
+                        index_d = differences.index(element)
+
+                        # Access the corresponding entry in the original 'data' list to access the 'maxSpeed' value
+                        max_speed = speed[index_d]['maxSpeed'][0]
+                        new_list.append(max_speed)
+
+                
+        # gdf = gpd.GeoDataFrame(new_list)
+        # print(type(gdf))
+        # print(gdf)
+        return new_list
