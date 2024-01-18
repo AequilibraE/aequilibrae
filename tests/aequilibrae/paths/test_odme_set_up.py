@@ -70,10 +70,16 @@ class TestODMESingleClassSetUp(TestCase):
         """
         Using this to figure out how API works - should be removed eventually.
         """
-        df = pd.DataFrame(data=[[-1]], columns=["Default"])
-        for i in range(5): 
-            df.loc[len(df)] = {"Default" : i}
-        print(df)
+        self.assignclass.set_pce(2)
+        # Set synthetic demand matrix & count volumes
+        self.matrix.matrix_view = np.zeros(self.dims)
+        self.matrix.matrix_view[self.index[1], self.index[2]] = 10
+
+        # Get Results:
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
+        print(flow)
 
     # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
     # Basic tests are ran on demand matrices which produce little to no congestion.
@@ -105,7 +111,7 @@ class TestODMESingleClassSetUp(TestCase):
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
 
-    def test_basic_1_1_b(self) -> None: 
+    def test_basic_1_1_b(self) -> None:
         """
         Check that running ODME with 0 demand matrix returns 0 matrix, with
         many count volumes of 0.

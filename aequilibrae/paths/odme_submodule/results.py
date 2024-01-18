@@ -155,6 +155,8 @@ class ODMEResults(object):
     def init_timer(self) -> None:
         """
         Initialises the internal times (for statistics purposes).
+        
+        Should be run when the ODME procedure begins execution.
         """
         self.time = time.time()
 

@@ -50,7 +50,7 @@ class ScalingFactors(object):
 
         elif self.algo_name == "reg_spiess":
             self._algorithm = self.__reg_spiess
-        
+
         else:
             raise ValueError(
                 f"Invalid algorithm name: {self.algo_name}"
@@ -332,7 +332,7 @@ class ScalingFactors(object):
         spiess_grads = self.__get_derivative_matrices_spiess()
         g_hats = self.init_demand_matrices
         reg_grads = [
-            demand - g_hat 
+            demand - g_hat
             for demand, g_hat in zip(self.demand_matrices, g_hats)
         ]
 

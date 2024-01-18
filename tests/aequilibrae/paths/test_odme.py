@@ -39,7 +39,6 @@ class TestODME(TestCase):
         self.index = self.car_graph.nodes_to_indices
         self.dims = self.matrix.matrix_view.shape
         self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
-        # Still need to add mode/class name to these!!!
 
         # Initial assignment parameters:
         self.assignment = TrafficAssignment()
@@ -115,7 +114,7 @@ class TestODME(TestCase):
 
         Checks we recover the original matrix.
         """
-        algorithm = "spiess"
+        algorithm = "reg_spiess"
 
         # Get original flows:
         self.assignment.execute()
@@ -140,7 +139,12 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(1, 1000, 0.0001, 0.00001), algorithm=algorithm)
+        odme = ODME(self.assignment,
+            count_volumes,
+            stop_crit=(10, 500, 1, 0.1),
+            alpha=0.24,
+            algorithm=algorithm)
+        #x = odme.estimate_alpha(0.1)
         odme.execute()
         new_demand = odme.get_demands()[0]
         odme.get_all_statistics().to_csv(f"/workspaces/aequilibrae/odme_stats/stats_all_vols_{algorithm}.csv")

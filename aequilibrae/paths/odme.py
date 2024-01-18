@@ -42,7 +42,7 @@ class ODME(object):
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
-        alpha=None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
+        alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
         algorithm="spiess" # currently defaults to spiess
     ):
         """
@@ -106,8 +106,8 @@ class ODME(object):
         self.inner_convergence_crit = stop_crit[3]
 
         # Hyper-parameters for regularisation:
-        if alpha:
-            if alpha > 1 or alpha < 0:
+        if algorithm in ["reg_spiess"]:
+            if alpha is None or alpha > 1 or alpha < 0: # THIS CHECK SHOULD PROBABLY BE MORE ROBUST
                 raise ValueError("Hyper-parameter alpha should be between 0 and 1")
             self.alpha = alpha
             self.beta = 1 - alpha
@@ -120,6 +120,17 @@ class ODME(object):
         self.results = ODMEResults(self)
 
     # Utilities:
+    def estimate_alpha(self, alpha: float) -> float:
+        """
+        Estimates a starting hyper-paramater for regularised 
+        spiess given a number between 0-1.
+        
+        ONLY IMPLEMENTED FOR SINGLE CLASS!
+        """
+        demand_sum = np.sum(self.demand_matrices[0])
+        flow_sum = np.sum(self.count_volumes["obs_volume"])
+        return (alpha * flow_sum) / ((alpha * flow_sum) + ((1 - alpha) * demand_sum))
+
     def __get_norms(self, algo: str) -> Tuple[int, int]:
         """
         Sets the specifications for the objective function for the algorithm chosen.
