@@ -104,7 +104,7 @@ ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, Po
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
 
-cdef class RouteChoice:
+cdef class RouteChoiceSet:
     cdef:
         double [:] cost_view
         long long [:] graph_fs_view
@@ -115,9 +115,9 @@ cdef class RouteChoice:
         long long [:] ids_graph_view
         long long [:] compressed_link_ids
         long long num_nodes
-    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] scratch_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil
+    cdef void path_find(RouteChoiceSet self, long origin_index, long dest_index, double [:] scratch_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil
     cdef RouteSet_t *generate_route_set(
-        RouteChoice self,
+        RouteChoiceSet self,
         long origin_index,
         long dest_index,
         unsigned int max_routes,

@@ -8,9 +8,7 @@ import pandas as pd
 import numpy as np
 
 from aequilibrae import Graph, Project
-from aequilibrae.paths.route_choice import RouteChoice
-
-import time
+from aequilibrae.paths.route_choice import RouteChoiceSet
 
 from ...data import siouxfalls_project
 
@@ -35,7 +33,7 @@ class TestRouteChoice(TestCase):
         self.project.close()
 
     def test_route_choice(self):
-        rc = RouteChoice(self.graph)
+        rc = RouteChoiceSet(self.graph)
         a, b = 1, 20
 
         results = rc.run(a, b, max_routes=10, max_depth=0)
@@ -67,7 +65,7 @@ class TestRouteChoice(TestCase):
         )
 
     def test_route_choice_empty_path(self):
-        rc = RouteChoice(self.graph)
+        rc = RouteChoiceSet(self.graph)
         a = 1
 
         self.assertEqual(
@@ -76,13 +74,11 @@ class TestRouteChoice(TestCase):
 
     def test_route_choice_batched(self):
         np.random.seed(0)
-        rc = RouteChoice(self.graph)
+        rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
         results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
-
-        # breakpoint()
 
         self.assertEqual(len(results), len(nodes), "Requested number of route sets not returned")
 
@@ -91,7 +87,7 @@ class TestRouteChoice(TestCase):
             self.assertEqual(len(route_set), max_routes, f"Requested number of routes not returned for {od}")
 
     def test_route_choice_exceptions(self):
-        rc = RouteChoice(self.graph)
+        rc = RouteChoiceSet(self.graph)
         args = [
             (1, 20, 0, 0),
             (1, 20, -1, 0),

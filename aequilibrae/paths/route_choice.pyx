@@ -70,7 +70,7 @@ from typing import List, Tuple
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
 
-cdef class RouteChoice:
+cdef class RouteChoiceSet:
     """
     Route choice implemented via breadth first search with link removal (BFS-LE) as described in Rieser-Schüssler,
     Balmer, and Axhausen, 'Route Choice Sets for Very High-Resolution Data'
@@ -140,7 +140,7 @@ cdef class RouteChoice:
             for i in prange(c_ods.size()):
                 origin_index = self.nodes_to_indices_view[c_ods[i].first]
                 dest_index = self.nodes_to_indices_view[c_ods[i].second]
-                deref(results)[i] = RouteChoice.generate_route_set(
+                deref(results)[i] = RouteChoiceSet.generate_route_set(
                     self,
                     origin_index,
                     dest_index,
@@ -188,7 +188,7 @@ cdef class RouteChoice:
         df.set_geometry("geometry")
         df.to_file("test1.gpkg", layer='routes', driver="GPKG")
 
-    cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
+    cdef void path_find(RouteChoiceSet self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
         path_finding_a_star(
             origin_index,
             dest_index,
@@ -209,7 +209,7 @@ cdef class RouteChoice:
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
     cdef RouteSet_t *generate_route_set(
-        RouteChoice self,
+        RouteChoiceSet self,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -256,7 +256,7 @@ cdef class RouteChoice:
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoice.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn)
+                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn)
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)
