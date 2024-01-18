@@ -84,10 +84,10 @@ class TestODMEMultiClassSetUp(TestCase):
         self.moto_index = self.moto_graph.nodes_to_indices
         self.moto_dims = self.moto_matrix.matrix_view.shape
 
-        self.user_class_names = ["car", "motorcycle", "truck"]
-        self.user_classes = [self.carclass, self.motoclass, self.truckclass]
+        self.user_classes = self.assignment.classes
+        self.user_class_names = [user_class.__id__ for user_class in self.user_classes]
         self.user_class_dims = [self.car_dims, self.moto_dims, self.truck_dims]
-        self.matrices = [self.car_matrix, self.moto_matrix, self.truck_matrix]
+        self.matrices = [user_class.matrix for user_class in self.user_classes]
 
         # Currently testing algorithm:
         self.algorithm = "spiess"
