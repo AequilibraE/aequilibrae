@@ -1,4 +1,6 @@
 import copy
+import json
+import pandas as pd
 from pathlib import Path
 from tempfile import gettempdir, mkdtemp
 import geopandas as gpd
@@ -37,3 +39,49 @@ class TestOVMProcessor(TestCase):
         for i in range(0, len(link_gdf)):
             if i > 0:  
                 assert new_geom["geometry"][i] == shapely.LineString([node1, (148.7164585, -20.2730418), node2])
+        
+    def test_link_lanes(self):
+        """
+        segment and node infomation is currently [1] element of links when running from_ovm.py
+        """
+        simple = [{"direction": "backward"}, 
+                  {"direction": "forward"}]
+        
+        lane_1 = [{'direction': 'forward', 'restrictions': {'access': [{'allowed': {'when': {'mode': ['hov']}}}], 
+                                                            'minOccupancy': {'isAtLeast': 3}}}, 
+                  {'direction': 'forward'}, 
+                  {'direction': 'forward'}]
+        
+        def road(lane):
+            road_info = str({"class":"secondary",
+                "surface":"paved",
+                "restrictions":{"speedLimits":{"maxSpeed":[70,"km/h"]}},
+                "roadNames":{"common":[{"language":"local","value":"Shute Harbour Road"}]},
+                "lanes": lane})
+            return road_info
+        
+        segment = {'ovm_id': '8b9d0e128cd9fff-163FF6797FC40661', 'connectors': ['8f9d0e128cd9709-167FF64A37F1BFFB', '8f9d0e128cd98d6-15FFF68E65613FDF'], 'direction': None, 
+                   'link_type': 'secondary', 'name': 'Shute Harbour Road', 'speed':  '{"maxSpeed":[70,"km/h"]}', 'lanes': None, 'road': road(simple), 
+                   'geometry': shapely.LineString([(148.7245987, -20.2747175), (148.7246504, -20.2747531), (148.724688, -20.274802), (148.7247077, -20.2748593), (148.7247078, -20.2749195)])}
+        # print(segment)
+        o = OVMDownloader(["car"], self.pth)
+        a_node = {'ovm_id': '8f9d0e128cd9709-167FF64A37F1BFFB', 'geometry': shapely.Point(148.72460, -20.27472)}
+        b_node = {'ovm_id': '8f9d0e128cd98d6-15FFF68E65613FDF', 'geometry': shapely.Point(148.72471, -20.27492)}
+        node_df = gpd.GeoDataFrame(data=[a_node,b_node])
+        # print(node_df)
+
+        o.create_node_ids(node_df)
+
+        gdf = o.split_connectors(segment)
+        
+        print(gdf['direction'])
+
+        assert len(simple) == 2
+        assert len(simple) == 3
+        assert type(road(simple)) == str
+        assert type(gdf) == gpd.GeoDataFrame
+
+        assert len(lane_1) == 3
+        assert type(road(lane_1)) == str
+
+        
