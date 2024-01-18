@@ -287,7 +287,4 @@ cdef class RouteChoice:
         for banned in queue:
             del banned
 
-        # printf("Depth: %d\n", depth)
-        # printf("Routes: %zu\n", route_set.size())
-
         return route_set
