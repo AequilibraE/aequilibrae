@@ -131,6 +131,7 @@ html_theme_options = {
         "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
+    "navbar_align": "left",
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
