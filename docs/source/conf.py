@@ -54,15 +54,18 @@ else:
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "nbsphinx",
-    "sphinx_gallery.load_style",
-    "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
-    "sphinx_autodoc_annotation",
-    "sphinx.ext.autosummary",
+    "sphinx_gallery.gen_gallery",
+    "sphinx.ext.graphviz",
+    "nbsphinx",
     "sphinx_git",
     "sphinx_panels",
     "sphinx_copybutton"
@@ -70,17 +73,19 @@ extensions = [
 
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
+    "backreferences_dir": os.path.join("generated"),
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     'capture_repr': ('_repr_html_', '__repr__'),
     'remove_config_comments': True,
+    "doc_module": "sphinx_gallery",
     "subsection_order": ExplicitOrder(["examples/creating_models",
                                       "examples/editing_networks",
                                       "examples/trip_distribution",
                                       "examples/visualization",
                                       "examples/aequilibrae_without_a_model",
                                       "examples/full_workflows",
-                                      "examples/other_applications"])
+                                      "examples/other_applications"]),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -109,7 +114,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-# highlight_language = "none"
+highlight_language = "python3"
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -124,14 +129,17 @@ html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 
 html_theme_options = {
+    "navbar_center": ["navbar-nav"],
     "show_nav_level": 0,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
-    "navbar_end": ["theme-switcher", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
+    "navbar_start": ["navbar-logo", "version-switcher"],
     "switcher": {
         "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
     "navbar_align": "left",
+    "search_bar_text": "Search",
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
