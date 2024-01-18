@@ -105,6 +105,9 @@ cdef class RouteChoiceSet:
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
     def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
         cdef:
             vector[pair[long long, long long]] c_ods = ods
@@ -188,6 +191,7 @@ cdef class RouteChoiceSet:
         df.set_geometry("geometry")
         df.to_file("test1.gpkg", layer='routes', driver="GPKG")
 
+    @cython.initializedcheck(False)
     cdef void path_find(RouteChoiceSet self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
         path_finding_a_star(
             origin_index,
