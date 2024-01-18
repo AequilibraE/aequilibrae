@@ -31,18 +31,17 @@ ok and fast. This is only used to shuffle the queue.
 
 queue, next_queue: These are vectors of pointers to sets of removed links. We never need to push to the front of these so a
 vector is best. We maintain two queues, one that we are currently iterating over, and one that we can add to, building
-up with all the newly removed link sets. These two are swapped at the end of an iterator, next_queue is then
+up with all the newly removed link sets. These two are swapped at the end of an iteration, next_queue is then
 cleared. These store sets of removed links.
 
 banned, next_banned: `banned` is the iterator variable for `queue`. `banned` is copied into `next_banned` where another
 link can be added without mutating `banned`. If we've already seen this set of removed links `next_banned` is immediately
 deallocated. Otherwise it's placed into `next_queue`.
 
-vec: `vec` is a scratch variable to store pointers to new vectors, or paths while we are building them. Each time a path
+vec: `vec` is a scratch variable to store pointers to new vectors, or rather, paths while we are building them. Each time a path
 is found a new one is allocated, built, and stored in the route_set.
 
 p, connector: Scratch variables for iteration.
-
 
 Optimisations: As described in the paper, both optimisations have been implemented. The path finding operates on the
 compressed graph and the queue is shuffled if its possible to fill the route set that iteration. The route set may not
@@ -164,6 +163,30 @@ cdef class RouteChoice:
 
         del results
         return dict(zip(ods, res))
+
+    def _generate_line_strins(self, project, graph, results):
+        """Debug method"""
+        import geopandas as gpd
+        import shapely
+
+        links = project.network.links.data.set_index("link_id")
+        df = []
+        for od, route_set in results.items():
+            for route in route_set:
+                df.append(
+                    (
+                        *od,
+                        shapely.MultiLineString(
+                            links.loc[
+                                graph.graph[graph.graph.__compressed_id__.isin(route)].link_id
+                            ].geometry.to_list()
+                        ),
+                    )
+                )
+
+        df = gpd.GeoDataFrame(df, columns=["origin", "destination", "geometry"])
+        df.set_geometry("geometry")
+        df.to_file("test1.gpkg", layer='routes', driver="GPKG")
 
     cdef void path_find(RouteChoice self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
         path_finding_a_star(
