@@ -12,18 +12,18 @@ from aequilibrae.paths.route_choice import RouteChoice
 
 import time
 
-# from ...data import siouxfalls_project
+from ...data import siouxfalls_project
 
 
+# In these tests `max_depth` should be provided to prevent a runaway test case and just burning CI time
 class TestRouteChoice(TestCase):
     def setUp(self) -> None:
-        # os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
-        # proj_path = os.path.join(gettempdir(), "test_route_choice" + uuid.uuid4().hex)
-        # os.mkdir(proj_path)
-        # zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
+        proj_path = os.path.join(gettempdir(), "test_route_choice" + uuid.uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
 
-        proj_path = "/home/jake/Software/aequilibrae_performance_tests/models/Arkansas/"
         self.project = Project()
         self.project.open(proj_path)
         self.project.network.build_graphs(fields=["distance"], modes=["c"])
@@ -34,82 +34,73 @@ class TestRouteChoice(TestCase):
     def tearDown(self) -> None:
         self.project.close()
 
-    # def test_route_choice(self):
-    #     rc = RouteChoice(self.graph)
+    def test_route_choice(self):
+        rc = RouteChoice(self.graph)
+        a, b = 1, 20
 
-    #     results = rc.run(220591, 352, max_routes=1000, max_depth=0)
-    #     # print(*results, sep="\n")
-    #     print(len(results), len(set(results)))
-    #     self.assertEqual(len(results), len(set(results)))
+        results = rc.run(a, b, max_routes=10, max_depth=0)
+        self.assertEqual(len(results), 10, "Returned more routes than expected")
+        self.assertEqual(len(results), len(set(results)), "Returned duplicate routes")
 
-    #     import shapely
+        # With a depth 1 only one path will be found
+        results = rc.run(a, b, max_routes=0, max_depth=1)
+        self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
+        self.assertListEqual(results, [(58, 52, 29, 24, 12, 8, 5, 1)], "Initial route isn't the shortest A* route")
 
-    #     links = self.project.network.links.data.set_index("link_id")
-    #     df = []
-    #     for route in results:
-    #         df.append(
-    #             (
-    #                 route,
-    #                 shapely.MultiLineString(
-    #                     links.loc[
-    #                         self.graph.graph[self.graph.graph.__compressed_id__.isin(route)].link_id
-    #                     ].geometry.to_list()
-    #                 ).wkt,
-    #             )
-    #         )
+        # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
+        results2 = rc.run(a, b, max_routes=0, max_depth=2)
+        self.assertEqual(
+            len(results2), 1 + len(results[0]) - 4, "Depth of 2 didn't yield the expected number of routes"
+        )
+        self.assertTrue(results[0] in results2, "Initial route isn't present in a lower depth")
 
-    #     df = pd.DataFrame(df, columns=["route", "geometry"])
-    #     df.to_csv("test1.csv")
+        self.assertListEqual(
+            rc.run(a, b, max_routes=0, max_depth=2, seed=0),
+            rc.run(a, b, max_routes=0, max_depth=2, seed=10),
+            "Seeded and unseeded results differ with unlimited `max_routes` (queue is incorrectly being shuffled)",
+        )
 
-    #     # breakpoint()
+        self.assertNotEqual(
+            rc.run(a, b, max_routes=3, max_depth=2, seed=0),
+            rc.run(a, b, max_routes=3, max_depth=2, seed=10),
+            "Seeded and unseeded results don't differ with limited `max_routes` (queue is not being shuffled)",
+        )
+
+    def test_route_choice_empty_path(self):
+        rc = RouteChoice(self.graph)
+        a = 1
+
+        self.assertEqual(
+            rc.batched([(a, a)], max_routes=0, max_depth=3), {(a, a): []}, "Route set from self to self should be empty"
+        )
 
     def test_route_choice_batched(self):
-        rc = RouteChoice(self.graph)
-
-        # breakpoint()
-        # results =
         np.random.seed(0)
-        n = 1000
-        cores = 4
+        rc = RouteChoice(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
-        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(n, 2), replace=False)]
-
-        t = time.time()
-        results = rc.batched(nodes, max_routes=20, max_depth=0, cores=cores)
-        end = time.time() - t
-        print("Time:", end, "per:", end / n)
+        max_routes = 20
+        results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
 
         # breakpoint()
+
+        self.assertEqual(len(results), len(nodes), "Requested number of route sets not returned")
 
         for od, route_set in results.items():
-            self.assertEqual(len(route_set), len(set(route_set)))
+            self.assertEqual(len(route_set), len(set(route_set)), f"Duplicate routes returned for {od}")
+            self.assertEqual(len(route_set), max_routes, f"Requested number of routes not returned for {od}")
 
-        # import geopandas as gpd
-        # import shapely
+    def test_route_choice_exceptions(self):
+        rc = RouteChoice(self.graph)
+        args = [
+            (1, 20, 0, 0),
+            (1, 20, -1, 0),
+            (1, 20, 0, -1),
+            (0, 20, 1, 1),
+            (1, 0, 1, 1),
+        ]
 
-        # links = self.project.network.links.data.set_index("link_id")
-        # df = []
-        # for od, route_set in results.items():
-        #     for route in route_set:
-        #         df.append(
-        #             (
-        #                 *od,
-        #                 shapely.MultiLineString(
-        #                     links.loc[
-        #                         self.graph.graph[self.graph.graph.__compressed_id__.isin(route)].link_id
-        #                     ].geometry.to_list()
-        #                 ),
-        #             )
-        #         )
-
-        # df = gpd.GeoDataFrame(df, columns=["origin", "destination", "geometry"])
-        # df.set_geometry("geometry")
-        # df.to_file("test1.gpkg", layer='routes', driver="GPKG")
-
-        # breakpoint()
-        assert False
-
-if __name__ == "__main__":
-    t = TestRouteChoice()
-    t.setUp()
-    t.test_route_choice()
+        for a, b, max_routes, max_depth in args:
+            with self.subTest(a=a, b=b, max_routes=max_routes, max_depth=max_depth):
+                with self.assertRaises(ValueError):
+                    rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
