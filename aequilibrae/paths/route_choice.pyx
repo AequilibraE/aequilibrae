@@ -110,33 +110,10 @@ cdef class RouteChoice:
         """
         pass
 
-    def run(self, long origin, long destination, unsigned int max_routes=0, unsigned int max_depth=0, unsigned int seed=0):
-        cdef:
-            long origin_index = self.nodes_to_indices_view[origin]
-            long dest_index = self.nodes_to_indices_view[destination]
-            double [:] scratch_cost = np.empty(self.cost_view.shape[0])  # allocation of new memory view required gil
-            long long [:] scratch_predecessor = np.empty(self.num_nodes + 1, dtype=np.int64)
-            long long [:] scratch_conn = np.empty(self.num_nodes + 1, dtype=np.int64)
-            RouteSet_t *results
+    def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0):
+        return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed)[(origin, destination)]
 
-        if origin_index == -1:
-            raise ValueError(f"Origin {origin} is not present within the compact graph")
-        if dest_index == -1:
-            raise ValueError(f"Destination {destination} is not present within the compact graph")
-        print(origin_index, dest_index)
-        assert False
-
-        with nogil:
-            results = RouteChoice.generate_route_set(self, origin_index, dest_index, max_routes, max_depth, scratch_cost, scratch_predecessor, scratch_conn, seed)
-
-        res = []
-        for x in deref(results):
-            res.append(tuple(deref(x)))
-            del x
-
-        return res
-
-    def batched(self, ods: List[Tuple[int, int]], unsigned int max_routes=0, unsigned int max_depth=0, unsigned int seed=0, unsigned int cores=1):
+    def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
         cdef:
             vector[pair[long long, long long]] c_ods = ods
 
@@ -150,7 +127,25 @@ cdef class RouteChoice:
             long dest_index
             long long i
 
-        with nogil, parallel(num_threads=cores):
+        if max_routes == 0 and max_depth == 0:
+            raise ValueError("Either `max_routes` or `max_depth` must be >= 0")
+
+        if max_routes < 0 or max_depth < 0 or cores < 0:
+            raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
+
+        for o, d in ods:
+            if self.nodes_to_indices_view[o] == -1:
+                raise ValueError(f"Origin {o} is not present within the compact graph")
+            if self.nodes_to_indices_view[d] == -1:
+                raise ValueError(f"Destination {d} is not present within the compact graph")
+
+        cdef:
+            unsigned int c_max_routes = max_routes
+            unsigned int c_max_depth = max_depth
+            unsigned int c_seed = seed
+            unsigned int c_cores = cores
+
+        with nogil, parallel(num_threads=c_cores):
             for i in prange(c_ods.size()):
                 origin_index = self.nodes_to_indices_view[c_ods[i].first]
                 dest_index = self.nodes_to_indices_view[c_ods[i].second]
@@ -158,12 +153,12 @@ cdef class RouteChoice:
                     self,
                     origin_index,
                     dest_index,
-                    max_routes,
-                    max_depth,
+                    c_max_routes,
+                    c_max_depth,
                     cost_matrix[threadid()],
                     predecessors_matrix[threadid()],
                     conn_matrix[threadid()],
-                    seed
+                    c_seed
                 )
 
         # Build results into python objects using Cythons auto-conversion from vector[long long] to list then to tuple (for set operations)
