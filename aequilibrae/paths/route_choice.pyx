@@ -89,6 +89,7 @@ cdef class RouteChoice:
 
     def __cinit__(self):
         """C level init. For C memory allocation and initialisation. Called exactly once per object."""
+        pass
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
@@ -113,6 +114,8 @@ cdef class RouteChoice:
     def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0):
         return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed)[(origin, destination)]
 
+    # Bounds checking doesn't really need to be disabled here but the warning is annoying
+    @cython.boundscheck(False)
     def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
         cdef:
             vector[pair[long long, long long]] c_ods = ods
@@ -123,9 +126,7 @@ cdef class RouteChoice:
             long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
 
             vector[RouteSet_t *] *results = new vector[RouteSet_t *](len(ods))
-            long origin_index
-            long dest_index
-            long long i
+            long long origin_index, dest_index, i
 
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be >= 0")
@@ -133,17 +134,18 @@ cdef class RouteChoice:
         if max_routes < 0 or max_depth < 0 or cores < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
-        for o, d in ods:
-            if self.nodes_to_indices_view[o] == -1:
-                raise ValueError(f"Origin {o} is not present within the compact graph")
-            if self.nodes_to_indices_view[d] == -1:
-                raise ValueError(f"Destination {d} is not present within the compact graph")
-
         cdef:
             unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
             unsigned int c_seed = seed
             unsigned int c_cores = cores
+            long long o, d
+
+        for o, d in ods:
+            if self.nodes_to_indices_view[o] == -1:
+                raise ValueError(f"Origin {o} is not present within the compact graph")
+            if self.nodes_to_indices_view[d] == -1:
+                raise ValueError(f"Destination {d} is not present within the compact graph")
 
         with nogil, parallel(num_threads=c_cores):
             for i in prange(c_ods.size()):
