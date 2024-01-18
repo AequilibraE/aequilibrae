@@ -72,6 +72,21 @@ class TestRouteChoice(TestCase):
             rc.batched([(a, a)], max_routes=0, max_depth=3), {(a, a): []}, "Route set from self to self should be empty"
         )
 
+    def test_route_choice_blocking_centroids(self):
+        a, b = 1, 20
+
+        self.graph.set_blocked_centroid_flows(False)
+        rc = RouteChoiceSet(self.graph)
+
+        results = rc.run(a, b, max_routes=2, max_depth=2)
+        self.assertNotEqual(results, [], "Unblocked centroid flow found no paths")
+
+        self.graph.set_blocked_centroid_flows(True)
+        rc = RouteChoiceSet(self.graph)
+
+        results = rc.run(a, b, max_routes=2, max_depth=2)
+        self.assertListEqual(results, [], "Blocked centroid flow found a path")
+
     def test_route_choice_batched(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)

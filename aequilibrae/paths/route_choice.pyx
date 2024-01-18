@@ -70,6 +70,7 @@ from typing import List, Tuple
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
 
+@cython.embedsignature(True)
 cdef class RouteChoiceSet:
     """
     Route choice implemented via breadth first search with link removal (BFS-LE) as described in Rieser-Schüssler,
@@ -92,6 +93,8 @@ cdef class RouteChoiceSet:
         self.lon_view = tmp.lon.values
         self.ids_graph_view = graph.compact_graph.id.values
         self.num_nodes = graph.compact_num_nodes
+        self.zones = graph.num_zones
+        self.block_flows_through_centroids = graph.block_centroid_flows
 
     def __dealloc__(self):
         """
@@ -100,7 +103,27 @@ cdef class RouteChoiceSet:
         """
         pass
 
+    @cython.embedsignature(True)
     def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0):
+        """
+        Compute the a route set for a single OD pair.
+
+        Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
+        unique possible paths have been found then a smaller set will be returned.
+
+        Thin wrapper around ``RouteChoiceSet.batched``.
+
+        :Arguments:
+            **origin** (:obj:`int`): Origin node ID. Must be present within compact graph. Recommended to choose a centroid.
+            **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to choose a centroid.
+            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
+            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
+            **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
+
+        :Returns:
+            **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
+                                                         Represents paths from ``origin`` to ``destination``.
+        """
         return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed)[(origin, destination)]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
@@ -109,6 +132,25 @@ cdef class RouteChoiceSet:
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
     def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
+        """
+        Compute the a route set for a list of OD pairs.
+
+        Often the returned list for each OD pair's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
+        unique possible paths have been found then a smaller set will be returned.
+
+        :Arguments:
+            **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination node ID must be
+                                                    present within compact graph. Recommended to choose a centroids.
+            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
+            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
+            **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
+            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``1``.
+
+        :Returns:
+            **route sets** (:obj:`dict[tuple[int, int], list[tuple[int, ...]]]`): Returns a list of unique tuples of compact link IDs for
+                                                                                 each OD pair provided (as keys). Represents paths from
+                                                                                 ``origin`` to ``destination``.
+        """
         cdef:
             vector[pair[long long, long long]] c_ods = ods
 
@@ -116,6 +158,7 @@ cdef class RouteChoiceSet:
             double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)
             long long [:, :] predecessors_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
             long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (cores, self.b_nodes_view.shape[0])).copy()
 
             vector[RouteSet_t *] *results = new vector[RouteSet_t *](len(ods))
             long long origin_index, dest_index, i
@@ -143,6 +186,17 @@ cdef class RouteChoiceSet:
             for i in prange(c_ods.size()):
                 origin_index = self.nodes_to_indices_view[c_ods[i].first]
                 dest_index = self.nodes_to_indices_view[c_ods[i].second]
+
+                if self.block_flows_through_centroids:
+                    blocking_centroid_flows(
+                        0,  # Always blocking
+                        origin_index,
+                        self.zones,
+                        self.graph_fs_view,
+                        b_nodes_matrix[threadid()],
+                        self.b_nodes_view,
+                    )
+
                 deref(results)[i] = RouteChoiceSet.generate_route_set(
                     self,
                     origin_index,
@@ -152,8 +206,19 @@ cdef class RouteChoiceSet:
                     cost_matrix[threadid()],
                     predecessors_matrix[threadid()],
                     conn_matrix[threadid()],
-                    c_seed
+                    b_nodes_matrix[threadid()],
+                    c_seed,
                 )
+
+                if self.block_flows_through_centroids:
+                    blocking_centroid_flows(
+                        1,  # Always unblocking
+                        origin_index,
+                        self.zones,
+                        self.graph_fs_view,
+                        b_nodes_matrix[threadid()],
+                        self.b_nodes_view,
+                    )
 
         # Build results into python objects using Cythons auto-conversion from vector[long long] to list then to tuple (for set operations)
         res = []
@@ -192,12 +257,21 @@ cdef class RouteChoiceSet:
         df.to_file("test1.gpkg", layer='routes', driver="GPKG")
 
     @cython.initializedcheck(False)
-    cdef void path_find(RouteChoiceSet self, long origin_index, long dest_index, double [:] thread_cost, long long [:] thread_predecessors, long long [:] thread_conn) noexcept nogil:
+    cdef void path_find(
+        RouteChoiceSet self,
+        long origin_index,
+        long dest_index,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        long long [:] thread_b_nodes
+    ) noexcept nogil:
+        """Small wrapper around path finding, thread locals should be passes as arguments."""
         path_finding_a_star(
             origin_index,
             dest_index,
             thread_cost,
-            self.b_nodes_view,
+            thread_b_nodes,
             self.graph_fs_view,
             self.nodes_to_indices_view,
             self.lat_view,
@@ -221,6 +295,7 @@ cdef class RouteChoiceSet:
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
+        long long [:] thread_b_nodes,
         unsigned int seed
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
@@ -260,7 +335,7 @@ cdef class RouteChoiceSet:
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn)
+                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes)
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)
