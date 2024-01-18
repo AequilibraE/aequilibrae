@@ -126,6 +126,7 @@ class OVMDownloader(WorkerThread):
                 CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                 CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
                 CAST(road AS JSON) ->>'lanes' AS lanes,
+                road,
                 geometry
             FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
             WHERE bbox.minx > '{bbox[0]}'
@@ -167,6 +168,8 @@ class OVMDownloader(WorkerThread):
         # print(gdf_link['speed'])
         # gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
         gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
+        print(f"type of speed: {type(gdf_link['speed'][1])}")
+        print(gdf_link['speed'][1])
         
         gdf_node['node_id'] = self.create_node_ids(gdf_node)
         gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
@@ -224,8 +227,7 @@ class OVMDownloader(WorkerThread):
             # No common nodes found
             raise ValueError("No common nodes.")
 
-
-        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
+        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'road', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
         final_result = final_result[link_order]
 
         final_result.to_parquet(output_file_link)
@@ -347,13 +349,17 @@ class OVMDownloader(WorkerThread):
     
     # Function to process each row and create a new GeoDataFrame
     def split_connectors(self, row):
-        # Extract necessary information from the row        
+        # Extract necessary information from the row   
+        print(type(row))     
         connectors = row['connectors']
+        print(self.nodes)
 
         # Check if 'Connectors' has more than 2 elements
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
-            
+            direction_dict = {'forward': 1, 'backward': -1, 'bothWays': 0, None: [1, -1],
+                              'alternating': 'Travel is one-way and changes between forward and backward constantly', 
+                              'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
 
             rows = []
             for i in range(len(connectors) - 1):
@@ -363,10 +369,10 @@ class OVMDownloader(WorkerThread):
                 # print(self.get_speed(row['speed']))
                 # print(type(self.get_speed(row['speed'])))
                 # print()
+                print(row['direction'])
                 new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
-                            'direction': row['direction'], 'link_type': row['link_type'], 'name': row['name'], 
-                            'speed': self.get_speed(row['speed']), 'ovm_id': row['ovm_id'], 'geometry': row['geometry'], 'lanes': row['lanes'],
-                            'restrictions': row['speed']}
+                            'direction': direction_dict[row['direction']], 'link_type': row['link_type'], 'road': row['road'], 'name': row['name'], 'speed': self.get_speed(row['speed']), 
+                            'ovm_id': row['ovm_id'], 'geometry': row['geometry'], 'lanes': len(row['direction']) if row['direction'] is not None else 2, 'restrictions': row['speed']}
                 rows.append(new_row)
             processed_df = gpd.GeoDataFrame(rows)
         else:
@@ -374,14 +380,15 @@ class OVMDownloader(WorkerThread):
         return processed_df
 
     def get_speed(self, speed_row):
-        new_list = []
-        
+        """
+        This function returns the speed of a road, if they have multiple speeds listed it will total the speeds listed by the proportions of the road they makeup.
+        """
         if speed_row == None:
-            new_list.append(speed_row)
+            adjusted_speed = speed_row
         else:
             speed = json.loads(speed_row)
             if type(speed) == dict:
-                new_list.append(speed['maxSpeed'][0])
+                adjusted_speed = speed['maxSpeed'][0]
             elif type(speed) == list and len(speed) >= 1:
                 # Extract the 'at' list from each dictionary
                 # eg [[0.0, 0.064320774], [0.064320774, 1.0]]
@@ -393,32 +400,14 @@ class OVMDownloader(WorkerThread):
                 # eg [0.064320774, 0.935679226]
                 differences = [diff for at in at_values_list for diff in (at[i + 1] - at[i] for i in range(len(at) - 1))]
                 
-                # Create a dictionary with keys as flat_differences and values as at_values_list
-                result_dict = dict(zip(differences, at_values_list))
-        
-                max_difference = max(differences)
-
-                if max_difference >= 0.7:
+                new_list = []
+                for element in differences:
                     # Find the index of the value in the differences list
-                    index = differences.index(max_difference)
+                    index_d = differences.index(element)
 
                     # Access the corresponding entry in the original 'data' list to access the 'maxSpeed' value
-                    max_speed = speed[index]['maxSpeed'][0]
-
-                    new_list.append(max_speed)
-                else:
-                    # print('split')
-                    # print(speed)
-                    for element in differences:
-                        # Find the index of the value in the differences list
-                        index_d = differences.index(element)
-
-                        # Access the corresponding entry in the original 'data' list to access the 'maxSpeed' value
-                        max_speed = speed[index_d]['maxSpeed'][0]
-                        new_list.append(max_speed)
-
+                    speed_segment = speed[index_d]['maxSpeed'][0] * element
+                    new_list.append(speed_segment)
                 
-        # gdf = gpd.GeoDataFrame(new_list)
-        # print(type(gdf))
-        # print(gdf)
-        return new_list
+                adjusted_speed = round(sum(new_list),2)
+        return adjusted_speed
