@@ -129,7 +129,7 @@ class ODME(object):
         """
         demand_sum = np.sum(self.demand_matrices[0])
         flow_sum = np.sum(self.count_volumes["obs_volume"])
-        return (alpha * flow_sum) / ((alpha * flow_sum) + ((1 - alpha) * demand_sum))
+        return (alpha * demand_sum) / ((alpha * flow_sum) + ((1 - alpha) * demand_sum))
 
     def __get_norms(self, algo: str) -> Tuple[int, int]:
         """
