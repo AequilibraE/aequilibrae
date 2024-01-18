@@ -160,11 +160,11 @@ class ScalingFactors(object):
         derivatives = []
         # Create a derivative matrix for each user class:
         for i, user_class in enumerate(self.class_names):
-            observed = self._count_volumes[self._count_volumes['class'] == user_class]
+            observed = self._count_volumes[self._count_volumes['class'] == user_class].reset_index(drop=True)
             factors = np.empty((len(observed), *(self._demand_dims[i])))
-            for i, row in observed.iterrows():
+            for j, row in observed.iterrows():
                 sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
-                factors[i, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
+                factors[j, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
 
             # Add derivative matrix to list of derivatives:
             derivatives.append(np.sum(factors, axis=0))
@@ -219,7 +219,7 @@ class ScalingFactors(object):
 
         NOTE - THINK ABOUT RENAMING FOR CONSISTENCY
         """
-        class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
+        class_counts = self._count_volumes[self._count_volumes['class'] == user_class].reset_index(drop=True)
         demand = self.demand_matrices[self.names_to_indices[user_class]]
 
         # Calculating link flow derivatives:
