@@ -1,82 +1,72 @@
 # cython: language_level=3str
-# distutils: define_macros=CYTHON_TRACE_NOGIL=1
 
-"""This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen,
-'Route Choice Sets for Very High-Resolution Data'.
+"""This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
+Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
 
 A rough overview of the algorithm is as follows.
     1. Prepare the initial graph, this is depth 0 with no links removed.
-    2. Find a short path, P. If P is empty stop, else add P to the path set.
+    2. Find a short path, P. If P is not empty add P to the path set.
     3. For all links p in P, remove p from E, compounding with the previously removed links.
     4. De-duplicate the sub-graphs, we only care about unique sub-graphs.
     5. Go to 2.
 
-Thoughts:
+Details: The general idea of the algorithm is pretty simple, as is the implementation. The caveats here is that there is
+a lot of cpp interop and memory management. A description of the purpose of variables is in order:
 
-    - Path set: One issue is that the path set can't be stored as a simple sub-graph. This is because it is the union of
-      multiple paths. The union of two partially separate paths may create paths that are no in the paths
-      themselves. Instead I believe we can store the paths as (compressed) tries, operating on the common prefix
-      links/nodes. Each branch in the trie would encode a branch in the choice of route. This has the benefit of being
-      very small to store and iterating over all choices is some traversal of the tree. Downsides of this are, insertion
-      and search scale with the length of the paths. Each lookup requires a linear time search of the existing tree. As
-      each link in the path is removed the number of branches scales with the length of the path times the degree of the
-      vertices.
+route_set: See route_choice.pxd for full type signature. It's an unordered set (hash set) of pointers to vectors of link
+IDs. It uses a custom hashing function and comparator. The hashing function is defined in a string that in inlined
+directly into the output ccp. This is done allow declaring an the `()` operator, which is required and AFAIK not
+possible in Cython. The hash is designed to dereference then hash order dependent vectors. One isn't provided by
+stdlib. The comparator simply dereferences the pointer and uses the vector comparator. It's designed to store the
+outputted paths. Heap allocated (needs to be returned).
 
-      Another option is hash maps, just throw hash maps at it. Upsides of this is they are much more generic, no special
-      methods required and we'll likely be able to use something off the shelf. Downsides are that their performance is
-      largely dependent on the hash function. We'll need to use the set of removed edges as the key, which the path as
-      the value. This means we can't compress the paths. Choosing a good hash function may be tough, because link/node
-      ids can be arbitrarily large we'll have to consider overflows, though an non-naive function should handle this
-      fine. We'll also want to avoid modulo, Wikipedia says using a multiply-shift scheme with a Mersenne prime like
-      2^61 - 1 should work well. Although we have variable length paths, fixed length vector hashing can be applied and
-      padded to blocks of our paths.
+removed_links: See route_choice.pxd for full type signature. It's an unordered set of pointers to unordered sets of link
+IDs. Similarly to `route_set` is uses a custom hash function and comparator. This hash function is designed to be order
+independent and should only use commutative operations. The comparator is the same. It's designed to store all of the
+removed link sets we've seen before. This allows us to detected duplicated graphs.
 
-    - Removed link set: This set suffers from the similar issues as the path set as order doesn't matter. I think a hash
-      or tree set is about the only way to go about this. Since order doesn't matter a trie doesn't make sense but a
-      tree set using sorted node/link ids could work.
+rng: A custom imported version of std::linear_congruential_engine. libcpp doesn't provide one so we do. It should be
+significantly faster than the std::mersenne_twister_engine without sacrificing much. We don't need amazing RNG, just
+ok and fast. This is only used to shuffle the queue.
 
-      Another option is a bit map. For a million link network, the bitmap would "only" be 125kB. Membership checks and
-      addition and removal from this set would be incredibly fast, faster than anything else, however comparison may
-      suffer. We could hash this bitmap but if we're hashing it we might as well just hash the removal set.
+queue, next_queue: These are vectors of pointers to sets of removed links. We never need to push to the front of these so a
+vector is best. We maintain two queues, one that we are currently iterating over, and one that we can add to, building
+up with all the newly removed link sets. These two are swapped at the end of an iterator, next_queue is then
+cleared. These store sets of removed links.
 
-      We could also nest the hash sets, essentially building up a hash set of previously seen hashes.
+banned, next_banned: `banned` is the iterator variable for `queue`. `banned` is copied into `next_banned` where another
+link can be added without mutating `banned`. If we've already seen this set of removed links `next_banned` is immediately
+deallocated. Otherwise it's placed into `next_queue`.
 
-    - Hash functions: We're looking for a "incremental (multi)set hash function", because we don't need it to be secure
-      at all some commutative binary operation should work e.g. +, *, ^. Whether or not they make good hash functions
-      remains to be seen.
+vec: `vec` is a scratch variable to store pointers to new vectors, or paths while we are building them. Each time a path
+is found a new one is allocated, built, and stored in the route_set.
 
-    - Graph modification: Actually removing a link from the graph would require modification of the existing
-      methods. Instead we can just require that the cost of a like is float or double and set it to INFINITY, that way
-      the algorithms will never consider the link as viable.
+p, connector: Scratch variables for iteration.
 
-Current front runner: Suffix trie of (reversed) paths, each node will store a pointer to the parent node allowing
-traversal up the tree to reconstruct the path.
-Removed link set stored as a sorted prefix trie of sorts. Haven't flushed out the full idea for this but I think it
-could work. Each node would store a pointer to a node in the route set tree that represents the path found with that
-set of removed links.
 
-Current implementation: Hash maps, hash sets, and whatever it took to get something working. Implementation is naive
-and inefficient, data is copied all over the place.
+Optimisations: As described in the paper, both optimisations have been implemented. The path finding operates on the
+compressed graph and the queue is shuffled if its possible to fill the route set that iteration. The route set may not
+be filled due to duplicate paths but we can't know that in advance so we shuffle anyway.
+
+Any further optimisations should focus on the path finding, from benchmarks it dominates the run time (~98%). Since huge
+routes aren't required small-ish things like the memcpy and banned link set copy aren't high priority.
 
 """
 
-from aequilibrae.paths.results import PathResults
 from aequilibrae import Graph
-import numpy as np
-from typing import List, Tuple
 
 from libc.math cimport INFINITY
 from libc.string cimport memcpy
-from libc.stdio cimport printf
 from libc.limits cimport UINT_MAX
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from cython.operator cimport dereference as deref, preincrement as inc
+from cython.operator cimport dereference as deref
 from cython.parallel cimport parallel, prange, threadid
 
 import numpy as np
+from typing import List, Tuple
 
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
@@ -121,7 +111,7 @@ cdef class RouteChoice:
             vector[pair[long long, long long]] c_ods = ods
 
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
-            double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)  # allocation of new memory view required gil
+            double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)
             long long [:, :] predecessors_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
             long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
 
@@ -206,7 +196,7 @@ cdef class RouteChoice:
         long long [:] thread_conn,
         unsigned int seed
     ) noexcept nogil:
-        """Main method for route set generation"""
+        """Main method for route set generation. See top of file for commentary."""
         cdef:
             RouteSet_t *route_set
             LinkSet_t removed_links
@@ -261,7 +251,7 @@ cdef class RouteChoice:
                     for connector in deref(vec):
                         # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
                         # then add a single element. An incremental set hash function could be of use. However, the since of this set is
-                        # directly dependent on the current depth. As the route set size grows so incredibly fast the depth will rarely get
+                        # directly dependent on the current depth and as the route set size grows so incredibly fast the depth will rarely get
                         # high enough for this to matter.
                         # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
                         new_banned = new unordered_set[long long](deref(banned))
@@ -282,6 +272,10 @@ cdef class RouteChoice:
 
         # We may have added more banned link sets to the queue then found out we hit the max depth, we should free those
         for banned in queue:
+            del banned
+
+        # We should also free all the sets in removed_links, we don't be needing them
+        for banned in removed_links:
             del banned
 
         return route_set
