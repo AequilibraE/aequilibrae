@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.AoN import build_compressed_graph
+from aequilibrae.paths.graph_building import build_compressed_graph
 
 from aequilibrae.context import get_logger
 
