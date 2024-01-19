@@ -43,7 +43,8 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
-        algorithm="spiess" # currently defaults to spiess
+        algorithm="spiess", # currently defaults to spiess
+        verbose:bool =False # For printing as we go
     ):
         """
         For now see description in pdf file in SMP internship team folder
@@ -119,6 +120,9 @@ class ODME(object):
         # RESULTS & STATISTICS (NEW VERSION)
         self.results = ODMEResults(self)
 
+        # For printing ongoing state
+        self._verbose = verbose
+
     # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
         """
@@ -157,7 +161,6 @@ class ODME(object):
                 }
             )
 
-    # NOTE - THIS FUNCTION DOESN'T DEPEND ON self - SHOULD I MAKE IT A CLASS FUNCTION?
     @staticmethod
     def get_sl_key(row: pd.Series) -> str:
         """
@@ -245,18 +248,6 @@ class ODME(object):
         """
         Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
         """
-        # Get cumulative factors for each demand matrix
-        # cumulative_factors = []
-        # for i, demand_matrix in enumerate(self.demand_matrices):
-        #     factors = np.nan_to_num(demand_matrix / self.init_demand_matrices[i], nan=1)
-        #     cumulative_factors.append(
-        #         pd.DataFrame({
-        #             "class": [self.class_names[i] for _ in range(demand_matrix.size)],
-        #             "Factors": factors.ravel()
-        #         })
-        #     )
-
-        # return pd.concat(cumulative_factors, ignore_index=True)
         return self.results.get_cumulative_factors()
 
     def get_all_statistics(self) -> pd.DataFrame:
@@ -304,6 +295,9 @@ class ODME(object):
                 inner += 1
                 self.__execute_inner_iter()
                 self.results.log_iter(ODMEResults.INNER)
+            
+            if self._verbose:
+                print(f"Outer iteration {outer} is complete.")
 
             # Reassign values at the end of each outer loop
             self.__perform_assignment()
