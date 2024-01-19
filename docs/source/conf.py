@@ -64,21 +64,16 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx_gallery.gen_gallery",
-    "sphinx.ext.graphviz",
-    "nbsphinx",
-    "sphinx_git",
-    "sphinx_panels",
+    "sphinx_design",
     "sphinx_copybutton"
 ]
 
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
-    "backreferences_dir": os.path.join("generated"),
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
     'capture_repr': ('_repr_html_', '__repr__'),
     'remove_config_comments': True,
-    "doc_module": "sphinx_gallery",
     "subsection_order": ExplicitOrder(["examples/creating_models",
                                       "examples/editing_networks",
                                       "examples/trip_distribution",
