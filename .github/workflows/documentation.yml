@@ -27,7 +27,6 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
-        python -m pip install sphinx-gallery --user
         sudo apt update
         sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
