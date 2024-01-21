@@ -125,7 +125,6 @@ class OVMDownloader(WorkerThread):
                 CAST(road AS JSON) ->>'class' AS link_type,
                 CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                 CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
-                CAST(road AS JSON) ->>'lanes' AS lanes,
                 road,
                 geometry
             FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
@@ -165,11 +164,8 @@ class OVMDownloader(WorkerThread):
         gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
 
         # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
-        # print(gdf_link['speed'])
         # gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
         gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
-        print(f"type of speed: {type(gdf_link['speed'][1])}")
-        print(gdf_link['speed'][1])
         
         gdf_node['node_id'] = self.create_node_ids(gdf_node)
         gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
@@ -181,7 +177,6 @@ class OVMDownloader(WorkerThread):
         # print(self.get_speed(gdf_link)['speed'])
         # print()
         for index, row in gdf_link.iterrows():
-            # print(index)
             # Process each row and append the resulting GeoDataFrame to the list
             processed_df = self.split_connectors(row)
 
@@ -227,7 +222,7 @@ class OVMDownloader(WorkerThread):
             # No common nodes found
             raise ValueError("No common nodes.")
 
-        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'road', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes', 'geometry']
+        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'road', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes_ab', 'lanes_ba', 'geometry']
         final_result = final_result[link_order]
 
         final_result.to_parquet(output_file_link)
@@ -349,30 +344,27 @@ class OVMDownloader(WorkerThread):
     
     # Function to process each row and create a new GeoDataFrame
     def split_connectors(self, row):
-        # Extract necessary information from the row   
-        print(type(row))     
+        # Extract necessary information from the row     
         connectors = row['connectors']
-        print(self.nodes)
-
+        direction_dictionary = self.get_direction(row['direction'])
         # Check if 'Connectors' has more than 2 elements
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
-            direction_dict = {'forward': 1, 'backward': -1, 'bothWays': 0, None: [1, -1],
-                              'alternating': 'Travel is one-way and changes between forward and backward constantly', 
-                              'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
-
             rows = []
             for i in range(len(connectors) - 1):
-                # print('in split_con')
-                # print(row['restrictions'])
-                
-                # print(self.get_speed(row['speed']))
-                # print(type(self.get_speed(row['speed'])))
-                # print()
-                print(row['direction'])
-                new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],'a_node': self.nodes[connectors[i]]['node_id'], 'b_node': self.nodes[connectors[i + 1]]['node_id'], 
-                            'direction': direction_dict[row['direction']], 'link_type': row['link_type'], 'road': row['road'], 'name': row['name'], 'speed': self.get_speed(row['speed']), 
-                            'ovm_id': row['ovm_id'], 'geometry': row['geometry'], 'lanes': len(row['direction']) if row['direction'] is not None else 2, 'restrictions': row['speed']}
+                print(self.get_direction(row['direction']))
+                new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],
+                           'a_node': self.nodes[connectors[i]]['node_id'], 
+                           'b_node': self.nodes[connectors[i + 1]]['node_id'], 
+                           'direction': direction_dictionary['direction'], 
+                           'link_type': row['link_type'], 
+                           'road': row['road'], 
+                           'name': row['name'], 'speed': self.get_speed(row['speed']), 
+                           'ovm_id': row['ovm_id'], 
+                           'geometry': row['geometry'], 
+                           'lanes_ab': direction_dictionary['lanes_ab'], 
+                           'lanes_ba': direction_dictionary['lanes_ba'], 
+                           'restrictions': row['speed']}
                 rows.append(new_row)
             processed_df = gpd.GeoDataFrame(rows)
         else:
@@ -411,3 +403,25 @@ class OVMDownloader(WorkerThread):
                 
                 adjusted_speed = round(sum(new_list),2)
         return adjusted_speed
+    
+    @staticmethod
+    def get_direction(directions_list):
+        direction_dict = {'forward': 1, 'backward': -1, 'bothWays': 0,
+                            'alternating': 'Travel is one-way and changes between forward and backward constantly', 
+                            'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
+        check_numbers = lambda lst: 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0
+        new_diction = {}
+        new_list = []
+
+        if directions_list is None:
+            new_list = [-1, 1]
+        elif directions_list != None:
+            for direct in directions_list:
+                direction = direction_dict[direct['direction']]
+                new_list.append(direction)
+
+        new_diction = {'direction': check_numbers(new_list), 
+                        'lanes_ab': new_list.count(1) if 1 in new_list else None, 
+                        'lanes_ba': new_list.count(-1) if -1 in new_list else None}
+        
+        return new_diction
