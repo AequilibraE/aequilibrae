@@ -79,6 +79,22 @@ class TestOVMProcessor(TestCase):
                           {'direction': 'backward'},
                           {'direction': 'forward'}, 
                           {'direction': 'forward'}]}]]
+        
+        lane_merge_twice = [[{'at': [0, 0.2], 
+                              'value':[
+                                  {'direction': 'backward'},
+                                  {'direction': 'backward'},
+                                  {'direction': 'forward'}, 
+                                  {'direction': 'forward'}]}],
+                            [{'at': [0.2, 0.8], 
+                              'value':[
+                                  {'direction': 'backward'},
+                                  {'direction': 'forward'}, 
+                                  {'direction': 'forward'}]}],
+                            [{'at': [0.8, 1],
+                              'value':[
+                                  {'direction': 'backward'},
+                                  {'direction': 'forward'}]}]]
         def road(lane):
             road_info = str({"class":"secondary",
                 "surface":"paved",
@@ -147,7 +163,6 @@ class TestOVMProcessor(TestCase):
 
         gdf_lane_begins = o.split_connectors(segment(lane_begins, road(lane_begins)))
 
-
         assert len(lane_begins) == 2
         assert len(lane_begins[0][0]['value']) == 2
         assert len(lane_begins[1][0]['value']) == 3
@@ -155,3 +170,15 @@ class TestOVMProcessor(TestCase):
         assert gdf_lane_begins['lanes_ab'][0] == 2
         assert gdf_lane_begins['lanes_ba'][0] == 1
         print('gdf_lane_begins test: passed')
+
+        
+        gdf_lane_merge_twice = o.split_connectors(segment(lane_merge_twice, road(lane_merge_twice)))
+
+        assert len(lane_merge_twice) == 3
+        assert len(lane_merge_twice[0][0]['value']) == 4
+        assert len(lane_merge_twice[1][0]['value']) == 3
+        assert len(lane_merge_twice[2][0]['value']) == 2
+        assert gdf_lane_merge_twice['direction'][0] == 0
+        assert gdf_lane_merge_twice['lanes_ab'][0] == 2
+        assert gdf_lane_merge_twice['lanes_ba'][0] == 1
+        print('gdf_lane_merge_twice test: passed')
