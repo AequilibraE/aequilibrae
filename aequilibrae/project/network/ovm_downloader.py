@@ -406,7 +406,6 @@ class OVMDownloader(WorkerThread):
     
     @staticmethod
     def get_direction(directions_list):
-        new_diction = {}
         new_list = []
         at_dictionary = {}
 
@@ -423,22 +422,26 @@ class OVMDownloader(WorkerThread):
                 'lanes_ba': lst.count(-1) if -1 in lst else None
             }
 
-        # Default new_list to [-1, 1] if directions_list is None
         if directions_list is None:
             new_list = [-1, 1]
-        elif directions_list != None:           
+        elif directions_list != None:       
             for direct in directions_list:
                 if type(direct) == dict:
+                    
                     # Extract direction from the dictionary and append to new_list
                     direction = direction_dict[direct['direction']]
                     new_list.append(direction)
-                elif type(direct) == list:
+                elif type(direct) == list: 
+                    a_list =[]
                     at_dictionary[str(direct[0]['at'])] = direct[0]['at'][1] - direct[0]['at'][0]
                     max_key = max(at_dictionary, key=at_dictionary.get)
+                    a_list.append(max_key) 
 
                     # Check if the current list is the one with maximum 'at' range
-                    if str(direct[0]['at']) == max_key:
+                    if str(direct[0]['at']) == a_list[-1]:
+                        new_list.clear()            
                         for lists in direct[0]['value']:
                             direction = direction_dict[lists['direction']]
                             new_list.append(direction)
+
         return check_numbers(lst=new_list)
