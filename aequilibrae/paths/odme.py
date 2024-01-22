@@ -97,6 +97,8 @@ class ODME(object):
         self._obj_func = None
         self.__init_objective_func()
         self.last_convergence = None
+        self.flow_obj = None # Component of objective function from flows
+        self.reg_obj = None # Component of objective function from regularisation
         self.convergence_change = float('inf')
 
         # Stopping criterion
@@ -212,9 +214,9 @@ class ODME(object):
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
-            obj1 = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            regularisation = np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
-            self.__set_convergence_values((self.alpha * obj1) + (self.beta * regularisation))
+            self.flow_obj = self.alpha * np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
+            self.reg_obj = self.beta * np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
+            self.__set_convergence_values(self.flow_obj + self.reg_obj)
 
         def __obj_func(self) -> None:
             """
@@ -224,7 +226,8 @@ class ODME(object):
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
-            self.__set_convergence_values(np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1)
+            self.flow_obj = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
+            self.__set_convergence_values(self.flow_obj)
 
         if p_2:
             self._obj_func = __reg_obj_func

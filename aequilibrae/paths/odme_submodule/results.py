@@ -11,7 +11,7 @@ class ODMEResults(object):
     # Columns for various dataframes:
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)",
         "Loop Time (s)", "Convergence", "Inner Convergence", "class", "link_id", "direction",
-        "obs_volume", "assign_volume", "Assigned - Observed"]
+        "obs_volume", "assign_volume", "Assigned - Observed", "Flow Objective", "Reg Objective"]
     FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #',
         'mean', 'median', 'std_deviation', 'variance', 'sum', 'min', 'max']
 
@@ -107,10 +107,8 @@ class ODMEResults(object):
         data["Total Run Time (s)"] = [self.total_time for _ in range(self.odme.num_counts)]
         data["Convergence"] = [self.odme.last_convergence for _ in range(self.odme.num_counts)]
         data["Inner Convergence"] = [self.odme.convergence_change for _ in range(self.odme.num_counts)]
-
-        # data["Total Iteration #"] = [self.odme.total_iter for _ in range(self.odme.num_counts)]
-        # data["Outer Loop #"] = [self.odme.outer for _ in range(self.odme.num_counts)]
-        # data["Inner Loop #"] = [self.odme.inner for _ in range(self.odme.num_counts)]
+        data["Flow Objective"] = [self.odme.flow_obj for _ in range(self.odme.num_counts)]
+        data["Reg Objective"] = [self.odme.reg_obj for _ in range(self.odme.num_counts)]
 
         data["Total Iteration #"] = [self.total_iter for _ in range(self.odme.num_counts)]
         data["Outer Loop #"] = [self.outer for _ in range(self.odme.num_counts)]
