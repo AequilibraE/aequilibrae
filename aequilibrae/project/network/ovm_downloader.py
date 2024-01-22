@@ -410,46 +410,35 @@ class OVMDownloader(WorkerThread):
         new_list = []
         at_dictionary = {}
 
+        # Dictionary mapping direction strings to numeric values or descriptions
         direction_dict = {'forward': 1, 'backward': -1, 'bothWays': 0,
                             'alternating': 'Travel is one-way and changes between forward and backward constantly', 
                             'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
-        check_numbers = lambda lst: 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0       
-        new_diction = lambda new_list: {'direction': check_numbers(new_list),
-                                'lanes_ab': new_list.count(1) if 1 in new_list else None,
-                                'lanes_ba': new_list.count(-1) if -1 in new_list else None}
+        
+        # Lambda function to check numbers and create a new dictionary
 
+        check_numbers = lambda lst: {
+                'direction': 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0,
+                'lanes_ab': lst.count(1) if 1 in lst else None,
+                'lanes_ba': lst.count(-1) if -1 in lst else None
+            }
+
+        # Default new_list to [-1, 1] if directions_list is None
         if directions_list is None:
             new_list = [-1, 1]
-        elif directions_list != None:
-           
+        elif directions_list != None:           
             for direct in directions_list:
-                # print(type(direct))
                 if type(direct) == dict:
+                    # Extract direction from the dictionary and append to new_list
                     direction = direction_dict[direct['direction']]
                     new_list.append(direction)
                 elif type(direct) == list:
-                    print(direct)
-                    new_list = []
-                    for lists in direct[1]['value']:
-                        direction = direction_dict[lists['direction']]
-                        new_list.append(direction)
-                        print(new_list)
-                        print()
-                        for i in range(len(direct)-1):
-                            print(new_list)
-                            at_dictionary[str(direct[i]['at'])] = new_diction(new_list=new_list)
-                    for i in at_dictionary.keys():
-                        return at_dictionary[i]
+                    at_dictionary[str(direct[0]['at'])] = direct[0]['at'][1] - direct[0]['at'][0]
+                    max_key = max(at_dictionary, key=at_dictionary.get)
 
-        # new_diction = {'direction': check_numbers(new_list), 
-        #                 'lanes_ab': new_list.count(1) if 1 in new_list else None, 
-        #                 'lanes_ba': new_list.count(-1) if -1 in new_list else None}
-        
-        print(f'at: {at_dictionary}')
-        print(at_dictionary.keys())
-        if at_dictionary == {}:
-            print('empty')
-        else:
-            for i in at_dictionary.keys():
-                print(at_dictionary[i])
-        return new_diction(new_list=new_list)
+                    # Check if the current list is the one with maximum 'at' range
+                    if str(direct[0]['at']) == max_key:
+                        for lists in direct[0]['value']:
+                            direction = direction_dict[lists['direction']]
+                            new_list.append(direction)
+        return check_numbers(lst=new_list)
