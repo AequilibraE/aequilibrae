@@ -55,6 +55,26 @@ class TestOVMProcessor(TestCase):
                   {'direction': 'forward'}, 
                   {'direction': 'forward'}]
         
+        highway = [{"direction": "backward"},
+                   {"direction": "backward"},
+                   {"direction": "backward"},
+                   {"direction": "backward"}, 
+                   {"direction": "forward"},
+                   {"direction": "forward"},
+                   {"direction": "forward"},
+                   {"direction": "forward"}]
+        
+        lane_ends = [[{'at': [0, 0.67]},
+                      {'value':[
+                          {'direction': 'backward'},
+                          {'direction': 'forward'},
+                          {'direction': 'forward'}]}],
+                     [{'at': [0.67, 1]},
+                      {'value':[
+                          {'direction': 'backward'},
+                          {'direction': 'forward'}]}]]
+        print(lane_ends)
+        
         def road(lane):
             road_info = str({"class":"secondary",
                 "surface":"paved",
@@ -79,24 +99,47 @@ class TestOVMProcessor(TestCase):
             assert type(road(lane_type)) == str
             assert type(o.split_connectors(segment(lane_type, road(lane_type)))) == gpd.GeoDataFrame
 
+        print('gdf_no_info test')
         gdf_no_info = o.split_connectors(segment(no_info, road(no_info)))
 
         assert gdf_no_info['direction'][0] == 0
         assert gdf_no_info['lanes_ab'][0] == 1
         assert gdf_no_info['lanes_ba'][0] == 1
-
+        print()
+        print('gdf_simple test')
         gdf_simple = o.split_connectors(segment(simple, road(simple)))
 
         assert len(simple) == 2
         assert gdf_simple['direction'][0] == 0
         assert gdf_simple['lanes_ab'][0] == 1
         assert gdf_simple['lanes_ab'][0] == 1
-
+        print()
+        print('gdf_lanes_3 test')
         gdf_lanes_3 = o.split_connectors(segment(lanes_3, road(lanes_3)))
         
         assert len(lanes_3) == 3
         assert gdf_lanes_3['direction'][0] == 1
         assert gdf_lanes_3['lanes_ab'][0] == 3
         assert gdf_lanes_3['lanes_ba'][0] == None
-
+        print()
+        print('gdf_highway test')
+        gdf_highway = o.split_connectors(segment(highway, road(highway)))
         
+        assert len(highway) == 8
+        assert gdf_highway['direction'][0] == 0
+        assert gdf_highway['lanes_ab'][0] == 4
+        assert gdf_highway['lanes_ba'][0] == 4
+        print()
+        print('gdf_lane_ends test')
+        gdf_lane_ends = o.split_connectors(segment(lane_ends, road(lane_ends)))
+
+        assert len(lane_ends) == 2
+        print(lane_ends[0])
+        print(lane_ends[0][1]['value'])
+        assert len(lane_ends[0][1]['value']) == 3
+        assert len(lane_ends[1][1]['value']) == 2
+        assert gdf_lane_ends['direction'][0] == 0
+        assert gdf_lane_ends['lanes_ab'][0] == 2
+        assert gdf_lane_ends['lanes_ba'][0] == 1
+        assert gdf_lane_ends['lanes_ab'][0] == 1
+        assert gdf_lane_ends['lanes_ba'][0] == 1

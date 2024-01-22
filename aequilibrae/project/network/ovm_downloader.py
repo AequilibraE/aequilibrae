@@ -352,7 +352,7 @@ class OVMDownloader(WorkerThread):
             # Split the DataFrame into multiple rows
             rows = []
             for i in range(len(connectors) - 1):
-                print(self.get_direction(row['direction']))
+                # print(self.get_direction(row['direction']))
                 new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],
                            'a_node': self.nodes[connectors[i]]['node_id'], 
                            'b_node': self.nodes[connectors[i + 1]]['node_id'], 
@@ -406,22 +406,50 @@ class OVMDownloader(WorkerThread):
     
     @staticmethod
     def get_direction(directions_list):
+        new_diction = {}
+        new_list = []
+        at_dictionary = {}
+
         direction_dict = {'forward': 1, 'backward': -1, 'bothWays': 0,
                             'alternating': 'Travel is one-way and changes between forward and backward constantly', 
                             'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
-        check_numbers = lambda lst: 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0
-        new_diction = {}
-        new_list = []
+        check_numbers = lambda lst: 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0       
+        new_diction = lambda new_list: {'direction': check_numbers(new_list),
+                                'lanes_ab': new_list.count(1) if 1 in new_list else None,
+                                'lanes_ba': new_list.count(-1) if -1 in new_list else None}
 
         if directions_list is None:
             new_list = [-1, 1]
         elif directions_list != None:
+           
             for direct in directions_list:
-                direction = direction_dict[direct['direction']]
-                new_list.append(direction)
+                # print(type(direct))
+                if type(direct) == dict:
+                    direction = direction_dict[direct['direction']]
+                    new_list.append(direction)
+                elif type(direct) == list:
+                    print(direct)
+                    new_list = []
+                    for lists in direct[1]['value']:
+                        direction = direction_dict[lists['direction']]
+                        new_list.append(direction)
+                        print(new_list)
+                        print()
+                        for i in range(len(direct)-1):
+                            print(new_list)
+                            at_dictionary[str(direct[i]['at'])] = new_diction(new_list=new_list)
+                    for i in at_dictionary.keys():
+                        return at_dictionary[i]
 
-        new_diction = {'direction': check_numbers(new_list), 
-                        'lanes_ab': new_list.count(1) if 1 in new_list else None, 
-                        'lanes_ba': new_list.count(-1) if -1 in new_list else None}
+        # new_diction = {'direction': check_numbers(new_list), 
+        #                 'lanes_ab': new_list.count(1) if 1 in new_list else None, 
+        #                 'lanes_ba': new_list.count(-1) if -1 in new_list else None}
         
-        return new_diction
+        print(f'at: {at_dictionary}')
+        print(at_dictionary.keys())
+        if at_dictionary == {}:
+            print('empty')
+        else:
+            for i in at_dictionary.keys():
+                print(at_dictionary[i])
+        return new_diction(new_list=new_list)
