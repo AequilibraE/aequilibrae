@@ -95,6 +95,17 @@ class TestOVMProcessor(TestCase):
                               'value':[
                                   {'direction': 'backward'},
                                   {'direction': 'forward'}]}]]
+        
+        equal_dis = [[{'at': [0, 0.5], 
+                       'value':[
+                          {'direction': 'backward'},
+                          {'direction': 'forward'}, 
+                          {'direction': 'forward'}]}],
+                     [{'at': [0.5, 1], 
+                       'value':[
+                          {'direction': 'backward'},
+                          {'direction': 'forward'}]}]]
+        
         def road(lane):
             road_info = str({"class":"secondary",
                 "surface":"paved",
@@ -182,3 +193,13 @@ class TestOVMProcessor(TestCase):
         assert gdf_lane_merge_twice['lanes_ab'][0] == 2
         assert gdf_lane_merge_twice['lanes_ba'][0] == 1
         print('gdf_lane_merge_twice test: passed')
+
+        gdf_equal_dis = o.split_connectors(segment(equal_dis, road(equal_dis)))
+
+        assert len(equal_dis) == 2
+        assert len(equal_dis[0][0]['value']) == 3
+        assert len(equal_dis[1][0]['value']) == 2
+        assert gdf_equal_dis['direction'][0] == 0
+        assert gdf_equal_dis['lanes_ab'][0] == 2
+        assert gdf_equal_dis['lanes_ba'][0] == 1
+        print('gdf_lane_ends test: passed')
