@@ -43,8 +43,8 @@ class ODME(object):
         count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
-        algorithm="spiess", # currently defaults to spiess
-        verbose:bool =False # For printing as we go
+        algorithm: str = "spiess", # currently defaults to spiess
+        verbose: bool = False # For printing as we go
     ):
         """
         For now see description in pdf file in SMP internship team folder
