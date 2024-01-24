@@ -24,9 +24,10 @@ Implementation of ODME Infrastructure:
 # It probably should also do any checking of user input that is required
 # (ie no client classes should have to check)
 
+from typing import Tuple
 import numpy as np
 import pandas as pd
-from typing import Tuple
+import os
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
@@ -233,6 +234,19 @@ class ODME(object):
             self._obj_func = __reg_obj_func
         else:
             self._obj_func = __obj_func
+
+    def save_results(self) -> None:
+        """
+        Saves final demand matrix and stores relavent procedure details.
+        (Should be run following ODME execution)
+        """
+        # Find project.sqlite procedure inputs
+        # Find filepath to place new demand matrix
+        # Find timestamp
+        # Check what else needs to be done
+        # See example in distribution file and copy
+        # to save matrix as appropriate and store everything else appropriately.
+        return
 
     # Output/Results:
     def get_demands(self) -> list[np.ndarray]:
