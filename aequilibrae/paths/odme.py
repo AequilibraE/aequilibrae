@@ -5,11 +5,9 @@ Implementation of ODME Infrastructure:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
-# NOTE - Lots of squeezing of matrices happens after assignment due to the functionality of select
-# link analysis and assignment with regards to traffic assignment.
-
-# NOTE - We need to use matrix.view_names[0] to access the appropriate results rather than the class
-# __id__, due to some artifacts of previous design choices/changes.
+# NOTE 1 - Currently following TrafficAssignment the matrix appears to gain a dimension, which seems
+# to be a bug and we need to squeeze this each time assignment is performed. This also occurs
+# for selet link matrices.
 
 # NOTE - To Do:
 #       Initialiser -> Needs to be seriously cleaned up.
@@ -25,12 +23,16 @@ Implementation of ODME Infrastructure:
 # (ie no client classes should have to check)
 
 from typing import Tuple
+from uuid import uuid4
+from datetime import datetime
 import numpy as np
 import pandas as pd
-import os
+#import os
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
+from aequilibrae.context import get_active_project
+from aequilibrae.project.data.matrix_record import MatrixRecord
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -41,7 +43,7 @@ class ODME(object):
     # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
-        count_volumes: pd.DataFrame, # [class, link_id, direction, volume]
+        count_volumes: pd.DataFrame, # [class, link_id, direction, obs_volume]
         stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
         alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
         algorithm: str = "spiess", # currently defaults to spiess
@@ -61,24 +63,23 @@ class ODME(object):
                     of algorithm they choose.
 
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS (MULTI-CLASS UNDER DEVELOPMENT)
+        CHANGE STOPPING CRITERION TO BE A DICTIONARY!
         """
         # Parameters for assignments
         self.assignment = assignment
         self.classes = assignment.classes
-        self.num_classes = len(self.classes)
-        self.single_class = (self.num_classes == 1) # If we are doing single class ODME
         # Everything is implicitly ordered by this:
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
+        self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
+     
         # Current demand matrices:
         self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
-        # May be unecessary - if we do keep it need to make a copy ->
-        # MAYBE PUT THIS IN AN IF STATEMENT AND ONLY COPY IF A REGULARISATION TERM IS SPECIFIED
+
         # Initial demand matrices:
         self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
-        self.demand_dims = [self.demand_matrices[i].shape for i in range(self.num_classes)]
 
         # Observed Links & Associated Volumes
         # MAYBE I SHOULD SPLIT THIS INTO ONE DATAFRAME PER CLASS
@@ -90,7 +91,7 @@ class ODME(object):
         # Set all select links:
         self.__set_select_links()
 
-        # Not yet relevant - Algorithm Specifications:
+        # Algorithm Specifications:
         self._norms = self.__get_norms(algorithm)
         self._algorithm = algorithm
 
@@ -125,6 +126,9 @@ class ODME(object):
 
         # For printing ongoing state
         self._verbose = verbose
+
+        self.procedure_date = ""
+        self.procedure_id = ""
 
     # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
@@ -235,10 +239,16 @@ class ODME(object):
         else:
             self._obj_func = __obj_func
 
-    def save_results(self) -> None:
-        """
-        Saves final demand matrix and stores relavent procedure details.
-        (Should be run following ODME execution)
+    def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
+        """Saves the final demand matrix output to the project file
+
+        :Arguments:
+            **name** (:obj:`str`): Name of the desired matrix record
+            **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            **project** (:obj:`Project`, Optional): Project we want to save the results to.
+            Defaults to the active project
+
+            NOT YET COMPLETED!!!
         """
         # Find project.sqlite procedure inputs
         # Find filepath to place new demand matrix
@@ -246,6 +256,15 @@ class ODME(object):
         # Check what else needs to be done
         # See example in distribution file and copy
         # to save matrix as appropriate and store everything else appropriately.
+
+        project = project or get_active_project()
+        mats = project.matrices
+        # record = mats.new_record(name, file_name, self.output)
+        # record.procedure_id = self.procedure_id
+        # record.timestamp = self.procedure_date
+        # record.procedure = "Origin-Destination Matrix Estimation"
+        # record.save()
+        # return record
         return
 
     # Output/Results:
@@ -275,24 +294,15 @@ class ODME(object):
         """
         return pd.concat(self.results.statistics, ignore_index=True)
 
-    # Generic Algorithm Structure:
-    # Should everything that isn't top level be moved to scaling factors?
-    # I.e. execute just calls another class which acts independently?
-    # And then this class just has to initialise, set variables, call execute and
-    # load/save results?
-    # ScalingFactors can then be turned into a class which runs the actual algorithm
-    # (similar to LinearApproximation) and results can just hold all the statistics
-    # and final results?
-    # In addition, perhaps we should have a thread per class since if they are considered
-    # independent they can all be done in parallel? This may not work with all different types of
-    # algorithms.
     def execute(self) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
         """
-        # Initialise timing:
+        # Initialise Procedure:
         self.results.init_timer()
+        self.procedure_date = str(datetime.today())
+        self.procedure_id = uuid4().hex
 
         # Create values for SL matrices & assigned flows
         self.__perform_assignment()
@@ -306,7 +316,7 @@ class ODME(object):
 
             # Run inner iterations:
             # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
-            self.convergence_change = float('inf') # Ensures at least 1 inner convergence is run per loop
+            self.convergence_change = float('inf') # Ensures at least 1 inner iteration is run per outer loop
             inner = 0
             while inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
                 inner += 1
@@ -334,27 +344,25 @@ class ODME(object):
         NOTE - Need to check how matrix dimensions will work for multi-class.
         """
         # Change matrix.matrix_view to the current demand matrix (as np.array)
-        for i, assignclass in enumerate(self.classes):
-            assignclass.matrix.matrix_view = self.demand_matrices[i]
+        for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demand_matrices):
+            aeq_matrix.matrix_view = demand
 
         # Perform the assignment
         self.assignment.execute()
         
-        # TEMPORARY FIX - I DON'T REALLY KNOW WHY WE HAVE AN EXTRA DIMENSION NOW BUT I'LL FLATTEN
-        # IT SINCE IT ISN'T RELEVANT TO SINGLE CLASS OR SINGLE COUNT CASES
-        for assignclass in self.classes:
-            assignclass.matrix.matrix_view = np.squeeze(assignclass.matrix.matrix_view, axis=2)
+        # See note 1 for details on np.squeeze usage - MAYBE PUT THIS IN DOCSTRING!
+        for matrix in self.aequilibrae_matrices:
+            matrix.matrix_view = np.squeeze(matrix.matrix_view, axis=2)
 
         # Store reference to select link demand matrices as proportion matrices
+        # See note 1 for details on np.squeeze usage
         # MULTI-CLASS GENERALISATION REQUIRES TESTING IN FUTURE!!!
-        for i, assignclass in enumerate(self.classes):
+        for assignclass, demand in zip(self.classes, self.demand_matrices):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
                 self._sl_matrices[link] = np.nan_to_num(
-                    np.squeeze(sl_matrices[link], axis=2) / self.demand_matrices[i])
-        # NOTE - squeeze since multiple matrices are stored for select link or class (ask Jamie/Jake),
-        # but we only have one of each per set of select links so we can ignore this for now.
-        # In future when multiple class ODME is implemented this needs to be checked/changed.
+                    np.squeeze(sl_matrices[link], axis=2) / demand
+                    )
 
         # Extract and store array of assigned volumes to the select links
         self.__extract_volumes()
@@ -374,11 +382,8 @@ class ODME(object):
         # DECIDE WHETHER TO PUT THIS IN INITIALISER OR NOT!!!
         # Dictionary to select correct column of results dataframe
         col = dict()
-        for i, cls_name in enumerate(self.class_names):
-            # NOTE - due to the design change of the TrafficClass to only hold one
-            # user class, this should not be necessary, however this is still a remnant
-            # piece of code which uses the names from the aequilibrae matrix itself.
-            name = self.aequilibrae_matrices[i].view_names[0]
+        for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+            name = matrix.view_names[0]
             col[cls_name] = {1: f"{name}_ab", -1: f"{name}_ba", 0: f"{name}_tot"}
 
         # For extracting a single assigned flow:
@@ -400,13 +405,11 @@ class ODME(object):
     def __execute_inner_iter(self) -> None:
         """
         Runs an inner iteration of the ODME algorithm. 
-        This assumes the SL matrices stay constant and modifies
-        the current demand matrices.
+        This assumes the SL matrices stay constant and modifies the current demand matrices.
         """
         # Element-wise multiplication of demand matrices by scaling factors
         factors = self.__get_scaling_factors()
-        for i, factor in enumerate(factors):
-            self.demand_matrices[i] = self.demand_matrices[i] * factor
+        self.demand_matrices = [demand * factor for demand, factor in zip(self.demand_matrices, factors)]
 
         # Recalculate the link flows
         self.__calculate_volumes()
@@ -422,7 +425,6 @@ class ODME(object):
         """
         algorithm = ScalingFactors(self, self._algorithm)
         factors = algorithm.generate()
-        #self.__record_factor_stats(factors)
         self.results.record_factor_stats(factors)
         return factors
 
