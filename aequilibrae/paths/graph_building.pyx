@@ -5,7 +5,10 @@ cimport cython
 
 from libcpp.queue cimport queue
 
-
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+@cython.initializedcheck(False)
 cdef void _remove_dead_ends(
     long long [:] graph_fs,
     long long [:] all_nodes,
