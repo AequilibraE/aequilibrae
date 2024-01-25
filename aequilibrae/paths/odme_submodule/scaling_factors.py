@@ -28,9 +28,9 @@ class ScalingFactors(object):
         self.class_names = odme.class_names
         self.names_to_indices = odme.names_to_indices
         self.num_classes = len(self.class_names)
-        self._demand_dims = odme.demand_dims
         self._sl_matrices = odme._sl_matrices
         self.demand_matrices = odme.demand_matrices
+        self._demand_dims = [demand.shape for demand in self.demand_matrices]
         self.init_demand_matrices = odme.demand_matrices
         if algorithm in ["reg_spiess"]:
             self._alpha = odme.alpha
