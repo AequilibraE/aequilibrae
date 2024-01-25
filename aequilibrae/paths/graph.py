@@ -77,6 +77,8 @@ class GraphBase(ABC):
 
         self.g_link_crosswalk = np.array([])  # 4 a link ID in the BIG graph, a corresponding link in the compressed 1
 
+        self.dead_end_links = np.array([])
+
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
 
