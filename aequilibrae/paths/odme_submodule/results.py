@@ -51,8 +51,8 @@ class ODMEResults(object):
         """
         # Get cumulative factors for each demand matrix
         cumulative_factors = []
-        for i, demand_matrix in enumerate(self.odme.demand_matrices):
-            factors = np.nan_to_num(demand_matrix / self.odme.init_demand_matrices[i], nan=1)
+        for initial, final in zip(self.odme.init_demand_matrices, self.odme.demand_matrices):
+            factors = np.nan_to_num(final / initial, nan=1)
             cumulative_factors.append(
                 pd.DataFrame({
                     "class": [self.odme.class_names[i] for _ in range(demand_matrix.size)],

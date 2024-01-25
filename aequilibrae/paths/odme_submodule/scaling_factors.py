@@ -24,17 +24,18 @@ class ScalingFactors(object):
         self.algo_name = algorithm
         self.__set_algorithm()
 
-        self._count_volumes = odme.count_volumes
+        self._c_v = odme.count_volumes
         self.class_names = odme.class_names
+        self._class_counts = {
+            name : self._c_v[self._c_v['class'] == name].reset_index(drop=True)
+            for name in self.class_names
+            }
         self.names_to_indices = odme.names_to_indices
-        self.num_classes = len(self.class_names)
         self._sl_matrices = odme._sl_matrices
         self.demand_matrices = odme.demand_matrices
-        self._demand_dims = [demand.shape for demand in self.demand_matrices]
         self.init_demand_matrices = odme.demand_matrices
         if algorithm in ["reg_spiess"]:
-            self._alpha = odme.alpha
-            self._beta = odme.beta
+            self._alpha, self._beta = odme.alpha, odme.beta
 
         self.odme = odme
 
@@ -71,6 +72,8 @@ class ScalingFactors(object):
         proportionally (via SL matrix) assigned flow & observed flows.
 
         MULTI-CLASS UNDER DEVELOPMENT! (REQUIRES TESTING)
+        NOTE - This algorithm is defunct, it has no advantage over spiess
+        and only existed for initial testing purposes.
         """
         # Steps:
         # 1. For each link create a factor f_a given by \hat v_a / v_a
@@ -84,18 +87,17 @@ class ScalingFactors(object):
         # NOTE - by not approximating step size we may over-correct massively.
 
         scaling_factors = []
-        c_v = self._count_volumes
         # Steps 1 & 2:
-        for i, name in enumerate(self.class_names):
-            observed = c_v[c_v['class'] == name]
+        for demand, name in zip(self.demand_matrices, self.class_names):
+            observed = self._c_v[self._c_v['class'] == name]
 
             # If there are no observations leave matrix unchanged
             if len(observed) == 0:
-                scaling_factors.append(np.ones(self._demand_dims[i]))
+                scaling_factors.append(np.ones(demand.shape))
                 continue
 
-            factors = np.empty((len(observed), *(self._demand_dims[i])))
-            for j, row in self._count_volumes.iterrows():
+            factors = np.empty((len(observed), *(demand.shape)))
+            for j, row in self._c_v.iterrows():
                 # Create factor matrix:
                 if row["obs_volume"] != 0 and row['assign_volume'] != 0:
 
@@ -112,7 +114,7 @@ class ScalingFactors(object):
 
                 # If assigned or observed value is 0 we cannot do anything right now
                 else:
-                    factor_matrix = np.ones(self._demand_dims[i])
+                    factor_matrix = np.ones(demand.shape)
                 
                 # Add factor matrix
                 factors[j, :, :] = factor_matrix
@@ -142,8 +144,8 @@ class ScalingFactors(object):
 
         # Get scaling factors:
         scaling_factors = [
-            1 - (step_sizes[i] * gradient_matrices[i])
-            for i in range(self.num_classes)
+            1 - (step * gradient)
+            for step, gradient in zip(step_sizes,gradient_matrices)
         ]
         return scaling_factors
 
@@ -159,9 +161,9 @@ class ScalingFactors(object):
         # without storing too many things in memory.
         derivatives = []
         # Create a derivative matrix for each user class:
-        for i, user_class in enumerate(self.class_names):
-            observed = self._count_volumes[self._count_volumes['class'] == user_class].reset_index(drop=True)
-            factors = np.empty((len(observed), *(self._demand_dims[i])))
+        for demand, user_class in zip(self.demand_matrices , self.class_names):
+            observed = self._class_counts[user_class]
+            factors = np.empty((len(observed), *(demand.shape)))
             for j, row in observed.iterrows():
                 sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
                 factors[j, :, :] = sl_matrix * (row['assign_volume'] - row['obs_volume'])
@@ -181,16 +183,16 @@ class ScalingFactors(object):
 
         MULTI-CLASS UNDER DEVELOPMENT!
         """
-        bounds = self.__get_step_size_limits_spiess(gradients)
+        all_bounds = self.__get_step_size_limits_spiess(gradients)
 
         # SOME MINOR OPTIMISATIONS CAN BE DONE HERE IN TERMS OF WHAT PRECISELY TO CALCULATE:
         # Calculate step-sizes (lambdas) for each gradient matrix:
         lambdas = []
-        for i, user_class in enumerate(self.class_names):
+        for bounds, user_class, gradient in zip(all_bounds, self.class_names, gradients):
             # Calculating link flow derivatives:
             flow_derivatives = self.__get_flow_derivatives_spiess(
                 user_class,
-                gradients[i]
+                gradient
             )
 
             # Calculate minimising step length:
@@ -202,7 +204,7 @@ class ScalingFactors(object):
                 min_lambda = 0
 
             # Check minimising lambda is within bounds:
-            lambdas.append(self.__enforce_bounds(min_lambda, *bounds[i]))
+            lambdas.append(self.__enforce_bounds(min_lambda, *bounds))
 
         return lambdas
 
@@ -219,12 +221,12 @@ class ScalingFactors(object):
 
         NOTE - THINK ABOUT RENAMING FOR CONSISTENCY
         """
-        class_counts = self._count_volumes[self._count_volumes['class'] == user_class].reset_index(drop=True)
+        data = self._class_counts[user_class]
         demand = self.demand_matrices[self.names_to_indices[user_class]]
 
         # Calculating link flow derivatives:
-        flow_derivatives = np.empty(len(class_counts))
-        for j, row in class_counts.iterrows():
+        flow_derivatives = np.empty(len(data))
+        for j, row in data.iterrows():
             sl_matrix = self._sl_matrices[self.odme.get_sl_key(row)]
             flow_derivatives[j] = -np.sum(demand * sl_matrix * gradient)
 
@@ -236,8 +238,8 @@ class ScalingFactors(object):
         of the form (observed - assigned,...) for each count
         volume given for that class.
         """
-        class_counts = self._count_volumes[self._count_volumes['class'] == user_class]
-        return class_counts['obs_volume'].to_numpy() - class_counts['assign_volume'].to_numpy()
+        data = self._class_counts[user_class]
+        return data['obs_volume'].to_numpy() - data['assign_volume'].to_numpy()
 
     def __enforce_bounds(self, value: float, upper: float, lower: float) -> float:
         """
@@ -256,8 +258,8 @@ class ScalingFactors(object):
             return upper # Upper Bound Violated
         elif value < lower:
             return lower # Lower Bound Violated
-        else: # Bounds Not Violated
-            return value
+        else:
+            return value # Bounds Not Violated
 
     def __get_step_size_limits_spiess(self,
             gradients: list[np.ndarray]) -> list[Tuple[float, float]]:
@@ -274,16 +276,16 @@ class ScalingFactors(object):
         # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
         bounds = []
         # Create each bound and check for edge cases with empty sets:
-        for i, gradient in enumerate(gradients):
+        for demand, gradient in zip(self.demand_matrices, gradients):
             # Upper bound:
-            upper_mask = np.logical_and(self.demand_matrices[i] > 0, gradient > 0)
+            upper_mask = np.logical_and(demand > 0, gradient > 0)
             if np.any(upper_mask):
                 upper_lim = 1 / np.min(gradient[upper_mask])
             else:
                 upper_lim = float('inf')
 
             # Lower bound:
-            lower_mask = np.logical_and(self.demand_matrices[i] > 0, gradient < 0)
+            lower_mask = np.logical_and(demand > 0, gradient < 0)
             if np.any(lower_mask):
                 lower_lim = 1 / np.max(gradient[lower_mask])
             else:
@@ -314,8 +316,8 @@ class ScalingFactors(object):
 
         # Get scaling factors:
         scaling_factors = [
-            1 - (step_sizes[i] * gradient_matrices[i])
-            for i in range(self.num_classes)
+            1 - (step * gradient)
+            for step, gradient in zip(step_sizes, gradient_matrices)
         ]
 
         return scaling_factors
@@ -337,8 +339,8 @@ class ScalingFactors(object):
         ]
 
         return [
-            (self._alpha * spiess) + (self._beta * reg_grads[i])
-            for i, spiess in enumerate(spiess_grads)
+            (self._alpha * spiess) + (self._beta * regularisation)
+            for regularisation, spiess in zip(reg_grads, spiess_grads)
             ]
 
     def __get_step_sizes_reg_spiess(self, gradients: list[np.ndarray]) -> list[float]:
@@ -355,22 +357,21 @@ class ScalingFactors(object):
         MULTI-CLASS UNDER DEVELOPMENT!
         """
         # THIS IS THE SAME BOUNDS AS REGULAR SPIESS, MAY WANT TO CONFIRM THIS IS CORRECT
-        bounds = self.__get_step_size_limits_spiess(gradients)
+        all_bounds = self.__get_step_size_limits_spiess(gradients)
 
-        # NOT FULLY IMPLEMENTED BELOW THIS!!!
         # Calculate step-sizes (lambdas) for each gradient matrix:
         lambdas = []
-        for i, user_class in enumerate(self.class_names):
+        for gradient, user_class, bounds in zip(gradients, self.class_names, all_bounds):
             # Calculating flow components for step size:
             flow_derivatives = self.__get_flow_derivatives_spiess(
                 user_class,
-                gradients[i]
+                gradient
             )
             flow_errors = self.__get_flow_errors(user_class)
 
             # Calculate demand components of step size
             demand_errors = self.__get_demand_errors(user_class)
-            demand_derivative = self.__get_demand_derivative(user_class, gradients[i])
+            demand_derivative = self.__get_demand_derivative(user_class, gradient)
 
             # Calculate minimising step length: MAY WANT TO MAKE THIS A SEPARATE FUNCTION
             min_lambda = (
@@ -389,7 +390,7 @@ class ScalingFactors(object):
                 min_lambda = 0
 
             # Check minimising lambda is within bounds:
-            lambdas.append(self.__enforce_bounds(min_lambda, *bounds[i]))
+            lambdas.append(self.__enforce_bounds(min_lambda, *bounds))
 
         return lambdas
 
