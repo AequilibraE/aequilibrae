@@ -39,6 +39,8 @@ class ODMEResults(object):
         # Time data for logging information
         self.total_time = 0
         self.time = None
+        self.create_time = time.asctime()
+        self.exec_time = None
 
         # Clean up stuff
         # From here to continue decide how to more appropriately record results and statistics
@@ -156,6 +158,7 @@ class ODMEResults(object):
         
         Should be run when the ODME procedure begins execution.
         """
+        self.exec_time = time.asctime()
         self.time = time.time()
 
     def __increment_outer(self) -> None:
