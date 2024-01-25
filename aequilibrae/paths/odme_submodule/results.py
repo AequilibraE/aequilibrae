@@ -51,8 +51,8 @@ class ODMEResults(object):
         """
         cumulative_factors = []
         for initial, final, name in zip(
-            self.odme.init_demand_matrices,
-            self.odme.demand_matrices,
+            self.odme.original_demands,
+            self.odme.demands,
             self.odme.class_names
             ):
             # Get cumulative factors for this demand matrix and store them:
@@ -133,9 +133,9 @@ class ODMEResults(object):
         """
         # Create statistics on all new factors:
         data = []
-        for i, factor in enumerate(factors):
+        for cls_name, factor in zip(self.odme.class_names, factors):
             data.append([
-                self.odme.class_names[i],
+                cls_name,
                 self.outer,
                 self.inner,
                 self.total_inner,

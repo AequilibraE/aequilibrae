@@ -32,8 +32,8 @@ class ScalingFactors(object):
             }
         self.names_to_indices = odme.names_to_indices
         self._sl_matrices = odme._sl_matrices
-        self.demand_matrices = odme.demand_matrices
-        self.init_demand_matrices = odme.init_demand_matrices
+        self.demand_matrices = odme.demands
+        self.original_demands = odme.original_demands
         if algorithm in ["reg_spiess"]:
             self._alpha, self._beta = odme.alpha, odme.beta
 
@@ -332,7 +332,7 @@ class ScalingFactors(object):
         IS THE APPROPRIATE GRADIENT FOR MULTI-CLASS (EVEN IF IT LIKELY IS THE CASE)
         """
         spiess_grads = self.__get_derivative_matrices_spiess()
-        g_hats = self.init_demand_matrices
+        g_hats = self.original_demands
         reg_grads = [
             demand - g_hat
             for demand, g_hat in zip(self.demand_matrices, g_hats)
@@ -400,7 +400,7 @@ class ScalingFactors(object):
         of the form (initial - current,...)
         """
         index = self.names_to_indices[user_class]
-        return self.init_demand_matrices[index] - self.demand_matrices[index]
+        return self.original_demands[index] - self.demand_matrices[index]
 
     def __get_demand_derivative(self,
         user_class:str,

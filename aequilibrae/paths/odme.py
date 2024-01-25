@@ -44,7 +44,10 @@ class ODME(object):
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, obs_volume]
-        stop_crit=(50, 50, 10**-4,10**-4), # max_iterations (inner/outer), convergence criterion
+        stop_crit={"max_outer": 50,
+            "max_inner": 50,
+            "convergence_crit": 10**-4,
+            "inner_convergence": 10**-4},
         alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
         algorithm: str = "spiess", # currently defaults to spiess
         verbose: bool = False # For printing as we go
@@ -65,37 +68,30 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS (MULTI-CLASS UNDER DEVELOPMENT)
         CHANGE STOPPING CRITERION TO BE A DICTIONARY!
         """
-        # Parameters for assignments
         self.assignment = assignment
         self.classes = assignment.classes
-        # Everything is implicitly ordered by this:
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
+        # The following are implicitly ordered by the list of Traffic Classes:
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
-     
-        # Current demand matrices:
-        self.demand_matrices = [user_class.matrix.matrix_view for user_class in self.classes]
-
-        # Initial demand matrices:
-        self.init_demand_matrices = [np.copy(matrix) for matrix in self.demand_matrices]
+        self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
+        self.original_demands = [np.copy(matrix) for matrix in self.demands]
 
         # Observed Links & Associated Volumes
-        # MAYBE I SHOULD SPLIT THIS INTO ONE DATAFRAME PER CLASS
         self.count_volumes = count_volumes.copy(deep=True)
         self.num_counts = len(self.count_volumes)
 
-        self._sl_matrices = dict() # Dictionary of proportion matrices
-
-        # Set all select links:
+        # Select Link:
+        self._sl_matrices = dict()
         self.__set_select_links()
 
         # Algorithm Specifications:
         self._norms = self.__get_norms(algorithm)
         self._algorithm = algorithm
 
-        # Initialise objective function
+        # Objective Function:
         self._obj_func = None
         self.__init_objective_func()
         self.last_convergence = None
@@ -104,11 +100,11 @@ class ODME(object):
         self.convergence_change = float('inf')
 
         # Stopping criterion
-        # May need to specify this further to differentiate between inner & outer criterion
-        self.max_outer = stop_crit[0]
-        self.max_inner = stop_crit[1]
-        self.outer_convergence_crit = stop_crit[2]
-        self.inner_convergence_crit = stop_crit[3]
+        # CHANGE TO DICTIONARY
+        self.max_outer = stop_crit["max_outer"]
+        self.max_inner = stop_crit["max_inner"]
+        self.outer_convergence_crit = stop_crit["convergence_crit"]
+        self.inner_convergence_crit = stop_crit["inner_convergence"]
 
         # Hyper-parameters for regularisation:
         if algorithm in ["reg_spiess"]:
@@ -117,16 +113,13 @@ class ODME(object):
             self.alpha = alpha
             self.beta = 1 - alpha
 
-        # May also want to save the last convergence value.
-        # We may also want to store other variables dependent on the algorithm used,
-        # e.g. the derivative of link flows w.r.t. step size.
-
-        # RESULTS & STATISTICS (NEW VERSION)
+        # Results/Statistics:
         self.results = ODMEResults(self)
 
-        # For printing ongoing state
+        # Printing During Runtime:
         self._verbose = verbose
-
+        
+        # Procedure Information:
         self.procedure_date = ""
         self.procedure_id = ""
 
@@ -138,7 +131,7 @@ class ODME(object):
         
         ONLY IMPLEMENTED FOR SINGLE CLASS!
         """
-        demand_sum = np.sum(self.demand_matrices[0])
+        demand_sum = np.sum(self.demands[0])
         flow_sum = np.sum(self.count_volumes["obs_volume"])
         return (alpha * demand_sum) / ((alpha * flow_sum) + ((1 - alpha) * demand_sum))
 
@@ -272,7 +265,7 @@ class ODME(object):
         """
         Returns all demand matrices (can be called before or after execution).
         """
-        return self.demand_matrices
+        return self.demands
 
     def get_iteration_factors(self) -> pd.DataFrame:
         """
@@ -344,7 +337,7 @@ class ODME(object):
         NOTE - Need to check how matrix dimensions will work for multi-class.
         """
         # Change matrix.matrix_view to the current demand matrix (as np.array)
-        for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demand_matrices):
+        for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demands):
             aeq_matrix.matrix_view = demand
 
         # Perform the assignment
@@ -357,7 +350,7 @@ class ODME(object):
         # Store reference to select link demand matrices as proportion matrices
         # See note 1 for details on np.squeeze usage
         # MULTI-CLASS GENERALISATION REQUIRES TESTING IN FUTURE!!!
-        for assignclass, demand in zip(self.classes, self.demand_matrices):
+        for assignclass, demand in zip(self.classes, self.demands):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
                 self._sl_matrices[link] = np.nan_to_num(
@@ -409,7 +402,7 @@ class ODME(object):
         """
         # Element-wise multiplication of demand matrices by scaling factors
         factors = self.__get_scaling_factors()
-        self.demand_matrices = [demand * factor for demand, factor in zip(self.demand_matrices, factors)]
+        self.demands = [demand * factor for demand, factor in zip(self.demands, factors)]
 
         # Recalculate the link flows
         self.__calculate_volumes()

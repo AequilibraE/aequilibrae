@@ -141,7 +141,7 @@ class TestODME(TestCase):
         # Perform ODME:
         odme = ODME(self.assignment,
             count_volumes,
-            stop_crit=(10, 500, 1, 0.1),
+            stop_crit={"max_outer": 10, "max_inner": 500, "convergence_crit": 1, "inner_convergence": 0.1},
             alpha=0.24,
             algorithm=algorithm)
         #x = odme.estimate_alpha(0.1)
@@ -191,7 +191,13 @@ class TestODME(TestCase):
         self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
 
         # Perform ODME:
-        odme = ODME(self.assignment, count_volumes, stop_crit=(100, 100, 0.00001, 0.00001), algorithm="spiess")
+        odme = ODME(self.assignment,
+            count_volumes,
+            stop_crit={"max_outer": 100,
+                "max_inner": 100,
+                "convergence_crit": 0.00001,
+                "inner_convergence": 0.00001},
+            algorithm="spiess")
         odme.execute()
         new_demand = odme.get_demands()[0]
         odme.get_all_statistics().to_csv("/workspaces/aequilibrae/odme_stats/stats_3_vols.csv")
