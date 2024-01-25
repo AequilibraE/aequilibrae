@@ -49,13 +49,17 @@ class ODMEResults(object):
         """
         Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
         """
-        # Get cumulative factors for each demand matrix
         cumulative_factors = []
-        for initial, final in zip(self.odme.init_demand_matrices, self.odme.demand_matrices):
+        for initial, final, name in zip(
+            self.odme.init_demand_matrices,
+            self.odme.demand_matrices,
+            self.odme.class_names
+            ):
+            # Get cumulative factors for this demand matrix and store them:
             factors = np.nan_to_num(final / initial, nan=1)
             cumulative_factors.append(
                 pd.DataFrame({
-                    "class": [self.odme.class_names[i] for _ in range(demand_matrix.size)],
+                    "class": [name for _ in range(final.size)],
                     "Factors": factors.ravel()
                 })
             )
