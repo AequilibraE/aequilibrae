@@ -33,7 +33,7 @@ class ScalingFactors(object):
         self.names_to_indices = odme.names_to_indices
         self._sl_matrices = odme._sl_matrices
         self.demand_matrices = odme.demand_matrices
-        self.init_demand_matrices = odme.demand_matrices
+        self.init_demand_matrices = odme.init_demand_matrices
         if algorithm in ["reg_spiess"]:
             self._alpha, self._beta = odme.alpha, odme.beta
 
