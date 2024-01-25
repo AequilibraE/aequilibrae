@@ -170,6 +170,8 @@ class GraphBase(ABC):
                 neg_names.append(name + "_ba")
         not_pos = pd.DataFrame(not_pos, copy=True)[neg_names]
         not_pos.columns = names
+
+        # Swap the a and b nodes of these edges. Direction is used for mapping the graph.graph back to the network. It does not indicate the direction of the link.
         not_pos.loc[:, "direction"] = -1
         aux = np.array(not_pos.a_node.values, copy=True)
         not_pos.loc[:, "a_node"] = not_pos.loc[:, "b_node"]
