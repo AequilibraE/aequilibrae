@@ -31,8 +31,14 @@ import pandas as pd
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
+
+# COPIED FROM IPF
 from aequilibrae.context import get_active_project
 from aequilibrae.project.data.matrix_record import MatrixRecord
+from aequilibrae.matrix import AequilibraeMatrix
+import importlib.util as iutil
+spec = iutil.find_spec("openmatrix")
+has_omx = spec is not None
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -78,6 +84,15 @@ class ODME(object):
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
         self.original_demands = [np.copy(matrix) for matrix in self.demands]
+
+        self.matrix = assignment.classes[0].matrix
+        if self.matrix.is_omx():
+            self.output = AequilibraeMatrix()
+            self.output.create_from_omx(
+                self.output.random_name(), self.matrix.file_path, cores=self.matrix_names
+            )
+        else:
+            self.output = self.matrix.copy(AequilibraeMatrix().random_name(), memory_only=True)
 
         # Observed Links & Associated Volumes
         self.count_volumes = count_volumes.copy(deep=True)
@@ -249,16 +264,18 @@ class ODME(object):
         # Check what else needs to be done
         # See example in distribution file and copy
         # to save matrix as appropriate and store everything else appropriately.
+        for view_name,demand in zip(self.matrix_names, self.demands):
+            self.output.computational_view([view_name])
+            self.output.matrix_view = demand
 
         project = project or get_active_project()
         mats = project.matrices
-        # record = mats.new_record(name, file_name, self.output)
-        # record.procedure_id = self.procedure_id
-        # record.timestamp = self.procedure_date
-        # record.procedure = "Origin-Destination Matrix Estimation"
-        # record.save()
-        # return record
-        return
+        record = mats.new_record(name, file_name, self.output)
+        record.procedure_id = self.procedure_id
+        record.timestamp = self.procedure_date
+        record.procedure = "Origin-Destination Matrix Estimation"
+        record.save()
+        return record
 
     # Output/Results:
     def get_demands(self) -> list[np.ndarray]:
