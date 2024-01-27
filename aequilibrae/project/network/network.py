@@ -22,7 +22,7 @@ from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.network.osm_builder import OSMBuilder
-from aequilibrae.project.network.osm_utils.place_getter import placegetter
+from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close

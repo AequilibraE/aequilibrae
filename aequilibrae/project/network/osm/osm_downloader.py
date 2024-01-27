@@ -13,12 +13,12 @@ import logging
 import time
 import re
 import requests
-from .osm_utils.osm_params import http_headers, memory
+from .osm_params import http_headers, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
+from aequilibrae.utils import WorkerThread
 import gc
 import importlib.util as iutil
-from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
