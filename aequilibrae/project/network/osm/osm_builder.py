@@ -5,35 +5,37 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+from shapely import Point
+from shapely.geometry import Polygon
 
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.haversine import haversine
-from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.utils import WorkerThread
-
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 pyqt = iutil.find_spec("PyQt5") is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
 if iutil.find_spec("qgis") is not None:
-    import qgis
+    pass
 
 
 class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, osm_items: List, path: str, node_start=10000, project=None) -> None:
+    def __init__(self, osm_items: List, project, model_area: Polygon) -> None:
         WorkerThread.__init__(self, None)
         self.project = project or get_active_project()
         self.logger = self.project.logger
         self.osm_items = osm_items
-        self.path = path
-        self.node_start = node_start
+        self.model_area = model_area
+        self.path = self.project.path_to_file
+        self.node_start = 10000
         self.__link_types = None  # type: LinkTypes
         self.report = []
         self.__model_link_types = []
@@ -83,6 +85,7 @@ class OSMBuilder(WorkerThread):
             nid = node.pop("id")
             _ = node.pop("type")
             node["node_id"] = i + self.node_start
+            node["inside_model"] = self.model_area.contains(Point(node["lon"], node["lat"]))
             self.nodes[nid] = node
             self.node_df.append([node["node_id"], nid, node["lon"], node["lat"]])
             self.__emit_all(["Value", i])
@@ -186,6 +189,8 @@ class OSMBuilder(WorkerThread):
             if len(vars["modes"]) > 0:
                 for i in range(segments):
                     attributes = self.__build_link_data(vars, intersections, i, linknodes, node_ids, fields)
+                    if attributes is None:
+                        continue
                     all_attrs.append(attributes)
                     vars["link_id"] += 1
 
@@ -240,6 +245,9 @@ class OSMBuilder(WorkerThread):
         )
 
         geometry = ["{} {}".format(self.nodes[x]["lon"], self.nodes[x]["lat"]) for x in all_nodes]
+        inside_area = sum([self.nodes[x]["inside_model"] for x in all_nodes])
+        if inside_area == 0:
+            return None
         geometry = "LINESTRING ({})".format(", ".join(geometry))
 
         attributes = [vars.get(x) for x in fields]

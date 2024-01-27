@@ -1,18 +1,16 @@
 import importlib.util as iutil
 import math
-from sqlite3 import Connection as sqlc
 from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
 import shapely.wkt
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
@@ -20,9 +18,10 @@ from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
-from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.network.osm.osm_builder import OSMBuilder
+from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
+from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close
@@ -51,7 +50,6 @@ class Network(WorkerThread):
         from aequilibrae.paths import Graph
 
         WorkerThread.__init__(self, None)
-        self.source = project.source  # type: sqlc
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
         self.logger = project.logger
@@ -125,7 +123,7 @@ class Network(WorkerThread):
 
     def create_from_osm(
         self,
-        area: Optional[Polygon] = None,
+        model_area: Optional[Polygon] = None,
         place_name: Optional[str] = None,
         modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
@@ -184,11 +182,16 @@ class Network(WorkerThread):
             raise ValueError("'modes' needs to be string or list/tuple of string")
 
         if place_name is None:
-            if area.bounds[0] < -180 or area.bounds[2] > 180 or area.bounds[1] < -90 or area.bounds[3] > 90:        
+            if (
+                model_area.bounds[0] < -180
+                or model_area.bounds[2] > 180
+                or model_area.bounds[1] < -90
+                or model_area.bounds[3] > 90
+            ):
                 raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
+            west, south, east, north = model_area.bounds
         else:
             bbox, report = placegetter(place_name)
-            west, south, east, north = bbox
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
                 self.logger.warning(msg)
@@ -196,6 +199,8 @@ class Network(WorkerThread):
             for i in report:
                 if "PLACE FOUND" in i:
                     self.logger.info(i)
+            model_area = box(*bbox)
+            west, south, east, north = bbox
 
         # Need to compute the size of the bounding box to not exceed it too much
         height = haversine((east + west) / 2, south, (east + west) / 2, north)
@@ -206,7 +211,7 @@ class Network(WorkerThread):
         max_query_area_size = par["max_query_area_size"]
 
         if area < max_query_area_size:
-            polygons = [bbox]
+            polygons = [model_area]
         else:
             polygons = []
             parts = math.ceil(area / max_query_area_size)
@@ -220,8 +225,9 @@ class Network(WorkerThread):
                 for j in range(vertical):
                     ymin = max(-90, south + j * dy)
                     ymax = min(90, south + (j + 1) * dy)
-                    box = [xmin, ymin, xmax, ymax]
-                    polygons.append(box)
+                    subarea = box(xmin, ymin, xmax, ymax)
+                    if subarea.intersects(model_area):
+                        polygons.append(subarea)
         self.logger.info("Downloading data")
         self.downloader = OSMDownloader(polygons, modes, logger=self.logger)
         if pyqt:
@@ -230,7 +236,7 @@ class Network(WorkerThread):
         self.downloader.doWork()
 
         self.logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, self.source, project=self.project)
+        self.builder = OSMBuilder(self.downloader.json, project=self.project, model_area=model_area)
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)

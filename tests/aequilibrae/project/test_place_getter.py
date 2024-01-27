@@ -1,7 +1,8 @@
-from unittest import TestCase
-from aequilibrae.project.network.osm.place_getter import placegetter
-from random import random
 import os
+from random import random
+from unittest import TestCase
+
+from aequilibrae.project.network.osm.place_getter import placegetter
 
 
 class Test(TestCase):
