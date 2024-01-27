@@ -9,6 +9,7 @@ detach them in order to use OSMNx as a dependency or submodule
 
 For the original work, please see https://github.com/gboeing/osmnx
 """
+
 import logging
 import time
 import re
