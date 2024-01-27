@@ -31,6 +31,10 @@ project.new(fldr)
 # For the sake of this example, we will choose the small nation of Nauru.
 project.network.create_from_osm(place_name="Nauru")
 
+# We can also choose to create a model from a polygon (which must be in EPSG:4326)
+# Or from a Polygon defined by a bounding box, for example
+# project.network.create_from_osm(model_area=box(-112.185, 36.59, -112.179, 36.60))
+
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier
 links = project.network.links.data
