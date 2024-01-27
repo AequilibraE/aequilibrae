@@ -55,6 +55,9 @@ class OSMBuilder(WorkerThread):
             self.__worksetup()
             node_count = self.data_structures()
             self.importing_links(node_count, conn)
+            conn.execute(
+                "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
+            )
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def data_structures(self):
