@@ -1,7 +1,7 @@
 import importlib.util as iutil
 import math
 from sqlite3 import Connection as sqlc
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ from shapely.ops import unary_union
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network import OSMDownloader
+from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
@@ -21,7 +21,7 @@ from aequilibrae.project.network.links import Links
 from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.periods import Periods
-from aequilibrae.project.network.osm_builder import OSMBuilder
+from aequilibrae.project.network.osm.osm_builder import OSMBuilder
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -125,22 +125,17 @@ class Network(WorkerThread):
 
     def create_from_osm(
         self,
-        west: float = None,
-        south: float = None,
-        east: float = None,
-        north: float = None,
-        place_name: str = None,
+        area: Optional[Polygon] = None,
+        place_name: Optional[str] = None,
         modes=["car", "transit", "bicycle", "walk"],
     ) -> None:
         """
         Downloads the network from Open-Street Maps
 
         :Arguments:
-            **west** (:obj:`float`, Optional): West most coordinate of the download bounding box
 
-            **south** (:obj:`float`, Optional): South most coordinate of the download bounding box
-
-            **east** (:obj:`float`, Optional): East most coordinate of the download bounding box
+            **area** (:obj:`Polygon`, Optional): Polygon for which the network will be downloaded. If not provided,
+            a place name would be required
 
             **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
             required
@@ -189,9 +184,8 @@ class Network(WorkerThread):
             raise ValueError("'modes' needs to be string or list/tuple of string")
 
         if place_name is None:
-            if min(east, west) < -180 or max(east, west) > 180 or min(north, south) < -90 or max(north, south) > 90:
-                raise ValueError("Coordinates out of bounds")
-            bbox = [west, south, east, north]
+            if area.bounds[0] < -180 or area.bounds[2] > 180 or area.bounds[1] < -90 or area.bounds[3] > 90:        
+                raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
         else:
             bbox, report = placegetter(place_name)
             west, south, east, north = bbox

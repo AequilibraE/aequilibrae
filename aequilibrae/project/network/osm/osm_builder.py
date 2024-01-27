@@ -1,6 +1,5 @@
 import gc
 import importlib.util as iutil
-import sqlite3
 import string
 from typing import List
 
@@ -10,20 +9,17 @@ import pandas as pd
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network.link_types import LinkTypes
+from aequilibrae.project.network.haversine import haversine
 from aequilibrae.utils.spatialite_utils import connect_spatialite
-from .haversine import haversine
-from ...utils import WorkerThread
+from aequilibrae.utils import WorkerThread
 
 from aequilibrae.utils.db_utils import commit_and_close
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
+pyqt = iutil.find_spec("PyQt5") is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
-spec = iutil.find_spec("qgis")
-isqgis = spec is not None
-if isqgis:
+if iutil.find_spec("qgis") is not None:
     import qgis
 
 
