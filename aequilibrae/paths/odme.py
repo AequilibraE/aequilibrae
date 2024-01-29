@@ -29,12 +29,11 @@ import numpy as np
 import pandas as pd
 from os.path import join
 
-from aequilibrae.paths import TrafficAssignment
+from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 
 # COPIED FROM IPF
 from aequilibrae.context import get_active_project
-from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.matrix import AequilibraeMatrix
 import importlib.util as iutil
 spec = iutil.find_spec("openmatrix")
@@ -74,11 +73,10 @@ class ODME(object):
         """
         self.assignment = assignment
         self.classes = assignment.classes
-        self.class_names = [user_class.__id__ for user_class in self.classes]
         self.output = AequilibraeMatrix()
-
         self.__duplicate_matrices()
 
+        self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
         # The following are implicitly ordered by the list of Traffic Classes:
@@ -135,16 +133,32 @@ class ODME(object):
 
     def __duplicate_matrices(self):
         """
+        Duplicates the given matrices in memory only and replaces the TrafficClass objects.
         """
         args = {"zones": self.classes[0].matrix.zones,
         "matrix_names": [f"{user_class.__id__}_{user_class.matrix.view_names[0]}" for user_class in self.classes],
         "index_names": ["my_indices"],
         "memory_only": True,
         }
- 
+
         self.output.create_empty(**args)
 
         # Loop through TrafficClasses - create new and replace, then set classes
+        new_classes = []
+        for usr_cls in self.classes:
+            # NEED TO REPLACE THE MATRIX OBJECT
+            dup_matrix = self.output # Duplicated matrix
+            dup_matrix.index = usr_cls.matrix.index
+            dup_matrix.computational_view([f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"])
+            dup_matrix.matrix_view = np.array(usr_cls.matrix.matrix_view[:, :], copy=True)
+            # I DON'T THINK THIS WORKS CORRECTLY!
+            # NEED TO ALSO SET THE PCE!
+            new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix)
+            new_cls.set_pce(usr_cls.pce)
+            new_classes.append(TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix))
+
+        self.assignment.set_classes(new_classes)
+        self.classes = new_classes
 
     # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
@@ -273,7 +287,8 @@ class ODME(object):
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
-        # record.description = Create json and save to this file
+        # Note that below just involves doing str() to the particular results file.
+        # record.procedure_report = Create json and save to this file # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
         record.save()
 
     # Output/Results:
