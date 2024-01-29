@@ -3,9 +3,11 @@ import importlib.util as iutil
 import sqlite3
 import logging
 from pathlib import Path
+import string
 
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.context import get_logger
 import importlib.util as iutil
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -53,7 +55,11 @@ class OVMDownloader(WorkerThread):
         self.conn = None
         self.GeoDataFrame = []
         self.nodes = {}
-        self.node_ids = {}
+        self.node_ids = {}  
+        self.__link_types = None  # type: LinkTypes
+        self.__model_link_types = []
+        self.__model_link_type_ids = []
+        self.__link_type_quick_reference = {}
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path).replace("\\", "/")
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
@@ -167,6 +173,10 @@ class OVMDownloader(WorkerThread):
         """
         c.execute(sql_node)
 
+        self.conn = connect_spatialite(self.pth)
+        self.curr = self.conn.cursor()
+        self.__worksetup()
+
         # Creating links GeoDataFrame
         df_link = pd.read_parquet(output_file_link)
         geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
@@ -180,10 +190,6 @@ class OVMDownloader(WorkerThread):
         # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
         # gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
         gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
-        # all_nodes =[]
-        # for node in gdf_node['ovm_id']:
-        #     all_nodes.append(node)
-        # print(all_nodes)
         gdf_node['node_id'] = self.create_node_ids(gdf_node)
         
         
@@ -192,9 +198,6 @@ class OVMDownloader(WorkerThread):
 
         # Iterate over rows using iterrows()
         result_dfs = []
-        # print('table')
-        # print(self.get_speed(gdf_link)['speed'])
-        # print()
         for index, row in gdf_link.iterrows():
             # Process each row and append the resulting GeoDataFrame to the list
             processed_df = self.split_connectors(row)
@@ -264,10 +267,6 @@ class OVMDownloader(WorkerThread):
         gdf_node.to_parquet(output_file_node)
         g_dataframes.append(gdf_node)
         self.GeoDataFrame.append(g_dataframes)
-        # print(self.pth)
-
-        self.conn = connect_spatialite(self.pth)
-        self.curr = self.conn.cursor()
 
         table = "links"
         # fields = self.get_link_fields()
@@ -295,7 +294,7 @@ class OVMDownloader(WorkerThread):
         self.conn.executemany(sql, node_df)
         self.conn.commit()
 
-        all_attrs = final_result.head().values.tolist()
+        all_attrs = final_result.values.tolist()
 
         sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(link_order) - 1)))
         self.logger.info("Adding network links")
@@ -312,7 +311,51 @@ class OVMDownloader(WorkerThread):
 
         return g_dataframes    
     
-    
+    def __worksetup(self):
+        self.__link_types = self.project.network.link_types
+        lts = self.__link_types.all_types()
+        for lt_id, lt in lts.items():
+            self.__model_link_types.append(lt.link_type)
+            self.__model_link_type_ids.append(lt_id)
+
+    def __repair_link_type(self, link_type: str) -> str:
+        original_link_type = link_type
+        link_type = "".join([x for x in link_type if x in string.ascii_letters + "_"]).lower()
+        split = link_type.split("_")
+        for i, piece in enumerate(split[1:]):
+            if piece in ["link", "segment", "stretch"]:
+                link_type = "_".join(split[0 : i + 1])
+
+        if len(link_type) == 0:
+            link_type = "empty"
+
+        if len(self.__model_link_type_ids) >= 51 and link_type not in self.__model_link_types:
+            link_type = "aggregate_link_type"
+
+        if link_type in self.__model_link_types:
+            lt = self.__link_types.get_by_name(link_type)
+            if original_link_type not in lt.description:
+                lt.description += f", {original_link_type}"
+                lt.save()
+            self.__link_type_quick_reference[original_link_type.lower()] = link_type
+            return link_type
+
+        letter = link_type[0]
+        if letter in self.__model_link_type_ids:
+            letter = letter.upper()
+            if letter in self.__model_link_type_ids:
+                for letter in string.ascii_letters:
+                    if letter not in self.__model_link_type_ids:
+                        break
+        letter
+        lt = self.__link_types.new(letter)
+        lt.link_type = link_type
+        lt.description = f"Link types from Overture Maps: {original_link_type}"
+        lt.save()
+        self.__model_link_types.append(link_type)
+        self.__model_link_type_ids.append(letter)
+        self.__link_type_quick_reference[original_link_type.lower()] = link_type
+        return link_type
 
     def create_node_ids(self, data_frame):
         '''
@@ -423,17 +466,19 @@ class OVMDownloader(WorkerThread):
     def split_connectors(self, row):
         # Extract necessary information from the row     
         connectors = row['connectors']
+        
         direction_dictionary = self.get_direction(row['direction'])
         # Check if 'Connectors' has more than 2 elements
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
             rows = []
+            
             for i in range(len(connectors) - 1):
-                # print(self.get_direction(row['direction']))
                 new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 
                            'b_node': self.nodes[connectors[i + 1]]['node_id'], 
                            'direction': direction_dictionary['direction'], 
-                           'link_type': row['link_type'],
+                           'link_type': self.__link_type_quick_reference.get(
+                                row["link_type"].lower(), self.__repair_link_type(row["link_type"])),
                            'name': row['name'], 'speed_ab': self.get_speed(row['speed']), 
                            'ovm_id': row['ovm_id'], 
                            'geometry': row['geometry'],
@@ -486,10 +531,7 @@ class OVMDownloader(WorkerThread):
         has_fields = [x[1].lower() for x in structure]
         fields = [field.lower() for field in self.get_link_fields()] + ["ovm_id"]
         for field in [f for f in fields if f not in has_fields]:
-            print(field)
             ltype = self.get_link_field_type(field).upper()
-            print(ltype)
-            print()
             curr.execute(f"Alter table Links add column {field} {ltype}")
         self.conn.commit()
 
