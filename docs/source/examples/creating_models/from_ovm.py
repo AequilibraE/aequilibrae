@@ -1,5 +1,6 @@
 # %%
 # Imports
+from pathlib import Path
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
@@ -19,12 +20,29 @@ project.new(fldr)
 # and data wrangling that will be done)
 
 # We can create from a bounding box or a named place.
-# For the sake of this example, we will choose the small nation of Nauru.
-project.network.create_from_ovm(west=148.7077, south=-20.2780, east=148.7324, north=-20.2621, data_source=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
-bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+# For the sake of this example, we will choose the small town of Airlie Beach.
+dir = str(Path('../../../../').resolve())
 
-# project.network.create_from_ovm(west=153.1771, south=-27.6851, east=153.2018, north=-27.6703, data_source=r'C:\Users\penny\git\data\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
+# We have stored Airlie Beach's transportation parquet files in the folder with the file path data_source below as using the cloud-native Parquet files takes a much longer time to run
+# We recommend downloading these cloud-native Parquet files to drive and replacing the data_source file to match
+# The application of Microsoft Azure Storage Explorer was used to download this data. Steps to accieve this:
+#  - right click Storage accounts and select 'Connect to Azure Storage', this will cause a window to pop up 
+#  - Select 'Blob container or directory'
+#  - Select 'Anonymously (my blob container allows public access)'
+#  - In the box 'Blob container or directory URL:' paste in the Overture Maps cloud-native Parquet file loction specified on thier github download page with the
+#    current url being 'https://github.com/OvertureMaps/data/blob/main/README.md#how-to-access-overture-maps-data'
+#    for example the theme transportation the location for Microsoft Azure is 'https://overturemapswestus2.blob.core.windows.net/release/2024-01-17-alpha.0/theme=admins'
+#    In the box 'Display name:' this label does not impact the information being downloaded, it's recommend to input the theme of the blob data being imported
+#    for this example the display name should be transportation.
+
+data_source = Path(dir) / 'tests' / 'data' / 'overture' / 'theme=transportation'
+
+#The "bbox" parameter specifies the bounding box encompassing the desired geographical location. In the given example, this refers to the bounding box that encompasses Airlie Beach.
+bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=data_source)
+
 # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
+# project.network.create_from_ovm(west=brisbane_bbox[0], south=brisbane_bbox[1], east=brisbane_bbox[2], north=brisbane_bbox[3], data_source=r'C:\Users\penny\git\data\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
 # links = download[0]
 # nodes = download[1]
  # %%
