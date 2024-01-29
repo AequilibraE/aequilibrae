@@ -27,7 +27,7 @@ from uuid import uuid4
 from datetime import datetime
 import numpy as np
 import pandas as pd
-#import os
+from os.path import join
 
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
@@ -45,15 +45,13 @@ class ODME(object):
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
+    DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50, "convergence_crit": 10**-4, "inner_convergence": 10**-4}
 
     # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame, # [class, link_id, direction, obs_volume]
-        stop_crit={"max_outer": 50,
-            "max_inner": 50,
-            "convergence_crit": 10**-4,
-            "inner_convergence": 10**-4},
+        stop_crit=None,
         alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
         algorithm: str = "spiess", # currently defaults to spiess
         verbose: bool = False # For printing as we go
@@ -77,6 +75,10 @@ class ODME(object):
         self.assignment = assignment
         self.classes = assignment.classes
         self.class_names = [user_class.__id__ for user_class in self.classes]
+        self.output = AequilibraeMatrix()
+
+        self.__duplicate_matrices()
+
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
         # The following are implicitly ordered by the list of Traffic Classes:
@@ -84,15 +86,6 @@ class ODME(object):
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
         self.original_demands = [np.copy(matrix) for matrix in self.demands]
-
-        self.matrix = assignment.classes[0].matrix
-        if self.matrix.is_omx():
-            self.output = AequilibraeMatrix()
-            self.output.create_from_omx(
-                self.output.random_name(), self.matrix.file_path, cores=self.matrix_names
-            )
-        else:
-            self.output = self.matrix.copy(AequilibraeMatrix().random_name(), memory_only=True)
 
         # Observed Links & Associated Volumes
         self.count_volumes = count_volumes.copy(deep=True)
@@ -116,6 +109,8 @@ class ODME(object):
 
         # Stopping criterion
         # CHANGE TO DICTIONARY
+        if not stop_crit:
+            stop_crit = self.DEFAULT_STOP_CRIT
         self.max_outer = stop_crit["max_outer"]
         self.max_inner = stop_crit["max_inner"]
         self.outer_convergence_crit = stop_crit["convergence_crit"]
@@ -137,6 +132,19 @@ class ODME(object):
         # Procedure Information:
         self.procedure_date = ""
         self.procedure_id = ""
+
+    def __duplicate_matrices(self):
+        """
+        """
+        args = {"zones": self.classes[0].matrix.zones,
+        "matrix_names": [f"{user_class.__id__}_{user_class.matrix.view_names[0]}" for user_class in self.classes],
+        "index_names": ["my_indices"],
+        "memory_only": True,
+        }
+ 
+        self.output.create_empty(**args)
+
+        # Loop through TrafficClasses - create new and replace, then set classes
 
     # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
@@ -247,7 +255,7 @@ class ODME(object):
         else:
             self._obj_func = __obj_func
 
-    def save_to_project(self, name: str, file_name: str, project=None) -> MatrixRecord:
+    def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the final demand matrix output to the project file
 
         :Arguments:
@@ -258,24 +266,15 @@ class ODME(object):
 
             NOT YET COMPLETED!!!
         """
-        # Find project.sqlite procedure inputs
-        # Find filepath to place new demand matrix
-        # Find timestamp
-        # Check what else needs to be done
-        # See example in distribution file and copy
-        # to save matrix as appropriate and store everything else appropriately.
-        for view_name,demand in zip(self.matrix_names, self.demands):
-            self.output.computational_view([view_name])
-            self.output.matrix_view = demand
-
         project = project or get_active_project()
         mats = project.matrices
-        record = mats.new_record(name, file_name, self.output)
+        self.output.copy(join(mats.fldr, file_name)) # 'Save As'
+        record = mats.new_record(name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
+        # record.description = Create json and save to this file
         record.save()
-        return record
 
     # Output/Results:
     def get_demands(self) -> list[np.ndarray]:
@@ -451,7 +450,7 @@ class ODME(object):
             volume.
             """
             sl_matrix = self._sl_matrices[self.get_sl_key(row)]
-            demand_matrix = self.demand_matrices[self.names_to_indices[row['class']]]
+            demand_matrix = self.demands[self.names_to_indices[row['class']]]
             return np.sum(sl_matrix * demand_matrix)
 
         # Calculate flows for all rows:
