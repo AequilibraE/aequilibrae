@@ -9,10 +9,19 @@ from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from unittest import TestCase
 import os
 
+from uuid import uuid4
+from os.path import join
+from aequilibrae import Project
+from aequilibrae.project.network.ovm_builder import OVMBuilder
+
 class TestOVMProcessor(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         self.pth = Path(mkdtemp(prefix="aequilibrae"))
+
+        self.fldr = join(gettempdir(), uuid4().hex)
+        self.project = Project()
+        self.project.new(self.fldr)
 
     def test_link_geo_trimmer(self):
         node1 = (148.7165148, -20.273062)
@@ -24,8 +33,9 @@ class TestOVMProcessor(TestCase):
         node_lu = {1: {'lat': node1[1], 'long': node1[0], 'coord': node1},
                    2: {'lat': node2[1], 'long': node2[0], 'coord': node2}}
     
-        o = OVMDownloader(["car"], self.pth)
-        
+        dataframes = [link_gdf, gpd.GeoDataFrame()]
+        o = OVMBuilder(ovm_download=dataframes, project_path=self.pth, project=self.project)
+
         # Iterate over the correct range
         new_geom['geometry'] = [o.trim_geometry(node_lu, row) for e, row in link_gdf.iterrows()]
 
@@ -44,7 +54,6 @@ class TestOVMProcessor(TestCase):
         """
         segment and node infomation is currently [1] element of links when running from_ovm.py
         """
-        o = OVMDownloader(["car"], self.pth)
 
         no_info = None
         simple = [{"direction": "backward"}, 
@@ -117,6 +126,10 @@ class TestOVMProcessor(TestCase):
         a_node = {'ovm_id': '8f9d0e128cd9709-167FF64A37F1BFFB', 'geometry': shapely.Point(148.72460, -20.27472)}
         b_node = {'ovm_id': '8f9d0e128cd98d6-15FFF68E65613FDF', 'geometry': shapely.Point(148.72471, -20.27492)}
         node_df = gpd.GeoDataFrame(data=[a_node,b_node])
+
+        dataframes = [gpd.GeoDataFrame(), node_df]
+        o = OVMBuilder(ovm_download=dataframes, project_path=self.pth, project=self.project)
+
 
         def segment(direction, road):
             segment = {'ovm_id': '8b9d0e128cd9fff-163FF6797FC40661', 'connectors': ['8f9d0e128cd9709-167FF64A37F1BFFB', '8f9d0e128cd98d6-15FFF68E65613FDF'], 'direction': direction, 

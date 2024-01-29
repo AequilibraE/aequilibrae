@@ -296,8 +296,7 @@ class OVMBuilder(WorkerThread):
                 new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 
                            'b_node': self.nodes[connectors[i + 1]]['node_id'], 
                            'direction': direction_dictionary['direction'], 
-                           'link_type': self.__link_type_quick_reference.get(
-                                row["link_type"].lower(), self.__repair_link_type(row["link_type"])),
+                           'link_type': self.__link_type_quick_reference.get(row["link_type"].lower(), self.__repair_link_type(row["link_type"])),
                            'name': row['name'], 'speed_ab': self.get_speed(row['speed']), 
                            'ovm_id': row['ovm_id'], 
                            'geometry': row['geometry'],
