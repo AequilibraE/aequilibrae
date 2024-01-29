@@ -14,6 +14,7 @@ from shapely.ops import unary_union
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network import OSMDownloader
+from aequilibrae.project.network.ovm_builder import OVMBuilder
 from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
@@ -206,6 +207,15 @@ class Network(WorkerThread):
         # downloaded = self.downloader.downloadTransportation(bbox,data_source,output_dir)
         # self.links = downloaded[0]
         # self.nodes = downloaded[1]
+
+        self.logger.info("Building Network")
+        self.builder = OVMBuilder(self.downloader.g_dataframes, self.source, project=self.project)
+
+        if pyqt:
+            self.builder.building.connect(self.signal_handler)
+        print('hi')
+        self.builder.doWork(output_dir)
+        print('no')
 
         self.logger.info("Network built successfully")
 
