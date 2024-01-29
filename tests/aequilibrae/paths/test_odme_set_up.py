@@ -34,7 +34,7 @@ class TestODMESingleClassSetUp(TestCase):
         self.project.open(proj_path)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs["c"]  # type: Graph
-    
+
         self.car_graph.set_graph("free_flow_time")
         self.car_graph.set_blocked_centroid_flows(False)
         self.matrix = self.project.matrices.get_matrix("demand_omx")
@@ -459,7 +459,7 @@ class TestODMESingleClassSetUp(TestCase):
         new_demand = odme.get_demands()[0]
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
+        flow = assign_df.loc[assign_df["link_id"] == 1, "car_matrix_ab"].values[0]
 
         # Assertions:
         #   Resulting Demand Matrix:
@@ -470,7 +470,7 @@ class TestODMESingleClassSetUp(TestCase):
         #   Flow Matches Observation:
         self.assertAlmostEqual(flow, 40, msg="Newly assigned flow doesn't match observed.")
         #   Only Link 1 has Non-Zero Flow:
-        test = (assign_df["matrix_ab"] == 0) | (assign_df["link_id"] == 1)
+        test = (assign_df["car_matrix_ab"] == 0) | (assign_df["link_id"] == 1)
         self.assertTrue(test.all(), msg="Unexpected non-zero link flow.")
 
     def test_basic_3_2(self) -> None:
@@ -509,7 +509,9 @@ class TestODMESingleClassSetUp(TestCase):
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
+        new_flow = assign_df.loc[assign_df["link_id"] == 38, "car_matrix_ab"].values[0]
+
+        self.matrix = self.assignment.classes[0].matrix
 
         # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
         self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
@@ -549,8 +551,10 @@ class TestODMESingleClassSetUp(TestCase):
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
-        flow_35 = assign_df.loc[assign_df["link_id"] == 35, "matrix_ab"].values[0]
+        flow_5 = assign_df.loc[assign_df["link_id"] == 5, "car_matrix_ab"].values[0]
+        flow_35 = assign_df.loc[assign_df["link_id"] == 35, "car_matrix_ab"].values[0]
+
+        self.matrix = self.assignment.classes[0].matrix
 
         # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
         self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
