@@ -37,9 +37,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     signal = SignalImpl(object)
 
-    def __init__(
-        self, network, agency_identifier, file_path, day="", description="", default_capacities={}
-    ):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -69,7 +67,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
-        self.__default_capacities = default_capacities
+        self.__default_capacities = capacities
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
