@@ -1,12 +1,19 @@
 import json
+import importlib.util as iutil
+import sqlite3
 import logging
 from pathlib import Path
 
+from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
 import importlib.util as iutil
+from aequilibrae.utils.spatialite_utils import connect_spatialite
 from aequilibrae.project.network.haversine import haversine
 from aequilibrae.utils import WorkerThread
+
+# from .haversine import haversine
+# from ...utils import WorkerThread
 
 import duckdb
 import shapely
@@ -23,6 +30,11 @@ pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
+spec = iutil.find_spec("qgis")
+isqgis = spec is not None
+if isqgis:
+    import qgis 
+
 class OVMDownloader(WorkerThread):
     if pyqt:
         downloading = pyqtSignal(object)
@@ -31,8 +43,9 @@ class OVMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None, node_start=10000):
+    def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None, node_start=10000, project=None) -> None:
         WorkerThread.__init__(self, None)
+        self.project = project or get_active_project()
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
         self.node_start = node_start
@@ -42,7 +55,8 @@ class OVMDownloader(WorkerThread):
         self.nodes = {}
         self.node_ids = {}
         self.__project_path = Path(project_path)
-        self.pth = str(self.__project_path / 'theme=transportation').replace("\\", "/")
+        self.pth = str(self.__project_path).replace("\\", "/")
+        self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
 
     def initialise_duckdb_spatial(self):
         conn = duckdb.connect()
@@ -99,8 +113,8 @@ class OVMDownloader(WorkerThread):
         g_dataframes = []
         # for t in ['segment','connector']:
             
-        output_file_link = output_dir  / f'type=segment' / f'transportation_data_segment.parquet'
-        output_file_node = output_dir  / f'type=connector' / f'transportation_data_connector.parquet'
+        output_file_link = output_dir / f'theme=transportation' / f'type=segment' / f'transportation_data_segment.parquet'
+        output_file_node = output_dir / f'theme=transportation' / f'type=connector' / f'transportation_data_connector.parquet'
             # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
         output_file_link.parent.mkdir(parents=True, exist_ok=True)
         output_file_node.parent.mkdir(parents=True, exist_ok=True)
@@ -166,8 +180,13 @@ class OVMDownloader(WorkerThread):
         # Convert the 'speed' column values from JSON strings to Python objects, taking the first element if present
         # gdf_link['speed'] = gdf_link['speed'].apply(lambda x: json.loads(x)[0] if x else None)
         gdf_link['name'] = gdf_link['name'].apply(lambda x: json.loads(x)[0]['value'] if x else None)
-        
+        # all_nodes =[]
+        # for node in gdf_node['ovm_id']:
+        #     all_nodes.append(node)
+        # print(all_nodes)
         gdf_node['node_id'] = self.create_node_ids(gdf_node)
+        
+        
         gdf_node['ogc_fid'] = pd.Series(list(range(1, len(gdf_node) + 1)))
         gdf_node['is_centroid'] = 0
 
@@ -191,8 +210,8 @@ class OVMDownloader(WorkerThread):
         final_result['ogc_fid'] = pd.Series(list(range(1, len(final_result) + 1)))
         final_result['geometry'] = [self.trim_geometry(self.node_ids, row) for e, row in final_result[['a_node','b_node','geometry']].iterrows()]
         
-        final_result['travel_time'] = 1
-        final_result['capacity'] = 1
+        final_result['travel_time_ab'] = None
+        final_result['capacity_ab'] = None
 
         distance_list = []
         for i in range(0, len(final_result)):
@@ -221,13 +240,23 @@ class OVMDownloader(WorkerThread):
         else:
             # No common nodes found
             raise ValueError("No common nodes.")
+        fields = self.get_link_fields()
+        link_order = fields.copy() + ['geometry']
 
-        link_order = ['ogc_fid', 'link_id', 'connectors', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'road', 'name', 'restrictions', 'speed', 'travel_time', 'capacity', 'ovm_id', 'lanes_ab', 'lanes_ba', 'geometry']
+        for element in link_order:
+            if element not in final_result:
+                final_result[element] = None
+        
+
+        # link_order = ['ogc_fid', 'link_id', 'a_node', 'b_node', 'direction', 'distance', 'modes', 'link_type', 'name', 'speed_ab', 'lanes_ab', 'lanes_ba', 'travel_time_ab', 'capacity_ab', 'ovm_id', 'geometry']
         final_result = final_result[link_order]
+        
 
         final_result.to_parquet(output_file_link)
         g_dataframes.append(final_result)
         self.GeoDataFrame.append(g_dataframes)
+
+        final_result['geometry'] = final_result['geometry'].astype(str)
 
         node_order = ['ogc_fid', 'node_id', 'is_centroid', 'modes', 'link_types', 'ovm_id', 'geometry']
         gdf_node = gdf_node[node_order]
@@ -235,7 +264,55 @@ class OVMDownloader(WorkerThread):
         gdf_node.to_parquet(output_file_node)
         g_dataframes.append(gdf_node)
         self.GeoDataFrame.append(g_dataframes)
+        # print(self.pth)
+
+        self.conn = connect_spatialite(self.pth)
+        self.curr = self.conn.cursor()
+
+        table = "links"
+        # fields = self.get_link_fields()
+        # fields.pop(fields.index('link_id'))
+        
+        self.__update_table_structure()
+        field_names = ",".join(fields)        
+
+        self.logger.info("Adding network nodes")
+        self.__emit_all(["text", "Adding network nodes"])
+
+        sql = "insert into nodes(node_id, is_centroid, ovm_id, geometry) Values(?, 0, ?, MakePoint(?,?, 4326))"
+        node_df = []
+        for node_attributes in gdf_node.iterrows():
+
+            node_df.append([node_attributes[1].iloc[1],
+                              node_attributes[1].iloc[5],
+                              node_attributes[1].iloc[6].coords[0][0],
+                              node_attributes[1].iloc[6].coords[0][1]])
+        node_df = (
+            pd.DataFrame(node_df, columns=["A", "B", "C", "D"])
+            .drop_duplicates(subset=["C", "D"])
+            .to_records(index=False)
+        )
+        self.conn.executemany(sql, node_df)
+        self.conn.commit()
+
+        all_attrs = final_result.head().values.tolist()
+
+        sql = self.insert_qry.format(table, field_names, ",".join(["?"] * (len(link_order) - 1)))
+        self.logger.info("Adding network links")
+        self.__emit_all(["text", "Adding network links"])
+        try:
+            self.curr.executemany(sql, all_attrs)
+        except Exception as e:
+            self.logger.error("error when inserting link {}. Error {}".format(all_attrs[0], e.args))
+            self.logger.error(sql)
+            raise e
+
+        self.conn.commit()
+        self.curr.close()
+
         return g_dataframes    
+    
+    
 
     def create_node_ids(self, data_frame):
         '''
@@ -318,7 +395,7 @@ class OVMDownloader(WorkerThread):
         loosely adapted from http://www.github.com/gboeing/osmnx
         """
 
-        p = Parameters().parameters["network"]["osm"]
+        p = Parameters().parameters["network"]["ovm"]
         all_tags = p["all_link_types"]
 
         p = p["modes"]
@@ -353,18 +430,16 @@ class OVMDownloader(WorkerThread):
             rows = []
             for i in range(len(connectors) - 1):
                 # print(self.get_direction(row['direction']))
-                new_row = {'connectors': [self.nodes[connectors[ii]]['node_id'] for ii in range(len(connectors))],
-                           'a_node': self.nodes[connectors[i]]['node_id'], 
+                new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 
                            'b_node': self.nodes[connectors[i + 1]]['node_id'], 
                            'direction': direction_dictionary['direction'], 
-                           'link_type': row['link_type'], 
-                           'road': row['road'], 
-                           'name': row['name'], 'speed': self.get_speed(row['speed']), 
+                           'link_type': row['link_type'],
+                           'name': row['name'], 'speed_ab': self.get_speed(row['speed']), 
                            'ovm_id': row['ovm_id'], 
-                           'geometry': row['geometry'], 
+                           'geometry': row['geometry'],
                            'lanes_ab': direction_dictionary['lanes_ab'], 
-                           'lanes_ba': direction_dictionary['lanes_ba'], 
-                           'restrictions': row['speed']}
+                           'lanes_ba': direction_dictionary['lanes_ba']
+                           }
                 rows.append(new_row)
             processed_df = gpd.GeoDataFrame(rows)
         else:
@@ -404,6 +479,46 @@ class OVMDownloader(WorkerThread):
                 adjusted_speed = round(sum(new_list),2)
         return adjusted_speed
     
+    def __update_table_structure(self):
+        curr = self.conn.cursor()
+        curr.execute("pragma table_info(Links)")
+        structure = curr.fetchall()
+        has_fields = [x[1].lower() for x in structure]
+        fields = [field.lower() for field in self.get_link_fields()] + ["ovm_id"]
+        for field in [f for f in fields if f not in has_fields]:
+            print(field)
+            ltype = self.get_link_field_type(field).upper()
+            print(ltype)
+            print()
+            curr.execute(f"Alter table Links add column {field} {ltype}")
+        self.conn.commit()
+
+    @staticmethod
+    def get_link_fields():
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+        owf = [list(x.keys())[0] for x in fields["one-way"]]
+
+        twf1 = ["{}_ab".format(list(x.keys())[0]) for x in fields["two-way"]]
+        twf2 = ["{}_ba".format(list(x.keys())[0]) for x in fields["two-way"]]
+
+        return owf + twf1 + twf2 + ["ovm_id"]
+    
+    @staticmethod
+    def get_link_field_type(field_name):
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        if field_name[-3:].lower() in ["_ab", "_ba"]:
+            field_name = field_name[:-3]
+            for tp in fields["two-way"]:
+                if field_name in tp:
+                    return tp[field_name]["type"]
+        else:
+            for tp in fields["one-way"]:
+                if field_name in tp:
+                    return tp[field_name]["type"]
+    
     @staticmethod
     def get_direction(directions_list):
         new_list = []
@@ -415,7 +530,6 @@ class OVMDownloader(WorkerThread):
                             'reversible': 'Travel is one-way and changes between forward and backward infrequently'}
         
         # Lambda function to check numbers and create a new dictionary
-
         check_numbers = lambda lst: {
                 'direction': 1 if all(x == 1 for x in lst) else -1 if all(x == -1 for x in lst) else 0,
                 'lanes_ab': lst.count(1) if 1 in lst else None,

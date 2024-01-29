@@ -202,10 +202,10 @@ class Network(WorkerThread):
         self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
         if pyqt:
             self.downloader.downloading.connect(self.signal_handler)
-        
-        downloaded = self.downloader.downloadTransportation(bbox,data_source,output_dir)
-        self.links = downloaded[0]
-        self.nodes = downloaded[1]
+        self.downloader.downloadTransportation(bbox,data_source,output_dir)
+        # downloaded = self.downloader.downloadTransportation(bbox,data_source,output_dir)
+        # self.links = downloaded[0]
+        # self.nodes = downloaded[1]
 
         self.logger.info("Network built successfully")
 

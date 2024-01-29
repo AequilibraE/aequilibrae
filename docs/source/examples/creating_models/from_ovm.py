@@ -28,13 +28,14 @@ bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
 # links = download[0]
 # nodes = download[1]
  # %%
-links = project.network.links
-nodes = project.network.nodes
+links = project.network.links.data
+
+# links = project.network.links
+# nodes = project.network.nodes
 links
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier
-# links = project.network.links.data
 
 # We create a Folium layer
 network_links = folium.FeatureGroup("links")
