@@ -74,7 +74,7 @@ class ODME(object):
         self.assignment = assignment
         self.classes = assignment.classes
         self.output = AequilibraeMatrix()
-        self.__duplicate_matrices()
+        #self.__duplicate_matrices()
 
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
@@ -154,7 +154,8 @@ class ODME(object):
             dup_matrix.computational_view([f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"])
             new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix)
             new_cls.set_pce(usr_cls.pce)
-            new_cls.set_fixed_cost(usr_cls.fixed_cost_field, usr_cls.fc_multiplier)
+            if usr_cls.fixed_cost_field:
+                new_cls.set_fixed_cost(usr_cls.fixed_cost_field, usr_cls.fc_multiplier)
             new_cls.set_vot(usr_cls.vot)
             new_classes.append(TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix))
 
