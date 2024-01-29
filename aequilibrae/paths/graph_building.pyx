@@ -248,7 +248,7 @@ def build_compressed_graph(graph):
         burnt_links,
     )
 
-    graph.dead_end_links = graph.graph.link_id.values[burnt_links >= 0]  # Perhaps filter to unique link_ids? There'll be duplicates in here
+    graph.dead_end_links = graph.graph.link_id.values[burnt_links]  # Perhaps filter to unique link_ids? There'll be duplicates in here
     df = pd.DataFrame(graph.network, copy=True)
     if graph.dead_end_links.shape[0]:
         df = df[~df.link_id.isin(graph.dead_end_links)]
