@@ -99,15 +99,10 @@ class AequilibraeData(object):
 
             if not isinstance(self.data_types, list):
                 raise ValueError('Data types, "data_types", needs to be a list')
-            # The check below is not working properly with the QGIS importer
-            # else:
-            #     for dt in self.data_types:
-            #         if not isinstance(dt, type):
-            #             raise ValueError('Data types need to be Python or Numpy data types')
 
             for field in self.fields:
-                if isinstance(field, str):
-                    raise TypeError(field + " is not a string. You cannot use it as a field name")
+                if not isinstance(field, str):
+                    raise TypeError(f"{field} is not a string. You cannot use it as a field name")
                 if not field.isidentifier():
                     raise Exception(field + " is a not a valid identifier name. You cannot use it as a field name")
                 if field in object.__dict__:
@@ -115,7 +110,7 @@ class AequilibraeData(object):
 
             self.num_fields = len(self.fields)
 
-            dtype = [("index", self.aeq_index_type)] + [list(zip(self.fields, self.data_types))]
+            dtype = [("index", self.aeq_index_type)] + list(zip(self.fields, self.data_types))
 
             # the file
             if self.memory_mode:
