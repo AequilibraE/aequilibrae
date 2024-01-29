@@ -39,7 +39,7 @@ def test__populate(data):
         if key in data:
             assert val == data[key], "Stop population with record failed"
 
-    new_data = deepcopy(data.items())
+    new_data = deepcopy(data)
     new_data[randomword(randint(1, 15))] = randomword(randint(1, 20))
     with pytest.raises(KeyError):
         _ = Stop(1, tuple(new_data.values()), list(new_data.keys()))

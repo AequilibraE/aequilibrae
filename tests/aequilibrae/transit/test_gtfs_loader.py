@@ -33,7 +33,7 @@ def test_load_data(gtfs_loader, gtfs_fldr):
 
     df = cap[cap.city == "Coquimbo"]
     df.loc[df.min_distance < 100, "speed"] = 10
-    dict_speeds = dict(df.groupby(["mode"]))
+    dict_speeds = {x: df for x, df in df.groupby(["mode"])} # noqa: C416
     gtfs = gtfs_loader
 
     gtfs._set_maximum_speeds(dict_speeds)
