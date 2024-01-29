@@ -5,6 +5,7 @@ import tempfile
 import uuid
 import warnings
 from functools import reduce
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -128,7 +129,7 @@ class AequilibraeMatrix(object):
 
     def __save_as(self, file_name: str, cores: List[str]):
 
-        if ".aem" in file_name:
+        if Path(file_name).suffix.lower() == ".aem":
             mat = AequilibraeMatrix()
             args = {
                 "zones": self.zones,
@@ -146,7 +147,7 @@ class AequilibraeMatrix(object):
             mat.close()
             del mat
 
-        elif ".omx" in file_name:
+        elif Path(file_name).suffix.lower() == ".omx":
             omx_mat = omx.open_file(file_name, "w")
             for core in cores:
                 omx_mat[core] = self.matrix[core]
