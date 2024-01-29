@@ -96,7 +96,6 @@ assig.execute()  # we then execute the assignment
 
 # %%
 # Convergence report is easy to see
-import pandas as pd
 
 convergence_report = assig.report()
 print(convergence_report.head())

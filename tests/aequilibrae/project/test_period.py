@@ -1,12 +1,9 @@
 from unittest import TestCase
-from sqlite3 import IntegrityError
 import os
 from shutil import copytree, rmtree
-from random import randint, random
+from random import randint
 import uuid
 from tempfile import gettempdir
-from shapely.geometry import Point
-import shapely.wkb
 from aequilibrae.project import Project
 import pandas as pd
 

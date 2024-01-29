@@ -1,4 +1,3 @@
-from copy import deepcopy
 import importlib.util as iutil
 import logging
 import socket
@@ -19,7 +18,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
+from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.paths.optimal_strategies import OptimalStrategies

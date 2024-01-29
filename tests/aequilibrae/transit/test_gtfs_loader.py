@@ -1,13 +1,11 @@
-from os.path import join, dirname, abspath
+from os.path import join
 from pathlib import Path
 
 import pytest
 
 import pandas as pd
-from aequilibrae.transit import Transit
 
 from aequilibrae.transit.gtfs_loader import GTFSReader
-from aequilibrae.utils.create_example import create_example
 
 
 @pytest.fixture

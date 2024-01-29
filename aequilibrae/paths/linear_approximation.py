@@ -4,15 +4,12 @@ import os
 from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
-from typing import List, Dict
 
 import numpy as np
 
 from aequilibrae import global_logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
-from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.context import get_active_project
 from ..utils import WorkerThread
 
 try:
@@ -36,7 +33,7 @@ else:
     global_logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
-    from aequilibrae.paths.traffic_assignment import TrafficAssignment
+    pass
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None

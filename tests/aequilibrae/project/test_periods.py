@@ -1,14 +1,12 @@
 import os
 import uuid
 from copy import copy, deepcopy
-from random import randint, random
+from random import randint
 from shutil import copytree, rmtree
 from tempfile import gettempdir
 from unittest import TestCase, TestLoader as _TestLoader
 import pandas as pd
 
-import shapely.wkb
-from shapely.geometry import Point
 
 from aequilibrae.project import Project
 from ...data import siouxfalls_project

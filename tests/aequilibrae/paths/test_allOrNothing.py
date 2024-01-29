@@ -3,10 +3,8 @@ from tempfile import gettempdir
 from unittest import TestCase
 import uuid
 from aequilibrae.utils.create_example import create_example
-from aequilibrae.paths import Graph
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.all_or_nothing import allOrNothing
-from ...data import test_graph
 
 
 # TODO: Add checks for results for this test (Assignment AoN)

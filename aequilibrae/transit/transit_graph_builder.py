@@ -1428,9 +1428,11 @@ class TransitGraphBuilder:
         g.network["id"] = g.network.link_id
         g.prepare_graph(
             self.vertices[
-                (self.vertices.node_type == "origin")
-                if self.blocking_centroid_flows
-                else (self.vertices.node_type == "od")
+                (
+                    (self.vertices.node_type == "origin")
+                    if self.blocking_centroid_flows
+                    else (self.vertices.node_type == "od")
+                )
             ].node_id.values
         )
         g.set_graph("trav_time")

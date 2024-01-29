@@ -1,6 +1,5 @@
 import gc
 import importlib.util as iutil
-import sqlite3
 import string
 from typing import List
 
@@ -9,7 +8,6 @@ import pandas as pd
 
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
-from aequilibrae.project.network.link_types import LinkTypes
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .haversine import haversine
 from ...utils import WorkerThread
@@ -24,7 +22,7 @@ if pyqt:
 spec = iutil.find_spec("qgis")
 isqgis = spec is not None
 if isqgis:
-    import qgis
+    pass
 
 
 class OSMBuilder(WorkerThread):

@@ -1,4 +1,3 @@
-from copy import deepcopy
 import os
 from tempfile import gettempdir
 from uuid import uuid4
@@ -7,10 +6,8 @@ import sys
 from unittest import TestCase
 from itertools import product
 
-from aequilibrae.paths import Graph
 from aequilibrae.paths.results import PathResults
 from aequilibrae.utils.create_example import create_example
-import numpy as np
 
 # Adds the folder with the data to the path and collects the paths to the files
 lib_path = os.path.abspath(os.path.join("..", "../tests"))

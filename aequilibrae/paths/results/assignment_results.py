@@ -7,7 +7,6 @@ from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
-from pathlib import Path
 
 try:
     from aequilibrae.paths.AoN import sum_axis1, assign_link_loads

@@ -1,7 +1,7 @@
 import warnings
 from copy import deepcopy
 from typing import Union, List, Tuple, Dict
-from abc import ABC, abstractmethod
+from abc import ABC
 
 import numpy as np
 

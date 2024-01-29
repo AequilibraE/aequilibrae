@@ -8,7 +8,7 @@ from unittest import TestCase
 
 import pandas as pd
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
+from aequilibrae import TrafficAssignment, TrafficClass, Project
 from ...data import siouxfalls_project
 
 

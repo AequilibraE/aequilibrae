@@ -3,7 +3,6 @@ from tempfile import gettempdir
 from uuid import uuid4
 from os.path import join
 from aequilibrae.paths import TrafficClass
-from aequilibrae.paths import Graph
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.utils.create_example import create_example
 

@@ -1,19 +1,11 @@
 import os
-import pathlib
-import random
-import sqlite3
-import string
 import uuid
-from random import choice
 from tempfile import gettempdir
 from unittest import TestCase
 
-import numpy as np
-import pandas as pd
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph
+from aequilibrae import TrafficAssignment, TrafficClass
 from aequilibrae.utils.create_example import create_example
-from ...data import siouxfalls_project
 
 
 class TestMCTrafficAssignment(TestCase):

@@ -1,4 +1,4 @@
-from sqlite3 import IntegrityError, Connection
+from sqlite3 import IntegrityError
 from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.field_editor import FieldEditor
 from aequilibrae.project.table_loader import TableLoader

@@ -5,7 +5,6 @@ import numpy as np
 
 from .multi_threaded_aon import MultiThreadedAoN
 from ..utils import WorkerThread
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import global_logger
 
 try:
@@ -19,8 +18,7 @@ if pyqt:
     from PyQt5.QtCore import pyqtSignal as SIGNAL
 
 if False:
-    from .results import AssignmentResults
-    from .graph import Graph
+    pass
 
 
 class allOrNothing(WorkerThread):

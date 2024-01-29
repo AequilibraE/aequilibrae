@@ -1,7 +1,6 @@
 from shapely.geometry import LineString
 from aequilibrae.project import Project
 from aequilibrae.transit import Transit
-import pytest
 
 from aequilibrae.project.database_connection import database_connection
 

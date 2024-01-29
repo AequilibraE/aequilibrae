@@ -1,4 +1,3 @@
-from typing import List
 from aequilibrae.transit.date_tools import create_days_between, day_of_week
 
 

@@ -9,7 +9,6 @@ import numpy as np
 from aequilibrae.utils.create_example import create_example
 
 # Adds the folder with the data to the path and collects the paths to the files
-from ...data import path_test, test_graph
 
 
 class TestSkimming_single_origin(unittest.TestCase):

@@ -12,7 +12,7 @@ from itertools import product
 import numpy as np
 
 from aequilibrae import Project
-from aequilibrae.paths import path_computation, Graph
+from aequilibrae.paths import path_computation
 from aequilibrae.paths.results import PathResults
 from aequilibrae.utils.create_example import create_example
 from ...data import triangle_graph_blocking, st_varent_network

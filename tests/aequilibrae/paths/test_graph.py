@@ -6,7 +6,6 @@ import pandas as pd
 from aequilibrae.paths import Graph
 from os.path import join
 from uuid import uuid4
-from .parameters_test import centroids
 from aequilibrae.project import Project
 from ...data import siouxfalls_project
 from aequilibrae.paths.results import PathResults
@@ -17,8 +16,8 @@ from aequilibrae.transit import Transit
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
-from ...data import path_test, test_graph, test_network
-from shutil import copytree, rmtree
+from ...data import path_test, test_graph
+from shutil import copytree
 
 
 class TestGraph(TestCase):

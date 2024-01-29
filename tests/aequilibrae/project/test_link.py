@@ -1,6 +1,5 @@
 from unittest import TestCase
 from shapely.ops import substring
-from copy import copy, deepcopy
 import os
 from shutil import copytree, rmtree
 import uuid

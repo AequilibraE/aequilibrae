@@ -1,13 +1,8 @@
 from unittest import TestCase
 import os
 import tempfile
-import numpy as np
-from aequilibrae.paths import TransitGraph
 from os.path import join
 from uuid import uuid4
-from aequilibrae.project import Project
-from ...data import siouxfalls_project
-from aequilibrae.paths.results import PathResults
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.transit import Transit
 
@@ -15,8 +10,6 @@ from aequilibrae.transit import Transit
 # Adds the folder with the data to the path and collects the paths to the files
 # lib_path = os.path.abspath(os.path.join('..', '../tests'))
 # sys.path.append(lib_path)
-from ...data import path_test, test_graph, test_network
-from shutil import copytree, rmtree
 
 
 class TestTransitGraphBuilder(TestCase):

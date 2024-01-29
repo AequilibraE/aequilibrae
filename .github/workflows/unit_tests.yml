@@ -20,8 +20,8 @@ jobs:
           pip install -r requirements_additional.txt
           pip install -r tests/requirements_tests.txt
 
-      - name: Lint with flake8
-        run: flake8
+      - name: Lint with ruff
+        run: ruff . --check
 
       - name: Check code format with Black
         run: black --check .

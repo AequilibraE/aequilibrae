@@ -1,6 +1,6 @@
 from unittest import TestCase
 import os
-from shutil import copytree, rmtree
+from shutil import copytree
 import uuid
 import random
 import string

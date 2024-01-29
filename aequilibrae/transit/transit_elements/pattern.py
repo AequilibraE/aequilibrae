@@ -1,11 +1,11 @@
 import math
 from sqlite3 import Connection
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 import shapely.wkb
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
 from shapely.ops import substring
 
 from aequilibrae.log import logger
@@ -142,7 +142,7 @@ class Pattern(BasicPTElement):
         if not self.__feed.graphs:
             self.__feed.builds_link_graphs_with_broken_stops()
 
-        if not mode_correspondence[self.route_type] in self.__feed.graphs:
+        if mode_correspondence[self.route_type] not in self.__feed.graphs:
             return
 
         self.__feed.path_store.add_graph(

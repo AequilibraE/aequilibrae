@@ -1,7 +1,5 @@
 import importlib.util as iutil
 import math
-from sqlite3 import Connection as sqlc
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -48,7 +46,6 @@ class Network(WorkerThread):
     link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
-        from aequilibrae.paths import Graph
 
         WorkerThread.__init__(self, None)
         self.source = project.source  # type: sqlc
