@@ -376,4 +376,4 @@ def build_compressed_graph(graph):
 
     # If will refer all the links that have no correlation to an element beyond the last link
     # This element will always be zero during assignment
-    graph.graph.loc[graph.graph.__compressed_id__.isna(), "__compressed_id__"] = graph.compact_graph.id.max() + 1
+    graph.graph.__compressed_id__ = graph.graph.__compressed_id__.fillna(graph.compact_graph.id.max() + 1).astype(np.int64)

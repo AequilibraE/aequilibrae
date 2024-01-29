@@ -113,6 +113,6 @@ if __name__ == "__main__":
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
             [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_graph_building],
-            compiler_directives={'language_level': "3str"},
+            compiler_directives={"language_level": "3str"},
         ),
     )

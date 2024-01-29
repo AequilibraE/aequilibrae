@@ -125,83 +125,47 @@ class TestTransitGraph(TestCase):
 
 class TestGraphCompression(TestCase):
     def setUp(self) -> None:
-        # proj_path = os.path.join(tempfile.gettempdir(), "test_graph_compression" + uuid4().hex)
-        # os.mkdir(proj_path)
-        # zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
+        proj_path = os.path.join(tempfile.gettempdir(), "test_graph_compression" + uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
 
         # proj_path = "/home/jake/Software/aequilibrae_performance_tests/models/kaitang"
-        # link_df = pd.read_csv(os.path.join(proj_path, "link_modified.csv"))
-        # centroids_array = np.array([3, 6, 10])
+        self.link_df = pd.read_csv(os.path.join(proj_path, "links_modified.csv"))
+        self.node_df = pd.read_csv(os.path.join(proj_path, "nodes_modified.csv"))
+        centroids_array = np.array([7, 8, 11])
 
-        # self.net = link_df.copy()
-
-        # self.graph = Graph()
-        # self.graph.network = self.net
-        # self.graph.mode = "a"
-        # self.graph.prepare_graph(centroids_array)
-        # self.graph.set_blocked_centroid_flows(False)
-        # self.graph.set_graph("fft")
-
-
-        # proj_path = "/home/jake/Software/aequilibrae_performance_tests/models/chicago_sketch/"i
-
-        proj_path = "/home/jake/Software/aequilibrae_performance_tests/models/LongAn/"
-        self.project = Project()
-        self.project.open(proj_path)
-        self.project.network.build_graphs(fields=["distance"], modes=["c"])
-        self.graph = self.project.network.graphs["c"]  # type: Graph
-        self.graph.set_graph("distance")
+        self.graph = Graph()
+        self.graph.network = self.link_df
+        self.graph.mode = "a"
+        self.graph.prepare_graph(centroids_array)
         self.graph.set_blocked_centroid_flows(False)
+        self.graph.set_graph("fft")
 
-    def test_debug(self):
-        # print(self.graph.graph, end="\n" + ("-" * 100) + "\n")
-        # print(self.graph.compact_graph, end="\n" + ("-" * 100) + "\n")
-        # print(self.net, end="\n" + ("-" * 100) + "\n")
-        # print(self.graph.compact_all_nodes, end="\n" + ("-" * 100) + "\n")
-        # print(self.graph.compact_nodes_to_indices, end="\n" +("-" * 100) + "\n")
+    def test_compressed_graph(self):
+        # Check the compressed links, links 4 and 5 should be collapsed into 2 links from 3 - 10 and 10 - 3.
+        compressed_links = self.graph.graph[
+            self.graph.graph.__compressed_id__.duplicated(keep=False)
+            & (self.graph.graph.__compressed_id__ != self.graph.compact_graph.id.max() + 1)
+        ]
 
-        # 4610495
+        self.assertListEqual(compressed_links.link_id.unique().tolist(), [4, 5])
 
-        # import geopandas as gpd
-        # import shapely
-        # print("dumping graph")
+        # Confirm these compacted links map back up to a contraction between the correct nodes
+        self.assertListEqual(
+            self.graph.compact_all_nodes[
+                self.graph.compact_graph[self.graph.compact_graph.id.isin(compressed_links.__compressed_id__.unique())][
+                    ["a_node", "b_node"]
+                ].values
+            ].tolist(),
+            [[3, 10], [10, 3]],
+        )
 
-        # df = []
-        # self.graph.graph["__compressed_id__"] = self.graph.graph["__compressed_id__"].astype(int)
-        # g = self.graph.compact_graph
-        # nodes = self.project.network.nodes.data.set_index("node_id")
-
-        # # breakpoint()
-
-        # for i, row in g.iterrows():
-        #     df.append(
-        #         (
-        #             row.a_node,
-        #             row.b_node,
-        #             shapely.LineString(
-        #                     [
-        #                         nodes.loc[self.graph.compact_all_nodes[row.a_node]].geometry, nodes.loc[self.graph.compact_all_nodes[row.b_node]].geometry
-        #                     ]
-        #             ).wkt,
-        #         )
-        #     )
-
-        # df = pd.DataFrame(df, columns=["origin", "destination", "geometry"])
-        # df.to_csv("links_without_dead_ends.csv")
-        # # df = gpd.GeoDataFrame(df, columns=["origin", "destination", "geometry"])
-        # # df.set_geometry("geometry")
-        # # df.to_file("test1.gpkg", layer='routes', driver="GPKG")
-
-        # pd.DataFrame(self.graph.compact_all_nodes[np.union1d(g.a_node, g.b_node)], columns=["node_id"]).to_csv("nodes_without_dead_ends.csv")
-
-        # print(self.graph.network)
-        # print(self.graph.graph)
-        # print(self.graph.compact_graph)
-
-        # breakpoint()
-
-        self.assertTrue(False)
-
-        nodes = np.hstack([graph.network.a_node.values, graph.network.b_node.values])
-        counts = np.bincount(nodes)
-        (counts == 1).nonzero()[0]
+    def test_dead_end_removal(self):
+        # The dead end remove should be able to remove links [30, 38]. In it's current state it is not able to remove
+        # link 40 as it's a single direction link with no outgoing edges so its not possible to find the incoming edges
+        # (in general) without a transposed graph representation.
+        self.assertSetEqual(
+            set(self.graph.dead_end_links),
+            set(self.graph.graph[self.graph.graph.dead_end == 1].link_id) - {40},
+            "Dead end removal removed incorrect links",
+        )
