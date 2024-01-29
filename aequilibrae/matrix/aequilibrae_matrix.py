@@ -5,6 +5,7 @@ import tempfile
 import uuid
 import warnings
 from functools import reduce
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -90,7 +91,7 @@ class AequilibraeMatrix(object):
         self.omx_file = None  # type: omx.File
         self.__version__ = VERSION  # Writes file version
 
-    def save(self, names=()) -> None:
+    def save(self, names=(), file_name=None) -> None:
         """Saves matrix data back to file.
 
         If working with AEM file, it flushes data to disk. If working with OMX, requires new names.
@@ -98,6 +99,10 @@ class AequilibraeMatrix(object):
         :Arguments:
             **names** (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files
         """
+        if file_name is not None:
+            cores = names if len(names) else self.names
+            self.__save_as(file_name, cores)
+            return
 
         if not self.__omx:
             self.__flush(self.matrices)
@@ -121,6 +126,38 @@ class AequilibraeMatrix(object):
 
         self.names = self.omx_file.list_matrices()
         self.computational_view(names)
+
+    def __save_as(self, file_name: str, cores: List[str]):
+
+        if Path(file_name).suffix.lower() == ".aem":
+            mat = AequilibraeMatrix()
+            args = {
+                "zones": self.zones,
+                "matrix_names": cores,
+                "index_names": self.index_names,
+                "memory_only": False,
+                "file_name": file_name,
+            }
+            mat.create_empty(**args)
+            mat.indices[:, :] = self.indices[:, :]
+            for core in cores:
+                mat.matrix[core][:, :] = self.matrix[core][:, :]
+            mat.name = self.name
+            mat.description = self.description
+            mat.close()
+            del mat
+
+        elif Path(file_name).suffix.lower() == ".omx":
+            omx_mat = omx.open_file(file_name, "w")
+            for core in cores:
+                omx_mat[core] = self.matrix[core]
+
+            for index in self.index_names:
+                omx_mat.create_mapping(index, self.indices[index])
+
+            omx_mat.attrs.name = self.name
+            omx_mat.attrs.description = self.description
+            omx_mat.close()
 
     def create_empty(
         self,
