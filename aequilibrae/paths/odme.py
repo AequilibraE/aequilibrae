@@ -147,14 +147,15 @@ class ODME(object):
         new_classes = []
         for usr_cls in self.classes:
             # NEED TO REPLACE THE MATRIX OBJECT
-            dup_matrix = self.output # Duplicated matrix
-            dup_matrix.index = usr_cls.matrix.index
+            # self.output.matrix[f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"] = usr_cls.matrix.matrix[usr_cls.matrix.view_names[0]]
+            self.output.matrix[f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"] = np.array(usr_cls.matrix.matrix_view, copy=True)
+            dup_matrix = self.output
+            dup_matrix.index[:] = usr_cls.matrix.index[:]
             dup_matrix.computational_view([f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"])
-            dup_matrix.matrix_view = np.array(usr_cls.matrix.matrix_view[:, :], copy=True)
-            # I DON'T THINK THIS WORKS CORRECTLY!
-            # NEED TO ALSO SET THE PCE!
             new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix)
             new_cls.set_pce(usr_cls.pce)
+            new_cls.set_fixed_cost(usr_cls.fixed_cost_field, usr_cls.fc_multiplier)
+            new_cls.set_vot(usr_cls.vot)
             new_classes.append(TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix))
 
         self.assignment.set_classes(new_classes)
@@ -282,7 +283,7 @@ class ODME(object):
         """
         project = project or get_active_project()
         mats = project.matrices
-        self.output.copy(join(mats.fldr, file_name)) # 'Save As'
+        self.output.save(file_name= join(mats.fldr, file_name)) # 'Save As'
         record = mats.new_record(name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
