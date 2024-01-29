@@ -47,20 +47,10 @@ class OVMDownloader(WorkerThread):
 
     def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None) -> None:
         WorkerThread.__init__(self, None)
-        # self.project = project or get_active_project()
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
-        # self.node_start = node_start
-        # self.report = []
-        # self.conn = None
         self.GeoDataFrame = []
-        # self.nodes = {}
-        # self.node_ids = {}  
         self.g_dataframes =[]
-        # self.__link_types = None  # type: LinkTypes
-        # self.__model_link_types = []
-        # self.__model_link_type_ids = []
-        # self.__link_type_quick_reference = {}
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path).replace("\\", "/")
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
@@ -116,18 +106,20 @@ class OVMDownloader(WorkerThread):
 
     def downloadTransportation(self, bbox, data_source, output_dir):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir)
-        # g_dataframes = []
-        # for t in ['segment','connector']:
-        # print(output_dir)
+        output_dir = Path(output_dir) / f'theme=transportation'
+        print()
+        print(data_source)
+        print(output_dir)
+        
             
         output_file_link = output_dir / f'type=segment' / f'transportation_data_segment.parquet'
         output_file_node = output_dir / f'type=connector' / f'transportation_data_connector.parquet'
             # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
         output_file_link.parent.mkdir(parents=True, exist_ok=True)
         output_file_node.parent.mkdir(parents=True, exist_ok=True)
-
-        
+        print(output_file_link)
+        print()
+        # Uncomment to see what information is stored the parquet file
         # sql = f"""
         #     DESCRIBE
         #     SELECT 
