@@ -12,7 +12,6 @@ from aequilibrae import global_logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
-from aequilibrae.context import get_active_project
 from ..utils import WorkerThread
 
 try:
@@ -342,7 +341,7 @@ class LinearApproximation(WorkerThread):
     def doWork(self):
         self.execute()
 
-    def execute(self):
+    def execute(self):  # noqa: C901
         # We build the fixed cost field
 
         for c in self.traffic_classes:
@@ -371,7 +370,7 @@ class LinearApproximation(WorkerThread):
 
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
-        for self.iter in range(1, self.max_iter + 1):
+        for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
             if pyqt:
                 self.equilibration.emit(["rgap", self.rgap])

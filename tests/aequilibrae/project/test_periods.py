@@ -59,9 +59,7 @@ class TestPeriods(TestCase):
         self.curr.execute("pragma table_info(periods)")
         dt = self.curr.fetchall()
 
-        actual_fields = set([x[1] for x in dt])
-        actual_fields = sorted(list(actual_fields))
-
+        actual_fields = sorted({x[1] for x in dt})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table periods")
 
     def test_copy(self):

@@ -4,6 +4,7 @@ import os
 import tempfile
 import uuid
 import warnings
+from copy import copy
 from functools import reduce
 from typing import List
 
@@ -221,7 +222,7 @@ class AequilibraeMatrix(object):
             else:
                 raise Exception("Matrix names need to be provided as a list")
 
-        self.names = [x for x in matrix_names]
+        self.names = copy(matrix_names)
         self.cores = len(self.names)
         if self.zones is None:
             return
@@ -344,8 +345,8 @@ class AequilibraeMatrix(object):
             )
             idx_names = functools.reduce(lambda acc, n: acc + [robust_name(n, INDEX_NAME_MAX_LENGTH, acc)], do_idx, [])
         else:
-            core_names = [x for x in do_cores]
-            idx_names = [x for x in do_idx]
+            core_names = list(do_cores)
+            idx_names = list(do_idx)
 
         self.create_empty(
             file_name=file_path,
@@ -391,7 +392,7 @@ class AequilibraeMatrix(object):
         trip_df = pd.read_csv(path_to_file)
 
         # Creating zone indices
-        zones_list = sorted(list(set(list(trip_df[from_column].unique()) + list(trip_df[to_column].unique()))))
+        zones_list = sorted(set(list(trip_df[from_column].unique()) + list(trip_df[to_column].unique())))
         zones_df = pd.DataFrame({"zone": zones_list, "idx": list(np.arange(len(zones_list)))})
 
         trip_df = trip_df.merge(
@@ -570,9 +571,9 @@ class AequilibraeMatrix(object):
             np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0] = data_size
 
             # matrix name
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[
-                0
-            ] = self.name
+            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0] = (
+                self.name
+            )
 
             # matrix description
             offset = 18 + MATRIX_NAME_MAX_LENGTH
@@ -1095,9 +1096,9 @@ class AequilibraeMatrix(object):
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
                 matrix_name = str(matrix_name)[0:MATRIX_NAME_MAX_LENGTH]
 
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[
-                0
-            ] = matrix_name
+            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0] = (
+                matrix_name
+            )
 
     def setDescription(self, matrix_description: str):
         """

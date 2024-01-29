@@ -93,9 +93,7 @@ class TestLinks(TestCase):
         self.curr.execute("pragma table_info(links)")
         dt = self.curr.fetchall()
 
-        actual_fields = set([x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"])
-        actual_fields = sorted(list(actual_fields))
-
+        actual_fields = sorted({x[1].replace("_ab", "").replace("_ba", "") for x in dt if x[1] != "ogc_fid"})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table links")
 
     def test_refresh(self):

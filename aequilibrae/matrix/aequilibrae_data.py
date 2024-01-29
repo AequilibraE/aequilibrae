@@ -106,7 +106,7 @@ class AequilibraeData(object):
             #             raise ValueError('Data types need to be Python or Numpy data types')
 
             for field in self.fields:
-                if not type(field) is str:
+                if isinstance(field, str):
                     raise TypeError(field + " is not a string. You cannot use it as a field name")
                 if not field.isidentifier():
                     raise Exception(field + " is a not a valid identifier name. You cannot use it as a field name")
@@ -115,7 +115,7 @@ class AequilibraeData(object):
 
             self.num_fields = len(self.fields)
 
-            dtype = [("index", self.aeq_index_type)] + [(f, dt) for f, dt in zip(self.fields, self.data_types)]
+            dtype = [("index", self.aeq_index_type)] + [list(zip(self.fields, self.data_types))]
 
             # the file
             if self.memory_mode:

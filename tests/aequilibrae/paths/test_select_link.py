@@ -216,7 +216,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     for i in range(len(sl)):
         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
         sl_links.append(node_pair)
-    mask = dict()
+    mask = {}
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):
             for k in range(1, len(path)):

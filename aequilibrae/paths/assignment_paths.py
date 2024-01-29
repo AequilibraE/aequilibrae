@@ -94,15 +94,12 @@ class AssignmentPaths(object):
 
     def read_path_file(self, origin: int, iteration: int, traffic_class_id: str) -> (pd.DataFrame, pd.DataFrame):
         possible_traffic_classes = list(filter(lambda x: x.id == traffic_class_id, self.classes))
-        assert (
-            len(possible_traffic_classes) == 1
-        ), f"traffic class id not unique, please choose one of {list(map(lambda x: x.id, self.classes))}"
+        class_ids = [x.id for x in self.classes]
+        assert len(possible_traffic_classes) == 1, f"traffic class id not unique, please choose one of {class_ids}"
         traffic_class = possible_traffic_classes[0]
-        base_dir = os.path.join(
-            self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.name}"
-        )
-        path_o_f = os.path.join(base_dir, f"o{origin}.feather")
-        path_o_index_f = os.path.join(base_dir, f"o{origin}_indexdata.feather")
+        b_dir = os.path.join(self.path_base_dir, f"iter{iteration}", f"path_c{traffic_class.id}_{traffic_class.name}")
+        path_o_f = os.path.join(b_dir, f"o{origin}.feather")
+        path_o_index_f = os.path.join(b_dir, f"o{origin}_indexdata.feather")
         path_o = pd.read_feather(path_o_f)
         path_o_index = pd.read_feather(path_o_index_f)
         return path_o, path_o_index
