@@ -23,7 +23,7 @@ class Matrices:
         tl = TableLoader()
         with commit_and_close(self.project.connect()) as conn:
             matrices_list = tl.load_table(conn, "matrices")
-        self.__fields = [x for x in tl.fields]
+        self.__fields = list(tl.fields)
         if matrices_list:
             self.__properties = list(matrices_list[0].keys())
         for lt in matrices_list:
@@ -143,7 +143,7 @@ class Matrices:
         mr = self.get_record(matrix_name)
         mr.delete()
 
-    def new_record(self, name: str, file_name: str, matrix=AequilibraeMatrix()) -> MatrixRecord:
+    def new_record(self, name: str, file_name: str, matrix=None) -> MatrixRecord:
         """Creates a new record for a matrix in disk, but does not save it
 
         If the matrix file is not already on disk, it will fail
@@ -155,7 +155,7 @@ class Matrices:
         Return:
             *matrix_record* (:obj:`MatrixRecord`): A matrix record that can be manipulated in memory before saving
         """
-
+        matrix = matrix or AequilibraeMatrix()
         if name in self.__items:
             raise ValueError(f"There is already a matrix of name ({name}). It must be unique.")
 

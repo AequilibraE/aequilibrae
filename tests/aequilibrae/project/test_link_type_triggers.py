@@ -22,7 +22,7 @@ class TestProject(TestCase):
         qry_file = os.path.join(root, "database_specification/network/triggers/link_type_table_triggers.sql")
         with open(qry_file, "r") as sql_file:
             self.queries = sql_file.read()
-        self.queries = [cmd for cmd in self.queries.split("#")]
+        self.queries = list(self.queries.split("#"))
 
     def tearDown(self) -> None:
         self.proj.close()
@@ -106,7 +106,7 @@ class TestProject(TestCase):
             fields = {x[1]: x[0] for x in f}
 
             sql = "select * from links where link_id=70"
-            a = [x for x in self.proj.conn.execute(sql).fetchone()]
+            a = list(self.proj.conn.execute(sql).fetchone())
             a[fields["link_type"]] = "something indeed silly123"
             a[fields["link_id"]] = 456789
             a[fields["a_node"]] = 777

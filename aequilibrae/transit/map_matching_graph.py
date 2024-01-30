@@ -298,8 +298,6 @@ class MMGraph(WorkerThread):
         net_data.loc[fltr, "free_flow_time"] = ((net_data[fltr].distance / 1000) / CONNECTOR_SPEED) * 60
 
         g = Graph()
-        g.network_ok = True
-        g.status = "OK"
         g.network = net_data
         g.prepare_graph(np.array(centroids))
         g.set_graph("free_flow_time")

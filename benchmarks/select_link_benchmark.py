@@ -11,7 +11,7 @@ import warnings
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from aequilibrae import Project, TrafficAssignment, TrafficClass
+from aequilibrae import Project, TrafficAssignment, TrafficClass  # noqa: E402
 
 
 def aequilibrae_init(proj_path: str, cost: str):
@@ -166,7 +166,7 @@ def main():
                 print("BENCHING links: ", link.keys() if link else link)
                 qries = [] if link is None else list(link.values())
 
-                t = timeit.Timer(lambda: assignment.execute())
+                t = timeit.Timer(lambda: assignment.execute())  # noqa: B023
                 times = t.repeat(repeat=3, number=args["iters"])
                 df = pd.DataFrame(
                     {

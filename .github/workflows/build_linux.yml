@@ -29,22 +29,22 @@ jobs:
         mkdir -p dist
         cp -v ./*-manylinux*.whl dist/
 
-    - name: update versions to conform with QGIS
-      run: |
-        cd .github
-        python qgis_requirements.py
-        cd ..
-
-    - name: Build manylinux Python wheels
-      uses: RalfG/python-wheels-manylinux-build@v0.7.1
-      with:
-        python-versions: 'cp39-cp39'
-        pip-wheel-args: '--no-deps'
-
-    - name: Moves wheels
-      run: |
-        mkdir -p dist
-        cp -v ./*-manylinux*.whl dist/
+#    - name: update versions to conform with QGIS
+#      run: |
+#        cd .github
+#        python qgis_requirements.py
+#        cd ..
+#
+#    - name: Build manylinux Python wheels
+#      uses: RalfG/python-wheels-manylinux-build@v0.7.1
+#      with:
+#        python-versions: 'cp39-cp39'
+#        pip-wheel-args: '--no-deps'
+#
+#    - name: Moves wheels
+#      run: |
+#        mkdir -p dist
+#        cp -v ./*-manylinux*.whl dist/
 
     - name: Stores artifacts along with the workflow result
       if: ${{ github.event_name == 'push'}}

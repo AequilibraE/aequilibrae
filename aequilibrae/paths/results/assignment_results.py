@@ -138,14 +138,14 @@ class AssignmentResults(AssignmentResultsBase):
         self.__integer_type = graph.default_types("int")
 
         if matrix.view_names is None:
-            raise ("Please set the matrix_procedures computational view")
+            raise ValueError("Please set the matrix_procedures computational view")
         self.classes["number"] = 1
         if len(matrix.matrix_view.shape) > 2:
             self.classes["number"] = matrix.matrix_view.shape[2]
         self.classes["names"] = matrix.view_names
 
         if graph is None:
-            raise ("Please provide a graph")
+            raise ValueError("Please provide a graph")
         self.compact_nodes = graph.compact_num_nodes
         self.compact_links = graph.compact_num_links
 
@@ -154,7 +154,7 @@ class AssignmentResults(AssignmentResultsBase):
         self.centroids = graph.centroids
         self.links = graph.num_links
         self.num_skims = len(graph.skim_fields)
-        self.skim_names = [x for x in graph.skim_fields]
+        self.skim_names = list(graph.skim_fields)
         self.lids = graph.graph.link_id.values
         self.direcs = graph.graph.direction.values
         self.crosswalk = np.zeros(graph.graph.shape[0], self.__integer_type)

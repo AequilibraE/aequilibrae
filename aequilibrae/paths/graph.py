@@ -12,7 +12,7 @@ from aequilibrae.paths.graph_building import build_compressed_graph
 from aequilibrae.context import get_logger
 
 
-class GraphBase(ABC):
+class GraphBase(ABC):  # noqa: B024
     """
     Graph class.
 
@@ -264,8 +264,8 @@ class GraphBase(ABC):
         self._id = uuid.uuid4().hex
 
     def __build_column_names(self, all_titles: List[str]) -> Tuple[list, list]:
-        fields = [x for x in self.required_default_fields]
-        types = [x for x in self.__required_default_types]
+        fields = list(self.required_default_fields)
+        types = list(self.__required_default_types)
         for column in all_titles:
             if column not in self.required_default_fields and column[0:-3] not in self.required_default_fields:
                 if column[-3:] == "_ab":
@@ -482,19 +482,17 @@ class GraphBase(ABC):
                 new_type = float(new_type)
             except ValueError as verr:
                 self.logger.warning("Could not convert {} - {}".format(new_type, verr.__str__()))
-        nt = type(new_type)
-        def_type = None
-        if nt == int:
+        if isinstance(new_type, int):
             def_type = int
             if current_type == float:
-                def_type == float
+                def_type = float
             elif current_type == str:
                 def_type = str
-        elif nt == float:
+        elif isinstance(new_type, float):
             def_type = float
             if current_type == str:
                 def_type = str
-        elif nt == str:
+        elif isinstance(new_type, str):
             def_type = str
         else:
             raise ValueError("WRONG TYPE OR NULL VALUE")

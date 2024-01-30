@@ -48,7 +48,7 @@ class GMNSExporter(WorkerThread):
         self.modes_df.to_csv(join(self.output_path, "use_definition.csv"), index=False)
 
     def update_direction_field(self):
-        two_way_cols = list(set([col[:-3] for col in list(self.links_df.columns) if col[-3:] in ["_ab", "_ba"]]))
+        two_way_cols = list({col[:-3] for col in list(self.links_df.columns) if col[-3:] in ["_ab", "_ba"]})
 
         ab_links = pd.DataFrame(self.links_df[self.links_df.direction > -1], copy=True)
         ba_links = pd.DataFrame(self.links_df[self.links_df.direction < 1], copy=True)
