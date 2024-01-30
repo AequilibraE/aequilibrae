@@ -39,7 +39,7 @@ class OVMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, ovm_download, project_path: Union[str, Path], logger: logging.Logger = None, node_start=10000, project=None) -> None:
+    def __init__(self, ovm_download: list, project_path: Union[str, Path], logger: logging.Logger = None, node_start=10000, project=None) -> None:
         WorkerThread.__init__(self, None)
         self.project = project or get_active_project()
         self.logger = logger or get_logger()
@@ -63,15 +63,14 @@ class OVMBuilder(WorkerThread):
         if pyqt:
             self.building.emit(*args)
 
-    def doWork(self,output_dir):
+    def doWork(self,output_dir: Path):
         self.conn = connect_spatialite(self.pth)
         self.curr = self.conn.cursor()
         self.__worksetup()
         self.formatting(self.links_gdf, self.nodes_gdf, output_dir)
-        
-        # self.__emit_all(["finished_threaded_procedure", 0])
+        self.__emit_all(["finished_threaded_procedure", 0])
 
-    def formatting(self, links_gdf, nodes_gdf, output_dir):
+    def formatting(self, links_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, output_dir: Path):
         g_dataframes = []
         output_dir = Path(output_dir)
         output_file_link = output_dir / f'type=segment' / f'transportation_data_segment.parquet'
@@ -93,7 +92,7 @@ class OVMBuilder(WorkerThread):
             result_dfs.append(processed_df)
 
         # Concatenate the resulting DataFrames into a final GeoDataFrame
-        final_result = pd.concat(result_dfs, ignore_index=True)
+        final_result = pd.concat((df.dropna(axis=1, how='all') for df in result_dfs), ignore_index=True)
 
         # adding neccassary columns for aequilibrea data frame
         final_result['link_id'] = pd.Series(list(range(1, len(final_result) + 1)))
@@ -139,6 +138,7 @@ class OVMBuilder(WorkerThread):
         self.GeoDataFrame.append(g_dataframes)
 
         # For goemetry to work in the sql
+        final_result = pd.DataFrame(final_result)
         final_result['geometry'] = final_result['geometry'].astype(str)
 
         node_order = ['ogc_fid', 'node_id', 'is_centroid', 'modes', 'link_types', 'ovm_id', 'geometry']
@@ -173,6 +173,7 @@ class OVMBuilder(WorkerThread):
         )
         self.conn.executemany(sql, node_df)
         self.conn.commit()
+        del nodes_gdf
 
         all_attrs = final_result.values.tolist()
 
@@ -187,6 +188,7 @@ class OVMBuilder(WorkerThread):
             raise e
         
         self.conn.commit()
+        del final_result
         self.curr.close()
 
     def __worksetup(self):
@@ -235,7 +237,7 @@ class OVMBuilder(WorkerThread):
         self.__link_type_quick_reference[original_link_type.lower()] = link_type
         return link_type
 
-    def create_node_ids(self, data_frame):
+    def create_node_ids(self, data_frame: gpd.GeoDataFrame) -> pd.Series:
         '''
         Creates node_ids as well as the self.nodes and self.node_ids dictories
         '''
@@ -250,7 +252,7 @@ class OVMBuilder(WorkerThread):
         return data_frame['node_id']
 
     def modes_per_link_type(self):
-        p = Parameters()
+        p = Parameters(self.project)
         modes = p.parameters["network"]["ovm"]["modes"]
         result = [(key, key[0]) for key in modes.keys()]
         mode_codes = {p[0]: p[1] for p in result}
@@ -267,7 +269,7 @@ class OVMBuilder(WorkerThread):
         type_list = {k: "".join(set(v)) for k, v in type_list.items()}
         return type_list, "{}".format(notfound)
                 
-    def trim_geometry(self, node_lu, row):
+    def trim_geometry(self, node_lu: dict, row: dict) -> shapely.LineString:
         lat_long_a = node_lu[row["a_node"]]['coord']
         lat_long_b = node_lu[row["b_node"]]['coord']
         start,end = -1, -1
@@ -281,7 +283,7 @@ class OVMBuilder(WorkerThread):
         return shapely.LineString(row.geometry.coords[start:end+1])
     
     # Function to process each row and create a new GeoDataFrame
-    def split_connectors(self, row):
+    def split_connectors(self, row: dict) -> gpd.GeoDataFrame:
         # Extract necessary information from the row     
         connectors = row['connectors']
         
@@ -308,7 +310,7 @@ class OVMBuilder(WorkerThread):
             raise ValueError("Invalid amount of connectors provided. Must be 2< to be considered a link.")
         return processed_df
 
-    def get_speed(self, speed_row):
+    def get_speed(self, speed_row) -> float:
         """
         This function returns the speed of a road, if they have multiple speeds listed it will total the speeds listed by the proportions of the road they makeup.
         """
@@ -364,7 +366,7 @@ class OVMBuilder(WorkerThread):
         return owf + twf1 + twf2 + ["ovm_id"]
     
     @staticmethod
-    def get_link_field_type(field_name):
+    def get_link_field_type(field_name: list):
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
@@ -379,7 +381,7 @@ class OVMBuilder(WorkerThread):
                     return tp[field_name]["type"]
     
     @staticmethod
-    def get_direction(directions_list):
+    def get_direction(directions_list: list):
         new_list = []
         at_dictionary = {}
 

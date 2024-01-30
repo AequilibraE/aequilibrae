@@ -45,7 +45,7 @@ class OVMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, modes, project_path: Union[str, Path], logger: logging.Logger = None) -> None:
+    def __init__(self, modes: list, project_path: Union[str, Path], logger: logging.Logger = None) -> None:
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
@@ -104,21 +104,16 @@ class OVMDownloader(WorkerThread):
         c.execute(sql)
 
 
-    def downloadTransportation(self, bbox, data_source, output_dir):
+    def downloadTransportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir)
-        print()
-        print(data_source)
-        print(output_dir)
-        
+        output_dir = Path(output_dir)        
             
         output_file_link = output_dir / f'type=segment' / f'transportation_data_segment.parquet'
         output_file_node = output_dir / f'type=connector' / f'transportation_data_connector.parquet'
             # output_file = output_dir  / f'type={t}' / f'transportation_data_{t}.parquet'
         output_file_link.parent.mkdir(parents=True, exist_ok=True)
         output_file_node.parent.mkdir(parents=True, exist_ok=True)
-        print(output_file_link)
-        print()
+
         # Uncomment to see what information is stored the parquet file
         # sql = f"""
         #     DESCRIBE
@@ -179,11 +174,11 @@ class OVMDownloader(WorkerThread):
         gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
         self.g_dataframes.append(gdf_node)
 
-    def download_test_data(self, l_data_source):
+    def download_test_data(self, data_source: Union[str, Path]):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''
         airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
         # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
-        data_source = l_data_source.replace("\\", "/")
+        data_source = data_source.replace("\\", "/")
 
 
         for t in ['segment','connector']:
@@ -214,7 +209,7 @@ class OVMDownloader(WorkerThread):
         """
         loosely adapted from http://www.github.com/gboeing/osmnx
         """
-
+        
         p = Parameters().parameters["network"]["ovm"]
         all_tags = p["all_link_types"]
 
@@ -229,13 +224,13 @@ class OVMDownloader(WorkerThread):
         tags_to_keep = list(set(tags_to_keep))
 
         # Default to remove
-        # service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
-        # access = '["access"!~"private"]'
+        service = '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]'
+        access = '["access"!~"private"]'
 
         filtered = [x for x in all_tags if x not in tags_to_keep]
         filtered = "|".join(filtered)
 
-        # filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
+        filter = f'["area"!~"yes"]["highway"!~"{filtered}"]{service}{access}'
 
         return filter
     
