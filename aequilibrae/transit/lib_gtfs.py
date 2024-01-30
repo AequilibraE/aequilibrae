@@ -37,7 +37,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
     signal = SignalImpl(object)
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", default_capacities={}):
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -67,7 +67,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
-        self.__default_capacities = default_capacities
+        self.__default_capacities = capacities
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -104,7 +104,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             Modes not covered in the data will not be touched and distance brackets not covered will receive
             the maximum speed, with a warning
         """
-        dict_speeds = {x: df for x, df in max_speeds.groupby(["mode"])}
+        dict_speeds = dict(max_speeds.groupby(["mode"]))
         self.gtfs_data._set_maximum_speeds(dict_speeds)
 
     def dates_available(self) -> list:
@@ -126,7 +126,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.__do_execute_map_matching = allow
 
-    def map_match(self, route_types=[3]) -> None:
+    def map_match(self, route_types=[3]) -> None:  # noqa: B006
         """Performs map-matching for all routes of one or more types.
 
         Defaults to map-matching Bus routes (type 3) only.
@@ -139,7 +139,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if not isinstance(route_types, list) and not isinstance(route_types, tuple):
             raise TypeError("Route_types must be list or tuple")
 
-        if any([not isinstance(item, int) for item in route_types]):
+        if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
         mt = f"Map-matching routes for {self.gtfs_data.agency.agency}"
@@ -313,7 +313,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             all_pats = [trip.pattern_hash for trip in new_trips]
             cntr = route.route_id + PATTERN_ID_MULTIPLIER
-            for pat_hash in sorted(list(set(all_pats))):
+            for pat_hash in sorted(set(all_pats)):
                 c.pattern_lookup[pat_hash] = cntr
 
                 cntr += ((all_pats.count(pat_hash) // 100) + 1) * PATTERN_ID_MULTIPLIER
@@ -447,7 +447,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
         """
 
-        route_types = list(set([r.route_type for r in self.select_routes.values()]))
+        route_types = list({r.route_type for r in self.select_routes.values()})
         route_types = [mode_id for mode_id in route_types if mode_correspondence[mode_id] not in self.graphs]
         if not route_types:
             return

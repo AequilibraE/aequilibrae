@@ -17,7 +17,7 @@ if iutil.find_spec("pyarrow") is not None:
     include_dirs.append(pa.get_include())
 
 is_win = "WINDOWS" in platform.platform().upper()
-is_mac = any([e in platform.platform().upper() for e in ["MACOS", "DARWIN"]])
+is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])
 prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
 compile_args = [cpp_std, f"{prefix}openmp"]
@@ -59,7 +59,7 @@ ext_mod_put = Extension(
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
-pkgs = [pkg for pkg in find_packages()]
+pkgs = list(find_packages())
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],

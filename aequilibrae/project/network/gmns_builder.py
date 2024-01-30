@@ -1,5 +1,7 @@
 import math
 import re
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 import string
@@ -98,7 +100,7 @@ class GMNSBuilder(WorkerThread):
 
         l_fields.save()
 
-        all_fields = [k for k in gmns_l_fields]
+        all_fields = list(gmns_l_fields)
         missing_f = [c for c in list(self.link_df.columns) if c not in all_fields]
         if missing_f != []:
             print(
@@ -123,7 +125,7 @@ class GMNSBuilder(WorkerThread):
 
         n_fields.save()
 
-        all_fields = [k for k in gmns_n_fields]
+        all_fields = list(gmns_n_fields)
         missing_f = [c for c in list(self.node_df.columns) if c not in all_fields]
         if missing_f != []:
             print(
@@ -248,7 +250,7 @@ class GMNSBuilder(WorkerThread):
         sorted_df.drop(to_drop_lst, axis=0, inplace=True)
         self.link_df = self.link_df[self.link_df.link_id.isin(list(sorted_df.link_id))]
         self.link_df.reset_index(drop=True, inplace=True)
-        direction = [x for x in list(self.link_df[gmns_dir])]
+        direction = list(self.link_df[gmns_dir])
 
         return direction
 
@@ -377,7 +379,7 @@ class GMNSBuilder(WorkerThread):
             pattern.sub(lambda x: "_" + char_replaces[x.group()], s).replace("+", "").replace("-", "_")
             for s in modes_list
         ]
-        mode_ids_list = [x for x in modes_list]
+        mode_ids_list = deepcopy(modes_list)
 
         saved_modes = list(self.modes.all_modes())
         with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
@@ -414,7 +416,7 @@ class GMNSBuilder(WorkerThread):
                     new_mode.save()
 
                     mode_to_add += letters[0]
-                    saved_modes += [x for x in mode_to_add]
+                    saved_modes += list(mode_to_add)
                 else:
                     mode_to_add += modes_df.loc[modes_df.name == m, "id"].item()
 

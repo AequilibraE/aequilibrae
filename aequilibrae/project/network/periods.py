@@ -71,7 +71,7 @@ class Periods(BasicTable):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             data = conn.execute(f"{self.sql} where period_id=?", [period_id]).fetchone()
         if data:
-            data = {key: val for key, val in zip(self.__fields, data)}
+            data = dict(zip(self.__fields, data))
             period = Period(data, self.project)
             self.__items[period.period_id] = period
             return period

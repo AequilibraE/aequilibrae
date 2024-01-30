@@ -1,11 +1,10 @@
+from copy import deepcopy
 from random import randint, choice, uniform
-from shapely.geometry import LineString
-import pytest
-from aequilibrae.project import Project
-from aequilibrae.transit import Transit
-from aequilibrae.project.database_connection import database_connection
-from aequilibrae.transit.functions.get_srid import get_srid
 
+import pytest
+from shapely.geometry import LineString
+
+from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Stop
 from tests.aequilibrae.transit.random_word import randomword
 
@@ -40,10 +39,10 @@ def test__populate(data):
         if key in data:
             assert val == data[key], "Stop population with record failed"
 
-    new_data = {key: val for key, val in data.items()}
+    new_data = deepcopy(data)
     new_data[randomword(randint(1, 15))] = randomword(randint(1, 20))
     with pytest.raises(KeyError):
-        s = Stop(1, tuple(new_data.values()), list(new_data.keys()))
+        _ = Stop(1, tuple(new_data.values()), list(new_data.keys()))
 
 
 def test_save_to_database(data, transit_conn):
@@ -62,9 +61,7 @@ def test_save_to_database(data, transit_conn):
                 VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"""
     transit_conn.execute(sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line])
 
-    qry = transit_conn.execute(
-        "Select agency_id, link, dir, description, street from stops where stop=?", [data["stop_id"]]
-    ).fetchone()
-    result = [x for x in qry]
+    sql = "Select agency_id, link, dir, description, street from stops where stop=?"
+    result = list(transit_conn.execute(sql, [data["stop_id"]]).fetchone())
     expected = [s.agency_id, link, direc, data["stop_desc"], data["stop_street"]]
     assert result == expected, "Saving Stop to the database failed"

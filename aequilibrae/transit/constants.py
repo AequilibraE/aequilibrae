@@ -15,13 +15,13 @@ DRIVING_SIDE = 1
 
 
 class Constants:
-    agencies: Dict[str, Any] = dict()
-    srid: Dict[int, int] = dict()
-    routes: Dict[int, int] = dict()
-    trips: Dict[int, int] = dict()
-    patterns: Dict[int, int] = dict()
-    pattern_lookup: Dict[int, int] = dict()
-    stops: Dict[int, int] = dict()
-    fares: Dict[int, int] = dict()
-    links: Dict[int, int] = dict()
-    transit_links: Dict[int, int] = dict()
+    agencies: Dict[str, Any] = {}
+    srid: Dict[int, int] = {}
+    routes: Dict[int, int] = {}
+    trips: Dict[int, int] = {}
+    patterns: Dict[int, int] = {}
+    pattern_lookup: Dict[int, int] = {}
+    stops: Dict[int, int] = {}
+    fares: Dict[int, int] = {}
+    links: Dict[int, int] = {}
+    transit_links: Dict[int, int] = {}

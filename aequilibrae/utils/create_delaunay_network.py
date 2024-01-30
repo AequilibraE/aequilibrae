@@ -57,7 +57,7 @@ class DelaunayAnalysis:
         for triangle in all_edges:
             links = list(combinations(triangle, 2))
             for i in links:
-                f, t = sorted(list(i))
+                f, t = sorted(i)
                 edges.append([points.at[f, "node_id"], points.at[t, "node_id"]])
 
         edges = pd.DataFrame(edges)

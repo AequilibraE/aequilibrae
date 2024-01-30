@@ -67,7 +67,7 @@ class LinkTypes:
             link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
-        self.__fields = [x for x in tl.fields]
+        self.__fields = list(tl.fields)
         for lt in link_types_list:
             if lt["link_type_id"] not in self.__items:
                 self.__items[lt["link_type_id"]] = LinkType(lt, self.project)

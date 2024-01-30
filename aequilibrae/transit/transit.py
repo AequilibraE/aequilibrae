@@ -65,7 +65,7 @@ class Transit:
             file_path=file_path,
             day=day,
             description=description,
-            default_capacities=self.default_capacities,
+            capacities=self.default_capacities,
         )
         return gtfs
 

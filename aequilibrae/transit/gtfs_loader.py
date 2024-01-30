@@ -49,16 +49,16 @@ class GTFSReader(WorkerThread):
         self.feed_date = ""
         self.agency = Agency()
         self.services = {}
-        self.routes: Dict[int, Route] = dict()
-        self.trips: Dict[int, Dict[Route]] = dict()
-        self.stops: Dict[int, Stop] = dict()
+        self.routes: Dict[int, Route] = {}
+        self.trips: Dict[int, Dict[Route]] = {}
+        self.stops: Dict[int, Stop] = {}
         self.stop_times = {}
         self.shapes = {}
         self.trip_data = {}
         self.fare_rules = []
         self.fare_attributes = {}
         self.feed_dates = []
-        self.data_arrays = dict()
+        self.data_arrays = {}
         self.wgs84 = pyproj.Proj("epsg:4326")
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
@@ -280,7 +280,7 @@ class GTFSReader(WorkerThread):
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
-            shape = LineString([x for x in zip(items["shape_pt_lon"], items["shape_pt_lat"])])
+            shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
             self.shapes[shape_id] = shape
 
     def __load_trips_table(self):
@@ -422,8 +422,8 @@ class GTFSReader(WorkerThread):
 
         df = pd.DataFrame(stoptimes)
 
-        df.loc[:, "arrival_time"] == df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
-        df.loc[:, "departure_time"] == df.loc[:, "arrival_time"]
+        df.loc[:, "arrival_time"] = df.loc[:, ["arrival_time", "departure_time"]].max(axis=1)
+        df.loc[:, "departure_time"] = df.loc[:, "arrival_time"]
 
         counter = df.shape[0]
         df = df.assign(other_stop=df.stop_id.shift(-1), other_trip=df.trip_id.shift(-1))

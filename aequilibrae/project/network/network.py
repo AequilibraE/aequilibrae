@@ -130,7 +130,7 @@ class Network(WorkerThread):
         east: float = None,
         north: float = None,
         place_name: str = None,
-        modes=["car", "transit", "bicycle", "walk"],
+        modes=["car", "transit", "bicycle", "walk"],  # noqa: B006
     ) -> None:
         """
         Downloads the network from Open-Street Maps

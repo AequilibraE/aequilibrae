@@ -142,7 +142,7 @@ class Pattern(BasicPTElement):
         if not self.__feed.graphs:
             self.__feed.builds_link_graphs_with_broken_stops()
 
-        if not mode_correspondence[self.route_type] in self.__feed.graphs:
+        if mode_correspondence[self.route_type] not in self.__feed.graphs:
             return
 
         self.__feed.path_store.add_graph(
@@ -183,7 +183,7 @@ class Pattern(BasicPTElement):
         empty_frame = pd.DataFrame([])
 
         # We search for disconnected stops:
-        candidate_stops = [stop for stop in self.stops]
+        candidate_stops = list(self.stops)
         stop_node_idxs = [stop.___map_matching_id__[self.route_type] for stop in candidate_stops]
 
         node0 = graph.network.a_node[~graph.network.a_node.isin(graph.centroids)].min()

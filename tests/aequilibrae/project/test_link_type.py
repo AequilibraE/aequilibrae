@@ -21,7 +21,7 @@ class TestLinkType(TestCase):
     def test_changing_link_type_id(self):
         ltypes = self.proj.network.link_types
 
-        lt = random.choice([x for x in ltypes.all_types().values()])
+        lt = random.choice(list(ltypes.all_types().values()))
 
         with self.assertRaises(ValueError):
             lt.link_type_id = "test my description"
