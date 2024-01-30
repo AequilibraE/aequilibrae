@@ -148,10 +148,14 @@ class ODME(object):
         new_classes = []
         for usr_cls in self.classes:
             # NEED TO REPLACE THE MATRIX OBJECT
-            # self.output.matrix[f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"] = usr_cls.matrix.matrix[usr_cls.matrix.view_names[0]]
-            self.output.matrix[f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"] = np.array(usr_cls.matrix.matrix_view, copy=True)
+            view_name = f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"
+            index = self.output.names.index(view_name)
+            # THE BELOW NEEDS TO BE CHANGED TO MAKE SURE IT CAN DEAL WITH EITHER 3D OR 2D 'MATRICES'
+            self.output.matrices[:, :, index] = np.array(usr_cls.matrix.matrix_view, copy=True)
+            #self.output.matrix[view_name] = usr_cls.matrix.matrix[usr_cls.matrix.view_names[0]]
             dup_matrix = self.output
             dup_matrix.index[:] = usr_cls.matrix.index[:]
+            # THE FOLLOWING LINE CHANGES THE PREVIOUS TRAFFIC CLASS COMPUTATIONAL VIEW!
             dup_matrix.computational_view([f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"])
             new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix)
             new_cls.set_pce(usr_cls.pce)
