@@ -125,7 +125,7 @@ class Network(WorkerThread):
         self,
         model_area: Optional[Polygon] = None,
         place_name: Optional[str] = None,
-        modes=["car", "transit", "bicycle", "walk"],
+        modes=("car", "transit", "bicycle", "walk"),
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -138,7 +138,7 @@ class Network(WorkerThread):
             **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
             required
 
-            **modes** (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
+            **modes** (:obj:`tuple`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
 
         .. code-block:: python
