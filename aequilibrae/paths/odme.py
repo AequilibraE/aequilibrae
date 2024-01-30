@@ -25,6 +25,7 @@ from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
 from os.path import join
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -33,6 +34,14 @@ from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
+
+# COPIED FROM AEQUILIBRAE MATRIX
+import importlib.util as iutil
+# Checks if we can display OMX
+spec = iutil.find_spec("openmatrix")
+has_omx = spec is not None
+if has_omx:
+    import openmatrix as omx
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -136,36 +145,22 @@ class ODME(object):
         """
         Duplicates the given matrices in memory only and replaces the TrafficClass objects.
         """
-        args = {"zones": self.classes[0].matrix.zones,
-        "matrix_names": [f"{user_class.__id__}_{user_class.matrix.view_names[0]}" for user_class in self.classes],
-        "index_names": ["my_indices"],
-        "memory_only": True,
-        }
-
-        self.output.create_empty(**args)
-
         # Loop through TrafficClasses - create new and replace, then set classes
         new_classes = []
         for usr_cls in self.classes:
-            # NEED TO REPLACE THE MATRIX OBJECT
-            view_name = f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"
-            index = self.output.names.index(view_name)
-            # THE BELOW NEEDS TO BE CHANGED TO MAKE SURE IT CAN DEAL WITH EITHER 3D OR 2D 'MATRICES'
-            self.output.matrices[:, :, index] = np.array(usr_cls.matrix.matrix_view, copy=True)
-            #self.output.matrix[view_name] = usr_cls.matrix.matrix[usr_cls.matrix.view_names[0]]
-            dup_matrix = self.output
-            dup_matrix.index[:] = usr_cls.matrix.index[:]
-            # THE FOLLOWING LINE CHANGES THE PREVIOUS TRAFFIC CLASS COMPUTATIONAL VIEW!
-            dup_matrix.computational_view([f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"])
-            new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix)
+            #view_name = f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"
+            mat = usr_cls.matrix.copy(cores = usr_cls.matrix.view_names, memory_only=True)
+            mat.computational_view()
+
+            new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, mat)
             new_cls.set_pce(usr_cls.pce)
             if usr_cls.fixed_cost_field:
                 new_cls.set_fixed_cost(usr_cls.fixed_cost_field, usr_cls.fc_multiplier)
             new_cls.set_vot(usr_cls.vot)
-            new_classes.append(TrafficClass(usr_cls.__id__, usr_cls.graph, dup_matrix))
+            new_classes.append(new_cls)
 
         self.assignment.set_classes(new_classes)
-        self.classes = new_classes
+        self.classes = self.assignment.classes
 
     # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
@@ -289,7 +284,51 @@ class ODME(object):
         """
         project = project or get_active_project()
         mats = project.matrices
-        self.output.save(file_name= join(mats.fldr, file_name)) # 'Save As'
+
+        if Path(file_name).suffix.lower() == ".omx":
+            omx_mat = omx.open_file(join(mats.fldr, file_name), "w")
+            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+                for core in matrix.view_names:
+                    omx_mat[f"{cls_name}_{core}"] = matrix.matrix[core]
+
+            # for index in self.aequilibrae_matrices[0].index_names:
+            index = self.aequilibrae_matrices[0].current_index
+            omx_mat.create_mapping(index, self.aequilibrae_matrices[0].index)
+
+            #omx_mat.attrs.name = name
+            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+                for core in matrix.view_names:
+                    omx_mat[f"{cls_name}_{core}"].attrs.description = f"ODME Procedure {self.procedure_id}"
+            omx_mat.close()
+
+        elif ".aem" in file_name:
+            mat = AequilibraeMatrix()
+            matrix_names = []
+            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+                for core in matrix.view_names:
+                    matrix_names.append(f"{cls_name}_{core}")
+
+            args = {
+                "zones": self.aequilibrae_matrices[0].zones,
+                "matrix_names": matrix_names,
+                "index_names": self.aequilibrae_matrices[0].index_names,
+                "memory_only": False,
+                "file_name": file_name,
+            }
+            mat.create_empty(**args)
+            mat.indices[:, :] = self.aequilibrae_matrices[0].indices[:, :]
+            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+                for core in matrix.view_names:
+                    mat.matrix[f"{cls_name}_{core}"][:, :] = matrix[core][:, :]
+            mat.description = f"ODME Procedure {self.procedure_id}"
+            mat.save()
+            mat.close()
+            del mat
+
+        else:
+            raise ValueError("Only supporting .omx and .aem")
+
+        # self.output.save(file_name= join(mats.fldr, file_name)) # 'Save As'
         record = mats.new_record(name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
