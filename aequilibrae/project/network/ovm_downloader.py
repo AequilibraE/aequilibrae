@@ -106,7 +106,7 @@ class OVMDownloader(WorkerThread):
 
     def downloadTransportation(self, bbox, data_source, output_dir):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir) / f'theme=transportation'
+        output_dir = Path(output_dir)
         print()
         print(data_source)
         print(output_dir)
