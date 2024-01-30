@@ -146,7 +146,7 @@ class TestODMEMultiClassSetUp(TestCase):
         for i, matrix in enumerate(self.matrices):
             np.testing.assert_allclose(
                 matrix.matrix_view,
-                np.zeros(self.user_class_dims[i]),
+                np.zeros(self.user_class_dims[i])[:, :, np.newaxis],
                 err_msg=f"The {self.user_class_names[i]} matrix was changed from 0 when initially a 0 matrix!"
             )
 
@@ -187,7 +187,7 @@ class TestODMEMultiClassSetUp(TestCase):
         for i, matrices in enumerate(zip(original_demands, new_demands)):
             old, new = matrices
             np.testing.assert_allclose(
-                old,
+                old[:, :, np.newaxis],
                 new,
                 err_msg=f"The {self.user_class_names[i]} matrix was changed when given count volumes " +
                 "which correspond to currently assigned volumes!"

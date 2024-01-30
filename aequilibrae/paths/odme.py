@@ -5,9 +5,8 @@ Implementation of ODME Infrastructure:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
-# NOTE 1 - Currently following TrafficAssignment the matrix appears to gain a dimension, which seems
-# to be a bug and we need to squeeze this each time assignment is performed. This also occurs
-# for selet link matrices.
+# NOTE 1 - Following TrafficAssignment the matrices become 3 dimensional - this is not a bug
+# and the squeezes need to be removed from the code.
 
 # NOTE - To Do:
 #       Initialiser -> Needs to be seriously cleaned up.
@@ -25,19 +24,15 @@ Implementation of ODME Infrastructure:
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
+from os.path import join
 import numpy as np
 import pandas as pd
-from os.path import join
 
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 
-# COPIED FROM IPF
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
-import importlib.util as iutil
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
 
 class ODME(object):
     """ ODME Infrastructure """
@@ -74,7 +69,7 @@ class ODME(object):
         self.assignment = assignment
         self.classes = assignment.classes
         self.output = AequilibraeMatrix()
-        #self.__duplicate_matrices()
+        self.__duplicate_matrices()
 
         self.class_names = [user_class.__id__ for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
@@ -83,6 +78,12 @@ class ODME(object):
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
+        # RESHAPING MATRICES BECAUSE WHEN COMPUTATIONAL VIEW IS DONE WITH A SINGLE CLASS WE ONLY GET
+        # n x n instead of n x n x 1
+        for i, demand in enumerate(self.demands):
+            if len(demand.shape) == 2:
+                self.demands[i] = demand[:, :, np.newaxis]
+
         self.original_demands = [np.copy(matrix) for matrix in self.demands]
 
         # Observed Links & Associated Volumes
@@ -375,19 +376,14 @@ class ODME(object):
 
         # Perform the assignment
         self.assignment.execute()
-        
-        # See note 1 for details on np.squeeze usage - MAYBE PUT THIS IN DOCSTRING!
-        for matrix in self.aequilibrae_matrices:
-            matrix.matrix_view = np.squeeze(matrix.matrix_view, axis=2)
 
         # Store reference to select link demand matrices as proportion matrices
         # See note 1 for details on np.squeeze usage
-        # MULTI-CLASS GENERALISATION REQUIRES TESTING IN FUTURE!!!
         for assignclass, demand in zip(self.classes, self.demands):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
                 self._sl_matrices[link] = np.nan_to_num(
-                    np.squeeze(sl_matrices[link], axis=2) / demand
+                    sl_matrices[link] / demand
                     )
 
         # Extract and store array of assigned volumes to the select links
