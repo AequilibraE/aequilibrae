@@ -134,7 +134,7 @@ class Zoning(BasicTable):
     def __has_zoning(self):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             dt = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
-        return any(["zone" in x[0].lower() for x in dt])
+        return any("zone" in x[0].lower() for x in dt)
 
     def __load(self):
         tl = TableLoader()

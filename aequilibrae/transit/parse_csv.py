@@ -5,7 +5,7 @@ import copy
 from numpy.lib.recfunctions import append_fields
 
 
-def parse_csv(file_name: str, column_order=[]):
+def parse_csv(file_name: str, column_order=[]):  # noqa B006
     tot = []
     if isinstance(file_name, str):
         csvfile = open(file_name, encoding="utf-8-sig")

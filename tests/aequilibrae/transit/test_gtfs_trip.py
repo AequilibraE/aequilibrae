@@ -1,3 +1,4 @@
+from copy import copy
 from random import randint, choice
 import pytest
 
@@ -39,11 +40,11 @@ class TestTrip:
     def test_save_to_database(self, data, transit_conn):
         r = Trip()
         r._populate(tuple(data.values()), list(data.keys()))
-        times = [r for r in range(randint(5, 15))]
+        times = list(range(randint(5, 15)))
         patid = randint(15, 2500000)
 
-        r.arrivals = [r for r in times]
-        r.departures = [r for r in times]
+        r.arrivals = copy(times)
+        r.departures = copy(times)
         r.pattern_id = patid
         r.source_time = [0] * len(times)
         r.save_to_database(transit_conn)

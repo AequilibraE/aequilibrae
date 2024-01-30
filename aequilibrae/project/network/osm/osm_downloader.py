@@ -122,7 +122,7 @@ class OSMDownloader(WorkerThread):
                 msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
                 self.logger.info(msg)
-        except Exception:
+        except Exception as err:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
             # overpass_request until we get a valid response
@@ -141,7 +141,9 @@ class OSMDownloader(WorkerThread):
             # else, this was an unhandled status_code, throw an exception
             else:
                 self.report.append(f"Server at {domain} returned status code {response.status_code} and no JSON data")
-                raise Exception(f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}")
+                raise Exception(
+                    f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}"
+                ) from err
 
         return response_json
 

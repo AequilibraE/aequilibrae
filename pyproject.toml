@@ -7,3 +7,51 @@ extend-exclude = '''docs/*'''
 
 [build-system]
 requires = ["setuptools", "numpy", "cython", "pyaml", "pyqt5", "requests", "scipy", "shapely", "pandas", "pyarrow", "pyproj", "wheel"]
+
+
+[tool.ruff]
+
+select = ["B", "C", "E", "F", "W"]
+ignore = ["E501", "F401", "F403", "B028", "B007", "B017"]
+exclude = [
+    ".idea",
+    "__pycache__",
+    "sphinx",
+    ".ipynb_checkpoints",
+    "aequilibrae.egg-info",
+    "docs/*",
+    "notebooks",
+    "bin/hpc",
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    ".venv",
+    ".venv39",
+    ".venv310",
+    ".venv311",
+    ".venv312",
+]
+line-length = 120
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+target-version = "py39"
+
+[tool.ruff.mccabe]
+max-complexity = 20

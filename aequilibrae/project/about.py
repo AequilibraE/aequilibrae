@@ -56,7 +56,7 @@ class About:
     def list_fields(self) -> list:
         """Returns a list of all characteristics the about table holds"""
 
-        return [x for x in self.__characteristics]
+        return list(self.__characteristics)
 
     def add_info_field(self, info_field: str) -> None:
         """Adds new information field to the model
@@ -105,7 +105,7 @@ class About:
 
     def __has_about(self, conn):
         sql = "SELECT name FROM sqlite_master WHERE type='table';"
-        return any(["about" in x[0] for x in conn.execute(sql).fetchall()])
+        return any("about" in x[0] for x in conn.execute(sql).fetchall())
 
     def __load(self, conn):
         self.__characteristics = []
