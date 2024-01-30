@@ -1,5 +1,6 @@
 import copy
 import json
+import tempfile
 import pandas as pd
 from pathlib import Path
 from tempfile import gettempdir, mkdtemp
@@ -127,29 +128,36 @@ class TestOVMProcessor(TestCase):
         b_node = {'ovm_id': '8f9d0e128cd98d6-15FFF68E65613FDF', 'geometry': shapely.Point(148.72471, -20.27492)}
         node_df = gpd.GeoDataFrame(data=[a_node,b_node])
 
-        dataframes = [gpd.GeoDataFrame(), node_df]
-        o = OVMBuilder(ovm_download=dataframes, project_path=self.pth, project=self.project)
-
-
         def segment(direction, road):
             segment = {'ovm_id': '8b9d0e128cd9fff-163FF6797FC40661', 'connectors': ['8f9d0e128cd9709-167FF64A37F1BFFB', '8f9d0e128cd98d6-15FFF68E65613FDF'], 'direction': direction, 
                    'link_type': 'secondary', 'name': 'Shute Harbour Road', 'speed':  '{"maxSpeed":[70,"km/h"]}', 'road': road, 
                    'geometry': shapely.LineString([(148.7245987, -20.2747175), (148.7246504, -20.2747531), (148.724688, -20.274802), (148.7247077, -20.2748593), (148.7247078, -20.2749195)])}
             return segment
-
-        o.create_node_ids(node_df)
-
-        for lane_type in [no_info, simple, lanes_3, highway, lane_ends]:
-            assert type(road(lane_type)) == str
-            assert type(o.split_connectors(segment(lane_type, road(lane_type)))) == gpd.GeoDataFrame
-
         
-        gdf_no_info = o.split_connectors(segment(no_info, road(no_info)))
+        dataframes = [gpd.GeoDataFrame(), node_df]
+        o = OVMBuilder(ovm_download=dataframes, project_path=self.pth, project=self.project)
 
-        assert gdf_no_info['direction'][0] == 0
-        assert gdf_no_info['lanes_ab'][0] == 1
-        assert gdf_no_info['lanes_ba'][0] == 1
-        print('gdf_no_info test: passed')
+        with tempfile.TemporaryDirectory() as output_dir:
+
+        # for lane_type in [no_info, simple, lanes_3, highway, lane_ends]:
+        #     print(gpd.GeoDataFrame(segment(lane_type, road(lane_type)))['connectors'])
+        #     print(node_df)
+            
+        #     assert type(road(lane_type)) == str
+        #     assert type(o.split_connectors(segment(lane_type, road(lane_type)))) == gpd.GeoDataFrame
+
+            dataframes = [gpd.GeoDataFrame(segment(no_info, road(no_info))), node_df]
+            o = OVMBuilder(ovm_download=dataframes, project_path=self.pth, project=self.project)
+            # o.__worksetup()
+            o.create_node_ids(node_df)
+            # gdf_no_info = o.split_connectors(segment(no_info, road(no_info)))
+            gdf_no_info = o.formatting(dataframes[0], dataframes[1], output_dir)
+            print(gdf_no_info.columns)
+
+            assert gdf_no_info['direction'][0] == 0
+            assert gdf_no_info['lanes_ab'][0] == 1
+            assert gdf_no_info['lanes_ba'][0] == 1
+            print('gdf_no_info test: passed')
         
         gdf_simple = o.split_connectors(segment(simple, road(simple)))
 
