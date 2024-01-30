@@ -43,7 +43,6 @@ class OVMBuilder(WorkerThread):
         WorkerThread.__init__(self, None)
         self.project = project or get_active_project()
         self.logger = logger or get_logger()
-        # self.filter = self.get_ovm_filter(modes)
         self.node_start = node_start
         self.report = []
         self.conn = None
@@ -291,7 +290,7 @@ class OVMBuilder(WorkerThread):
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
             rows = []
-            
+
             for i in range(len(connectors) - 1):
                 new_row = {'a_node': self.nodes[connectors[i]]['node_id'], 
                            'b_node': self.nodes[connectors[i + 1]]['node_id'], 

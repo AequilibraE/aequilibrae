@@ -213,10 +213,8 @@ class Network(WorkerThread):
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)
-        print('hi')
-        self.builder.doWork(output_dir)
-        print('no')
 
+        self.builder.doWork(output_dir)
         self.logger.info("Network built successfully")
 
     def create_from_osm(
