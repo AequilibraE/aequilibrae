@@ -9,14 +9,6 @@ Implementation of ODME Infrastructure:
 #       All docstrings need to be updated appropriately
 #       Any extra clean up needs to be done
 
-# All docstrings and this stuff at the top need cleaning up
-
-# Ideally in future this class should act as an entirely top level class for user interaction.
-# I.e, the user should be able to intialise, set parameters, call execute and get various results
-# but this class does not need to hold any of the actual algorithms or statistics itself.
-# It probably should also do any checking of user input that is required
-# (ie no client classes should have to check)
-
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime

@@ -149,7 +149,6 @@ class ODMEResults(object):
         self.factor_stats = pd.concat([self.factor_stats, new_stats], ignore_index=True)
 
     # Extra Utilities:
-
     def init_timer(self) -> None:
         """
         Initialises the internal times (for statistics purposes).
