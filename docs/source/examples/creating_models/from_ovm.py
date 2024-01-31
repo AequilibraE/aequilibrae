@@ -47,10 +47,10 @@ project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north
 # nodes = download[1]
  # %%
 links = project.network.links.data
+nodes = project.network.nodes.data
+nodes
 
-# links = project.network.links
-# nodes = project.network.nodes
-links
+# links
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier

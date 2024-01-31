@@ -157,20 +157,17 @@ class Network(WorkerThread):
             >>> p = Project()
             >>> p.new("/tmp/new_project")
 
-            # Because we have our own server, we can set a bigger area for download (in M2)
-            >>> par.parameters['osm']['max_query_area_size'] = 10000000000
-
             # Save the parameters to disk
             >>> par.write_back()
 
             # Now we can import the network for any place we want
-            # p.network.create_from_osm(place_name="my_beautiful_hometown")
+            # p.network.create_from_ovm(place_name="my_beautiful_hometown")
 
             >>> p.close()
         """
 
         if self.count_links() > 0:
-            raise FileExistsError("You can only import an OSM network into a brand new model file")
+            raise FileExistsError("You can only import an OVM network into a brand new model file")
 
         curr = self.conn.cursor()
         curr.execute("""ALTER TABLE links ADD COLUMN ovm_id integer""")

@@ -68,6 +68,7 @@ class OVMBuilder(WorkerThread):
         self.curr = self.conn.cursor()
         self.__worksetup()
         self.formatting(self.links_gdf, self.nodes_gdf, output_dir)
+        print(self.pth)
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def formatting(self, links_gdf: gpd.GeoDataFrame, nodes_gdf: gpd.GeoDataFrame, output_dir: Path):
@@ -122,6 +123,8 @@ class OVMBuilder(WorkerThread):
             # Create the 'link_types' and 'modes' columns for the 'nodes_gdf' DataFrame
             nodes_gdf['link_types'] = matched_rows['link_type']
             nodes_gdf['modes'] = matched_rows['modes']
+            nodes_gdf['ovm_id'] = nodes_gdf['ovm_id']
+            nodes_gdf['geometry'] = nodes_gdf['geometry']
         else:
             # No common nodes found
             raise ValueError("No common nodes.")
@@ -171,6 +174,11 @@ class OVMBuilder(WorkerThread):
             .drop_duplicates(subset=["C", "D"])
             .to_records(index=False)
         )
+        # print(type(node_df))
+        # print(len(node_df))
+        # print(node_df)
+        # print(node_df[0])
+        # print(len(node_df))
         self.conn.executemany(sql, node_df)
         self.conn.commit()
         del nodes_gdf
@@ -247,7 +255,7 @@ class OVMBuilder(WorkerThread):
             node_count = i + self.node_start
             node_ids.append(node_count)
             self.node_ids[node_count] = {'ovm_id': data_frame['ovm_id'][i], 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y)}
-            self.nodes[data_frame['ovm_id'][i]] = {'node_id': node_count, 'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y)}
+            self.nodes[data_frame['ovm_id'][i]] = {'lat': data_frame['geometry'][i].y, 'lon': data_frame['geometry'][i].x, 'coord': (data_frame['geometry'][i].x, data_frame['geometry'][i].y), 'node_id': node_count}
         data_frame['node_id'] = pd.Series(node_ids)
         return data_frame['node_id']
 
