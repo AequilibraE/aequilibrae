@@ -188,6 +188,42 @@ class TestODMESingleClassSetUp(TestCase):
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes)
 
+    def test_basic_2_4(self) -> None:
+        """
+        Check ValueError is raised if invalid stopping criteria are given
+        or stopping criteria are given with missing criteria.
+        """
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, 1]],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+
+        # Check invalid (0) max iterations
+        stop_crit = {"max_outer": 0,
+            "max_inner": 0,
+            "convergence_crit": 10**-4,
+            "inner_convergence": 10**-4
+            }
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+
+        # Check invalid (negative) convergence
+        stop_crit = {"max_outer": 10,
+            "max_inner": 10,
+            "convergence_crit": -10**-4,
+            "inner_convergence": -10**-4
+            }
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+
+        # Check missing criteria
+        stop_crit = {"max_outer": 10,
+            "max_inner": 10,
+            "convergence_crit": 10**-4,
+            }
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+
     # Simple Test Cases (Exact Results Expected For Spiess):
     def test_basic_3_1(self) -> None:
         """
