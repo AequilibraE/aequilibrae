@@ -200,6 +200,45 @@ class TestSelectLink(TestCase):
             ),
         )
 
+    def test_multi_iteration(self):
+        for algorithm in ["all-or-nothing", "msa", "fw", "cfw", "bfw"]:
+            with self.subTest(algorithm=algorithm):
+                assignment = TrafficAssignment()
+                assignclass = TrafficClass("car", self.car_graph, self.matrix)
+                assignment.set_classes([assignclass])
+                assignment.set_vdf("BPR")
+                assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+                assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+                assignment.set_capacity_field("capacity")
+                assignment.set_time_field("free_flow_time")
+                assignment.max_iter = 10
+                assignment.set_algorithm(algorithm)
+
+                assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
+                assignment.execute()
+
+                assign_df = assignment.results().reset_index(drop=False).fillna(0)
+                sl_matrix_1 = assignclass.results.select_link_od.matrix["sl_1_1"].squeeze()
+                sl_matrix_5 = assignclass.results.select_link_od.matrix["sl_5_1"].squeeze()
+
+                assigned_flow_1 = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
+                assigned_flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
+                sl_flow_1 = np.sum(sl_matrix_1)
+                sl_flow_5 = np.sum(sl_matrix_5)
+
+                self.assertAlmostEqual(
+                    assigned_flow_1,
+                    sl_flow_1,
+                    msg=f"Select link results differ to that of the assignment ({algorithm})",
+                    delta=1e-5,
+                )
+                self.assertAlmostEqual(
+                    assigned_flow_5,
+                    sl_flow_5,
+                    msg=f"Select link results differ to that of the assignment ({algorithm})",
+                    delta=1e-5,
+                )
+
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
     res = PathResults()
