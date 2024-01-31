@@ -162,9 +162,9 @@ class ODME(object):
                 "Currently implemented algorithms include:\n" +
                 '\n'.join(self.ALL_ALGORITHMS))
 
-        # Check stopping criteria
+        # Check stopping criteria if given
         stop_error = False
-        if stop_crit:
+        if stop_crit is not None:
             keys = self.DEFAULT_STOP_CRIT.keys()
             if not isinstance(stop_crit, dict):
                 stop_error = True
@@ -208,11 +208,12 @@ class ODME(object):
             raise ValueError("Count volumes must be a non-empty pandas dataframe with columns:\n" +
                 '\n'.join(self.COUNT_VOLUME_COLS))
 
-        # Check alpha value
-        if not isinstance(alpha, (float, int)):
-            raise ValueError("Input alpha should be a float or integer (0 to 1)")
-        elif alpha > 1 or  alpha < 0:
-            raise ValueError("Input alpha should be between 0 and 1")
+        # Check alpha value if given
+        if alpha is not None:
+            if not isinstance(alpha, (float, int)):
+                raise ValueError("Input alpha should be a float or integer (0 to 1)")
+            elif alpha > 1 or  alpha < 0:
+                raise ValueError("Input alpha should be between 0 and 1")
 
     def __duplicate_matrices(self):
         """
