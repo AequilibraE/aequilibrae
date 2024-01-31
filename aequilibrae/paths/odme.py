@@ -75,7 +75,6 @@ class ODME(object):
 
         # The following are implicitly ordered by the list of Traffic Classes:
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
-        self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
         # Reshaping matrices because when computational_view is done with a single class we get
         # n x n instead of n x n x 1
