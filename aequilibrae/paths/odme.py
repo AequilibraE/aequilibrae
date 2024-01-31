@@ -454,16 +454,16 @@ class ODME(object):
         # Create values for SL matrices & assigned flows
         self.__perform_assignment()
 
-        # Begin outer iteration
+        # Outer iterations
         outer = 0
         while outer < self.max_outer and self.last_convergence > self.outer_convergence_crit:
             # Log stats before running algorithm:
             outer += 1
             self.results.log_iter(ODMEResults.OUTER)
 
-            # Run inner iterations:
-            # INNER STOPPING CRITERION - FIND A BETTER WAY TO DO INNER STOPPING CRITERION
-            self.convergence_change = float('inf') # Ensures at least 1 inner iteration is run per outer loop
+            # Inner iterations:
+            # Ensure at least 1 inner iteration is run per outer loop
+            self.convergence_change = float('inf')
             inner = 0
             while inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
                 inner += 1
