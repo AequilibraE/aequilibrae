@@ -3,7 +3,7 @@ Implementation of ODME Infrastructure:
 """
 
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
-# with biconjugate/conjugate frank-wolfe
+# with biconjugate/conjugate frank-wolfe - refer to Issue #493
 
 # NOTE - To Do:
 #       All docstrings need to be updated appropriately
