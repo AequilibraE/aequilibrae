@@ -57,7 +57,6 @@ class TestODMESingleClassSetUp(TestCase):
         self.matrix.close()
         self.project.close()
 
-    # Basic tests are ran on demand matrices which produce little to no congestion.
     # 1) Edge Cases
     def test_basic_1_1(self) -> None:
         """
