@@ -5,15 +5,9 @@ Implementation of ODME Infrastructure:
 # NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
 # with biconjugate/conjugate frank-wolfe
 
-# NOTE 1 - Following TrafficAssignment the matrices become 3 dimensional - this is not a bug
-# and the squeezes need to be removed from the code.
-
 # NOTE - To Do:
-#       Initialiser -> Needs to be seriously cleaned up.
-#       Objective Function -> Needs to be updated to allowed for regularisation term
-#                          -> May be useful to consider normalising alpha/beta
-#                          -> Needs to be updated to include pce
-#       Execution -> Need to work later on a better way to automate inner stopping criterion
+#       All docstrings need to be updated appropriately
+#       Any extra clean up needs to be done
 
 # All docstrings and this stuff at the top need cleaning up
 
@@ -46,11 +40,12 @@ if has_omx:
 
 class ODME(object):
     """ ODME Infrastructure """
-    # Input count volume columns (assigned volumes will be added)
+    # Input count volume columns (assigned volumes will be added during execution)
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
-    DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50, "convergence_crit": 10**-4, "inner_convergence": 10**-4}
+    DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50,
+        "convergence_crit": 10**-4, "inner_convergence": 10**-4}
 
     def __init__(self,
         assignment: TrafficAssignment,
@@ -90,7 +85,7 @@ class ODME(object):
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
-        # RESHAPING MATRICES BECAUSE WHEN COMPUTATIONAL VIEW IS DONE WITH A SINGLE CLASS WE GET
+        # Reshaping matrices because when computational_view is done with a single class we get
         # n x n instead of n x n x 1
         for i, demand in enumerate(self.demands):
             if len(demand.shape) == 2:
@@ -115,6 +110,7 @@ class ODME(object):
         self.last_convergence = None
         # Component of objective function from flows/regularisation:
         self.flow_obj, self.reg_obj = None, None
+        # Initially inf to ensure inner iterations begin
         self.convergence_change = float('inf')
 
         # Stopping criterion
@@ -511,7 +507,6 @@ class ODME(object):
         self.assignment.execute()
 
         # Store reference to select link demand matrices as proportion matrices
-        # See note 1 for details on np.squeeze usage
         for assignclass, demand in zip(self.classes, self.demands):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
