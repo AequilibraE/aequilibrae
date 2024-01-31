@@ -122,7 +122,7 @@ class LinearApproximation(WorkerThread):
 
         self.step_direction = {}  # type: Dict[AssignmentResults]
         self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.pre_previous_step_direction = {}  # type: Dict[AssignmentResults]
+        self.tmp_step_direction = {}  # type: Dict[AssignmentResults]
 
         for c in self.traffic_classes:
             r = AssignmentResults()
@@ -147,7 +147,7 @@ class LinearApproximation(WorkerThread):
                 r.prepare(c.graph, c.matrix)
                 r.compact_link_loads = np.zeros([])
                 r.compact_total_link_loads = np.zeros([])
-                self.pre_previous_step_direction[c._id] = r
+                self.tmp_step_direction[c._id] = r
 
     def calculate_conjugate_stepsize(self):
         self.vdf.apply_derivative(
@@ -263,11 +263,11 @@ class LinearApproximation(WorkerThread):
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
-                pre_previous = self.pre_previous_step_direction[c._id]
-                copy_two_dimensions(pre_previous.link_loads, sdr.link_loads, self.cores)
-                pre_previous.total_flows()
+                previous = self.previous_step_direction[c._id]  # needed for BFW conjugate stepsize calculation
+                copy_two_dimensions(previous.link_loads, sdr.link_loads, self.cores)
+                previous.total_flows()
                 if c.results.num_skims > 0:
-                    copy_three_dimensions(pre_previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
+                    copy_three_dimensions(previous.skims.matrix_view, sdr.skims.matrix_view, self.cores)
 
                 linear_combination(
                     sdr.link_loads, sdr.link_loads, c._aon_results.link_loads, self.conjugate_stepsize, self.cores
@@ -289,10 +289,11 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.pre_previous_step_direction[c._id]  # type: AssignmentResults
+                ppst = self.tmp_step_direction[c._id]  # type: AssignmentResults
                 prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
                 stp_dir = self.step_direction[c._id]  # type: AssignmentResults
 
+                # make copy of current stp direction since we overwrite it but will need it as previous_direction in next step
                 copy_two_dimensions(ppst.link_loads, stp_dir.link_loads, self.cores)
                 ppst.total_flows()
                 if c.results.num_skims > 0:
@@ -320,6 +321,7 @@ class LinearApproximation(WorkerThread):
 
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
+                # copy results back into prev_stp_dir
                 copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads, self.cores)
                 prev_stp_dir.total_flows()
                 if c.results.num_skims > 0:
