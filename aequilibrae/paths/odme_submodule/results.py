@@ -40,10 +40,6 @@ class ODMEResults(object):
         self.total_time = 0
         self.time = None
 
-        # Clean up stuff
-        # From here to continue decide how to more appropriately record results and statistics
-        # and make sure the two classes have as little coupling as possible
-
     # Statistics:
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
@@ -99,7 +95,7 @@ class ODMEResults(object):
         """
         Computes statistics regarding previous iteration and stores them in the statistics list.
         """
-        # Compute Statistics:
+        # Compute Timing:
         old_time = self.time
         self.time = time.time()
         loop_time = self.time - old_time
@@ -107,16 +103,16 @@ class ODMEResults(object):
 
         # Create Data:
         data = self.odme.count_volumes.copy(deep=True)
-        data["Loop Time (s)"] = [loop_time for _ in range(self.odme.num_counts)]
-        data["Total Run Time (s)"] = [self.total_time for _ in range(self.odme.num_counts)]
-        data["Convergence"] = [self.odme.last_convergence for _ in range(self.odme.num_counts)]
-        data["Inner Convergence"] = [self.odme.convergence_change for _ in range(self.odme.num_counts)]
-        data["Flow Objective"] = [self.odme.flow_obj for _ in range(self.odme.num_counts)]
-        data["Reg Objective"] = [self.odme.reg_obj for _ in range(self.odme.num_counts)]
+        data["Loop Time (s)"] = [loop_time for _ in range(len(data))]
+        data["Total Run Time (s)"] = [self.total_time for _ in range(len(data))]
+        data["Convergence"] = [self.odme.last_convergence for _ in range(len(data))]
+        data["Inner Convergence"] = [self.odme.convergence_change for _ in range(len(data))]
+        data["Flow Objective"] = [self.odme.flow_obj for _ in range(len(data))]
+        data["Reg Objective"] = [self.odme.reg_obj for _ in range(len(data))]
 
-        data["Total Iteration #"] = [self.total_iter for _ in range(self.odme.num_counts)]
-        data["Outer Loop #"] = [self.outer for _ in range(self.odme.num_counts)]
-        data["Inner Loop #"] = [self.inner for _ in range(self.odme.num_counts)]
+        data["Total Iteration #"] = [self.total_iter for _ in range(len(data))]
+        data["Outer Loop #"] = [self.outer for _ in range(len(data))]
+        data["Inner Loop #"] = [self.inner for _ in range(len(data))]
 
         data["Assigned - Observed"] = (
             self.odme.count_volumes['assign_volume'].to_numpy() -

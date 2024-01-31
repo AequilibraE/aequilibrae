@@ -97,7 +97,6 @@ class ODME(object):
 
         # Observed Links & Associated Volumes
         self.count_volumes = count_volumes.copy(deep=True)
-        self.num_counts = len(self.count_volumes)
 
         # Select Link:
         self._sl_matrices = dict()
