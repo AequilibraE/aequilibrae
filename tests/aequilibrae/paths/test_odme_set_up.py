@@ -52,7 +52,6 @@ class TestODMESingleClassSetUp(TestCase):
         self.index = self.car_graph.nodes_to_indices
         # Extend dimensions by 1 to enable an AequilibraeMatrix to be used
         self.dims = self.matrix.matrix_view.shape + (1,)
-        self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
 
     def tearDown(self) -> None:
         self.matrix.close()
@@ -69,7 +68,7 @@ class TestODMESingleClassSetUp(TestCase):
         self.matrix.matrices = np.zeros(self.dims)
         count_volumes = pd.DataFrame(
             data=[["car", 1, 1, 0]],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
 
         # Run ODME algorithm.
@@ -105,7 +104,7 @@ class TestODMESingleClassSetUp(TestCase):
             ["car", 65, 1, 85],
             ["car", 23, 1, 0]
         ]
-        count_volumes = pd.DataFrame(data=data, columns=self.count_vol_cols)
+        count_volumes = pd.DataFrame(data=data, columns=ODME.COUNT_VOLUME_COLS)
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes)
@@ -143,7 +142,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Perform ODME with unchanged count volumes
         count_volumes = pd.DataFrame(
             data=[["car", link, 1, flows[i]] for i, link in enumerate(links)],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
@@ -161,7 +160,7 @@ class TestODMESingleClassSetUp(TestCase):
         Check ValueError is raised if no count volumes are given.
         """
         with self.assertRaises(ValueError):
-            ODME(self.assignment, pd.DataFrame(data=[], columns=self.count_vol_cols))
+            ODME(self.assignment, pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS))
 
     def test_basic_2_2(self) -> None:
         """
@@ -170,7 +169,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
             data=[["car", i, 1, i * (-1 * (i%3 == 0))] for i in range(1, 50)],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
 
         with self.assertRaises(ValueError):
@@ -183,7 +182,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
             data=[["car", 1, 1, i] for i in range(2)],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
 
         with self.assertRaises(ValueError):
@@ -214,7 +213,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Perform ODME with doubled link flow on link 38
         count_volumes = pd.DataFrame(
             data=[["car", 38, 1, 2 * old_flow]],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
@@ -252,7 +251,7 @@ class TestODMESingleClassSetUp(TestCase):
         # Perform ODME with competing link flows on 5 & 35
         count_volumes = pd.DataFrame(
             data=[["car", 5, 1, 100], ["car", 35, 1, 50]],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
