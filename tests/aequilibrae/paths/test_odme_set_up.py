@@ -15,11 +15,7 @@ from ...data import siouxfalls_project
 
 class TestODMESingleClassSetUp(TestCase):
     """
-    Suite of Unit Tests for internal implementation of ODME class.
-    Should not be ran during commits - only used for contrsuction purposes (ie implementation details can 
-    change for internal functionality of ODME class).
-
-    In future these can be generalised to simple basic unit tests.
+    Basic unit tests for ODME single class execution
     """
 
     def setUp(self) -> None:
@@ -40,12 +36,6 @@ class TestODMESingleClassSetUp(TestCase):
         self.matrix = self.project.matrices.get_matrix("demand_aem")
         self.matrix.computational_view()
 
-        # Extra data for convenience:
-        self.index = self.car_graph.nodes_to_indices
-        # Extend dimensions by 1 to enable an AequilibraeMatrix to be used
-        self.dims = self.matrix.matrix_view.shape + (1,)
-        self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
-
         # Initial assignment parameters:
         self.assignment = TrafficAssignment()
         self.assignclass = TrafficClass("car", self.car_graph, self.matrix)
@@ -58,31 +48,17 @@ class TestODMESingleClassSetUp(TestCase):
         self.assignment.max_iter = 5
         self.assignment.set_algorithm("msa")
 
+        # Extra data for convenience:
+        self.index = self.car_graph.nodes_to_indices
+        # Extend dimensions by 1 to enable an AequilibraeMatrix to be used
+        self.dims = self.matrix.matrix_view.shape + (1,)
+        self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
+
     def tearDown(self) -> None:
         self.matrix.close()
         self.project.close()
 
-    def test_playground(self) -> None:
-        """
-        Using this to figure out how API works - should be removed eventually.
-        """
-        self.assignclass.set_pce(2)
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view = np.zeros(self.dims)
-        self.matrix.matrix_view[self.index[1], self.index[2]] = 10
-
-        # Get Results:
-        self.assignment.execute()
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
-        print(flow)
-
-    # Basic tests check basic edge cases, invalid inputs and a few simple inputs:
     # Basic tests are ran on demand matrices which produce little to no congestion.
-    # 1) Edge Cases
-    # 2) Input Validity Checking (Ensuring API is Consistent)
-    # 3) General Test Cases (Using Synthetic Demand Matrices & Pre-determined Results)
-
     # 1) Edge Cases
     def test_basic_1_1_a(self) -> None:
         """
@@ -325,23 +301,23 @@ class TestODMESingleClassSetUp(TestCase):
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes)
 
-    # Simple Test Cases (Exact Results Expected Without Regularisation Term):
+    # Simple Test Cases (Exact Results Expected For Spiess):
     def test_basic_3_1(self) -> None:
         """
-        Input single count volume representing OD path from node i to node j
-        along link a, with demand matrix which is 0 everywhere except on OD pair (i, j).
-        Ensure count volume is small enough that the best (i, j) path is via link a.
+        Input single count volume representing OD path from node 1 to node 2
+        along link 1, with demand matrix which is 0 everywhere except on OD pair (1, 2).
+        We give count volume on link 1 by given double the demand.
+        NOTE - this can be visualised in QGIS using the Sioux Falls network
 
-        Here (i, j) is (1, 2) and a is 1 - find at top of graph in QGIS.
-
-        Check that the only OD pair that has changed is at index (i, j) and that
-        the assignment produces flow on on link a and nowhere else.
+        Check that the only OD pair that has changed is at index (1, 2) and that
+        the assignment produces flow on on link 1 and nowhere else.
         """
         # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view = np.zeros(self.dims)
-        self.matrix.matrix_view[self.index[1], self.index[2]] = 10
+        synthetic_demand = np.zeros(self.dims)
+        synthetic_demand[self.index[1], self.index[2], 0] = 10
+        self.matrix.matrices = synthetic_demand
         count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 40]],
+            data=[["car", 1, 1, 20]],
             columns=self.count_vol_cols
         )
 
@@ -357,15 +333,16 @@ class TestODMESingleClassSetUp(TestCase):
 
         # Assertions:
         #   Resulting Demand Matrix:
-        #       Correct Shape:
-        #self.assertEqual(new_demand.shape, self.dims, msg="Shape of output demand matrix does not match initial demand.")
         #       Non-negative:
-        self.assertTrue(np.all(new_demand >= 0), msg="Output demand matrix contains negative values.")
+        self.assertTrue(np.all(new_demand >= 0),
+            msg="Output demand matrix contains negative values.")
         #   Flow Matches Observation:
-        self.assertAlmostEqual(flow, 40, msg="Newly assigned flow doesn't match observed.")
+        self.assertAlmostEqual(flow, 20,
+            msg="Newly assigned flow doesn't match observed count.")
         #   Only Link 1 has Non-Zero Flow:
         test = (assign_df["matrix_ab"] == 0) | (assign_df["link_id"] == 1)
-        self.assertTrue(test.all(), msg="Unexpected non-zero link flow.")
+        self.assertTrue(test.all(),
+            msg="Unexpected non-zero link flow.")
 
     def test_basic_3_2(self) -> None:
         """
@@ -387,9 +364,6 @@ class TestODMESingleClassSetUp(TestCase):
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         old_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
-        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
-        #self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
-
         # Perform ODME with doubled link flow on link 38
         count_volumes = pd.DataFrame(
             data=[["car", 38, 1, 2 * old_flow]],
@@ -398,17 +372,12 @@ class TestODMESingleClassSetUp(TestCase):
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
         new_demand = odme.get_demands()[0]
-        factor_stats = odme.get_iteration_factors()
-        assignment_data = odme.get_all_statistics()
 
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
         self.matrix = self.assignment.classes[0].matrix
-
-        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
-        # self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
 
         # Assert link flow is in fact doubled:
         self.assertAlmostEqual(new_flow, 2 * old_flow)        
@@ -450,16 +419,10 @@ class TestODMESingleClassSetUp(TestCase):
 
         self.matrix = self.assignment.classes[0].matrix
 
-        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
-        # self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
-
         # Assert link flows are equal:
         self.assertAlmostEqual(flow_5, flow_35, msg="Expected balanced flows but are unbalanced")
         # Assert link flows are balanced halfway between each other:
         self.assertAlmostEqual(flow_5, (flow_5 + flow_35)/2, msg="Expected flows to be halfway between 50 & 100")
-
-        # Assert shape of new demand matrix is unchanged
-        #self.assertEqual(new_demand.shape, self.dims, msg="Demand matrix dimensions have been changed")
 
         # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
@@ -471,4 +434,3 @@ class TestODMESingleClassSetUp(TestCase):
             self.matrix.matrix_view,
             err_msg="ODME should perturb original matrix_view!"
         )
-        
