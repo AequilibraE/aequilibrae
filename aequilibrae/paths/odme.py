@@ -150,24 +150,53 @@ class ODME(object):
         algorithm: str) -> None:
         """
         Ensures all user input is of correct format/value.
+        NOTE - we do not check if the assignment is given properly,
+        this is assumed to either be done correctly or for any errors
+        to be picked up by the TrafficAssignment class.
         """
         # Check algorithm
-        if algorithm not in self.ALL_ALGORITHMS:
+        if not isinstance(algorithm, str):
+            raise ValueError("Algorithm must be input as a string")
+        elif algorithm not in self.ALL_ALGORITHMS:
             raise ValueError(f"'{algorithm}' is not a valid algorithm.\n" +
                 "Currently implemented algorithms include:\n" +
                 '\n'.join(self.ALL_ALGORITHMS))
 
         # Check stopping criteria
-        keys = self.DEFAULT_STOP_CRIT.keys()
+        stop_error = False
+        if stop_crit:
+            keys = self.DEFAULT_STOP_CRIT.keys()
+            if not isinstance(stop_crit, dict):
+                stop_error = True
+            else:
+                for key in keys:
+                    if key not in stop_crit:
+                        stop_error = True
+                    elif key in ["max_outer", "max_inner"]:
+                        if not isinstance(stop_crit[key], int):
+                            stop_error = True
+                        elif stop_crit[key] < 1:
+                            stop_error = True
+                    else: 
+                        if not isinstance(stop_crit[key], (float, int)):
+                            stop_error = True
+                        elif stop_crit[key] < 0:
+                            stop_error = True
+        if stop_error:
+            raise ValueError("Stopping criterion must be given as a dictionary as follows," +
+                "(key -> type of value):" +
+                "max_outer -> positive integer" +
+                "max_inner -> positive integer" +
+                "convergence_crit -> non-negative integer/float" +
+                "inner_convergence -> non-negative integer/float")
 
         # Check count volumes
 
         # Check alpha value
-        if not (isinstance(alpha, float) or isinstance(alpha, int)):
-            raise ValueError("Input alpha should be a number")
+        if not isinstance(alpha, (float, int)):
+            raise ValueError("Input alpha should be a float or integer (0 to 1)")
         elif alpha > 1 or  alpha < 0:
             raise ValueError("Input alpha should be between 0 and 1")
-        
 
     def __duplicate_matrices(self):
         """
