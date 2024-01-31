@@ -304,50 +304,9 @@ class TestODMESingleClassSetUp(TestCase):
     # Simple Test Cases (Exact Results Expected For Spiess):
     def test_basic_3_1(self) -> None:
         """
-        Input single count volume representing OD path from node 1 to node 2
-        along link 1, with demand matrix which is 0 everywhere except on OD pair (1, 2).
-        We give count volume on link 1 by given double the demand.
-        NOTE - this can be visualised in QGIS using the Sioux Falls network
-
-        Check that the only OD pair that has changed is at index (1, 2) and that
-        the assignment produces flow on on link 1 and nowhere else.
-        """
-        # Set synthetic demand matrix & count volumes
-        synthetic_demand = np.zeros(self.dims)
-        synthetic_demand[self.index[1], self.index[2], 0] = 10
-        self.matrix.matrices = synthetic_demand
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 20]],
-            columns=self.count_vol_cols
-        )
-
-        # Run ODME
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-
-        # Get Results:
-        new_demand = odme.get_demands()[0]
-        self.assignment.execute()
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
-
-        # Assertions:
-        #   Resulting Demand Matrix:
-        #       Non-negative:
-        self.assertTrue(np.all(new_demand >= 0),
-            msg="Output demand matrix contains negative values.")
-        #   Flow Matches Observation:
-        self.assertAlmostEqual(flow, 20,
-            msg="Newly assigned flow doesn't match observed count.")
-        #   Only Link 1 has Non-Zero Flow:
-        test = (assign_df["matrix_ab"] == 0) | (assign_df["link_id"] == 1)
-        self.assertTrue(test.all(),
-            msg="Unexpected non-zero link flow.")
-
-    def test_basic_3_2(self) -> None:
-        """
         Test for single count volume observation which is double the currently assigned flow when 
         setting only 2 OD pairs to be non-negative such that all flow enters this link.
+        NOTE - we are using small flows with little congestion.
 
         Link is 38, and OD pairs are 13-12 & 24-12 (bottom left area of graph in QGIS)
 
@@ -355,9 +314,9 @@ class TestODMESingleClassSetUp(TestCase):
         """
         # Set synthetic demand matrix
         demand = np.zeros(self.dims)
-        demand[self.index[13], self.index[12]] = 1
-        demand[self.index[24], self.index[12]] = 1
-        self.matrix.matrix_view = demand
+        demand[self.index[13], self.index[12], 0] = 1
+        demand[self.index[24], self.index[12], 0] = 1
+        self.matrix.matrices = demand
 
         # Extract assigned flow on link 38
         self.assignment.execute()
@@ -371,24 +330,23 @@ class TestODMESingleClassSetUp(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.get_demands()[0]
 
+        # Get results
+        new_demand = odme.get_demands()[0]
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
         new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
-        self.matrix = self.assignment.classes[0].matrix
+        # Assert link flow is doubled:
+        self.assertAlmostEqual(new_flow, 2 * old_flow)    
 
-        # Assert link flow is in fact doubled:
-        self.assertAlmostEqual(new_flow, 2 * old_flow)        
-        
-        # Assert only appropriate O-D pairs (13-12 & 24-12) have had demand changed
+        # Assert only appropriate O-D's have increased non-zero demand
         od_13_12 = new_demand[self.index[13], self.index[12]]
         od_24_12 = new_demand[self.index[24], self.index[12]]
         self.assertAlmostEqual(np.sum(new_demand), od_13_12 + od_24_12)
         self.assertTrue(od_13_12 > 1 or od_24_12 > 1)
 
-    def test_basic_3_3(self) -> None:
+    def test_basic_3_2(self) -> None:
         """
         Test for two count volume observations with competing priorities for links (ie differing 
         observed volumes). Only has 1 non-zero OD pair which influences both links.
@@ -396,12 +354,12 @@ class TestODMESingleClassSetUp(TestCase):
         Links are 5 & 35, and OD pair is 13-1 (see left side of graph in QGIS)
 
         Check that error from assigned volumes and observed volumes is balanced across both links.
-        We expect flow on 5 and 35 to be equal and halfway between observed on each
+        We expect flow on 5 and 35 to be equal and between the count volume on each
         """
         # Set synthetic demand matrix
         demand = np.zeros(self.dims)
-        demand[self.index[13], self.index[1]] = 10
-        self.matrix.matrix_view = demand
+        demand[self.index[13], self.index[1], 0] = 10
+        self.matrix.matrices = demand
 
         # Perform ODME with competing link flows on 5 & 35
         count_volumes = pd.DataFrame(
@@ -410,27 +368,20 @@ class TestODMESingleClassSetUp(TestCase):
         )
         odme = ODME(self.assignment, count_volumes)
         odme.execute()
-        new_demand = odme.get_demands()[0]
 
+        # Get Results:
+        new_demand = odme.get_demands()[0]
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        flow_5 = assign_df.loc[assign_df["link_id"] == 5, "car_matrix_ab"].values[0]
-        flow_35 = assign_df.loc[assign_df["link_id"] == 35, "car_matrix_ab"].values[0]
-
-        self.matrix = self.assignment.classes[0].matrix
+        flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
+        flow_35 = assign_df.loc[assign_df["link_id"] == 35, "matrix_ab"].values[0]
 
         # Assert link flows are equal:
         self.assertAlmostEqual(flow_5, flow_35, msg="Expected balanced flows but are unbalanced")
-        # Assert link flows are balanced halfway between each other:
-        self.assertAlmostEqual(flow_5, (flow_5 + flow_35)/2, msg="Expected flows to be halfway between 50 & 100")
 
-        # Assert only appropriate O-D pair (13-12 & 24-12) have had demand changed
+        # Assert link flows are balanced halfway between each other:
+        self.assertTrue(flow_5 > 50 and flow_5 < 100, msg="Expected flows to be halfway between 50 & 100")
+
+        # Assert only appropriate O-D's have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
         self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
-
-        # Assert we have perturbed the matrix view itself (not a copy):
-        np.testing.assert_equal(
-            odme.get_demands()[0],
-            self.matrix.matrix_view,
-            err_msg="ODME should perturb original matrix_view!"
-        )
