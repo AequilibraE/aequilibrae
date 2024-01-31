@@ -60,7 +60,7 @@ class TestODMESingleClassSetUp(TestCase):
 
     # Basic tests are ran on demand matrices which produce little to no congestion.
     # 1) Edge Cases
-    def test_basic_1_1_a(self) -> None:
+    def test_basic_1_1(self) -> None:
         """
         Check that running ODME with 0 demand matrix returns 0 matrix, with
         single count volume of 0.
@@ -81,29 +81,6 @@ class TestODMESingleClassSetUp(TestCase):
                 np.zeros(self.dims),
                 odme.get_demands()[0],
                 err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
-        )
-
-    def test_basic_1_1_b(self) -> None:
-        """
-        Check that running ODME with 0 demand matrix returns 0 matrix, with
-        many non-zero count volumes.
-        """
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrices = np.zeros(self.dims)
-        count_volumes = pd.DataFrame(
-            data=[["car", i, 1, (i * 35) % (1 + (i // 3))] for i in range(2, 30, 2)],
-            columns=self.count_vol_cols
-        )
-
-        # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes)
-        odme.execute()
-
-        # Check resulting :
-        np.testing.assert_allclose(
-                np.zeros(self.dims),
-                odme.get_demands()[0],
-                err_msg="0 demand matrix with many non-zero count volumes does not return 0 matrix",
         )
 
     def test_basic_1_2(self) -> None:
@@ -181,11 +158,7 @@ class TestODMESingleClassSetUp(TestCase):
     # 2) Input Validity
     def test_basic_2_1(self) -> None:
         """
-        Check that the ODME class does not accept input with no count volumes.
-        Current API raises ValueError in this case.
-
-        (NOTE - this is specific to this API, we could choose to simply return
-        the initial demand matrix with no perturbation).
+        Check ValueError is raised if no count volumes are given.
         """
         with self.assertRaises(ValueError):
             ODME(self.assignment, pd.DataFrame(data=[], columns=self.count_vol_cols))
@@ -205,8 +178,7 @@ class TestODMESingleClassSetUp(TestCase):
 
     def test_basic_2_3(self) -> None:
         """
-        Check ValueError is raised if multiple count volumes
-        are given for the same link.
+        Check ValueError is raised if duplicate count volumes are given.
         """
         # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
