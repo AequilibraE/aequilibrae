@@ -3,8 +3,7 @@
 ODME related code
 =============
 
-STILL NEED TO ADD SOME EXPLANATIONS HERE
-THIS BIT IS COPIED FROM paths.results.__init__.py
+This is copied from paths.results.__init__.py
 """
 __author__ = "Mittun Sudhahar ($Author: Mittun Sudhahar $)"
 __version__ = "1.0"
