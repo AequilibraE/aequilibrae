@@ -21,7 +21,7 @@ As of July 2022, it is possible to import the following files from a GMNS source
 * geometry table.
 
 You can find the specification for all these tables in the GMNS documentation, 
-`here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
+`here <https://github.com/zephyr-data-specs/GMNS/tree/develop/docs/spec>`_.
 
 By default, the method ``create_from_gmns()`` read all required and optional fields
 specified in the GMNS link and node tables specification. If you need it to read 
