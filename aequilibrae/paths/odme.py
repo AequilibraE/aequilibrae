@@ -8,6 +8,7 @@ Implementation of ODME Infrastructure:
 # NOTE - To Do:
 #       All docstrings need to be updated appropriately
 #       Any extra clean up needs to be done
+#       Check the matrix replacement in __perform_assignment
 
 from typing import Tuple
 from uuid import uuid4
@@ -490,6 +491,8 @@ class ODME(object):
 
         NOTE - Need to check how matrix dimensions will work for multi-class.
         """
+        # NEED TO CHECK THAT THIS IS DONE CORRECTLY AND WE DON'T NEED TO CHANGE 
+        # THE UNDERLYING aeq_matrix.matrices OBJECT INSTEAD! ASK PEDRO ABOUT THIS
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demands):
             aeq_matrix.matrix_view = demand
