@@ -124,6 +124,8 @@ class LinearApproximation(WorkerThread):
         self.previous_step_direction = {}  # type: Dict[AssignmentResults]
         self.pre_previous_step_direction = {}  # type: Dict[AssignmentResults]
 
+        self.aons = {}
+
         for c in self.traffic_classes:
             r = AssignmentResults()
             r.prepare(c.graph, c.matrix)
@@ -245,6 +247,7 @@ class LinearApproximation(WorkerThread):
         # 2nd iteration is a fw step. if the previous step replaced the aggregated
         # solution so far, we need to start anew.
         if self.iter == 2 or self.stepsize == 1.0 or self.do_fw_step or self.algorithm in ["msa", "frank-wolfe"]:
+            print("hit iter 2 step dir block")
             self.do_fw_step = False
             self.do_conjugate_step = True
             self.conjugate_stepsize = 0.0
@@ -257,13 +260,29 @@ class LinearApproximation(WorkerThread):
                     copy_three_dimensions(stp_dir_res.skims.matrix_view, aon_res.skims.matrix_view, self.cores)
                 sd_flows.append(aon_res.total_link_loads)
 
+                if c._selected_links:
+                    aux_res = self.aons[c._id].aux_res
+                    for name, idx in c._aon_results._selected_links.items():
+                        copy_two_dimensions(
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            self.cores,
+                        )
+                        copy_three_dimensions(
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
+                            self.cores,
+                        )
+
         # 3rd iteration is cfw. also, if we had to reset direction search we need a cfw step before bfw
         elif (self.iter == 3) or (self.do_conjugate_step) or (self.algorithm == "cfw"):
+            print("hit iter 3 step dir block")
             self.do_conjugate_step = False
             self.calculate_conjugate_stepsize()
             for c in self.traffic_classes:
                 sdr = self.step_direction[c._id]
                 pre_previous = self.pre_previous_step_direction[c._id]
+
                 copy_two_dimensions(pre_previous.link_loads, sdr.link_loads, self.cores)
                 pre_previous.total_flows()
                 if c.results.num_skims > 0:
@@ -282,10 +301,44 @@ class LinearApproximation(WorkerThread):
                         self.cores,
                     )
 
+                if c._selected_links:
+                    aux_res = self.aons[c._id].aux_res
+                    for name, idx in c._aon_results._selected_links.items():
+                        copy_two_dimensions(
+                            aux_res.sl_link_loads_pre_previous_step_direction[idx, :, :],
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            self.cores,
+                        )
+                        copy_three_dimensions(
+                            aux_res.sl_od_matrix_pre_previous_step_direction[idx, :, :, :],
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            self.cores,
+                        )
+
+                        linear_combination_skims(
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
+                            self.conjugate_stepsize,
+                            self.cores,
+                        )
+
+                        linear_combination(
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            self.conjugate_stepsize,
+                            self.cores,
+                        )
+
+                        # copy_two_dimensions(aux_res.sl_link_loads_previous_step_direction, aux_res.sl_link_loads_pre_previous_step_direction, self.cores)
+                        # copy_three_dimensions(aux_res.sl_od_matrix_previous_step_direction, aux_res.sl_od_matrix_pre_previous_step_direction, self.cores)
+
                 sdr.total_flows()
                 sd_flows.append(sdr.total_link_loads)
         # biconjugate
         else:
+            print("hit else step dir block", self.iter)
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
@@ -318,6 +371,49 @@ class LinearApproximation(WorkerThread):
                         self.cores,
                     )
 
+                if c._selected_links:
+                    aux_res = self.aons[c._id].aux_res
+                    for name, idx in c._aon_results._selected_links.items():
+                        copy_two_dimensions(
+                            aux_res.sl_link_loads_pre_previous_step_direction[idx, :, :],
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            self.cores,
+                        )
+                        copy_three_dimensions(
+                            aux_res.sl_od_matrix_pre_previous_step_direction[idx, :, :, :],
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            self.cores,
+                        )
+
+                        triple_linear_combination_skims(
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            np.sum(aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],
+                            aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                            aux_res.sl_od_matrix_previous_step_direction[idx, :, :, :],
+                            self.betas,
+                            self.cores,
+                        )
+
+                        triple_linear_combination(
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
+                            aux_res.sl_link_loads_step_direction[idx, :, :],
+                            aux_res.sl_link_loads_previous_step_direction[idx, :, :],
+                            self.betas,
+                            self.cores,
+                        )
+
+                        copy_two_dimensions(
+                            aux_res.sl_link_loads_previous_step_direction[idx, :, :],
+                            aux_res.sl_link_loads_pre_previous_step_direction[idx, :, :],
+                            self.cores,
+                        )
+                        copy_three_dimensions(
+                            aux_res.sl_od_matrix_previous_step_direction[idx, :, :, :],
+                            aux_res.sl_od_matrix_pre_previous_step_direction[idx, :, :, :],
+                            self.cores,
+                        )
+
                 sd_flows.append(np.sum(stp_dir.link_loads, axis=1))
 
                 copy_two_dimensions(prev_stp_dir.link_loads, ppst.link_loads, self.cores)
@@ -344,6 +440,7 @@ class LinearApproximation(WorkerThread):
     def execute(self):  # noqa: C901
         # We build the fixed cost field
 
+        self.aons = {}
         for c in self.traffic_classes:
             # Copying select link dictionary that maps name to its relevant matrices into the class' results
             c._aon_results._selected_links = c._selected_links
@@ -363,10 +460,11 @@ class LinearApproximation(WorkerThread):
                 c.fixed_cost[c.graph.graph.__supernet_id__] = v * c.fc_multiplier / c.vot
                 c.fixed_cost[np.isnan(c.fixed_cost)] = 0
 
-        # TODO: Review how to eliminate this. It looks unnecessary
-        # Just need to create some arrays for cost
-        for c in self.traffic_classes:
+            # TODO: Review how to eliminate this. It looks unnecessary
+            # Just need to create some arrays for cost
             c.graph.set_graph(self.time_field)
+
+            self.aons[c._id] = allOrNothing(c.matrix, c.graph, c._aon_results)
 
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
@@ -385,7 +483,7 @@ class LinearApproximation(WorkerThread):
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
-                aon = allOrNothing(c.matrix, c.graph, c._aon_results)
+                aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
                 if pyqt:
                     aon.assignment.connect(self.signal_handler)
                 aon.execute()
@@ -397,6 +495,7 @@ class LinearApproximation(WorkerThread):
 
             flows = []
             if self.iter == 1:
+                print("hit iter 1 block")
                 for c in self.traffic_classes:
                     copy_two_dimensions(c.results.link_loads, c._aon_results.link_loads, self.cores)
                     c.results.total_flows()
@@ -409,23 +508,25 @@ class LinearApproximation(WorkerThread):
                             # The temp has an index associated with the link_set name
                             copy_three_dimensions(
                                 c.results.select_link_od.matrix[name],  # matrix being written into
-                                np.sum(aon.aux_res.temp_sl_od_matrix, axis=0)[
+                                np.sum(self.aons[c._id].aux_res.temp_sl_od_matrix, axis=0)[
                                     idx, :, :, :
                                 ],  # results after the iteration
                                 self.cores,  # core count
                             )
                             copy_two_dimensions(
                                 c.results.select_link_loading[name],  # ouput matrix
-                                np.sum(aon.aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
+                                np.sum(self.aons[c._id].aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
                                 self.cores,  # core count
                             )
                     flows.append(c.results.total_link_loads)
 
             else:
+                print("hit iter else block")
                 self.__calculate_step_direction()
                 self.calculate_stepsize()
                 for c in self.traffic_classes:
                     stp_dir = self.step_direction[c._id]
+
                     cls_res = c.results
                     linear_combination(
                         cls_res.link_loads, stp_dir.link_loads, cls_res.link_loads, self.stepsize, self.cores
@@ -441,21 +542,24 @@ class LinearApproximation(WorkerThread):
                         )
 
                     if c._selected_links:
+                        aux_res = self.aons[c._id].aux_res
                         for name, idx in c._aon_results._selected_links.items():
                             # Copy the temporary results into the final od matrix, referenced by link_set name
                             # The temp flows have an index associated with the link_set name
+                            # print(sl_stp_dir[name].skims.matrix_view)
+
                             linear_combination_skims(
-                                c.results.select_link_od.matrix[name],  # output matrix
-                                np.sum(aon.aux_res.temp_sl_od_matrix, axis=0)[idx, :, :, :],  # matrix 1
-                                c.results.select_link_od.matrix[name],  # matrix 2 (previous iteration)
+                                cls_res.select_link_od.matrix[name],  # output matrix
+                                aux_res.sl_od_matrix_step_direction[idx, :, :, :],
+                                cls_res.select_link_od.matrix[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
                             )
 
                             linear_combination(
-                                c.results.select_link_loading[name],  # output matrix
-                                np.sum(aon.aux_res.temp_sl_link_loading, axis=0)[idx, :, :],  # matrix 1
-                                c.results.select_link_loading[name],  # matrix 2 (previous iteration)
+                                cls_res.select_link_loading[name],  # output matrix
+                                aux_res.sl_link_loads_step_direction[idx, :, :],
+                                cls_res.select_link_loading[name],  # matrix 2 (previous iteration)
                                 self.stepsize,  # stepsize
                                 self.cores,  # core count
                             )
