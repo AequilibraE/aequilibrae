@@ -190,28 +190,9 @@ class TestODMESingleClassSetUp(TestCase):
         with self.assertRaises(ValueError):
             ODME(self.assignment, pd.DataFrame(data=[], columns=self.count_vol_cols))
 
-    def test_basic_2_2_a(self) -> None:
+    def test_basic_2_2(self) -> None:
         """
-        Check ValuError is raised if a single negative count volumes is given.
-        """
-        with self.assertRaises(ValueError):
-            ODME(self.assignment, pd.DataFrame(data=[["car", 1, 1, -1]], columns=self.count_vol_cols))
-
-    def test_basic_2_2_b(self) -> None:
-        """
-        Check ValueError is raised if a many negative count volumes are given.
-        """
-        count_volumes = pd.DataFrame(
-            data=[["car", i, 1, -i] for i in range(1, 50)],
-            columns=self.count_vol_cols
-        )
-
-        with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
-
-    def test_basic_2_2_c(self) -> None:
-        """
-        Check ValueError is raised if a subset of count volumes are negative.
+        Check ValueError is raised if negative count volumes are given.
         """
         # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
@@ -224,77 +205,12 @@ class TestODMESingleClassSetUp(TestCase):
 
     def test_basic_2_3(self) -> None:
         """
-        Check (DECIDE WHICH TYPE OF) error is raised if multiple count volumes
+        Check ValueError is raised if multiple count volumes
         are given for the same link.
         """
-        assert False
-
-    def test_basic_2_4(self) -> None:
-        """
-        Check (DECIDE WHICH TYPE OF) error is raised if a given link does not exist.
-
-        (NOTE - this may be a case of COUPLING since this error may be propagated from
-        the TrafficClass class).
-        """
-        assert False
-
-    def test_basic_2_5(self) -> None:
-        """
-        Check ValueError is raised if input assignment object 
-        has no classes or volume delay function set.
-
-        Note - these tests may be bad since they are technically testing other parts of the API -
-        check with Jamie/Pedro if these are appropriate.
-        """
-        assignment = TrafficAssignment()
-
-        with self.assertRaises(ValueError):
-            ODME(assignment, pd.DataFrame(data=[["car", 1, 1, 0]], columns=self.count_vol_cols))
-
-    def test_basic_2_6(self) -> None:
-        """
-        Check ValueError is raised if input assignment object 
-        has no volume delay function set.
-        """
-        assert False
-
-    def test_basic_2_7(self) -> None:
-        """
-        Check (DECIDE WHICH TYPE OF) error is raised if input assignment object 
-        has no assignment algorithm set.
-        """
-        assert False
-
-    def test_basic_2_8_a(self) -> None:
-        """
-        Check ValueError is raised if input demand matrix contains 
-        all negative values.
-
-        (NOTE - this may be intended to be a part of some other part of the API and hence shouldn't
-        be tested here).
-        """
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view = -1 * np.ones(self.matrix.matrix_view.shape)   
+        # Makes every third value a negative count volume
         count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 0]],
-            columns=self.count_vol_cols
-        )
-
-        with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
-
-    def test_basic_2_8_b(self) -> None:
-        """
-        Check ValueError is raised if input demand matrix contains 
-        a single negative values.
-
-        (NOTE - this may be intended to be a part of some other part of the API and hence shouldn't
-        be tested here).
-        """
-        # Set synthetic demand matrix & count volumes
-        self.matrix.matrix_view[1, 1] = -1
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 0]],
+            data=[["car", 1, 1, i] for i in range(2)],
             columns=self.count_vol_cols
         )
 
