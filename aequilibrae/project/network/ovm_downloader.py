@@ -50,7 +50,6 @@ class OVMDownloader(WorkerThread):
         self.logger = logger or get_logger()
         self.filter = self.get_ovm_filter(modes)
         self.GeoDataFrame = []
-        self.g_dataframes =[]
         self.__project_path = Path(project_path)
         self.pth = str(self.__project_path).replace("\\", "/")
         self.insert_qry = """INSERT INTO {} ({}, geometry) VALUES({}, GeomFromText(?, 4326))"""
@@ -166,13 +165,13 @@ class OVMDownloader(WorkerThread):
         df_link = pd.read_parquet(output_file_link)
         geo_link = gpd.GeoSeries.from_wkb(df_link.geometry, crs=4326)
         gdf_link = gpd.GeoDataFrame(df_link,geometry=geo_link)
-        self.g_dataframes.append(gdf_link)
 
         # Creating nodes GeoDataFrame
         df_node = pd.read_parquet(output_file_node)
         geo_node = gpd.GeoSeries.from_wkb(df_node.geometry, crs=4326)
         gdf_node = gpd.GeoDataFrame(df_node,geometry=geo_node)
-        self.g_dataframes.append(gdf_node)
+
+        return gdf_link, gdf_node
 
     def download_test_data(self, data_source: Union[str, Path]):
         '''This method only used to seed/bootstrap a local copy of a small test data set'''

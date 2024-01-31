@@ -1,4 +1,23 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: venv
+#     language: python
+#     name: python3
+# ---
+
 # %%
+# %load_ext autoreload
+# %autoreload 2
+
 # Imports
 from pathlib import Path
 from uuid import uuid4
@@ -12,9 +31,10 @@ from aequilibrae.project.network.ovm_downloader import OVMDownloader
 
 # %%
 # We create an empty project on an arbitrary folder
-fldr = join(gettempdir(), uuid4().hex)
-project = Project()
-project.new(fldr)
+from shutil import rmtree
+
+
+fldr = "/home/jamie/git/aeq/aeq-penny/airlie_model/"
 # %%
 # Now we can download the network from any place in the world (as long as you have memory for all the download
 # and data wrangling that will be done)
@@ -39,18 +59,43 @@ data_source = Path(dir) / 'tests' / 'data' / 'overture' / 'theme=transportation'
 
 #The "bbox" parameter specifies the bounding box encompassing the desired geographical location. In the given example, this refers to the bounding box that encompasses Airlie Beach.
 bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
-project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=data_source)
+
+rmtree(fldr, ignore_errors=True)
+project = Project()
+project.new(fldr)
+output_dir = Path(fldr) / "raw_parquet"
+
+project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=output_dir)
 
 # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
 # project.network.create_from_ovm(west=brisbane_bbox[0], south=brisbane_bbox[1], east=brisbane_bbox[2], north=brisbane_bbox[3], data_source=r'C:\Users\penny\git\data\theme=transportation', output_dir=r'C:\Users\penny\git\Aequilibrae\tests\data\overture\theme=transportation')
 # links = download[0]
 # nodes = download[1]
- # %%
+# %%
 links = project.network.links.data
 nodes = project.network.nodes.data
-nodes
+links[links.a_node==10221]
 
 # links
+
+# %%
+import numpy as np
+
+
+project.network.build_graphs()
+graph = project.network.graphs['c']
+graph.prepare_graph(centroids=np.array([10001]))
+graph.set_graph('distance')
+
+from aequilibrae.paths import PathResults
+res = PathResults()
+
+res.prepare(graph)
+res.compute_path(10329,10336) # 10003, 10363)
+res.path
+
+# %%
+nodes
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier

@@ -200,10 +200,10 @@ class Network(WorkerThread):
         self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
         if pyqt:
             self.downloader.downloading.connect(self.signal_handler)
-        self.downloader.downloadTransportation(bbox,data_source,output_dir)
+        segments_gdf, connectors_gdf = self.downloader.downloadTransportation(bbox,data_source,output_dir)
 
         self.logger.info("Building Network")
-        self.builder = OVMBuilder(self.downloader.g_dataframes, self.source, project=self.project)
+        self.builder = OVMBuilder(segments_gdf, connectors_gdf, self.source, project=self.project)
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)

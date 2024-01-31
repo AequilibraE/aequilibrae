@@ -1,0 +1,34 @@
+2024-01-31 15:02:06,616;WARNING ; About table already exists. Nothing was done
+2024-01-31 15:02:06,629;INFO ; Downloading data
+2024-01-31 15:02:06,775;INFO ; Building Network
+2024-01-31 15:02:06,818;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:06,829;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:06,841;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:06,853;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:06,914;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:06,977;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:07,041;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:07,059;WARNING ; Link type has not yet been saved to the database. Do so explicitly
+2024-01-31 15:02:08,072;INFO ; Adding network nodes
+2024-01-31 15:02:08,111;INFO ; Adding network links
+2024-01-31 15:02:08,322;INFO ; Network built successfully
+2024-01-31 15:02:08,400;WARNING ; Your graph has no centroids
+2024-01-31 15:02:08,403;WARNING ; Your graph has no centroids
+2024-01-31 15:02:08,405;WARNING ; Your graph has no centroids
+2024-01-31 15:02:08,409;WARNING ; Your graph has no centroids
+2024-01-31 15:02:08,420;WARNING ; Field(s) speed, travel_time, capacity, cycleway, cycleway_right, cycleway_left, busway, busway_right, busway_left has(ve) at least one NaN value. Check your computations
+2024-01-31 15:02:14,188;WARNING ; Your graph has no centroids
+2024-01-31 15:02:14,190;WARNING ; Your graph has no centroids
+2024-01-31 15:02:14,192;WARNING ; Your graph has no centroids
+2024-01-31 15:02:14,194;WARNING ; Your graph has no centroids
+2024-01-31 15:02:14,203;WARNING ; Field(s) speed, travel_time, capacity, cycleway, cycleway_right, cycleway_left, busway, busway_right, busway_left has(ve) at least one NaN value. Check your computations
+2024-01-31 15:02:23,519;WARNING ; Your graph has no centroids
+2024-01-31 15:02:23,521;WARNING ; Your graph has no centroids
+2024-01-31 15:02:23,524;WARNING ; Your graph has no centroids
+2024-01-31 15:02:23,527;WARNING ; Your graph has no centroids
+2024-01-31 15:02:23,538;WARNING ; Field(s) speed, travel_time, capacity, cycleway, cycleway_right, cycleway_left, busway, busway_right, busway_left has(ve) at least one NaN value. Check your computations
+2024-01-31 15:03:00,939;WARNING ; Your graph has no centroids
+2024-01-31 15:03:00,942;WARNING ; Your graph has no centroids
+2024-01-31 15:03:00,945;WARNING ; Your graph has no centroids
+2024-01-31 15:03:00,947;WARNING ; Your graph has no centroids
+2024-01-31 15:03:00,957;WARNING ; Field(s) speed, travel_time, capacity, cycleway, cycleway_right, cycleway_left, busway, busway_right, busway_left has(ve) at least one NaN value. Check your computations
