@@ -1,6 +1,7 @@
 """
  Original Author:  UNKNOWN. COPIED FROM STACKOVERFLOW BUT CAN'T REMEMBER EXACTLY WHERE
  """
+
 import importlib.util as iutil
 
 spec = iutil.find_spec("PyQt5")

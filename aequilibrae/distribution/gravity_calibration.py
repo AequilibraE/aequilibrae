@@ -4,6 +4,7 @@ Algorithms to **calibrate** synthetic gravity models with power and exponential 
 The procedures implemented in this code are some of those suggested in
 Modelling Transport, 4th Edition, Ortuzar and Willumsen, Wiley 2011
 """
+
 from time import perf_counter
 
 import numpy as np

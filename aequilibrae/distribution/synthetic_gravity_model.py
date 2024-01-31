@@ -57,7 +57,7 @@ class SyntheticGravityModel:
                     else:
                         raise ValueError("Model has unknown parameters: " + str(key))
         except ValueError as err:
-            raise ValueError("File provided is not a valid Synthetic Gravity Model - {}".format(err.__str__()))
+            raise ValueError("File provided is not a valid Synthetic Gravity Model - {}".format(err.__str__())) from err
 
     def save(self, file_name):
         R"""Saves model to disk in yaml format. Extension is \*.mod"""

@@ -54,17 +54,17 @@ else:
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "nbsphinx",
-    "sphinx_gallery.load_style",
-    "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
-    "sphinx_autodoc_annotation",
-    "sphinx.ext.autosummary",
-    "sphinx_git",
-    "sphinx_panels",
+    "sphinx_gallery.gen_gallery",
+    "sphinx_design",
     "sphinx_copybutton"
 ]
 
@@ -80,7 +80,7 @@ sphinx_gallery_conf = {
                                       "examples/visualization",
                                       "examples/aequilibrae_without_a_model",
                                       "examples/full_workflows",
-                                      "examples/other_applications"])
+                                      "examples/other_applications"]),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -109,7 +109,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-# highlight_language = "none"
+highlight_language = "python3"
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -121,16 +121,20 @@ html_theme = "pydata_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = ['_static', '_static/.htaccess', "_static/switcher.json"]
 
 html_theme_options = {
+    "navbar_center": ["navbar-nav"],
     "show_nav_level": 0,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
-    "navbar_end": ["theme-switcher", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
+    "navbar_start": ["navbar-logo", "version-switcher"],
     "switcher": {
         "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
+    "navbar_align": "left",
+    "search_bar_text": "Search",
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to

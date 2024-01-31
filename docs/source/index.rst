@@ -16,120 +16,68 @@ other open-source packages in the Python (NumPy, really) ecosystem.
    If you are looking for the documentation for **QAequilibraE (the companion QGIS Plugin)**, you can
    see it on its `own webpage <http://www.aequilibrae.com/qgis>`_.
 
-.. panels::
-   :card: text-center bg-transparent border-light
-   :container: container pb-3
-   :header: text-center border-light
-   :footer: border-light
-   :column: col-lg-6 col-md-6 col-sm-6 col-xs-12 p-2
+.. grid::
 
-   ---
-   :column: col-lg-12 p-2
-   :fa:`folder`
-   **Getting Started**
-   ^^^^^^^^^^^^^^^^^^^
+    .. grid-item-card:: :material-twotone:`folder;1.5em` Getting Started
+        :link: getting_started
+        :link-type: ref
+        :text-align: center
+        
+        New to AequilibraE? Get started here!
 
-   New to AequilibraE? Get started here!
+.. grid::
 
-   +++++++++++++++++
+    .. grid-item-card:: :material-twotone:`folder;1.5em` Using AequilibraE
+        :link: _auto_examples/index
+        :link-type: any
+        :text-align: center
+        
+        A series of examples on how to use AequilibraE, from building a model from scratch
+        to editing an existing, performing trip distribution or traffic assignment to analyzing
+        results.
 
-   .. link-button:: getting_started
-      :type: ref
-      :text: Getting Started
-      :classes: btn-block btn-secondary stretched-link
+.. grid::
 
-   ---
-   :column: col-lg-12 p-2
-   :fa:`folder`
-   **Using AequilibraE**
-   ^^^^^^^^^^^^^^^^^^^^^
+    .. grid-item-card:: :material-twotone:`menu_book;1.5em` Modeling with AequilibraE
+        :link: modeling_with_aequilibrae
+        :link-type: any
+        :text-align: center
+        
+        An in-depth guide to modeling with AequilibraE, including the concepts that guide its
+        development and user-experience.
 
-   A series of examples on how to use AequilibraE, from building a model from scratch
-   to editing an existing, performing trip distribution or traffic assignment to analyzing
-   results.
+    .. grid-item-card:: :material-twotone:`build;1.5em` API References
+        :link: api_reference
+        :link-type: ref
+        :text-align: center
+        
+        Reference guide to AequilibraE's API.
 
-   +++++++++++++++++
+.. grid::
 
-   .. link-button:: _auto_examples/index
-      :type: ref
-      :text: Examples
-      :classes: btn-block btn-secondary stretched-link
+    .. grid-item-card:: :material-twotone:`check;1.5em` Software Validation & Benchmarking
+        :link: validation
+        :link-type: any
+        :text-align: center
+        
+        Want to see how we test the software for correctness and performance?
 
-   ---
-   :fa:`book`
-   **Modeling with AequilibraE**
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    .. grid-item-card:: :material-twotone:`lightbulb;1.5em` Developing
+        :link: developing_aequilibrae
+        :link-type: ref
+        :text-align: center
+        
+        Looking for something more than using the software? Check out the development info.
 
-   An in-depth guide to modeling with AequilibraE, including the concepts that guide its
-   development and user-experience.
+.. grid::
 
-   +++++++++++++++++
-
-   .. link-button:: modeling_with_aequilibrae
-         :type: ref
-         :text: Modeling with AequilibraE
-         :classes: btn-block btn-secondary stretched-link
-   
-   ---
-
-   :fa:`tools`
-   **API References**
-   ^^^^^^^^^^^^^^^^^^
-
-   Reference guide to AequilibraE's API.
-
-   +++++++++++++++++
-
-   .. link-button:: api
-         :type: ref
-         :text: API references
-         :classes: btn-block btn-secondary stretched-link
-   
-   ---
-
-   :fa:`check`
-   **Software Validation & Benchmarking**
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-   Want to see how we test the software for correctness and performance?
-
-   ++++++++++++++++++++++++++++++++++
-
-   .. link-button:: validation
-         :type: ref
-         :text: Validation & Benchmarking
-         :classes: btn-block btn-secondary stretched-link
-
-   ---
-
-   :fa:`lightbulb`
-   **Developing**
-   ^^^^^^^^^^^^^^
-
-   Looking for something more than using the software? Check out the development info.
-
-   ++++++++++++
-
-   .. link-button:: developing
-         :type: ref
-         :text: Developing
-         :classes: btn-block btn-secondary stretched-link
-
-   ---
-   :column: col-lg-12 p-2
-   :fa:`folder`
-   **Support and sponsors**
-   ^^^^^^^^^^^
-
-   Support for AequilibraE is available in multiple forms. Check the most adequate for your case and the list
-   of supporters here
-
-   +++++++++++++++++
-
-   .. link-button:: support
-      :type: ref
-      :text: Support and sponsors
-      :classes: btn-block btn-secondary stretched-link
+    .. grid-item-card:: :material-twotone:`support_agent;1.5em` Support and sponsors
+        :link: support
+        :link-type: ref
+        :text-align: center
+        
+        Support for AequilibraE is available in multiple forms. Check the most adequate for your case and the list
+        of supporters here.
 
 .. toctree::
    :hidden:
