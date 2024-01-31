@@ -377,11 +377,14 @@ class TestODMESingleClassSetUp(TestCase):
         flow_35 = assign_df.loc[assign_df["link_id"] == 35, "matrix_ab"].values[0]
 
         # Assert link flows are equal:
-        self.assertAlmostEqual(flow_5, flow_35, msg="Expected balanced flows but are unbalanced")
+        self.assertAlmostEqual(flow_5, flow_35,
+            msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
 
         # Assert link flows are balanced halfway between each other:
-        self.assertTrue(flow_5 > 50 and flow_5 < 100, msg="Expected flows to be halfway between 50 & 100")
+        self.assertTrue(flow_5 > 50 and flow_5 < 100,
+            msg="Expected flows to be halfway between 50 & 100")
 
         # Assert only appropriate O-D's have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
-        self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
+        self.assertAlmostEqual(np.sum(new_demand), od_13_1,
+            msg="Unexpected OD pair has non-zero demand")
