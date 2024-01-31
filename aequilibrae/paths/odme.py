@@ -15,6 +15,8 @@ Implementation of ODME Infrastructure:
 #                          -> Needs to be updated to include pce
 #       Execution -> Need to work later on a better way to automate inner stopping criterion
 
+# All docstrings and this stuff at the top need cleaning up
+
 # Ideally in future this class should act as an entirely top level class for user interaction.
 # I.e, the user should be able to intialise, set parameters, call execute and get various results
 # but this class does not need to hold any of the actual algorithms or statistics itself.
@@ -26,6 +28,7 @@ from uuid import uuid4
 from datetime import datetime
 from os.path import join
 from pathlib import Path
+import importlib.util as iutil
 import numpy as np
 import pandas as pd
 
@@ -35,8 +38,6 @@ from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 
-# COPIED FROM AEQUILIBRAE MATRIX
-import importlib.util as iutil
 # Checks if we can display OMX
 spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
@@ -53,12 +54,12 @@ class ODME(object):
     # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
-        count_volumes: pd.DataFrame, # [class, link_id, direction, obs_volume]
+        count_volumes: pd.DataFrame,
         stop_crit=None,
-        alpha: float = None, # Used for regularisation - should be given in form (alpha, beta) as a Tuple
-        algorithm: str = "spiess", # currently defaults to spiess
-        verbose: bool = False # For printing as we go
-    ):
+        alpha: float = None,
+        algorithm: str = "spiess",
+        verbose: bool = False
+    ) -> None:
         """
         For now see description in pdf file in SMP internship team folder
 
@@ -75,6 +76,8 @@ class ODME(object):
         CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS (MULTI-CLASS UNDER DEVELOPMENT)
         CHANGE STOPPING CRITERION TO BE A DICTIONARY!
         """
+        self.__check_inputs(count_volumes, stop_crit, alpha, algorithm)
+
         self.assignment = assignment
         self.classes = assignment.classes
         self.output = AequilibraeMatrix()
@@ -87,7 +90,7 @@ class ODME(object):
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         self.matrix_names = [matrix.view_names[0] for matrix in self.aequilibrae_matrices]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
-        # RESHAPING MATRICES BECAUSE WHEN COMPUTATIONAL VIEW IS DONE WITH A SINGLE CLASS WE ONLY GET
+        # RESHAPING MATRICES BECAUSE WHEN COMPUTATIONAL VIEW IS DONE WITH A SINGLE CLASS WE GET
         # n x n instead of n x n x 1
         for i, demand in enumerate(self.demands):
             if len(demand.shape) == 2:
@@ -110,12 +113,11 @@ class ODME(object):
         self._obj_func = None
         self.__init_objective_func()
         self.last_convergence = None
-        self.flow_obj = None # Component of objective function from flows
-        self.reg_obj = None # Component of objective function from regularisation
+        # Component of objective function from flows/regularisation:
+        self.flow_obj, self.reg_obj = None, None
         self.convergence_change = float('inf')
 
         # Stopping criterion
-        # CHANGE TO DICTIONARY
         if not stop_crit:
             stop_crit = self.DEFAULT_STOP_CRIT
         self.max_outer = stop_crit["max_outer"]
@@ -140,6 +142,33 @@ class ODME(object):
         self.procedure_date = ""
         self.procedure_id = ""
 
+    # Utilities:
+    def __check_inputs(self,
+        counts: pd.DataFrame,
+        stop_crit: dict,
+        alpha: float,
+        algorithm: str) -> None:
+        """
+        Ensures all user input is of correct format/value.
+        """
+        # Check algorithm
+        if algorithm not in self.ALL_ALGORITHMS:
+            raise ValueError(f"'{algorithm}' is not a valid algorithm.\n" +
+                "Currently implemented algorithms include:\n" +
+                '\n'.join(self.ALL_ALGORITHMS))
+
+        # Check stopping criteria
+        keys = self.DEFAULT_STOP_CRIT.keys()
+
+        # Check count volumes
+
+        # Check alpha value
+        if not (isinstance(alpha, float) or isinstance(alpha, int)):
+            raise ValueError("Input alpha should be a number")
+        elif alpha > 1 or  alpha < 0:
+            raise ValueError("Input alpha should be between 0 and 1")
+        
+
     def __duplicate_matrices(self):
         """
         Duplicates the given matrices in memory only and replaces the TrafficClass objects.
@@ -161,7 +190,6 @@ class ODME(object):
         self.assignment.set_classes(new_classes)
         self.classes = self.assignment.classes
 
-    # Utilities:
     def estimate_alpha(self, alpha: float) -> float:
         """
         Estimates a starting hyper-paramater for regularised 
@@ -270,6 +298,7 @@ class ODME(object):
         else:
             self._obj_func = __obj_func
 
+    # Output/Results:
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the final demand matrix output to the project file
 
@@ -336,7 +365,6 @@ class ODME(object):
         # record.procedure_report = Create json and save to this file # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
         record.save()
 
-    # Output/Results:
     def get_demands(self) -> list[np.ndarray]:
         """
         Returns all demand matrices (can be called before or after execution).
@@ -363,6 +391,7 @@ class ODME(object):
         """
         return pd.concat(self.results.statistics, ignore_index=True)
 
+    # ODME Execution:
     def execute(self) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
@@ -465,7 +494,6 @@ class ODME(object):
             axis=1
         )
 
-    # WE COULD POTENTIALLY MOVE EVERYTHING BELOW HERE TO THE SCALINGFACTORS CLASS AND RENAME IT
     def __execute_inner_iter(self) -> None:
         """
         Runs an inner iteration of the ODME algorithm. 
