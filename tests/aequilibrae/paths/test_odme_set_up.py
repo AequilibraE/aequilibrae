@@ -53,6 +53,9 @@ class TestODMESingleClassSetUp(TestCase):
         # Extend dimensions by 1 to enable an AequilibraeMatrix to be used
         self.dims = self.matrix.matrix_view.shape + (1,)
 
+        # Change this to test different algorithms
+        self.algorithm = "spiess"
+
     def tearDown(self) -> None:
         self.matrix.close()
         self.project.close()
@@ -71,7 +74,7 @@ class TestODMESingleClassSetUp(TestCase):
         )
 
         # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
         # Check result:
@@ -106,7 +109,7 @@ class TestODMESingleClassSetUp(TestCase):
         count_volumes = pd.DataFrame(data=data, columns=ODME.COUNT_VOLUME_COLS)
 
         # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
      
         # Check result:
@@ -143,7 +146,7 @@ class TestODMESingleClassSetUp(TestCase):
             data=[["car", link, 1, flows[i]] for i, link in enumerate(links)],
             columns=ODME.COUNT_VOLUME_COLS
         )
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
         # Check results
@@ -165,7 +168,9 @@ class TestODMESingleClassSetUp(TestCase):
         """
         # No count volumes:
         with self.assertRaises(ValueError):
-            ODME(self.assignment, pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS))
+            ODME(self.assignment,
+                pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS),
+                algorithm=self.algorithm)
 
         # Negative count volumes:
         links = [1, 3, 10, 30, 36, 41, 49, 57, 62, 66, 69, 70]
@@ -174,7 +179,7 @@ class TestODMESingleClassSetUp(TestCase):
             columns=ODME.COUNT_VOLUME_COLS
         )
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
+            ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
         # Duplicate count volumes:
         count_volumes = pd.DataFrame(
@@ -182,7 +187,7 @@ class TestODMESingleClassSetUp(TestCase):
             columns=ODME.COUNT_VOLUME_COLS
         )
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
+            ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
         # Non-float/integer count volumes:
         count_volumes = pd.DataFrame(
@@ -190,7 +195,7 @@ class TestODMESingleClassSetUp(TestCase):
             columns=ODME.COUNT_VOLUME_COLS
         )
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
+            ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
     def test_basic_2_2(self) -> None:
         """
@@ -209,7 +214,7 @@ class TestODMESingleClassSetUp(TestCase):
             "inner_convergence": 10**-4
             }
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
         # Check invalid (negative) convergence
         stop_crit = {"max_outer": 10,
@@ -218,7 +223,7 @@ class TestODMESingleClassSetUp(TestCase):
             "inner_convergence": -10**-4
             }
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
         # Check missing criteria
         stop_crit = {"max_outer": 10,
@@ -226,7 +231,7 @@ class TestODMESingleClassSetUp(TestCase):
             "convergence_crit": 10**-4,
             }
         with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes, stop_crit=stop_crit)
+            ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
     # Simple Test Cases (Exact Results Expected For Spiess):
     def test_basic_3_1(self) -> None:
@@ -255,7 +260,7 @@ class TestODMESingleClassSetUp(TestCase):
             data=[["car", 38, 1, 2 * old_flow]],
             columns=ODME.COUNT_VOLUME_COLS
         )
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
         # Get results
@@ -293,7 +298,7 @@ class TestODMESingleClassSetUp(TestCase):
             data=[["car", 5, 1, 100], ["car", 35, 1, 50]],
             columns=ODME.COUNT_VOLUME_COLS
         )
-        odme = ODME(self.assignment, count_volumes)
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
         # Get Results:
