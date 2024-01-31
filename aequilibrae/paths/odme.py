@@ -46,12 +46,12 @@ if has_omx:
 
 class ODME(object):
     """ ODME Infrastructure """
-    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume", "assign_volume"]
+    # Input count volume columns (assigned volumes will be added)
+    COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
     DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50, "convergence_crit": 10**-4, "inner_convergence": 10**-4}
 
-    # DOCSTRING NEEDS UPDATING
     def __init__(self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame,
@@ -182,6 +182,7 @@ class ODME(object):
                             stop_error = True
                         elif stop_crit[key] < 0:
                             stop_error = True
+        
         if stop_error:
             raise ValueError("Stopping criterion must be given as a dictionary as follows," +
                 "(key -> type of value):" +
@@ -191,6 +192,21 @@ class ODME(object):
                 "inner_convergence -> non-negative integer/float")
 
         # Check count volumes
+        counts_error = False
+        if not isinstance(counts, pd.DataFrame):
+            counts_error = True
+        elif len(counts) < 1:
+            counts_error = True
+        elif len(counts.columns) != len(self.COUNT_VOLUME_COLS):
+            counts_error = True
+        elif not counts_error:
+            for col in counts.columns:
+                if col not in self.COUNT_VOLUME_COLS:
+                    counts_error = True
+
+        if counts_error:
+            raise ValueError("Count volumes must be a non-empty pandas dataframe with columns:\n" +
+                '\n'.join(self.COUNT_VOLUME_COLS))
 
         # Check alpha value
         if not isinstance(alpha, (float, int)):
