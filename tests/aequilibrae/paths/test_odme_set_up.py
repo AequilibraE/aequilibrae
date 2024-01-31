@@ -156,38 +156,43 @@ class TestODMESingleClassSetUp(TestCase):
     # 2) Input Validity
     def test_basic_2_1(self) -> None:
         """
-        Check ValueError is raised if no count volumes are given.
+        Check ValueError is raised if count volumes are not given appropriately.
+        These include:
+        - no count volumes given
+        - negative count volumes given
+        - duplicate count volumes given
+        - non-float/integer count volumes given
         """
+        # No count volumes:
         with self.assertRaises(ValueError):
             ODME(self.assignment, pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS))
 
+        # Negative count volumes:
+        links = [1, 3, 10, 30, 36, 41, 49, 57, 62, 66, 69, 70]
+        count_volumes = pd.DataFrame(
+            data=[["car", link, 1, -link] for link in links],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes)
+
+        # Duplicate count volumes:
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, i] for i in range(5)],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes)
+
+        # Non-float/integer count volumes:
+        count_volumes = pd.DataFrame(
+            data=[["car", 1, 1, '7'], ["car", 10, 1, [1]], ["car", 15, 1, (1, 2)]],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes)
+
     def test_basic_2_2(self) -> None:
-        """
-        Check ValueError is raised if negative count volumes are given.
-        """
-        # Makes every third value a negative count volume
-        count_volumes = pd.DataFrame(
-            data=[["car", i, 1, i * (-1 * (i%3 == 0))] for i in range(1, 50)],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
-
-        with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
-
-    def test_basic_2_3(self) -> None:
-        """
-        Check ValueError is raised if duplicate count volumes are given.
-        """
-        # Makes every third value a negative count volume
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, i] for i in range(2)],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
-
-        with self.assertRaises(ValueError):
-            ODME(self.assignment, count_volumes)
-
-    def test_basic_2_4(self) -> None:
         """
         Check ValueError is raised if invalid stopping criteria are given
         or stopping criteria are given with missing criteria.
