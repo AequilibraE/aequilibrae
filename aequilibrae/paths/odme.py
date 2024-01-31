@@ -199,14 +199,30 @@ class ODME(object):
             counts_error = True
         elif len(counts.columns) != len(self.COUNT_VOLUME_COLS):
             counts_error = True
-        elif not counts_error:
+
+        if not counts_error:
             for col in counts.columns:
                 if col not in self.COUNT_VOLUME_COLS:
                     counts_error = True
 
+        if not counts_error:
+            observed = counts["obs_volume"]
+            if not (pd.api.types.is_float_dtype(observed) or
+                pd.api.types.is_integer_dtype(observed)):
+                counts_error = True
+            elif not np.all(observed >= 0):
+                counts_error = True
+
+        if not counts_error:
+            if counts.duplicated(subset=["class", "link_id", "direction"]).any():
+                counts_error = True
+
         if counts_error:
             raise ValueError("Count volumes must be a non-empty pandas dataframe with columns:\n" +
-                '\n'.join(self.COUNT_VOLUME_COLS))
+                '\n'.join(self.COUNT_VOLUME_COLS) +
+                "\n and all observed volumes must be non-negative floats or integers, and" +
+                "only a single count volume should be given for a" +
+                "particular class, link_id and direction")
 
         # Check alpha value if given
         if alpha is not None:
