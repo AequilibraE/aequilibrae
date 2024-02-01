@@ -226,7 +226,6 @@ class ODME(object):
         # Loop through TrafficClasses - create new and replace, then set classes
         new_classes = []
         for usr_cls in self.classes:
-            #view_name = f"{usr_cls.__id__}_{usr_cls.matrix.view_names[0]}"
             mat = usr_cls.matrix.copy(cores = usr_cls.matrix.view_names, memory_only=True)
             mat.computational_view()
 
@@ -362,6 +361,8 @@ class ODME(object):
         """
         project = project or get_active_project()
         mats = project.matrices
+
+        # MODULARISE IF STATEMENTS
 
         if Path(file_name).suffix.lower() == ".omx":
             omx_mat = omx.open_file(join(mats.fldr, file_name), "w")
