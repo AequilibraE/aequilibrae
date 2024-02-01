@@ -331,8 +331,6 @@ class TestODMESingleClassSetUp(TestCase):
 class TestODMEMultiClassSetUp(TestCase):
     """
     Basic unit tests for ODME multiple class execution
-
-    NOTE - we use the data stored for test_mc_traffic_assignment.py
     """
 
     def setUp(self) -> None:
