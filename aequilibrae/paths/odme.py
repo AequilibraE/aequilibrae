@@ -361,7 +361,6 @@ class ODME(object):
         mats = project.matrices
         file_path = join(mats.fldr, file_name)
 
-        
         if Path(file_name).suffix.lower() == ".omx":
             self.__save_as_omx(file_path)
         elif ".aem" in file_name:
@@ -374,7 +373,8 @@ class ODME(object):
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
         # Note that below just involves doing str() to the particular results file.
-        # record.procedure_report = Create json and save to this file # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
+        # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
+        # record.procedure_report = Create json and save to this file
         record.save()
 
     def __save_as_omx(self, file_path: str) -> None:
