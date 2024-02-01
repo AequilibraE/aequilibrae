@@ -105,7 +105,7 @@ class OVMDownloader(WorkerThread):
 
     def downloadTransportation(self, bbox: list, data_source: Union[str, Path], output_dir: Union[str, Path]):
         data_source = Path(data_source) or DEFAULT_OVM_S3_LOCATION
-        output_dir = Path(output_dir)        
+        output_dir = Path(output_dir)  / "theme=transportation"      
             
         output_file_link = output_dir / f'type=segment' / f'transportation_data_segment.parquet'
         output_file_node = output_dir / f'type=connector' / f'transportation_data_connector.parquet'
