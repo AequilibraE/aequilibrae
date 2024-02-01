@@ -129,7 +129,7 @@ class OVMDownloader(WorkerThread):
             SELECT 
                 id AS ovm_id,
                 connectors,
-                CAST(road AS JSON) ->>'lanes' AS lanes,
+                CAST(road AS JSON) ->>'lanes' AS direction,
                 CAST(road AS JSON) ->>'class' AS link_type,
                 CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                 CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
