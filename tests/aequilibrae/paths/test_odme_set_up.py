@@ -34,7 +34,9 @@ class TestODMESingleClassSetUp(TestCase):
 
         self.car_graph.set_graph("free_flow_time")
         self.car_graph.set_blocked_centroid_flows(False)
-        self.matrix = self.project.matrices.get_matrix("demand_aem")
+
+        # Using copy ensures we can manipulate either .aem or .omx matrices
+        self.matrix = self.project.matrices.get_matrix("demand_aem").copy(memory_only=True)
         self.matrix.computational_view()
 
         # Initial assignment parameters:
@@ -334,7 +336,7 @@ class TestODMEMultiClassSetUp(TestCase):
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
         # Create graphs
-        proj_path = os.path.join(gettempdir(), "test_mc_traffic_assignment_" + uuid.uuid4().hex)
+        proj_path = os.path.join(gettempdir(), "test_odme_traffic_assignment_" + uuid.uuid4().hex)
         self.project = create_example(proj_path)
         self.project.network.build_graphs()
         self.car_graph = self.project.network.graphs["c"]  # type: Graph
@@ -346,18 +348,15 @@ class TestODMEMultiClassSetUp(TestCase):
             graph.set_graph("free_flow_time")
             graph.set_blocked_centroid_flows(False)
 
-        # Open matrices:
-        self.car_matrix = self.project.matrices.get_matrix("demand_mc")
+        # Open matrices: (note - we copy them to get a memory only non omx version)
+        self.car_matrix = self.project.matrices.get_matrix("demand_mc").copy(memory_only=True)
         self.car_matrix.computational_view(["car"])
-        self.car_index = self.car_graph.nodes_to_indices
 
-        self.truck_matrix = self.project.matrices.get_matrix("demand_mc")
+        self.truck_matrix = self.project.matrices.get_matrix("demand_mc").copy(memory_only=True)
         self.truck_matrix.computational_view(["trucks"])
-        self.truck_index = self.truck_graph.nodes_to_indices
 
-        self.moto_matrix = self.project.matrices.get_matrix("demand_mc")
+        self.moto_matrix = self.project.matrices.get_matrix("demand_mc").copy(memory_only=True)
         self.moto_matrix.computational_view(["motorcycle"])
-        self.moto_index = self.moto_graph.nodes_to_indices
 
         # Create assignment object and assign classes
         self.assignment = TrafficAssignment()
@@ -381,19 +380,16 @@ class TestODMEMultiClassSetUp(TestCase):
         self.assignment.max_iter = 5
         self.assignment.set_algorithm("msa")
 
-        # Store parameters needed for ODME/demand matrix manipulation:
-        self.count_vol_cols = ["class", "link_id", "direction", "obs_volume"]
+        # Store extra variables needed for ODME/demand matrix manipulation:
         self.car_index = self.car_graph.nodes_to_indices
-        self.car_dims = self.car_matrix.matrix_view.shape
         self.truck_index = self.truck_graph.nodes_to_indices
-        self.truck_dims = self.truck_matrix.matrix_view.shape
         self.moto_index = self.moto_graph.nodes_to_indices
-        self.moto_dims = self.moto_matrix.matrix_view.shape
 
         self.user_classes = self.assignment.classes
         self.user_class_names = [user_class.__id__ for user_class in self.user_classes]
-        self.user_class_dims = [self.car_dims, self.moto_dims, self.truck_dims]
         self.matrices = [user_class.matrix for user_class in self.user_classes]
+        self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
+        self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
 
         # Currently testing algorithm:
         self.algorithm = "spiess"
@@ -407,28 +403,34 @@ class TestODMEMultiClassSetUp(TestCase):
     def test_all_zeros(self) -> None:
         """
         Check that running ODME on 3 user classes with all 0 demand matrices,
-        returns 0 demand matrix when given a single count volume of 0 from each
+        returns 0 demand matrix when given a count volumes of 0 from each
         class.
         """
         # Set synthetic demand matrix & count volumes
-        for i, matrix in enumerate(self.matrices):
-            matrix.matrix_view = np.zeros(self.user_class_dims[i])
-        
+        for dims, matrix in zip(self.matrix_dims, self.matrices):
+            matrix.matrices = np.zeros(dims)
+
         count_volumes = pd.DataFrame(
             data=[[user_class, 1, 1, 0] for user_class in self.user_class_names],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
+        demands = odme.get_demands()
 
         # Check for each class that the matrix is still 0's.
-        for i, matrix in enumerate(self.matrices):
+        for demand, dims, matrix, mname in zip(
+            demands,
+            self.matrix_view_dims,
+            self.matrices,
+            self.user_class_names
+            ):
             np.testing.assert_allclose(
-                matrix.matrix_view,
-                np.zeros(self.user_class_dims[i])[:, :, np.newaxis],
-                err_msg=f"The {self.user_class_names[i]} matrix was changed from 0 when initially a 0 matrix!"
+                demand,
+                np.zeros(dims),
+                err_msg=f"The {mname} matrix was changed from 0 when initially a 0 matrix!"
             )
 
     def test_no_changes(self) -> None:
@@ -451,7 +453,7 @@ class TestODMEMultiClassSetUp(TestCase):
                 for i in assign_df["link_id"]
                 for j, matrix in enumerate(self.matrices)
                 ],
-            columns=self.count_vol_cols
+            columns=ODME.COUNT_VOLUME_COLS
         )
 
         # Store original matrices
@@ -473,5 +475,9 @@ class TestODMEMultiClassSetUp(TestCase):
                 err_msg=f"The {self.user_class_names[i]} matrix was changed when given count volumes " +
                 "which correspond to currently assigned volumes!"
             )
+
+    #def
+    # Change to inputs
+    # Extension to one of 3_1/2
 
 # Will need a test checking everything works fine if you do not include count volumes for a particular class
