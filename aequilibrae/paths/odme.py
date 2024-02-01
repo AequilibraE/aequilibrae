@@ -46,7 +46,6 @@ class ODME(object):
         stop_crit=None,
         alpha: float = None,
         algorithm: str = "spiess",
-        verbose: bool = False
     ) -> None:
         """
         For now see description in pdf file in SMP internship team folder
@@ -121,9 +120,6 @@ class ODME(object):
 
         # Results/Statistics:
         self.results = ODMEResults(self)
-
-        # Printing During Runtime:
-        self._verbose = verbose
         
         # Procedure Information:
         self.procedure_date = ""
@@ -453,7 +449,7 @@ class ODME(object):
         return pd.concat(self.results.statistics, ignore_index=True)
 
     # ODME Execution:
-    def execute(self) -> None:
+    def execute(self, verbose=False) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
@@ -482,7 +478,7 @@ class ODME(object):
                 self.__execute_inner_iter()
                 self.results.log_iter(ODMEResults.INNER)
             
-            if self._verbose:
+            if verbose:
                 print(f"Outer iteration {outer} is complete.")
 
             # Reassign values at the end of each outer loop
