@@ -131,8 +131,6 @@ class OVMBuilder(WorkerThread):
             # Create the 'link_types' and 'modes' columns for the 'nodes_gdf' DataFrame
             nodes_gdf["link_types"] = matched_rows["link_type"]
             nodes_gdf["modes"] = matched_rows["modes"]
-            nodes_gdf["ovm_id"] = nodes_gdf["ovm_id"]
-            nodes_gdf["geometry"] = nodes_gdf["geometry"]
         else:
             # No common nodes found
             raise ValueError("No common nodes.")
