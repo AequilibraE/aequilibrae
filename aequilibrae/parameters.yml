@@ -262,8 +262,6 @@ network:
         - pedestrian
         - track
         - unclassified
-        mode_filter:
-          bicycle: 'no'
         unknown_tags: true
       car:
         link_types:
@@ -276,8 +274,6 @@ network:
         - residential
         - livingStreet
         - parkingAisle
-        mode_filter:
-          motor_vehicle: 'no'
         unknown_tags: true
       transit:
         link_types:
@@ -299,8 +295,6 @@ network:
         - track
         - bridleway
         - unclassified
-        mode_filter:
-          pedestrian: 'no'
         unknown_tags: true
   gmns:
     critical_dist: 2
