@@ -295,7 +295,7 @@ class OVMBuilder(WorkerThread):
         # Extract necessary information from the row
         connectors = row["connectors"]
 
-        direction_dictionary = self.get_direction(row["lanes"])
+        direction_dictionary = self.get_direction(row["direction"])
         # Check if 'Connectors' has more than 2 elements
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
