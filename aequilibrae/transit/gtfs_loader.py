@@ -179,10 +179,8 @@ class GTFSReader(WorkerThread):
                             }
                         )
 
-                        for _, rec in max_speeds.iterrows():
-                            df.loc[
-                                (df.dist >= rec.min_distance) & (df.dist < rec.max_distance), "max_speed"
-                            ] = rec.speed
+                        for _, r in max_speeds.iterrows():
+                            df.loc[(df.dist >= r.min_distance) & (df.dist < r.max_distance), "max_speed"] = r.speed
 
                         to_fix = df[df.max_speed < df.speed].index.values
                         if to_fix.shape[0] > 0:
