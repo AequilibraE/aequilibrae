@@ -249,9 +249,7 @@ class AequilibraeMatrix(object):
                         if mat_name in object.__dict__:
                             raise ValueError(mat_name + " is a reserved name")
                         if len(mat_name) > CORE_NAME_MAX_LENGTH:
-                            raise ValueError(
-                                f"Matrix names need to be be shorter than {CORE_NAME_MAX_LENGTH}: {mat_name}"
-                            )
+                            raise ValueError(f"Matrix names need to be shorter than {CORE_NAME_MAX_LENGTH}: {mat_name}")
                     else:
                         raise ValueError("Matrix core names need to be strings: " + str(mat_name))
             else:
