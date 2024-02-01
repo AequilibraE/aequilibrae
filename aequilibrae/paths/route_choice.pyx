@@ -15,7 +15,7 @@ a lot of cpp interop and memory management. A description of the purpose of vari
 
 route_set: See route_choice.pxd for full type signature. It's an unordered set (hash set) of pointers to vectors of link
 IDs. It uses a custom hashing function and comparator. The hashing function is defined in a string that in inlined
-directly into the output ccp. This is done allow declaring an the `()` operator, which is required and AFAIK not
+directly into the output ccp. This is done allow declaring of the `()` operator, which is required and AFAIK not
 possible in Cython. The hash is designed to dereference then hash order dependent vectors. One isn't provided by
 stdlib. The comparator simply dereferences the pointer and uses the vector comparator. It's designed to store the
 outputted paths. Heap allocated (needs to be returned).
@@ -86,7 +86,7 @@ cdef class RouteChoiceSet:
         # self.heuristic = HEURISTIC_MAP[self.res._heuristic]
         self.cost_view = graph.compact_cost
         self.graph_fs_view = graph.compact_fs
-        self.b_nodes_view = graph.compact_graph.b_node.values  # FIXME: Why does path_computation copy this?
+        self.b_nodes_view = graph.compact_graph.b_node.values
         self.nodes_to_indices_view = graph.compact_nodes_to_indices
         tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
         self.lat_view = tmp.lat.values
@@ -164,7 +164,7 @@ cdef class RouteChoiceSet:
             long long origin_index, dest_index, i
 
         if max_routes == 0 and max_depth == 0:
-            raise ValueError("Either `max_routes` or `max_depth` must be >= 0")
+            raise ValueError("Either `max_routes` or `max_depth` must be > 0")
 
         if max_routes < 0 or max_depth < 0 or cores < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
@@ -231,30 +231,6 @@ cdef class RouteChoiceSet:
 
         del results
         return dict(zip(ods, res))
-
-    def _generate_line_strins(self, project, graph, results):
-        """Debug method"""
-        import geopandas as gpd
-        import shapely
-
-        links = project.network.links.data.set_index("link_id")
-        df = []
-        for od, route_set in results.items():
-            for route in route_set:
-                df.append(
-                    (
-                        *od,
-                        shapely.MultiLineString(
-                            links.loc[
-                                graph.graph[graph.graph.__compressed_id__.isin(route)].link_id
-                            ].geometry.to_list()
-                        ),
-                    )
-                )
-
-        df = gpd.GeoDataFrame(df, columns=["origin", "destination", "geometry"])
-        df.set_geometry("geometry")
-        df.to_file("test1.gpkg", layer='routes', driver="GPKG")
 
     @cython.initializedcheck(False)
     cdef void path_find(
