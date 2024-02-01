@@ -321,7 +321,7 @@ class TestODMESingleClassSetUp(TestCase):
 
         # Assert link flows are balanced halfway between each other:
         self.assertTrue(flow_5 > 50 and flow_5 < 100,
-            msg="Expected flows to be halfway between 50 & 100")
+            msg="Expected flows to be between 50 & 100")
 
         # Assert only appropriate O-D's have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
@@ -392,6 +392,9 @@ class TestODMEMultiClassSetUp(TestCase):
         self.matrices = [user_class.matrix for user_class in self.user_classes]
         self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
         self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
+        self.class_to_matrix_idx = [
+            matrix.names.index(matrix.view_names[0]) for matrix in self.matrices]
+        self.indexes = [self.car_index, self.truck_index, self.moto_index]
 
         # Currently testing algorithm:
         self.algorithm = "spiess"
@@ -453,9 +456,58 @@ class TestODMEMultiClassSetUp(TestCase):
     # Simple MC Test Case
     def test_simple_mc(self) -> None:
         """
-        Tests whether...
+        Tests whether ODME can handle multiple classes with multiple
+        links with competing priorities. Serves as an extension to test
+        3.2 for single class.
 
-        Serves as an extension to 3.1/2 from the single class tests.
+        Links with competing priorities are again links 5/35 (upper left going downwards).
+        Single OD pair with (different across classes) non-zero demand for each class
+        is OD pair 13->1.
         """
-        # NOT YET IMPLEMENTED
-        assert False
+        # Set synthetic demand matrices
+        ods = [10, 20, 50]
+        for dims, matrix, index, o_d, idx in zip(
+            self.matrix_dims,
+            self.matrices,
+            self.indexes,
+            ods,
+            self.class_to_matrix_idx
+            ):
+            matrix.matrices = np.zeros(dims)
+            matrix.matrices[index[13], index[1], idx] = o_d
+
+
+        # Perform ODME with competing link flows on 5 & 35
+        flows = [[100, 50], [30, 10], [20, 60]]
+        count_volumes = pd.DataFrame(
+            data=[["car", 5, 1, flows[0][0]], ["car", 35, 1, flows[0][1]],
+                ["truck", 5, 1, flows[1][0]], ["truck", 35, 1, flows[1][1]],
+                ["motorcycle", 5, 1, flows[2][0]], ["motorcycle", 35, 1, flows[2][1]]],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
+        odme.execute()
+
+        # Get Results:
+        self.assignment.execute()
+        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
+        demands = odme.get_demands()
+
+        # Check Results:
+        for flow, name in zip(flows, self.class_ids):
+            flow_5 = assign_df.loc[assign_df["link_id"] == 5, f"{name}_ab"].values[0]
+            flow_35 = assign_df.loc[assign_df["link_id"] == 35, f"{name}_ab"].values[0]
+
+            # Assert link flows are equal:
+            self.assertAlmostEqual(flow_5, flow_35,
+                msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
+
+            # Assert link flows are balanced halfway between each other:
+            self.assertTrue(flow_5 > min(flow) and flow_5 < max(flow),
+                msg=f"Expected flows to be between {min(flow)} & {max(flow)}")
+
+        for index, demand, idx in zip(self.indexes, demands, self.class_to_matrix_idx):
+            # Assert only appropriate O-D's have had demand changed
+            od_13_1 = demand[index[13], index[1], idx]
+            self.assertAlmostEqual(demand, od_13_1,
+                msg="Unexpected OD pair has non-zero demand")
