@@ -96,3 +96,5 @@ build/
 coverage.xml
 
 #### End snippet
+tests/data/overture/theme=transportation/type=connector/transportation_data_connector.parquet
+tests/data/overture/theme=transportation/type=segment/transportation_data_segment.parquet

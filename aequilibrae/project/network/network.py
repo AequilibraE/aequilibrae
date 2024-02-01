@@ -2,6 +2,7 @@ import importlib.util as iutil
 import math
 from sqlite3 import Connection as sqlc
 from typing import Dict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,8 @@ from shapely.ops import unary_union
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.network import OSMDownloader
+from aequilibrae.project.network.ovm_builder import OVMBuilder
+from aequilibrae.project.network.ovm_downloader import OVMDownloader
 from aequilibrae.project.network.gmns_builder import GMNSBuilder
 from aequilibrae.project.network.gmns_exporter import GMNSExporter
 from aequilibrae.project.network.haversine import haversine
@@ -22,6 +25,7 @@ from aequilibrae.project.network.modes import Modes
 from aequilibrae.project.network.nodes import Nodes
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.network.osm_builder import OSMBuilder
+# from aequilibrae.project.network.ovm_builder import OVMBuilder
 from aequilibrae.project.network.osm_utils.place_getter import placegetter
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
@@ -122,6 +126,94 @@ class Network(WorkerThread):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             all_modes = [x[0] for x in conn.execute("""select mode_id from modes""").fetchall()]
         return all_modes
+
+    def create_from_ovm(
+        self,
+        west: float = None,
+        south: float = None,
+        east: float = None,
+        north: float = None,
+        place_name: str = None,
+        data_source: Path = None,
+        output_dir: Path = None,
+        modes=["car", "transit", "bicycle", "walk"],
+    ) -> None:
+        """
+        Downloads the network from Open-Street Maps
+
+        :Arguments:
+            **west** (:obj:`float`, Optional): West most coordinate of the download bounding box
+
+            **south** (:obj:`float`, Optional): South most coordinate of the download bounding box
+
+            **east** (:obj:`float`, Optional): East most coordinate of the download bounding box
+
+            **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
+            required
+
+            **modes** (:obj:`list`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
+            file
+
+        .. code-block:: python
+
+            >>> from aequilibrae import Project
+
+            >>> p = Project()
+            >>> p.new("/tmp/new_project")
+
+            # Save the parameters to disk
+            >>> par.write_back()
+
+            # Now we can import the network for any place we want
+            # p.network.create_from_ovm(place_name="my_beautiful_hometown")
+
+            >>> p.close()
+        """
+
+        if self.count_links() > 0:
+            raise FileExistsError("You can only import an OVM network into a brand new model file")
+
+        curr = self.conn.cursor()
+        curr.execute("""ALTER TABLE links ADD COLUMN ovm_id integer""")
+        curr.execute("""ALTER TABLE nodes ADD COLUMN ovm_id integer""")
+        self.conn.commit()
+
+        if isinstance(modes, (tuple, list)):
+            modes = list(modes)
+        elif isinstance(modes, str):
+            modes = [modes]
+        else:
+            raise ValueError("'modes' needs to be string or list/tuple of string")
+
+        if place_name is None:
+            if min(east, west) < -180 or max(east, west) > 180 or min(north, south) < -90 or max(north, south) > 90:
+                raise ValueError("Coordinates out of bounds")
+            bbox = [west, south, east, north]
+        else:
+            bbox, report = placegetter(place_name)
+            west, south, east, north = bbox
+            if bbox is None:
+                msg = f'We could not find a reference for place name "{place_name}"'
+                self.logger.warning(msg)
+                return
+            for i in report:
+                if "PLACE FOUND" in i:
+                    self.logger.info(i)
+
+        self.logger.info("Downloading data")
+        self.downloader = OVMDownloader(modes, self.source, logger=self.logger)
+        if pyqt:
+            self.downloader.downloading.connect(self.signal_handler)
+        segments_gdf, connectors_gdf = self.downloader.downloadTransportation(bbox,data_source,output_dir)
+
+        self.logger.info("Building Network")
+        self.builder = OVMBuilder(segments_gdf, connectors_gdf, self.source, project=self.project)
+
+        if pyqt:
+            self.builder.building.connect(self.signal_handler)
+
+        self.builder.doWork(output_dir)
+        self.logger.info("Network built successfully")
 
     def create_from_osm(
         self,
