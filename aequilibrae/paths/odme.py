@@ -359,42 +359,16 @@ class ODME(object):
         """
         project = project or get_active_project()
         mats = project.matrices
+        file_path = join(mats.fldr, file_name)
 
-        # MODULARISE IF STATEMENTS
-
+        
         if Path(file_name).suffix.lower() == ".omx":
-            self.__save_as_omx(join(mats.fldr, file_name))
-
-        # NOT SURE IF .AEM WORKS PROPERLY YET!!!
-        # HOW DOES IT KNOW WHERE TO SAVE IT?
+            self.__save_as_omx(file_path)
         elif ".aem" in file_name:
-            mat = AequilibraeMatrix()
-            matrix_names = []
-            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
-                for core in matrix.view_names:
-                    matrix_names.append(f"{cls_name}_{core}")
-
-            args = {
-                "zones": self.aequilibrae_matrices[0].zones,
-                "matrix_names": matrix_names,
-                "index_names": self.aequilibrae_matrices[0].index_names,
-                "memory_only": False,
-                "file_name": file_name,
-            }
-            mat.create_empty(**args)
-            mat.indices[:, :] = self.aequilibrae_matrices[0].indices[:, :]
-            for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
-                for core in matrix.view_names:
-                    mat.matrix[f"{cls_name}_{core}"][:, :] = matrix[core][:, :]
-            mat.description = f"ODME Procedure {self.procedure_id}"
-            mat.save()
-            mat.close()
-            del mat
-
-        else:
+            self.__save_as_aem(file_path)
+        else: # unsupported file-type
             raise ValueError("Only supporting .omx and .aem")
 
-        # self.output.save(file_name= join(mats.fldr, file_name)) # 'Save As'
         record = mats.new_record(name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
@@ -403,13 +377,13 @@ class ODME(object):
         # record.procedure_report = Create json and save to this file # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
         record.save()
 
-    def __save_as_omx(self, file_name: str) -> None:
+    def __save_as_omx(self, file_path: str) -> None:
         """Saves the final demand matrix output as a .omx file to the project file
 
         :Arguments:
-            **file_name** (:obj:`str`): Name for the matrix file name (must end with .omx)
+            **file_path** (:obj:`str`): File path for the matrix file name (must end with .omx)
         """
-        omx_mat = omx.open_file(file_name, "w")
+        omx_mat = omx.open_file(file_path, "w")
         for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
             for core in matrix.view_names:
                 omx_mat[f"{cls_name}_{core}"] = matrix.matrix[core]
@@ -419,14 +393,39 @@ class ODME(object):
 
         for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
             for core in matrix.view_names:
-                omx_mat[f"{cls_name}_{core}"].attrs.description = f"ODME Procedure {self.procedure_id}"
+                description = f"ODME Procedure {self.procedure_id}"
+                omx_mat[f"{cls_name}_{core}"].attrs.description = description
         omx_mat.close()
 
-    def __save_as_aem(self) -> None:
+    def __save_as_aem(self, file_path: str) -> None:
         """
-        NOT YET IMPLEMENTED
+        Saves the final demand matrix output as a .aem file to the project file
+
+        :Arguments:
+            **file_path** (:obj:`str`): File path for the matrix file name (must end with .aem)
         """
-        return
+        mat = AequilibraeMatrix()
+        matrix_names = []
+        for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+            for core in matrix.view_names:
+                matrix_names.append(f"{cls_name}_{core}")
+
+        args = {
+            "zones": self.aequilibrae_matrices[0].zones,
+            "matrix_names": matrix_names,
+            "index_names": self.aequilibrae_matrices[0].index_names,
+            "memory_only": False,
+            "file_name": file_path,
+        }
+        mat.create_empty(**args)
+        mat.indices[:, :] = self.aequilibrae_matrices[0].indices[:, :]
+        for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
+            for core in matrix.view_names:
+                mat.matrix[f"{cls_name}_{core}"][:, :] = matrix.matrix[core][:, :]
+        mat.description = f"ODME Procedure {self.procedure_id}"
+        mat.save()
+        mat.close()
+        del mat
 
     def get_demands(self) -> list[np.ndarray]:
         """
