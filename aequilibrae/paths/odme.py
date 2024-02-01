@@ -449,7 +449,7 @@ class ODME(object):
         return pd.concat(self.results.statistics, ignore_index=True)
 
     # ODME Execution:
-    def execute(self, verbose=False) -> None:
+    def execute(self, verbose=False, print_rate=1) -> None:
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
@@ -478,7 +478,7 @@ class ODME(object):
                 self.__execute_inner_iter()
                 self.results.log_iter(ODMEResults.INNER)
             
-            if verbose:
+            if verbose and outer % print_rate == 0:
                 print(f"Outer iteration {outer} is complete.")
 
             # Reassign values at the end of each outer loop
