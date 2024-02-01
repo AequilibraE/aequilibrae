@@ -152,11 +152,7 @@ class ScalingFactors(object):
     def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
         """
         Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
-
-        MULTI-CLASS UNDER DEVELOPMENT!
         """
-        # THIS CAN BE SIGNIFICANTLY SIMPLIFIED - SEE NOTES
-
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
         derivatives = []

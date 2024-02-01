@@ -78,7 +78,7 @@ class ODME(object):
         self.aequilibrae_matrices = [user_class.matrix for user_class in self.classes]
         self.demands = [user_class.matrix.matrix_view for user_class in self.classes]
         # Reshaping matrices because when computational_view is done with a single class we get
-        # n x n instead of n x n x 1
+        # n x n instead of n x n x 1 - NOTE: this may be redundant now
         for i, demand in enumerate(self.demands):
             if len(demand.shape) == 2:
                 self.demands[i] = demand[:, :, np.newaxis]
@@ -170,7 +170,7 @@ class ODME(object):
                             stop_error = True
                         elif stop_crit[key] < 0:
                             stop_error = True
-        
+
         if stop_error:
             raise ValueError("Stopping criterion must be given as a dictionary as follows," +
                 "(key -> type of value):" +
@@ -503,7 +503,7 @@ class ODME(object):
 
         NOTE - Need to check how matrix dimensions will work for multi-class.
         """
-        # NEED TO CHECK THAT THIS IS DONE CORRECTLY AND WE DON'T NEED TO CHANGE 
+        # NEED TO CHECK THAT THIS IS DONE CORRECTLY AND WE DON'T NEED TO CHANGE
         # THE UNDERLYING aeq_matrix.matrices OBJECT INSTEAD! ASK PEDRO ABOUT THIS
         # Change matrix.matrix_view to the current demand matrix (as np.array)
         for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demands):
