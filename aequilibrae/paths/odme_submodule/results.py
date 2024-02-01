@@ -6,6 +6,9 @@ import time
 import numpy as np
 import pandas as pd
 
+
+# ADD FUNCTIONALITY TO SPLIT DATA INTO A: DEPENDENT ON ITERATION, B: DEPENDENT ON COUNT VOLUME
+# ADD A WAY TO SAVE B TO CSV's
 class ODMEResults(object):
     """ Results and statistics of an ODME procedure """
     # Columns for various dataframes:
