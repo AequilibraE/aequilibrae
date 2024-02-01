@@ -53,35 +53,6 @@ class MultiThreadedAoN:
                 dtype=graph.default_types("float"),
             )
 
-            link_loads_step_dir_shape = (
-                len(results._selected_links),
-                graph.compact_num_links,
-                results.classes["number"],
-            )
-
-            od_matrix_step_dir_shape = (
-                len(results._selected_links),
-                graph.num_zones,
-                graph.num_zones,
-                results.classes["number"],
-            )
-
-            self.sl_link_loads_step_direction = np.zeros(link_loads_step_dir_shape, dtype=graph.default_types("float"))
-            self.sl_link_loads_previous_step_direction = np.zeros(
-                link_loads_step_dir_shape, dtype=graph.default_types("float")
-            )
-            self.sl_link_loads_pre_previous_step_direction = np.zeros(
-                link_loads_step_dir_shape, dtype=graph.default_types("float")
-            )
-
-            self.sl_od_matrix_step_direction = np.zeros(od_matrix_step_dir_shape, dtype=graph.default_types("float"))
-            self.sl_od_matrix_previous_step_direction = np.zeros(
-                od_matrix_step_dir_shape, dtype=graph.default_types("float")
-            )
-            self.sl_od_matrix_pre_previous_step_direction = np.zeros(
-                od_matrix_step_dir_shape, dtype=graph.default_types("float")
-            )
-
         if results.num_skims > 0:
             self.temporary_skims = np.zeros((results.cores, results.compact_nodes, results.num_skims), dtype=ftype)
         else:

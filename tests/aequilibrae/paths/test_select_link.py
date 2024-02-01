@@ -217,26 +217,20 @@ class TestSelectLink(TestCase):
                 assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
                 assignment.execute()
 
-                assign_df = assignment.results().reset_index(drop=False).fillna(0)
-                sl_matrix_1 = assignclass.results.select_link_od.matrix["sl_1_1"].squeeze()
-                sl_matrix_5 = assignclass.results.select_link_od.matrix["sl_5_1"].squeeze()
-
-                assigned_flow_1 = assign_df.loc[assign_df["link_id"] == 1, "matrix_ab"].values[0]
-                assigned_flow_5 = assign_df.loc[assign_df["link_id"] == 5, "matrix_ab"].values[0]
-                sl_flow_1 = np.sum(sl_matrix_1)
-                sl_flow_5 = np.sum(sl_matrix_5)
+                assignment_results = pd.DataFrame(assignclass.results.get_load_results().data).set_index("index")
+                sl_results = pd.DataFrame(assignclass.results.get_sl_results().data).set_index("index")
 
                 self.assertAlmostEqual(
-                    assigned_flow_1,
-                    sl_flow_1,
+                    assignment_results["matrix_ab"].loc[1],
+                    sl_results["sl_1_1_matrix_ab"].loc[1],
                     msg=f"Select link results differ to that of the assignment ({algorithm})",
-                    delta=1e-5,
+                    delta=1e-6,
                 )
                 self.assertAlmostEqual(
-                    assigned_flow_5,
-                    sl_flow_5,
+                    assignment_results["matrix_ab"].loc[5],
+                    sl_results["sl_5_1_matrix_ab"].loc[5],
                     msg=f"Select link results differ to that of the assignment ({algorithm})",
-                    delta=1e-5,
+                    delta=1e-6,
                 )
 
 
