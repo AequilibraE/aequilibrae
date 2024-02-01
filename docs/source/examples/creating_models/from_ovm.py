@@ -1,40 +1,47 @@
 """
-.. _plot_from_osm:
-
-Project from OpenStreetMap
+Project from Overture Maps
 =============================
-
-In this example, we show how to create an empty project and populate it with a network from OpenStreetMap.
-
-This time we will use Folium to visualize the network.
+In this example, we show how to create an empty project and populate it with a network from Overture Maps.
+We will use Folium to visualize the network.
 """
 
 # %%
 # Imports
+from pathlib import Path
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae import Project
 import folium
-# sphinx_gallery_thumbnail_path = 'images/nauru.png'
 
 # %%
 # We create an empty project on an arbitrary folder
+from shutil import rmtree
+
 fldr = join(gettempdir(), uuid4().hex)
 project = Project()
 project.new(fldr)
 # %%
 # Now we can download the network from any place in the world (as long as you have memory for all the download
 # and data wrangling that will be done)
+# We have stored Airlie Beach's transportation parquet files in the folder with the file path data_source below as using the cloud-native Parquet files takes a much longer time to run
+# We recommend downloading these cloud-native Parquet files to drive and replacing the data_source file to match
+dir = str(Path('../../../../').resolve())
+data_source = Path(dir) / 'tests' / 'data' / 'overture' / 'theme=transportation'
+output_dir = Path(fldr) / "raw_parquet"
 
+# For the sake of this example, we will choose the small town of Airlie Beach.
+# The "bbox" parameter specifies the bounding box encompassing the desired geographical location. In the given example, this refers to the bounding box that encompasses Airlie Beach.
+bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+ 
 # We can create from a bounding box or a named place.
-# For the sake of this example, we will choose the small nation of Nauru.
-project.network.create_from_osm(place_name="Nauru")
+project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=output_dir)
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier
 links = project.network.links.data
 
+# %%
 # We create a Folium layer
 network_links = folium.FeatureGroup("links")
 
@@ -51,12 +58,9 @@ for i, row in links.iterrows():
     ).add_to(network_links)
 
 # %%
-# We get the center of the region we are working with some SQL magic
-curr = project.conn.cursor()
-curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
-long, lat = curr.fetchone()
-print(long)
-print(lat)
+# We get the center of the region
+long = (bbox[0]+bbox[2])/2
+lat = (bbox[1]+bbox[3])/2
 
 # %%
 map_osm = folium.Map(location=[lat, long], zoom_start=14)

@@ -230,6 +230,78 @@ network:
         mode_filter:
           pedestrian: 'no'
         unknown_tags: true
+  ovm:
+    all_link_types:
+    - bridleway
+    - cycleway 
+    - driveway
+    - footway
+    - livingStreet
+    - motorway
+    - parkingAisle
+    - pedestrian
+    - primary
+    - residential
+    - secondary
+    - steps
+    - tertiary
+    - track
+    - trunk
+    - unclassified
+    - unknown
+    modes:
+      bicycle:
+        link_types:
+        - primary
+        - secondary
+        - tertiary
+        - livingStreet
+        - parkingAisle
+        - residential
+        - cycleway
+        - pedestrian
+        - track
+        - unclassified
+        mode_filter:
+          bicycle: 'no'
+        unknown_tags: true
+      car:
+        link_types:
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - livingStreet
+        - parkingAisle
+        mode_filter:
+          motor_vehicle: 'no'
+        unknown_tags: true
+      transit:
+        link_types:
+        - motorway
+        - trunk
+        - primary
+        - secondary
+        - tertiary
+        - unclassified
+        - residential
+        - livingStreet
+        unknown_tags: true
+      walk:
+        link_types:
+        - cycleway
+        - footway
+        - steps
+        - pedestrian
+        - track
+        - bridleway
+        - unclassified
+        mode_filter:
+          pedestrian: 'no'
+        unknown_tags: true
   gmns:
     critical_dist: 2
     node:
