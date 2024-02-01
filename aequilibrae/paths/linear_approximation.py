@@ -122,7 +122,7 @@ class LinearApproximation(WorkerThread):
 
         self.step_direction = {}  # type: Dict[AssignmentResults]
         self.previous_step_direction = {}  # type: Dict[AssignmentResults]
-        self.pre_previous_step_direction = {}  # type: Dict[AssignmentResults]
+        self.temp_step_direction_for_copy = {}  # type: Dict[AssignmentResults]
 
         self.aons = {}
 
@@ -133,7 +133,7 @@ class LinearApproximation(WorkerThread):
 
         if self.algorithm in ["cfw", "bfw"]:
             for c in self.traffic_classes:
-                for d in [self.step_direction, self.previous_step_direction, self.pre_previous_step_direction]:
+                for d in [self.step_direction, self.previous_step_direction, self.temp_step_direction_for_copy]:
                     r = AssignmentResults()
                     r.prepare(c.graph, c.matrix)
                     r.compact_link_loads = np.zeros([])
@@ -328,7 +328,7 @@ class LinearApproximation(WorkerThread):
             self.calculate_biconjugate_direction()
             # deep copy because we overwrite step_direction but need it on next iteration
             for c in self.traffic_classes:
-                ppst = self.pre_previous_step_direction[c._id]  # type: AssignmentResults
+                ppst = self.temp_step_direction_for_copy[c._id]  # type: AssignmentResults
                 prev_stp_dir = self.previous_step_direction[c._id]  # type: AssignmentResults
                 stp_dir = self.step_direction[c._id]  # type: AssignmentResults
 
@@ -363,12 +363,12 @@ class LinearApproximation(WorkerThread):
                         sl_step_dir_ll = self.sl_step_dir_ll[c._id][name]
                         sl_step_dir_od = self.sl_step_dir_od[c._id][name]
                         copy_two_dimensions(
-                            sl_step_dir_ll["pre_prev_sdr"],
+                            sl_step_dir_ll["temp_prev_sdr"],
                             sl_step_dir_ll["sdr"],
                             self.cores,
                         )
                         copy_three_dimensions(
-                            sl_step_dir_od["pre_prev_sdr"],
+                            sl_step_dir_od["temp_prev_sdr"],
                             sl_step_dir_od["sdr"],
                             self.cores,
                         )
@@ -377,7 +377,7 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_ll["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             sl_step_dir_ll["sdr"],
-                            sl_step_dir_ll["pre_prev_sdr"],
+                            sl_step_dir_ll["temp_prev_sdr"],
                             self.betas,
                             self.cores,
                         )
@@ -393,12 +393,12 @@ class LinearApproximation(WorkerThread):
 
                         copy_two_dimensions(
                             sl_step_dir_ll["prev_sdr"],
-                            sl_step_dir_ll["pre_prev_sdr"],
+                            sl_step_dir_ll["temp_prev_sdr"],
                             self.cores,
                         )
                         copy_three_dimensions(
                             sl_step_dir_od["prev_sdr"],
-                            sl_step_dir_od["pre_prev_sdr"],
+                            sl_step_dir_od["temp_prev_sdr"],
                             self.cores,
                         )
 
@@ -453,13 +453,13 @@ class LinearApproximation(WorkerThread):
                 self.sl_step_dir_ll[c._id][name] = {
                     "sdr": np.zeros(link_loads_step_dir_shape, dtype=c.graph.default_types("float")),
                     "prev_sdr": np.zeros(link_loads_step_dir_shape, dtype=c.graph.default_types("float")),
-                    "pre_prev_sdr": np.zeros(link_loads_step_dir_shape, dtype=c.graph.default_types("float")),
+                    "temp_prev_sdr": np.zeros(link_loads_step_dir_shape, dtype=c.graph.default_types("float")),
                 }
 
                 self.sl_step_dir_od[c._id][name] = {
                     "sdr": np.zeros(od_step_dir_shape, dtype=c.graph.default_types("float")),
                     "prev_sdr": np.zeros(od_step_dir_shape, dtype=c.graph.default_types("float")),
-                    "pre_prev_sdr": np.zeros(od_step_dir_shape, dtype=c.graph.default_types("float")),
+                    "temp_prev_sdr": np.zeros(od_step_dir_shape, dtype=c.graph.default_types("float")),
                 }
 
             # Sizes the temporary objects used for the results
