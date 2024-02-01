@@ -68,7 +68,6 @@ class ODME(object):
 
         self.assignment = assignment
         self.classes = assignment.classes
-        self.output = AequilibraeMatrix()
         self.__duplicate_matrices()
 
         self.class_names = [user_class.__id__ for user_class in self.classes]
