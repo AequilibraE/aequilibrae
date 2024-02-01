@@ -364,10 +364,10 @@ class TestODMEMultiClassSetUp(TestCase):
         self.assignment = TrafficAssignment()
         self.carclass = TrafficClass("car", self.car_graph, self.car_matrix)
         self.carclass.set_pce(1.0)
-        self.motoclass = TrafficClass("motorcycle", self.moto_graph, self.moto_matrix)
-        self.motoclass.set_pce(0.2)
         self.truckclass = TrafficClass("truck", self.truck_graph, self.truck_matrix)
         self.truckclass.set_pce(2.5)
+        self.motoclass = TrafficClass("motorcycle", self.moto_graph, self.moto_matrix)
+        self.motoclass.set_pce(0.2)
 
         self.assignment.set_classes([self.carclass, self.truckclass, self.motoclass])
 
@@ -388,7 +388,7 @@ class TestODMEMultiClassSetUp(TestCase):
         self.moto_index = self.moto_graph.nodes_to_indices
 
         self.user_classes = self.assignment.classes
-        self.user_class_names = [user_class.__id__ for user_class in self.user_classes]
+        self.class_ids = [user_class.__id__ for user_class in self.user_classes]
         self.matrices = [user_class.matrix for user_class in self.user_classes]
         self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
         self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
@@ -413,7 +413,7 @@ class TestODMEMultiClassSetUp(TestCase):
             matrix.matrices = np.zeros(dims)
 
         count_volumes = pd.DataFrame(
-            data=[[user_class, 1, 1, 0] for user_class in self.user_class_names],
+            data=[[user_class, 1, 1, 0] for user_class in self.class_ids],
             columns=ODME.COUNT_VOLUME_COLS
         )
 
@@ -427,7 +427,7 @@ class TestODMEMultiClassSetUp(TestCase):
             demands,
             self.matrix_view_dims,
             self.matrices,
-            self.user_class_names
+            self.class_ids
             ):
             np.testing.assert_allclose(
                 demand,
@@ -438,10 +438,17 @@ class TestODMEMultiClassSetUp(TestCase):
     # Input Validity
     def test_mc_inputs(self) -> None:
         """
-        Checks ValueErrors are raised for invalid inputs involving multiple classes
+        Checks ValueErrors are raised for invalid inputs involving duplicate
+        count volumes with multiple classes.
         """
-        # NOT YET IMPLEMENTED
-        assert False
+        # Duplicate count volumes:
+        data = [[cls_id, 10, 1, i] for i in range(3) for cls_id in self.class_ids]
+        count_volumes = pd.DataFrame(
+            data=data,
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+        with self.assertRaises(ValueError):
+            ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
     # Simple MC Test Case
     def test_simple_mc(self) -> None:
