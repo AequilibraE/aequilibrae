@@ -534,7 +534,6 @@ class ODME(object):
         'flow'.
         """
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        # DECIDE WHETHER TO PUT THIS IN INITIALISER OR NOT!!!
         # Dictionary to select correct column of results dataframe
         col = dict()
         for cls_name, matrix in zip(self.class_names, self.aequilibrae_matrices):
