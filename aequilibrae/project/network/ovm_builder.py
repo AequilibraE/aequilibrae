@@ -121,8 +121,8 @@ class OVMBuilder(WorkerThread):
         mode_codes, not_found_tags = self.modes_per_link_type()
         links_gdf["modes"] = links_gdf["link_type"].apply(lambda x: mode_codes.get(x, not_found_tags))
 
-        common_nodes = links_gdf["b_node"].isin(nodes_gdf["node_id"])
-        print(common_nodes.sum())
+        common_nodes = links_gdf["a_node"].isin(nodes_gdf["node_id"])
+        
         # Check if any common nodes exist
         if common_nodes.any():
             # If common node exist, retrieve the DataFrame of matched rows using boolean indexing
@@ -154,10 +154,6 @@ class OVMBuilder(WorkerThread):
         nodes_gdf = nodes_gdf[node_order]
 
         nodes_gdf.to_parquet(output_file_node)
-
-        table = "links"
-        # fields = self.get_link_fields()
-        # fields.pop(fields.index('link_id'))
 
         self.__update_table_structure()
         field_names = ",".join(fields)
@@ -299,7 +295,7 @@ class OVMBuilder(WorkerThread):
         # Extract necessary information from the row
         connectors = row["connectors"]
 
-        direction_dictionary = self.get_direction(row["direction"])
+        direction_dictionary = self.get_direction(row["lanes"])
         # Check if 'Connectors' has more than 2 elements
         if np.size(connectors) >= 2:
             # Split the DataFrame into multiple rows
