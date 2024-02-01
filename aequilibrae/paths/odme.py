@@ -487,7 +487,7 @@ class ODME(object):
 
             # Reassign values at the end of each outer loop
             self.__perform_assignment()
-        
+
         # Add final stats following final assignment:
         self.results.log_iter(ODMEResults.FINAL_LOG)
 
