@@ -119,8 +119,6 @@ class TestODME(TestCase):
         # Get original flows:
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        # SQUISH EXTRA DIMENSION FOR NOW - DEAL WITH THIS PROPERLY LATER ON!!!
-        self.matrix.matrix_view = np.squeeze(self.matrix.matrix_view, axis=2)
 
         # Set the observed count volumes:
         flow = lambda i: assign_df.loc[assign_df["link_id"] == i, "matrix_ab"].values[0]
@@ -136,7 +134,7 @@ class TestODME(TestCase):
         np.random.seed(0)
         perturbation = 5 # %
         perturbation_matrix = np.random.uniform(1 - perturbation/100, 1 + perturbation/100, size=self.dims)
-        self.matrix.matrix_view = np.round(self.matrix.matrix_view * perturbation_matrix)
+        self.matrix.matrices = np.round(self.matrix.matrix_view * perturbation_matrix)[:, :, np.newaxis]
 
         # Perform ODME:
         odme = ODME(self.assignment,
