@@ -400,7 +400,7 @@ class TestODMEMultiClassSetUp(TestCase):
             mat.close()
         self.project.close()
 
-    # Basic tests for multi-class ODME
+    # Basic Zeros Test
     def test_all_zeros(self) -> None:
         """
         Check that running ODME on 3 user classes with all 0 demand matrices,
@@ -434,51 +434,20 @@ class TestODMEMultiClassSetUp(TestCase):
                 err_msg=f"The {mname} matrix was changed from 0 when initially a 0 matrix!"
             )
 
-    def test_no_changes(self) -> None:
+    # Input Validity
+    def test_mc_inputs(self) -> None:
         """
-        Check that running ODME on 3 user classes with original demand matrices
-        and all count volumes corresponding to those currently assigned does not
-        perturb original matrices.
+        Checks ValueErrors are raised for invalid inputs involving multiple classes
         """
-        # Get original flows:
-        self.assignment.execute()
-        assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        for matrix in self.matrices:
-            matrix.matrix_view = np.squeeze(matrix.matrix_view, axis=2)
+        # NOT YET IMPLEMENTED
+        assert False
 
-        # Set the observed count volumes:
-        flow = lambda i, matrix: assign_df.loc[assign_df["link_id"] == i, f"{matrix.view_names[0]}_ab"].values[0]
-        count_volumes = pd.DataFrame(
-            data=[
-                [self.user_class_names[j], i, 1, flow(i, matrix)]
-                for i in assign_df["link_id"]
-                for j, matrix in enumerate(self.matrices)
-                ],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+    # Simple MC Test Case
+    def test_simple_mc(self) -> None:
+        """
+        Tests whether...
 
-        # Store original matrices
-        original_demands = [np.copy(matrix.matrix_view) for matrix in self.matrices]
-
-        # Run ODME algorithm.
-        odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
-        odme.execute()
-
-        # Get results
-        new_demands = odme.get_demands()
-
-        # Check for each class that the matrix is still 0's.
-        for i, matrices in enumerate(zip(original_demands, new_demands)):
-            old, new = matrices
-            np.testing.assert_allclose(
-                old[:, :, np.newaxis],
-                new,
-                err_msg=f"The {self.user_class_names[i]} matrix was changed when given count volumes " +
-                "which correspond to currently assigned volumes!"
-            )
-
-    #def
-    # Change to inputs
-    # Extension to one of 3_1/2
-
-# Will need a test checking everything works fine if you do not include count volumes for a particular class
+        Serves as an extension to 3.1/2 from the single class tests.
+        """
+        # NOT YET IMPLEMENTED
+        assert False
