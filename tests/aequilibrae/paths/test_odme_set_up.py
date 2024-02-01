@@ -13,6 +13,7 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, ODME
 from aequilibrae.utils.create_example import create_example
 from ...data import siouxfalls_project
 
+# NOTE - we cannot test using bfw/cfw until Issue #493 is resolved.
 
 class TestODMESingleClassSetUp(TestCase):
     """
