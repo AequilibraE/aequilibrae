@@ -173,37 +173,6 @@ class OVMDownloader(WorkerThread):
 
         return gdf_link, gdf_node
 
-    def download_test_data(self, data_source: Union[str, Path]):
-        '''This method only used to seed/bootstrap a local copy of a small test data set'''
-        airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
-        # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
-        data_source = data_source.replace("\\", "/")
-
-
-        for t in ['segment','connector']:
-            (Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f'type={t}').mkdir(parents=True, exist_ok=True)
-            pth1 = Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f"type={t}" / f'airlie_beach_transportation_{t}.parquet'
-            sql = f"""
-                COPY (
-                SELECT 
-                    *
-                FROM read_parquet('{data_source}/type={t}/*', union_by_name=True)
-                WHERE bbox.minx > '{airlie_bbox[0]}'
-                    AND bbox.maxx < '{airlie_bbox[2]}'
-                    AND bbox.miny > '{airlie_bbox[1]}'
-                    AND bbox.maxy < '{airlie_bbox[3]}')
-                TO '{pth1}'
-                (FORMAT 'parquet', COMPRESSION 'ZSTD');
-            """
-            c = self.initialise_duckdb_spatial()
-            c.execute(sql)
-
-            df = pd.read_parquet(Path(pth1))
-            geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
-            gdf = gpd.GeoDataFrame(df,geometry=geo)
-            gdf.to_parquet(Path(pth1))
-        # return gdf    
-
     def get_ovm_filter(self, modes: list) -> str:
         """
         loosely adapted from http://www.github.com/gboeing/osmnx
@@ -233,3 +202,34 @@ class OVMDownloader(WorkerThread):
 
         return filter
     
+    def _download_test_data(self, data_source: Union[str, Path]):
+        '''This method only used to seed/bootstrap a local copy of a small test data set which should be commited to version control'''
+        airlie_bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
+        # brisbane_bbox = [153.1771, -27.6851, 153.2018, -27.6703]
+        data_source = data_source.replace("\\", "/")
+
+
+        for t in ['segment','connector']:
+            (Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f'type={t}').mkdir(parents=True, exist_ok=True)
+            pth1 = Path(__file__).parent.parent.parent.parent / "tests" / "data" / "overture" / "theme=transportation" / f"type={t}" / f'airlie_beach_transportation_{t}.parquet'
+            sql = f"""
+                COPY (
+                SELECT 
+                    *
+                FROM read_parquet('{data_source}/type={t}/*', union_by_name=True)
+                WHERE bbox.minx > '{airlie_bbox[0]}'
+                    AND bbox.maxx < '{airlie_bbox[2]}'
+                    AND bbox.miny > '{airlie_bbox[1]}'
+                    AND bbox.maxy < '{airlie_bbox[3]}')
+                TO '{pth1}'
+                (FORMAT 'parquet', COMPRESSION 'ZSTD');
+            """
+            c = self.initialise_duckdb_spatial()
+            c.execute(sql)
+
+            df = pd.read_parquet(Path(pth1))
+            geo = gpd.GeoSeries.from_wkb(df.geometry, crs=4326)
+            gdf = gpd.GeoDataFrame(df,geometry=geo)
+            gdf.to_parquet(Path(pth1))
+        # return gdf    
+
