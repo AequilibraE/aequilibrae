@@ -25,7 +25,8 @@ class TestODMESingleClassSetUp(TestCase):
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         proj_path = os.path.join(gettempdir(), "test_odme_files" + uuid.uuid4().hex)
         os.mkdir(proj_path)
-        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project),
+            "sioux_falls_single_class.zip")).extractall(proj_path)
 
         # Initialise project:
         self.project = Project()
@@ -97,8 +98,8 @@ class TestODMESingleClassSetUp(TestCase):
         # Set synthetic demand matrix & count volumes
         demand = np.ones(self.dims)
         zeroes = [(18, 6), (5, 11), (11, 5), (23, 2), (13, 19), (19, 21), (19, 24), (17, 5)]
-        for o, d in zeroes:
-            demand[self.index[o], self.index[d], 0] = 0
+        for orig, dest in zeroes:
+            demand[self.index[orig], self.index[dest], 0] = 0
         self.matrix.matrices = demand
 
         data = [
@@ -115,12 +116,13 @@ class TestODMESingleClassSetUp(TestCase):
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
-     
+
         # Check result:
-        err_msg = "Demand matrix with many 0 entries, has non-zero demand following ODME at one of those entries"
-        for o, d in zeroes:
+        err_msg = ("Demand matrix with many 0 entries, has non-zero demand " +
+            "following ODME at one of those entries")
+        for orig, dest in zeroes:
             np.testing.assert_array_equal(
-                odme.get_demands()[0][self.index[o], self.index[d], 0],
+                odme.get_demands()[0][self.index[orig], self.index[dest], 0],
                 0,
                 err_msg=err_msg,
             )
@@ -157,7 +159,8 @@ class TestODMESingleClassSetUp(TestCase):
         np.testing.assert_allclose(
             init_demand[:, :, np.newaxis],
             odme.get_demands()[0],
-            err_msg="Demand matrix changed when given many links with observed volume equal to initial assigned volumes"
+            err_msg=("Demand matrix changed when given many links with observed " +
+                "volume equal to initial assigned volumes")
         )
 
     # 2) Input Validity
@@ -240,7 +243,7 @@ class TestODMESingleClassSetUp(TestCase):
     # Simple Test Cases (Exact Results Expected For Spiess):
     def test_basic_3_1(self) -> None:
         """
-        Test for single count volume observation which is double the currently assigned flow when 
+        Test for single count volume observation which is double the currently assigned flow when
         setting only 2 OD pairs to be non-negative such that all flow enters this link.
         NOTE - we are using small flows with little congestion.
 
@@ -284,7 +287,7 @@ class TestODMESingleClassSetUp(TestCase):
 
     def test_basic_3_2(self) -> None:
         """
-        Test for two count volume observations with competing priorities for links (ie differing 
+        Test for two count volume observations with competing priorities for links (ie differing
         observed volumes). Only has 1 non-zero OD pair which influences both links.
 
         Links are 5 & 35, and OD pair is 13-1 (see left side of graph in QGIS)
