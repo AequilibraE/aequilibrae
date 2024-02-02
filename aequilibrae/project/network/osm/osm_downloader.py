@@ -13,13 +13,17 @@ For the original work, please see https://github.com/gboeing/osmnx
 import logging
 import time
 import re
+from typing import List
+
 import requests
-from .osm_utils.osm_params import http_headers, memory
+from shapely import Polygon
+
+from .osm_params import http_headers, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
+from aequilibrae.utils import WorkerThread
 import gc
 import importlib.util as iutil
-from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -35,7 +39,7 @@ class OSMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes, logger: logging.Logger = None):
+    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
@@ -63,7 +67,7 @@ class OSMDownloader(WorkerThread):
             self.logger.debug(msg)
             self.__emit_all(["Value", counter])
             self.__emit_all(["text", msg])
-            west, south, east, north = poly
+            west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
                 south=south,
