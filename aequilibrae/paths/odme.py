@@ -432,26 +432,6 @@ class ODME(object):
         """
         return self.demands
 
-    def get_iteration_factors(self) -> pd.DataFrame:
-        """
-        Returns a dataframe on statistics of factors for each iteration.
-        """
-        return self.results.get_link_statistics()
-
-    def get_cumulative_factors(self) -> pd.DataFrame:
-        """
-        Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
-        """
-        return self.results.get_cumulative_factors()
-
-    def get_all_statistics(self) -> pd.DataFrame:
-        """
-        Returns dataframe of all assignment values across iterations,
-        along with other statistical information (see self.FACTOR_COLS) 
-        per iteration, per count volume.
-        """
-        return pd.concat(self.results.iteration_stats, ignore_index=True)
-
     # ODME Execution:
     def execute(self, verbose=False, print_rate=1) -> None:
         """ 
@@ -481,7 +461,7 @@ class ODME(object):
                 inner += 1
                 self.__execute_inner_iter()
                 self.results.log_iter(ODMEResults.INNER)
-            
+
             if verbose and outer % print_rate == 0:
                 print(f"Outer iteration {outer} is complete.")
 
