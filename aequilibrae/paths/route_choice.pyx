@@ -95,6 +95,7 @@ cdef class RouteChoiceSet:
         self.num_nodes = graph.compact_num_nodes
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
+        self.a_star = True
 
     def __dealloc__(self):
         """
@@ -104,7 +105,7 @@ cdef class RouteChoiceSet:
         pass
 
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0):
+    def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0, a_star: bool = True):
         """
         Compute the a route set for a single OD pair.
 
@@ -124,14 +125,14 @@ cdef class RouteChoiceSet:
             **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
                                                          Represents paths from ``origin`` to ``destination``.
         """
-        return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed)[(origin, destination)]
+        return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed, a_star=a_star)[(origin, destination)]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
+    def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1, a_star: bool = True):
         """
         Compute the a route set for a list of OD pairs.
 
@@ -160,6 +161,10 @@ cdef class RouteChoiceSet:
             long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
             long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (cores, self.b_nodes_view.shape[0])).copy()
 
+            # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
+            # interface.
+            long long [:, :] _reached_first_matrix
+
             vector[RouteSet_t *] *results = new vector[RouteSet_t *](len(ods))
             long long origin_index, dest_index, i
 
@@ -181,6 +186,13 @@ cdef class RouteChoiceSet:
                 raise ValueError(f"Origin {o} is not present within the compact graph")
             if self.nodes_to_indices_view[d] == -1:
                 raise ValueError(f"Destination {d} is not present within the compact graph")
+
+        self.a_star = a_star
+
+        if self.a_star:
+            _reached_first_matrix = np.zeros((cores, 1), dtype=np.int64)  # Dummy array to allow slicing
+        else:
+            _reached_first_matrix = np.zeros((cores, self.num_nodes), dtype=np.int64)
 
         with nogil, parallel(num_threads=c_cores):
             for i in prange(c_ods.size()):
@@ -207,6 +219,7 @@ cdef class RouteChoiceSet:
                     predecessors_matrix[threadid()],
                     conn_matrix[threadid()],
                     b_nodes_matrix[threadid()],
+                    _reached_first_matrix[threadid()],
                     c_seed,
                 )
 
@@ -240,23 +253,37 @@ cdef class RouteChoiceSet:
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
-        long long [:] thread_b_nodes
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first
     ) noexcept nogil:
         """Small wrapper around path finding, thread locals should be passes as arguments."""
-        path_finding_a_star(
-            origin_index,
-            dest_index,
-            thread_cost,
-            thread_b_nodes,
-            self.graph_fs_view,
-            self.nodes_to_indices_view,
-            self.lat_view,
-            self.lon_view,
-            thread_predecessors,
-            self.ids_graph_view,
-            thread_conn,
-            EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
-        )
+        if self.a_star:
+            path_finding_a_star(
+                origin_index,
+                dest_index,
+                thread_cost,
+                thread_b_nodes,
+                self.graph_fs_view,
+                self.nodes_to_indices_view,
+                self.lat_view,
+                self.lon_view,
+                thread_predecessors,
+                self.ids_graph_view,
+                thread_conn,
+                EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
+            )
+        else:
+            path_finding(
+                origin_index,
+                dest_index,
+                thread_cost,
+                thread_b_nodes,
+                self.graph_fs_view,
+                thread_predecessors,
+                self.ids_graph_view,
+                thread_conn,
+                _thread_reached_first
+            )
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -272,6 +299,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_predecessors,
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
         unsigned int seed
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
@@ -311,7 +339,7 @@ cdef class RouteChoiceSet:
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes)
+                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)

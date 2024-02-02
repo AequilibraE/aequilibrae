@@ -117,6 +117,7 @@ cdef class RouteChoiceSet:
         long long num_nodes
         long long zones
         bint block_flows_through_centroids
+        bint a_star
 
     cdef void path_find(
         RouteChoiceSet self,
@@ -125,7 +126,8 @@ cdef class RouteChoiceSet:
         double [:] scratch_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
-        long long [:] thread_b_nodes
+        long long [:] thread_b_nodes,
+        long long [:] thread_reached_first
     ) noexcept nogil
 
     cdef RouteSet_t *generate_route_set(
@@ -138,5 +140,6 @@ cdef class RouteChoiceSet:
         long long [:] thread_predecessors,
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
         unsigned int seed
     ) noexcept nogil
