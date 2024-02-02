@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.paths import TrafficAssignment, TrafficClass
-from aequilibrae.paths.odme import ScalingFactors, ODMEResults
+from aequilibrae.paths.odme_ import ScalingFactors, ODMEResults
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
