@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from aequilibrae.paths import TrafficAssignment, TrafficClass
-from aequilibrae.paths.odme_submodule import ScalingFactors, ODMEResults
+from aequilibrae.paths.odme import ScalingFactors, ODMEResults
 
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
@@ -370,11 +370,10 @@ class ODME(object):
         record.procedure = "Origin-Destination Matrix Estimation"
         # Note that below just involves doing str() to the particular results file.
         # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
-        # record.procedure_report = Create json and save to this file
-        record.procedure_report = json.dumps({
-            "iterations": data.to_dict(),
-            "by_link": by_link.to_dict()
-        })
+        # record.procedure_report = json.dumps({
+        #     "iterations": data.to_dict(),
+        #     "by_link": by_link.to_dict()
+        # })
         record.save()
 
     def __save_as_omx(self, file_path: str) -> None:
