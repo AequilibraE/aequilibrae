@@ -333,7 +333,33 @@ class TestODMESingleClass(TestCase):
         """
         Checks that we can save matrices to project appropriately.
         """
-        pass
+        # Create zero matrix to check we save this one
+        self.matrix.matrices = np.zeros(self.dims)
+
+        # Placeholder count volumes:
+        counts = pd.DataFrame(
+            data=[["car", 1, 1, 0]],
+            columns=ODME.COUNT_VOLUME_COLS
+        )
+
+        # Create ODME object then save to appropriate location
+        odme = ODME(self.assignment, counts)
+        suffix = "omx"
+        fname = f"test.{suffix}"
+        name = f"test_{suffix}"
+        odme.save_to_project(name, fname, project=self.project)
+
+        matrix = self.project.matrices.get_matrix(name)
+        matrix.computational_view()
+
+        # Check saved matrix is the same as the initial matrix:
+        np.testing.assert_allclose(
+                np.zeros(self.dims),
+                matrix.matrix_view[:, :, np.newaxis], # Need new axis as this is single class
+                err_msg="Saved 0 demand matrix but did not get 0 demand matrix when extracted!",
+        )
+
+
 
 class TestODMEMultiClass(TestCase):
     """
