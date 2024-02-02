@@ -71,8 +71,12 @@ class AssignmentBase(ABC):
         if log_specification:
             self.log_specification()
 
-        self.__prepare_execute()
+        self._prepare_execute()
         self.assignment.execute()
+
+    @abstractmethod
+    def _prepare_execute(self):
+        pass
 
     @abstractmethod
     def log_specification(self):
@@ -504,7 +508,7 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
 
-    def __prepare_execute(self) -> None:
+    def _prepare_execute(self) -> None:
         """
         Reset's arrays used relating to congested times in assignment algorithm.
 
@@ -1000,6 +1004,6 @@ class TransitAssignment(AssignmentBase):
         self._check_field(frequency_field)
         self._config["Frequency field"] = frequency_field
 
-    def __prepare_execute(self) -> None:
+    def _prepare_execute(self) -> None:
         """ Does nothing, included for base class compatibility """
         pass
