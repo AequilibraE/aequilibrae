@@ -184,8 +184,7 @@ class AssignmentResults(AssignmentResultsBase):
             )
 
             sl_idx = {}
-            for i, val in enumerate(self._selected_links.items()):
-                name, arr = val
+            for i, (name, arr) in enumerate(self._selected_links.items()):
                 sl_idx[name] = i
                 # Filling select_links array with linksets. Note the default value is -1, which is used as a placeholder
                 # It also denotes when the given row has no more selected links, since Cython cannot handle
