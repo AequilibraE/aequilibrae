@@ -12,11 +12,15 @@ import pandas as pd
 class ODMEResults(object):
     """ Results and statistics of an ODME procedure """
     # Columns for various dataframes:
+
+    # THIS ONE GETS WRITTEN TO THE procedure_report
     DATA_COLS = ["Outer Loop #", "Inner Loop #", "Total Iteration #", "Total Run Time (s)",
-        "Loop Time (s)", "Convergence", "Inner Convergence", "class", "link_id", "direction",
-        "obs_volume", "assign_volume", "Assigned - Observed", "Flow Objective", "Reg Objective"]
-    FACTOR_COLS = ['class', 'Outer Loop #', 'Inner Loop #', 'Total Inner Iteration #',
-        'mean', 'median', 'std_deviation', 'variance', 'sum', 'min', 'max']
+        "Loop Time (s)", "Convergence", "Inner Convergence", "class", "obs_volume", "assign_volume"
+        'mean_factor', 'median_factor', 'std_deviation_factor', 'variance_factor', 'min_factor', 'max_factor']
+        
+    # This only for debugging
+    LINK_COLS = ["Outer Loop #", "Inner Loop #", "link_id", "direction", "class",
+                 "obs_volume", "assign_volume", "Assigned - Observed", "Flow Objective", "Reg Objective"]
 
     # For logging different iterations:
     INNER, OUTER, FINAL_LOG = 0, 1, 2
