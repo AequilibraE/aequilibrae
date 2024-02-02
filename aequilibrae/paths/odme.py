@@ -10,6 +10,7 @@ Implementation of ODME Infrastructure:
 #       Any extra clean up needs to be done
 #       Check the matrix replacement in __perform_assignment
 
+import json
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
@@ -370,6 +371,10 @@ class ODME(object):
         # Note that below just involves doing str() to the particular results file.
         # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
         # record.procedure_report = Create json and save to this file
+        record.procedure_report = json.dumps({
+            "iterations": data.to_dict(),
+            "by_link": by_link.to_dict()
+        })
         record.save()
 
     def __save_as_omx(self, file_path: str) -> None:
