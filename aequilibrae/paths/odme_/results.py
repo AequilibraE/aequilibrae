@@ -79,7 +79,7 @@ class ODMEResults(object):
         Returns dataframe of all statistics relevant to each iteration.
         See self.ITERATION_COLS.
         """
-        if len(self.iteration_stats) == 0:
+        if len(self.iteration_stats) != 0:
             return pd.concat(self.iteration_stats, ignore_index=True)
         else:
             return pd.DataFrame(columns=self.ITERATION_COLS)
@@ -89,7 +89,7 @@ class ODMEResults(object):
         Returns dataframe of all statistics relevant to each link.
         See self.LINK_COLS.
         """
-        if len(self.link_stats) == 0:
+        if len(self.link_stats) != 0:
             return pd.concat(self.link_stats, ignore_index=True)
         else:
             return pd.DataFrame(columns=self.LINK_COLS)
