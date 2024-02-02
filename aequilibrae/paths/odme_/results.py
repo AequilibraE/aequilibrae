@@ -78,14 +78,20 @@ class ODMEResults(object):
         Returns dataframe of all statistics relevant to each iteration.
         See self.ITERATION_COLS.
         """
-        return pd.concat(self.iteration_stats, ignore_index=True)
+        if len(self.iteration_stats):
+            return pd.concat(self.iteration_stats, ignore_index=True)
+        else:
+            return pd.DataFrame(columns=self.ITERATION_COLS)
 
     def get_link_statistics(self) -> pd.DataFrame:
         """
         Returns dataframe of all statistics relevant to each link.
         See self.LINK_COLS.
         """
-        return pd.concat(self.link_stats, ignore_index=True)
+        if len(self.link_stats):
+            return pd.concat(self.link_stats, ignore_index=True)
+        else:
+            return pd.DataFrame(columns=self.LINK_COLS)
 
     def log_iter(self, iter_type: int) -> None:
         """
