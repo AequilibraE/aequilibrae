@@ -421,6 +421,7 @@ class TestODMEMultiClass(TestCase):
         self.user_classes = self.assignment.classes
         self.class_ids = [user_class._id for user_class in self.user_classes]
         self.matrices = [user_class.matrix for user_class in self.user_classes]
+        self.matrix_view_names = [matrix.view_names[0] for matrix in self.matrices]
         self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
         self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
         self.class_to_matrix_idx = [
@@ -530,7 +531,7 @@ class TestODMEMultiClass(TestCase):
             self.assertAlmostEqual(np.sum(demand), od_13_1,
                 msg="Unexpected OD pair has non-zero demand")
 
-        for flow, name in zip(flows, self.class_ids):
+        for flow, name in zip(flows, self.matrix_view_names):
             flow_5 = assign_df.loc[assign_df["link_id"] == 5, f"{name}_ab"].values[0]
             flow_35 = assign_df.loc[assign_df["link_id"] == 35, f"{name}_ab"].values[0]
 
