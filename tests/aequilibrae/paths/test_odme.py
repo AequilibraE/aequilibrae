@@ -359,8 +359,6 @@ class TestODMESingleClass(TestCase):
                 err_msg="Saved 0 demand matrix but did not get 0 demand matrix when extracted!",
         )
 
-
-
 class TestODMEMultiClass(TestCase):
     """
     Basic unit tests for ODME multiple class execution
