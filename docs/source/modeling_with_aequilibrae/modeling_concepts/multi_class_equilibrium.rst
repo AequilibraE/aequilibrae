@@ -149,7 +149,7 @@ Other opportunities for parallelization, such as the computation of costs and
 its derivatives (required during the line-search optimization step), as well as
 all linear combination operations for vectors and matrices have been achieved
 through the use of OpenMP in pure Cython code. These implementations can be
-cound on a file called *parallel_numpy.pyx* if you are curious to look at.
+found on a file called *parallel_numpy.pyx* if you are curious to look at.
 
 Much of the gains of going back to Cython to parallelize these functions came
 from making in-place computation using previously existing arrays, as the
