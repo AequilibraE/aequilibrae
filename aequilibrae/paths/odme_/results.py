@@ -36,12 +36,12 @@ class ODMEResults(object):
         self.odme = odme
 
         # Statistics depending on each iterations
-        self.iteration_stats = pd.DataFrame(columns=self.ITERATION_COLS)
+        self.iteration_stats = []
         # Information on factors to be logged with implicit ordering by ODME classes
         self.current_factors = None
 
         # Statistics depending on each link
-        self.link_stats = pd.DataFrame(columns=self.LINK_COLS)
+        self.link_stats = []
 
         # Iteration number data:
         self.total_iter, self.outer, self.inner = 0, 0, 0
@@ -164,8 +164,8 @@ class ODMEResults(object):
         Appends the newest set of link statistics.
         """
         data = self.odme.count_volumes.copy(deep=True)
-        data[ "Outer Loop #"] = [self.outer for _ in len(data)]
-        data["Inner Loop #"] = [self.inner for _ in len(data)]
+        data[ "Outer Loop #"] = [self.outer for _ in range(len(data))]
+        data["Inner Loop #"] = [self.inner for _ in range(len(data))]
         data["Assigned - Observed"] = (
             self.odme.count_volumes['assign_volume'].to_numpy() -
             self.odme.count_volumes["obs_volume"].to_numpy()
