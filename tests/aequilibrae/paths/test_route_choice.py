@@ -115,3 +115,26 @@ class TestRouteChoice(TestCase):
             with self.subTest(a=a, b=b, max_routes=max_routes, max_depth=max_depth):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
+def generate_line_strings(project, graph, results):
+    """Debug method"""
+    import geopandas as gpd
+    import shapely
+
+    links = project.network.links.data.set_index("link_id")
+    df = []
+    for od, route_set in results.items():
+        for route in route_set:
+            df.append(
+                (
+                    *od,
+                    shapely.MultiLineString(
+                        links.loc[
+                            graph.graph[graph.graph.__compressed_id__.isin(route)].link_id
+                        ].geometry.to_list()
+                    ),
+                )
+            )
+
+    df = gpd.GeoDataFrame(df, columns=["origin", "destination", "geometry"])
+    df.set_geometry("geometry")
+    return df
