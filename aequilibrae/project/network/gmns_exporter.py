@@ -12,7 +12,7 @@ class GMNSExporter(WorkerThread):
         self.p = Parameters()
         self.links_df = net.links.data
         self.nodes_df = net.nodes.data
-        self.source = net.source
+        self.source = net.project.path_to_file
         self.output_path = path
 
         self.gmns_parameters = self.p.parameters["network"]["gmns"]

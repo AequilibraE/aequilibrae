@@ -17,9 +17,15 @@ class TestNetwork(TestCase):
         self.project = Project()
         self.project.new(proj_path)
 
-        link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/link.csv"
-        node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/node.csv"
-        use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/use_group.csv"
+        link_file = (
+            "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/link.csv"
+        )
+        node_file = (
+            "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/node.csv"
+        )
+        use_group_file = (
+            "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/use_group.csv"
+        )
 
         new_link_fields = {
             "bridge": {"description": "bridge flag", "type": "text", "required": False},
