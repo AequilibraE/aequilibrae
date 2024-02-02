@@ -15,7 +15,7 @@ from ...data import siouxfalls_project
 
 # NOTE - we cannot test using bfw/cfw until Issue #493 is resolved.
 
-class TestODMESingleClassSetUp(TestCase):
+class TestODMESingleClass(TestCase):
     """
     Basic unit tests for ODME single class execution
     """
@@ -328,7 +328,14 @@ class TestODMESingleClassSetUp(TestCase):
         self.assertAlmostEqual(np.sum(new_demand), od_13_1,
             msg="Unexpected OD pair has non-zero demand")
 
-class TestODMEMultiClassSetUp(TestCase):
+    # Saving Test
+    def test_save(self) -> None:
+        """
+        Checks that we can save matrices to project appropriately.
+        """
+        pass
+
+class TestODMEMultiClass(TestCase):
     """
     Basic unit tests for ODME multiple class execution
     """
