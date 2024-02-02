@@ -249,10 +249,7 @@ class AequilibraeMatrix(object):
                         if mat_name in object.__dict__:
                             raise ValueError(mat_name + " is a reserved name")
                         if len(mat_name) > CORE_NAME_MAX_LENGTH:
-                            raise ValueError(
-                                "Matrix names need to be be shorter "
-                                "than {}: {}".format(CORE_NAME_MAX_LENGTH, mat_name)
-                            )
+                            raise ValueError(f"Matrix names need to be shorter than {CORE_NAME_MAX_LENGTH}: {mat_name}")
                     else:
                         raise ValueError("Matrix core names need to be strings: " + str(mat_name))
             else:
@@ -607,9 +604,7 @@ class AequilibraeMatrix(object):
             np.memmap(self.file_path, dtype="uint8", offset=17, mode="r+", shape=1)[0] = data_size
 
             # matrix name
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0] = (
-                self.name
-            )
+            np.memmap(self.file_path, dtype=f"S{MATRIX_NAME_MAX_LENGTH}", offset=18, mode="r+", shape=1)[0] = self.name
 
             # matrix description
             offset = 18 + MATRIX_NAME_MAX_LENGTH
@@ -1132,9 +1127,7 @@ class AequilibraeMatrix(object):
             if len(str(matrix_name)) > MATRIX_NAME_MAX_LENGTH:
                 matrix_name = str(matrix_name)[0:MATRIX_NAME_MAX_LENGTH]
 
-            np.memmap(self.file_path, dtype="S" + str(MATRIX_NAME_MAX_LENGTH), offset=18, mode="r+", shape=1)[0] = (
-                matrix_name
-            )
+            np.memmap(self.file_path, dtype=f"S{MATRIX_NAME_MAX_LENGTH}", offset=18, shape=1)[0] = matrix_name
 
     def setDescription(self, matrix_description: str):
         """

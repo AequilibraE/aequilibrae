@@ -36,8 +36,6 @@ class allOrNothing(WorkerThread):
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
-        self.report = []
-        self.cumulative = 0
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -55,6 +53,9 @@ class allOrNothing(WorkerThread):
         self.execute()
 
     def execute(self):
+        self.report = []
+        self.cumulative = 0
+
         if pyqt:
             self.assignment.emit(["zones finalized", 0])
 
