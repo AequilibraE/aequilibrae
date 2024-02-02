@@ -377,7 +377,7 @@ class LinearApproximation(WorkerThread):
                             sl_step_dir_ll["sdr"],
                             np.sum(aux_res.temp_sl_link_loading, axis=0)[idx, :, :],
                             sl_step_dir_ll["sdr"],
-                            sl_step_dir_ll["temp_prev_sdr"],
+                            sl_step_dir_ll["prev_sdr"],
                             self.betas,
                             self.cores,
                         )
