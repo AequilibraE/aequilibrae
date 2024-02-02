@@ -22,10 +22,10 @@ def test_link_geo_trimmer():
     }
 
     with tempfile.TemporaryDirectory() as output_dir:
-        output_dir = Path(output_dir)
+        project_dir = str(Path(output_dir) / "project")
         project = Project()
-        project.new(output_dir / "project")
-        o = OVMBuilder(link_gdf, gpd.GeoDataFrame(), project_path=output_dir / "project", project=project)
+        project.new(project_dir)
+        o = OVMBuilder(link_gdf, gpd.GeoDataFrame(), project_path=project_dir, project=project)
 
         # Iterate over the correct range
         new_geom["geometry"] = [o.trim_geometry(node_lu, row) for e, row in link_gdf.iterrows()]
@@ -39,6 +39,8 @@ def test_link_geo_trimmer():
         for i in range(0, len(link_gdf)):
             if i > 0:
                 assert new_geom["geometry"][i] == shapely.LineString([node1, (148.7164585, -20.2730418), node2])
+
+        project.close()
 
 def test_link_lanes():
     """
