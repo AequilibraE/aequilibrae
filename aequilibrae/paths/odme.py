@@ -10,7 +10,6 @@ Implementation of ODME Infrastructure:
 #       Any extra clean up needs to be done
 #       Check the matrix replacement in __perform_assignment
 
-import json
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
@@ -19,6 +18,7 @@ from pathlib import Path
 import importlib.util as iutil
 import numpy as np
 import pandas as pd
+import json
 
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.odme_ import ScalingFactors, ODMEResults
@@ -70,7 +70,7 @@ class ODME(object):
         self.classes = assignment.classes
         self.__duplicate_matrices()
 
-        self.class_names = [user_class.__id__ for user_class in self.classes]
+        self.class_names = [user_class._id for user_class in self.classes]
         self.names_to_indices = {name: index for index, name in enumerate(self.class_names)}
 
         # The following are implicitly ordered by the list of Traffic Classes:
@@ -225,7 +225,7 @@ class ODME(object):
             mat = usr_cls.matrix.copy(cores = usr_cls.matrix.view_names, memory_only=True)
             mat.computational_view()
 
-            new_cls = TrafficClass(usr_cls.__id__, usr_cls.graph, mat)
+            new_cls = TrafficClass(usr_cls._id, usr_cls.graph, mat)
             new_cls.set_pce(usr_cls.pce)
             if usr_cls.fixed_cost_field:
                 new_cls.set_fixed_cost(usr_cls.fixed_cost_field, usr_cls.fc_multiplier)
@@ -267,7 +267,7 @@ class ODME(object):
                 {
                     self.get_sl_key(row):
                     [(row['link_id'], row['direction'])]
-                    for _, row in c_v[c_v['class'] == user_class.__id__
+                    for _, row in c_v[c_v['class'] == user_class._id
                     ].iterrows()
                 }
             )
@@ -370,10 +370,10 @@ class ODME(object):
         record.procedure = "Origin-Destination Matrix Estimation"
         # Note that below just involves doing str() to the particular results file.
         # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
-        # record.procedure_report = json.dumps({
-        #     "iterations": data.to_dict(),
-        #     "by_link": by_link.to_dict()
-        # })
+        record.procedure_report = json.dumps({
+            "iterations": self.results.get_iteration_statistics().to_dict(),
+            "by_link": self.results.get_link_statistics().to_dict()
+        })
         record.save()
 
     def __save_as_omx(self, file_path: str) -> None:
@@ -436,7 +436,7 @@ class ODME(object):
         """
         Returns a dataframe on statistics of factors for each iteration.
         """
-        return self.results.factor_stats
+        return self.results.get_link_statistics()
 
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
@@ -450,7 +450,7 @@ class ODME(object):
         along with other statistical information (see self.FACTOR_COLS) 
         per iteration, per count volume.
         """
-        return pd.concat(self.results.statistics, ignore_index=True)
+        return pd.concat(self.results.iteration_stats, ignore_index=True)
 
     # ODME Execution:
     def execute(self, verbose=False, print_rate=1) -> None:

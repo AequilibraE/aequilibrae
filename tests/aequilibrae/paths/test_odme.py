@@ -419,7 +419,7 @@ class TestODMEMultiClass(TestCase):
         self.moto_index = self.moto_graph.nodes_to_indices
 
         self.user_classes = self.assignment.classes
-        self.class_ids = [user_class.__id__ for user_class in self.user_classes]
+        self.class_ids = [user_class._id for user_class in self.user_classes]
         self.matrices = [user_class.matrix for user_class in self.user_classes]
         self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
         self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
