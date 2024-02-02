@@ -21,8 +21,9 @@ class ODMEResults(object):
         'variance_factor', 'min_factor', 'max_factor']
 
     # This only for debugging
-    LINK_COLS = ["class", "link_id", "direction", "Outer Loop #", "Inner Loop #",
-                 "obs_volume", "assign_volume", "Assigned - Observed"]
+    LINK_COLS = ["class", "link_id", "direction",
+        "Outer Loop #", "Inner Loop #", "Total Iteration #",
+        "obs_volume", "assign_volume", "Assigned - Observed"]
 
     # For logging different iterations:
     INNER, OUTER, FINAL_LOG = 0, 1, 2
@@ -78,7 +79,7 @@ class ODMEResults(object):
         Returns dataframe of all statistics relevant to each iteration.
         See self.ITERATION_COLS.
         """
-        if len(self.iteration_stats):
+        if len(self.iteration_stats) == 0:
             return pd.concat(self.iteration_stats, ignore_index=True)
         else:
             return pd.DataFrame(columns=self.ITERATION_COLS)
@@ -88,7 +89,7 @@ class ODMEResults(object):
         Returns dataframe of all statistics relevant to each link.
         See self.LINK_COLS.
         """
-        if len(self.link_stats):
+        if len(self.link_stats) == 0:
             return pd.concat(self.link_stats, ignore_index=True)
         else:
             return pd.DataFrame(columns=self.LINK_COLS)
@@ -172,6 +173,7 @@ class ODMEResults(object):
         data = self.odme.count_volumes.copy(deep=True)
         data[ "Outer Loop #"] = [self.outer for _ in range(len(data))]
         data["Inner Loop #"] = [self.inner for _ in range(len(data))]
+        data["Total Iteration #"] = [self.total_iter for _ in range(len(data))]
         data["Assigned - Observed"] = (
             self.odme.count_volumes['assign_volume'].to_numpy() -
             self.odme.count_volumes["obs_volume"].to_numpy()
