@@ -3,11 +3,13 @@ import importlib.util as iutil
 import string
 from math import floor
 from pathlib import Path
+from typing import List
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import shapely.wkb
+from shapely import MultiLineString
 from shapely.geometry import Polygon, LineString
 
 from aequilibrae.context import get_active_project
@@ -16,6 +18,7 @@ from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
+from aequilibrae.project.project_creation import remove_triggers, add_triggers
 
 pyqt = iutil.find_spec("PyQt5") is not None
 if pyqt:
@@ -94,53 +97,50 @@ class OSMBuilder(WorkerThread):
         self.establish_modes_for_all_links(conn)
         self.process_link_attributes()
 
-        final_links = []
         self.logger.info("Geo-procesing links")
         self.__emit_all(["text", "Adding network links"])
+        geometries = []
         for counter, (idx, link) in enumerate(self.links_df.iterrows()):
             self.__emit_all(["Value", counter])
             if counter % message_step == 0:
                 self.logger.info(f"Creating segments from {counter:,} out of {shape_ :,} OSM link objects")
 
             # How can I link have less than two points?
+            if not isinstance(link["nodes"], list):
+                geometries.append(LineString())
+                self.logger.error(f"OSM link {idx} does not have a list of nodes.")
+                continue
+
             if len(link["nodes"]) < 2:
-                self.logger.error(f"Link {idx} has less than two nodes. {link}")
+                self.logger.error(f"Link {idx} has less than two nodes. {link.nodes}")
+                geometries.append(LineString())
                 continue
 
             # The link is a straight line between two points
             # Or all midpoints are only part of a single link
             node_indices = node_count.loc[link["nodes"], "counter"]
             if len(link["nodes"]) == 2 or node_indices[1:-1].max() == 1:
-                self.__set_geometry(link)
-                final_links.append(link)
-                continue
+                # The link has no intersections
+                geo = self.__build_geometry(link.nodes)
+            else:
+                # The link has intersections
+                intersecs = np.where(node_indices > 1)[0]
+                geos = []
+                for i, j in zip(intersecs[:-1], intersecs[1:]):
+                    geos.append(self.__build_geometry(link.nodes[i : j + 1]))
+                geo = MultiLineString(geos)
 
-            intersecs = np.where(node_indices > 1)[0]
-            for i, j in zip(intersecs[:-1], intersecs[1:]):
-                rec = link.copy(deep=True)
-                rec["nodes"] = link["nodes"][i : j + 1]
-                self.__set_geometry(rec)
-                final_links.append(rec)
+            geometries.append(geo)
 
-        self.links_df = pd.concat(final_links, axis=1).transpose()
-        self.links_df = self.links_df.assign(link_id=np.arange(self.links_df.shape[0]) + 1).drop(columns=["nodes"])
-
-        del final_links
-        gc.collect()
-
-        # Gets ONLY the nodes that are needed
-        self.links_df = gpd.GeoDataFrame(self.links_df, geometry=self.links_df.geometry, crs=4326)
+        # Builds the link Geo dataframe
+        self.links_df.drop(columns=["nodes"], inplace=True)
+        self.links_df = gpd.GeoDataFrame(self.links_df, geometry=geometries, crs=4326)
         self.links_df = self.links_df.clip(self.model_area).explode(index_parts=False)
+        self.links_df = self.links_df[self.links_df.geometry.length > 0]
+
         self.links_df.loc[:, "link_id"] = np.arange(self.links_df.shape[0]) + 1
 
-        clip_nodes = pd.concat(self.__valid_links)
-        clip_nodes = clip_nodes[clip_nodes.link_id.isin(self.links_df.link_id)]
-
         self.node_df.reset_index(inplace=True)
-        self.node_df = self.node_df[self.node_df.osm_id.isin(clip_nodes.nodes)]
-        del clip_nodes
-        gc.collect()
-
         cols = ["node_id", "osm_id", "is_centroid", "modes", "link_types"]
         self.node_df = gpd.GeoDataFrame(self.node_df[cols], geometry=self.node_df.geometry, crs=self.node_df.crs)
 
@@ -152,9 +152,16 @@ class OSMBuilder(WorkerThread):
 
         self.logger.info("Adding nodes to file")
         self.__emit_all(["text", "Adding nodes to file"])
+
+        # Removing the triggers before adding all nodes makes things a LOT faster
+        remove_triggers(conn, self.logger, "network")
+
         self.node_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="nodes", mode="a")
         del self.node_df
         gc.collect()
+
+        # But we need to add them back to add the links
+        add_triggers(conn, self.logger, "network")
 
         # self.links_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="links", mode="a")
 
@@ -174,12 +181,8 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Adding links to file"])
         conn.executemany(insert_qry, links_df)
 
-    def __set_geometry(self, rec: pd.Series) -> LineString:
-        rec.geometry = LineString(self.node_df.loc[rec.nodes, "geometry"])
-        rec.link_id = self.__link_id
-
-        self.__valid_links.append({"link_id": [self.__link_id] * len(rec.nodes), "nodes": rec.nodes})
-        self.__link_id += 1
+    def __build_geometry(self, nodes: List[int]) -> LineString:
+        return LineString(self.node_df.loc[nodes, "geometry"])
 
     def __update_table_structure(self, conn):
         structure = conn.execute("pragma table_info(Links)").fetchall()
@@ -195,14 +198,16 @@ class OSMBuilder(WorkerThread):
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
 
+        self.links_df.highway.fillna("missing", inplace=True)
+        self.links_df.highway = self.links_df.highway.str.lower()
         for i, lt in enumerate(self.links_df.highway.unique()):
-            if str(lt).lower() in self.__all_ltp.link_type.values:
+            if str(lt) in self.__all_ltp.highway.values:
                 continue
             data.append([*self.__define_link_type(str(lt)), str(lt)])
             self.__all_ltp = pd.concat(
                 [self.__all_ltp, pd.DataFrame(data, columns=["link_type_id", "link_type", "highway"])]
             )
-        self.__all_ltp.drop_duplicates(inplace=True)
+            self.__all_ltp.drop_duplicates(inplace=True)
         self.links_df = self.links_df.merge(self.__all_ltp[["link_type", "highway"]], on="highway", how="left")
         self.links_df.drop(columns=["highway"], inplace=True)
 
@@ -287,6 +292,9 @@ class OSMBuilder(WorkerThread):
                     return tp[field_name]["type"]
 
     def process_link_attributes(self):
+        self.links_df = self.links_df.assign(direction=0, link_id=0)
+        self.links_df.loc[self.links_df.oneway == "yes", "direction"] = 1
+        self.links_df.loc[self.links_df.oneway == "backward", "direction"] = -1
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
@@ -317,8 +325,6 @@ class OSMBuilder(WorkerThread):
         cols = list_columns(self.project.conn, "links") + ["nodes"]
         self.links_df = self.links_df[[x for x in cols if x in self.links_df.columns]]
         gc.collect()
-        self.links_df["geometry"] = 0
-        self.links_df["link_id"] = 0
 
     def establish_modes_for_all_links(self, conn):
         p = Parameters()
