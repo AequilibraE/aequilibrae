@@ -43,18 +43,10 @@ class OSMBuilder(WorkerThread):
         self.report = []
         self.__all_ltp = pd.DataFrame([])
         self.__link_id = 1
-        self.__valid_links = {"link_id": [], "nodes": []}
+        self.__valid_links = []
 
-        nodes = (
-            data["nodes"]
-            .assign(
-                is_centroid=0,
-                modes="",
-                link_types="",
-                node_id=np.arange(data["nodes"].shape[0]) + self.node_start,
-            )
-            .reset_index(drop=True)
-        )
+        nids = np.arange(data["nodes"].shape[0]) + self.node_start
+        nodes = data["nodes"].assign(is_centroid=0, modes="", link_types="", node_id=nids).reset_index(drop=True)
         self.node_df = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.lon, nodes.lat), crs=4326)
         del nodes
         del data["nodes"]
@@ -141,7 +133,7 @@ class OSMBuilder(WorkerThread):
         self.links_df = self.links_df.clip(self.model_area).explode(index_parts=False)
         self.links_df.loc[:, "link_id"] = np.arange(self.links_df.shape[0]) + 1
 
-        clip_nodes = pd.DataFrame(self.__valid_links)
+        clip_nodes = pd.concat(self.__valid_links)
         clip_nodes = clip_nodes[clip_nodes.link_id.isin(self.links_df.link_id)]
 
         self.node_df.reset_index(inplace=True)
@@ -186,8 +178,7 @@ class OSMBuilder(WorkerThread):
         rec.geometry = LineString(self.node_df.loc[rec.nodes, "geometry"])
         rec.link_id = self.__link_id
 
-        self.__valid_links["link_id"].extend([self.__link_id] * len(rec.nodes))
-        self.__valid_links["nodes"].extend(rec.nodes)
+        self.__valid_links.append({"link_id": [self.__link_id] * len(rec.nodes), "nodes": rec.nodes})
         self.__link_id += 1
 
     def __update_table_structure(self, conn):
