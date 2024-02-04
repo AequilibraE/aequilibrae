@@ -229,14 +229,14 @@ class Network(WorkerThread):
                     if subarea.intersects(model_area):
                         polygons.append(subarea)
         self.logger.info("Downloading data")
-        self.downloader = OSMDownloader(polygons, modes, logger=self.logger)
+        dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
         if pyqt:
-            self.downloader.downloading.connect(self.signal_handler)
+            dwnloader.downloading.connect(self.signal_handler)
 
-        self.downloader.doWork()
+        dwnloader.doWork()
 
         self.logger.info("Building Network")
-        self.builder = OSMBuilder(self.downloader.json, project=self.project, model_area=model_area)
+        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area)
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)

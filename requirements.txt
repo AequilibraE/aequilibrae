@@ -8,3 +8,4 @@ pandas
 pyproj
 rtree
 openmatrix
+geopandas
