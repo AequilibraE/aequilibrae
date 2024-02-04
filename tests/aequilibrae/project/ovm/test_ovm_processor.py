@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import geopandas as gpd
 import shapely
-from unittest import TestCase
+from aequilibrae import global_logger
 
 from aequilibrae import Project
 from aequilibrae.project.network.ovm_builder import OVMBuilder
@@ -74,10 +74,9 @@ def test_link_lanes():
     ]
 
     lane_ends = [
-        [
-            {
-                "at": [0, 0.67],
-                "value": [{"direction": "backward"}, {"direction": "forward"}, {"direction": "forward"}],
+        [{
+            "at": [0, 0.67],
+            "value": [{"direction": "backward"}, {"direction": "forward"}, {"direction": "forward"}],
             }
         ],
         [{"at": [0.67, 1], "value": [{"direction": "backward"}, {"direction": "forward"}]}],
@@ -124,31 +123,30 @@ def test_link_lanes():
         [{"at": [0.5, 1], "value": [{"direction": "backward"}, {"direction": "forward"}]}],
     ]
 
-    def road(lane):
-        road_info = str(
-            {
-                "class": "secondary",
-                "surface": "paved",
-                "restrictions": {"speedLimits": {"maxSpeed": [70, "km/h"]}},
-                "roadNames": {"common": [{"language": "local", "value": "Shute Harbour Road"}]},
-                "lanes": lane,
-            }
-        )
-        return road_info
+    # def road(lane):
+    #     road_info = str(
+    #         {
+    #             "class": "secondary",
+    #             "surface": "paved",
+    #             "restrictions": {"speedLimits": {"maxSpeed": [70, "km/h"]}},
+    #             "roadNames": {"common": [{"language": "local", "value": "Shute Harbour Road"}]},
+    #             "lanes": lane,
+    #         }
+    #     )
+    #     return road_info
 
     a_node = {"ovm_id": "8f9d0e128cd9709-167FF64A37F1BFFB", "geometry": shapely.Point(148.72460, -20.27472)}
     b_node = {"ovm_id": "8f9d0e128cd98d6-15FFF68E65613FDF", "geometry": shapely.Point(148.72471, -20.27492)}
     node_df = gpd.GeoDataFrame(data=[a_node, b_node])
 
-    def segment(direction, road):
+    def segment(direction):
         segment = {
             "ovm_id": "8b9d0e128cd9fff-163FF6797FC40661",
-            "connectors": ["8f9d0e128cd9709-167FF64A37F1BFFB", "8f9d0e128cd98d6-15FFF68E65613FDF"],
+            "connectors": [["8f9d0e128cd9709-167FF64A37F1BFFB", "8f9d0e128cd98d6-15FFF68E65613FDF"]],
             "direction": direction,
             "link_type": "secondary",
             "name": '[{"value": "Shute Harbour Road"}]',
             "speed": '{"maxSpeed":[70,"km/h"]}',
-            "road": road,
             "geometry": shapely.LineString(
                 [
                     (148.7245987, -20.2747175),
@@ -160,43 +158,57 @@ def test_link_lanes():
             ),
         }
         return segment
+    
+    # def link_gdf(lane_info):
+    #     return gpd.GeoDataFrame(segment(lane_info, road(lane_info)))
+    
+    def set_up_ovmbuilder(lane_info, output_dir, project):
+        print(lane_info)
+        print()
+        print(segment(lane_info))
+        links = gpd.GeoDataFrame(segment(lane_info))
+        print(links)
+        o = OVMBuilder(links, node_df, project_path=output_dir / "project", project=project)
+        o.create_node_ids(node_df)
+        o._worksetup()
+        link_gdf = o.formatting(links, node_df, output_dir)
+        print(link_gdf)
+        return link_gdf
+
 
     with tempfile.TemporaryDirectory() as output_dir:
         output_dir = Path(output_dir)
         project = Project()
         project.new(output_dir / "project")
 
-        link_gdf = gpd.GeoDataFrame(segment(no_info, road(no_info)))
-        o = OVMBuilder(link_gdf, node_df, project_path=output_dir / "project", project=project)
-        o.create_node_ids(node_df)
-        gdf_no_info = o.formatting(link_gdf, node_df, output_dir)
+        gdf_no_info = set_up_ovmbuilder(no_info, output_dir, project)
 
         assert gdf_no_info["direction"][0] == 0
         assert gdf_no_info["lanes_ab"][0] == 1
         assert gdf_no_info["lanes_ba"][0] == 1
 
-        gdf_simple = o.split_connectors(segment(simple, road(simple)))
+        gdf_simple = set_up_ovmbuilder(simple, output_dir, project)
 
         assert len(simple) == 2
         assert gdf_simple["direction"][0] == 0
         assert gdf_simple["lanes_ab"][0] == 1
         assert gdf_simple["lanes_ab"][0] == 1
 
-        gdf_lanes_3 = o.split_connectors(segment(lanes_3, road(lanes_3)))
+        gdf_lanes_3 = set_up_ovmbuilder(lanes_3, output_dir, project)
 
         assert len(lanes_3) == 3
         assert gdf_lanes_3["direction"][0] == 1
         assert gdf_lanes_3["lanes_ab"][0] == 3
         assert gdf_lanes_3["lanes_ba"][0] == None
 
-        gdf_highway = o.split_connectors(segment(highway, road(highway)))
+        gdf_highway = set_up_ovmbuilder(highway, output_dir, project)
 
         assert len(highway) == 8
         assert gdf_highway["direction"][0] == 0
         assert gdf_highway["lanes_ab"][0] == 4
         assert gdf_highway["lanes_ba"][0] == 4
 
-        gdf_lane_ends = o.split_connectors(segment(lane_ends, road(lane_ends)))
+        gdf_lane_ends = set_up_ovmbuilder(lane_ends, output_dir, project)
 
         assert len(lane_ends) == 2
         assert len(lane_ends[0][0]["value"]) == 3
@@ -205,7 +217,7 @@ def test_link_lanes():
         assert gdf_lane_ends["lanes_ab"][0] == 2
         assert gdf_lane_ends["lanes_ba"][0] == 1
 
-        gdf_lane_begins = o.split_connectors(segment(lane_begins, road(lane_begins)))
+        gdf_lane_begins = set_up_ovmbuilder(lane_begins, output_dir, project)
 
         assert len(lane_begins) == 2
         assert len(lane_begins[0][0]["value"]) == 2
@@ -214,7 +226,7 @@ def test_link_lanes():
         assert gdf_lane_begins["lanes_ab"][0] == 2
         assert gdf_lane_begins["lanes_ba"][0] == 1
 
-        gdf_lane_merge_twice = o.split_connectors(segment(lane_merge_twice, road(lane_merge_twice)))
+        gdf_lane_merge_twice = set_up_ovmbuilder(lane_merge_twice, output_dir, project)
 
         assert len(lane_merge_twice) == 3
         assert len(lane_merge_twice[0][0]["value"]) == 4
@@ -224,7 +236,7 @@ def test_link_lanes():
         assert gdf_lane_merge_twice["lanes_ab"][0] == 2
         assert gdf_lane_merge_twice["lanes_ba"][0] == 1
 
-        gdf_equal_dis = o.split_connectors(segment(equal_dis, road(equal_dis)))
+        gdf_equal_dis = set_up_ovmbuilder(equal_dis, output_dir, project)
 
         assert len(equal_dis) == 2
         assert len(equal_dis[0][0]["value"]) == 3

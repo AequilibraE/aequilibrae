@@ -133,7 +133,6 @@ class OVMDownloader(WorkerThread):
                 CAST(road AS JSON) ->>'class' AS link_type,
                 CAST(road AS JSON) ->>'roadNames' ->>'common' AS name,
                 CAST(road AS JSON) ->>'restrictions' ->> 'speedLimits' AS speed,
-                road,
                 geometry
             FROM read_parquet('{data_source}/type=segment/*', union_by_name=True)
             WHERE bbox.minx > '{bbox[0]}'

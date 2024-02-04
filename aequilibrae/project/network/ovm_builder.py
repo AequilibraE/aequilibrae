@@ -74,7 +74,7 @@ class OVMBuilder(WorkerThread):
     def doWork(self, output_dir: Path):
         self.conn = connect_spatialite(self.pth)
         self.curr = self.conn.cursor()
-        self.__worksetup()
+        self._worksetup()
         self.formatting(self.links_gdf, self.nodes_gdf, output_dir)
         self.__emit_all(["finished_threaded_procedure", 0])
 
@@ -187,7 +187,7 @@ class OVMBuilder(WorkerThread):
         del links_gdf
         self.curr.close()
 
-    def __worksetup(self):
+    def _worksetup(self):
         self.__link_types = self.project.network.link_types
         lts = self.__link_types.all_types()
         for lt_id, lt in lts.items():

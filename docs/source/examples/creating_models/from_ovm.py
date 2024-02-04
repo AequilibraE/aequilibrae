@@ -45,14 +45,14 @@ project.new(fldr)
 # We recommend downloading these cloud-native Parquet files to drive and replacing the data_source file to match
 dir = str(Path('../../../../').resolve())
 data_source = Path(dir) / 'tests' / 'data' / 'overture' / 'theme=transportation'
-output_dir = Path(fldr) / "raw_parquet"
+output_dir = Path(fldr) / "theme=transportation"
 
 # For the sake of this example, we will choose the small town of Airlie Beach.
 # The "bbox" parameter specifies the bounding box encompassing the desired geographical location. In the given example, this refers to the bounding box that encompasses Airlie Beach.
 bbox = [148.7077, -20.2780, 148.7324, -20.2621 ]
  
 # We can create from a bounding box or a named place.
-project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=output_dir)
+project.network.create_from_ovm(west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3], data_source=data_source, output_dir=data_source)
 
 # %%
 # We grab all the links data as a Pandas DataFrame so we can process it easier
@@ -87,3 +87,5 @@ map_osm
 
 # %%
 project.close()
+
+# %%
