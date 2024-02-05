@@ -25,7 +25,8 @@ create TABLE if not exists matrices (name          TEXT     NOT NULL PRIMARY KEY
                                      procedure_id  TEXT,
                                      timestamp     DATETIME DEFAULT current_timestamp,
                                      description   TEXT,
-                                     report        JSON);
+                                     report        TEXT
+);
 
 
 --#

@@ -1,3 +1,4 @@
+import json
 from os import unlink
 from os.path import isfile, join
 
@@ -47,6 +48,13 @@ class MatrixRecord(SafeClass):
         """Updates this matrix record with the matrix core count in disk"""
         self.__dict__["cores"] = self.__get_cores()
 
+
+    @property
+    def report(self):
+        """Retrieves the underlying report and decodes from JSON"""
+        return json.loads(self.__dict__['report'])
+
+
     def get_data(self) -> AequilibraeMatrix:
         """Returns the actual matrix for further computation
 
@@ -66,8 +74,12 @@ class MatrixRecord(SafeClass):
                     raise ValueError("Another matrix with this name already exists")
                 elif instance == "file_name":
                     raise ValueError("There is another matrix record for this file")
+        
+        if instance == "report":
+            self.__dict__[instance] = json.dumps(value)
+        else: 
+            self.__dict__[instance] = value
 
-        self.__dict__[instance] = value
         if instance in ["file_name", "cores"]:
             self.__dict__["cores"] = self.__get_cores()
 
@@ -78,3 +90,4 @@ class MatrixRecord(SafeClass):
         mat.close()
         del mat
         return cores
+
