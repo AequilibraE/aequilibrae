@@ -368,7 +368,8 @@ class ODME(object):
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
             self.flow_obj = self.alpha * np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            self.reg_obj = self.beta * np.sum(np.abs(self.init_demand_matrices[0] - self.demand_matrices[0])**p_2) / p_2
+            self.reg_obj = self.beta * np.sum(
+                np.abs(self.original_demands[0] - self.demands[0])**p_2) / p_2
             self.__set_convergence_values(self.flow_obj + self.reg_obj)
 
         def __obj_func(self) -> None:
@@ -418,7 +419,7 @@ class ODME(object):
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
-        record.procedure_report = json.dumps({
+        record.report = json.dumps({
             "iterations": self.results.get_iteration_statistics().to_dict(),
             "by_link": self.results.get_link_statistics().to_dict()
         })

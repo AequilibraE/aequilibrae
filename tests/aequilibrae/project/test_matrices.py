@@ -46,6 +46,17 @@ class TestMatrices(TestCase):
         rec.file_name = "SiouxFalls.omx"
         self.assertEqual(rec.cores, 1, "Setting a file that exists did not correct the number of cores")
 
+    def test_report(self):
+        rec = self.matrices.get_record("omx2")
+        with self.assertRaises(ValueError):
+            rec.name = "omx"
+
+        with self.assertRaises(ValueError):
+            rec.file_name = "sfalls_skims.omx"
+
+        rec.file_name = "SiouxFalls.omx"
+        self.assertEqual(rec.cores, 1, "Setting a file that exists did not correct the number of cores")
+
     def test_clear_database(self):
         self.__mat_count(3, "The test data started wrong")
 
