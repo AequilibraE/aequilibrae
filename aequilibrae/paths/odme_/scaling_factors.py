@@ -302,7 +302,7 @@ class ScalingFactors(object):
 
     # regularised spiess - see technical documentation for details
     # TODO - generalise fully to multi-class (including within technical
-    # documentation) and experiment/record results to ascertain efficacy 
+    # documentation) and experiment/record results to ascertain efficacy
     # of algorithm.
     def __reg_spiess(self) -> list[np.ndarray]:
         """
