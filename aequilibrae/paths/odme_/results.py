@@ -10,33 +10,55 @@ import pandas as pd
 # ADD FUNCTIONALITY TO SPLIT DATA INTO A: DEPENDENT ON ITERATION, B: DEPENDENT ON COUNT VOLUME
 # ADD A WAY TO SAVE B TO CSV's
 class ODMEResults(object):
-    """ Results and statistics of an ODME procedure.
-    
-    See Use examples or docstring of ODME for how to use. 
+    """Results and statistics of an ODME procedure.
+
+    See Use examples or docstring of ODME for how to use.
     User interaction methods include:
 
     get_cumulative_factors()
     get_iteration_statistics()
     get_link_statistics()
     """
+
     # Columns for various dataframes:
 
     # This one get written to the procedure_report
-    ITERATION_COLS = ["class", "Outer Loop #", "Inner Loop #", "Total Iteration #",
-        "Total Run Time (s)", "Loop Time (s)", "Convergence", "Inner Convergence",
-        "Flow Objective", "Reg Objective",
-        'mean_factor', 'median_factor', 'std_deviation_factor',
-        'variance_factor', 'min_factor', 'max_factor']
+    ITERATION_COLS = [
+        "class",
+        "Outer Loop #",
+        "Inner Loop #",
+        "Total Iteration #",
+        "Total Run Time (s)",
+        "Loop Time (s)",
+        "Convergence",
+        "Inner Convergence",
+        "Flow Objective",
+        "Reg Objective",
+        "mean_factor",
+        "median_factor",
+        "std_deviation_factor",
+        "variance_factor",
+        "min_factor",
+        "max_factor",
+    ]
 
     # This only for debugging
-    LINK_COLS = ["class", "link_id", "direction",
-        "Outer Loop #", "Inner Loop #", "Total Iteration #",
-        "obs_volume", "assign_volume", "Assigned - Observed"]
+    LINK_COLS = [
+        "class",
+        "link_id",
+        "direction",
+        "Outer Loop #",
+        "Inner Loop #",
+        "Total Iteration #",
+        "obs_volume",
+        "assign_volume",
+        "Assigned - Observed",
+    ]
 
     # For logging different iterations:
     INNER, OUTER, FINAL_LOG = 0, 1, 2
 
-    def __init__(self, odme: 'ODME') -> None:
+    def __init__(self, odme: "ODME") -> None:
         """
         Initialises necessary fields from odme object in order to generate
         statistics and results.
@@ -69,18 +91,11 @@ class ODMEResults(object):
         Return the cumulative factors (ratio of final to initial matrix) in a pandas dataframe.
         """
         cumulative_factors = []
-        for initial, final, name in zip(
-            self.odme.original_demands,
-            self.odme.demands,
-            self.odme.class_names
-            ):
+        for initial, final, name in zip(self.odme.original_demands, self.odme.demands, self.odme.class_names):
             # Get cumulative factors for this demand matrix and store them:
             factors = np.nan_to_num(final / initial, nan=1)
             cumulative_factors.append(
-                pd.DataFrame({
-                    "class": [name for _ in range(final.size)],
-                    "Factors": factors.ravel()
-                })
+                pd.DataFrame({"class": [name for _ in range(final.size)], "Factors": factors.ravel()})
             )
 
         return pd.concat(cumulative_factors, ignore_index=True)
@@ -120,9 +135,7 @@ class ODMEResults(object):
         elif iter_type == self.FINAL_LOG:
             self.__prepare_final()
         else:
-            raise ValueError(
-                f"\'{iter_type}\' is not a valid type of iteration!"
-            )
+            raise ValueError(f"'{iter_type}' is not a valid type of iteration!")
 
         self.__log_stats()
 
@@ -146,7 +159,7 @@ class ODMEResults(object):
         # Create Data:
         for cls_name, factor_stats in zip(self.odme.class_names, self.current_factors):
             data = dict()
-            
+
             data["class"] = [cls_name]
             data["Outer Loop #"] = [self.outer]
             data["Inner Loop #"] = [self.inner]
@@ -156,7 +169,7 @@ class ODMEResults(object):
             data["Convergence"] = [self.odme.last_convergence]
             data["Inner Convergence"] = [self.odme.convergence_change]
             data["Flow Objective"] = [self.odme.flow_obj]
-            data["Reg Objective"] = [self.odme.reg_obj] # Only relevant for reg_spiess
+            data["Reg Objective"] = [self.odme.reg_obj]  # Only relevant for reg_spiess
             data["mean_factor"] = factor_stats["mean_factor"]
             data["median_factor"] = factor_stats["median_factor"]
             data["std_deviation_factor"] = factor_stats["std_deviation_factor"]
@@ -181,13 +194,12 @@ class ODMEResults(object):
         Appends the newest set of link statistics.
         """
         data = self.odme.count_volumes.copy(deep=True)
-        data[ "Outer Loop #"] = [self.outer for _ in range(len(data))]
+        data["Outer Loop #"] = [self.outer for _ in range(len(data))]
         data["Inner Loop #"] = [self.inner for _ in range(len(data))]
         data["Total Iteration #"] = [self.total_iter for _ in range(len(data))]
         data["Assigned - Observed"] = (
-            self.odme.count_volumes['assign_volume'].to_numpy() -
-            self.odme.count_volumes["obs_volume"].to_numpy()
-            )
+            self.odme.count_volumes["assign_volume"].to_numpy() - self.odme.count_volumes["obs_volume"].to_numpy()
+        )
         self.link_stats.append(data)
 
     def record_factor_stats(self, factors: list[np.ndarray]) -> None:
@@ -198,20 +210,22 @@ class ODMEResults(object):
         # Create statistics on all new factors:
         self.current_factors = []
         for factor in factors:
-            self.current_factors.append({
-                'mean_factor' : np.mean(factor),
-                'median_factor': np.median(factor),
-                'std_deviation_factor' : np.std(factor),
-                'variance_factor' : np.var(factor),
-                'min_factor' : np.min(factor),
-                'max_factor' : np.max(factor)
-            })
+            self.current_factors.append(
+                {
+                    "mean_factor": np.mean(factor),
+                    "median_factor": np.median(factor),
+                    "std_deviation_factor": np.std(factor),
+                    "variance_factor": np.var(factor),
+                    "min_factor": np.min(factor),
+                    "max_factor": np.max(factor),
+                }
+            )
 
     # Extra Utilities:
     def init_timer(self) -> None:
         """
         Initialises the internal times (for statistics purposes).
-        
+
         Should be run when the ODME procedure begins execution.
         """
         self.time = time.time()
@@ -246,11 +260,13 @@ class ODMEResults(object):
         """
         self.current_factors = []
         for _ in self.odme.classes:
-            self.current_factors.append({
-                    'mean_factor' : None,
-                    'median_factor': None,
-                    'std_deviation_factor' : None,
-                    'variance_factor' : None,
-                    'min_factor' : None,
-                    'max_factor' : None
-                })
+            self.current_factors.append(
+                {
+                    "mean_factor": None,
+                    "median_factor": None,
+                    "std_deviation_factor": None,
+                    "variance_factor": None,
+                    "min_factor": None,
+                    "max_factor": None,
+                }
+            )

@@ -1005,5 +1005,5 @@ class TransitAssignment(AssignmentBase):
         self._config["Frequency field"] = frequency_field
 
     def _prepare_execute(self) -> None:
-        """ Does nothing, included for base class compatibility """
+        """Does nothing, included for base class compatibility"""
         pass

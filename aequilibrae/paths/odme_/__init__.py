@@ -5,6 +5,7 @@ ODME related code
 
 This is copied from paths.results.__init__.py
 """
+
 __author__ = "Mittun Sudhahar ($Author: Mittun Sudhahar $)"
 __version__ = "1.0"
 __revision__ = "$Revision: 1 $"

@@ -15,6 +15,7 @@ from ...data import siouxfalls_project
 
 # NOTE - we cannot test using bfw/cfw until Issue #493 is resolved.
 
+
 class TestODMESingleClass(TestCase):
     """
     Basic unit tests for ODME single class execution
@@ -25,8 +26,7 @@ class TestODMESingleClass(TestCase):
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
         proj_path = os.path.join(gettempdir(), "test_odme_files" + uuid.uuid4().hex)
         os.mkdir(proj_path)
-        zipfile.ZipFile(join(dirname(siouxfalls_project),
-            "sioux_falls_single_class.zip")).extractall(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
 
         # Initialise project:
         self.project = Project()
@@ -73,10 +73,7 @@ class TestODMESingleClass(TestCase):
         """
         # Set synthetic demand matrix & count volumes
         self.matrix.matrices = np.zeros(self.dims)
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 0]],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", 1, 1, 0]], columns=ODME.COUNT_VOLUME_COLS)
 
         # Run ODME algorithm.
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
@@ -84,9 +81,9 @@ class TestODMESingleClass(TestCase):
 
         # Check result:
         np.testing.assert_allclose(
-                np.zeros(self.dims),
-                odme.get_demands()[0],
-                err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
+            np.zeros(self.dims),
+            odme.get_demands()[0],
+            err_msg="0 demand matrix with single count volume of 0 does not return 0 matrix",
         )
 
     def test_basic_1_2(self) -> None:
@@ -109,7 +106,7 @@ class TestODMESingleClass(TestCase):
             ["car", 18, 1, 100],
             ["car", 6, 1, 2],
             ["car", 65, 1, 85],
-            ["car", 23, 1, 0]
+            ["car", 23, 1, 0],
         ]
         count_volumes = pd.DataFrame(data=data, columns=ODME.COUNT_VOLUME_COLS)
 
@@ -118,8 +115,7 @@ class TestODMESingleClass(TestCase):
         odme.execute()
 
         # Check result:
-        err_msg = ("Demand matrix with many 0 entries, has non-zero demand " +
-            "following ODME at one of those entries")
+        err_msg = "Demand matrix with many 0 entries, has non-zero demand " + "following ODME at one of those entries"
         for orig, dest in zeroes:
             np.testing.assert_array_equal(
                 odme.get_demands()[0][self.index[orig], self.index[dest], 0],
@@ -129,10 +125,10 @@ class TestODMESingleClass(TestCase):
 
     def test_basic_1_3(self) -> None:
         """
-        Given count volumes which are identical to the assigned volumes of an 
+        Given count volumes which are identical to the assigned volumes of an
         initial demand matrix - ODME should not change this demand matrix (since
         we are looking for a local solution and this already provides one).
-        
+
         Also checks that the shape of the resulting matrix matches the intial
         demand matrix.
 
@@ -143,14 +139,12 @@ class TestODMESingleClass(TestCase):
         # Extract assigned flow on various links
         self.assignment.execute()
         assign_df = self.assignment.results().reset_index(drop=False).fillna(0)
-        links = [1,2,4,5,6,8,11,12,14,19,23,26,32,38,49,52,64,71,72]
-        flows = [assign_df.loc[assign_df["link_id"] == link, "matrix_ab"].values[0]
-            for link in links]
+        links = [1, 2, 4, 5, 6, 8, 11, 12, 14, 19, 23, 26, 32, 38, 49, 52, 64, 71, 72]
+        flows = [assign_df.loc[assign_df["link_id"] == link, "matrix_ab"].values[0] for link in links]
 
         # Perform ODME with unchanged count volumes
         count_volumes = pd.DataFrame(
-            data=[["car", link, 1, flows[i]] for i, link in enumerate(links)],
-            columns=ODME.COUNT_VOLUME_COLS
+            data=[["car", link, 1, flows[i]] for i, link in enumerate(links)], columns=ODME.COUNT_VOLUME_COLS
         )
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
@@ -159,8 +153,10 @@ class TestODMESingleClass(TestCase):
         np.testing.assert_allclose(
             init_demand[:, :, np.newaxis],
             odme.get_demands()[0],
-            err_msg=("Demand matrix changed when given many links with observed " +
-                "volume equal to initial assigned volumes")
+            err_msg=(
+                "Demand matrix changed when given many links with observed "
+                + "volume equal to initial assigned volumes"
+            ),
         )
 
     # 2) Input Validity
@@ -175,31 +171,22 @@ class TestODMESingleClass(TestCase):
         """
         # No count volumes:
         with self.assertRaises(ValueError):
-            ODME(self.assignment,
-                pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS),
-                algorithm=self.algorithm)
+            ODME(self.assignment, pd.DataFrame(data=[], columns=ODME.COUNT_VOLUME_COLS), algorithm=self.algorithm)
 
         # Negative count volumes:
         links = [1, 3, 10, 30, 36, 41, 49, 57, 62, 66, 69, 70]
-        count_volumes = pd.DataFrame(
-            data=[["car", link, 1, -link] for link in links],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", link, 1, -link] for link in links], columns=ODME.COUNT_VOLUME_COLS)
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
         # Duplicate count volumes:
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, i] for i in range(5)],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", 1, 1, i] for i in range(5)], columns=ODME.COUNT_VOLUME_COLS)
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
         # Non-float/integer count volumes:
         count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, '7'], ["car", 10, 1, [1]], ["car", 15, 1, (1, 2)]],
-            columns=ODME.COUNT_VOLUME_COLS
+            data=[["car", 1, 1, "7"], ["car", 10, 1, [1]], ["car", 15, 1, (1, 2)]], columns=ODME.COUNT_VOLUME_COLS
         )
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, algorithm=self.algorithm)
@@ -209,34 +196,24 @@ class TestODMESingleClass(TestCase):
         Check ValueError is raised if invalid stopping criteria are given
         or stopping criteria are given with missing criteria.
         """
-        count_volumes = pd.DataFrame(
-            data=[["car", 1, 1, 1]],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", 1, 1, 1]], columns=ODME.COUNT_VOLUME_COLS)
 
         # Check invalid (0) max iterations
-        stop_crit = {"max_outer": 0,
-            "max_inner": 0,
-            "convergence_crit": 10**-4,
-            "inner_convergence": 10**-4
-            }
+        stop_crit = {"max_outer": 0, "max_inner": 0, "convergence_crit": 10**-4, "inner_convergence": 10**-4}
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
         # Check invalid (negative) convergence
-        stop_crit = {"max_outer": 10,
-            "max_inner": 10,
-            "convergence_crit": -10**-4,
-            "inner_convergence": -10**-4
-            }
+        stop_crit = {"max_outer": 10, "max_inner": 10, "convergence_crit": -(10**-4), "inner_convergence": -(10**-4)}
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
         # Check missing criteria
-        stop_crit = {"max_outer": 10,
+        stop_crit = {
+            "max_outer": 10,
             "max_inner": 10,
             "convergence_crit": 10**-4,
-            }
+        }
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, stop_crit=stop_crit, algorithm=self.algorithm)
 
@@ -263,10 +240,7 @@ class TestODMESingleClass(TestCase):
         old_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
         # Perform ODME with doubled link flow on link 38
-        count_volumes = pd.DataFrame(
-            data=[["car", 38, 1, 2 * old_flow]],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", 38, 1, 2 * old_flow]], columns=ODME.COUNT_VOLUME_COLS)
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
@@ -277,7 +251,7 @@ class TestODMESingleClass(TestCase):
         new_flow = assign_df.loc[assign_df["link_id"] == 38, "matrix_ab"].values[0]
 
         # Assert link flow is doubled:
-        self.assertAlmostEqual(new_flow, 2 * old_flow)    
+        self.assertAlmostEqual(new_flow, 2 * old_flow)
 
         # Assert only appropriate O-D's have increased non-zero demand
         od_13_12 = new_demand[self.index[13], self.index[12]]
@@ -301,10 +275,7 @@ class TestODMESingleClass(TestCase):
         self.matrix.matrices = demand
 
         # Perform ODME with competing link flows on 5 & 35
-        count_volumes = pd.DataFrame(
-            data=[["car", 5, 1, 100], ["car", 35, 1, 50]],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=[["car", 5, 1, 100], ["car", 35, 1, 50]], columns=ODME.COUNT_VOLUME_COLS)
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
 
@@ -316,17 +287,14 @@ class TestODMESingleClass(TestCase):
         flow_35 = assign_df.loc[assign_df["link_id"] == 35, "matrix_ab"].values[0]
 
         # Assert link flows are equal:
-        self.assertAlmostEqual(flow_5, flow_35,
-            msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
+        self.assertAlmostEqual(flow_5, flow_35, msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
 
         # Assert link flows are balanced halfway between each other:
-        self.assertTrue(flow_5 > 50 and flow_5 < 100,
-            msg="Expected flows to be between 50 & 100")
+        self.assertTrue(flow_5 > 50 and flow_5 < 100, msg="Expected flows to be between 50 & 100")
 
         # Assert only appropriate O-D's have had demand changed
         od_13_1 = new_demand[self.index[13], self.index[1]]
-        self.assertAlmostEqual(np.sum(new_demand), od_13_1,
-            msg="Unexpected OD pair has non-zero demand")
+        self.assertAlmostEqual(np.sum(new_demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
 
     # Saving Test
     def test_save(self) -> None:
@@ -337,10 +305,7 @@ class TestODMESingleClass(TestCase):
         self.matrix.matrices = np.zeros(self.dims)
 
         # Placeholder count volumes:
-        counts = pd.DataFrame(
-            data=[["car", 1, 1, 0]],
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        counts = pd.DataFrame(data=[["car", 1, 1, 0]], columns=ODME.COUNT_VOLUME_COLS)
 
         # Create ODME object then save to appropriate location
         odme = ODME(self.assignment, counts)
@@ -354,10 +319,11 @@ class TestODMESingleClass(TestCase):
 
         # Check saved matrix is the same as the initial matrix:
         np.testing.assert_allclose(
-                np.zeros(self.dims),
-                matrix.matrix_view[:, :, np.newaxis], # Need new axis as this is single class
-                err_msg="Saved 0 demand matrix but did not get 0 demand matrix when extracted!",
+            np.zeros(self.dims),
+            matrix.matrix_view[:, :, np.newaxis],  # Need new axis as this is single class
+            err_msg="Saved 0 demand matrix but did not get 0 demand matrix when extracted!",
         )
+
 
 class TestODMEMultiClass(TestCase):
     """
@@ -424,8 +390,7 @@ class TestODMEMultiClass(TestCase):
         self.matrix_view_names = [matrix.view_names[0] for matrix in self.matrices]
         self.matrix_dims = [matrix.matrices.shape for matrix in self.matrices]
         self.matrix_view_dims = [matrix.matrix_view.shape + (1,) for matrix in self.matrices]
-        self.class_to_matrix_idx = [
-            matrix.names.index(matrix.view_names[0]) for matrix in self.matrices]
+        self.class_to_matrix_idx = [matrix.names.index(matrix.view_names[0]) for matrix in self.matrices]
         self.indexes = [self.car_index, self.truck_index, self.moto_index]
 
         # Currently testing algorithm:
@@ -448,8 +413,7 @@ class TestODMEMultiClass(TestCase):
             matrix.matrices = np.zeros(dims)
 
         count_volumes = pd.DataFrame(
-            data=[[user_class, 1, 1, 0] for user_class in self.class_ids],
-            columns=ODME.COUNT_VOLUME_COLS
+            data=[[user_class, 1, 1, 0] for user_class in self.class_ids], columns=ODME.COUNT_VOLUME_COLS
         )
 
         # Run ODME algorithm.
@@ -458,16 +422,9 @@ class TestODMEMultiClass(TestCase):
         demands = odme.get_demands()
 
         # Check for each class that the matrix is still 0's.
-        for demand, dims, matrix, mname in zip(
-            demands,
-            self.matrix_view_dims,
-            self.matrices,
-            self.class_ids
-            ):
+        for demand, dims, matrix, mname in zip(demands, self.matrix_view_dims, self.matrices, self.class_ids):
             np.testing.assert_allclose(
-                demand,
-                np.zeros(dims),
-                err_msg=f"The {mname} matrix was changed from 0 when initially a 0 matrix!"
+                demand, np.zeros(dims), err_msg=f"The {mname} matrix was changed from 0 when initially a 0 matrix!"
             )
 
     # Input Validity
@@ -478,10 +435,7 @@ class TestODMEMultiClass(TestCase):
         """
         # Duplicate count volumes:
         data = [[cls_id, 10, 1, i] for i in range(3) for cls_id in self.class_ids]
-        count_volumes = pd.DataFrame(
-            data=data,
-            columns=ODME.COUNT_VOLUME_COLS
-        )
+        count_volumes = pd.DataFrame(data=data, columns=ODME.COUNT_VOLUME_COLS)
         with self.assertRaises(ValueError):
             ODME(self.assignment, count_volumes, algorithm=self.algorithm)
 
@@ -499,22 +453,23 @@ class TestODMEMultiClass(TestCase):
         # Set synthetic demand matrices
         ods = [10, 20, 50]
         for dims, matrix, index, o_d, idx in zip(
-            self.matrix_dims,
-            self.matrices,
-            self.indexes,
-            ods,
-            self.class_to_matrix_idx
-            ):
+            self.matrix_dims, self.matrices, self.indexes, ods, self.class_to_matrix_idx
+        ):
             matrix.matrices = np.zeros(dims)
             matrix.matrices[index[13], index[1], idx] = o_d
 
         # Perform ODME with competing link flows on 5 & 35
         flows = [[100, 50], [30, 10], [20, 60]]
         count_volumes = pd.DataFrame(
-            data=[["car", 5, 1, flows[0][0]], ["car", 35, 1, flows[0][1]],
-                ["truck", 5, 1, flows[1][0]], ["truck", 35, 1, flows[1][1]],
-                ["motorcycle", 5, 1, flows[2][0]], ["motorcycle", 35, 1, flows[2][1]]],
-            columns=ODME.COUNT_VOLUME_COLS
+            data=[
+                ["car", 5, 1, flows[0][0]],
+                ["car", 35, 1, flows[0][1]],
+                ["truck", 5, 1, flows[1][0]],
+                ["truck", 35, 1, flows[1][1]],
+                ["motorcycle", 5, 1, flows[2][0]],
+                ["motorcycle", 35, 1, flows[2][1]],
+            ],
+            columns=ODME.COUNT_VOLUME_COLS,
         )
         odme = ODME(self.assignment, count_volumes, algorithm=self.algorithm)
         odme.execute()
@@ -528,17 +483,16 @@ class TestODMEMultiClass(TestCase):
         for index, demand, idx in zip(self.indexes, demands, self.class_to_matrix_idx):
             # Assert only appropriate O-D's have had demand changed
             od_13_1 = demand[index[13], index[1], 0]
-            self.assertAlmostEqual(np.sum(demand), od_13_1,
-                msg="Unexpected OD pair has non-zero demand")
+            self.assertAlmostEqual(np.sum(demand), od_13_1, msg="Unexpected OD pair has non-zero demand")
 
         for flow, name in zip(flows, self.matrix_view_names):
             flow_5 = assign_df.loc[assign_df["link_id"] == 5, f"{name}_ab"].values[0]
             flow_35 = assign_df.loc[assign_df["link_id"] == 35, f"{name}_ab"].values[0]
 
             # Assert link flows are equal:
-            self.assertAlmostEqual(flow_5, flow_35,
-                msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
+            self.assertAlmostEqual(flow_5, flow_35, msg=f"Expected balanced flows but are: {flow_5} and {flow_35}")
 
             # Assert link flows are balanced halfway between each other:
-            self.assertTrue(flow_5 > min(flow) and flow_5 < max(flow),
-                msg=f"Expected flows to be between {min(flow)} & {max(flow)}")
+            self.assertTrue(
+                flow_5 > min(flow) and flow_5 < max(flow), msg=f"Expected flows to be between {min(flow)} & {max(flow)}"
+            )

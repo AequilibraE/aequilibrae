@@ -20,7 +20,6 @@ class TestMatrices(TestCase):
 
         self.project = Project()
         self.project.open(proj_dir)
-
         self.matrices = self.project.matrices
         self.matrices.reload()
         self.curr = self.project.conn.cursor()
@@ -56,7 +55,6 @@ class TestMatrices(TestCase):
 
         self.matrices.reload()
         self.assertEqual(self.matrices.get_record("omx2").report, {"a": 7}, "Can store a dictionary")
-
 
     def test_clear_database(self):
         self.__mat_count(3, "The test data started wrong")

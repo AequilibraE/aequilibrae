@@ -1,6 +1,7 @@
 """
 ODME Infrastructure (User Interaction Class):
 """
+
 # TODO - 3 todo's remaining in code, see below
 
 from typing import Tuple
@@ -24,6 +25,7 @@ spec = iutil.find_spec("openmatrix")
 has_omx = spec is not None
 if has_omx:
     import openmatrix as omx
+
 
 class ODME(object):
     """Origin-Destination Matrix Estimation class.
@@ -59,7 +61,7 @@ class ODME(object):
         >>> import pandas as pd
         >>> counts = pd.read_csv("/tmp/test_data.csv")
 
-        # We can now run the ODME procedure, see Use examples page for a more 
+        # We can now run the ODME procedure, see Use examples page for a more
         # comprehensive overview of the options available when initialising.
         >>> odme = ODME(assignment, counts)
         >>> odme.execute() # See Use examples for optional arguments
@@ -81,19 +83,20 @@ class ODME(object):
         # Statistics on the procedure tracking each link (count volumes)
         >>> link_stats = results.get_link_statistics()
     """
+
     # Input count volume columns (assigned volumes will be added during execution)
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
-    GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
+    GMEAN_LIMIT = 0.01  # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
     ALL_ALGORITHMS = ["gmean", "spiess", "reg_spiess"]
-    DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50,
-        "convergence_crit": 10**-4, "inner_convergence": 10**-4}
+    DEFAULT_STOP_CRIT = {"max_outer": 50, "max_inner": 50, "convergence_crit": 10**-4, "inner_convergence": 10**-4}
 
-    def __init__(self,
+    def __init__(
+        self,
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame,
         stop_crit=None,
         algorithm: str = "spiess",
-        alpha: float = None
+        alpha: float = None,
     ) -> None:
         """
         Parameters:
@@ -104,11 +107,11 @@ class ODME(object):
                     need to have preset select links (these will be overwritten).
             count_volumes: a dataframe detailing the links, the class they are associated with,
                     the direction and their observed volume.
-            stop_crit: the maximum number of iterations and the convergence criterion 
+            stop_crit: the maximum number of iterations and the convergence criterion
                     (see ODME.DEFAULT_STOP_CRIT for formatting).
             algorithm: specification for which gradient-descent based algorithm to use
                     (see ODME.ALL_ALGORITHMS for options).
-            alpha: used as a hyper-parameter for regularised spiess (see technical document for 
+            alpha: used as a hyper-parameter for regularised spiess (see technical document for
                     details).
 
         NOTE - certain functionality is only implemented for single class ODME - see docstrings for
@@ -152,7 +155,7 @@ class ODME(object):
         # Component of objective function from flows/regularisation:
         self.flow_obj, self.reg_obj = None, None
         # Initially inf to ensure inner iterations begin
-        self.convergence_change = float('inf')
+        self.convergence_change = float("inf")
 
         # Stopping criterion
         if not stop_crit:
@@ -164,24 +167,20 @@ class ODME(object):
 
         # Hyper-parameters for regularisation:
         if algorithm in ["reg_spiess"]:
-            if alpha is None or alpha > 1 or alpha < 0: # THIS CHECK SHOULD PROBABLY BE MORE ROBUST
+            if alpha is None or alpha > 1 or alpha < 0:  # THIS CHECK SHOULD PROBABLY BE MORE ROBUST
                 raise ValueError("Hyper-parameter alpha should be between 0 and 1")
             self.alpha = alpha
             self.beta = 1 - alpha
 
         # Results/Statistics:
         self.results = ODMEResults(self)
-        
+
         # Procedure Information:
         self.procedure_date = ""
         self.procedure_id = ""
 
     # Utilities:
-    def __check_inputs(self,
-        counts: pd.DataFrame,
-        stop_crit: dict,
-        alpha: float,
-        algorithm: str) -> None:
+    def __check_inputs(self, counts: pd.DataFrame, stop_crit: dict, alpha: float, algorithm: str) -> None:
         """
         Ensures all user input is of correct format/value.
         NOTE - we do not check if the assignment is given properly,
@@ -192,9 +191,11 @@ class ODME(object):
         if not isinstance(algorithm, str):
             raise ValueError("Algorithm must be input as a string")
         elif algorithm not in self.ALL_ALGORITHMS:
-            raise ValueError(f"'{algorithm}' is not a valid algorithm.\n" +
-                "Currently implemented algorithms include:\n" +
-                '\n'.join(self.ALL_ALGORITHMS))
+            raise ValueError(
+                f"'{algorithm}' is not a valid algorithm.\n"
+                + "Currently implemented algorithms include:\n"
+                + "\n".join(self.ALL_ALGORITHMS)
+            )
 
         # Check stopping criteria if given
         stop_error = False
@@ -211,19 +212,21 @@ class ODME(object):
                             stop_error = True
                         elif stop_crit[key] < 1:
                             stop_error = True
-                    else: 
+                    else:
                         if not isinstance(stop_crit[key], (float, int)):
                             stop_error = True
                         elif stop_crit[key] < 0:
                             stop_error = True
 
         if stop_error:
-            raise ValueError("Stopping criterion must be given as a dictionary as follows," +
-                "(key -> type of value):" +
-                "max_outer -> positive integer" +
-                "max_inner -> positive integer" +
-                "convergence_crit -> non-negative integer/float" +
-                "inner_convergence -> non-negative integer/float")
+            raise ValueError(
+                "Stopping criterion must be given as a dictionary as follows,"
+                + "(key -> type of value):"
+                + "max_outer -> positive integer"
+                + "max_inner -> positive integer"
+                + "convergence_crit -> non-negative integer/float"
+                + "inner_convergence -> non-negative integer/float"
+            )
 
         # Check count volumes
         counts_error = False
@@ -241,8 +244,7 @@ class ODME(object):
 
         if not counts_error:
             observed = counts["obs_volume"]
-            if not (pd.api.types.is_float_dtype(observed) or
-                pd.api.types.is_integer_dtype(observed)):
+            if not (pd.api.types.is_float_dtype(observed) or pd.api.types.is_integer_dtype(observed)):
                 counts_error = True
             elif not np.all(observed >= 0):
                 counts_error = True
@@ -252,17 +254,19 @@ class ODME(object):
                 counts_error = True
 
         if counts_error:
-            raise ValueError("Count volumes must be a non-empty pandas dataframe with columns:\n" +
-                '\n'.join(self.COUNT_VOLUME_COLS) +
-                "\n and all observed volumes must be non-negative floats or integers, and" +
-                "only a single count volume should be given for a" +
-                "particular class, link_id and direction")
+            raise ValueError(
+                "Count volumes must be a non-empty pandas dataframe with columns:\n"
+                + "\n".join(self.COUNT_VOLUME_COLS)
+                + "\n and all observed volumes must be non-negative floats or integers, and"
+                + "only a single count volume should be given for a"
+                + "particular class, link_id and direction"
+            )
 
         # Check alpha value if given
         if alpha is not None:
             if not isinstance(alpha, (float, int)):
                 raise ValueError("Input alpha should be a float or integer (0 to 1)")
-            elif alpha > 1 or  alpha < 0:
+            elif alpha > 1 or alpha < 0:
                 raise ValueError("Input alpha should be between 0 and 1")
 
     def __duplicate_matrices(self):
@@ -272,7 +276,7 @@ class ODME(object):
         # Loop through TrafficClasses - create new and replace, then set classes
         new_classes = []
         for usr_cls in self.classes:
-            mat = usr_cls.matrix.copy(cores = usr_cls.matrix.view_names, memory_only=True)
+            mat = usr_cls.matrix.copy(cores=usr_cls.matrix.view_names, memory_only=True)
             mat.computational_view()
 
             new_cls = TrafficClass(usr_cls._id, usr_cls.graph, mat)
@@ -287,9 +291,9 @@ class ODME(object):
 
     def estimate_alpha(self, alpha: float) -> float:
         """
-        Estimates a starting hyper-paramater for regularised 
+        Estimates a starting hyper-paramater for regularised
         spiess given a number between 0-1.
-        
+
         NOTE - currently only implemented for single class
         """
         demand_sum = np.sum(self.demands[0])
@@ -313,10 +317,8 @@ class ODME(object):
         for user_class in self.classes:
             user_class.set_select_links(
                 {
-                    self.get_sl_key(row):
-                    [(row['link_id'], row['direction'])]
-                    for _, row in c_v[c_v['class'] == user_class._id
-                    ].iterrows()
+                    self.get_sl_key(row): [(row["link_id"], row["direction"])]
+                    for _, row in c_v[c_v["class"] == user_class._id].iterrows()
                 }
             )
 
@@ -350,10 +352,10 @@ class ODME(object):
 
         Current objective functions have 2 parts which are summed:
             1. The p-norm raised to the power p of the error vector for observed flows.
-            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) 
+            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector)
                for the demand matrix.
-        
-        NOTE - currently (1.) must always be present, but (2.) (the regularisation term) 
+
+        NOTE - currently (1.) must always be present, but (2.) (the regularisation term)
                need not be present.
         """
         p_1 = self._norms[0]
@@ -366,10 +368,9 @@ class ODME(object):
             # NOTE - pce not yet included for multi-class
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
-            assign_vals = self.count_volumes['assign_volume'].to_numpy()
-            self.flow_obj = self.alpha * np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
-            self.reg_obj = self.beta * np.sum(
-                np.abs(self.original_demands[0] - self.demands[0])**p_2) / p_2
+            assign_vals = self.count_volumes["assign_volume"].to_numpy()
+            self.flow_obj = self.alpha * np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
+            self.reg_obj = self.beta * np.sum(np.abs(self.original_demands[0] - self.demands[0]) ** p_2) / p_2
             self.__set_convergence_values(self.flow_obj + self.reg_obj)
 
         def __obj_func(self) -> None:
@@ -379,8 +380,8 @@ class ODME(object):
             # NOTE - pce not yet included for multi-class
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
-            assign_vals = self.count_volumes['assign_volume'].to_numpy()
-            self.flow_obj = np.sum(np.abs(obs_vals - assign_vals)**p_1) / p_1
+            assign_vals = self.count_volumes["assign_volume"].to_numpy()
+            self.flow_obj = np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
             self.__set_convergence_values(self.flow_obj)
 
         if p_2:
@@ -412,17 +413,19 @@ class ODME(object):
             self.__save_as_omx(file_path)
         elif ".aem" in file_name:
             self.__save_as_aem(file_path)
-        else: # unsupported file-type
+        else:  # unsupported file-type
             raise ValueError("Only supporting .omx and .aem")
 
         record = mats.new_record(name, file_name)
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
-        record.report = json.dumps({
-            "iterations": self.results.get_iteration_statistics().to_dict(),
-            "by_link": self.results.get_link_statistics().to_dict()
-        })
+        record.report = json.dumps(
+            {
+                "iterations": self.results.get_iteration_statistics().to_dict(),
+                "by_link": self.results.get_link_statistics().to_dict(),
+            }
+        )
         record.save()
 
     def __save_as_omx(self, file_path: str) -> None:
@@ -483,8 +486,8 @@ class ODME(object):
 
     # ODME Execution:
     def execute(self, verbose=False, print_rate=1) -> None:
-        """ 
-        Run ODME algorithm until either the maximum iterations has been reached, 
+        """
+        Run ODME algorithm until either the maximum iterations has been reached,
         or the convergence criterion has been met.
 
         Parameters:
@@ -510,7 +513,7 @@ class ODME(object):
 
             # Inner iterations:
             # Ensure at least 1 inner iteration is run per outer loop
-            self.convergence_change = float('inf')
+            self.convergence_change = float("inf")
             inner = 0
             while inner < self.max_inner and self.convergence_change > self.inner_convergence_crit:
                 inner += 1
@@ -530,15 +533,15 @@ class ODME(object):
     # function is sufficient - we may want to replace the matrix.matrices value
     # and call matrix.computational_view() (with appropriate arguments) instead.
     def __perform_assignment(self) -> None:
-        """ 
+        """
         Uses current demand matrix to perform an assignment, then save
-        the assigned flows and select link matrices. Also recalculates the 
+        the assigned flows and select link matrices. Also recalculates the
         objective function following an assignment.
 
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
         """
-        # Change the demand matrices within the TrafficClass's to the current 
+        # Change the demand matrices within the TrafficClass's to the current
         # demand matrices that have been calculated from the previous outer iteration.
         for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demands):
             aeq_matrix.matrix_view = demand
@@ -550,9 +553,7 @@ class ODME(object):
         for assignclass, demand in zip(self.classes, self.demands):
             sl_matrices = assignclass.results.select_link_od.matrix
             for link in sl_matrices:
-                self._sl_matrices[link] = np.nan_to_num(
-                    sl_matrices[link] / demand
-                    )
+                self._sl_matrices[link] = np.nan_to_num(sl_matrices[link] / demand)
 
         # Extract and store array of assigned volumes to the select links
         self.__extract_volumes()
@@ -564,7 +565,7 @@ class ODME(object):
         """
         Extracts and stores assigned volumes (corresponding for those for which we have
         observations - ie count volumes).
-        
+
         NOTE - this does not take into account pce, ie this is the number of vehicles, not
         'flow'.
         """
@@ -581,18 +582,14 @@ class ODME(object):
             Extracts volume corresponding to particular link (from row) and return it.
             For inner iterations need to calculate this via __calculate_volumes
             """
-            return assign_df.loc[assign_df['link_id'] == row['link_id'],
-                col[row['class']][row['direction']]].values[0]
+            return assign_df.loc[assign_df["link_id"] == row["link_id"], col[row["class"]][row["direction"]]].values[0]
 
         # Extract a flow for each count volume:
-        self.count_volumes['assign_volume'] = self.count_volumes.apply(
-            extract_volume,
-            axis=1
-        )
+        self.count_volumes["assign_volume"] = self.count_volumes.apply(extract_volume, axis=1)
 
     def __execute_inner_iter(self) -> None:
         """
-        Runs an inner iteration of the ODME algorithm. 
+        Runs an inner iteration of the ODME algorithm.
         This assumes the SL matrices stay constant and modifies the current demand matrices.
         """
         # Element-wise multiplication of demand matrices by scaling factors
@@ -608,7 +605,7 @@ class ODME(object):
     def __get_scaling_factors(self) -> list[np.ndarray]:
         """
         Returns scaling matrices for each user class - depending on algorithm chosen.
-        
+
         NOTE - we expect any algorithm to return a list of factor matrices in order of the
         stored user classes.
         """
@@ -625,15 +622,15 @@ class ODME(object):
         # Calculate a single flow:
         def __calculate_volume(self, row: pd.Series) -> float:
             """
-            Given a single row of the count volumes dataframe, 
-            calculates the appropriate corresponding assigned 
+            Given a single row of the count volumes dataframe,
+            calculates the appropriate corresponding assigned
             volume.
             """
             sl_matrix = self._sl_matrices[self.get_sl_key(row)]
-            demand_matrix = self.demands[self.names_to_indices[row['class']]]
+            demand_matrix = self.demands[self.names_to_indices[row["class"]]]
             return np.sum(sl_matrix * demand_matrix)
 
         # Calculate flows for all rows:
-        self.count_volumes['assign_volume'] = self.count_volumes.apply(
-            lambda row: __calculate_volume(self, row),
-            axis=1)
+        self.count_volumes["assign_volume"] = self.count_volumes.apply(
+            lambda row: __calculate_volume(self, row), axis=1
+        )
