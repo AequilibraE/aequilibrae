@@ -75,15 +75,10 @@ class OSMBuilder(WorkerThread):
         self.node_df.osm_id = self.node_df.osm_id.astype(np.int64)
         self.node_df.set_index(["osm_id"], inplace=True)
 
-        self.logger.info("Creating necessary link types")
-        self.__emit_all(["text", "Creating necessary link types"])
-        self.__build_link_types()
+        self.__process_link_chunk()
         shape_ = self.links_df.shape[0]
         message_step = floor(shape_ / 100)
         self.__emit_all(["maxValue", shape_])
-
-        self.establish_modes_for_all_links(conn)
-        self.process_link_attributes()
 
         self.logger.info("Geo-procesing links")
         self.__emit_all(["text", "Adding network links"])
@@ -115,7 +110,7 @@ class OSMBuilder(WorkerThread):
                 intersecs = np.where(node_indices > 1)[0]
                 geos = []
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geos.append(self.__build_geometry(link.nodes[i: j + 1]))
+                    geos.append(self.__build_geometry(link.nodes[i : j + 1]))
                 geo = MultiLineString(geos)
 
             geometries.append(geo)
@@ -172,22 +167,38 @@ class OSMBuilder(WorkerThread):
     def __build_geometry(self, nodes: List[int]) -> LineString:
         return LineString(self.node_df.loc[nodes, "geometry"])
 
-
-
     def __process_link_chunk(self):
+        self.logger.info("Creating necessary link types")
+        self.__emit_all(["text", "Creating necessary link types"])
 
-        if "tags" in df.columns:
-            df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
-            df.columns = [x.replace(":", "_") for x in df.columns]
-
-    def __build_link_types(self):
-        data = []
+        # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
+        # And let's also assume that each row will be 100 fields at 8 bytes each
+        # This makes 1Gb roughly equal to 1.34 million rows, so 1 million would so.
+        chunk_size = 100_000_000
+        list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
+        self.links_df = pd.DataFrame([])
+        # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
 
-        self.links_df.highway.fillna("missing", inplace=True)
-        self.links_df.highway = self.links_df.highway.str.lower()
-        for i, lt in enumerate(self.links_df.highway.unique()):
+            for i, df in enumerate(list_dfs):
+                if "tags" in df.columns:
+                    df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
+                    df.columns = [x.replace(":", "_") for x in df.columns]
+                    df = self.__build_link_types(df)
+                    df = self.__establish_modes_for_all_links(conn, df)
+                    df = self.__process_link_attributes(df)
+                else:
+                    self.logger.error("OSM link data does not have tags. Skipping an entire data chunk")
+                    df = pd.DataFrame([])
+                list_dfs[i] = df
+        self.links_df = pd.concat(list_dfs)
+
+    def __build_link_types(self, df):
+        data = []
+        df.highway.fillna("missing", inplace=True)
+        df.highway = df.highway.str.lower()
+        for i, lt in enumerate(df.highway.unique()):
             if str(lt) in self.__all_ltp.highway.values:
                 continue
             data.append([*self.__define_link_type(str(lt)), str(lt)])
@@ -195,8 +206,8 @@ class OSMBuilder(WorkerThread):
                 [self.__all_ltp, pd.DataFrame(data, columns=["link_type_id", "link_type", "highway"])]
             )
             self.__all_ltp.drop_duplicates(inplace=True)
-        self.links_df = self.links_df.merge(self.__all_ltp[["link_type", "highway"]], on="highway", how="left")
-        self.links_df.drop(columns=["highway"], inplace=True)
+        df = df.merge(self.__all_ltp[["link_type", "highway"]], on="highway", how="left")
+        return df.drop(columns=["highway"])
 
     def __define_link_type(self, link_type: str) -> str:
         proj_link_types = self.project.network.link_types
@@ -206,7 +217,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0: i + 1])
+                link_type = "_".join(split[0 : i + 1])
 
         if self.__all_ltp.shape[0] >= 51:
             link_type = "aggregate_link_type"
@@ -234,43 +245,7 @@ class OSMBuilder(WorkerThread):
         lt.save()
         return [letter, link_type]
 
-
-    def process_link_attributes(self):
-        self.links_df = self.links_df.assign(direction=0, link_id=0)
-        self.links_df.loc[self.links_df.oneway == "yes", "direction"] = 1
-        self.links_df.loc[self.links_df.oneway == "backward", "direction"] = -1
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-
-        for x in fields["one-way"]:
-            keys_ = list(x.values())[0]
-            field = list(x.keys())[0]
-            osm_name = keys_.get("osm_source", field).replace(":", "_")
-            self.links_df.rename(columns={osm_name: field}, inplace=True, errors="ignore")
-
-        for x in fields["two-way"]:
-            keys_ = list(x.values())[0]
-            field = list(x.keys())[0]
-            if "osm_source" not in keys_:
-                continue
-            osm_name = keys_.get("osm_source", field).replace(":", "_")
-            self.links_df[f"{field}_ba"] = self.links_df[osm_name].copy()
-            self.links_df.rename(columns={osm_name: f"{field}_ab"}, inplace=True, errors="ignore")
-            if "osm_behaviour" in keys_ and keys_["osm_behaviour"] == "divide":
-                self.links_df[f"{field}_ab"] = pd.to_numeric(self.links_df[f"{field}_ab"], errors="coerce") / 2
-                self.links_df[f"{field}_ba"] = pd.to_numeric(self.links_df[f"{field}_ba"], errors="coerce") / 2
-
-                if f"{field}_forward" in self.links_df:
-                    fld = pd.to_numeric(self.links_df[f"{field}_forward"], errors="coerce")
-                    self.links_df.loc[fld > 0, f"{field}_ab"] = fld[fld > 0]
-                if f"{field}_backward" in self.links_df:
-                    fld = pd.to_numeric(self.links_df[f"{field}_backward"], errors="coerce")
-                    self.links_df.loc[fld > 0, f"{field}_ba"] = fld[fld > 0]
-        cols = list_columns(self.project.conn, "links") + ["nodes"]
-        self.links_df = self.links_df[[x for x in cols if x in self.links_df.columns]]
-        gc.collect()
-
-    def establish_modes_for_all_links(self, conn):
+    def __establish_modes_for_all_links(self, conn, df: pd.DataFrame) -> pd.DataFrame:
         p = Parameters()
         modes = p.parameters["network"]["osm"]["modes"]
 
@@ -289,9 +264,51 @@ class OSMBuilder(WorkerThread):
 
         type_list = {k: "".join(set(v)) for k, v in type_list.items()}
 
-        df = pd.DataFrame([[k, v] for k, v in type_list.items()], columns=["link_type", "modes"])
-        self.links_df = self.links_df.merge(df, on="link_type", how="left")
-        self.links_df.modes.fillna("".join(sorted(notfound)), inplace=True)
+        df_aux = pd.DataFrame([[k, v] for k, v in type_list.items()], columns=["link_type", "modes"])
+        df = df.merge(df_aux, on="link_type", how="left")
+        df.modes.fillna("".join(sorted(notfound)))
+        return df
+
+    def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.assign(direction=0, link_id=0)
+        df.loc[df.oneway == "yes", "direction"] = 1
+        df.loc[df.oneway == "backward", "direction"] = -1
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        for x in fields["one-way"]:
+            keys_ = list(x.values())[0]
+            field = list(x.keys())[0]
+            osm_name = keys_.get("osm_source", field).replace(":", "_")
+            df.rename(columns={osm_name: field}, inplace=True, errors="ignore")
+
+        for x in fields["two-way"]:
+            keys_ = list(x.values())[0]
+            field = list(x.keys())[0]
+            if "osm_source" not in keys_:
+                continue
+            osm_name = keys_.get("osm_source", field).replace(":", "_")
+            df[f"{field}_ba"] = df[osm_name].copy()
+            df.rename(columns={osm_name: f"{field}_ab"}, inplace=True, errors="ignore")
+            if "osm_behaviour" in keys_ and keys_["osm_behaviour"] == "divide":
+                df[f"{field}_ab"] = pd.to_numeric(df[f"{field}_ab"], errors="coerce")
+                df[f"{field}_ba"] = pd.to_numeric(df[f"{field}_ba"], errors="coerce")
+
+                # Divides the values by 2 or zero them depending on the link direction
+                df.loc[df.direction == 0, f"{field}_ab"] /= 2
+                df.loc[df.direction == -1, f"{field}_ab"] = 0
+
+                df.loc[df.direction == 0, f"{field}_ba"] /= 2
+                df.loc[df.direction == 1, f"{field}_ba"] = 0
+
+                if f"{field}_forward" in df:
+                    fld = pd.to_numeric(df[f"{field}_forward"], errors="coerce")
+                    df.loc[fld > 0, f"{field}_ab"] = fld[fld > 0]
+                if f"{field}_backward" in df:
+                    fld = pd.to_numeric(df[f"{field}_backward"], errors="coerce")
+                    df.loc[fld > 0, f"{field}_ba"] = fld[fld > 0]
+        cols = list_columns(self.project.conn, "links") + ["nodes"]
+        return df[[x for x in cols if x in df.columns]]
 
     ######## TABLE STRUCTURE UPDATING ########
     def __update_table_structure(self, conn):
