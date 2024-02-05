@@ -142,13 +142,11 @@ class ScalingFactors(object):
         # Step 3:
         return scaling_factors
 
-    # spiess (REFERENCE HERE) - TODO
-    
-    # TODO - add reference to Spiess and above
+    # spiess (Spiess, 1990)
     def __spiess(self) -> list[np.ndarray]:
         """
         Calculates scaling factor based on gradient descent method via SL matrix,
-        assigned flow & observed flows as described by Spiess (1990) - REFERENCE HERE
+        assigned flow & observed flows as described by (Spiess, 1990)
         """
         # Derivative matrices for spiess algorithm:
         gradient_matrices = self.__get_derivative_matrices_spiess()
@@ -163,10 +161,9 @@ class ScalingFactors(object):
         ]
         return scaling_factors
     
-    # TODO - add reference to Spiess
     def __get_derivative_matrices_spiess(self) -> list[np.ndarray]:
         """
-        Returns derivative matrix (see Spiess (1990) - REFERENCE HERE)
+        Returns derivative matrix (see (Spiess, 1990) and technical documentation)
         """
         # There are probably some numpy/cython ways to do this in parallel and
         # without storing too many things in memory.
@@ -184,11 +181,9 @@ class ScalingFactors(object):
 
         return derivatives
 
-    # TODO - add reference to Spiess
     def __get_step_sizes_spiess(self, gradients: list[np.ndarray]) -> list[float]:
         """
-        Returns estimate of optimal step size (see Spiess (1990) - REFERENCE HERE 
-        and technical documentation)
+        Returns estimate of optimal step size (see (Spiess, 1990) and technical documentation)
 
         Parameters:
             gradients: The previously calculated gradient matrices - required for calculating 
@@ -273,13 +268,12 @@ class ScalingFactors(object):
         else:
             return value # Bounds Not Violated
 
-    # TODO - add reference
     def __get_step_size_limits_spiess(self,
             gradients: list[np.ndarray]
             ) -> list[Tuple[float, float]]:
         """
-        Returns bounds for step size in order of upper bound, then lower bound (see Spiess
-        (1990) - REFERENCE HERE and technical documentation) for each gradient matrix.
+        Returns bounds for step size in order of upper bound, then lower bound (see (Spiess, 1990)
+        and technical documentation) for each gradient matrix.
 
         Parameters:
             gradient: The currently calculating gradient matrix - required for calculating 
@@ -307,7 +301,6 @@ class ScalingFactors(object):
         return bounds
 
     # regularised spiess - see technical documentation for details
-    
     # TODO - generalise fully to multi-class (including within technical
     # documentation) and experiment/record results to ascertain efficacy 
     # of algorithm.
