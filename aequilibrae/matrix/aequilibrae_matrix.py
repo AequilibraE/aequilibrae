@@ -1,5 +1,4 @@
 import functools
-import importlib.util as iutil
 import os
 import tempfile
 import uuid
@@ -14,10 +13,6 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 
 # Checks if we can display OMX
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
-if has_omx:
-    import openmatrix as omx
 
 # CONSTANTS
 VERSION = 1  # VERSION OF THE MATRIX FORMAT
@@ -54,9 +49,7 @@ COMPRESSED = 1
 # Offset:  18 + 50*cores + Y*20  |   18 + 50*cores + Y*20 + Y*zones*8   |
 
 
-matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
-if has_omx:
-    matrix_export_types.append("Open matrix (*.omx)")
+matrix_export_types = ["Open matrix (*.omx), Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
 
 
 class AequilibraeMatrix(object):
@@ -160,14 +153,14 @@ class AequilibraeMatrix(object):
             omx_mat.close()
 
     def create_empty(
-        self,
-        file_name: str = None,
-        zones: int = None,
-        matrix_names: List[str] = None,
-        data_type: np.dtype = np.float64,
-        index_names: List[str] = None,
-        compressed: bool = False,
-        memory_only: bool = True,
+            self,
+            file_name: str = None,
+            zones: int = None,
+            matrix_names: List[str] = None,
+            data_type: np.dtype = np.float64,
+            index_names: List[str] = None,
+            compressed: bool = False,
+            memory_only: bool = True,
     ):
         """
         Creates an empty matrix in the AequilibraE format
@@ -286,14 +279,14 @@ class AequilibraeMatrix(object):
             return mat
 
     def create_from_omx(
-        self,
-        file_path: str,
-        omx_path: str,
-        cores: List[str] = None,
-        mappings: List[str] = None,
-        robust: bool = True,
-        compressed: bool = False,
-        memory_only: bool = True,
+            self,
+            file_path: str,
+            omx_path: str,
+            cores: List[str] = None,
+            mappings: List[str] = None,
+            robust: bool = True,
+            compressed: bool = False,
+            memory_only: bool = True,
     ) -> None:
         """
         Creates an AequilibraeMatrix from an original OpenMatrix
@@ -335,10 +328,6 @@ class AequilibraeMatrix(object):
 
                 if trial_name not in forbiden_names:
                     return trial_name
-
-        if not has_omx:
-            print("Open Matrix is not installed. Cannot continue")
-            return
 
         if compressed:
             raise Warning("Matrix compression not yet supported")
@@ -788,10 +777,6 @@ class AequilibraeMatrix(object):
         """
         fname, file_extension = os.path.splitext(output_name.upper())
 
-        if file_extension == ".OMX":
-            if not has_omx:
-                raise ValueError("Open Matrix is not installed. Cannot continue")
-
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise NotImplementedError(f"File extension {file_extension} not implemented yet")
 
@@ -917,15 +902,15 @@ class AequilibraeMatrix(object):
                 self.matrix_view = self.matrices[:, :, idx1]
             elif len(core_list) > 1:
                 idx2 = self.names.index(core_list[-1])
-                self.matrix_view = self.matrices[:, :, idx1 : idx2 + 1]
+                self.matrix_view = self.matrices[:, :, idx1: idx2 + 1]
 
     def copy(
-        self,
-        output_name: str = None,
-        cores: List[str] = None,
-        names: List[str] = None,
-        compress: bool = None,
-        memory_only: bool = True,
+            self,
+            output_name: str = None,
+            cores: List[str] = None,
+            names: List[str] = None,
+            compress: bool = None,
+            memory_only: bool = True,
     ):
         """
         Copies a list of cores (or all cores) from one matrix file to another one
