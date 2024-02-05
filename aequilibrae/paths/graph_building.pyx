@@ -32,8 +32,8 @@ cdef void _remove_dead_ends(
     #     - nodes for which all out going links point to the same node and has the same number of back links.
     #       This is a generalisation of dead-ends formed by a node with a single bidirectional link to another
     #
-    # Removal: At nodes of interest we begin a BFS search for links we can remove. It's uncommon to the BFS to extend far as the stopping
-    # criteria and conditions for expansion are very similar, often this just searches in along a line.
+    # Removal: At nodes of interest we begin a Breadth First Search (BFS) for links we can remove. It's uncommon for the BFS to extend far as the stopping
+    # criteria and conditions for expansion are very similar, often this just searches along a line.
     # For removal the node must have "no choices", that is, all outgoing edges point to the same node *and* all incoming edges can be account for as
     # from that same node.
     # The criteria for expansion is that there are no incoming edges *and* all outgoing edges point to the same node.
@@ -68,16 +68,16 @@ cdef void _remove_dead_ends(
                 continue
 
             ### Propagation
-            # We now know that he node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node] > 0 and out_degree[node] > 0
+            # We now know that the node we are looking at has a mix of incoming and outgoing edges, i.e. in_degree[node] > 0 and out_degree[node] > 0
             # That implies that this node is reachable from some other node. We now need to assess if this node would ever be considered in pathfinding.
-            # To be considered there needs to be some form of real choice, i.e. there needs to be multiple ways to leave a new node. If the only way
+            # To be considered, there needs to be some form of real choice, i.e. there needs to be multiple ways to leave a new node. If the only way
             # to leave this node is back the way we came then the cost of the path
             #     ... -> pre -> node -> pre -> ...
             # is greater than that of
             #     ... -> pre -> ...
             # so we can remove this link to node. This is because negative cost cycles are disallowed in path finding.
             #
-            # We don't remove the case were the is only one new node that could be used to leave as it is handled in the graph compression.
+            # We don't remove the case where there is only one new node that could be used to leave as it is handled in the graph compression.
             # It would however, be possible to handle that here as well.
 
             # If all the outgoing edges are to the same node *and* all incoming edges come from that node, then there is no real choice and the
