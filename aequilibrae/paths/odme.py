@@ -1,10 +1,6 @@
 """
 Implementation of ODME Infrastructure:
 """
-
-# NOTE - Until issue with select link flows not matching assigned flows ODME should not be used
-# with biconjugate/conjugate frank-wolfe - refer to Issue #493
-
 # NOTE - To Do:
 #       All docstrings need to be updated appropriately
 #       Any extra clean up needs to be done
@@ -33,7 +29,61 @@ if has_omx:
     import openmatrix as omx
 
 class ODME(object):
-    """ ODME Infrastructure """
+    """Origin-Destination Matrix Estimation class.
+
+    For a comprehensive example on use, see the Use examples page.
+
+    .. code-block:: python
+
+        >>> from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, ODME
+        >>> project = Project.from_path("/tmp/test_project")
+        >>> project.network.build_graphs()
+
+        >>> graph = project.network.graphs['c'] # we grab the graph for cars
+        >>> graph.set_blocked_centroid_flows(False)
+
+        >>> matrix = project.matrices.get_matrix("demand_omx")
+        >>> matrix.computational_view(['car']) # The demand matrix is what we want to estimate
+
+        # See the TrafficAssignment class on details for how to create an assignment
+        >>> assignment = TrafficAssignment()
+        # Make sure we have the matrix we want to perturb included in the TrafficClass
+        >>> assignclass = TrafficClass("car", graph, matrix)
+        >>> assignment.set_classes([assignclass])
+        >>> assignment.set_vdf("BPR")
+        >>> assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+        >>> assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+        >>> assignment.set_capacity_field("capacity")
+        >>> assignment.set_time_field("free_flow_time")
+        >>> assignment.max_iter = 5
+        >>> assignment.set_algorithm("msa")
+
+        # We now need to create our data (count volumes), suppose we have these in a csv file:
+        >>> import pandas as pd
+        >>> counts = pd.read_csv("/tmp/test_data.csv")
+
+        # We can now run the ODME procedure, see Use examples page for a more 
+        # comprehensive overview of the options available when initialising.
+        >>> odme = ODME(assignment, counts)
+        >>> odme.execute() # See Use examples for optional arguments
+
+        # There are multiple ways to deal with the output to ODME,
+        # the simplest is to save the procedure as output demand matrices
+        # and procedure statistics to the project database.
+        >>> odme.save_to_project("odme_test", "odme_test.omx", project=project)
+
+        # We can also get statistics in memory immediately as pandas dataframes
+        >>> results = odme.results
+
+        # Dataframe of the cumulative factors applied to the input demands
+        >>> cumulative_factors = results.get_cumulative_factors()
+
+        # Statistics on the procedure across each iteration
+        >>> iterative_stats = results.get_iteration_statistics()
+
+        # Statistics on the procedure tracking each link (count volumes)
+        >>> link_stats = results.get_link_statistics()
+    """
     # Input count volume columns (assigned volumes will be added during execution)
     COUNT_VOLUME_COLS = ["class", "link_id", "direction", "obs_volume"]
     GMEAN_LIMIT = 0.01 # FACTOR LIMITING VARIABLE - FOR TESTING PURPOSES - DEFUNCT!
@@ -45,24 +95,27 @@ class ODME(object):
         assignment: TrafficAssignment,
         count_volumes: pd.DataFrame,
         stop_crit=None,
-        alpha: float = None,
         algorithm: str = "spiess",
+        alpha: float = None
     ) -> None:
         """
-        For now see description in pdf file in SMP internship team folder
-
         Parameters:
-            assignment: the TrafficAssignment object - should be initialised with volume delay functions
-                    and their parameters and an assignment algorithm, as well as a TrafficClass containing
-                    an initial demand matrix. Doesn't need to have preset select links.
-            count_volumes: a dataframe detailing the links, the class they are associated with, the direction
-                    and their observed volume. NOTE - CURRENTLY ASSUMING SINGLE CLASS
-            stop_crit: the maximum number of iterations and the convergence criterion.
-            alg_spec: NOT YET AVAILABLE - will be implemented later to allow user flexibility on what sort 
-                    of algorithm they choose.
+            assignment: the TrafficAssignment object - should be initialised with volume
+                    delay functions and their parameters and an assignment algorithm,
+                    as well as TrafficClass's containing initial demand matrices (which
+                    will be duplicated so input data is not corrupted). Doesn't
+                    need to have preset select links (these will be overwritten).
+            count_volumes: a dataframe detailing the links, the class they are associated with,
+                    the direction and their observed volume.
+            stop_crit: the maximum number of iterations and the convergence criterion 
+                    (see ODME.DEFAULT_STOP_CRIT for formatting).
+            algorithm: specification for which gradient-descent based algorithm to use
+                    (see ODME.ALL_ALGORITHMS for options).
+            alpha: used as a hyper-parameter for regularised spiess (see technical document for 
+                    details).
 
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS (MULTI-CLASS UNDER DEVELOPMENT)
-        CHANGE STOPPING CRITERION TO BE A DICTIONARY!
+        NOTE - certain functionality is only implemented for single class ODME - see docstrings for
+               such cases.
         """
         self.__check_inputs(count_volumes, stop_crit, alpha, algorithm)
 
@@ -240,7 +293,7 @@ class ODME(object):
         Estimates a starting hyper-paramater for regularised 
         spiess given a number between 0-1.
         
-        ONLY IMPLEMENTED FOR SINGLE CLASS!
+        NOTE - currently only implemented for single class
         """
         demand_sum = np.sum(self.demands[0])
         flow_sum = np.sum(self.count_volumes["obs_volume"])
@@ -249,8 +302,6 @@ class ODME(object):
     def __get_norms(self, algo: str) -> Tuple[int, int]:
         """
         Sets the specifications for the objective function for the algorithm chosen.
-
-        SHOULD REALLY MAKE ALL THIS OBJECTIVE FUNCTION STUFF MAKE MORE SENSE
         """
         if algo in ["gmean", "spiess"]:
             return (2, 0)
@@ -259,7 +310,7 @@ class ODME(object):
 
     def __set_select_links(self) -> None:
         """
-        Sets all select links for each class and for each observation.
+        Sets all select links for each class and for each associated set of count volumes.
         """
         c_v = self.count_volumes
         for user_class in self.classes:
@@ -277,6 +328,9 @@ class ODME(object):
         """
         Given a particular row from the observervations (count_volumes) returns
         a key corresponding to it for use in all select link extraction.
+
+        NOTE - this is intended for internal use only - it has no relevance outside
+        of this class and classes within the odme_ submodule.
         """
         return f"sl_{row['class']}_{row['link_id']}_{row['direction']}"
 
@@ -289,21 +343,21 @@ class ODME(object):
             self.convergence_change = abs(self.last_convergence - new_convergence)
         self.last_convergence = new_convergence
 
+    # TODO - I have previously forgotten to include the pce into the objective
+    # function for multi-class purposes, this needs to be done by multiplying the 
+    # component of flow for each class contributing to the objective function by
+    # the pce of that class.
     def __init_objective_func(self) -> None:
         """
-        Initialises the objective function - parameters must be specified by user.
+        Initialises the objective function - depends on algorithm chosen by user.
 
         Current objective functions have 2 parts which are summed:
             1. The p-norm raised to the power p of the error vector for observed flows.
-            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) for the demand matrix.
+            2. The p-norm raised to the power p of the error matrix (treated as a n^2 vector) 
+               for the demand matrix.
         
-        (1.) must always be present, but (2.) (the regularisation term) need not be present (ie, specified as 0 by user).
-        Default currently set to l1 (manhattan) norm for (1.) with no regularisation term (p2 = 0).
-
-        CURRENTLY ONLY IMPLEMENTED FOR SINGLE CLASS!
-        NOT YET COMPLETED FOR SINGLE CLASS - STILL UNDER DEVELOPMENT!
-        HOW DO I GENERALISE THIS TO MULTI-CLASS
-        NEED TO CHECK HOW PCE AFFECTS THIS!
+        NOTE - currently (1.) must always be present, but (2.) (the regularisation term) 
+               need not be present.
         """
         p_1 = self._norms[0]
         p_2 = self._norms[1]
@@ -312,14 +366,7 @@ class ODME(object):
             """
             Objective function containing regularisation term.
 
-            NOTE - NOT YET READY FOR USE! REGULARISATION TERM SHOULD BE ALPHA/BETA WEIGHTED!
-            NEED TO DECIDE WHETHER I WANT TO SOMEHOW NORMALISE THE ALPHA/BETA WEIGHTS
-
-            NOTE - IT'S POSSIBLE TO ONLY USE 1 HYPER-PARAMETER INTERNALLY BY USING 
-            GAMMA = ALPHA/(1-ALPHA) - BUT THIS MIGHT HAVE FLOATING POINT ERRORS.
-
-            ONLY IMPLEMENTED FOR SINGLE CLASS!
-            NEEDS TO INCLUDE PCE FOR MULTI-CLASS!
+            # NOTE - pce not yet included for multi-class
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
@@ -331,7 +378,7 @@ class ODME(object):
             """
             Objective function with no regularisation term.
 
-            NEEDS TO INCLUDE PCE!
+            # NOTE - pce not yet included for multi-class
             """
             obs_vals = self.count_volumes["obs_volume"].to_numpy()
             assign_vals = self.count_volumes['assign_volume'].to_numpy()
@@ -437,6 +484,12 @@ class ODME(object):
         """ 
         Run ODME algorithm until either the maximum iterations has been reached, 
         or the convergence criterion has been met.
+
+        Parameters:
+            verbose: if true will print output to screen during runtime so user
+                can track ODME progress.
+            print_rate: the rate at which to print output to user (if verbose is true).
+                Does nothing if verbose is false.
         """
         # Initialise Procedure:
         self.results.init_timer()
@@ -471,6 +524,9 @@ class ODME(object):
         # Add final stats following final assignment:
         self.results.log_iter(ODMEResults.FINAL_LOG)
 
+    # TODO - check whether the demand matrix replacement at the start of the following
+    # function is sufficient - we may want to replace the matrix.matrices value
+    # and call matrix.computational_view() (with appropriate arguments) instead.
     def __perform_assignment(self) -> None:
         """ 
         Uses current demand matrix to perform an assignment, then save
@@ -479,12 +535,9 @@ class ODME(object):
 
         This function will only be called at the start of an outer
         iteration & during the final convergence test.
-
-        NOTE - Need to check how matrix dimensions will work for multi-class.
         """
-        # NEED TO CHECK THAT THIS IS DONE CORRECTLY AND WE DON'T NEED TO CHANGE
-        # THE UNDERLYING aeq_matrix.matrices OBJECT INSTEAD! ASK PEDRO ABOUT THIS
-        # Change matrix.matrix_view to the current demand matrix (as np.array)
+        # Change the demand matrices within the TrafficClass's to the current 
+        # demand matrices that have been calculated from the previous outer iteration.
         for aeq_matrix, demand in zip(self.aequilibrae_matrices, self.demands):
             aeq_matrix.matrix_view = demand
 
@@ -553,7 +606,8 @@ class ODME(object):
     def __get_scaling_factors(self) -> list[np.ndarray]:
         """
         Returns scaling matrices for each user class - depending on algorithm chosen.
-        Note: we expect any algorithm to return a list of factor matrices in order of the
+        
+        NOTE - we expect any algorithm to return a list of factor matrices in order of the
         stored user classes.
         """
         algorithm = ScalingFactors(self, self._algorithm)
