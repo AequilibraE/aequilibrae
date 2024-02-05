@@ -10,7 +10,15 @@ import pandas as pd
 # ADD FUNCTIONALITY TO SPLIT DATA INTO A: DEPENDENT ON ITERATION, B: DEPENDENT ON COUNT VOLUME
 # ADD A WAY TO SAVE B TO CSV's
 class ODMEResults(object):
-    """ Results and statistics of an ODME procedure """
+    """ Results and statistics of an ODME procedure.
+    
+    See Use examples or docstring of ODME for how to use. 
+    User interaction methods include:
+
+    get_cumulative_factors()
+    get_iteration_statistics()
+    get_link_statistics()
+    """
     # Columns for various dataframes:
 
     # This one get written to the procedure_report
@@ -32,6 +40,9 @@ class ODMEResults(object):
         """
         Initialises necessary fields from odme object in order to generate
         statistics and results.
+
+        Parameters:
+            odme: an ODME object which this class will track.
         """
         # ODME object:
         self.odme = odme
@@ -52,10 +63,10 @@ class ODMEResults(object):
         self.loop_time = None
         self.time = None
 
-    # Statistics:
+    # User Interaction Methods:
     def get_cumulative_factors(self) -> pd.DataFrame:
         """
-        Return the cumulative factors (ratio of final to initial matrix) in a dataframe.
+        Return the cumulative factors (ratio of final to initial matrix) in a pandas dataframe.
         """
         cumulative_factors = []
         for initial, final, name in zip(
@@ -76,8 +87,8 @@ class ODMEResults(object):
 
     def get_iteration_statistics(self) -> pd.DataFrame:
         """
-        Returns dataframe of all statistics relevant to each iteration.
-        See self.ITERATION_COLS.
+        Returns pandas dataframe of all statistics relevant to each iteration.
+        See self.ITERATION_COLS for details.
         """
         if len(self.iteration_stats) != 0:
             return pd.concat(self.iteration_stats, ignore_index=True)
@@ -86,22 +97,21 @@ class ODMEResults(object):
 
     def get_link_statistics(self) -> pd.DataFrame:
         """
-        Returns dataframe of all statistics relevant to each link.
-        See self.LINK_COLS.
+        Returns pandas dataframe of all statistics relevant to each link.
+        See self.LINK_COLS for details.
         """
         if len(self.link_stats) != 0:
             return pd.concat(self.link_stats, ignore_index=True)
         else:
             return pd.DataFrame(columns=self.LINK_COLS)
 
+    # Statistic Recording Methods:
     def log_iter(self, iter_type: int) -> None:
         """
         Logs statistics for a given iteration type (inner/outer/final log).
 
         Parameters:
-            iter_type: the type of iteration to log
-
-        NEEDS UPDATING TO ALLOW FOR US TO RECORD FACTOR STATS AT APPROPRIATE TIMES!!!
+            iter_type: the type of iteration to log (includes INNER, OUTER, FINAL_LOG)
         """
         if iter_type == self.INNER:
             self.__prepare_inner()
@@ -114,9 +124,9 @@ class ODMEResults(object):
                 f"\'{iter_type}\' is not a valid type of iteration!"
             )
 
-        self.log_stats()
+        self.__log_stats()
 
-    def log_stats(self) -> None:
+    def __log_stats(self) -> None:
         """
         Computes statistics regarding previous iteration and stores them in the statistics list.
         """
@@ -224,7 +234,7 @@ class ODMEResults(object):
 
     def __prepare_final(self) -> None:
         """
-        Prepares logging of final iteration
+        Prepares final log before ODME procedure is expected to end
         """
         self.outer += 1
         self.inner = 0
