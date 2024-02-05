@@ -110,7 +110,7 @@ class OSMBuilder(WorkerThread):
                 intersecs = np.where(node_indices > 1)[0]
                 geos = []
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geos.append(self.__build_geometry(link.nodes[i : j + 1]))
+                    geos.append(self.__build_geometry(link.nodes[i: j + 1]))
                 geo = MultiLineString(geos)
 
             geometries.append(geo)
@@ -168,20 +168,21 @@ class OSMBuilder(WorkerThread):
         return LineString(self.node_df.loc[nodes, "geometry"])
 
     def __process_link_chunk(self):
-        self.logger.info("Creating necessary link types")
-        self.__emit_all(["text", "Creating necessary link types"])
+        self.logger.info("Processing link modes, types and fields")
+        self.__emit_all(["text", "Processing link modes, types and fields"])
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
         # And let's also assume that each row will be 100 fields at 8 bytes each
         # This makes 1Gb roughly equal to 1.34 million rows, so 1 million would so.
         chunk_size = 100_000_000
-        list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
+        list_dfs = [self.links_df.iloc[i: i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = pd.DataFrame([])
         # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
-
+            self.__emit_all(["maxValue", len(list_dfs)])
             for i, df in enumerate(list_dfs):
+                self.__emit_all(["Value", i])
                 if "tags" in df.columns:
                     df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
                     df.columns = [x.replace(":", "_") for x in df.columns]
@@ -217,7 +218,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0 : i + 1])
+                link_type = "_".join(split[0: i + 1])
 
         if self.__all_ltp.shape[0] >= 51:
             link_type = "aggregate_link_type"
