@@ -344,7 +344,7 @@ class ODME(object):
         self.last_convergence = new_convergence
 
     # TODO - I have previously forgotten to include the pce into the objective
-    # function for multi-class purposes, this needs to be done by multiplying the 
+    # function for multi-class purposes, this needs to be done by multiplying the
     # component of flow for each class contributing to the objective function by
     # the pce of that class.
     def __init_objective_func(self) -> None:
@@ -391,6 +391,12 @@ class ODME(object):
             self._obj_func = __obj_func
 
     # Output/Results:
+
+    # TODO - the procedure report is not yet properly implemented since the
+    # procedure_report column in the matrix sql file doesn't yet exist.
+    # Need to find out how to fix this and then check the data is stored
+    # correctly and can be retrieved to obtain the same results as directly
+    # extracting the results from the corresponding ODMEResults object.
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the final demand matrix output to the project file
 
@@ -415,8 +421,6 @@ class ODME(object):
         record.procedure_id = self.procedure_id
         record.timestamp = self.procedure_date
         record.procedure = "Origin-Destination Matrix Estimation"
-        # Note that below just involves doing str() to the particular results file.
-        # CHECK WHETHER THIS IS ACCURATE - THIS SEEMS DIFFERENT TO PROCEDURE REPORT
         record.procedure_report = json.dumps({
             "iterations": self.results.get_iteration_statistics().to_dict(),
             "by_link": self.results.get_link_statistics().to_dict()
