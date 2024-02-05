@@ -1,20 +1,17 @@
 """
-Implementation of ODME Infrastructure:
+ODME Infrastructure (User Interaction Class):
 """
-# NOTE - To Do:
-#       All docstrings need to be updated appropriately
-#       Any extra clean up needs to be done
-#       Check the matrix replacement in __perform_assignment
+# TODO - 3 todo's remaining in code, see below
 
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
 from os.path import join
 from pathlib import Path
+import json
 import importlib.util as iutil
 import numpy as np
 import pandas as pd
-import json
 
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 from aequilibrae.paths.odme_ import ScalingFactors, ODMEResults
