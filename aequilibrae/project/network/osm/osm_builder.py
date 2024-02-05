@@ -8,17 +8,17 @@ from typing import List
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import shapely.wkb
+from pandas import json_normalize
 from shapely import MultiLineString
 from shapely.geometry import Polygon, LineString
 
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
+from aequilibrae.project.project_creation import remove_triggers, add_triggers
 from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
-from aequilibrae.project.project_creation import remove_triggers, add_triggers
 
 pyqt = iutil.find_spec("PyQt5") is not None
 if pyqt:
@@ -62,28 +62,16 @@ class OSMBuilder(WorkerThread):
 
     def doWork(self):
         with commit_and_close(connect_spatialite(self.path)) as conn:
-            node_count = self.data_structures()
-            self.importing_network(node_count, conn)
+            self.__update_table_structure(conn)
+            self.importing_network(conn)
             conn.execute(
                 "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
             )
         self.__emit_all(["finished_threaded_procedure", 0])
 
-    def data_structures(self):
-        self.logger.info("Setting data structures for nodes")
+    def importing_network(self, conn):
+        node_count = pd.DataFrame(self.links_df["nodes"].explode("nodes")).assign(counter=1).groupby("nodes").count()
 
-        aux = pd.DataFrame(self.links_df["nodes"].explode("nodes")).assign(counter=1).groupby("nodes").count()
-
-        self.logger.info("Finalizing data structures")
-        self.__emit_all(["text", "Finalizing data structures"])
-        return aux
-
-    def importing_network(self, node_count, conn):
-        self.__update_table_structure(conn)
-
-        self.logger.info("Adding network nodes")
-        conn.commit()
-        self.__emit_all(["text", "Adding network nodes"])
         self.node_df.osm_id = self.node_df.osm_id.astype(np.int64)
         self.node_df.set_index(["osm_id"], inplace=True)
 
@@ -127,7 +115,7 @@ class OSMBuilder(WorkerThread):
                 intersecs = np.where(node_indices > 1)[0]
                 geos = []
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geos.append(self.__build_geometry(link.nodes[i : j + 1]))
+                    geos.append(self.__build_geometry(link.nodes[i: j + 1]))
                 geo = MultiLineString(geos)
 
             geometries.append(geo)
@@ -184,14 +172,13 @@ class OSMBuilder(WorkerThread):
     def __build_geometry(self, nodes: List[int]) -> LineString:
         return LineString(self.node_df.loc[nodes, "geometry"])
 
-    def __update_table_structure(self, conn):
-        structure = conn.execute("pragma table_info(Links)").fetchall()
-        has_fields = [x[1].lower() for x in structure]
-        fields = [field.lower() for field in self.get_link_fields()] + ["osm_id"]
-        for field in [f for f in fields if f not in has_fields]:
-            ltype = self.get_link_field_type(field).upper()
-            conn.execute(f"Alter table Links add column {field} {ltype}")
-        conn.commit()
+
+
+    def __process_link_chunk(self):
+
+        if "tags" in df.columns:
+            df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
+            df.columns = [x.replace(":", "_") for x in df.columns]
 
     def __build_link_types(self):
         data = []
@@ -219,7 +206,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0 : i + 1])
+                link_type = "_".join(split[0: i + 1])
 
         if self.__all_ltp.shape[0] >= 51:
             link_type = "aggregate_link_type"
@@ -247,49 +234,6 @@ class OSMBuilder(WorkerThread):
         lt.save()
         return [letter, link_type]
 
-    def __get_link_property(self, d2, val, linktags, v):
-        vald = linktags.get(f'{v["osm_source"]}:{d2}', val)
-        if vald is None:
-            return vald
-
-        if vald.isdigit():
-            if vald == val and v["osm_behaviour"] == "divide":
-                vald = float(val) / 2
-        return vald
-
-    @staticmethod
-    def unique_count(a):
-        # From: https://stackoverflow.com/a/21124789/1480643
-        unique, inverse = np.unique(a, return_inverse=True)
-        count = np.zeros(len(unique), int)
-        np.add.at(count, inverse, 1)
-        return np.vstack((unique, count)).T
-
-    @staticmethod
-    def get_link_fields():
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-        owf = [list(x.keys())[0] for x in fields["one-way"]]
-
-        twf1 = ["{}_ab".format(list(x.keys())[0]) for x in fields["two-way"]]
-        twf2 = ["{}_ba".format(list(x.keys())[0]) for x in fields["two-way"]]
-
-        return owf + twf1 + twf2 + ["osm_id"]
-
-    @staticmethod
-    def get_link_field_type(field_name):
-        p = Parameters()
-        fields = p.parameters["network"]["links"]["fields"]
-
-        if field_name[-3:].lower() in ["_ab", "_ba"]:
-            field_name = field_name[:-3]
-            for tp in fields["two-way"]:
-                if field_name in tp:
-                    return tp[field_name]["type"]
-        else:
-            for tp in fields["one-way"]:
-                if field_name in tp:
-                    return tp[field_name]["type"]
 
     def process_link_attributes(self):
         self.links_df = self.links_df.assign(direction=0, link_id=0)
@@ -349,9 +293,38 @@ class OSMBuilder(WorkerThread):
         self.links_df = self.links_df.merge(df, on="link_type", how="left")
         self.links_df.modes.fillna("".join(sorted(notfound)), inplace=True)
 
+    ######## TABLE STRUCTURE UPDATING ########
+    def __update_table_structure(self, conn):
+        structure = conn.execute("pragma table_info(Links)").fetchall()
+        has_fields = [x[1].lower() for x in structure]
+        fields = [field.lower() for field in self.get_link_fields()] + ["osm_id"]
+        for field in [f for f in fields if f not in has_fields]:
+            ltype = self.get_link_field_type(field).upper()
+            conn.execute(f"Alter table Links add column {field} {ltype}")
+        conn.commit()
+
     @staticmethod
-    def get_node_fields():
+    def get_link_fields():
         p = Parameters()
-        fields = p.parameters["network"]["nodes"]["fields"]
-        fields = [list(x.keys())[0] for x in fields]
-        return fields + ["osm_id"]
+        fields = p.parameters["network"]["links"]["fields"]
+        owf = [list(x.keys())[0] for x in fields["one-way"]]
+
+        twf1 = ["{}_ab".format(list(x.keys())[0]) for x in fields["two-way"]]
+        twf2 = ["{}_ba".format(list(x.keys())[0]) for x in fields["two-way"]]
+
+        return owf + twf1 + twf2 + ["osm_id"]
+
+    @staticmethod
+    def get_link_field_type(field_name):
+        p = Parameters()
+        fields = p.parameters["network"]["links"]["fields"]
+
+        if field_name[-3:].lower() in ["_ab", "_ba"]:
+            field_name = field_name[:-3]
+            for tp in fields["two-way"]:
+                if field_name in tp:
+                    return tp[field_name]["type"]
+        else:
+            for tp in fields["one-way"]:
+                if field_name in tp:
+                    return tp[field_name]["type"]

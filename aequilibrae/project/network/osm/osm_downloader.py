@@ -19,7 +19,6 @@ from typing import List, Dict
 
 import pandas as pd
 import requests
-from pandas import json_normalize
 from shapely import Polygon
 
 from aequilibrae.context import get_logger
@@ -95,11 +94,7 @@ class OSMDownloader(WorkerThread):
         self.__emit_all(["text", "Downloading finished. Processing data"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
             df = pd.concat(lst, ignore_index=True).drop_duplicates(subset=["id"]).drop(columns=["type"])
-            if table == "links":
-                if "tags" in df.columns:
-                    df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
-                    df.columns = [x.replace(":", "_") for x in df.columns]
-            else:
+            if table != "links":
                 df = df.drop(columns=["tags"])
             self.data[table] = df.rename(columns={"id": "osm_id"})
             lst.clear()
