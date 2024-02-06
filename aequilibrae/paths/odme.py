@@ -2,7 +2,7 @@
 ODME Infrastructure (User Interaction Class):
 """
 
-# TODO - 3 todo's remaining in code, see below
+# TODO - 2 todo's remaining in code, see below
 
 from typing import Tuple
 from uuid import uuid4
@@ -342,10 +342,6 @@ class ODME(object):
             self.convergence_change = abs(self.last_convergence - new_convergence)
         self.last_convergence = new_convergence
 
-    # TODO - I have previously forgotten to include the pce into the objective
-    # function for multi-class purposes, this needs to be done by multiplying the
-    # component of flow for each class contributing to the objective function by
-    # the pce of that class.
     def __init_objective_func(self) -> None:
         """
         Initialises the objective function - depends on algorithm chosen by user.
@@ -367,10 +363,19 @@ class ODME(object):
 
             # NOTE - pce not yet included for multi-class
             """
-            obs_vals = self.count_volumes["obs_volume"].to_numpy()
-            assign_vals = self.count_volumes["assign_volume"].to_numpy()
-            self.flow_obj = self.alpha * np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
+            # Get flow term:
+            self.flow_obj = 0
+            for name, usr_cls in zip(self.class_names, self.classes):
+                counts = self.count_volumes[self.count_volumes["class"] == name].reset_index(drop=True)
+                obs_vals = counts["obs_volume"].to_numpy()
+                assign_vals = counts["assign_volume"].to_numpy()
+                self.flow_obj += usr_cls.pce * np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
+            self.flow_obj *= self.alpha
+
+            # Get regularised term:
             self.reg_obj = self.beta * np.sum(np.abs(self.original_demands[0] - self.demands[0]) ** p_2) / p_2
+
+            # Sum terms:
             self.__set_convergence_values(self.flow_obj + self.reg_obj)
 
         def __obj_func(self) -> None:
@@ -379,9 +384,13 @@ class ODME(object):
 
             # NOTE - pce not yet included for multi-class
             """
-            obs_vals = self.count_volumes["obs_volume"].to_numpy()
-            assign_vals = self.count_volumes["assign_volume"].to_numpy()
-            self.flow_obj = np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
+            # Get flow term:
+            self.flow_obj = 0
+            for name, usr_cls in zip(self.class_names, self.classes):
+                counts = self.count_volumes[self.count_volumes["class"] == name].reset_index(drop=True)
+                obs_vals = counts["obs_volume"].to_numpy()
+                assign_vals = counts["assign_volume"].to_numpy()
+                self.flow_obj += usr_cls.pce * np.sum(np.abs(obs_vals - assign_vals) ** p_1) / p_1
             self.__set_convergence_values(self.flow_obj)
 
         if p_2:
