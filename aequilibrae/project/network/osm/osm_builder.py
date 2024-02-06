@@ -268,8 +268,9 @@ class OSMBuilder(WorkerThread):
 
     def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.assign(direction=0, link_id=0)
-        df.loc[df.oneway == "yes", "direction"] = 1
-        df.loc[df.oneway == "backward", "direction"] = -1
+        if "oneway" in df.columns:
+            df.loc[df.oneway == "yes", "direction"] = 1
+            df.loc[df.oneway == "backward", "direction"] = -1
         p = Parameters()
         fields = p.parameters["network"]["links"]["fields"]
 
