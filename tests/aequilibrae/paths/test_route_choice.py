@@ -116,6 +116,67 @@ class TestRouteChoice(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
 
+    def test_debug(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        import matplotlib.pyplot as plt
+
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        # nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        nodes = [(1, x) for x in self.graph.centroids if x != 1]
+
+        max_routes = 20
+        results: dict[
+            tuple[int, int],  # OD keys
+            list[  # routes, length = max_routes
+                tuple[int, ...]  # individual paths, length variable
+            ]
+        ]
+
+        self.graph.centroids
+
+        # Table of origins
+        results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
+        batch = pa.RecordBatch.from_arrays([pa.array(v) for v in results.values()], names=[str(k[1]) for k in results.keys()])
+        table = pa.Table.from_batches([batch] * 5)
+
+        lengths = [len(r) for k, v in results.items() for r in v]
+        # plt.hist(lengths)
+        # plt.show(block=False)
+
+        ty = pa.map_(
+            pa.uint32(),  # Destination
+            pa.list_(  # route set
+                pa.list_(pa.uint32()),  # path
+                # list_size=max_routes  # We could make this fixed length, not sure if it has benefits?
+            )
+        )
+
+        # Route map contains a column (a list below) for each origin.
+        # Each column is a map of (key, value) pairs where key is the destination and value is a list of paths
+        # paths are lists of uint32s. We don't need int64 since they'll never contain negative (invalid) link IDs
+        route_map = pa.array([
+            [(k[1], v) for k, v in results.items()],  # Real example, TODO: make coercion easier
+            [(k[1] * 100, v[::-1]) for k, v in results.items()]  # different one just for the sake of it
+        ], type=ty)
+
+        struct = pa.struct([
+            pa.field("column index", pa.list_(pa.int32())),  # List origin IDs at index they appear in the above ^^^
+            pa.field("route map", pa.list_(route_map.type), nullable=False),  # Not sure why this has to be a pa.list_(route_map.type) but just route_map.type doesn't work
+        ])
+
+        route_choice = pa.array([{
+            "column index": [1, 100],  # Here we encode the origin ID to index map separately. I couldn't figure out how to nest MapArrays/I'm not sure its needed
+            "routes map": route_map
+        }], type=struct)  # Because the thing struct really stores lists of fields we could store multiple route choices in the same table
+
+        table = pa.Table.from_pydict({'route choice': route_choice})  # Need to wrap the whole thing in a table to keep arrow happy
+        pq.write_table(table, "table.parquet")  # Pretty sure with this structure writing a partitioned data set doesn't work
+
+        # breakpoint()
+        assert False
+
 
 def generate_line_strings(project, graph, results):
     """Debug method"""
