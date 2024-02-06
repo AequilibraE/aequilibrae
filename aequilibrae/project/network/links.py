@@ -163,7 +163,7 @@ class Links(BasicTable):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             data = conn.execute(f"{self.sql} where link_id=?", [link_id]).fetchone()
         if data:
-            return {key: val for key, val in zip(self.__fields, data)}
+            return dict(zip(self.__fields, data))
         raise ValueError("Link_id does not exist on the network")
 
     def __new_link_id(self):

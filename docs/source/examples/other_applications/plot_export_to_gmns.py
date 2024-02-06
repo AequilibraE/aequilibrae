@@ -37,7 +37,7 @@ project.network.export_to_gmns(path=output_fldr)
 # %%
 # Now, let's plot a map. This map can be compared with the images of the README.md
 # file located in this example repository on GitHub:
-# https://github.com/zephyr-data-specs/GMNS/blob/development/Small_Network_Examples/Arlington_Signals/README.md
+# https://github.com/zephyr-data-specs/GMNS/blob/develop/examples/Arlington_Signals/README.md
 links = pd.read_csv(os.path.join(output_fldr, "link.csv"))
 nodes = pd.read_csv(os.path.join(output_fldr, "node.csv"))
 

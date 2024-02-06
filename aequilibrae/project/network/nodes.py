@@ -66,7 +66,7 @@ class Nodes(BasicTable):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             data = conn.execute(f"{self.sql} where node_id=?", [node_id]).fetchone()
         if data:
-            data = {key: val for key, val in zip(self.__fields, data)}
+            data = dict(zip(self.__fields, data))
             node = Node(data, self.project)
             self.__items[node.node_id] = node
             return node

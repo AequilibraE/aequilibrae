@@ -1,10 +1,11 @@
 from unittest import TestCase
 import os
 import tempfile
+import zipfile
 import numpy as np
 import pandas as pd
 from aequilibrae.paths import Graph
-from os.path import join
+from os.path import join, dirname
 from uuid import uuid4
 from .parameters_test import centroids
 from aequilibrae.project import Project
@@ -120,3 +121,51 @@ class TestTransitGraph(TestCase):
 
     def test_transit_graph_od_node_mapping(self):
         pd.testing.assert_frame_equal(self.graph.od_node_mapping, self.transit_graph.od_node_mapping)
+
+
+class TestGraphCompression(TestCase):
+    def setUp(self) -> None:
+        proj_path = os.path.join(tempfile.gettempdir(), "test_graph_compression" + uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "KaiTang.zip")).extractall(proj_path)
+
+        # proj_path = "/home/jake/Software/aequilibrae_performance_tests/models/kaitang"
+        self.link_df = pd.read_csv(os.path.join(proj_path, "links_modified.csv"))
+        self.node_df = pd.read_csv(os.path.join(proj_path, "nodes_modified.csv"))
+        centroids_array = np.array([7, 8, 11])
+
+        self.graph = Graph()
+        self.graph.network = self.link_df
+        self.graph.mode = "a"
+        self.graph.prepare_graph(centroids_array)
+        self.graph.set_blocked_centroid_flows(False)
+        self.graph.set_graph("fft")
+
+    def test_compressed_graph(self):
+        # Check the compressed links, links 4 and 5 should be collapsed into 2 links from 3 - 10 and 10 - 3.
+        compressed_links = self.graph.graph[
+            self.graph.graph.__compressed_id__.duplicated(keep=False)
+            & (self.graph.graph.__compressed_id__ != self.graph.compact_graph.id.max() + 1)
+        ]
+
+        self.assertListEqual(compressed_links.link_id.unique().tolist(), [4, 5])
+
+        # Confirm these compacted links map back up to a contraction between the correct nodes
+        self.assertListEqual(
+            self.graph.compact_all_nodes[
+                self.graph.compact_graph[self.graph.compact_graph.id.isin(compressed_links.__compressed_id__.unique())][
+                    ["a_node", "b_node"]
+                ].values
+            ].tolist(),
+            [[3, 10], [10, 3]],
+        )
+
+    def test_dead_end_removal(self):
+        # The dead end remove should be able to remove links [30, 38]. In it's current state it is not able to remove
+        # link 40 as it's a single direction link with no outgoing edges so its not possible to find the incoming edges
+        # (in general) without a transposed graph representation.
+        self.assertSetEqual(
+            set(self.graph.dead_end_links),
+            set(self.graph.graph[self.graph.graph.dead_end == 1].link_id) - {40},
+            "Dead end removal removed incorrect links",
+        )

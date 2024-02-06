@@ -31,7 +31,7 @@ if "WINDOWS" in platform.platform().upper():
 
     root = "C:/hostedtoolcache/windows/Python/"
     file = "sqlite3.dll"
-    for d, subD, f in walk(root):
+    for d, _, f in walk(root):
         if file in f:
             if "x64" in d:
                 zipfile.ZipFile(zip_path64).extractall(d)

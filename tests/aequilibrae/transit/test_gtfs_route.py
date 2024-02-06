@@ -53,7 +53,7 @@ class TestRoute:
             "Select agency_id, shortname, longname, description, route_type from routes where route=?",
             [data["route_id"]],
         )
-        result = [x for x in curr.fetchone()]
+        result = list(curr.fetchone())
         expected = [
             data["agency_id"],
             data["route_short_name"],

@@ -37,7 +37,7 @@ class Stop(BasicPTElement):
         self.srid = -1
         self.geo: Optional[Point] = None
         self.route_type: Optional[int] = None
-        self.___map_matching_id__: Dict[Any, Any] = dict()
+        self.___map_matching_id__: Dict[Any, Any] = {}
         self.__moved_map_matching__ = 0
 
         for key, value in zip(headers, record):

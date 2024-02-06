@@ -62,8 +62,8 @@ class TestNodes(TestCase):
             node.geometry = Point([x, y])
 
         nodes.save()
-        for nd, coords in zip(chosen, coords):
-            x, y = coords
+        for nd, crd in zip(chosen, coords):
+            x, y = crd
             self.curr.execute("Select is_centroid, asBinary(geometry) from nodes where node_id=?;", [nd])
             flag, wkb = self.curr.fetchone()
             self.assertEqual(flag, 0, "Saving of is_centroid failed")
@@ -80,9 +80,7 @@ class TestNodes(TestCase):
         self.curr.execute("pragma table_info(nodes)")
         dt = self.curr.fetchall()
 
-        actual_fields = set([x[1] for x in dt if x[1] != "ogc_fid"])
-        actual_fields = sorted(list(actual_fields))
-
+        actual_fields = sorted({x[1] for x in dt if x[1] != "ogc_fid"})
         self.assertEqual(fields, actual_fields, "Table editor is weird for table nodes")
 
     def test_copy(self):

@@ -9,16 +9,21 @@ detach them in order to use OSMNx as a dependency or submodule
 
 For the original work, please see https://github.com/gboeing/osmnx
 """
+
 import logging
 import time
 import re
+from typing import List
+
 import requests
-from .osm_utils.osm_params import http_headers, memory
+from shapely import Polygon
+
+from .osm_params import http_headers, memory
 from aequilibrae.parameters import Parameters
 from aequilibrae.context import get_logger
+from aequilibrae.utils import WorkerThread
 import gc
 import importlib.util as iutil
-from ...utils import WorkerThread
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -34,7 +39,7 @@ class OSMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes, logger: logging.Logger = None):
+    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
@@ -62,7 +67,7 @@ class OSMDownloader(WorkerThread):
             self.logger.debug(msg)
             self.__emit_all(["Value", counter])
             self.__emit_all(["text", msg])
-            west, south, east, north = poly
+            west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
                 south=south,
@@ -117,7 +122,7 @@ class OSMDownloader(WorkerThread):
                 msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
                 self.logger.info(msg)
-        except Exception:
+        except Exception as err:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
             # overpass_request until we get a valid response
@@ -136,7 +141,9 @@ class OSMDownloader(WorkerThread):
             # else, this was an unhandled status_code, throw an exception
             else:
                 self.report.append(f"Server at {domain} returned status code {response.status_code} and no JSON data")
-                raise Exception(f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}")
+                raise Exception(
+                    f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}"
+                ) from err
 
         return response_json
 

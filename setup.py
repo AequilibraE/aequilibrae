@@ -4,6 +4,7 @@ from os.path import join
 
 import numpy as np
 from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 from setuptools import Extension
 from setuptools import setup, find_packages
 
@@ -17,7 +18,7 @@ if iutil.find_spec("pyarrow") is not None:
     include_dirs.append(pa.get_include())
 
 is_win = "WINDOWS" in platform.platform().upper()
-is_mac = any([e in platform.platform().upper() for e in ["MACOS", "DARWIN"]])
+is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])
 prefix = "/" if is_win else "-f"
 cpp_std = "/std:c++17" if is_win else "-std=c++17"
 compile_args = [cpp_std, f"{prefix}openmp"]
@@ -33,7 +34,6 @@ ext_mod_aon = Extension(
     include_dirs=include_dirs,
     language="c++",
 )
-
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
@@ -55,11 +55,29 @@ ext_mod_put = Extension(
     language="c++",
 )
 
+ext_mod_bfs_le = Extension(
+    "aequilibrae.paths.route_choice",
+    [join("aequilibrae", "paths", "route_choice.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
+ext_mod_graph_building = Extension(
+    "aequilibrae.paths.graph_building",
+    [join("aequilibrae", "paths", "graph_building.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
 
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
-pkgs = [pkg for pkg in find_packages()]
+pkgs = list(find_packages())
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
@@ -104,5 +122,8 @@ if __name__ == "__main__":
             "Programming Language :: Python :: 3.12",
         ],
         cmdclass={"build_ext": build_ext},
-        ext_modules=[ext_mod_aon, ext_mod_ipf, ext_mod_put],
+        ext_modules=cythonize(
+            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_bfs_le, ext_mod_graph_building],
+            compiler_directives={"language_level": "3str"},
+        ),
     )

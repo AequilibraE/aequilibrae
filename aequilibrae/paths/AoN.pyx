@@ -11,7 +11,6 @@ include 'conical.pyx'
 include 'inrets.pyx'
 include 'parallel_numpy.pyx'
 include 'path_file_saving.pyx'
-include 'graph_building.pyx'
 
 def one_to_all(origin, matrix, graph, result, aux_result, curr_thread):
     # type: (int, AequilibraeMatrix, Graph, AssignmentResults, MultiThreadedAoN, int) -> int
@@ -242,19 +241,20 @@ def path_computation(origin, destination, graph, results):
                                     original_b_nodes_view)
 
         if a_star_bint:
-            w = path_finding_a_star(origin_index,
-                                    dest_index,
-                                    g_view,
-                                    b_nodes_view,
-                                    graph_fs_view,
-                                    nodes_to_indices_view,
-                                    lat_view,
-                                    lon_view,
-                                    predecessors_view,
-                                    ids_graph_view,
-                                    conn_view,
-                                    reached_first_view,
-                                    heuristic)
+            path_finding_a_star(
+                origin_index,
+                dest_index,
+                g_view,
+                b_nodes_view,
+                graph_fs_view,
+                nodes_to_indices_view,
+                lat_view,
+                lon_view,
+                predecessors_view,
+                ids_graph_view,
+                conn_view,
+                heuristic
+            )
         else:
             w = path_finding(origin_index,
                              dest_index if early_exit_bint else -1,
@@ -267,7 +267,7 @@ def path_computation(origin, destination, graph, results):
                              reached_first_view)
 
 
-        if skims > 0:
+        if skims > 0 and not a_star_bint:
             skim_single_path(origin_index,
                              nodes,
                              skims,
