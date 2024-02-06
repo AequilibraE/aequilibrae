@@ -10,6 +10,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+import openmatrix as omx
 from scipy.sparse import coo_matrix
 
 # Checks if we can display OMX
