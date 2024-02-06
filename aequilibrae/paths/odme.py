@@ -2,8 +2,6 @@
 ODME Infrastructure (User Interaction Class):
 """
 
-# TODO - 2 todo's remaining in code, see below
-
 from typing import Tuple
 from uuid import uuid4
 from datetime import datetime
