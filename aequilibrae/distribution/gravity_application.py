@@ -1,5 +1,4 @@
 import glob
-import importlib.util as iutil
 import logging
 import os
 import tempfile
@@ -14,9 +13,6 @@ from aequilibrae.context import get_active_project
 from aequilibrae.distribution.ipf import Ipf
 from aequilibrae.distribution.synthetic_gravity_model import SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
 
 
 class GravityApplication:
