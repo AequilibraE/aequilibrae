@@ -390,12 +390,6 @@ class ODME(object):
             self._obj_func = __obj_func
 
     # Output/Results:
-
-    # TODO - the procedure report is not yet properly implemented since the
-    # procedure_report column in the matrix sql file doesn't yet exist.
-    # Need to find out how to fix this and then check the data is stored
-    # correctly and can be retrieved to obtain the same results as directly
-    # extracting the results from the corresponding ODMEResults object.
     def save_to_project(self, name: str, file_name: str, project=None) -> None:
         """Saves the final demand matrix output to the project file
 
