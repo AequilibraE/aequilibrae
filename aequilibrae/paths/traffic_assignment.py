@@ -665,7 +665,6 @@ class TrafficAssignment(AssignmentBase):
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-        if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
         if not project:
