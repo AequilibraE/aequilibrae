@@ -24,9 +24,6 @@ pyqt = iutil.find_spec("PyQt5") is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
-if iutil.find_spec("qgis") is not None:
-    pass
-
 
 class OSMBuilder(WorkerThread):
     if pyqt:
