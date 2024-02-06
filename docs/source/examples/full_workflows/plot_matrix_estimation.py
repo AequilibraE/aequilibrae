@@ -7,7 +7,6 @@ import zipfile
 from os.path import join, dirname
 from tempfile import gettempdir
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
@@ -50,8 +49,6 @@ assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 assignment.set_capacity_field("capacity")
 assignment.set_time_field("free_flow_time")
 assignment.max_iter = 5
-
-# NOTE - Until Issue #493 is resolved algorithms cfw & bfw cannot be used for assignment.
 assignment.set_algorithm("msa")
 
 # %% [markdown]
@@ -85,24 +82,26 @@ stop_crit = {"max_outer": 10,
     "convergence_crit": 1,
     "inner_convergence": 0.1}
 
+algorithm = "spiess"
 odme = ODME(assignment,
     counts,
     stop_crit=stop_crit,
-    algorithm="spiess"
+    algorithm=algorithm,
+    alpha=0.5 # Only used for regularised spiess
     )
 
 # %% [markdown]
 # We can now run the ODME procedure. Note that when we execute ODME it will make a copy of all input matrices and leave the original matrices unchanged.
 
 # %%
-odme.execute(verbose=True, print_rate=2) # Verbose allows us to track the progress of ODME as it occurs
+odme.execute(verbose=True, print_rate=2) # Verbose/print_rate allow us to track the progress of ODME as it occurs
 
 # %% [markdown]
-# If we wish to we can save the results using the save_to_project() method which will both save the results and generate a procedure report (NOT YET IMPLEMENTED).
+# If we wish to we can save the results using the save_to_project() method which will both save the results and generate a procedure report (saved in the project database via sqlite).
 
 # %%
 # If we wish to save the project we can call the following function -
-# (saving as both .omx or .aem are supported)
+# (both .omx or .aem are supported for save_to_project())
 odme.save_to_project("example_doc", "example_doc.omx", project=project)
 
 # %% [markdown]
@@ -112,18 +111,22 @@ odme.save_to_project("example_doc", "example_doc.omx", project=project)
 # To get the demand matrices as a list of numpy arrays:
 new_demands = odme.get_demands()
 
-# A dataframe containing extensive statistics for each count volume and iteration:
-stats = odme.get_all_statistics() # use stats.columns to see all data provided
+# A dataframe containing extensive statistics for each iteration:
+iteration_stats = odme.results.get_iteration_statistics() # use iteration_stats.columns to see all data provided
 
-# A dataframe containing summary statistics on the factors applied to each demand matrix over each iteration:
-iterative_factors = odme.get_iteration_factors()
+# A dataframe containing statistics pertaining to each link
+link_stats = odme.results.get_link_statistics() # use link_stats.columns to see all data provided
 
 # An unordered list of cumulative factors applied to each demand matrix
 # (the same as dividing the final demand matrix by the initial demand)
-cumulative_factors = odme.get_cumulative_factors()
+cumulative_factors = odme.results.get_cumulative_factors()
 
 # %% [markdown]
 # From here the results can be analysed by the user - we will provide a few sample plots of what can be visualised.
+
+# %%
+# Uncomment this code to generate a directory within which to save plots:
+# os.mkdir("odme_plots")
 
 # %%
 # Plotting all count volumes across iterations:
@@ -131,26 +134,55 @@ sns.relplot(x='Total Iteration #',
     y='Assigned - Observed',
     hue='link_id', 
     kind='line', 
-    data=stats, 
+    data=link_stats,
     markers=True, 
     dashes=False)
+plt.title(f"Assigned Link Error over Iterations (using {algorithm})")
+plt.tight_layout()
+
+# Uncomment this code to save the plot:
+# plt.savefig(f"odme_plots/link_err_{algorithm}.png", dpi=300)
+
+# %%
+# Plotting the factors applied across each iteration:
+plt.plot(iteration_stats['Total Iteration #'], iteration_stats['mean_factor'], color="red")
+plt.plot(iteration_stats['Total Iteration #'], iteration_stats['min_factor'], color="green")
+plt.plot(iteration_stats['Total Iteration #'], iteration_stats['max_factor'], color="blue")
+
+plt.xlabel("Iterations")
+plt.ylabel("Factor Size")
+plt.title("Factor Distribution across Iterations")
+plt.tight_layout()
+
+# Uncomment this code to save the plot:
+# plt.savefig(f"odme_plots/factor_iter_{algorithm}.png", dpi=300)
 
 # %%
 # Plotting a histogram to visualise the total (cumulative) factors applied to the matrix:
-sns.histplot(cumulative_factors['Factors'], bins=20, kde=False, color='skyblue')
+sns.histplot(cumulative_factors['Factors'], bins=40, kde=False, color='skyblue')
+plt.title("Cumulative Factor Distribution")
+plt.tight_layout()
+
+# Uncomment this code to save the plot:
+# plt.savefig(f"odme_plots/cum_factor_{algorithm}.png", dpi=300)
 
 # %%
 # Plotting how the objective function changes across iterations:
 sns.lineplot(x='Total Iteration #',
     y='Convergence',
-    data=stats, 
+    data=iteration_stats, 
     markers=True, 
     dashes=False)
+plt.title("Objective Function over Iterations")
 
 # We can extract and visualise when each new outer iteration begins:
-outer_iterations = stats[stats["Inner Loop #"] == 0]["Total Iteration #"]
+outer_iterations = iteration_stats[iteration_stats["Inner Loop #"] == 0]["Total Iteration #"]
 for outer_iteration in outer_iterations:
     plt.axvline(x=outer_iteration, color='lightgrey', linestyle='--', linewidth=1)
+plt.tight_layout()
+
+# Uncomment this code to save the plot:
+# plt.savefig(f"odme_plots/obj_func_{algorithm}.png", dpi=300)
 
 # %% [markdown]
 # Finally we close the project and matrices:
