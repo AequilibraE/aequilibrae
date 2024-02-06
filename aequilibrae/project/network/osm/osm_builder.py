@@ -5,11 +5,9 @@ from math import floor
 from pathlib import Path
 from typing import List
 
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
-from shapely import MultiLineString
 from shapely.geometry import Polygon, LineString
 
 from aequilibrae.context import get_active_project
@@ -45,11 +43,9 @@ class OSMBuilder(WorkerThread):
         self.__link_id = 1
         self.__valid_links = []
 
+        # Building shapely geometries makes the code surprisingly slower.
         nids = np.arange(data["nodes"].shape[0]) + self.node_start
-        nodes = data["nodes"].assign(is_centroid=0, modes="", link_types="", node_id=nids).reset_index(drop=True)
-        self.node_df = gpd.GeoDataFrame(nodes, geometry=gpd.points_from_xy(nodes.lon, nodes.lat), crs=4326)
-        del nodes
-        del data["nodes"]
+        self.node_df = data["nodes"].assign(is_centroid=0, modes="", link_types="", node_id=nids).reset_index(drop=True)
         gc.collect()
         self.links_df = data["links"]
 
@@ -67,6 +63,7 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def importing_network(self, conn):
+        self.logger.info("Importing the network")
         node_count = pd.DataFrame(self.links_df["nodes"].explode("nodes")).assign(counter=1).groupby("nodes").count()
 
         self.node_df.osm_id = self.node_df.osm_id.astype(np.int64)
@@ -93,7 +90,6 @@ class OSMBuilder(WorkerThread):
 
             if len(link["nodes"]) < 2:
                 self.logger.error(f"Link {idx} has less than two nodes. {link.nodes}")
-                geometries.append(LineString())
                 continue
 
             # The link is a straight line between two points
@@ -101,28 +97,26 @@ class OSMBuilder(WorkerThread):
             node_indices = node_count.loc[link["nodes"], "counter"]
             if len(link["nodes"]) == 2 or node_indices[1:-1].max() == 1:
                 # The link has no intersections
-                geo = self.__build_geometry(link.nodes)
+                geometries.append([idx, self.__build_geometry(link.nodes)])
             else:
                 # The link has intersections
+                # We build repeated records for links when they have intersections
+                # This is because it is faster to do this way and then have all the data repeated
+                # when doing the join with the link fields below
                 intersecs = np.where(node_indices > 1)[0]
-                geos = []
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geos.append(self.__build_geometry(link.nodes[i: j + 1]))
-                geo = MultiLineString(geos)
-
-            geometries.append(geo)
+                    geometries.append([idx, self.__build_geometry(link.nodes[i : j + 1])])
 
         # Builds the link Geo dataframe
         self.links_df.drop(columns=["nodes"], inplace=True)
-        self.links_df = gpd.GeoDataFrame(self.links_df, geometry=geometries, crs=4326)
-        self.links_df = self.links_df.clip(self.model_area).explode(index_parts=False)
-        self.links_df = self.links_df[self.links_df.geometry.length > 0]
+        # We build a dataframe with the geometries created above
+        # and join with the database
+        geo_df = pd.DataFrame(geometries, columns=["link_id", "geometry"]).set_index("link_id")
+        self.links_df = self.links_df.join(geo_df, how="inner")
 
         self.links_df.loc[:, "link_id"] = np.arange(self.links_df.shape[0]) + 1
 
-        self.node_df.reset_index(inplace=True)
-        cols = ["node_id", "osm_id", "is_centroid", "modes", "link_types"]
-        self.node_df = gpd.GeoDataFrame(self.node_df[cols], geometry=self.node_df.geometry, crs=self.node_df.crs)
+        self.node_df = self.node_df.reset_index()
 
         # Saves the data to disk in case of issues loading it to the database
         osm_data_path = Path(self.project.project_base_path) / "osm_data"
@@ -136,7 +130,10 @@ class OSMBuilder(WorkerThread):
         # Removing the triggers before adding all nodes makes things a LOT faster
         remove_triggers(conn, self.logger, "network")
 
-        self.node_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="nodes", mode="a")
+        cols = ["node_id", "osm_id", "is_centroid", "modes", "link_types", "lon", "lat"]
+        insert_qry = f"INSERT INTO nodes ({','.join(cols[:-2])}, geometry) VALUES(?,?,?,?,?, MakePoint(?,?, 4326))"
+        conn.executemany(insert_qry, self.node_df[cols].to_records(index=False))
+
         del self.node_df
         gc.collect()
 
@@ -146,14 +143,13 @@ class OSMBuilder(WorkerThread):
         # self.links_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="links", mode="a")
 
         # I could not get the above line to work, so I used the following code instead
-        insert_qry = "INSERT INTO links ({},a_node, b_node, distance, geometry) VALUES({},0,0,0, GeomFromWKB(?, 4326))"
+        insert_qry = "INSERT INTO links ({},a_node, b_node, distance, geometry) VALUES({},0,0,0, GeomFromText(?, 4326))"
         cols_no_geo = self.links_df.columns.tolist()
         cols_no_geo.remove("geometry")
         insert_qry = insert_qry.format(", ".join(cols_no_geo), ", ".join(["?"] * len(cols_no_geo)))
 
-        geos = self.links_df.geometry.to_wkb()
         cols = cols_no_geo + ["geometry"]
-        links_df = pd.DataFrame(self.links_df[cols_no_geo]).assign(geometry=geos)[cols].to_records(index=False)
+        links_df = self.links_df[cols].to_records(index=False)
 
         del self.links_df
         gc.collect()
@@ -161,8 +157,10 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Adding links to file"])
         conn.executemany(insert_qry, links_df)
 
-    def __build_geometry(self, nodes: List[int]) -> LineString:
-        return LineString(self.node_df.loc[nodes, "geometry"])
+    def __build_geometry(self, nodes: List[int]) -> str:
+        slice = self.node_df.loc[nodes, :]
+        txt = ",".join((slice.lon.astype(str) + " " + slice.lat.astype(str)).tolist())
+        return f"LINESTRING({txt})"
 
     def __process_link_chunk(self):
         self.logger.info("Processing link modes, types and fields")
@@ -171,14 +169,15 @@ class OSMBuilder(WorkerThread):
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
         # And let's also assume that each row will be 100 fields at 8 bytes each
         # This makes 1Gb roughly equal to 1.34 million rows, so 1 million would so.
-        chunk_size = 100_000_000
-        list_dfs = [self.links_df.iloc[i: i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
+        chunk_size = 1_000_000
+        list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = pd.DataFrame([])
         # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
             self.__all_ltp = pd.read_sql('SELECT link_type_id, link_type, "" as highway from link_types', conn)
             self.__emit_all(["maxValue", len(list_dfs)])
             for i, df in enumerate(list_dfs):
+                self.logger.info(f"Processing chunk {i + 1}/{len(list_dfs)}")
                 self.__emit_all(["Value", i])
                 if "tags" in df.columns:
                     df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
@@ -215,7 +214,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0: i + 1])
+                link_type = "_".join(split[0 : i + 1])
 
         if self.__all_ltp.shape[0] >= 51:
             link_type = "aggregate_link_type"
@@ -264,7 +263,7 @@ class OSMBuilder(WorkerThread):
 
         df_aux = pd.DataFrame([[k, v] for k, v in type_list.items()], columns=["link_type", "modes"])
         df = df.merge(df_aux, on="link_type", how="left")
-        df.modes.fillna("".join(sorted(notfound)))
+        df.modes.fillna("".join(sorted(notfound)), inplace=True)
         return df
 
     def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
