@@ -12,17 +12,14 @@ The **ODME** infrastructure involves 2 layers of iterative processes (ie a bilev
 problem). There is a 'outer loop' and for each iteration within such an outer loop
 there is an 'inner loop'. The outer (or upper) optimisation task involves actually attempting
 to converge upon a local (close to the initial demand matrices) solution which accurately fits
-the count volume data. The inner (or lower) optimisation problem involves making the assumption that
-within an outer iteration we assume paths are constant and we recompute paths at each outer iteration.
-about the current state of the problem (see :ref:`technical documentation <at some link>`` for
-% EDIT THIS
-details) and attempting to solve the problem based on these assumptions. The main assumption is that
-within an outer iteration we assume paths are constant and we recompute paths at each outer iteration.
-For various algorithms the process of optimising within this inner loop is what typically defines each 
-iterative
-gradient based algorithm. This inner loop involves iteratively finding factor matrices which 
-based on the current assumptions/constraints should optimise the solution best. Implementation of
-algorithms themselves can be seen in the **ScalingFactors** class, whilst the main loop infrastructure
+the count volume data. Within the inner (or lower) optimisation problem we make the assumption that
+paths will remain constant with small changes to the demand matrices and attempt to optimise with
+respect to that (see :ref:`technical documentation <some link here>` for details). At the beginning
+of each outer iteration we recompute paths to compensate for congestion generated over the previous 
+inner loop. For various algorithms the process of optimising within this inner loop is what typically 
+defines each iterative gradient based algorithm. This inner loop involves iteratively finding factor
+matrices which based on the current assumptions/constraints should optimise the solution best. Implementation
+of algorithms themselves can be seen in the **ScalingFactors** class, whilst the main loop infrastructure
 is contained in the **ODME** class. There is also a results/statistics gathering class called
 **ODMEResults** which operates alongside the **ODME** class.
 
