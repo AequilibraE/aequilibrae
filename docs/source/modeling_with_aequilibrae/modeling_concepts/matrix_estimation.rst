@@ -87,6 +87,21 @@ The main hyper-parameter's to each iterative gradient based ODME procedure are t
 
 Results
 ~~~~~~~
-To obtain and view the results of an ODME procedure,
-% Refer to example notebook, here is main codeblock:
-% Talk about convergence plots
+There are 2 ways to extract the results of **ODME** - you can load them in memory with the
+**get_demands()** method or save them to disk using the **save_to_project** method. However,
+aside from these we may also want to determine the effectiveness of the **ODME** procedure itself.
+Within the :ref:`plot_matrix_estimation` notebook there are a number of examples of such plots
+showing how the error in link flows and factor size proceeds over various iterations. In particular,
+the plots on link flow errors are useful to determine if the solution is converging appropriately 
+(although for regularised spiess this is not alway intended to directly converge). Another important
+plot is the cumulative factor distribution - this is useful for comparing different algorithms/runs of
+**ODME** in order to determine the relative change to the intial demand matrices. Refer to the example
+notebook at :ref:`plot_matrix_estimation` for more, here is the main code for obtaining results:
+.. codeblock:: python
+
+    odme.save_to_project("example_doc", "example_doc.omx", project=project)
+    new_demands = odme.get_demands()
+
+    iteration_stats = odme.results.get_iteration_statistics() # Statistics over iterations
+    link_stats = odme.results.get_link_statistics() # Statistics tracking links
+    cumulative_factors = odme.results.get_cumulative_factors() # Cumulative factor distribution
