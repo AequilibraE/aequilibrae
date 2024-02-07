@@ -9,13 +9,17 @@ input **TrafficAssignment** object, details of which :ref:`are given here <assig
 AequilibraE ODME Overview
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The **ODME** infrastructure involves 2 layers of iterative processes (ie a bilevel optimisation
-problem). There is a so called 'outer loop' and for each iteration within such an outer loop
+problem). There is a 'outer loop' and for each iteration within such an outer loop
 there is an 'inner loop'. The outer (or upper) optimisation task involves actually attempting
 to converge upon a local (close to the initial demand matrices) solution which accurately fits
-the count volume data. The inner (or lower) optimisation problem involves making certain assumptions
+the count volume data. The inner (or lower) optimisation problem involves making the assumption that
+within an outer iteration we assume paths are constant and we recompute paths at each outer iteration.
 about the current state of the problem (see :ref:`technical documentation <at some link>`` for
-details) and attempting to solve the problem based on these assumptions. For various algorithms
-the process of optimising within this inner loop is what typically defines each iterative
+% EDIT THIS
+details) and attempting to solve the problem based on these assumptions. The main assumption is that
+within an outer iteration we assume paths are constant and we recompute paths at each outer iteration.
+For various algorithms the process of optimising within this inner loop is what typically defines each 
+iterative
 gradient based algorithm. This inner loop involves iteratively finding factor matrices which 
 based on the current assumptions/constraints should optimise the solution best. Implementation of
 algorithms themselves can be seen in the **ScalingFactors** class, whilst the main loop infrastructure
@@ -48,16 +52,12 @@ There are a few parameters the user must specify upon initialisation of the ODME
 
 Execution
 ~~~~~~~~~
+% Refer to example notebook, here is main codeblock:
 
 Algorithms
 ~~~~~~~~~~
 
 For now, the only algorithms available in AequilibraE are:
-
-* Geometric Mean: 
-This algorithm is usable for very simple cases (very few count volumes), however it typically is slower
-and less likely to converge in more complex cases - it was originally used just as a testing algorithm
-during development.
 
 * Spiess:
 The original paper by Spiess (1990) is :ref:`given here <REFERENCE HERE>` and we have implemented the
@@ -72,11 +72,13 @@ hyper-parameter alpha. See the :ref:`technical documentation <some link here>` f
 procedure still requires testing to determine how useful it is - and users should feel free to
 try it out for themselves.
 
-Results
-~~~~~~~
-To obtain and view the results of an ODME procedure, 
-
 Stopping Criterion
 ~~~~~~~~~~~~~~~~~~
 The main hyper-parameter's to each iterative gradient based ODME procedure are the stopping criterion
 (although some algorithms have additional parameters). 
+
+Results
+~~~~~~~
+To obtain and view the results of an ODME procedure,
+% Refer to example notebook, here is main codeblock:
+% Talk about convergence plots
