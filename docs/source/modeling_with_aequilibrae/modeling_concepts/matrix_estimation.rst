@@ -83,7 +83,33 @@ try it out for themselves.
 Stopping Criterion
 ~~~~~~~~~~~~~~~~~~
 The main hyper-parameter's to each iterative gradient based ODME procedure are the stopping criterion
-(although some algorithms have additional parameters). 
+(although some algorithms have additional parameters). There are 4 stopping criteria as follows:
+
+* **max_outer**: An integer representing the maximum number of outer iterations allowed - this will 
+  supersede the regular convergence criterion if that isn't met. Note that this effectively places a 
+  maximum time limit on the procedure - a large portion of time is spent on recomputing paths at each
+  outer iteration, and hence increasing this is expensive timewise. However, the more outer iterations 
+  completed the more accurate typically a solution will be, so there is a tradeoff which has to be 
+  determined by the user.
+
+* **max_inner**: This is the maximum number of inner iterations allowed and stops the procedure in the
+  event that the lower level optimisation problem is unable to converge. This is usually not as much
+  of a problem as the procedure is typically able to converge given the assumption that paths are constant
+  (see :ref:`technical documentation <some link here>` for details).
+
+* **convergence_crit**: A float which represents the threshold for the objective function which the 
+  procedure aims to reach. The smaller this value, the longer the procedure will continue. Typically
+  a smaller value here will correspond to a more accurate solution - however, in many cases it is not
+  possible to converge to 0 among outer iterations and the outer maximum iteration limit will be hit
+  regardless.
+
+* **inner_convergence**: The inner convergence is actually representative of the change in convergence
+  across iterations. It determines when we are no longer converging quickly enough for the inner loop
+  to have any more significant of an effect and thus when the procedure should stop. Whilst the lower
+  level optimisation problem will be solved more accurately with a smaller **inner_convergence** - this
+  can potentially cause the assumption of constant paths to be violated across an inner iteration and so
+  it is up to the user to determine how small they wish to set this parameter. Note that in most cases
+  this should be smaller than the **convergence_crit** parameter at the very most.
 
 Results
 ~~~~~~~
