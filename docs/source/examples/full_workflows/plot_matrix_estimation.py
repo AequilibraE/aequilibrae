@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: 'Python 3.10.12 (''venv'': venv)'
+#     language: python
+#     name: python3
+# ---
+
 # %%
 # Final Script to create plots to put into the documentation.
 
@@ -5,6 +21,7 @@ import os
 import uuid
 import zipfile
 from os.path import join, dirname
+from uuid import uuid4
 from tempfile import gettempdir
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +29,7 @@ import seaborn as sns
 import random
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, ODME
-from tests.data import siouxfalls_project
+from aequilibrae.utils.create_example import create_example
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -21,13 +38,10 @@ warnings.filterwarnings('ignore')
 # To begin ODME - open the relevant project and demand matrix, and create the relevant graphs with any desired parameters.Here we use a sample project from 'Sioux Falls' with a single car user class. ODME can be performed with multiple user classes (although not multiple cores per class for the moment).
 
 # %%
-os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
-proj_path = os.path.join(gettempdir(), "test_odme_files" + uuid.uuid4().hex)
-os.mkdir(proj_path)
-zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
+# Create example project on Sioux Falls Network
+fldr = join(gettempdir(), uuid4().hex)
+project = create_example(fldr)
 
-project = Project()
-project.open(proj_path)
 project.network.build_graphs()
 car_graph = project.network.graphs["c"]  # type: Graph
 
