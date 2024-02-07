@@ -49,7 +49,18 @@ There are a few parameters the user must specify upon initialisation of the ODME
 
 Execution
 ~~~~~~~~~
-% Refer to example notebook, here is main codeblock:
+See the :ref:`plot_matrix_estimation` page for a full example on how to execute **ODME**. Given that
+you have already created an appropriate **TrafficAssignment** object and have the **count_volumes** dataframe
+loaded you can execute the following:
+
+.. code-block:: python
+
+    odme = ODME(assignment, count_volumes)
+    odme.execute(verbose=True, print_rate=5)
+
+See :ref:`plot_matrix_estimation` for all optional arguments. During execution **verbose** will print out
+updates to the terminal during runtime regarding how many outer loops have passed and will print at the rate
+specified by **print_rate**.
 
 Algorithms
 ~~~~~~~~~~
