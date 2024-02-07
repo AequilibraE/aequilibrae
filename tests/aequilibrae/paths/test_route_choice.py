@@ -131,14 +131,16 @@ class TestRouteChoice(TestCase):
             tuple[int, int],  # OD keys
             list[  # routes, length = max_routes
                 tuple[int, ...]  # individual paths, length variable
-            ]
+            ],
         ]
 
         self.graph.centroids
 
         # Table of origins
         results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
-        batch = pa.RecordBatch.from_arrays([pa.array(v) for v in results.values()], names=[str(k[1]) for k in results.keys()])
+        batch = pa.RecordBatch.from_arrays(
+            [pa.array(v) for v in results.values()], names=[str(k[1]) for k in results.keys()]
+        )
         table = pa.Table.from_batches([batch] * 5)
 
         lengths = [len(r) for k, v in results.items() for r in v]
@@ -150,29 +152,24 @@ class TestRouteChoice(TestCase):
             pa.list_(  # route set
                 pa.list_(pa.uint32()),  # path
                 # list_size=max_routes  # We could make this fixed length, not sure if it has benefits?
-            )
+            ),
         )
 
-        # Route map contains a column (a list below) for each origin.
-        # Each column is a map of (key, value) pairs where key is the destination and value is a list of paths
-        # paths are lists of uint32s. We don't need int64 since they'll never contain negative (invalid) link IDs
-        route_map = pa.array([
-            [(k[1], v) for k, v in results.items()],  # Real example, TODO: make coercion easier
-            [(k[1] * 100, v[::-1]) for k, v in results.items()]  # different one just for the sake of it
-        ], type=ty)
+        # Each element in this array corresponds to a row in the table
+        map1 = pa.array(
+            [
+                [(k[1], v) for k, v in results.items()],  # Real example, TODO: make coercion easier
+                [(k[1] * 100, v[::-1]) for k, v in results.items()],  # different one just for the sake of it
+            ],
+            type=ty,
+        )
 
-        struct = pa.struct([
-            pa.field("column index", pa.list_(pa.int32())),  # List origin IDs at index they appear in the above ^^^
-            pa.field("route map", pa.list_(route_map.type), nullable=False),  # Not sure why this has to be a pa.list_(route_map.type) but just route_map.type doesn't work
-        ])
+        # Each row has the origin ID that it is for, same ordering as map1
+        table = pa.Table.from_arrays([pa.array([1, 100]), map1], names=["origin id", "map"])
+        pq.write_to_dataset(table, root_path="testing_parquet", partition_cols=["origin id"])
 
-        route_choice = pa.array([{
-            "column index": [1, 100],  # Here we encode the origin ID to index map separately. I couldn't figure out how to nest MapArrays/I'm not sure its needed
-            "routes map": route_map
-        }], type=struct)  # Because the thing struct really stores lists of fields we could store multiple route choices in the same table
-
-        table = pa.Table.from_pydict({'route choice': route_choice})  # Need to wrap the whole thing in a table to keep arrow happy
-        pq.write_table(table, "table.parquet")  # Pretty sure with this structure writing a partitioned data set doesn't work
+        # We can read back in only select rows using the filter
+        dataset = pq.ParquetDataset("testing_parquet", filters=[("origin id", "=", 100)])
 
         # breakpoint()
         assert False
