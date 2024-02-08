@@ -285,6 +285,8 @@ class OSMBuilder(WorkerThread):
             if "osm_source" not in keys_:
                 continue
             osm_name = keys_.get("osm_source", field).replace(":", "_")
+            if osm_name not in df.columns:
+                continue
             df[f"{field}_ba"] = df[osm_name].copy()
             df.rename(columns={osm_name: f"{field}_ab"}, inplace=True, errors="ignore")
             if "osm_behaviour" in keys_ and keys_["osm_behaviour"] == "divide":
