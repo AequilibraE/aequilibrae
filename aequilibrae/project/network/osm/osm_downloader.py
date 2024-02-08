@@ -95,10 +95,12 @@ class OSMDownloader(WorkerThread):
         self.__emit_all(["Value", len(self.polygons)])
         self.__emit_all(["text", "Downloading finished. Processing data"])
         for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
-            df = pd.concat(lst, ignore_index=True).drop_duplicates(subset=["id"]).drop(columns=["type"])
+            df = pd.DataFrame([])
+            if len(lst) > 0:
+                df = pd.concat(lst, ignore_index=True).drop_duplicates(subset=["id"]).drop(columns=["type"])
             if table != "links":
                 df = df.drop(columns=["tags"], errors="ignore")
-            self.data[table] = df.rename(columns={"id": "osm_id"})
+            self.data[table] = df.rename(columns={"id": "osm_id"}, errors="ignore")
             lst.clear()
             gc.collect()
 
