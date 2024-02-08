@@ -44,8 +44,8 @@ class OSMBuilder(WorkerThread):
         self.__valid_links = []
 
         # Building shapely geometries makes the code surprisingly slower.
-        nids = np.arange(data["nodes"].shape[0]) + self.node_start
-        self.node_df = data["nodes"].assign(is_centroid=0, modes="", link_types="", node_id=nids).reset_index(drop=True)
+        self.node_df = data["nodes"]
+        self.node_df.loc[:, "node_id"] = np.arange(data["nodes"].shape[0]) + self.node_start
         gc.collect()
         self.links_df = data["links"]
 
@@ -84,12 +84,11 @@ class OSMBuilder(WorkerThread):
 
             # How can I link have less than two points?
             if not isinstance(link["nodes"], list):
-                geometries.append(LineString())
-                self.logger.error(f"OSM link {idx} does not have a list of nodes.")
+                self.logger.debug(f"OSM link/feature {idx} does not have a list of nodes.")
                 continue
 
             if len(link["nodes"]) < 2:
-                self.logger.error(f"Link {idx} has less than two nodes. {link.nodes}")
+                self.logger.debug(f"Link {idx} has less than two nodes. {link.nodes}")
                 continue
 
             # The link is a straight line between two points

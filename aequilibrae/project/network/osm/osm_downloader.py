@@ -86,6 +86,8 @@ class OSMDownloader(WorkerThread):
             if json["elements"]:
                 for tag, lst in [("node", self._nodes), ("way", self._links)]:
                     df = pd.DataFrame([item for item in json["elements"] if item["type"] == tag])
+                    if tag == "node":
+                        df = df.assign(is_centroid=0, modes="", link_types="", node_id=0)
                     lst.append(df)
                 del json
                 gc.collect()
