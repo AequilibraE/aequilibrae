@@ -71,12 +71,13 @@ class OSMBuilder(WorkerThread):
 
         self.__process_link_chunk()
         shape_ = self.links_df.shape[0]
-        message_step = floor(shape_ / 100)
+        message_step = max(1, floor(shape_ / 100))
         self.__emit_all(["maxValue", shape_])
 
         self.logger.info("Geo-procesing links")
         self.__emit_all(["text", "Adding network links"])
         geometries = []
+        self.links_df.set_index(["osm_id"], inplace=True)
         for counter, (idx, link) in enumerate(self.links_df.iterrows()):
             self.__emit_all(["Value", counter])
             if counter % message_step == 0:
