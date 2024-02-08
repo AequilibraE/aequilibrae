@@ -45,7 +45,7 @@ class OSMBuilder(WorkerThread):
 
         # Building shapely geometries makes the code surprisingly slower.
         self.node_df = data["nodes"]
-        self.node_df.loc[:, "node_id"] = np.arange(data["nodes"].shape[0]) + self.node_start
+        self.node_df.loc[:, "node_id"] = np.arange(self.node_start, self.node_start + self.node_df.shape[0])
         gc.collect()
         self.links_df = data["links"]
 
@@ -105,7 +105,7 @@ class OSMBuilder(WorkerThread):
                 # when doing the join with the link fields below
                 intersecs = np.where(node_indices > 1)[0]
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geometries.append([idx, self.__build_geometry(link.nodes[i : j + 1])])
+                    geometries.append([idx, self.__build_geometry(link.nodes[i: j + 1])])
 
         # Builds the link Geo dataframe
         self.links_df.drop(columns=["nodes"], inplace=True)
@@ -170,7 +170,7 @@ class OSMBuilder(WorkerThread):
         # And let's also assume that each row will be 100 fields at 8 bytes each
         # This makes 1Gb roughly equal to 1.34 million rows, so 1 million would so.
         chunk_size = 1_000_000
-        list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
+        list_dfs = [self.links_df.iloc[i: i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = pd.DataFrame([])
         # Initialize link types
         with read_and_close(self.project.path_to_file) as conn:
@@ -214,7 +214,7 @@ class OSMBuilder(WorkerThread):
         split = link_type.split("_")
         for i, piece in enumerate(split[1:]):
             if piece in ["link", "segment", "stretch"]:
-                link_type = "_".join(split[0 : i + 1])
+                link_type = "_".join(split[0: i + 1])
 
         if self.__all_ltp.shape[0] >= 51:
             link_type = "aggregate_link_type"
