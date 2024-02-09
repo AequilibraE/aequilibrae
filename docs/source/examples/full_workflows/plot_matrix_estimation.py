@@ -1,21 +1,11 @@
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: 'Python 3.10.12 (''venv'': venv)'
-#     language: python
-#     name: python3
-# ---
+"""
+.. _plot_matrix_estimation:
 
-# %%
-# Final Script to create plots to put into the documentation.
+Matrix Estimation
+=================
+
+In this example, we show how to use the Origin Destination Matrix Estimation (ODME) procedure to deform a given set of demand matrices to more accurately produce known count volumes.
+"""
 
 import os
 import uuid
