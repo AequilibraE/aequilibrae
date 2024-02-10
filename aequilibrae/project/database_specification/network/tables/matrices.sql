@@ -24,7 +24,9 @@ create TABLE if not exists matrices (name          TEXT     NOT NULL PRIMARY KEY
                                      procedure     TEXT,
                                      procedure_id  TEXT,
                                      timestamp     DATETIME DEFAULT current_timestamp,
-                                     description   TEXT);
+                                     description   TEXT,
+                                     report        TEXT
+);
 
 
 --#

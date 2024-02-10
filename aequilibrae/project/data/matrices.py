@@ -6,7 +6,7 @@ import pandas as pd
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.project.data.matrix_record import MatrixRecord
 from aequilibrae.project.table_loader import TableLoader
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.db_utils import add_column_unless_exists, commit_and_close
 
 
 class Matrices:
@@ -14,6 +14,7 @@ class Matrices:
 
     def __init__(self, project):
         self.project = project
+        self._ensure_report_column()
         self.logger = project.logger
         self.__items = {}
         self.__fields = []
@@ -195,3 +196,6 @@ class Matrices:
     def _clear(self):
         """Eliminates records from memory. For internal use only"""
         self.__items.clear()
+
+    def _ensure_report_column(self):
+        add_column_unless_exists(self.project.conn, "matrices", "report", "TEXT")

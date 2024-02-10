@@ -8,6 +8,7 @@ from os.path import join
 from shutil import copytree
 import uuid
 from tempfile import gettempdir
+
 from ...data import siouxfalls_project
 from aequilibrae.project import Project
 
@@ -45,6 +46,15 @@ class TestMatrices(TestCase):
 
         rec.file_name = "SiouxFalls.omx"
         self.assertEqual(rec.cores, 1, "Setting a file that exists did not correct the number of cores")
+
+    def test_report(self):
+        rec = self.matrices.get_record("omx2")
+        rec.report = {"a": 7}
+        self.assertEqual(rec.report, {"a": 7}, "Can store a dictionary")
+        rec.save()
+
+        self.matrices.reload()
+        self.assertEqual(self.matrices.get_record("omx2").report, {"a": 7}, "Can store a dictionary")
 
     def test_clear_database(self):
         self.__mat_count(3, "The test data started wrong")
