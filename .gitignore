@@ -96,3 +96,12 @@ build/
 coverage.xml
 
 #### End snippet
+.DS_Store
+
+# Images
+*.png
+*.csv
+
+# Aequilibrae Procedure Log
+*.log
+*.qgz
