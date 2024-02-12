@@ -6,6 +6,7 @@ from tempfile import gettempdir
 from unittest import TestCase
 import pandas as pd
 import numpy as np
+import pyarrow as pa
 
 from aequilibrae import Graph, Project
 from aequilibrae.paths.route_choice import RouteChoiceSet
@@ -116,64 +117,40 @@ class TestRouteChoice(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
 
-    def test_debug(self):
-        import pyarrow as pa
-        import pyarrow.parquet as pq
-        import matplotlib.pyplot as plt
+    # def test_debug2(self):
+    #     import pyarrow as pa
+    #     import pyarrow.parquet as pq
+    #     import matplotlib.pyplot as plt
 
-        np.random.seed(0)
+    #     np.random.seed(0)
+    #     rc = RouteChoiceSet(self.graph)
+    #     nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+
+    #     max_routes = 20
+
+    #     breakpoint()
+    #     # Table of origins
+    #     table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
+
+    #     assert False
+
+    def test_round_trip(self):
+        np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
-        # nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        nodes = [(1, x) for x in self.graph.centroids if x != 1]
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
-        results: dict[
-            tuple[int, int],  # OD keys
-            list[  # routes, length = max_routes
-                tuple[int, ...]  # individual paths, length variable
-            ],
-        ]
 
-        self.graph.centroids
+        path = join(self.project.project_base_path, "batched results")
+        table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1, where=path)
 
-        # Table of origins
-        results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
-        batch = pa.RecordBatch.from_arrays(
-            [pa.array(v) for v in results.values()], names=[str(k[1]) for k in results.keys()]
-        )
-        table = pa.Table.from_batches([batch] * 5)
+        dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
+        new_table = dataset.to_table().to_pandas().sort_values(by=["origin id", "destination id"])[["origin id", "destination id", "route set"]].reset_index(drop=True)
 
-        lengths = [len(r) for k, v in results.items() for r in v]
-        # plt.hist(lengths)
-        # plt.show(block=False)
+        table = table.to_pandas().sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
 
-        ty = pa.map_(
-            pa.uint32(),  # Destination
-            pa.list_(  # route set
-                pa.list_(pa.uint32()),  # path
-                # list_size=max_routes  # We could make this fixed length, not sure if it has benefits?
-            ),
-        )
-
-        # Each element in this array corresponds to a row in the table
-        map1 = pa.array(
-            [
-                [(k[1], v) for k, v in results.items()],  # Real example, TODO: make coercion easier
-                [(k[1] * 100, v[::-1]) for k, v in results.items()],  # different one just for the sake of it
-            ],
-            type=ty,
-        )
-
-        # Each row has the origin ID that it is for, same ordering as map1
-        table = pa.Table.from_arrays([pa.array([1, 100]), map1], names=["origin id", "map"])
-        pq.write_to_dataset(table, root_path="testing_parquet", partition_cols=["origin id"])
-
-        # We can read back in only select rows using the filter
-        dataset = pq.ParquetDataset("testing_parquet", filters=[("origin id", "=", 100)])
-
-        # breakpoint()
-        assert False
-
+        pd.testing.assert_frame_equal(table, new_table)
 
 def generate_line_strings(project, graph, results):
     """Debug method"""

@@ -6,6 +6,12 @@ from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
 from libcpp cimport bool
 
+cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
+cimport pyarrow as pa
+cimport pyarrow.lib as libpa
+cimport pyarrow._dataset_parquet as pq
+from libcpp.memory cimport shared_ptr
+
 # std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
 # from libcpp.random cimport minstd_rand
 from libc.stdint cimport uint_fast32_t, uint_fast64_t
@@ -143,3 +149,13 @@ cdef class RouteChoiceSet:
         long long [:] _thread_reached_first,
         unsigned int seed
     ) noexcept nogil
+
+    @staticmethod
+    cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets)
+
+
+cdef class Checkpoint:
+    cdef:
+        public object where
+        public object schema
+        public object partition_cols
