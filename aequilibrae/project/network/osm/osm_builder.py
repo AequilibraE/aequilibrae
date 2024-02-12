@@ -143,6 +143,8 @@ class OSMBuilder(WorkerThread):
         # self.links_df.to_file(self.project.path_to_file, driver="SQLite", spatialite=True, layer="links", mode="a")
 
         # I could not get the above line to work, so I used the following code instead
+        self.links_df.index.name="osm_id"
+        self.links_df.reset_index(inplace=True)
         insert_qry = "INSERT INTO links ({},a_node, b_node, distance, geometry) VALUES({},0,0,0, GeomFromText(?, 4326))"
         cols_no_geo = self.links_df.columns.tolist()
         cols_no_geo.remove("geometry")
@@ -275,6 +277,8 @@ class OSMBuilder(WorkerThread):
         fields = p.parameters["network"]["links"]["fields"]
 
         for x in fields["one-way"]:
+            if "link_type" in x.keys():
+                continue
             keys_ = list(x.values())[0]
             field = list(x.keys())[0]
             osm_name = keys_.get("osm_source", field).replace(":", "_")
