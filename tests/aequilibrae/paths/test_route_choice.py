@@ -69,8 +69,8 @@ class TestRouteChoice(TestCase):
         rc = RouteChoiceSet(self.graph)
         a = 1
 
-        self.assertEqual(
-            rc.batched([(a, a)], max_routes=0, max_depth=3), {(a, a): []}, "Route set from self to self should be empty"
+        self.assertFalse(
+            rc.batched([(a, a)], max_routes=0, max_depth=3), "Route set from self to self should be empty"
         )
 
     def test_route_choice_blocking_centroids(self):
@@ -96,11 +96,12 @@ class TestRouteChoice(TestCase):
         max_routes = 20
         results = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
 
-        self.assertEqual(len(results), len(nodes), "Requested number of route sets not returned")
+        gb = results.to_pandas().groupby(by="origin id")
+        self.assertEqual(len(gb), len(nodes), "Requested number of route sets not returned")
 
-        for od, route_set in results.items():
-            self.assertEqual(len(route_set), len(set(route_set)), f"Duplicate routes returned for {od}")
-            self.assertEqual(len(route_set), max_routes, f"Requested number of routes not returned for {od}")
+        for _, row in gb:
+            self.assertFalse(any(row["route set"].duplicated()), f"Duplicate routes returned for {row['origin id']}")
+            self.assertEqual(len(row["route set"]), max_routes, f"Requested number of routes not returned for {row['origin id']}")
 
     def test_route_choice_exceptions(self):
         rc = RouteChoiceSet(self.graph)

@@ -147,7 +147,7 @@ cdef class RouteChoiceSet:
             **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
                                                          Represents paths from ``origin`` to ``destination``.
         """
-        return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed, a_star=a_star)[(origin, destination)]
+        return [tuple(x) for x in self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed, a_star=a_star).column("route set").to_pylist()]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -184,11 +184,6 @@ cdef class RouteChoiceSet:
                 each OD pair provided (as keys). Represents paths from ``origin`` to ``destination``. None if ``where`` was not None.
         """
         cdef:
-            long long origin_index, dest_index, i
-            unsigned int c_max_routes = max_routes
-            unsigned int c_max_depth = max_depth
-            unsigned int c_seed = seed
-            unsigned int c_cores = cores
             long long o, d
 
         if max_routes == 0 and max_depth == 0:
@@ -204,6 +199,12 @@ cdef class RouteChoiceSet:
                 raise ValueError(f"Destination {d} is not present within the compact graph")
 
         cdef:
+            long long origin_index, dest_index, i
+            unsigned int c_max_routes = max_routes
+            unsigned int c_max_depth = max_depth
+            unsigned int c_seed = seed
+            unsigned int c_cores = cores
+
             vector[pair[long long, long long]] c_ods
 
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
