@@ -94,18 +94,21 @@ class OSMBuilder(WorkerThread):
 
             # The link is a straight line between two points
             # Or all midpoints are only part of a single link
-            node_indices = node_count.loc[link["nodes"], "counter"]
+            node_indices = node_count.loc[link["nodes"], "counter"].to_numpy()
             if len(link["nodes"]) == 2 or node_indices[1:-1].max() == 1:
                 # The link has no intersections
-                geometries.append([idx, self.__build_geometry(link.nodes)])
+                geometries.append([idx, self._build_geometry(link.nodes)])
             else:
+                # Make sure we get the first and last nodes, as they are certainly the extremities of the sublinks
+                node_indices[0] = 2
+                node_indices[-1] = 2
                 # The link has intersections
                 # We build repeated records for links when they have intersections
                 # This is because it is faster to do this way and then have all the data repeated
                 # when doing the join with the link fields below
                 intersecs = np.where(node_indices > 1)[0]
                 for i, j in zip(intersecs[:-1], intersecs[1:]):
-                    geometries.append([idx, self.__build_geometry(link.nodes[i : j + 1])])
+                    geometries.append([idx, self._build_geometry(link.nodes[i : j + 1])])
 
         # Builds the link Geo dataframe
         self.links_df.drop(columns=["nodes"], inplace=True)
@@ -159,7 +162,7 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Adding links to file"])
         conn.executemany(insert_qry, links_df)
 
-    def __build_geometry(self, nodes: List[int]) -> str:
+    def _build_geometry(self, nodes: List[int]) -> str:
         slice = self.node_df.loc[nodes, :]
         txt = ",".join((slice.lon.astype(str) + " " + slice.lat.astype(str)).tolist())
         return f"LINESTRING({txt})"
