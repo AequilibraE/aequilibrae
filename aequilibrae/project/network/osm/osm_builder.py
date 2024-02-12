@@ -200,7 +200,7 @@ class OSMBuilder(WorkerThread):
 
     def __build_link_types(self, df):
         data = []
-        df.highway.fillna("missing", inplace=True)
+        df = df.fillna(value={"highway": "missing"})
         df.highway = df.highway.str.lower()
         for i, lt in enumerate(df.highway.unique()):
             if str(lt) in self.__all_ltp.highway.values:
@@ -270,8 +270,7 @@ class OSMBuilder(WorkerThread):
 
         df_aux = pd.DataFrame([[k, v] for k, v in type_list.items()], columns=["link_type", "modes"])
         df = df.merge(df_aux, on="link_type", how="left")
-        df.modes.fillna("".join(sorted(notfound)), inplace=True)
-        return df
+        return df.fillna(value={"modes": "".join(sorted(notfound))})
 
     def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.assign(direction=0, link_id=0)
