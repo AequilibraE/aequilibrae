@@ -69,9 +69,7 @@ class TestRouteChoice(TestCase):
         rc = RouteChoiceSet(self.graph)
         a = 1
 
-        self.assertFalse(
-            rc.batched([(a, a)], max_routes=0, max_depth=3), "Route set from self to self should be empty"
-        )
+        self.assertFalse(rc.batched([(a, a)], max_routes=0, max_depth=3), "Route set from self to self should be empty")
 
     def test_route_choice_blocking_centroids(self):
         a, b = 1, 20
@@ -101,7 +99,9 @@ class TestRouteChoice(TestCase):
 
         for _, row in gb:
             self.assertFalse(any(row["route set"].duplicated()), f"Duplicate routes returned for {row['origin id']}")
-            self.assertEqual(len(row["route set"]), max_routes, f"Requested number of routes not returned for {row['origin id']}")
+            self.assertEqual(
+                len(row["route set"]), max_routes, f"Requested number of routes not returned for {row['origin id']}"
+            )
 
     def test_route_choice_exceptions(self):
         rc = RouteChoiceSet(self.graph)
@@ -147,11 +147,17 @@ class TestRouteChoice(TestCase):
         rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1, where=path)
 
         dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
-        new_table = dataset.to_table().to_pandas().sort_values(by=["origin id", "destination id"])[["origin id", "destination id", "route set"]].reset_index(drop=True)
+        new_table = (
+            dataset.to_table()
+            .to_pandas()
+            .sort_values(by=["origin id", "destination id"])[["origin id", "destination id", "route set"]]
+            .reset_index(drop=True)
+        )
 
         table = table.to_pandas().sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
+
 
 def generate_line_strings(project, graph, results):
     """Debug method"""
