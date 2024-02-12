@@ -208,7 +208,7 @@ class OSMBuilder(WorkerThread):
         df = df.merge(self.__all_ltp[["link_type", "highway"]], on="highway", how="left")
         return df.drop(columns=["highway"])
 
-    def __define_link_type(self, link_type: str) -> str:
+    def __define_link_type(self, link_type: str) -> [str, str]:
         proj_link_types = self.project.network.link_types
         original_link_type = link_type
         link_type = "".join([x for x in link_type if x in string.ascii_letters + "_"]).lower()

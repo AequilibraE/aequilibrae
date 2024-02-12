@@ -68,7 +68,7 @@ class OSMDownloader(WorkerThread):
             m = f"[maxsize: {memory}]"
         for counter, poly in enumerate(self.polygons):
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            self.logger.debug(msg)
+            self.logger.info(msg)
             self.__emit_all(["Value", counter])
             self.__emit_all(["text", msg])
             west, south, east, north = poly.bounds
