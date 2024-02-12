@@ -169,9 +169,9 @@ class OSMBuilder(WorkerThread):
         self.__emit_all(["text", "Processing link modes, types and fields"])
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
-        # And let's also assume that each row will be 100 fields at 8 bytes each
-        # This makes 1Gb roughly equal to 1.34 million rows, so 1 million would so.
-        chunk_size = 1_000_000
+        # And let's also assume that each row will be 200 fields at 8 bytes each
+        # This makes 8Gb roughly equal to 5.3 million rows, so 5 million would so.
+        chunk_size = 5_000_000
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = pd.DataFrame([])
         # Initialize link types
@@ -182,6 +182,8 @@ class OSMBuilder(WorkerThread):
                 self.logger.info(f"Processing chunk {i + 1}/{len(list_dfs)}")
                 self.__emit_all(["Value", i])
                 if "tags" in df.columns:
+                    # It is critical to reset the index for the concat below to work
+                    df.reset_index(drop=True, inplace=True)
                     df = pd.concat([df, json_normalize(df["tags"])], axis=1).drop(columns=["tags"])
                     df.columns = [x.replace(":", "_") for x in df.columns]
                     df = self.__build_link_types(df)
@@ -191,7 +193,7 @@ class OSMBuilder(WorkerThread):
                     self.logger.error("OSM link data does not have tags. Skipping an entire data chunk")
                     df = pd.DataFrame([])
                 list_dfs[i] = df
-        self.links_df = pd.concat(list_dfs)
+        self.links_df = pd.concat(list_dfs, ignore_index=True)
 
     def __build_link_types(self, df):
         data = []
