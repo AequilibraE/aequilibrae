@@ -170,8 +170,8 @@ class OSMBuilder(WorkerThread):
 
         # It is hard to define an optimal chunk_size, so let's assume that 1GB is a good size per chunk
         # And let's also assume that each row will be 200 fields at 8 bytes each
-        # This makes 8Gb roughly equal to 5.3 million rows, so 5 million would so.
-        chunk_size = 5_000_000
+        # This makes 2Gb roughly equal to 2.6 million rows, so 2 million would so.
+        chunk_size = 1_000_000
         list_dfs = [self.links_df.iloc[i : i + chunk_size] for i in range(0, self.links_df.shape[0], chunk_size)]
         self.links_df = pd.DataFrame([])
         # Initialize link types
