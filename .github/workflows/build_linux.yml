@@ -17,6 +17,7 @@ jobs:
     - name: Install packages
       run: |
         python -m pip install --upgrade pip wheel cffi setuptools twine
+        python -c "import pyarrow; pyarrow.create_library_symlinks()"
 
     - name: Build manylinux Python wheels
       uses: RalfG/python-wheels-manylinux-build@v0.7.1
