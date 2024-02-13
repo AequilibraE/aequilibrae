@@ -71,6 +71,7 @@ from typing import List, Tuple
 import itertools
 import pathlib
 import logging
+import warnings
 
 cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
 cimport pyarrow as pa
@@ -110,14 +111,17 @@ cdef class RouteChoiceSet:
         self.graph_fs_view = graph.compact_fs
         self.b_nodes_view = graph.compact_graph.b_node.values
         self.nodes_to_indices_view = graph.compact_nodes_to_indices
-        tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
-        self.lat_view = tmp.lat.values
-        self.lon_view = tmp.lon.values
+
+        # tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
+        # self.lat_view = tmp.lat.values
+        # self.lon_view = tmp.lon.values
+        self.a_star = False
+
         self.ids_graph_view = graph.compact_graph.id.values
         self.num_nodes = graph.compact_num_nodes
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
-        self.a_star = True
+
 
     def __dealloc__(self):
         """
@@ -219,20 +223,24 @@ cdef class RouteChoiceSet:
 
             vector[RouteSet_t *] *results
 
-        self.a_star = a_star
+        # self.a_star = a_star
 
         if self.a_star:
             _reached_first_matrix = np.zeros((cores, 1), dtype=np.int64)  # Dummy array to allow slicing
         else:
-            _reached_first_matrix = np.zeros((cores, self.num_nodes), dtype=np.int64)
+            _reached_first_matrix = np.zeros((cores, self.num_nodes + 1), dtype=np.int64)
+
+        set_ods = set(ods)
+        if len(set_ods) != len(ods):
+            warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
         if where is not None:
             checkpoint = Checkpoint(where, self.schema, partition_cols=["origin id"])
-            batches = list(Checkpoint.batches(ods))
+            batches = list(Checkpoint.batches(set_ods))
             results = new vector[RouteSet_t *](<size_t>max(len(batch) for batch in batches))
         else:
-            batches = [ods]
-            results = new vector[RouteSet_t *](len(ods))
+            batches = [list(set_ods)]
+            results = new vector[RouteSet_t *](len(set_ods))
 
         for batch in batches:
             results.resize(len(batch))  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
