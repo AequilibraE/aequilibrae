@@ -131,27 +131,24 @@ cdef class RouteChoiceSet:
         pass
 
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0, a_star: bool = True):
+    def run(self, origin: int, destination: int, *args, **kwargs):
         """
         Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
         unique possible paths have been found then a smaller set will be returned.
 
-        Thin wrapper around ``RouteChoiceSet.batched``.
+        Thin wrapper around ``RouteChoiceSet.batched``. Additional arguments are forwarded to ``RouteChoiceSet.batched``.
 
         :Arguments:
             **origin** (:obj:`int`): Origin node ID. Must be present within compact graph. Recommended to choose a centroid.
             **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to choose a centroid.
-            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
-            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
-            **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
 
         :Returns:
             **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
                                                          Represents paths from ``origin`` to ``destination``.
         """
-        return [tuple(x) for x in self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed, a_star=a_star).column("route set").to_pylist()]
+        return [tuple(x) for x in self.batched([(origin, destination)], *args, **kwargs).column("route set").to_pylist()]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -166,7 +163,9 @@ cdef class RouteChoiceSet:
             seed: int = 0,
             cores: int = 1,
             a_star: bool = True,
-            where: Optional[str] = None
+            bfsle: bool = True,
+            penalty: float = 0.0,
+            where: Optional[str] = None,
     ):
         """
         Compute the a route set for a list of OD pairs.
@@ -178,9 +177,12 @@ cdef class RouteChoiceSet:
             **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination node ID must be
                                                     present within compact graph. Recommended to choose a centroids.
             **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
-            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
+            **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link penalisation.
+                                        Must be non-negative. Default of ``0`` for unlimited.
             **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
             **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``1``.
+            **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
+            **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible with ``bfsle=True``.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
 
         :Returns:
@@ -195,6 +197,12 @@ cdef class RouteChoiceSet:
 
         if max_routes < 0 or max_depth < 0 or cores < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
+
+        if penalty != 0.0 and bfsle:
+            raise ValueError("Link penalisation (`penatly` > 1.0) and `bfsle` cannot be enabled at once")
+
+        if not bfsle and penalty <= 1.0:
+            raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
 
         for o, d in ods:
             if self.nodes_to_indices_view[o] == -1:
@@ -260,19 +268,35 @@ cdef class RouteChoiceSet:
                             self.b_nodes_view,
                         )
 
-                    deref(results)[i] = RouteChoiceSet.generate_route_set(
-                        self,
-                        origin_index,
-                        dest_index,
-                        c_max_routes,
-                        c_max_depth,
-                        cost_matrix[threadid()],
-                        predecessors_matrix[threadid()],
-                        conn_matrix[threadid()],
-                        b_nodes_matrix[threadid()],
-                        _reached_first_matrix[threadid()],
-                        c_seed,
-                    )
+                    if bfsle:
+                        deref(results)[i] = RouteChoiceSet.bfsle(
+                            self,
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            cost_matrix[threadid()],
+                            predecessors_matrix[threadid()],
+                            conn_matrix[threadid()],
+                            b_nodes_matrix[threadid()],
+                            _reached_first_matrix[threadid()],
+                            c_seed,
+                        )
+                    else:
+                        deref(results)[i] = RouteChoiceSet.link_penalisation(
+                            self,
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            cost_matrix[threadid()],
+                            predecessors_matrix[threadid()],
+                            conn_matrix[threadid()],
+                            b_nodes_matrix[threadid()],
+                            _reached_first_matrix[threadid()],
+                            penalty,
+                            c_seed,
+                        )
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
@@ -344,7 +368,7 @@ cdef class RouteChoiceSet:
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    cdef RouteSet_t *generate_route_set(
+    cdef RouteSet_t *bfsle(
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
@@ -438,6 +462,60 @@ cdef class RouteChoiceSet:
         # We should also free all the sets in removed_links, we don't be needing them
         for banned in removed_links:
             del banned
+
+        return route_set
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef RouteSet_t *link_penalisation(
+        RouteChoiceSet self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
+        double penatly,
+        unsigned int seed
+    ) noexcept nogil:
+        cdef:
+            RouteSet_t *route_set
+
+            # Scratch objects
+            vector[long long] *vec
+            long long p, connector
+
+        max_routes = max_routes if max_routes != 0 else UINT_MAX
+        max_depth = max_depth if max_depth != 0 else UINT_MAX
+        route_set = new RouteSet_t()
+        memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
+
+        for depth in range(max_depth):
+            if route_set.size() >= max_routes:
+                break
+
+            RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
+
+            if thread_predecessors[dest_index] >= 0:
+                vec = new vector[long long]()
+                # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
+                p = dest_index
+                while p != origin_index:
+                    connector = thread_conn[p]
+                    p = thread_predecessors[p]
+                    vec.push_back(connector)
+
+                for connector in deref(vec):
+                    thread_cost[connector] *= penatly
+
+                route_set.insert(vec)
+            else:
+                break
 
         return route_set
 

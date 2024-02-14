@@ -37,54 +37,57 @@ class TestRouteChoice(TestCase):
         rc = RouteChoiceSet(self.graph)
         a, b = 1, 20
 
-        results = rc.run(a, b, max_routes=10, max_depth=0)
-        self.assertEqual(len(results), 10, "Returned more routes than expected")
-        self.assertEqual(len(results), len(set(results)), "Returned duplicate routes")
+        for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
+            with self.subTest(**kwargs):
+                results = rc.run(a, b, max_routes=10, **kwargs)
+                self.assertEqual(len(results), 10, "Returned more routes than expected")
+                self.assertEqual(len(results), len(set(results)), "Returned duplicate routes")
 
-        # With a depth 1 only one path will be found
-        results = rc.run(a, b, max_routes=0, max_depth=1)
-        self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
-        self.assertListEqual(results, [(58, 52, 29, 24, 12, 8, 5, 1)], "Initial route isn't the shortest A* route")
+                # With a depth 1 only one path will be found
+                results = rc.run(a, b, max_routes=0, max_depth=1)
+                self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
+                self.assertListEqual(results, [(1, 5, 8, 12, 24, 29, 52, 58)], "Initial route isn't the shortest A* route")
 
-        # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
-        results2 = rc.run(a, b, max_routes=0, max_depth=2)
-        self.assertEqual(
-            len(results2), 1 + len(results[0]) - 4, "Depth of 2 didn't yield the expected number of routes"
-        )
-        self.assertTrue(results[0] in results2, "Initial route isn't present in a lower depth")
+                # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
+                results2 = rc.run(a, b, max_routes=0, max_depth=2, **kwargs)
+                self.assertTrue(results[0] in results2, "Initial route isn't present in a lower depth")
 
         self.assertListEqual(
-            rc.run(a, b, max_routes=0, max_depth=2, seed=0),
-            rc.run(a, b, max_routes=0, max_depth=2, seed=10),
+            rc.run(a, b, max_routes=0, seed=0, max_depth=2),
+            rc.run(a, b, max_routes=0, seed=10, max_depth=2),
             "Seeded and unseeded results differ with unlimited `max_routes` (queue is incorrectly being shuffled)",
         )
 
         self.assertNotEqual(
-            rc.run(a, b, max_routes=3, max_depth=2, seed=0),
-            rc.run(a, b, max_routes=3, max_depth=2, seed=10),
+            rc.run(a, b, max_routes=3, seed=0, max_depth=2),
+            rc.run(a, b, max_routes=3, seed=10, max_depth=2),
             "Seeded and unseeded results don't differ with limited `max_routes` (queue is not being shuffled)",
         )
 
     def test_route_choice_empty_path(self):
-        rc = RouteChoiceSet(self.graph)
-        a = 1
+        for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
+            with self.subTest(**kwargs):
+                rc = RouteChoiceSet(self.graph)
+                a = 1
 
-        self.assertFalse(rc.batched([(a, a)], max_routes=0, max_depth=3), "Route set from self to self should be empty")
+                self.assertFalse(rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs), "Route set from self to self should be empty")
 
     def test_route_choice_blocking_centroids(self):
-        a, b = 1, 20
+        for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
+            with self.subTest(**kwargs):
+                a, b = 1, 20
 
-        self.graph.set_blocked_centroid_flows(False)
-        rc = RouteChoiceSet(self.graph)
+                self.graph.set_blocked_centroid_flows(False)
+                rc = RouteChoiceSet(self.graph)
 
-        results = rc.run(a, b, max_routes=2, max_depth=2)
-        self.assertNotEqual(results, [], "Unblocked centroid flow found no paths")
+                results = rc.run(a, b, max_routes=2, max_depth=2, **kwargs)
+                self.assertNotEqual(results, [], "Unblocked centroid flow found no paths")
 
-        self.graph.set_blocked_centroid_flows(True)
-        rc = RouteChoiceSet(self.graph)
+                self.graph.set_blocked_centroid_flows(True)
+                rc = RouteChoiceSet(self.graph)
 
-        results = rc.run(a, b, max_routes=2, max_depth=2)
-        self.assertListEqual(results, [], "Blocked centroid flow found a path")
+                results = rc.run(a, b, max_routes=2, max_depth=2, **kwargs)
+                self.assertListEqual(results, [], "Blocked centroid flow found a path")
 
     def test_route_choice_batched(self):
         np.random.seed(0)
@@ -115,7 +118,6 @@ class TestRouteChoice(TestCase):
         gb = results.to_pandas().groupby(by="origin id")
         self.assertEqual(len(gb), 1, "Duplicates not dropped")
 
-
     def test_route_choice_exceptions(self):
         rc = RouteChoiceSet(self.graph)
         args = [
@@ -130,6 +132,10 @@ class TestRouteChoice(TestCase):
             with self.subTest(a=a, b=b, max_routes=max_routes, max_depth=max_depth):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
+
+        with self.assertRaises(ValueError):
+            rc.run(1, 1, max_routes=1, max_depth=1, bfsle=True, penalty=1.5)
+            rc.run(1, 1, max_routes=1, max_depth=1, bfsle=False, penalty=0.1)
 
     # def test_debug2(self):
     #     import pyarrow as pa

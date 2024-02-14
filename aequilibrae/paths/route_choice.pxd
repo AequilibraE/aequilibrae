@@ -136,7 +136,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_reached_first
     ) noexcept nogil
 
-    cdef RouteSet_t *generate_route_set(
+    cdef RouteSet_t *bfsle(
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
@@ -147,6 +147,21 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        unsigned int seed
+    ) noexcept nogil
+
+    cdef RouteSet_t *link_penalisation(
+        RouteChoiceSet self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
+        double penatly,
         unsigned int seed
     ) noexcept nogil
 
