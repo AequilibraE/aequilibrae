@@ -46,7 +46,9 @@ class TestRouteChoice(TestCase):
                 # With a depth 1 only one path will be found
                 results = rc.run(a, b, max_routes=0, max_depth=1)
                 self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
-                self.assertListEqual(results, [(1, 5, 8, 12, 24, 29, 52, 58)], "Initial route isn't the shortest A* route")
+                self.assertListEqual(
+                    results, [(1, 5, 8, 12, 24, 29, 52, 58)], "Initial route isn't the shortest A* route"
+                )
 
                 # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
                 results2 = rc.run(a, b, max_routes=0, max_depth=2, **kwargs)
@@ -70,7 +72,10 @@ class TestRouteChoice(TestCase):
                 rc = RouteChoiceSet(self.graph)
                 a = 1
 
-                self.assertFalse(rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs), "Route set from self to self should be empty")
+                self.assertFalse(
+                    rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs),
+                    "Route set from self to self should be empty",
+                )
 
     def test_route_choice_blocking_centroids(self):
         for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
