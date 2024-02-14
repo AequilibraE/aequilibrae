@@ -62,7 +62,7 @@ from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from cython.operator cimport dereference as deref
+from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 
 import numpy as np
@@ -236,7 +236,7 @@ cdef class RouteChoiceSet:
 
         if where is not None:
             checkpoint = Checkpoint(where, self.schema, partition_cols=["origin id"])
-            batches = list(Checkpoint.batches(set_ods))
+            batches = list(Checkpoint.batches(list(set_ods)))
             results = new vector[RouteSet_t *](<size_t>max(len(batch) for batch in batches))
         else:
             batches = [list(set_ods)]
@@ -456,6 +456,8 @@ cdef class RouteChoiceSet:
 
             libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
 
+            vector[long long].reverse_iterator riter
+
             int offset = 0
 
         columns.emplace_back(shared_ptr[libpa.CArray]())  # Origins
@@ -474,8 +476,10 @@ cdef class RouteChoiceSet:
                 # TODO: Pyarrows Cython API is incredibly lacking, it's just functional and doesn't include all the nice things the C++ API has
                 # One such thing its missing the AppendValues, which can add whole iterators at once in a much smarter fashion.
                 # We'll have to reimport/extern the classes we use if we want to avoid the below
-                for link in deref(route):
-                    path_builder.Append(link)
+                riter = route.rbegin()
+                while riter != route.rend():
+                    path_builder.Append(deref(riter))
+                    inc(riter)
 
                 offset += route.size()
 
@@ -484,9 +488,6 @@ cdef class RouteChoiceSet:
         offset_builder.Finish(&offsets)
 
         route_set_results = libpa.CListArray.FromArraysAndType(route_set_dtype, deref(offsets.get()), deref(paths.get()), pool, shared_ptr[libpa.CBuffer]())
-        if not route_set_results.ok():
-            fprintf(stderr, "The Routes Sets Aren't Alright: %s\n", route_set_results.status().ToString().c_str())
-            abort()
 
         o_col.Finish(&columns[0])
         d_col.Finish(&columns[1])
