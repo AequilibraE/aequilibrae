@@ -8,7 +8,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon
 
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
@@ -57,9 +57,12 @@ class OSMBuilder(WorkerThread):
         with commit_and_close(connect_spatialite(self.path)) as conn:
             self.__update_table_structure(conn)
             self.importing_network(conn)
+
+            self.logger.info("Cleaning things up")
             conn.execute(
                 "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
             )
+            conn.execute("VACUUM;")
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def importing_network(self, conn):
@@ -269,8 +272,8 @@ class OSMBuilder(WorkerThread):
         type_list = {k: "".join(set(v)) for k, v in type_list.items()}
 
         df_aux = pd.DataFrame([[k, v] for k, v in type_list.items()], columns=["link_type", "modes"])
-        df = df.merge(df_aux, on="link_type", how="left")
-        return df.fillna(value={"modes": "".join(sorted(notfound))})
+        df = df.merge(df_aux, on="link_type", how="left").fillna(value={"modes": "".join(sorted(notfound))})
+        return df
 
     def __process_link_attributes(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.assign(direction=0, link_id=0)

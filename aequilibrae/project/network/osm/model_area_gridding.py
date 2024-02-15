@@ -1,28 +1,25 @@
 # Inspired by https://www.matecdev.com/posts/shapely-polygon-gridding.html
+from math import ceil
+
+import geopandas as gpd
 import numpy as np
 from shapely.geometry import Polygon
-import geopandas as gpd
 
 
 def geometry_grid(model_area, srid) -> gpd.GeoDataFrame:
     minx, miny, maxx, maxy = model_area.bounds
-    subd = min(0.01, abs(maxy - miny) / 3, abs(maxx - minx) / 3)
-    space_x = int((maxx - minx) / subd)
-    space_y = int((maxy - miny) / subd)
-    combx, comby = np.linspace(minx, maxx, space_x), np.linspace(miny, maxy, space_y)
+    # Some rough heuristic to get the number of points per sub-polygon in the 2 digits range
+    subd = ceil((len(model_area.boundary.coords) / 32) ** 0.5)
+    dx = (maxx - minx) / subd
+    dy = (maxy - miny) / subd
     elements = []
-    for i in range(len(combx) - 1):
-        for j in range(len(comby) - 1):
-            elements.append(
-                Polygon(
-                    [
-                        [combx[i], comby[j]],
-                        [combx[i], comby[j + 1]],
-                        [combx[i + 1], comby[j + 1]],
-                        [combx[i + 1], comby[j]],
-                    ]
-                )
-            )
+    x1 = minx
+    for i in range(subd):
+        j1 = miny
+        for j in range(subd):
+            elements.append(Polygon([[x1, j1], [x1, j1 + dy], [x1 + dx, j1 + dy], [x1 + dx, j1]]))
+            j1 += dy
+        x1 += dx
 
     gdf = gpd.GeoDataFrame({"id": np.arange(len(elements))}, geometry=elements, crs=srid)
 
