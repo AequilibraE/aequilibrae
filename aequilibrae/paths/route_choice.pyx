@@ -62,6 +62,7 @@ from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
+from libcpp.algorithm cimport sort
 from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 
@@ -166,6 +167,7 @@ cdef class RouteChoiceSet:
             bfsle: bool = True,
             penalty: float = 0.0,
             where: Optional[str] = None,
+            freq_as_well = False,
     ):
         """
         Compute the a route set for a list of OD pairs.
@@ -310,13 +312,27 @@ cdef class RouteChoiceSet:
 
             table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results)))
 
+
+            if freq_as_well:
+                freqs = []
+                for freq in deref(RouteChoiceSet.frequency(deref(results), c_cores)):
+                    freqs.append(
+                        (
+                            list(deref(freq.first)),
+                            list(deref(freq.second)),
+                        )
+                    )
+
             # Once we've made the table all results have been copied into some pyarrow structure, we can free our internal structures
             for result in deref(results):
                 for route in deref(result):
                     del route
 
             if where is None:  # There was only one batch anyway
-                return table
+                if freq_as_well:
+                    return table, freqs
+                else:
+                    return table
 
             checkpoint.write(table)
 
@@ -518,6 +534,58 @@ cdef class RouteChoiceSet:
                 break
 
         return route_set
+
+
+    @staticmethod
+    cdef vector[pair[vector[long long] *, vector[long long] *]] *frequency(vector[RouteSet_t *] &route_sets, unsigned int cores) noexcept nogil:
+        cdef:
+            vector[pair[vector[long long] *, vector[long long] *]] *freq_set = new vector[pair[vector[long long] *, vector[long long] *]]()
+            vector[long long] *keys
+            vector[long long] *counts
+
+            # Scatch objects
+            vector[long long] *link_union
+            size_t length, count
+            long long link, i
+
+        freq_set.reserve(route_sets.size())
+
+        with parallel(num_threads=cores):
+            link_union = new vector[long long]()
+            for i in prange(route_sets.size()):
+                route_set = route_sets[i]
+
+                link_union.clear()
+
+                keys = new vector[long long]()
+                counts = new vector[long long]()
+
+                length = 0
+                for route in deref(route_set):
+                    length = length + route.size()
+                link_union.reserve(length)
+
+                for route in deref(route_set):
+                    link_union.insert(link_union.end(), route.begin(), route.end())
+
+                sort(link_union.begin(), link_union.end())
+
+                union_iter = link_union.begin()
+                while union_iter != link_union.end():
+                    count = 0
+                    link = deref(union_iter)
+                    while link == deref(union_iter):
+                        count = count + 1
+                        inc(union_iter)
+
+                    keys.push_back(link)
+                    counts.push_back(count)
+
+                freq_set.emplace(freq_set.cbegin() + i, keys, counts)
+
+            del link_union
+
+        return freq_set
 
     @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets):

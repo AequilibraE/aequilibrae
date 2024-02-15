@@ -166,6 +166,9 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     @staticmethod
+    cdef vector[pair[vector[long long] *, vector[long long] *]] *frequency(vector[RouteSet_t *] &route_sets, unsigned int cores) noexcept nogil
+
+    @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets)
 
 

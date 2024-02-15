@@ -142,22 +142,22 @@ class TestRouteChoice(TestCase):
             rc.run(1, 1, max_routes=1, max_depth=1, bfsle=True, penalty=1.5)
             rc.run(1, 1, max_routes=1, max_depth=1, bfsle=False, penalty=0.1)
 
-    # def test_debug2(self):
-    #     import pyarrow as pa
-    #     import pyarrow.parquet as pq
-    #     import matplotlib.pyplot as plt
+    def test_debug2(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        import matplotlib.pyplot as plt
 
-    #     np.random.seed(0)
-    #     rc = RouteChoiceSet(self.graph)
-    #     nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
-    #     max_routes = 20
+        max_routes = 20
 
-    #     breakpoint()
-    #     # Table of origins
-    #     table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
+        # Table of origins
+        table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
+        breakpoint()
 
-    #     assert False
+        assert False
 
     def test_round_trip(self):
         np.random.seed(1000)
@@ -181,6 +181,23 @@ class TestRouteChoice(TestCase):
         table = table.to_pandas().sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
+
+    def test_frequency_results(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        table, freqs = rc.batched(nodes, max_routes=20, max_depth=10, freq_as_well=True)
+        table = table.to_pandas()
+
+        gb = table.groupby(by=["origin id", "destination id"])
+        for od, freq in zip(set(nodes), freqs):  # iteration order is changed by set operation
+            df = gb.get_group(od)
+            bincount = np.bincount(np.hstack(df["route set"].values))
+            keys = bincount.nonzero()[0]
+
+            vals = bincount[keys]
+            self.assertListEqual(list(keys), freq[0], "Keys of frequencies differreturns")
+            self.assertListEqual(list(vals), freq[1], "Values of frequencies differ")
 
 
 def generate_line_strings(project, graph, results):
