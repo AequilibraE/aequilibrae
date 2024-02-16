@@ -54,7 +54,7 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 
 from aequilibrae import Graph
 
-from libc.math cimport INFINITY
+from libc.math cimport INFINITY, pow, exp
 from libc.string cimport memcpy
 from libc.limits cimport UINT_MAX
 from libc.stdlib cimport abort
@@ -170,6 +170,9 @@ cdef class RouteChoiceSet:
             freq_as_well = False,
             cost_as_well = False,
             psl_as_well = False,
+            prob_as_well = False,
+            beta: float = 1.0,
+            theta: float = 1.0,
     ):
         """
         Compute the a route set for a list of OD pairs.
@@ -341,6 +344,13 @@ cdef class RouteChoiceSet:
                 for psl_vec in deref(psls):
                     psls_list.append(list(deref(psl_vec)))
                 returns.append(psls_list)
+
+            probs = RouteChoiceSet.compute_prob(deref(costs), deref(psls), beta, theta, c_cores)
+            if prob_as_well:
+                probs_list = []
+                for prob_vec in deref(probs):
+                    probs_list.append(list(deref(prob_vec)))
+                returns.append(probs_list)
 
             # Once we've made the table all results have been copied into some pyarrow structure, we can free our internal structures
             for result in deref(results):
@@ -666,7 +676,7 @@ cdef class RouteChoiceSet:
             pair[vector[long long] *, vector[long long] *] freq_set
             vector[long long].const_iterator link_iter
             vector[double] *total_cost
-            double prob
+            double gamma
             long long link, j
             size_t i
 
@@ -680,7 +690,7 @@ cdef class RouteChoiceSet:
 
                 j = 0
                 for route in deref(route_set):
-                    prob = 0.0
+                    gamma = 0.0
                     for link in deref(route):
                         # We know the frequency table is ordered and contains every link in the union of the routes.
                         # We want to find the index of the link, and use that to look up it's frequency
@@ -690,15 +700,67 @@ cdef class RouteChoiceSet:
                             fprintf(stderr, "Link %d not found in link set? not possible??\n", link)
                             abort()
 
-                        prob = prob + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+                        gamma = gamma + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
 
-                    psl_vec.push_back(prob / deref(total_cost)[j])
+                    psl_vec.push_back(gamma / deref(total_cost)[j])
 
                     j = j + 1
 
                 deref(psl_set)[i] = psl_vec
 
         return psl_set
+
+    @staticmethod
+    cdef vector[vector[double] *] *compute_prob(
+        vector[vector[double] *] &total_costs,
+        vector[vector[double] *] &gammas,
+        double beta,
+        double theta,
+        unsigned int cores
+    ) noexcept nogil:
+        cdef:
+            vector[vector[double] *] *prob_set = new vector[vector[double] *](total_costs.size())
+
+            # Scratch objects
+            vector[double] *total_cost
+            vector[double] *gamma_vec
+            vector[double] *prob_vec
+            double inv_prob, sum_gamma_i_to_beta, sum_exp_theta_c_i
+            long long route_set_idx
+            size_t i, j
+
+        with parallel(num_threads=cores):
+            for route_set_idx in prange(total_costs.size()):
+                total_cost = total_costs[route_set_idx]
+                gamma_vec = gammas[route_set_idx]
+                prob_vec = new vector[double]()
+                prob_vec.reserve(total_cost.size())
+
+
+                for i in range(total_cost.size()):
+                    inv_prob = 0.0
+                    for j in range(total_cost.size()):
+                        inv_prob = inv_prob + pow(deref(gamma_vec)[j] / deref(gamma_vec)[i], beta) * exp(-theta * (deref(total_cost)[j] - deref(total_cost)[i]))
+
+                    prob_vec.push_back(1.0 / inv_prob)
+
+                # sum_gamma_i_to_beta = 0.0
+                # sum_exp_theta_c_i = 0.0
+                # for i in range(total_cost.size()):
+                #     sum_gamma_i_to_beta = sum_gamma_i_to_beta + pow(deref(gamma_vec)[i], beta)
+                #     sum_exp_theta_c_i = sum_exp_theta_c_i + exp(beta * deref(total_cost)[i])
+
+                # for i in range(total_cost.size()):
+                #     inv_prob = 0.0
+                #     for j in range(total_cost.size()):
+                #         inv_prob = inv_prob + exp(-beta * deref(total_cost)[j]) * pow(deref(gamma_vec)[j], beta)
+                #     inv_prob = inv_prob * sum_exp_theta_c_i / sum_gamma_i_to_beta
+
+                #     prob_vec.push_back(1.0 / inv_prob)
+
+                deref(prob_set)[route_set_idx] = prob_vec
+
+        return prob_set
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

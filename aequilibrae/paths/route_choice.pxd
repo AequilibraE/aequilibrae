@@ -181,6 +181,15 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     @staticmethod
+    cdef vector[vector[double] *] *compute_prob(
+        vector[vector[double] *] &total_costs,
+        vector[vector[double] *] &gammas,
+        double beta,
+        double theta,
+        unsigned int cores
+    ) noexcept nogil
+
+    @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets)
 
 
