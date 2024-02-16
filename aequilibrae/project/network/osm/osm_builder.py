@@ -178,7 +178,7 @@ class OSMBuilder(WorkerThread):
         if not self.clean:
             conn.execute("VACUUM;")
             return
-        self.logger("Cleaning up the network down to the selected area")
+        self.logger.info("Cleaning up the network down to the selected area")
         links = gpd.GeoDataFrame.from_postgis("SELECT link_id, asBinary(geometry) AS geom FROM links", conn, crs=4326)
         links_left = [[x] for x in links[~links.link_id.isin(links.clip(self.model_area).link_id)].link_id]
         conn.executemany("DELETE FROM links WHERE link_id = ?", links_left)
