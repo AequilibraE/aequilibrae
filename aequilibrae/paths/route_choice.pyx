@@ -168,6 +168,7 @@ cdef class RouteChoiceSet:
             penalty: float = 0.0,
             where: Optional[str] = None,
             freq_as_well = False,
+            cost_as_well = False,
     ):
         """
         Compute the a route set for a list of OD pairs.
@@ -323,13 +324,20 @@ cdef class RouteChoiceSet:
                         )
                     )
 
+            if cost_as_well:
+                costs = []
+                for cost_vec in deref(RouteChoiceSet.compute_cost(deref(results), self.cost_view, c_cores)):
+                    costs.append(list(deref(cost_vec)))
+
             # Once we've made the table all results have been copied into some pyarrow structure, we can free our internal structures
             for result in deref(results):
                 for route in deref(result):
                     del route
 
             if where is None:  # There was only one batch anyway
-                if freq_as_well:
+                if cost_as_well:
+                    return table, costs
+                elif freq_as_well:
                     return table, freqs
                 else:
                     return table
@@ -589,6 +597,39 @@ cdef class RouteChoiceSet:
             del link_union
 
         return freq_set
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef vector[vector[double] *] *compute_cost(vector[RouteSet_t *] &route_sets, double[:] cost_view, unsigned int cores) noexcept nogil:
+        cdef:
+            vector[vector[double] *] *cost_set = new vector[vector[double] *](route_sets.size())
+            vector[double] *cost_vec
+
+            # Scratch objects
+            vector[long long] *link_union
+            size_t length,
+            double cost
+            long long link, i
+
+        with parallel(num_threads=cores):
+            for i in prange(route_sets.size()):
+                route_set = route_sets[i]
+                cost_vec = new vector[double]()
+                cost_vec.reserve(route_set.size())
+
+                for route in deref(route_set):
+                    cost = 0.0
+                    for link in deref(route):
+                        cost = cost + cost_view[link]
+
+                    cost_vec.push_back(cost)
+
+                deref(cost_set)[i] = cost_vec
+
+        return cost_set
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

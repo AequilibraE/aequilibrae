@@ -182,6 +182,19 @@ class TestRouteChoice(TestCase):
             self.assertListEqual(list(keys), freq[0], "Keys of frequencies differreturns")
             self.assertListEqual(list(vals), freq[1], "Values of frequencies differ")
 
+    def test_cost_results(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        table, costs = rc.batched(nodes, max_routes=20, max_depth=10, cost_as_well=True)
+        table = table.to_pandas()
+
+        gb = table.groupby(by=["origin id", "destination id"])
+        for od, cost_vec in zip(set(nodes), costs):  # iteration order is changed by set operation
+            df = gb.get_group(od)
+            for route, cost in zip(df["route set"].values, cost_vec):
+                np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
+
 
 def generate_line_strings(project, graph, results):
     """Debug method"""
