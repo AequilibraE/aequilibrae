@@ -535,7 +535,10 @@ cdef class RouteChoiceSet:
 
         return route_set
 
-
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     @staticmethod
     cdef vector[pair[vector[long long] *, vector[long long] *]] *frequency(vector[RouteSet_t *] &route_sets, unsigned int cores) noexcept nogil:
         cdef:
@@ -543,7 +546,7 @@ cdef class RouteChoiceSet:
             vector[long long] *keys
             vector[long long] *counts
 
-            # Scatch objects
+            # Scratch objects
             vector[long long] *link_union
             size_t length, count
             long long link, i
@@ -587,6 +590,10 @@ cdef class RouteChoiceSet:
 
         return freq_set
 
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets):
         cdef:

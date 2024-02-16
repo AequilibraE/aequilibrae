@@ -142,23 +142,6 @@ class TestRouteChoice(TestCase):
             rc.run(1, 1, max_routes=1, max_depth=1, bfsle=True, penalty=1.5)
             rc.run(1, 1, max_routes=1, max_depth=1, bfsle=False, penalty=0.1)
 
-    def test_debug2(self):
-        import pyarrow as pa
-        import pyarrow.parquet as pq
-        import matplotlib.pyplot as plt
-
-        np.random.seed(0)
-        rc = RouteChoiceSet(self.graph)
-        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-
-        max_routes = 20
-
-        # Table of origins
-        table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
-        breakpoint()
-
-        assert False
-
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
