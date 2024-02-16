@@ -62,7 +62,7 @@ from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from libcpp.algorithm cimport sort
+from libcpp.algorithm cimport sort, lower_bound
 from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 
@@ -169,6 +169,7 @@ cdef class RouteChoiceSet:
             where: Optional[str] = None,
             freq_as_well = False,
             cost_as_well = False,
+            psl_as_well = False,
     ):
         """
         Compute the a route set for a list of OD pairs.
@@ -313,21 +314,33 @@ cdef class RouteChoiceSet:
 
             table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results)))
 
+            returns = []
 
+            freqs = RouteChoiceSet.frequency(deref(results), c_cores)
             if freq_as_well:
-                freqs = []
-                for freq in deref(RouteChoiceSet.frequency(deref(results), c_cores)):
-                    freqs.append(
+                freqs_list = []
+                for freq in deref(freqs):
+                    freqs_list.append(
                         (
                             list(deref(freq.first)),
                             list(deref(freq.second)),
                         )
                     )
+                returns.append(freqs_list)
 
+            costs = RouteChoiceSet.compute_cost(deref(results), self.cost_view, c_cores)
             if cost_as_well:
-                costs = []
-                for cost_vec in deref(RouteChoiceSet.compute_cost(deref(results), self.cost_view, c_cores)):
-                    costs.append(list(deref(cost_vec)))
+                costs_list = []
+                for cost_vec in deref(costs):
+                    costs_list.append(list(deref(cost_vec)))
+                returns.append(costs_list)
+
+            psls = RouteChoiceSet.compute_psl(deref(results), deref(freqs), deref(costs), self.cost_view, c_cores)
+            if psl_as_well:
+                psls_list = []
+                for psl_vec in deref(psls):
+                    psls_list.append(list(deref(psl_vec)))
+                returns.append(psls_list)
 
             # Once we've made the table all results have been copied into some pyarrow structure, we can free our internal structures
             for result in deref(results):
@@ -335,12 +348,11 @@ cdef class RouteChoiceSet:
                     del route
 
             if where is None:  # There was only one batch anyway
-                if cost_as_well:
-                    return table, costs
-                elif freq_as_well:
-                    return table, freqs
+                if returns:
+                    return table, *returns
                 else:
                     return table
+
 
             checkpoint.write(table)
 
@@ -609,8 +621,6 @@ cdef class RouteChoiceSet:
             vector[double] *cost_vec
 
             # Scratch objects
-            vector[long long] *link_union
-            size_t length,
             double cost
             long long link, i
 
@@ -630,6 +640,65 @@ cdef class RouteChoiceSet:
                 deref(cost_set)[i] = cost_vec
 
         return cost_set
+
+    @staticmethod
+    cdef vector[vector[double] *] *compute_psl(
+        vector[RouteSet_t *] &route_sets,
+        vector[pair[vector[long long] *, vector[long long] *]] &freq_sets,
+        vector[vector[double] *] &total_costs,
+        double[:] cost_view,
+        unsigned int cores
+    ) noexcept nogil:
+        """
+        Notation changes:
+            i: j
+            a: link
+            t_a: cost_view
+            c_i: total_costs
+            A_i: route
+            sum_{k in R}: delta_{a,k}: freq_set
+        """
+        cdef:
+            vector[vector[double] *] *psl_set = new vector[vector[double] *](route_sets.size())
+            vector[double] *psl_vec
+
+            # Scratch objects
+            pair[vector[long long] *, vector[long long] *] freq_set
+            vector[long long].const_iterator link_iter
+            vector[double] *total_cost
+            double prob
+            long long link, j
+            size_t i
+
+        with parallel(num_threads=cores):
+            for i in prange(route_sets.size()):
+                route_set = route_sets[i]
+                freq_set = freq_sets[i]
+                total_cost = total_costs[i]
+                psl_vec = new vector[double]()
+                psl_vec.reserve(route_set.size())
+
+                j = 0
+                for route in deref(route_set):
+                    prob = 0.0
+                    for link in deref(route):
+                        # We know the frequency table is ordered and contains every link in the union of the routes.
+                        # We want to find the index of the link, and use that to look up it's frequency
+                        link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
+
+                        if link != deref(link_iter):
+                            fprintf(stderr, "Link %d not found in link set? not possible??\n", link)
+                            abort()
+
+                        prob = prob + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+
+                    psl_vec.push_back(prob / deref(total_cost)[j])
+
+                    j = j + 1
+
+                deref(psl_set)[i] = psl_vec
+
+        return psl_set
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
