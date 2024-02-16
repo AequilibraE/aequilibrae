@@ -126,6 +126,7 @@ class Network(WorkerThread):
         model_area: Optional[Polygon] = None,
         place_name: Optional[str] = None,
         modes=("car", "transit", "bicycle", "walk"),
+        clean=True,
     ) -> None:
         """
         Downloads the network from Open-Street Maps
@@ -140,6 +141,9 @@ class Network(WorkerThread):
 
             **modes** (:obj:`tuple`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
             file
+
+            **clean** (:obj:`bool`, Optional): Keeps only the links that intersects the model area polygon. Defaults to
+            True. Does not apply to networks downloaded with a place name
 
         .. code-block:: python
 
@@ -191,6 +195,7 @@ class Network(WorkerThread):
                 raise ValueError("Coordinates out of bounds. Polygon must be in WGS84")
             west, south, east, north = model_area.bounds
         else:
+            clean = False
             bbox, report = placegetter(place_name)
             if bbox is None:
                 msg = f'We could not find a reference for place name "{place_name}"'
@@ -236,7 +241,7 @@ class Network(WorkerThread):
         dwnloader.doWork()
 
         self.logger.info("Building Network")
-        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area)
+        self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
         if pyqt:
             self.builder.building.connect(self.signal_handler)

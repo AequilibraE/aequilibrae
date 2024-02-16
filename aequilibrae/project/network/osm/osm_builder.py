@@ -1,3 +1,4 @@
+import geopandas as gpd
 import gc
 import importlib.util as iutil
 import string
@@ -27,7 +28,7 @@ class OSMBuilder(WorkerThread):
     if pyqt:
         building = pyqtSignal(object)
 
-    def __init__(self, data, project, model_area: Polygon) -> None:
+    def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
 
         project.logger.info("Preparing OSM builder")
@@ -38,6 +39,7 @@ class OSMBuilder(WorkerThread):
         self.model_area = geometry_grid(model_area, 4326)
         self.path = self.project.path_to_file
         self.node_start = 10000
+        self.clean = clean
         self.report = []
         self.__all_ltp = pd.DataFrame([])
         self.__link_id = 1
@@ -62,7 +64,9 @@ class OSMBuilder(WorkerThread):
             conn.execute(
                 "DELETE FROM nodes WHERE node_id NOT IN (SELECT a_node FROM links union all SELECT b_node FROM links)"
             )
-            conn.execute("VACUUM;")
+            conn.commit()
+            self.__do_clean(conn)
+
         self.__emit_all(["finished_threaded_procedure", 0])
 
     def importing_network(self, conn):
@@ -169,6 +173,17 @@ class OSMBuilder(WorkerThread):
         slice = self.node_df.loc[nodes, :]
         txt = ",".join((slice.lon.astype(str) + " " + slice.lat.astype(str)).tolist())
         return f"LINESTRING({txt})"
+
+    def __do_clean(self, conn):
+        if not self.clean:
+            conn.execute("VACUUM;")
+            return
+        self.logger("Cleaning up the network down to the selected area")
+        links = gpd.GeoDataFrame.from_postgis("SELECT link_id, asBinary(geometry) AS geom FROM links", conn, crs=4326)
+        links_left = [[x] for x in links[~links.link_id.isin(links.clip(self.model_area).link_id)].link_id]
+        conn.executemany("DELETE FROM links WHERE link_id = ?", links_left)
+        conn.commit()
+        conn.execute("VACUUM;")
 
     def __process_link_chunk(self):
         self.logger.info("Processing link modes, types and fields")
