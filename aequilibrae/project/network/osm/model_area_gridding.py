@@ -9,7 +9,7 @@ from shapely.geometry import Polygon
 def geometry_grid(model_area, srid) -> gpd.GeoDataFrame:
     minx, miny, maxx, maxy = model_area.bounds
     # Some rough heuristic to get the number of points per sub-polygon in the 2 digits range
-    subd = ceil((len(model_area.boundary.coords) / 32) ** 0.5)
+    subd = ceil((len(model_area.exterior.coords) / 32) ** 0.5)
     dx = (maxx - minx) / subd
     dy = (maxy - miny) / subd
     elements = []
