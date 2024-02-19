@@ -216,7 +216,6 @@ class TestRouteChoice(TestCase):
         table, costs, psls, probs = rc.batched(nodes, max_routes=20, max_depth=10, prob_as_well=True, cost_as_well=True, psl_as_well=True)
         table = table.to_pandas()
 
-        breakpoint()
         for prob_vec in probs:
             self.assertAlmostEqual(1.0, sum(prob_vec), msg="Probability not close to 1.0")
         # for od, cost_vec in zip(set(nodes), costs):  # iteration order is changed by set operation

@@ -651,6 +651,10 @@ cdef class RouteChoiceSet:
 
         return cost_set
 
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     @staticmethod
     cdef vector[vector[double] *] *compute_psl(
         vector[RouteSet_t *] &route_sets,
@@ -710,6 +714,10 @@ cdef class RouteChoiceSet:
 
         return psl_set
 
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     @staticmethod
     cdef vector[vector[double] *] *compute_prob(
         vector[vector[double] *] &total_costs,
@@ -725,7 +733,7 @@ cdef class RouteChoiceSet:
             vector[double] *total_cost
             vector[double] *gamma_vec
             vector[double] *prob_vec
-            double inv_prob, sum_gamma_i_to_beta, sum_exp_theta_c_i
+            double inv_prob
             long long route_set_idx
             size_t i, j
 
@@ -736,27 +744,13 @@ cdef class RouteChoiceSet:
                 prob_vec = new vector[double]()
                 prob_vec.reserve(total_cost.size())
 
-
+                # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will lead to NaN results
                 for i in range(total_cost.size()):
                     inv_prob = 0.0
                     for j in range(total_cost.size()):
                         inv_prob = inv_prob + pow(deref(gamma_vec)[j] / deref(gamma_vec)[i], beta) * exp(-theta * (deref(total_cost)[j] - deref(total_cost)[i]))
 
                     prob_vec.push_back(1.0 / inv_prob)
-
-                # sum_gamma_i_to_beta = 0.0
-                # sum_exp_theta_c_i = 0.0
-                # for i in range(total_cost.size()):
-                #     sum_gamma_i_to_beta = sum_gamma_i_to_beta + pow(deref(gamma_vec)[i], beta)
-                #     sum_exp_theta_c_i = sum_exp_theta_c_i + exp(beta * deref(total_cost)[i])
-
-                # for i in range(total_cost.size()):
-                #     inv_prob = 0.0
-                #     for j in range(total_cost.size()):
-                #         inv_prob = inv_prob + exp(-beta * deref(total_cost)[j]) * pow(deref(gamma_vec)[j], beta)
-                #     inv_prob = inv_prob * sum_exp_theta_c_i / sum_gamma_i_to_beta
-
-                #     prob_vec.push_back(1.0 / inv_prob)
 
                 deref(prob_set)[route_set_idx] = prob_vec
 
