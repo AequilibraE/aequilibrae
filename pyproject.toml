@@ -55,3 +55,49 @@ target-version = "py39"
 
 [tool.ruff.mccabe]
 max-complexity = 20
+
+[tool.cibuildwheel]
+# While we test this facility we we will only build for 3.10
+build = ["cp310-*"]
+#build = ["cp38-*", "cp39-*","cp310-*", "cp311-*", "cp312-*"]
+
+# We do not build wheels for Python 3.6 or 3.7, or for 32-bit in either Linux or Windows
+skip = ["cp36-*", "cp37-*", "*-win32", "*-manylinux_i686"]
+test-skip = ""
+
+archs = ["auto"]
+build-frontend = "default"
+config-settings = {}
+dependency-versions = "pinned"
+environment = {}
+environment-pass = []
+build-verbosity = 0
+
+before-all = ""
+before-build = ""
+repair-wheel-command = ""
+
+test-command = ""
+before-test = ""
+test-requires = []
+test-extras = []
+
+container-engine = "docker"
+
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+manylinux-ppc64le-image = "manylinux2014"
+manylinux-s390x-image = "manylinux2014"
+manylinux-pypy_x86_64-image = "manylinux2014"
+manylinux-pypy_aarch64-image = "manylinux2014"
+
+musllinux-x86_64-image = "musllinux_1_1"
+musllinux-aarch64-image = "musllinux_1_1"
+musllinux-ppc64le-image = "musllinux_1_1"
+musllinux-s390x-image = "musllinux_1_1"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
