@@ -74,7 +74,7 @@ environment-pass = []
 build-verbosity = 0
 
 before-all = ""
-before-build = "".
+before-build = ""
 repair-wheel-command = ""
 
 test-command = ""
