@@ -17,6 +17,7 @@ library_dirs = []
 if iutil.find_spec("pyarrow") is not None:
     import pyarrow as pa
 
+    pa.create_library_symlinks()
     include_dirs.append(pa.get_include())
     libraries.extend(pa.get_libraries())
     library_dirs.extend(pa.get_library_dirs())
