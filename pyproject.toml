@@ -6,7 +6,7 @@ extend-exclude = '''docs/*'''
 
 
 [build-system]
-requires = ["setuptools", "numpy", "cython", "pyaml", "pyqt5", "requests", "scipy", "shapely", "pandas", "pyarrow", "pyproj", "wheel"]
+requires = ["setuptools", "numpy", "cython", "pandas", "pyarrow", "wheel"]
 
 
 [tool.ruff]
@@ -55,3 +55,46 @@ target-version = "py39"
 
 [tool.ruff.mccabe]
 max-complexity = 20
+
+[tool.cibuildwheel]
+# While we test this facility we we will only build for 3.10
+#build = ["cp310-*"]
+build = ["cp38-*", "cp39-*","cp310-*", "cp311-*", "cp312-*"]
+
+# We do not build wheels for Python 3.6 or 3.7, or for 32-bit in either Linux or Windows
+skip = ["cp36-*", "cp37-*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-s390x-*", "*-ppc64le-*"]
+test-skip = ""
+
+archs = ["auto"]
+build-frontend = "default"
+config-settings = {}
+dependency-versions = "pinned"
+environment = {}
+environment-pass = []
+build-verbosity = 0
+
+before-all = ""
+before-build = ""
+repair-wheel-command = ""
+
+test-command = ""
+before-test = ""
+test-requires = []
+test-extras = []
+
+container-engine = "docker"
+
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+manylinux-pypy_x86_64-image = "manylinux2014"
+manylinux-pypy_aarch64-image = "manylinux2014"
+
+[tool.cibuildwheel.linux]
+archs = ["auto", "aarch64"]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+#archs = ["x86_64", "universal2", "arm64"]
+archs = ["x86_64"]
+environment = { CC="gcc-12", CXX="g++-12" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
