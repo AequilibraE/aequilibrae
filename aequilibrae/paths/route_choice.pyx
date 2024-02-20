@@ -54,18 +54,36 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 
 from aequilibrae import Graph
 
-from libc.math cimport INFINITY
+from libc.math cimport INFINITY, pow, exp
 from libc.string cimport memcpy
 from libc.limits cimport UINT_MAX
+from libc.stdlib cimport abort
+from libcpp cimport nullptr
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from cython.operator cimport dereference as deref
+from libcpp.algorithm cimport sort, lower_bound
+from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
+cimport openmp
 
 import numpy as np
+import pyarrow as pa
 from typing import List, Tuple
+import itertools
+import pathlib
+import logging
+import warnings
+
+cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
+cimport pyarrow as pa
+cimport pyarrow.lib as libpa
+import pyarrow.dataset
+import pyarrow.parquet as pq
+from libcpp.memory cimport shared_ptr
+
+from libc.stdio cimport fprintf, printf, stderr
 
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
@@ -76,6 +94,23 @@ cdef class RouteChoiceSet:
     Route choice implemented via breadth first search with link removal (BFS-LE) as described in Rieser-Schüssler,
     Balmer, and Axhausen, 'Route Choice Sets for Very High-Resolution Data'
     """
+
+    route_set_dtype = pa.list_(pa.uint32())
+
+    schema = pa.schema([
+        pa.field("origin id", pa.uint32(), nullable=False),
+        pa.field("destination id", pa.uint32(), nullable=False),
+        pa.field("route set", route_set_dtype, nullable=False),
+    ])
+
+    psl_schema = pa.schema([
+        pa.field("origin id", pa.uint32(), nullable=False),
+        pa.field("destination id", pa.uint32(), nullable=False),
+        pa.field("route set", route_set_dtype, nullable=False),
+        pa.field("cost", pa.float64(), nullable=False),
+        pa.field("gamma", pa.float64(), nullable=False),
+        pa.field("probability", pa.float64(), nullable=False),
+    ])
 
     def __cinit__(self):
         """C level init. For C memory allocation and initialisation. Called exactly once per object."""
@@ -88,13 +123,17 @@ cdef class RouteChoiceSet:
         self.graph_fs_view = graph.compact_fs
         self.b_nodes_view = graph.compact_graph.b_node.values
         self.nodes_to_indices_view = graph.compact_nodes_to_indices
-        tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
-        self.lat_view = tmp.lat.values
-        self.lon_view = tmp.lon.values
+
+        # tmp = graph.lonlat_index.loc[graph.compact_all_nodes]
+        # self.lat_view = tmp.lat.values
+        # self.lon_view = tmp.lon.values
+        self.a_star = False
+
         self.ids_graph_view = graph.compact_graph.id.values
         self.num_nodes = graph.compact_num_nodes
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
+
 
     def __dealloc__(self):
         """
@@ -104,34 +143,45 @@ cdef class RouteChoiceSet:
         pass
 
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, max_routes: int = 0, max_depth: int = 0, seed: int = 0):
+    def run(self, origin: int, destination: int, *args, **kwargs):
         """
         Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
         unique possible paths have been found then a smaller set will be returned.
 
-        Thin wrapper around ``RouteChoiceSet.batched``.
+        Thin wrapper around ``RouteChoiceSet.batched``. Additional arguments are forwarded to ``RouteChoiceSet.batched``.
 
         :Arguments:
             **origin** (:obj:`int`): Origin node ID. Must be present within compact graph. Recommended to choose a centroid.
             **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to choose a centroid.
-            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
-            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
-            **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
 
         :Returns:
             **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
                                                          Represents paths from ``origin`` to ``destination``.
         """
-        return self.batched([(origin, destination)], max_routes=max_routes, max_depth=max_depth, seed=seed)[(origin, destination)]
+        return [tuple(x) for x in self.batched([(origin, destination)], *args, **kwargs).column("route set").to_pylist()]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    def batched(self, ods: List[Tuple[int, int]], max_routes: int = 0, max_depth: int = 0, seed: int = 0, cores: int = 1):
+    def batched(
+            self,
+            ods: List[Tuple[int, int]],
+            max_routes: int = 0,
+            max_depth: int = 0,
+            seed: int = 0,
+            cores: int = 0,
+            a_star: bool = True,
+            bfsle: bool = True,
+            penalty: float = 0.0,
+            where: Optional[str] = None,
+            path_size_logit: bool = False,
+            beta: float = 1.0,
+            theta: float = 1.0,
+    ):
         """
         Compute the a route set for a list of OD pairs.
 
@@ -142,39 +192,35 @@ cdef class RouteChoiceSet:
             **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination node ID must be
                                                     present within compact graph. Recommended to choose a centroids.
             **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
-            **max_depth** (:obj:`int`): Maximum depth BFS can explore. Must be non-negative. Default of ``0`` for unlimited.
+            **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link penalisation.
+                                        Must be non-negative. Default of ``0`` for unlimited.
             **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
-            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``1``.
+            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``0`` for all available.
+            **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
+            **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible with ``bfsle=True``.
+            **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
 
         :Returns:
             **route sets** (:obj:`dict[tuple[int, int], list[tuple[int, ...]]]`): Returns a list of unique tuples of compact link IDs for
-                                                                                 each OD pair provided (as keys). Represents paths from
-                                                                                 ``origin`` to ``destination``.
+                each OD pair provided (as keys). Represents paths from ``origin`` to ``destination``. None if ``where`` was not None.
         """
         cdef:
-            vector[pair[long long, long long]] c_ods = ods
-
-            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
-            double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)
-            long long [:, :] predecessors_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (cores, self.b_nodes_view.shape[0])).copy()
-
-            vector[RouteSet_t *] *results = new vector[RouteSet_t *](len(ods))
-            long long origin_index, dest_index, i
+            long long o, d
 
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be > 0")
 
-        if max_routes < 0 or max_depth < 0 or cores < 0:
+        if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
-        cdef:
-            unsigned int c_max_routes = max_routes
-            unsigned int c_max_depth = max_depth
-            unsigned int c_seed = seed
-            unsigned int c_cores = cores
-            long long o, d
+        if penalty != 0.0 and bfsle:
+            raise ValueError("Link penalisation (`penalty` > 1.0) and `bfsle` cannot be enabled at once")
+
+        if not bfsle and penalty <= 1.0:
+            raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
+
+        if path_size_logit and (beta < 0 or theta <= 0):
+            raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
 
         for o, d in ods:
             if self.nodes_to_indices_view[o] == -1:
@@ -182,55 +228,180 @@ cdef class RouteChoiceSet:
             if self.nodes_to_indices_view[d] == -1:
                 raise ValueError(f"Destination {d} is not present within the compact graph")
 
-        with nogil, parallel(num_threads=c_cores):
-            for i in prange(c_ods.size()):
-                origin_index = self.nodes_to_indices_view[c_ods[i].first]
-                dest_index = self.nodes_to_indices_view[c_ods[i].second]
+        cdef:
+            long long origin_index, dest_index, i
+            unsigned int c_max_routes = max_routes
+            unsigned int c_max_depth = max_depth
+            unsigned int c_seed = seed
+            unsigned int c_cores = cores if cores > 0 else openmp.omp_get_num_threads()
 
-                if self.block_flows_through_centroids:
-                    blocking_centroid_flows(
-                        0,  # Always blocking
-                        origin_index,
-                        self.zones,
-                        self.graph_fs_view,
-                        b_nodes_matrix[threadid()],
-                        self.b_nodes_view,
-                    )
+            vector[pair[long long, long long]] c_ods
 
-                deref(results)[i] = RouteChoiceSet.generate_route_set(
-                    self,
-                    origin_index,
-                    dest_index,
-                    c_max_routes,
-                    c_max_depth,
-                    cost_matrix[threadid()],
-                    predecessors_matrix[threadid()],
-                    conn_matrix[threadid()],
-                    b_nodes_matrix[threadid()],
-                    c_seed,
-                )
+            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
+            double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
+            long long [:, :] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (c_cores, self.b_nodes_view.shape[0])).copy()
 
-                if self.block_flows_through_centroids:
-                    blocking_centroid_flows(
-                        1,  # Always unblocking
-                        origin_index,
-                        self.zones,
-                        self.graph_fs_view,
-                        b_nodes_matrix[threadid()],
-                        self.b_nodes_view,
-                    )
+            # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
+            # interface.
+            long long [:, :] _reached_first_matrix
 
-        # Build results into python objects using Cythons auto-conversion from vector[long long] to list then to tuple (for set operations)
-        res = []
-        for result in deref(results):
-            links = []
-            for route in deref(result):
-                links.append(tuple(deref(route)))
-                del route
-            res.append(links)
+            vector[RouteSet_t *] *results
+            size_t max_results_len, batch_len, j
 
-        del results
-        return dict(zip(ods, res))
+        # self.a_star = a_star
+
+        if self.a_star:
+            _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
+        else:
+            _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
+
+        set_ods = set(ods)
+        if len(set_ods) != len(ods):
+            warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
+
+        if where is not None:
+            checkpoint = Checkpoint(where, self.schema, partition_cols=["origin id"])
+            batches = list(Checkpoint.batches(list(set_ods)))
+            max_results_len = <size_t>max(len(batch) for batch in batches)
+        else:
+            batches = [list(set_ods)]
+            max_results_len = len(set_ods)
+
+        results = new vector[RouteSet_t *](max_results_len)
+
+        cdef:
+            RouteSet_t *route_set
+            pair[vector[long long] *, vector[long long] *] freq_pair
+            vector[long long] *link_union = <vector[long long] *>nullptr
+            vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *gamma_set = <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *prob_set= <vector[vector[double] *] *>nullptr
+
+        if path_size_logit:
+            cost_set = new vector[vector[double] *](max_results_len)
+            gamma_set = new vector[vector[double] *](max_results_len)
+            prob_set = new vector[vector[double] *](max_results_len)
+
+        for batch in batches:
+            c_ods = batch  # Convert the batch to a cpp vector, this isn't strictly efficient but is nicer
+            batch_len = c_ods.size()
+            results.resize(batch_len)  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
+
+            if path_size_logit:
+                cost_set.clear()
+                gamma_set.clear()
+                prob_set.clear()
+
+                cost_set.resize(batch_len)
+                gamma_set.resize(batch_len)
+                prob_set.resize(batch_len)
+
+            with nogil, parallel(num_threads=c_cores):
+                # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
+                # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
+                if path_size_logit:
+                    link_union = new vector[long long]()
+
+                for i in prange(batch_len):
+                    origin_index = self.nodes_to_indices_view[c_ods[i].first]
+                    dest_index = self.nodes_to_indices_view[c_ods[i].second]
+
+                    if self.block_flows_through_centroids:
+                        blocking_centroid_flows(
+                            0,  # Always blocking
+                            origin_index,
+                            self.zones,
+                            self.graph_fs_view,
+                            b_nodes_matrix[threadid()],
+                            self.b_nodes_view,
+                        )
+
+                    if bfsle:
+                        route_set = RouteChoiceSet.bfsle(
+                            self,
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            cost_matrix[threadid()],
+                            predecessors_matrix[threadid()],
+                            conn_matrix[threadid()],
+                            b_nodes_matrix[threadid()],
+                            _reached_first_matrix[threadid()],
+                            c_seed,
+                        )
+                    else:
+                        route_set = RouteChoiceSet.link_penalisation(
+                            self,
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            cost_matrix[threadid()],
+                            predecessors_matrix[threadid()],
+                            conn_matrix[threadid()],
+                            b_nodes_matrix[threadid()],
+                            _reached_first_matrix[threadid()],
+                            penalty,
+                            c_seed,
+                        )
+
+                    if path_size_logit:
+                        link_union.clear()
+                        freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union))
+                        deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
+                        deref(gamma_set)[i] = RouteChoiceSet.compute_gamma(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
+                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(gamma_set)[i]), beta, theta)
+                        del freq_pair.first
+                        del freq_pair.second
+
+                    deref(results)[i] = route_set
+
+                    if self.block_flows_through_centroids:
+                        blocking_centroid_flows(
+                            1,  # Always unblocking
+                            origin_index,
+                            self.zones,
+                            self.graph_fs_view,
+                            b_nodes_matrix[threadid()],
+                            self.b_nodes_view,
+                        )
+
+                if path_size_logit:
+                    del link_union
+
+            table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
+
+            # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
+            if path_size_logit:
+                for j in range(batch_len):
+                    del deref(cost_set)[j]
+                    del deref(gamma_set)[j]
+                    del deref(prob_set)[j]
+
+            for j in range(batch_len):
+                for route in deref(deref(results)[j]):
+                    del route
+
+            if where is not None:
+                checkpoint.write(table)
+                del table
+            else:
+                break  # There was only one batch anyway
+
+        # We're done with everything now, we can free the outer internal structures
+        if path_size_logit:
+            del cost_set
+            del gamma_set
+            del prob_set
+            del results
+
+        if where is None:
+            return table
+        else:
+            return
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -240,29 +411,43 @@ cdef class RouteChoiceSet:
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
-        long long [:] thread_b_nodes
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first
     ) noexcept nogil:
         """Small wrapper around path finding, thread locals should be passes as arguments."""
-        path_finding_a_star(
-            origin_index,
-            dest_index,
-            thread_cost,
-            thread_b_nodes,
-            self.graph_fs_view,
-            self.nodes_to_indices_view,
-            self.lat_view,
-            self.lon_view,
-            thread_predecessors,
-            self.ids_graph_view,
-            thread_conn,
-            EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
-        )
+        if self.a_star:
+            path_finding_a_star(
+                origin_index,
+                dest_index,
+                thread_cost,
+                thread_b_nodes,
+                self.graph_fs_view,
+                self.nodes_to_indices_view,
+                self.lat_view,
+                self.lon_view,
+                thread_predecessors,
+                self.ids_graph_view,
+                thread_conn,
+                EQUIRECTANGULAR  # FIXME: enum import failing due to redefinition
+            )
+        else:
+            path_finding(
+                origin_index,
+                dest_index,
+                thread_cost,
+                thread_b_nodes,
+                self.graph_fs_view,
+                thread_predecessors,
+                self.ids_graph_view,
+                thread_conn,
+                _thread_reached_first
+            )
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    cdef RouteSet_t *generate_route_set(
+    cdef RouteSet_t *bfsle(
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
@@ -272,6 +457,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_predecessors,
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
         unsigned int seed
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
@@ -311,7 +497,7 @@ cdef class RouteChoiceSet:
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes)
+                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)
@@ -357,3 +543,329 @@ cdef class RouteChoiceSet:
             del banned
 
         return route_set
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef RouteSet_t *link_penalisation(
+        RouteChoiceSet self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
+        double penatly,
+        unsigned int seed
+    ) noexcept nogil:
+        cdef:
+            RouteSet_t *route_set
+
+            # Scratch objects
+            vector[long long] *vec
+            long long p, connector
+
+        max_routes = max_routes if max_routes != 0 else UINT_MAX
+        max_depth = max_depth if max_depth != 0 else UINT_MAX
+        route_set = new RouteSet_t()
+        memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
+
+        for depth in range(max_depth):
+            if route_set.size() >= max_routes:
+                break
+
+            RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
+
+            if thread_predecessors[dest_index] >= 0:
+                vec = new vector[long long]()
+                # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
+                p = dest_index
+                while p != origin_index:
+                    connector = thread_conn[p]
+                    p = thread_predecessors[p]
+                    vec.push_back(connector)
+
+                for connector in deref(vec):
+                    thread_cost[connector] *= penatly
+
+                route_set.insert(vec)
+            else:
+                break
+
+        return route_set
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil:
+        cdef:
+            vector[long long] *keys
+            vector[long long] *counts
+
+            # Scratch objects
+            size_t length, count
+            long long link, i
+
+        link_union.clear()
+
+        keys = new vector[long long]()
+        counts = new vector[long long]()
+
+        length = 0
+        for route in deref(route_set):
+            length = length + route.size()
+        link_union.reserve(length)
+
+        for route in deref(route_set):
+            link_union.insert(link_union.end(), route.begin(), route.end())
+
+        sort(link_union.begin(), link_union.end())
+
+        union_iter = link_union.begin()
+        while union_iter != link_union.end():
+            count = 0
+            link = deref(union_iter)
+            while link == deref(union_iter):
+                count = count + 1
+                inc(union_iter)
+
+            keys.push_back(link)
+            counts.push_back(count)
+
+        return make_pair(keys, counts)
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef vector[double] *compute_cost(RouteSet_t *route_set, double[:] cost_view) noexcept nogil:
+        cdef:
+            vector[double] *cost_vec
+
+            # Scratch objects
+            double cost
+            long long link, i
+
+        cost_vec = new vector[double]()
+        cost_vec.reserve(route_set.size())
+
+        for route in deref(route_set):
+            cost = 0.0
+            for link in deref(route):
+                cost = cost + cost_view[link]
+
+            cost_vec.push_back(cost)
+
+        return cost_vec
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef vector[double] *compute_gamma(
+        RouteSet_t *route_set,
+        pair[vector[long long] *, vector[long long] *] &freq_set,
+        vector[double] &total_cost,
+        double[:] cost_view
+    ) noexcept nogil:
+        """
+        Notation changes:
+            i: j
+            a: link
+            t_a: cost_view
+            c_i: total_costs
+            A_i: route
+            sum_{k in R}: delta_{a,k}: freq_set
+        """
+        cdef:
+            vector[double] *gamma_vec
+
+            # Scratch objects
+            vector[long long].const_iterator link_iter
+            double gamma
+            long long link, j
+            size_t i
+
+        gamma_vec = new vector[double]()
+        gamma_vec.reserve(route_set.size())
+
+        j = 0
+        for route in deref(route_set):
+            gamma = 0.0
+            for link in deref(route):
+                # We know the frequency table is ordered and contains every link in the union of the routes.
+                # We want to find the index of the link, and use that to look up it's frequency
+                link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
+
+                gamma = gamma + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+
+            gamma_vec.push_back(gamma / total_cost[j])
+
+            j = j + 1
+
+        return gamma_vec
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef vector[double] *compute_prob(
+        vector[double] &total_cost,
+        vector[double] &gamma_vec,
+        double beta,
+        double theta
+    ) noexcept nogil:
+        cdef:
+            # Scratch objects
+            vector[double] *prob_vec
+            double inv_prob
+            long long route_set_idx
+            size_t i, j
+
+        prob_vec = new vector[double]()
+        prob_vec.reserve(total_cost.size())
+
+        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will lead to NaN results
+        for i in range(total_cost.size()):
+            inv_prob = 0.0
+            for j in range(total_cost.size()):
+                inv_prob = inv_prob + pow(gamma_vec[j] / gamma_vec[i], beta) * exp(-theta * (total_cost[j] - total_cost[i]))
+
+            prob_vec.push_back(1.0 / inv_prob)
+
+        return prob_vec
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef shared_ptr[libpa.CTable] make_table_from_results(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &route_sets,
+        vector[vector[double] *] *cost_set,
+        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *prob_set
+    ):
+        cdef:
+            shared_ptr[libpa.CArray] paths
+            shared_ptr[libpa.CArray] offsets
+
+            libpa.CMemoryPool *pool = libpa.c_get_memory_pool()
+
+            # Custom imports, these are declared in route_choice.pxd *not* libarrow.
+            CUInt32Builder *path_builder = new CUInt32Builder(pool)
+            CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *gamma_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
+
+            libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
+            libpa.CUInt32Builder *o_col = new libpa.CUInt32Builder(pool)
+            libpa.CUInt32Builder *d_col = new libpa.CUInt32Builder(pool)
+            vector[shared_ptr[libpa.CArray]] columns
+            shared_ptr[libpa.CDataType] route_set_dtype = libpa.pyarrow_unwrap_data_type(RouteChoiceSet.route_set_dtype)
+
+            libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
+
+            int offset = 0
+            bint psl = (cost_set != nullptr and gamma_set != nullptr and prob_set != nullptr)
+
+        # Origins, Destination, Route set, [Cost for route, Gamma for route, Probability for route]
+        columns.resize(6 if psl else 3)
+
+        if psl:
+            cost_col = new CDoubleBuilder(pool)
+            gamma_col = new CDoubleBuilder(pool)
+            prob_col = new CDoubleBuilder(pool)
+
+            for i in range(ods.size()):
+                cost_col.AppendValues(deref(deref(cost_set)[i]))
+                gamma_col.AppendValues(deref(deref(gamma_set)[i]))
+                prob_col.AppendValues(deref(deref(prob_set)[i]))
+
+        for i in range(ods.size()):
+            route_set = route_sets[i]
+
+            # Instead of construction a "list of lists" style object for storing the route sets we instead will construct one big array of link ids
+            # with a corresponding offsets array that indicates where each new row (path) starts.
+            for route in deref(route_set):
+                o_col.Append(ods[i].first)
+                d_col.Append(ods[i].second)
+
+                offset_builder.Append(offset)
+                path_builder.AppendValues(route.crbegin(), route.crend())
+
+                offset += route.size()
+
+        path_builder.Finish(&paths)
+
+        offset_builder.Append(offset)  # Mark the end of the array in offsets
+        offset_builder.Finish(&offsets)
+
+        route_set_results = libpa.CListArray.FromArraysAndType(route_set_dtype, deref(offsets.get()), deref(paths.get()), pool, shared_ptr[libpa.CBuffer]())
+
+        o_col.Finish(&columns[0])
+        d_col.Finish(&columns[1])
+        columns[2] = deref(route_set_results)
+
+        if psl:
+            cost_col.Finish(&columns[3])
+            gamma_col.Finish(&columns[4])
+            prob_col.Finish(&columns[5])
+
+        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema)
+        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
+
+        del path_builder
+        del offset_builder
+        del o_col
+        del d_col
+
+        if psl:
+            del cost_col
+            del gamma_col
+            del prob_col
+
+        return table
+
+
+@cython.embedsignature(True)
+cdef class Checkpoint:
+    """
+    A small wrapper class to write a dataset partition by partition
+    """
+
+    def __init__(self, where, schema, partition_cols = None):
+        """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
+        self.where = pathlib.Path(where)
+        self.schema = schema
+        self.partition_cols = partition_cols
+
+    def write(self, table):
+        logger = logging.getLogger("aequilibrae")
+        pq.write_to_dataset(
+            table,
+            self.where,
+            partitioning=self.partition_cols,
+            partitioning_flavor="hive",
+            schema=self.schema,
+            use_threads=True,
+            existing_data_behavior="overwrite_or_ignore",
+            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
+        )
+
+    def read_dataset(self):
+        return pa.dataset.dataset(self.where, format="parquet", partitioning=pa.dataset.HivePartitioning(self.schema))
+
+    @staticmethod
+    def batches(ods: List[Tuple[int, int]]):
+        return (list(g) for k, g in itertools.groupby(sorted(ods), key=lambda x: x[0]))

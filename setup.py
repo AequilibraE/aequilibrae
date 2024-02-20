@@ -12,10 +12,15 @@ with open("__version__.py") as f:
     exec(f.read())
 
 include_dirs = [np.get_include()]
+libraries = []
+library_dirs = []
 if iutil.find_spec("pyarrow") is not None:
     import pyarrow as pa
 
+    pa.create_library_symlinks()
     include_dirs.append(pa.get_include())
+    libraries.extend(pa.get_libraries())
+    library_dirs.extend(pa.get_library_dirs())
 
 is_win = "WINDOWS" in platform.platform().upper()
 is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])
@@ -62,8 +67,11 @@ ext_mod_bfs_le = Extension(
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     include_dirs=include_dirs,
+    libraries=libraries,
+    library_dirs=library_dirs,
     language="c++",
 )
+
 ext_mod_graph_building = Extension(
     "aequilibrae.paths.graph_building",
     [join("aequilibrae", "paths", "graph_building.pyx")],
