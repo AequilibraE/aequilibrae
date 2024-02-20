@@ -150,8 +150,8 @@ class TestRouteChoice(TestCase):
         max_routes = 20
 
         path = join(self.project.project_base_path, "batched results")
-        table = rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1)
-        rc.batched(nodes, max_routes=max_routes, max_depth=10, cores=1, where=path)
+        table = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path)
 
         dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
         new_table = (
@@ -165,63 +165,40 @@ class TestRouteChoice(TestCase):
 
         pd.testing.assert_frame_equal(table, new_table)
 
-    def test_frequency_results(self):
-        np.random.seed(0)
-        rc = RouteChoiceSet(self.graph)
-        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table, freqs = rc.batched(nodes, max_routes=20, max_depth=10, freq_as_well=True)
-        table = table.to_pandas()
-
-        gb = table.groupby(by=["origin id", "destination id"])
-        for od, freq in zip(set(nodes), freqs):  # iteration order is changed by set operation
-            df = gb.get_group(od)
-            bincount = np.bincount(np.hstack(df["route set"].values))
-            keys = bincount.nonzero()[0]
-
-            vals = bincount[keys]
-            self.assertListEqual(list(keys), freq[0], "Keys of frequencies differreturns")
-            self.assertListEqual(list(vals), freq[1], "Values of frequencies differ")
-
     def test_cost_results(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table, costs = rc.batched(nodes, max_routes=20, max_depth=10, cost_as_well=True)
+        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
         table = table.to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
-        for od, cost_vec in zip(set(nodes), costs):  # iteration order is changed by set operation
-            df = gb.get_group(od)
-            for route, cost in zip(df["route set"].values, cost_vec):
+        for od, df in gb:
+            for route, cost in zip(df["route set"].values, df["cost"].values):
                 np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
 
-    # def test_psl_results(self):
-    #     np.random.seed(0)
-    #     rc = RouteChoiceSet(self.graph)
-    #     nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-    #     table, psls = rc.batched(nodes, max_routes=20, max_depth=10, psl_as_well=True)
-    #     table = table.to_pandas()
+    def test_gamma_results(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        table = table.to_pandas()
 
-    #     gb = table.groupby(by=["origin id", "destination id"])
-    #     breakpoint()
-    #     for od, cost_vec in zip(set(nodes), costs):  # iteration order is changed by set operation
-    #         df = gb.get_group(od)
-    #         for route, cost in zip(df["route set"].values, cost_vec):
-    #             np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
+        gb = table.groupby(by=["origin id", "destination id"])
+        for od, df in gb:
+            self.assertTrue(all((df["gamma"] > 0) & (df["gamma"] <= 1)))
 
     def test_prob_results(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table, costs, psls, probs = rc.batched(nodes, max_routes=20, max_depth=10, prob_as_well=True, cost_as_well=True, psl_as_well=True)
+        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
         table = table.to_pandas()
 
-        for prob_vec in probs:
-            self.assertAlmostEqual(1.0, sum(prob_vec), msg="Probability not close to 1.0")
-        # for od, cost_vec in zip(set(nodes), costs):  # iteration order is changed by set operation
-        #     df = gb.get_group(od)
-        #     for route, cost in zip(df["route set"].values, cost_vec):
-        #         np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
+        gb = table.groupby(by=["origin id", "destination id"])
+        for od, df in gb:
+            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg="Probability not close to 1.0")
+
 
 def generate_line_strings(project, graph, results):
     """Debug method"""

@@ -58,6 +58,7 @@ from libc.math cimport INFINITY, pow, exp
 from libc.string cimport memcpy
 from libc.limits cimport UINT_MAX
 from libc.stdlib cimport abort
+from libcpp cimport nullptr
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
@@ -65,6 +66,7 @@ from libcpp.utility cimport pair
 from libcpp.algorithm cimport sort, lower_bound
 from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
+cimport openmp
 
 import numpy as np
 import pyarrow as pa
@@ -99,6 +101,15 @@ cdef class RouteChoiceSet:
         pa.field("origin id", pa.uint32(), nullable=False),
         pa.field("destination id", pa.uint32(), nullable=False),
         pa.field("route set", route_set_dtype, nullable=False),
+    ])
+
+    psl_schema = pa.schema([
+        pa.field("origin id", pa.uint32(), nullable=False),
+        pa.field("destination id", pa.uint32(), nullable=False),
+        pa.field("route set", route_set_dtype, nullable=False),
+        pa.field("cost", pa.float64(), nullable=False),
+        pa.field("gamma", pa.float64(), nullable=False),
+        pa.field("probability", pa.float64(), nullable=False),
     ])
 
     def __cinit__(self):
@@ -162,15 +173,12 @@ cdef class RouteChoiceSet:
             max_routes: int = 0,
             max_depth: int = 0,
             seed: int = 0,
-            cores: int = 1,
+            cores: int = 0,
             a_star: bool = True,
             bfsle: bool = True,
             penalty: float = 0.0,
             where: Optional[str] = None,
-            freq_as_well = False,
-            cost_as_well = False,
-            psl_as_well = False,
-            prob_as_well = False,
+            path_size_logit: bool = False,
             beta: float = 1.0,
             theta: float = 1.0,
     ):
@@ -187,7 +195,7 @@ cdef class RouteChoiceSet:
             **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link penalisation.
                                         Must be non-negative. Default of ``0`` for unlimited.
             **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
-            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``1``.
+            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``0`` for all available.
             **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible with ``bfsle=True``.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
@@ -202,14 +210,17 @@ cdef class RouteChoiceSet:
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be > 0")
 
-        if max_routes < 0 or max_depth < 0 or cores < 0:
+        if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
         if penalty != 0.0 and bfsle:
-            raise ValueError("Link penalisation (`penatly` > 1.0) and `bfsle` cannot be enabled at once")
+            raise ValueError("Link penalisation (`penalty` > 1.0) and `bfsle` cannot be enabled at once")
 
         if not bfsle and penalty <= 1.0:
             raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
+
+        if path_size_logit and (beta < 0 or theta <= 0):
+            raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
 
         for o, d in ods:
             if self.nodes_to_indices_view[o] == -1:
@@ -222,28 +233,29 @@ cdef class RouteChoiceSet:
             unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
             unsigned int c_seed = seed
-            unsigned int c_cores = cores
+            unsigned int c_cores = cores if cores > 0 else openmp.omp_get_num_threads()
 
             vector[pair[long long, long long]] c_ods
 
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
-            double [:, :] cost_matrix = np.empty((cores, self.cost_view.shape[0]), dtype=float)
-            long long [:, :] predecessors_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] conn_matrix = np.empty((cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (cores, self.b_nodes_view.shape[0])).copy()
+            double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
+            long long [:, :] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
+            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (c_cores, self.b_nodes_view.shape[0])).copy()
 
             # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
             # interface.
             long long [:, :] _reached_first_matrix
 
             vector[RouteSet_t *] *results
+            size_t max_results_len, batch_len, j
 
         # self.a_star = a_star
 
         if self.a_star:
-            _reached_first_matrix = np.zeros((cores, 1), dtype=np.int64)  # Dummy array to allow slicing
+            _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
         else:
-            _reached_first_matrix = np.zeros((cores, self.num_nodes + 1), dtype=np.int64)
+            _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
         set_ods = set(ods)
         if len(set_ods) != len(ods):
@@ -252,16 +264,47 @@ cdef class RouteChoiceSet:
         if where is not None:
             checkpoint = Checkpoint(where, self.schema, partition_cols=["origin id"])
             batches = list(Checkpoint.batches(list(set_ods)))
-            results = new vector[RouteSet_t *](<size_t>max(len(batch) for batch in batches))
+            max_results_len = <size_t>max(len(batch) for batch in batches)
         else:
             batches = [list(set_ods)]
-            results = new vector[RouteSet_t *](len(set_ods))
+            max_results_len = len(set_ods)
+
+        results = new vector[RouteSet_t *](max_results_len)
+
+        cdef:
+            RouteSet_t *route_set
+            pair[vector[long long] *, vector[long long] *] freq_pair
+            vector[long long] *link_union = <vector[long long] *>nullptr
+            vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *gamma_set = <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *prob_set= <vector[vector[double] *] *>nullptr
+
+        if path_size_logit:
+            cost_set = new vector[vector[double] *](max_results_len)
+            gamma_set = new vector[vector[double] *](max_results_len)
+            prob_set = new vector[vector[double] *](max_results_len)
 
         for batch in batches:
-            results.resize(len(batch))  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
             c_ods = batch  # Convert the batch to a cpp vector, this isn't strictly efficient but is nicer
+            batch_len = c_ods.size()
+            results.resize(batch_len)  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
+
+            if path_size_logit:
+                cost_set.clear()
+                gamma_set.clear()
+                prob_set.clear()
+
+                cost_set.resize(batch_len)
+                gamma_set.resize(batch_len)
+                prob_set.resize(batch_len)
+
             with nogil, parallel(num_threads=c_cores):
-                for i in prange(c_ods.size()):
+                # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
+                # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
+                if path_size_logit:
+                    link_union = new vector[long long]()
+
+                for i in prange(batch_len):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
                     dest_index = self.nodes_to_indices_view[c_ods[i].second]
 
@@ -276,7 +319,7 @@ cdef class RouteChoiceSet:
                         )
 
                     if bfsle:
-                        deref(results)[i] = RouteChoiceSet.bfsle(
+                        route_set = RouteChoiceSet.bfsle(
                             self,
                             origin_index,
                             dest_index,
@@ -290,7 +333,7 @@ cdef class RouteChoiceSet:
                             c_seed,
                         )
                     else:
-                        deref(results)[i] = RouteChoiceSet.link_penalisation(
+                        route_set = RouteChoiceSet.link_penalisation(
                             self,
                             origin_index,
                             dest_index,
@@ -305,6 +348,17 @@ cdef class RouteChoiceSet:
                             c_seed,
                         )
 
+                    if path_size_logit:
+                        link_union.clear()
+                        freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union))
+                        deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
+                        deref(gamma_set)[i] = RouteChoiceSet.compute_gamma(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
+                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(gamma_set)[i]), beta, theta)
+                        del freq_pair.first
+                        del freq_pair.second
+
+                    deref(results)[i] = route_set
+
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
                             1,  # Always unblocking
@@ -315,60 +369,39 @@ cdef class RouteChoiceSet:
                             self.b_nodes_view,
                         )
 
-            table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results)))
+                if path_size_logit:
+                    del link_union
 
-            returns = []
+            table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
 
-            freqs = RouteChoiceSet.frequency(deref(results), c_cores)
-            if freq_as_well:
-                freqs_list = []
-                for freq in deref(freqs):
-                    freqs_list.append(
-                        (
-                            list(deref(freq.first)),
-                            list(deref(freq.second)),
-                        )
-                    )
-                returns.append(freqs_list)
+            # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
+            if path_size_logit:
+                for j in range(batch_len):
+                    del deref(cost_set)[j]
+                    del deref(gamma_set)[j]
+                    del deref(prob_set)[j]
 
-            costs = RouteChoiceSet.compute_cost(deref(results), self.cost_view, c_cores)
-            if cost_as_well:
-                costs_list = []
-                for cost_vec in deref(costs):
-                    costs_list.append(list(deref(cost_vec)))
-                returns.append(costs_list)
-
-            psls = RouteChoiceSet.compute_psl(deref(results), deref(freqs), deref(costs), self.cost_view, c_cores)
-            if psl_as_well:
-                psls_list = []
-                for psl_vec in deref(psls):
-                    psls_list.append(list(deref(psl_vec)))
-                returns.append(psls_list)
-
-            probs = RouteChoiceSet.compute_prob(deref(costs), deref(psls), beta, theta, c_cores)
-            if prob_as_well:
-                probs_list = []
-                for prob_vec in deref(probs):
-                    probs_list.append(list(deref(prob_vec)))
-                returns.append(probs_list)
-
-            # Once we've made the table all results have been copied into some pyarrow structure, we can free our internal structures
-            for result in deref(results):
-                for route in deref(result):
+            for j in range(batch_len):
+                for route in deref(deref(results)[j]):
                     del route
 
-            if where is None:  # There was only one batch anyway
-                if returns:
-                    return table, *returns
-                else:
-                    return table
+            if where is not None:
+                checkpoint.write(table)
+                del table
+            else:
+                break  # There was only one batch anyway
 
+        # We're done with everything now, we can free the outer internal structures
+        if path_size_logit:
+            del cost_set
+            del gamma_set
+            del prob_set
+            del results
 
-            checkpoint.write(table)
-
-            del table
-
-        return
+        if where is None:
+            return table
+        else:
+            return
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -570,98 +603,78 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[pair[vector[long long] *, vector[long long] *]] *frequency(vector[RouteSet_t *] &route_sets, unsigned int cores) noexcept nogil:
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil:
         cdef:
-            vector[pair[vector[long long] *, vector[long long] *]] *freq_set = new vector[pair[vector[long long] *, vector[long long] *]]()
             vector[long long] *keys
             vector[long long] *counts
 
             # Scratch objects
-            vector[long long] *link_union
             size_t length, count
             long long link, i
 
-        freq_set.reserve(route_sets.size())
+        link_union.clear()
 
-        with parallel(num_threads=cores):
-            link_union = new vector[long long]()
-            for i in prange(route_sets.size()):
-                route_set = route_sets[i]
+        keys = new vector[long long]()
+        counts = new vector[long long]()
 
-                link_union.clear()
+        length = 0
+        for route in deref(route_set):
+            length = length + route.size()
+        link_union.reserve(length)
 
-                keys = new vector[long long]()
-                counts = new vector[long long]()
+        for route in deref(route_set):
+            link_union.insert(link_union.end(), route.begin(), route.end())
 
-                length = 0
-                for route in deref(route_set):
-                    length = length + route.size()
-                link_union.reserve(length)
+        sort(link_union.begin(), link_union.end())
 
-                for route in deref(route_set):
-                    link_union.insert(link_union.end(), route.begin(), route.end())
+        union_iter = link_union.begin()
+        while union_iter != link_union.end():
+            count = 0
+            link = deref(union_iter)
+            while link == deref(union_iter):
+                count = count + 1
+                inc(union_iter)
 
-                sort(link_union.begin(), link_union.end())
+            keys.push_back(link)
+            counts.push_back(count)
 
-                union_iter = link_union.begin()
-                while union_iter != link_union.end():
-                    count = 0
-                    link = deref(union_iter)
-                    while link == deref(union_iter):
-                        count = count + 1
-                        inc(union_iter)
-
-                    keys.push_back(link)
-                    counts.push_back(count)
-
-                freq_set.emplace(freq_set.cbegin() + i, keys, counts)
-
-            del link_union
-
-        return freq_set
+        return make_pair(keys, counts)
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[vector[double] *] *compute_cost(vector[RouteSet_t *] &route_sets, double[:] cost_view, unsigned int cores) noexcept nogil:
+    cdef vector[double] *compute_cost(RouteSet_t *route_set, double[:] cost_view) noexcept nogil:
         cdef:
-            vector[vector[double] *] *cost_set = new vector[vector[double] *](route_sets.size())
             vector[double] *cost_vec
 
             # Scratch objects
             double cost
             long long link, i
 
-        with parallel(num_threads=cores):
-            for i in prange(route_sets.size()):
-                route_set = route_sets[i]
-                cost_vec = new vector[double]()
-                cost_vec.reserve(route_set.size())
+        cost_vec = new vector[double]()
+        cost_vec.reserve(route_set.size())
 
-                for route in deref(route_set):
-                    cost = 0.0
-                    for link in deref(route):
-                        cost = cost + cost_view[link]
+        for route in deref(route_set):
+            cost = 0.0
+            for link in deref(route):
+                cost = cost + cost_view[link]
 
-                    cost_vec.push_back(cost)
+            cost_vec.push_back(cost)
 
-                deref(cost_set)[i] = cost_vec
-
-        return cost_set
+        return cost_vec
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[vector[double] *] *compute_psl(
-        vector[RouteSet_t *] &route_sets,
-        vector[pair[vector[long long] *, vector[long long] *]] &freq_sets,
-        vector[vector[double] *] &total_costs,
-        double[:] cost_view,
-        unsigned int cores
+    cdef vector[double] *compute_gamma(
+        RouteSet_t *route_set,
+        pair[vector[long long] *, vector[long long] *] &freq_set,
+        vector[double] &total_cost,
+        double[:] cost_view
     ) noexcept nogil:
         """
         Notation changes:
@@ -673,100 +686,88 @@ cdef class RouteChoiceSet:
             sum_{k in R}: delta_{a,k}: freq_set
         """
         cdef:
-            vector[vector[double] *] *psl_set = new vector[vector[double] *](route_sets.size())
-            vector[double] *psl_vec
+            vector[double] *gamma_vec
 
             # Scratch objects
-            pair[vector[long long] *, vector[long long] *] freq_set
             vector[long long].const_iterator link_iter
-            vector[double] *total_cost
             double gamma
             long long link, j
             size_t i
 
-        with parallel(num_threads=cores):
-            for i in prange(route_sets.size()):
-                route_set = route_sets[i]
-                freq_set = freq_sets[i]
-                total_cost = total_costs[i]
-                psl_vec = new vector[double]()
-                psl_vec.reserve(route_set.size())
+        gamma_vec = new vector[double]()
+        gamma_vec.reserve(route_set.size())
 
-                j = 0
-                for route in deref(route_set):
-                    gamma = 0.0
-                    for link in deref(route):
-                        # We know the frequency table is ordered and contains every link in the union of the routes.
-                        # We want to find the index of the link, and use that to look up it's frequency
-                        link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
+        j = 0
+        for route in deref(route_set):
+            gamma = 0.0
+            for link in deref(route):
+                # We know the frequency table is ordered and contains every link in the union of the routes.
+                # We want to find the index of the link, and use that to look up it's frequency
+                link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
 
-                        if link != deref(link_iter):
-                            fprintf(stderr, "Link %d not found in link set? not possible??\n", link)
-                            abort()
+                gamma = gamma + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
 
-                        gamma = gamma + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+            gamma_vec.push_back(gamma / total_cost[j])
 
-                    psl_vec.push_back(gamma / deref(total_cost)[j])
+            j = j + 1
 
-                    j = j + 1
-
-                deref(psl_set)[i] = psl_vec
-
-        return psl_set
+        return gamma_vec
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[vector[double] *] *compute_prob(
-        vector[vector[double] *] &total_costs,
-        vector[vector[double] *] &gammas,
+    cdef vector[double] *compute_prob(
+        vector[double] &total_cost,
+        vector[double] &gamma_vec,
         double beta,
-        double theta,
-        unsigned int cores
+        double theta
     ) noexcept nogil:
         cdef:
-            vector[vector[double] *] *prob_set = new vector[vector[double] *](total_costs.size())
-
             # Scratch objects
-            vector[double] *total_cost
-            vector[double] *gamma_vec
             vector[double] *prob_vec
             double inv_prob
             long long route_set_idx
             size_t i, j
 
-        with parallel(num_threads=cores):
-            for route_set_idx in prange(total_costs.size()):
-                total_cost = total_costs[route_set_idx]
-                gamma_vec = gammas[route_set_idx]
-                prob_vec = new vector[double]()
-                prob_vec.reserve(total_cost.size())
+        prob_vec = new vector[double]()
+        prob_vec.reserve(total_cost.size())
 
-                # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will lead to NaN results
-                for i in range(total_cost.size()):
-                    inv_prob = 0.0
-                    for j in range(total_cost.size()):
-                        inv_prob = inv_prob + pow(deref(gamma_vec)[j] / deref(gamma_vec)[i], beta) * exp(-theta * (deref(total_cost)[j] - deref(total_cost)[i]))
+        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will lead to NaN results
+        for i in range(total_cost.size()):
+            inv_prob = 0.0
+            for j in range(total_cost.size()):
+                inv_prob = inv_prob + pow(gamma_vec[j] / gamma_vec[i], beta) * exp(-theta * (total_cost[j] - total_cost[i]))
 
-                    prob_vec.push_back(1.0 / inv_prob)
+            prob_vec.push_back(1.0 / inv_prob)
 
-                deref(prob_set)[route_set_idx] = prob_vec
-
-        return prob_set
+        return prob_vec
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef shared_ptr[libpa.CTable] make_table_from_results(vector[pair[long long, long long]] &ods, vector[RouteSet_t *] &route_sets):
+    cdef shared_ptr[libpa.CTable] make_table_from_results(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &route_sets,
+        vector[vector[double] *] *cost_set,
+        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *prob_set
+    ):
         cdef:
             shared_ptr[libpa.CArray] paths
             shared_ptr[libpa.CArray] offsets
+
             libpa.CMemoryPool *pool = libpa.c_get_memory_pool()
-            libpa.CUInt32Builder *path_builder = new libpa.CUInt32Builder(pool)
+
+            # Custom imports, these are declared in route_choice.pxd *not* libarrow.
+            CUInt32Builder *path_builder = new CUInt32Builder(pool)
+            CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *gamma_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
+
             libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
             libpa.CUInt32Builder *o_col = new libpa.CUInt32Builder(pool)
             libpa.CUInt32Builder *d_col = new libpa.CUInt32Builder(pool)
@@ -775,13 +776,21 @@ cdef class RouteChoiceSet:
 
             libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
 
-            vector[long long].reverse_iterator riter
-
             int offset = 0
+            bint psl = (cost_set != nullptr and gamma_set != nullptr and prob_set != nullptr)
 
-        columns.emplace_back(shared_ptr[libpa.CArray]())  # Origins
-        columns.emplace_back(shared_ptr[libpa.CArray]())  # Destination
-        columns.emplace_back(shared_ptr[libpa.CArray]())  # Route set
+        # Origins, Destination, Route set, [Cost for route, Gamma for route, Probability for route]
+        columns.resize(6 if psl else 3)
+
+        if psl:
+            cost_col = new CDoubleBuilder(pool)
+            gamma_col = new CDoubleBuilder(pool)
+            prob_col = new CDoubleBuilder(pool)
+
+            for i in range(ods.size()):
+                cost_col.AppendValues(deref(deref(cost_set)[i]))
+                gamma_col.AppendValues(deref(deref(gamma_set)[i]))
+                prob_col.AppendValues(deref(deref(prob_set)[i]))
 
         for i in range(ods.size()):
             route_set = route_sets[i]
@@ -791,18 +800,14 @@ cdef class RouteChoiceSet:
             for route in deref(route_set):
                 o_col.Append(ods[i].first)
                 d_col.Append(ods[i].second)
+
                 offset_builder.Append(offset)
-                # TODO: Pyarrows Cython API is incredibly lacking, it's just functional and doesn't include all the nice things the C++ API has
-                # One such thing its missing the AppendValues, which can add whole iterators at once in a much smarter fashion.
-                # We'll have to reimport/extern the classes we use if we want to avoid the below
-                riter = route.rbegin()
-                while riter != route.rend():
-                    path_builder.Append(deref(riter))
-                    inc(riter)
+                path_builder.AppendValues(route.crbegin(), route.crend())
 
                 offset += route.size()
 
         path_builder.Finish(&paths)
+
         offset_builder.Append(offset)  # Mark the end of the array in offsets
         offset_builder.Finish(&offsets)
 
@@ -812,12 +817,24 @@ cdef class RouteChoiceSet:
         d_col.Finish(&columns[1])
         columns[2] = deref(route_set_results)
 
-        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(libpa.pyarrow_unwrap_schema(RouteChoiceSet.schema), columns)
+        if psl:
+            cost_col.Finish(&columns[3])
+            gamma_col.Finish(&columns[4])
+            prob_col.Finish(&columns[5])
+
+        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema)
+        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
 
         del path_builder
         del offset_builder
         del o_col
         del d_col
+
+        if psl:
+            del cost_col
+            del gamma_col
+            del prob_col
+
         return table
 
 
