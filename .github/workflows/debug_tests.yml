@@ -15,7 +15,6 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
         pip install -r tests/requirements_tests.txt
-        python -c "import pyarrow; pyarrow.create_library_symlinks()"
 
     - name: Download spatialite on Linux
       run: |

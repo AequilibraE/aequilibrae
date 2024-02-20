@@ -28,7 +28,6 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel twine
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
-        python -c "import pyarrow; pyarrow.create_library_symlinks()"
 
     - name: Build
       run: |
