@@ -8,4 +8,4 @@ pandas
 pyproj
 rtree
 openmatrix
-pyarrow
+pyarrow==15.0.0

@@ -6,7 +6,7 @@ extend-exclude = '''docs/*'''
 
 
 [build-system]
-requires = ["setuptools", "numpy", "cython", "pandas", "pyarrow", "wheel"]
+requires = ["setuptools", "numpy", "cython", "pandas", "pyarrow==15.0.0", "wheel"]
 
 
 [tool.ruff]
@@ -92,9 +92,9 @@ manylinux-pypy_aarch64-image = "manylinux_2_28"
 [tool.cibuildwheel.linux]
 archs = ["auto", "aarch64"]
 build = ["cp310-*", "cp311-*", "cp312-*"]
-repair-wheel-command =["pip install pyarrow",
-                       'python -c "import pyarrow; pyarrow.create_library_symlinks()"',
-                       "auditwheel repair -w {dest_dir} {wheel}"]
+repair-wheel-command =[
+  "auditwheel repair -w {dest_dir} {wheel} --exclude libarrow.so.1500 --exclude libarrow_python.so"
+]
 
 [tool.cibuildwheel.macos]
 #archs = ["x86_64", "universal2", "arm64"]
