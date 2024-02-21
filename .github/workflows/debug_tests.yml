@@ -1,6 +1,6 @@
 name: Run tests for debugging sigabrt
 
-on: [pull_request]
+#on: [pull_request]
 
 jobs:
 

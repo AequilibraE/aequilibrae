@@ -84,16 +84,16 @@ test-extras = []
 
 container-engine = "docker"
 
-manylinux-x86_64-image = "manylinux2014"
-manylinux-aarch64-image = "manylinux2014"
-manylinux-pypy_x86_64-image = "manylinux2014"
-manylinux-pypy_aarch64-image = "manylinux2014"
+manylinux-x86_64-image = "manylinux_2_24"
+manylinux-aarch64-image = "manylinux_2_24"
+manylinux-pypy_x86_64-image = "manylinux_2_24"
+manylinux-pypy_aarch64-image = "manylinux_2_24"
 
 [tool.cibuildwheel.linux]
 archs = ["auto", "aarch64"]
 build = ["cp310-*", "cp311-*", "cp312-*"]
 repair-wheel-command =["pip install pyarrow",
-                       'sudo python -c "import pyarrow; pyarrow.create_library_symlinks()"',
+                       'python -c "import pyarrow; pyarrow.create_library_symlinks()"',
                        "auditwheel repair -w {dest_dir} {wheel}"]
 
 [tool.cibuildwheel.macos]
