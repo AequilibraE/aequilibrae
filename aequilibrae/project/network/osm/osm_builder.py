@@ -4,7 +4,7 @@ import importlib.util as iutil
 import string
 from math import floor
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -232,7 +232,7 @@ class OSMBuilder(WorkerThread):
         df = df.merge(self.__all_ltp[["link_type", "highway"]], on="highway", how="left")
         return df.drop(columns=["highway"])
 
-    def __define_link_type(self, link_type: str) -> tuple[str, str]:
+    def __define_link_type(self, link_type: str) -> Tuple[str, str]:
         proj_link_types = self.project.network.link_types
         original_link_type = link_type
         link_type = "".join([x for x in link_type if x in string.ascii_letters + "_"]).lower()
