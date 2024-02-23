@@ -79,6 +79,10 @@ def get_schema(conn, table_name):
     return {e.name: e for e in rv}
 
 
+def list_columns(conn, table_name):
+    return list(get_schema(conn, table_name).keys())
+
+
 def has_column(conn, table_name, col_name):
     return col_name in get_schema(conn, table_name)
 
