@@ -10,7 +10,7 @@ from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
 from aequilibrae.paths.results import AssignmentResults, TransitAssignmentResults
 
 
-class TransportClassBase(ABC):
+class TransportClassBase(ABC):  # noqa: B024
     def __init__(self, name: str, graph: GraphBase, matrix: AequilibraeMatrix) -> None:
         """
         Instantiates the class

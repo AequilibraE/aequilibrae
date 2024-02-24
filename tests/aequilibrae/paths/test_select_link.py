@@ -49,7 +49,7 @@ class TestSelectLink(TestCase):
         Uses two examples: 2 links in one select link, and a single Selected Link
         Checks both the OD Matrix and Link Loading
         """
-        self.assignclass.set_select_links({"sl 9 or 6": [(9, 1), (6, 1)], "just 3": [(3, 1)], "sl 5 for fun": [(5, 1)]})
+        self.assignclass.set_select_links({"sl_9_or_6": [(9, 1), (6, 1)], "just_3": [(3, 1)], "sl_5_for_fun": [(5, 1)]})
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
             od_mask, link_loading = create_od_mask(
@@ -72,7 +72,7 @@ class TestSelectLink(TestCase):
         Tests to make sure the OD matrix works when all links surrounding one origin are selected
         Confirms the Link Loading is done correctly in this case
         """
-        self.assignclass.set_select_links({"sl 1, 4, 3, and 2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
+        self.assignclass.set_select_links({"sl_1_4_3_and_2": [(1, 1), (4, 1), (3, 1), (2, 1)]})
 
         self.assignment.execute()
 
@@ -101,7 +101,7 @@ class TestSelectLink(TestCase):
         self.matrix.matrix_view = custom_demand
         self.assignclass.matrix = self.matrix
 
-        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
 
         self.assignment.execute()
         for key in self.assignclass._selected_links.keys():
@@ -126,7 +126,7 @@ class TestSelectLink(TestCase):
         self.assignment.execute()
         non_sl_loads = self.assignclass.results.get_load_results()
         self.setUp()
-        self.assignclass.set_select_links({"sl 39, 66, or 73": [(39, 1), (66, 1), (73, 1)]})
+        self.assignclass.set_select_links({"sl_39_66_or_73": [(39, 1), (66, 1), (73, 1)]})
         self.assignment.execute()
         sl_loads = self.assignclass.results.get_load_results()
         np.testing.assert_allclose(non_sl_loads.matrix_tot, sl_loads.matrix_tot)
@@ -200,6 +200,39 @@ class TestSelectLink(TestCase):
             ),
         )
 
+    def test_multi_iteration(self):
+        for algorithm in ["all-or-nothing", "msa", "fw", "cfw", "bfw"]:
+            with self.subTest(algorithm=algorithm):
+                assignment = TrafficAssignment()
+                assignclass = TrafficClass("car", self.car_graph, self.matrix)
+                assignment.set_classes([assignclass])
+                assignment.set_vdf("BPR")
+                assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+                assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+                assignment.set_capacity_field("capacity")
+                assignment.set_time_field("free_flow_time")
+                assignment.max_iter = 10
+                assignment.set_algorithm(algorithm)
+
+                assignclass.set_select_links({"sl_1_1": [(1, 1)], "sl_5_1": [(5, 1)]})
+                assignment.execute()
+
+                assignment_results = pd.DataFrame(assignclass.results.get_load_results().data).set_index("index")
+                sl_results = pd.DataFrame(assignclass.results.get_sl_results().data).set_index("index")
+
+                self.assertAlmostEqual(
+                    assignment_results["matrix_ab"].loc[1],
+                    sl_results["sl_1_1_matrix_ab"].loc[1],
+                    msg=f"Select link results differ to that of the assignment ({algorithm})",
+                    delta=1e-6,
+                )
+                self.assertAlmostEqual(
+                    assignment_results["matrix_ab"].loc[5],
+                    sl_results["sl_5_1_matrix_ab"].loc[5],
+                    msg=f"Select link results differ to that of the assignment ({algorithm})",
+                    delta=1e-6,
+                )
+
 
 def create_od_mask(demand: np.array, graph: Graph, sl):
     res = PathResults()
@@ -216,7 +249,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     for i in range(len(sl)):
         node_pair = graph.graph.iloc[sl[i]]["a_node"] + 1, graph.graph.iloc[sl[i]]["b_node"] + 1
         sl_links.append(node_pair)
-    mask = dict()
+    mask = {}
     for origin, val in enumerate(a):
         for dest, path in enumerate(val):
             for k in range(1, len(path)):
@@ -228,7 +261,7 @@ def create_od_mask(demand: np.array, graph: Graph, sl):
     for origin in range(24):
         for dest in range(24):
             if mask.get((origin, dest)):
-                sl_od[origin, dest] = demand[origin, dest]
+                sl_od[origin, dest] = demand[origin, dest][0]
 
     # make link loading
     loading = np.zeros((76, 1))

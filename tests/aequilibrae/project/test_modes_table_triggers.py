@@ -32,7 +32,7 @@ class TestProject(TestCase):
         qry_file = os.path.join(root, "database_specification/network/triggers/modes_table_triggers.sql")
         with open(qry_file, "r") as sql_file:
             self.queries = sql_file.read()
-        self.queries = [cmd for cmd in self.queries.split("#")]
+        self.queries = list(self.queries.split("#"))
 
     def tearDown(self) -> None:
         self.proj.close()
@@ -189,12 +189,11 @@ class TestProject(TestCase):
         cmd = self.__get_query("modes_on_links_insert")
         if self.rtree:
             self.curr.execute("pragma table_info(links)")
-            f = self.curr.fetchall()
-            fields = {x[1]: x[0] for x in f}
+            fields = {x[1]: x[0] for x in self.curr.fetchall()}
 
             sql = "select * from links where link_id=10"
             self.curr.execute(sql)
-            a = [x for x in self.curr.fetchone()]
+            a = list(self.curr.fetchone())
             a[fields["modes"]] = "as12"
             a[fields["link_id"]] = 1234
             a[fields["a_node"]] = 999
@@ -220,7 +219,7 @@ class TestProject(TestCase):
 
         sql = "select * from links where link_id=70"
         self.curr.execute(sql)
-        a = [x for x in self.curr.fetchone()]
+        a = list(self.curr.fetchone())
         a[fields["modes"]] = ""
         a[fields["link_id"]] = 4321
         a[fields["a_node"]] = 888

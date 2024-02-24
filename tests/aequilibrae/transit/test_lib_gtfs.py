@@ -23,7 +23,7 @@ def test_set_capacities(system_builder):
 
 def test_dates_available(system_builder):
     dates = system_builder.dates_available()
-    assert type(dates) is list
+    assert isinstance(dates, list)
 
 
 def test_set_allow_map_match(system_builder):

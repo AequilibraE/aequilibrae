@@ -1,6 +1,4 @@
 """
-.. _plot_assignment_without_model:
-
 Traffic Assignment without an AequilibraE Model
 ===============================================
 

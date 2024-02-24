@@ -1,7 +1,9 @@
-import time
 import re
+import time
 from typing import List, Union, Tuple
+
 import requests
+
 from aequilibrae.parameters import Parameters
 from .osm_params import http_headers
 

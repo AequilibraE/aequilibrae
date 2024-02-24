@@ -4,6 +4,6 @@ pytest
 pytest-cov
 pytest-subtests
 coveralls
-flake8
+ruff==0.1.14
 wheel
-black
+black==24.1.1

@@ -1,6 +1,7 @@
-from sqlite3 import IntegrityError, Connection
-from aequilibrae.project.network.link_type import LinkType
+from sqlite3 import IntegrityError
+
 from aequilibrae.project.field_editor import FieldEditor
+from aequilibrae.project.network.link_type import LinkType
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.spatialite_utils import connect_spatialite
@@ -67,7 +68,7 @@ class LinkTypes:
             link_types_list = tl.load_table(conn, "link_types")
         existing_list = [lt["link_type_id"] for lt in link_types_list]
 
-        self.__fields = [x for x in tl.fields]
+        self.__fields = list(tl.fields)
         for lt in link_types_list:
             if lt["link_type_id"] not in self.__items:
                 self.__items[lt["link_type_id"]] = LinkType(lt, self.project)
@@ -84,7 +85,6 @@ class LinkTypes:
         tp["link_type_id"] = link_type_id
         lt = LinkType(tp, self.project)
         self.__items[link_type_id] = lt
-        self.logger.warning("Link type has not yet been saved to the database. Do so explicitly")
         return lt
 
     def delete(self, link_type_id: str) -> None:

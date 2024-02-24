@@ -21,9 +21,9 @@ import folium
 
 # %%
 # We load the example file from the GMNS GitHub repository
-link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/link.csv"
-node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/node.csv"
-use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/development/Small_Network_Examples/Arlington_Signals/use_group.csv"
+link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/link.csv"
+node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/node.csv"
+use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/use_group.csv"
 
 # %%
 # We create the example project inside our temp folder
@@ -61,7 +61,7 @@ project.network.create_from_gmns(
 # %%
 # Now, let's plot a map. This map can be compared with the images of the README.md
 # file located in this example repository on GitHub:
-# https://github.com/zephyr-data-specs/GMNS/blob/development/Small_Network_Examples/Arlington_Signals/README.md
+# https://github.com/zephyr-data-specs/GMNS/blob/develop/examples/Arlington_Signals/README.md
 links = project.network.links.data
 nodes = project.network.nodes.data
 

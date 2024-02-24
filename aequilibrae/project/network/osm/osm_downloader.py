@@ -9,16 +9,22 @@ detach them in order to use OSMNx as a dependency or submodule
 
 For the original work, please see https://github.com/gboeing/osmnx
 """
-import logging
-import time
-import re
-import requests
-from .osm_utils.osm_params import http_headers, memory
-from aequilibrae.parameters import Parameters
-from aequilibrae.context import get_logger
+
 import gc
 import importlib.util as iutil
-from ...utils import WorkerThread
+import logging
+import re
+import time
+from typing import List, Dict
+
+import pandas as pd
+import requests
+from shapely import Polygon
+
+from aequilibrae.context import get_logger
+from aequilibrae.parameters import Parameters
+from aequilibrae.utils import WorkerThread
+from .osm_params import http_headers, memory
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -34,7 +40,7 @@ class OSMDownloader(WorkerThread):
         if pyqt:
             self.downloading.emit(*args)
 
-    def __init__(self, polygons, modes, logger: logging.Logger = None):
+    def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
         WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
@@ -45,6 +51,9 @@ class OSMDownloader(WorkerThread):
         self.overpass_endpoint = par["overpass_endpoint"]
         self.timeout = par["timeout"]
         self.sleeptime = par["sleeptime"]
+        self._nodes = []
+        self._links = []
+        self.data: Dict[str, pd.DataFrame] = {"nodes": pd.DataFrame([]), "links": pd.DataFrame([])}
 
     def doWork(self):
         infrastructure = 'way["highway"]'
@@ -59,10 +68,10 @@ class OSMDownloader(WorkerThread):
             m = f"[maxsize: {memory}]"
         for counter, poly in enumerate(self.polygons):
             msg = f"Downloading polygon {counter + 1} of {len(self.polygons)}"
-            self.logger.debug(msg)
+            self.logger.info(msg)
             self.__emit_all(["Value", counter])
             self.__emit_all(["text", msg])
-            west, south, east, north = poly
+            west, south, east, north = poly.bounds
             query_str = query_template.format(
                 north=north,
                 south=south,
@@ -75,10 +84,26 @@ class OSMDownloader(WorkerThread):
             )
             json = self.overpass_request(data={"data": query_str}, timeout=self.timeout)
             if json["elements"]:
-                self.json.extend(json["elements"])
-            del json
-            gc.collect()
+                for tag, lst in [("node", self._nodes), ("way", self._links)]:
+                    df = pd.DataFrame([item for item in json["elements"] if item["type"] == tag])
+                    if tag == "node":
+                        df = df.assign(is_centroid=0, modes="", link_types="", node_id=0)
+                    lst.append(df)
+                del json
+                gc.collect()
+
         self.__emit_all(["Value", len(self.polygons)])
+        self.__emit_all(["text", "Downloading finished. Processing data"])
+        for lst, table in [(self._links, "links"), (self._nodes, "nodes")]:
+            df = pd.DataFrame([])
+            if len(lst) > 0:
+                df = pd.concat(lst, ignore_index=True).drop_duplicates(subset=["id"]).drop(columns=["type"])
+            if table != "links":
+                df = df.drop(columns=["tags"], errors="ignore")
+            self.data[table] = df.rename(columns={"id": "osm_id"}, errors="ignore")
+            lst.clear()
+            gc.collect()
+
         self.__emit_all(["FinishedDownloading", 0])
 
     def overpass_request(self, data, pause_duration=None, timeout=180, error_pause_duration=None):
@@ -117,7 +142,7 @@ class OSMDownloader(WorkerThread):
                 msg = f'Server remark: "{response_json["remark"]}"'
                 self.report.append(msg)
                 self.logger.info(msg)
-        except Exception:
+        except Exception as err:
             # 429 is 'too many requests' and 504 is 'gateway timeout' from server
             # overload - handle these errors by recursively calling
             # overpass_request until we get a valid response
@@ -136,7 +161,9 @@ class OSMDownloader(WorkerThread):
             # else, this was an unhandled status_code, throw an exception
             else:
                 self.report.append(f"Server at {domain} returned status code {response.status_code} and no JSON data")
-                raise Exception(f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}")
+                raise Exception(
+                    f"Server returned no JSON data.\n{response} {response.reason}\n{response.text}"
+                ) from err
 
         return response_json
 

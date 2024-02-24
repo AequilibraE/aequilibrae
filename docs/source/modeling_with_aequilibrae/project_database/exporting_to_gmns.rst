@@ -34,4 +34,4 @@ back at the AequilibraE project.
     **is an optinal field listed in the GMNS node table specification.**
 
 You can find the GMNS specification
-`here <https://github.com/zephyr-data-specs/GMNS/tree/development/Specification_md>`_.
+`here <https://github.com/zephyr-data-specs/GMNS/tree/develop/docs/spec>`_.

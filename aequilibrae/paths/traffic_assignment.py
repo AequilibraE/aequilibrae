@@ -1,14 +1,12 @@
-from copy import deepcopy
-import importlib.util as iutil
 import logging
 import socket
 import sqlite3
+from abc import ABC, abstractmethod
 from datetime import datetime
 from os import path
 from pathlib import Path
 from typing import List, Dict, Union
 from uuid import uuid4
-from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
@@ -19,13 +17,10 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeData
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.linear_approximation import LinearApproximation
-from aequilibrae.paths.traffic_class import TrafficClass, TransitClass, TransportClassBase
+from aequilibrae.paths.optimal_strategies import OptimalStrategies
+from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
-from aequilibrae.paths.optimal_strategies import OptimalStrategies
-
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
 
 
 class AssignmentBase(ABC):
@@ -105,7 +100,7 @@ class AssignmentBase(ABC):
             **classes** (:obj:`List[TransportClassBase]`:) List of TransportClass's for assignment
         """
 
-        ids = set([x._id for x in classes])
+        ids = {x._id for x in classes}
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TransportClassBase]
@@ -286,15 +281,12 @@ class TrafficAssignment(AssignmentBase):
         elif instance == "vdf_parameters":
             if not self.__validate_parameters(value):
                 return False, value, f"Parameter set is not valid: {value} "
-        elif instance in ["time_field", "capacity_field"]:
-            if not isinstance(value, str):
-                return False, value, f"Value for {instance} is not string"
-        elif instance == "cores":
-            if not isinstance(value, int):
-                return False, value, f"Value for {instance} is not integer"
-        elif instance == "save_path_files":
-            if not isinstance(value, bool):
-                return False, value, f"Value for {instance} is not boolean"
+        elif instance in ["time_field", "capacity_field"] and not isinstance(value, str):
+            return False, value, f"Value for {instance} is not string"
+        elif instance == "cores" and not isinstance(value, int):
+            return False, value, f"Value for {instance} is not integer"
+        elif instance == "save_path_files" and not isinstance(value, bool):
+            return False, value, f"Value for {instance} is not boolean"
         if instance not in self.__dict__:
             return False, value, f"TrafficAssignment class does not have property {instance}"
         return True, value, ""
@@ -316,7 +308,7 @@ class TrafficAssignment(AssignmentBase):
             **classes** (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
         """
 
-        ids = set([x._id for x in classes])
+        ids = {x._id for x in classes}
         if len(ids) < len(classes):
             raise ValueError("Classes need to be unique. Your list of classes has repeated items/IDs")
         self.classes = classes  # type: List[TrafficClass]
@@ -673,7 +665,6 @@ class TrafficAssignment(AssignmentBase):
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-        if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
         if not project:
