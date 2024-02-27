@@ -1,11 +1,11 @@
 name: Documentation
 
-#on:
-#  push:
-#    branches:
-#      - develop
-#  pull_request:
-#  release:
+on:
+ push:
+   branches:
+     - develop
+ pull_request:
+ release:
 
 jobs:
   build:
