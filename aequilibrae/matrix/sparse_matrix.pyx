@@ -22,4 +22,4 @@ cdef class SparseMatrix:
         pass
 
     cpdef void helloworld(SparseMatrix self):
-        print("Hello from cpdef")
+        print("Hello from cpdef.")
