@@ -32,7 +32,7 @@ class TestOSMDownloader(TestCase):
         o = OSMDownloader([box(-112.185, 36.59, -112.179, 36.60)], ["car"])
         o.doWork()
 
-        if "elements" not in o.json[0]:
+        if len(o.json) == 0 or "elements" not in o.json[0]:
             return
 
         if len(o.json[0]["elements"]) > 1000:

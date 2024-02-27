@@ -1,5 +1,4 @@
 import functools
-import importlib.util as iutil
 import os
 import tempfile
 import uuid
@@ -11,13 +10,10 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+import openmatrix as omx
 from scipy.sparse import coo_matrix
 
 # Checks if we can display OMX
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
-if has_omx:
-    import openmatrix as omx
 
 # CONSTANTS
 VERSION = 1  # VERSION OF THE MATRIX FORMAT
@@ -54,9 +50,7 @@ COMPRESSED = 1
 # Offset:  18 + 50*cores + Y*20  |   18 + 50*cores + Y*20 + Y*zones*8   |
 
 
-matrix_export_types = ["Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
-if has_omx:
-    matrix_export_types.append("Open matrix (*.omx)")
+matrix_export_types = ["Open matrix (*.omx), Aequilibrae matrix (*.aem)", "Comma-separated file (*.csv)"]
 
 
 class AequilibraeMatrix(object):
@@ -335,10 +329,6 @@ class AequilibraeMatrix(object):
 
                 if trial_name not in forbiden_names:
                     return trial_name
-
-        if not has_omx:
-            print("Open Matrix is not installed. Cannot continue")
-            return
 
         if compressed:
             raise Warning("Matrix compression not yet supported")
@@ -787,10 +777,6 @@ class AequilibraeMatrix(object):
             2
         """
         fname, file_extension = os.path.splitext(output_name.upper())
-
-        if file_extension == ".OMX":
-            if not has_omx:
-                raise ValueError("Open Matrix is not installed. Cannot continue")
 
         if file_extension not in [".AEM", ".CSV", ".OMX"]:
             raise NotImplementedError(f"File extension {file_extension} not implemented yet")
