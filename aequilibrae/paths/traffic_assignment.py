@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import logging
 import socket
 import sqlite3
@@ -22,9 +21,6 @@ from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
-
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
 
 
 class AssignmentBase(ABC):
@@ -669,7 +665,6 @@ class TrafficAssignment(AssignmentBase):
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
             raise ValueError("Matrix needs to be either OMX or native AequilibraE")
-        if mat_format == "omx" and not has_omx:
             raise ImportError("OpenMatrix is not available on your system")
 
         if not project:

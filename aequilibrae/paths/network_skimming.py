@@ -22,9 +22,6 @@ pyqt = spec is not None
 if pyqt:
     from PyQt5.QtCore import pyqtSignal
 
-spec = iutil.find_spec("openmatrix")
-has_omx = spec is not None
-
 sys.dont_write_bytecode = True
 
 

@@ -6,9 +6,15 @@ from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
 from libcpp cimport bool
 
+cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
+cimport pyarrow as pa
+cimport pyarrow.lib as libpa
+cimport pyarrow._dataset_parquet as pq
+from libcpp.memory cimport shared_ptr
+
 # std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
 # from libcpp.random cimport minstd_rand
-from libc.stdint cimport uint_fast32_t, uint_fast64_t
+from libc.stdint cimport *
 
 cdef extern from "<random>" namespace "std" nogil:
     cdef cppclass random_device:
@@ -103,6 +109,21 @@ ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerD
 ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
+# Pyarrow's Cython API does not provide all the functions available in the C++ API, some of them are really useful.
+# Here we redeclare the classes with the functions we want, these are available in the current namespace, *not* libarrow
+cdef extern from "arrow/builder.h" namespace "arrow" nogil:
+
+    cdef cppclass CUInt32Builder" arrow::UInt32Builder"(libpa.CArrayBuilder):
+        CUInt32Builder(libpa.CMemoryPool* pool)
+        libpa.CStatus Append(const uint32_t value)
+        libpa.CStatus AppendValues(const vector[uint32_t] &values)
+        libpa.CStatus AppendValues(vector[uint32_t].const_reverse_iterator values_begin, vector[uint32_t].const_reverse_iterator values_end)
+
+    cdef cppclass CDoubleBuilder" arrow::DoubleBuilder"(libpa.CArrayBuilder):
+        CDoubleBuilder(libpa.CMemoryPool* pool)
+        libpa.CStatus Append(const double value)
+        libpa.CStatus AppendValues(const vector[double] &values)
+
 
 cdef class RouteChoiceSet:
     cdef:
@@ -130,7 +151,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_reached_first
     ) noexcept nogil
 
-    cdef RouteSet_t *generate_route_set(
+    cdef RouteSet_t *bfsle(
         RouteChoiceSet self,
         long origin_index,
         long dest_index,
@@ -143,3 +164,55 @@ cdef class RouteChoiceSet:
         long long [:] _thread_reached_first,
         unsigned int seed
     ) noexcept nogil
+
+    cdef RouteSet_t *link_penalisation(
+        RouteChoiceSet self,
+        long origin_index,
+        long dest_index,
+        unsigned int max_routes,
+        unsigned int max_depth,
+        double [:] thread_cost,
+        long long [:] thread_predecessors,
+        long long [:] thread_conn,
+        long long [:] thread_b_nodes,
+        long long [:] _thread_reached_first,
+        double penatly,
+        unsigned int seed
+    ) noexcept nogil
+
+    @staticmethod
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil
+
+    @staticmethod
+    cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
+
+    @staticmethod
+    cdef vector[double] *compute_gamma(
+        RouteSet_t *route_set,
+        pair[vector[long long] *, vector[long long] *] &freq_set,
+        vector[double] &total_cost,
+        double[:] cost_view
+    ) noexcept nogil
+
+    @staticmethod
+    cdef vector[double] *compute_prob(
+        vector[double] &total_cost,
+        vector[double] &gamma_vec,
+        double beta,
+        double theta
+    ) noexcept nogil
+
+    @staticmethod
+    cdef shared_ptr[libpa.CTable] make_table_from_results(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &route_sets,
+        vector[vector[double] *] *cost_set,
+        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *prob_set
+    )
+
+cdef class Checkpoint:
+    cdef:
+        public object where
+        public object schema
+        public object partition_cols

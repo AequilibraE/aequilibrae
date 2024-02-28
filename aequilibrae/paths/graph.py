@@ -24,7 +24,7 @@ class GraphBase(ABC):  # noqa: B024
     with degrees of two. This compresses long streams of links, such as along highways or curved roads, into single links.
 
     Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the observation
-    that in a graph with non-negative weights a dead end will over ever appear in the results of a short(est) path if the
+    that in a graph with non-negative weights a dead end will only ever appear in the results of a short(est) path if the
     origin or destination is present within that dead end.
 
     Dead end removal is applied before link contraction and does not create a strictly topological equivalent graph,
@@ -237,9 +237,9 @@ class GraphBase(ABC):  # noqa: B024
         if nans:
             self.logger.warning(f"Field(s) {nans} has(ve) at least one NaN value. Check your computations")
 
-        df.loc[:, "b_node"] = df.b_node.values.astype(self.__integer_type)
-        df.loc[:, "id"] = df.id.values.astype(self.__integer_type)
-        df.loc[:, "link_id"] = df.link_id.values.astype(self.__integer_type)
+        df["link_id"] = df["link_id"].astype(self.__integer_type)
+        df["b_node"] = df.b_node.values.astype(self.__integer_type)
+        df["id"] = df.id.values.astype(self.__integer_type)
         df["direction"] = df.direction.values.astype(np.int8)
 
         return all_nodes, num_nodes, nodes_to_indices, fs, df

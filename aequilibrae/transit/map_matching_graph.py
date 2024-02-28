@@ -118,8 +118,7 @@ class MMGraph(WorkerThread):
 
     def __build_graph_from_scratch(self):
         self.logger.info(f"Creating map-matching graph from scratch for mode_id={self.mode_id}")
-        self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=np.nan)
-        self.df.loc[:, "geo"] = self.df.wkt.apply(shapely.wkt.loads)
+        self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
         # We make sure all link IDs are in proper order
 

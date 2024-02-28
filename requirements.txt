@@ -8,3 +8,5 @@ pandas
 pyproj
 rtree
 openmatrix
+pyarrow==15.0.0
+geopandas
