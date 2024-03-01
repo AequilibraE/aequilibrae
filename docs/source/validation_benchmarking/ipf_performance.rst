@@ -4,7 +4,7 @@ IPF Performance
 It is quite common to have zones with different growth rates. To improve obtaining
 a trip matrix, which satisfies both trip-end constraints, we can use iterative methods,
 such as the iterative proportional fitting (IPF). In this section, we compare the 
-runtime of AquilibraE's current implementation of IPF, 
+runtime of AequilibraE's current implementation of IPF, 
 with a general IPF algorithm, available `here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
 
 The figure below compares the :ref:`AequilibraE's IPF runtime` with one core with the benchmark Python
@@ -19,7 +19,7 @@ core to speed up the fitting process.
     :align: center
     :alt: AequilibraE's IPF runtime
 
-As IPF is an embarassingly-parallel workload, we have implemented our version in Cython, taking full advantage
+As IPF is an embarrassingly-parallel workload, we have implemented our version in Cython, taking full advantage
 of parallelization and observing the impact of array orientation in memory. AequilibraE's
 IPF allows the user to choose how many cores are used for IPF in order to speed up the fitting process, which
 is extremely useful when handling models with lots of traffic zones.
@@ -31,7 +31,7 @@ speeding up the runtime in barely five times using five cores.
     :align: center
     :alt: number of cores used in IPF
 
-These tests were ran on a Threadripper 3970x (released in 2019) workstation with 32 cores (64 threads) @ 3.7 GHz
+These tests were run on a Threadripper 3970x (released in 2019) workstation with 32 cores (64 threads) @ 3.7 GHz
 and 256 Gb of RAM. With 32 cores in use, performing IPF took 0.105s on a 10,000 zones matrix,
 and 0.224 seconds on a 15,000 matrix. The code is provided below for convenience
 

@@ -18,7 +18,7 @@ projects, such as `SQLite <https://sqlite.org/index.html>`_,
 <https://numpy.org/>`_, as well as reasonably new industry standards such as the
 `Open-Matrix format <https://github.com/osPlanning/omx>`_.
 
-impressive performance, portability, self containment and open-source character
+Impressive performance, portability, self containment and open-source character
 of these pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
 
@@ -62,7 +62,7 @@ not need to worry about its existence until it is automatically created.
 
 The **demand_database.sqlite** is envisioned to hold all the demand-related
 information, and it is not yet structured within the AequilibraE code, as there
-is no pre-defined demand model available for use with AequilibraE. This detabase
+is no pre-defined demand model available for use with AequilibraE. This database
 is not created with the model, but we recommend using this concept on
 your demand models.
 
@@ -76,7 +76,7 @@ Package components: A conceptual view
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As all the components of an AequilibraE model based on open-source software and
-open-data standards, modeling with AequilibraE is a little different than
+open-data standards, modeling with AequilibraE is a little different from
 modeling with commercial packages, as the user can read and manipulate model
 components outside the software modeling environments (Python and QGIS).
 

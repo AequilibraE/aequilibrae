@@ -9,7 +9,7 @@ workflows to AequilibraE.
 
 Although modeling with AequilibraE should feel somewhat familiar to seasoned modelers, especially
 those used to programming, the mechanics of some of AequilibraE procedures might be foreign to
-some of users, so this section of the documentation will include discussions of the mechanics
+some users, so this section of the documentation will include discussions of the mechanics
 of some of these procedures and some light discussion on its motivation.
 
 Further, many AequilibraE users are new to the *craft*, so we have elected to start

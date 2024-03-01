@@ -3,13 +3,13 @@
 Traffic Assignment
 ==================
 
-Similar to other complex algorthms that handle a large amount of data through
+Similar to other complex algorithms that handle a large amount of data through
 complex computations, traffic assignment procedures can always be subject to at
 least one very reasonable question: Are the results right?
 
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
-comparing algorithm results, some of which have are available with highly
+comparing algorithm results, some of which having highly
 converged solutions (~1e-14). Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 Sioux Falls
@@ -170,7 +170,7 @@ Regional), as that instance has a comparable size to real-world models.
     :alt: Algorithm convergence comparison
 |
 
-Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
+Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
 reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
 after 1,000 iterations.
