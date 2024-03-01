@@ -30,6 +30,9 @@ class TestRouteChoice(TestCase):
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
 
+        self.mat = self.project.matrices.get_matrix("demand_omx")
+        self.mat.computational_view()
+
     def tearDown(self) -> None:
         self.project.close()
 
@@ -169,8 +172,10 @@ class TestRouteChoice(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+        table = rc.get_results().to_pandas()
+        breakpoint()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:

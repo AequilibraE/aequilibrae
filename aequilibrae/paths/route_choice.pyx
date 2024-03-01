@@ -114,7 +114,12 @@ cdef class RouteChoiceSet:
 
     def __cinit__(self):
         """C level init. For C memory allocation and initialisation. Called exactly once per object."""
-        pass
+        results = <vector[RouteSet_t *] *>nullptr
+        link_union_set = <vector[vector[long long] *] *>nullptr
+        cost_set = <vector[vector[double] *] *>nullptr
+        gamma_set = <vector[vector[double] *] *>nullptr
+        prob_set = <vector[vector[double] *] *>nullptr
+        ods = <vector[pair[long long, long long]] *>nullptr
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
@@ -134,13 +139,51 @@ cdef class RouteChoiceSet:
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
 
-
     def __dealloc__(self):
         """
         C level deallocation. For freeing memory allocated by this object. *Must* have GIL, `self` may be in a
         partially deallocated state already.
         """
-        pass
+        self.deallocate_results()
+
+    def deallocate_results(self):
+        """
+        Deallocate stored results, existing extracted results are not invalidated.
+        """
+        cdef:
+            RouteSet_t *route_set
+            vector[long long] *link_vec
+            vector[double] *double_vec
+
+        if self.results != nullptr:
+            for route_set in deref(self.results):
+                for link_vec in deref(route_set):
+                    del link_vec
+                del route_set
+            del self.results
+
+        if self.link_union_set != nullptr:
+            for link_vec in deref(self.link_union_set):
+                del link_vec
+            del self.link_union_vec
+
+        if self.cost_set != nullptr:
+            for double_vec in deref(self.cost_set):
+                del double_vec
+            del self.cost_vec
+
+        if self.gamma_set != nullptr:
+            for double_vec in deref(self.gamma_set):
+                del double_vec
+            del self.gamma_vec
+
+        if self.prob_set != nullptr:
+            for double_vec in deref(self.prob_set):
+                del double_vec
+            del self.prob_vec
+
+        if self.ods != nullptr:
+            del self.ods
 
     @cython.embedsignature(True)
     def run(self, origin: int, destination: int, *args, **kwargs):
@@ -160,7 +203,8 @@ cdef class RouteChoiceSet:
             **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
                                                          Represents paths from ``origin`` to ``destination``.
         """
-        return [tuple(x) for x in self.batched([(origin, destination)], *args, **kwargs).column("route set").to_pylist()]
+        self.batched([(origin, destination)], *args, **kwargs)
+        return [tuple(x) for x in self.get_results().column("route set").to_pylist()]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -199,10 +243,6 @@ cdef class RouteChoiceSet:
             **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible with ``bfsle=True``.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
-
-        :Returns:
-            **route sets** (:obj:`dict[tuple[int, int], list[tuple[int, ...]]]`): Returns a list of unique tuples of compact link IDs for
-                each OD pair provided (as keys). Represents paths from ``origin`` to ``destination``. None if ``where`` was not None.
         """
         cdef:
             long long o, d
@@ -274,15 +314,19 @@ cdef class RouteChoiceSet:
         cdef:
             RouteSet_t *route_set
             pair[vector[long long] *, vector[long long] *] freq_pair
-            vector[long long] *link_union = <vector[long long] *>nullptr
+            vector[long long] *link_union_scratch = <vector[long long] *>nullptr
+            vector[vector[long long] *] *link_union_set = <vector[vector[long long] *] *>nullptr
             vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
             vector[vector[double] *] *gamma_set = <vector[vector[double] *] *>nullptr
-            vector[vector[double] *] *prob_set= <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *prob_set = <vector[vector[double] *] *>nullptr
 
         if path_size_logit:
+            link_union_set = new vector[vector[long long] *](max_results_len)
             cost_set = new vector[vector[double] *](max_results_len)
             gamma_set = new vector[vector[double] *](max_results_len)
             prob_set = new vector[vector[double] *](max_results_len)
+
+        self.deallocate_results()  # We have be storing results from a previous run
 
         for batch in batches:
             c_ods = batch  # Convert the batch to a cpp vector, this isn't strictly efficient but is nicer
@@ -290,10 +334,15 @@ cdef class RouteChoiceSet:
             results.resize(batch_len)  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
 
             if path_size_logit:
+                # we may clear these objects because it's either:
+                # - the first iteration and they contain no elements, thus no memory to leak
+                # - the internal objects were freed by the previous iteration
+                link_union_set.clear()
                 cost_set.clear()
                 gamma_set.clear()
                 prob_set.clear()
 
+                link_union_set.resize(batch_len)
                 cost_set.resize(batch_len)
                 gamma_set.resize(batch_len)
                 prob_set.resize(batch_len)
@@ -302,7 +351,7 @@ cdef class RouteChoiceSet:
                 # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
                 # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
                 if path_size_logit:
-                    link_union = new vector[long long]()
+                    link_union_scratch = new vector[long long]()
 
                 for i in prange(batch_len):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
@@ -349,13 +398,13 @@ cdef class RouteChoiceSet:
                         )
 
                     if path_size_logit:
-                        link_union.clear()
-                        freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union))
+                        link_union_scratch.clear()
+                        freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union_scratch))
+                        deref(link_union_set)[i] = freq_pair.first
                         deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
                         deref(gamma_set)[i] = RouteChoiceSet.compute_gamma(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
                         deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(gamma_set)[i]), beta, theta)
-                        del freq_pair.first
-                        del freq_pair.second
+                        del freq_pair.second  # While we need the unique sorted links (.first), we don't need the frequencies (.second)
 
                     deref(results)[i] = route_set
 
@@ -370,38 +419,50 @@ cdef class RouteChoiceSet:
                         )
 
                 if path_size_logit:
-                    del link_union
-
-            table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
-
-            # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
-            if path_size_logit:
-                for j in range(batch_len):
-                    del deref(cost_set)[j]
-                    del deref(gamma_set)[j]
-                    del deref(prob_set)[j]
-
-            for j in range(batch_len):
-                for route in deref(deref(results)[j]):
-                    del route
+                    del link_union_scratch
 
             if where is not None:
+                table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
+
+                # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
+                if path_size_logit:
+                    for j in range(batch_len):
+                        del deref(link_union_set)[j]
+                        del deref(cost_set)[j]
+                        del deref(gamma_set)[j]
+                        del deref(prob_set)[j]
+
+                for j in range(batch_len):
+                    for route in deref(deref(results)[j]):
+                        del route
+                    del deref(results)[j]
+
                 checkpoint.write(table)
                 del table
             else:
-                break  # There was only one batch anyway
+                pass  # where is None ==> len(batches) == 1, i.e. there was only one batch and we should keep everything in memory
 
-        # We're done with everything now, we can free the outer internal structures
-        if path_size_logit:
-            del cost_set
-            del gamma_set
-            del prob_set
+        # Here we decide if we wish to preserve our results for later saving/link loading
+        if where is not None:
+            # We're done with everything now, we can free the outer internal structures
             del results
-
-        if where is None:
-            return table
+            if path_size_logit:
+                del link_union_set
+                del cost_set
+                del gamma_set
+                del prob_set
         else:
-            return
+            self.results = results
+            self.link_union_set = link_union_set
+            self.cost_set = cost_set
+            self.gamma_set = gamma_set
+            self.prob_set = prob_set
+
+            # Copy the c_ods vector, it was provided by the auto Cython conversion and is allocated on the stack,
+            # we should copy it to keep it around
+            self.ods = new vector[pair[long long, long long]](c_ods)
+
+            # self.link_union ?? This could be saved as a partial results from the computation above, although it isn't easy to get out rn
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -744,6 +805,92 @@ cdef class RouteChoiceSet:
 
         return prob_vec
 
+    def link_loading(self, double[:, :] matrix_view):
+        if self.ods == nullptr \
+           or self.link_union_set == nullptr \
+           or self.prob_set == nullptr:
+            raise ValueError("link loading requires Route Choice path_size_logit results")
+
+        cdef:
+            vector[double] *loads
+            vector[double] *route_set_prob
+
+            vector[long long] *link_union
+            vector[long long].const_iterator link_union_iter
+
+            vector[long long] *links
+            vector[long long].const_iterator link_iter
+
+            vector[double].const_iterator prob_iter
+
+            RouteSet_t *route_set
+            double demand, load, prob
+            size_t length
+            long origin_index, dest_index
+            int i
+
+        fprintf(stderr, "starting link loading\n")
+        with nogil, parallel(num_threads=1):
+            # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
+            # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
+            fprintf(stderr, "core: %d\n", threadid())
+
+            for i in prange(self.ods.size()):
+                origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
+                dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+                demand = matrix_view[origin_index, dest_index]
+                fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
+
+                route_set = deref(self.results)[i]
+                fprintf(stderr, "got route set\n")
+                link_union = deref(self.link_union_set)[i]
+                fprintf(stderr, "got link union\n")
+                route_set_prob = deref(self.prob_set)[i]
+                fprintf(stderr, "got route set probsk\n")
+
+                fprintf(stderr, "making new loads vector\n")
+                loads = new vector[double](link_union.size(), 0.0)
+
+                fprintf(stderr, "starting route iteration\n")
+                # We now iterate over all routes in the route_set, each route has an associated probability
+                route_prob_iter = route_set_prob.cbegin()
+                for route in deref(route_set):
+                    load = demand * deref(route_prob_iter)
+                    inc(route_prob_iter)
+
+                    if load == 0.0:
+                        continue
+
+                    # For each link in the route, we need to assign the appropriate demand * prob
+                    # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
+                    # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
+                    # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
+                    # This is also incredibly cache efficient, the only downsides are that the code is harder to read
+                    # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
+                    # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
+                    # then used an N-way merge we could reuse the sorted routes and the sorted link union.
+                    links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved
+                    sort(links.begin(), links.end())
+
+                    # links and link_union are sorted, and links is a subset of link_union
+                    link_union_iter = link_union.cbegin()
+                    link_iter = links.cbegin()
+
+                    # fprintf(stderr, "starting link iteration\n")
+                    while link_iter != links.cend():
+                        # Find the next location for the current link in links
+                        while deref(link_iter) != deref(link_union_iter):
+                            inc(link_union_iter)
+
+                        fprintf(stderr, "adding load of %f to link %d because link %d is in route\n", load, deref(link_union_iter), deref(link_iter))
+                        deref(loads)[link_union_iter - link_union.cbegin()] = deref(loads)[link_union_iter - link_union.cbegin()] + load
+
+                        inc(link_iter)
+
+                with gil:
+                    print(origin_index, dest_index, deref(loads))
+
+
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
@@ -834,6 +981,27 @@ cdef class RouteChoiceSet:
             del cost_col
             del gamma_col
             del prob_col
+
+        return table
+
+    def get_results(self):  # Cython doesn't like this type annotation... -> pa.Table:
+        """
+        :Returns:
+            **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of compact link IDs for
+                each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``. None if ``where`` was not None.
+        """
+        if self.results == nullptr or self.ods == nullptr:
+            raise ValueError("Route Choice results not computed yet")
+
+        table = libpa.pyarrow_wrap_table(
+            RouteChoiceSet.make_table_from_results(
+                deref(self.ods),
+                deref(self.results),
+                self.cost_set,
+                self.gamma_set,
+                self.prob_set
+            )
+        )
 
         return table
 

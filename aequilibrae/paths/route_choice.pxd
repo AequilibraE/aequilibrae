@@ -140,6 +140,13 @@ cdef class RouteChoiceSet:
         bint block_flows_through_centroids
         bint a_star
 
+        vector[pair[long long, long long]] *ods
+        vector[RouteSet_t *] *results
+        vector[vector[long long] *] *link_union_set
+        vector[vector[double] *] *cost_set
+        vector[vector[double] *] *gamma_set
+        vector[vector[double] *] *prob_set
+
     cdef void path_find(
         RouteChoiceSet self,
         long origin_index,
@@ -201,6 +208,8 @@ cdef class RouteChoiceSet:
         double beta,
         double theta
     ) noexcept nogil
+
+    # cdef void link_loading(self, double[:, :] matrix_view) nogil
 
     @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(
