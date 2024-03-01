@@ -136,6 +136,7 @@ cdef class RouteChoiceSet:
         long long [:] ids_graph_view
         long long [:] compressed_link_ids
         long long num_nodes
+        long long num_links
         long long zones
         bint block_flows_through_centroids
         bint a_star

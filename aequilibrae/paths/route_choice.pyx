@@ -136,6 +136,7 @@ cdef class RouteChoiceSet:
 
         self.ids_graph_view = graph.compact_graph.id.values
         self.num_nodes = graph.compact_num_nodes
+        self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
 
@@ -814,6 +815,8 @@ cdef class RouteChoiceSet:
         cdef:
             vector[double] *loads
             vector[double] *route_set_prob
+            vector[double] *collective_link_loads = new vector[double](self.num_links)  # FIXME FREE ME
+            vector[vector[double] *] *link_loads = new vector[vector[double] *](self.ods.size())  # FIXME FREE ME
 
             vector[long long] *link_union
             vector[long long].const_iterator link_union_iter
@@ -830,65 +833,77 @@ cdef class RouteChoiceSet:
             int i
 
         fprintf(stderr, "starting link loading\n")
-        with nogil, parallel(num_threads=1):
-            # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
-            # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
-            fprintf(stderr, "core: %d\n", threadid())
+        with nogil:
+            with parallel(num_threads=1):
+                # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
+                # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
+                fprintf(stderr, "core: %d\n", threadid())
 
-            for i in prange(self.ods.size()):
+                for i in prange(self.ods.size()):
+                    fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
+
+                    route_set = deref(self.results)[i]
+                    fprintf(stderr, "got route set\n")
+                    link_union = deref(self.link_union_set)[i]
+                    fprintf(stderr, "got link union\n")
+                    route_set_prob = deref(self.prob_set)[i]
+                    fprintf(stderr, "got route set probsk\n")
+
+                    fprintf(stderr, "making new loads vector\n")
+                    loads = new vector[double](link_union.size(), 0.0)  # FIXME FREE ME
+
+                    fprintf(stderr, "starting route iteration\n")
+                    # We now iterate over all routes in the route_set, each route has an associated probability
+                    route_prob_iter = route_set_prob.cbegin()
+                    for route in deref(route_set):
+                        prob = deref(route_prob_iter)
+                        inc(route_prob_iter)
+
+                        if prob == 0.0:
+                            continue
+
+                        # For each link in the route, we need to assign the appropriate demand * prob
+                        # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
+                        # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
+                        # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
+                        # This is also incredibly cache efficient, the only downsides are that the code is harder to read
+                        # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
+                        # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
+                        # then used an N-way merge we could reuse the sorted routes and the sorted link union.
+                        links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved  # FIXME FREE ME
+                        sort(links.begin(), links.end())
+
+                        # links and link_union are sorted, and links is a subset of link_union
+                        link_union_iter = link_union.cbegin()
+                        link_iter = links.cbegin()
+
+                        # fprintf(stderr, "starting link iteration\n")
+                        while link_iter != links.cend():
+                            # Find the next location for the current link in links
+                            while deref(link_iter) != deref(link_union_iter):
+                                inc(link_union_iter)
+
+                            fprintf(stderr, "adding load of %f to link %d because link %d is in route\n", load, deref(link_union_iter), deref(link_iter))
+                            deref(loads)[link_union_iter - link_union.cbegin()] = deref(loads)[link_union_iter - link_union.cbegin()] + prob
+
+                            inc(link_iter)
+
+                    deref(link_loads)[i] = loads
+                    with gil:
+                        print("path file:", origin_index, dest_index, deref(loads))
+
+            for i in range(self.ods.size()):
+                loads = deref(link_loads)[i]
+                link_union = deref(self.link_union_set)[i]
+
                 origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
                 dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
                 demand = matrix_view[origin_index, dest_index]
-                fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
 
-                route_set = deref(self.results)[i]
-                fprintf(stderr, "got route set\n")
-                link_union = deref(self.link_union_set)[i]
-                fprintf(stderr, "got link union\n")
-                route_set_prob = deref(self.prob_set)[i]
-                fprintf(stderr, "got route set probsk\n")
-
-                fprintf(stderr, "making new loads vector\n")
-                loads = new vector[double](link_union.size(), 0.0)
-
-                fprintf(stderr, "starting route iteration\n")
-                # We now iterate over all routes in the route_set, each route has an associated probability
-                route_prob_iter = route_set_prob.cbegin()
-                for route in deref(route_set):
-                    load = demand * deref(route_prob_iter)
-                    inc(route_prob_iter)
-
-                    if load == 0.0:
-                        continue
-
-                    # For each link in the route, we need to assign the appropriate demand * prob
-                    # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
-                    # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
-                    # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
-                    # This is also incredibly cache efficient, the only downsides are that the code is harder to read
-                    # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
-                    # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
-                    # then used an N-way merge we could reuse the sorted routes and the sorted link union.
-                    links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved
-                    sort(links.begin(), links.end())
-
-                    # links and link_union are sorted, and links is a subset of link_union
-                    link_union_iter = link_union.cbegin()
-                    link_iter = links.cbegin()
-
-                    # fprintf(stderr, "starting link iteration\n")
-                    while link_iter != links.cend():
-                        # Find the next location for the current link in links
-                        while deref(link_iter) != deref(link_union_iter):
-                            inc(link_union_iter)
-
-                        fprintf(stderr, "adding load of %f to link %d because link %d is in route\n", load, deref(link_union_iter), deref(link_iter))
-                        deref(loads)[link_union_iter - link_union.cbegin()] = deref(loads)[link_union_iter - link_union.cbegin()] + load
-
-                        inc(link_iter)
-
-                with gil:
-                    print(origin_index, dest_index, deref(loads))
+                for j in range(link_union.size()):
+                    deref(collective_link_loads)[deref(link_union)[j]] = deref(collective_link_loads)[deref(link_union)[j]] + demand * deref(loads)[j]
+            with gil:
+                print("link loads:", deref(collective_link_loads))
 
 
     @cython.wraparound(False)
