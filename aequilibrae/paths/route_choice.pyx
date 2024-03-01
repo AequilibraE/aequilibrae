@@ -162,29 +162,36 @@ cdef class RouteChoiceSet:
                     del link_vec
                 del route_set
             del self.results
+            self.results = <vector[RouteSet_t *] *>nullptr
 
         if self.link_union_set != nullptr:
             for link_vec in deref(self.link_union_set):
                 del link_vec
-            del self.link_union_vec
+            del self.link_union_set
+            self.link_union_set = <vector[vector[long long] *] *>nullptr
 
         if self.cost_set != nullptr:
             for double_vec in deref(self.cost_set):
                 del double_vec
-            del self.cost_vec
+            del self.cost_set
+            self.cost_set = <vector[vector[double] *] *>nullptr
 
         if self.gamma_set != nullptr:
             for double_vec in deref(self.gamma_set):
                 del double_vec
-            del self.gamma_vec
+            del self.gamma_set
+            self.gamma_set = <vector[vector[double] *] *>nullptr
 
         if self.prob_set != nullptr:
             for double_vec in deref(self.prob_set):
                 del double_vec
-            del self.prob_vec
+            del self.prob_set
+            self.prob_set = <vector[vector[double] *] *>nullptr
 
         if self.ods != nullptr:
             del self.ods
+            self.ods = prob_set = <vector[pair[long long, long long]] *>nullptr
+
 
     @cython.embedsignature(True)
     def run(self, origin: int, destination: int, *args, **kwargs):

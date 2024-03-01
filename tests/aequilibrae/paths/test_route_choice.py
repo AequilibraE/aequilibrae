@@ -75,8 +75,9 @@ class TestRouteChoice(TestCase):
                 rc = RouteChoiceSet(self.graph)
                 a = 1
 
+                rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs)
                 self.assertFalse(
-                    rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs),
+                    rc.get_results(),
                     "Route set from self to self should be empty",
                 )
 
@@ -103,7 +104,8 @@ class TestRouteChoice(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
-        results = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
         self.assertEqual(len(gb), len(nodes), "Requested number of route sets not returned")
@@ -121,7 +123,8 @@ class TestRouteChoice(TestCase):
 
         max_routes = 20
         with self.assertWarns(UserWarning):
-            results = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+            rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
         self.assertEqual(len(gb), 1, "Duplicates not dropped")
@@ -153,7 +156,8 @@ class TestRouteChoice(TestCase):
         max_routes = 20
 
         path = join(self.project.project_base_path, "batched results")
-        table = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        table = rc.get_results().to_pandas()
         rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path)
 
         dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
@@ -164,7 +168,7 @@ class TestRouteChoice(TestCase):
             .reset_index(drop=True)
         )
 
-        table = table.to_pandas().sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
+        table = table.sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
 
@@ -175,7 +179,7 @@ class TestRouteChoice(TestCase):
         rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
 
         table = rc.get_results().to_pandas()
-        breakpoint()
+        # breakpoint()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -186,8 +190,8 @@ class TestRouteChoice(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        table = rc.get_results().to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
@@ -197,8 +201,8 @@ class TestRouteChoice(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        table = rc.get_results().to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
