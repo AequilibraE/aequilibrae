@@ -847,7 +847,6 @@ cdef class RouteChoiceSet:
                 fprintf(stderr, "core: %d\n", threadid())
 
                 for i in prange(self.ods.size()):
-                    fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
 
                     route_set = deref(self.results)[i]
                     fprintf(stderr, "got route set\n")
@@ -890,14 +889,14 @@ cdef class RouteChoiceSet:
                             while deref(link_iter) != deref(link_union_iter):
                                 inc(link_union_iter)
 
-                            fprintf(stderr, "adding load of %f to link %d because link %d is in route\n", load, deref(link_union_iter), deref(link_iter))
+                            fprintf(stderr, "adding prob of %f to link %d because link %d is in route\n", prob, deref(link_union_iter), deref(link_iter))
                             deref(loads)[link_union_iter - link_union.cbegin()] = deref(loads)[link_union_iter - link_union.cbegin()] + prob
 
                             inc(link_iter)
 
                     deref(link_loads)[i] = loads
                     with gil:
-                        print("path file:", origin_index, dest_index, deref(loads))
+                        print("path file:", deref(loads))
 
             for i in range(self.ods.size()):
                 loads = deref(link_loads)[i]
@@ -906,11 +905,13 @@ cdef class RouteChoiceSet:
                 origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
                 dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
                 demand = matrix_view[origin_index, dest_index]
+                fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
 
                 for j in range(link_union.size()):
                     deref(collective_link_loads)[deref(link_union)[j]] = deref(collective_link_loads)[deref(link_union)[j]] + demand * deref(loads)[j]
             with gil:
                 print("link loads:", deref(collective_link_loads))
+        return deref(collective_link_loads)
 
 
     @cython.wraparound(False)
