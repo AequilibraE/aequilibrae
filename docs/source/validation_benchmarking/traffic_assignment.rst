@@ -9,7 +9,7 @@ least one very reasonable question: Are the results right?
 
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
-comparing algorithm results, some of which having highly
+comparing algorithm results, some of which achieve
 converged solutions (~1e-14). Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 Sioux Falls
