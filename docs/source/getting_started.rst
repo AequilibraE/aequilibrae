@@ -102,7 +102,7 @@ On MacOS one can use brew as per
 Hardware requirements
 ---------------------
 
-AequilibraE's requirements depend heavily of the size of the model you are using
+AequilibraE's requirements depend heavily on the size of the model you are using
 for computation. The most important
 things to keep an eye on are:
 
