@@ -148,6 +148,9 @@ cdef class RouteChoiceSet:
         vector[vector[double] *] *gamma_set
         vector[vector[double] *] *prob_set
 
+        unsigned int [:] mapping_idx
+        unsigned int [:] mapping_data
+
     cdef void path_find(
         RouteChoiceSet self,
         long origin_index,
@@ -211,6 +214,17 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     # cdef void link_loading(self, double[:, :] matrix_view) nogil
+
+    @staticmethod
+    cdef vector[vector[double] *] *compute_path_files(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &results,
+        vector[vector[long long] *] &link_union_set,
+        vector[vector[double] *] &prob_set
+    ) noexcept nogil
+
+    cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
+    cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
 
     @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(

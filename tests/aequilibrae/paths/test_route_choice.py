@@ -208,6 +208,18 @@ class TestRouteChoice(TestCase):
         for od, df in gb:
             self.assertAlmostEqual(1.0, sum(df["probability"].values), msg="Probability not close to 1.0")
 
+    def test_link_loading(self):
+
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+        link_loads = rc.link_loading(self.mat)
+        link_loads2 = rc.link_loading(self.mat, generate_path_files=True)
+
+        np.testing.assert_array_almost_equal(link_loads, link_loads2)
+
 
 def generate_line_strings(project, graph, results):
     """Debug method"""

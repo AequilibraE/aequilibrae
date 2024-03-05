@@ -75,6 +75,7 @@ import itertools
 import pathlib
 import logging
 import warnings
+from aequilibrae.matrix import AequilibraeMatrix
 
 cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
 cimport pyarrow as pa
@@ -139,6 +140,8 @@ cdef class RouteChoiceSet:
         self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
+
+        self.mapping_idx, self.mapping_data = graph.compressed_link_network_mapping
 
     def __dealloc__(self):
         """
@@ -813,105 +816,173 @@ cdef class RouteChoiceSet:
 
         return prob_vec
 
-    def link_loading(self, double[:, :] matrix_view):
+    def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False):
         if self.ods == nullptr \
            or self.link_union_set == nullptr \
            or self.prob_set == nullptr:
             raise ValueError("link loading requires Route Choice path_size_logit results")
 
+        if not isinstance(matrix, AequilibraeMatrix):
+            raise ValueError("`matrix` is not an AequilibraE matrix")
+
         cdef:
-            vector[double] *loads
-            vector[double] *route_set_prob
-            vector[double] *collective_link_loads = new vector[double](self.num_links)  # FIXME FREE ME
-            vector[vector[double] *] *link_loads = new vector[vector[double] *](self.ods.size())  # FIXME FREE ME
+            vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
+            vector[double] *ll
 
+        if generate_path_files:
+            path_files = RouteChoiceSet.compute_path_files(
+                deref(self.ods),
+                deref(self.results),
+                deref(self.link_union_set),
+                deref(self.prob_set)
+            )
+            tmp = []
+            for vec in deref(path_files):
+                tmp.append(deref(vec))
+            print(tmp)
+
+        def apply_link_loading_func(m):
+            if generate_path_files:
+                ll = self.apply_link_loading_from_path_files(
+                    m,
+                    deref(path_files),
+                )
+            else:
+                ll = self.apply_link_loading(m)
+            return deref(ll)
+
+        if len(matrix.view_names) == 1:
+            link_loads = apply_link_loading_func(matrix.matrix_view)
+        else:
+            link_loads = {
+                name: apply_link_loading_func(matrix.matrix_view[:, :, i])
+                for i, name in enumerate(matrix.names)
+            }
+
+        return link_loads
+
+
+    @staticmethod
+    cdef vector[vector[double] *] *compute_path_files(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &results,
+        vector[vector[long long] *] &link_union_set,
+        vector[vector[double] *] &prob_set
+    ) noexcept nogil:
+        cdef:
+            vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())  # FIXME FREE ME
             vector[long long] *link_union
-            vector[long long].const_iterator link_union_iter
+            vector[double] *loads
+            vector[double] *link
 
-            vector[long long] *links
+            vector[long long].const_iterator link_union_iter
             vector[long long].const_iterator link_iter
 
-            vector[double].const_iterator prob_iter
-
-            RouteSet_t *route_set
-            double demand, load, prob
-            size_t length
-            long origin_index, dest_index
+            size_t link_loc
+            double prob
             int i
 
-        fprintf(stderr, "starting link loading\n")
-        with nogil:
-            with parallel(num_threads=1):
-                # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
-                # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
-                fprintf(stderr, "core: %d\n", threadid())
+        with parallel(num_threads=6):
+            # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
+            # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
 
-                for i in prange(self.ods.size()):
+            for i in prange(ods.size()):
+                link_union = link_union_set[i]
+                loads = new vector[double](link_union.size(), 0.0)  # FIXME FREE ME
 
-                    route_set = deref(self.results)[i]
-                    fprintf(stderr, "got route set\n")
-                    link_union = deref(self.link_union_set)[i]
-                    fprintf(stderr, "got link union\n")
-                    route_set_prob = deref(self.prob_set)[i]
-                    fprintf(stderr, "got route set probsk\n")
+                # We now iterate over all routes in the route_set, each route has an associated probability
+                route_prob_iter = prob_set[i].cbegin()
+                for route in deref(results[i]):
+                    prob = deref(route_prob_iter)
+                    inc(route_prob_iter)
 
-                    fprintf(stderr, "making new loads vector\n")
-                    loads = new vector[double](link_union.size(), 0.0)  # FIXME FREE ME
+                    if prob == 0.0:
+                        continue
 
-                    fprintf(stderr, "starting route iteration\n")
-                    # We now iterate over all routes in the route_set, each route has an associated probability
-                    route_prob_iter = route_set_prob.cbegin()
-                    for route in deref(route_set):
-                        prob = deref(route_prob_iter)
-                        inc(route_prob_iter)
+                    # For each link in the route, we need to assign the appropriate demand * prob
+                    # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
+                    # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
+                    # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
+                    # This is also incredibly cache efficient, the only downsides are that the code is harder to read
+                    # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
+                    # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
+                    # then used an N-way merge we could reuse the sorted routes and the sorted link union.
+                    links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved  # FIXME FREE ME
+                    sort(links.begin(), links.end())
 
-                        if prob == 0.0:
-                            continue
+                    # links and link_union are sorted, and links is a subset of link_union
+                    link_union_iter = link_union.cbegin()
+                    link_iter = links.cbegin()
 
-                        # For each link in the route, we need to assign the appropriate demand * prob
-                        # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
-                        # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
-                        # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
-                        # This is also incredibly cache efficient, the only downsides are that the code is harder to read
-                        # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
-                        # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
-                        # then used an N-way merge we could reuse the sorted routes and the sorted link union.
-                        links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved  # FIXME FREE ME
-                        sort(links.begin(), links.end())
+                    while link_iter != links.cend():
+                        # Find the next location for the current link in links
+                        while deref(link_iter) != deref(link_union_iter):
+                            inc(link_union_iter)
 
-                        # links and link_union are sorted, and links is a subset of link_union
-                        link_union_iter = link_union.cbegin()
-                        link_iter = links.cbegin()
+                        link_loc = link_union_iter - link_union.cbegin()
+                        deref(loads)[link_loc] = deref(loads)[link_loc] + prob  # += here results in all zeros? Odd
 
-                        # fprintf(stderr, "starting link iteration\n")
-                        while link_iter != links.cend():
-                            # Find the next location for the current link in links
-                            while deref(link_iter) != deref(link_union_iter):
-                                inc(link_union_iter)
+                        inc(link_iter)
 
-                            fprintf(stderr, "adding prob of %f to link %d because link %d is in route\n", prob, deref(link_union_iter), deref(link_iter))
-                            deref(loads)[link_union_iter - link_union.cbegin()] = deref(loads)[link_union_iter - link_union.cbegin()] + prob
+                deref(link_loads)[i] = loads
 
-                            inc(link_iter)
+        return link_loads
 
-                    deref(link_loads)[i] = loads
-                    with gil:
-                        print("path file:", deref(loads))
+    cdef vector[double] *apply_link_loading_from_path_files(
+        RouteChoiceSet self,
+        double[:, :] matrix_view,
+        vector[vector[double] *] &path_files
+    ) noexcept nogil:
+        cdef:
+            vector[double] *loads
+            vector[long long] *link_union
+            long origin_index, dest_index
+            double demand
 
-            for i in range(self.ods.size()):
-                loads = deref(link_loads)[i]
-                link_union = deref(self.link_union_set)[i]
+            vector[double] *link_loads = new vector[double](self.num_links)  # FIXME FREE ME
 
-                origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
-                dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
-                demand = matrix_view[origin_index, dest_index]
-                fprintf(stderr, "od idx: %d, %d has demand: %f\n", origin_index, dest_index, demand)
+        for i in range(self.ods.size()):
+            loads = path_files[i]
+            link_union = deref(self.link_union_set)[i]
 
-                for j in range(link_union.size()):
-                    deref(collective_link_loads)[deref(link_union)[j]] = deref(collective_link_loads)[deref(link_union)[j]] + demand * deref(loads)[j]
-            with gil:
-                print("link loads:", deref(collective_link_loads))
-        return deref(collective_link_loads)
+            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            demand = matrix_view[origin_index, dest_index]
+
+            for j in range(link_union.size()):
+                link = deref(link_union)[j]
+                deref(link_loads)[link] = deref(link_loads)[link] + demand * deref(loads)[j]  # += here results in all zeros? Odd
+
+        return link_loads
+
+    cdef vector[double] *apply_link_loading(self, double[:, :] matrix_view) noexcept nogil:
+        cdef:
+            RouteSet_t *route_set
+            vector[double] *route_set_prob
+            long origin_index, dest_index
+            double demand, prob, load
+
+            vector[double] *link_loads = new vector[double](self.num_links)  # FIXME FREE ME
+
+        for i in range(self.ods.size()):
+            route_set = deref(self.results)[i]
+            route_set_prob = deref(self.prob_set)[i]
+
+            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            demand = matrix_view[origin_index, dest_index]
+
+            route_prob_iter = route_set_prob.cbegin()
+            for route in deref(route_set):
+                prob = deref(route_prob_iter)
+                inc(route_prob_iter)
+
+                load = prob * demand
+                for link in deref(route):
+                    deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
+
+        return link_loads
+
 
 
     @cython.wraparound(False)

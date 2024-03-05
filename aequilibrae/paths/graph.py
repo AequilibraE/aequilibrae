@@ -4,6 +4,7 @@ from abc import ABC
 from datetime import datetime
 from os.path import join
 from typing import List, Tuple, Optional
+import functools
 
 import numpy as np
 import pandas as pd
@@ -166,6 +167,12 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids.shape[0]:
             self.__build_compressed_graph()
             self.compact_num_links = self.compact_graph.shape[0]
+
+        # The cache property should be recalculated when the graph has been reprepared
+        try:
+            del self.compressed_link_network_mapping
+        except AttributeError:
+            pass
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -504,6 +511,45 @@ class GraphBase(ABC):  # noqa: B024
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+    @functools.cached_property
+    def compressed_link_network_mapping(self):
+        """
+        Two arrays providing a mapping of compressed id to link id.
+
+        Uses sparse compression. Index ``idx`` by the by compressed id and compressed id + 1, the
+        network IDs are then in the range ``idx[id]:idx[id + 1]``.
+
+        .. code-block:: python
+
+            >>> idx, data = graph.compressed_link_network_mapping
+            >>> data[idx[id]:idx[id + 1]]  # ==> Slice of network ID's corresponding to the compressed ID
+
+        Links not in the compressed graph are not contained within the ``data`` array.
+
+        :Returns:
+            **idx** (:obj:`np.array`): index array for ``data``
+            **data** (:obj:`np.array`): array of link ids
+        """
+
+        # Some links are completely removed from the network, they are assigned ID `self.compact_graph.id.max() + 1`,
+        # we skip them.
+        filtered = self.graph[self.graph.__compressed_id__ != self.compact_graph.id.max() + 1]
+        gb = filtered.groupby(by="__compressed_id__", sort=True)
+        idx = np.zeros(self.compact_num_links + 1, dtype=np.uint32)
+        data = np.zeros(len(filtered), dtype=np.uint32)
+
+        i = 0
+        for compressed_id, df in gb:
+            idx[compressed_id] = i
+            values = df.link_id.values
+            for j in range(len(values)):
+                data[i + j] = values[j]
+
+            i += len(values)
+
+        idx[-1] = i
+        return idx, data
 
 
 class Graph(GraphBase):
