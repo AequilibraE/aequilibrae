@@ -88,6 +88,7 @@ from libc.stdio cimport fprintf, printf, stderr
 
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
 include 'basic_path_finding.pyx'
+include 'parallel_numpy.pyx'
 
 @cython.embedsignature(True)
 cdef class RouteChoiceSet:
@@ -136,6 +137,7 @@ cdef class RouteChoiceSet:
         self.a_star = False
 
         self.ids_graph_view = graph.compact_graph.id.values
+        self.graph_compressed_id_view = graph.graph.__compressed_id__.values
         self.num_nodes = graph.compact_num_nodes
         self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
@@ -820,7 +822,8 @@ cdef class RouteChoiceSet:
 
         return prob_vec
 
-    def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False):
+    @cython.embedsignature(True)
+    def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
         if self.ods == nullptr \
            or self.link_union_set == nullptr \
            or self.prob_set == nullptr:
@@ -828,6 +831,8 @@ cdef class RouteChoiceSet:
 
         if not isinstance(matrix, AequilibraeMatrix):
             raise ValueError("`matrix` is not an AequilibraE matrix")
+
+        cores = cores if cores > 0 else openmp.omp_get_num_threads()
 
         cdef:
             vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
@@ -838,7 +843,8 @@ cdef class RouteChoiceSet:
                 deref(self.ods),
                 deref(self.results),
                 deref(self.link_union_set),
-                deref(self.prob_set)
+                deref(self.prob_set),
+                cores,
             )
             tmp = []
             for vec in deref(path_files):
@@ -853,7 +859,17 @@ cdef class RouteChoiceSet:
                 )
             else:
                 ll = self.apply_link_loading(m)
-            return deref(ll)
+
+            actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
+            assign_link_loads_cython(
+                actual,
+                # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without transferring owner ship.
+                <double[:ll.size(), :1]>&deref(ll)[0],
+                self.graph_compressed_id_view,
+                cores
+            )
+            del ll
+            return actual
 
         if len(matrix.view_names) == 1:
             link_loads = apply_link_loading_func(matrix.matrix_view)
@@ -865,14 +881,23 @@ cdef class RouteChoiceSet:
 
         return link_loads
 
-
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
     @staticmethod
     cdef vector[vector[double] *] *compute_path_files(
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &results,
         vector[vector[long long] *] &link_union_set,
-        vector[vector[double] *] &prob_set
+        vector[vector[double] *] &prob_set,
+        unsigned int cores
     ) noexcept nogil:
+        """
+        Computes the path files for the provided vector of RouteSets.
+
+        Returns vector of vectors of link loads corresponding to each link in it's link_union_set.
+        """
         cdef:
             vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())  # FIXME FREE ME
             vector[long long] *link_union
@@ -886,7 +911,7 @@ cdef class RouteChoiceSet:
             double prob
             long long i
 
-        with parallel(num_threads=6):
+        with parallel(num_threads=cores):
             # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
             # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
 
@@ -932,11 +957,22 @@ cdef class RouteChoiceSet:
 
         return link_loads
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
     cdef vector[double] *apply_link_loading_from_path_files(
         RouteChoiceSet self,
         double[:, :] matrix_view,
         vector[vector[double] *] &path_files
     ) noexcept nogil:
+        """
+        Apply link loading from path files.
+
+        If path files have already been computed then this is a more efficient manner for the link loading.
+
+        Returns a vector of link loads indexed by compressed link ID.
+        """
         cdef:
             vector[double] *loads
             vector[long long] *link_union
@@ -959,7 +995,16 @@ cdef class RouteChoiceSet:
 
         return link_loads
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
     cdef vector[double] *apply_link_loading(self, double[:, :] matrix_view) noexcept nogil:
+        """
+        Apply link loading.
+
+        Returns a vector of link loads indexed by compressed link ID.
+        """
         cdef:
             RouteSet_t *route_set
             vector[double] *route_set_prob
@@ -986,8 +1031,6 @@ cdef class RouteChoiceSet:
                     deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
 
         return link_loads
-
-
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

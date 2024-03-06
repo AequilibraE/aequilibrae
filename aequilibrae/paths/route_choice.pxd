@@ -135,6 +135,7 @@ cdef class RouteChoiceSet:
         double [:] lat_view
         double [:] lon_view
         long long [:] ids_graph_view
+        long long [:] graph_compressed_id_view
         long long [:] compressed_link_ids
         long long num_nodes
         long long num_links
@@ -214,14 +215,13 @@ cdef class RouteChoiceSet:
         double theta
     ) noexcept nogil
 
-    # cdef void link_loading(self, double[:, :] matrix_view) nogil
-
     @staticmethod
     cdef vector[vector[double] *] *compute_path_files(
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &results,
         vector[vector[long long] *] &link_union_set,
-        vector[vector[double] *] &prob_set
+        vector[vector[double] *] &prob_set,
+        unsigned int cores
     ) noexcept nogil
 
     cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
