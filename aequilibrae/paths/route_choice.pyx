@@ -884,7 +884,7 @@ cdef class RouteChoiceSet:
 
             size_t link_loc
             double prob
-            int i
+            long long i
 
         with parallel(num_threads=6):
             # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
