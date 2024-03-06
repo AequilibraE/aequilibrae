@@ -532,8 +532,10 @@ class GraphBase(ABC):  # noqa: B024
         """
 
         # Cache the result, this isn't a huge computation but isn't worth doing twice
-        if self.compressed_link_network_mapping_idx is not None \
-           and self.compressed_link_network_mapping_data is not None:
+        if (
+            self.compressed_link_network_mapping_idx is not None
+            and self.compressed_link_network_mapping_data is not None
+        ):
             return self.compressed_link_network_mapping_idx, self.compressed_link_network_mapping_data
 
         # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't

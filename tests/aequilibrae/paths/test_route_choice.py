@@ -188,7 +188,7 @@ class TestRouteChoice(TestCase):
                 np.testing.assert_almost_equal(
                     self.graph.cost[self.graph.graph.link_id.isin(route).values.nonzero()[0]].sum(),
                     cost,
-                    err_msg=f", cost differs for OD {od}"
+                    err_msg=f", cost differs for OD {od}",
                 )
 
     def test_gamma_results(self):
@@ -214,7 +214,6 @@ class TestRouteChoice(TestCase):
             self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
     def test_link_loading(self):
-
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
