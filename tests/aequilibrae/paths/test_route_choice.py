@@ -34,6 +34,7 @@ class TestRouteChoice(TestCase):
         self.mat.computational_view()
 
     def tearDown(self) -> None:
+        self.mat.close()
         self.project.close()
 
     def test_route_choice(self):
@@ -50,7 +51,7 @@ class TestRouteChoice(TestCase):
                 results = rc.run(a, b, max_routes=0, max_depth=1)
                 self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
                 self.assertListEqual(
-                    results, [(1, 5, 8, 12, 24, 29, 52, 58)], "Initial route isn't the shortest A* route"
+                    results, [(2, 6, 9, 13, 25, 30, 53, 59)], "Initial route isn't the shortest A* route"
                 )
 
                 # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
@@ -184,7 +185,11 @@ class TestRouteChoice(TestCase):
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
             for route, cost in zip(df["route set"].values, df["cost"].values):
-                np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
+                np.testing.assert_almost_equal(
+                    self.graph.cost[self.graph.graph.link_id.isin(route).values.nonzero()[0]].sum(),
+                    cost,
+                    err_msg=f", cost differs for OD {od}"
+                )
 
     def test_gamma_results(self):
         np.random.seed(0)
@@ -206,7 +211,7 @@ class TestRouteChoice(TestCase):
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
-            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg="Probability not close to 1.0")
+            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
     def test_link_loading(self):
 
