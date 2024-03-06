@@ -63,7 +63,7 @@ from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
-from libcpp.algorithm cimport sort, lower_bound
+from libcpp.algorithm cimport sort, lower_bound, reverse
 from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 cimport openmp
@@ -433,7 +433,7 @@ cdef class RouteChoiceSet:
                     del link_union_scratch
 
             if where is not None:
-                table = libpa.pyarrow_wrap_table(RouteChoiceSet.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
+                table = libpa.pyarrow_wrap_table(self.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
 
                 # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
                 if path_size_logit:
@@ -584,6 +584,8 @@ cdef class RouteChoiceSet:
                         p = thread_predecessors[p]
                         vec.push_back(connector)
 
+                    reverse(vec.begin(), vec.end())
+
                     for connector in deref(vec):
                         # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
                         # then add a single element. An incremental set hash function could be of use. However, the since of this set is
@@ -660,6 +662,8 @@ cdef class RouteChoiceSet:
                     connector = thread_conn[p]
                     p = thread_predecessors[p]
                     vec.push_back(connector)
+
+                reverse(vec.begin(), vec.end())
 
                 for connector in deref(vec):
                     thread_cost[connector] *= penatly
@@ -989,8 +993,8 @@ cdef class RouteChoiceSet:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(
+        RouteChoiceSet self,
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
@@ -1018,6 +1022,7 @@ cdef class RouteChoiceSet:
             libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
 
             int offset = 0
+            size_t network_link_begin, network_link_end, link
             bint psl = (cost_set != nullptr and gamma_set != nullptr and prob_set != nullptr)
 
         # Origins, Destination, Route set, [Cost for route, Gamma for route, Probability for route]
@@ -1043,9 +1048,17 @@ cdef class RouteChoiceSet:
                 d_col.Append(ods[i].second)
 
                 offset_builder.Append(offset)
-                path_builder.AppendValues(route.crbegin(), route.crend())
 
-                offset += route.size()
+                for link in deref(route):
+                    # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
+                    network_link_begin = self.mapping_idx[link]
+                    network_link_end = self.mapping_idx[link + 1]
+                    path_builder.AppendValues(
+                        &self.mapping_data[network_link_begin],
+                        network_link_end - network_link_begin
+                    )
+
+                    offset += network_link_end - network_link_begin
 
         path_builder.Finish(&paths)
 
@@ -1088,7 +1101,7 @@ cdef class RouteChoiceSet:
             raise ValueError("Route Choice results not computed yet")
 
         table = libpa.pyarrow_wrap_table(
-            RouteChoiceSet.make_table_from_results(
+            self.make_table_from_results(
                 deref(self.ods),
                 deref(self.results),
                 self.cost_set,

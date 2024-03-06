@@ -118,6 +118,7 @@ cdef extern from "arrow/builder.h" namespace "arrow" nogil:
         libpa.CStatus Append(const uint32_t value)
         libpa.CStatus AppendValues(const vector[uint32_t] &values)
         libpa.CStatus AppendValues(vector[uint32_t].const_reverse_iterator values_begin, vector[uint32_t].const_reverse_iterator values_end)
+        libpa.CStatus AppendValues(const uint32_t *values, int64_t length, const uint8_t *valid_bytes = nullptr)
 
     cdef cppclass CDoubleBuilder" arrow::DoubleBuilder"(libpa.CArrayBuilder):
         CDoubleBuilder(libpa.CMemoryPool* pool)
@@ -226,8 +227,8 @@ cdef class RouteChoiceSet:
     cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
     cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
 
-    @staticmethod
     cdef shared_ptr[libpa.CTable] make_table_from_results(
+        RouteChoiceSet self,
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
