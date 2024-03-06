@@ -4,7 +4,6 @@ from abc import ABC
 from datetime import datetime
 from os.path import join
 from typing import List, Tuple, Optional
-import functools
 
 import numpy as np
 import pandas as pd
@@ -96,6 +95,9 @@ class GraphBase(ABC):  # noqa: B024
 
         self.dead_end_links = np.array([])
 
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
+
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
 
@@ -168,11 +170,9 @@ class GraphBase(ABC):  # noqa: B024
             self.__build_compressed_graph()
             self.compact_num_links = self.compact_graph.shape[0]
 
-        # The cache property should be recalculated when the graph has been reprepared
-        try:
-            del self.compressed_link_network_mapping
-        except AttributeError:
-            pass
+        # The cache property should be recalculated when the graph has been re-prepared
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -512,10 +512,9 @@ class GraphBase(ABC):  # noqa: B024
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
 
-    @functools.cached_property
-    def compressed_link_network_mapping(self):
+    def create_compressed_link_network_mapping(self):
         """
-        Two arrays providing a mapping of compressed id to link id.
+        Create two arrays providing a mapping of compressed id to link id.
 
         Uses sparse compression. Index ``idx`` by the by compressed id and compressed id + 1, the
         network IDs are then in the range ``idx[id]:idx[id + 1]``.
@@ -531,6 +530,11 @@ class GraphBase(ABC):  # noqa: B024
             **idx** (:obj:`np.array`): index array for ``data``
             **data** (:obj:`np.array`): array of link ids
         """
+
+        # Cache the result, this isn't a huge computation but isn't worth doing twice
+        if self.compressed_link_network_mapping_idx is not None \
+           and self.compressed_link_network_mapping_data is not None:
+            return self.compressed_link_network_mapping_idx, self.compressed_link_network_mapping_data
 
         # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
         # bother redoing sorting it. This method would be faster using a Cython module but it's a one time compute
@@ -565,6 +569,11 @@ class GraphBase(ABC):  # noqa: B024
             i += len(values)
 
         idx[-1] = i
+
+        self.compressed_link_network_mapping_idx = idx
+        self.compressed_link_network_mapping_data = data
+
+        return idx, data
 
 
 class Graph(GraphBase):
