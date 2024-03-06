@@ -9,13 +9,13 @@ import numpy as np
 import pyarrow as pa
 
 from aequilibrae import Graph, Project
-from aequilibrae.paths.route_choice import RouteChoiceSet
+from aequilibrae.paths.route_choice_set import RouteChoiceSet
 
 from ...data import siouxfalls_project
 
 
 # In these tests `max_depth` should be provided to prevent a runaway test case and just burning CI time
-class TestRouteChoice(TestCase):
+class TestRouteChoiceSet(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
@@ -180,7 +180,6 @@ class TestRouteChoice(TestCase):
         rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
 
         table = rc.get_results().to_pandas()
-        # breakpoint()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
