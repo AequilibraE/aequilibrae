@@ -224,7 +224,7 @@ cdef void skim_single_path(long origin,
 
     # Zeroes the intrazonal cost
     for j in range(skims):
-            node_skims[origin, j] = 0
+        node_skims[origin, j] = 0
 
     # Cascade skimming
     for i in range(1, found + 1):
@@ -420,7 +420,7 @@ cdef inline double equirectangular_heuristic(double lat1, double lon1, double la
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef int path_finding_a_star(long origin,
+cpdef void path_finding_a_star(long origin,
                               long destination,
                               double[:] graph_costs,
                               long long [:] csr_indices,
@@ -431,7 +431,6 @@ cpdef int path_finding_a_star(long origin,
                               long long [:] pred,
                               long long [:] ids,
                               long long [:] connectors,
-                              long long [:] reached_first,
                               Heuristic heuristic) noexcept nogil:
     """
     Based on the pseudocode presented at https://en.wikipedia.org/wiki/A*_search_algorithm#Pseudocode
@@ -451,7 +450,6 @@ cpdef int path_finding_a_star(long origin,
         ElementState vert_state  # vertex state
         size_t origin_vert = <size_t>origin
         size_t destination_vert = <size_t>destination if destination != -1 else 0
-        ITYPE_t found = 0
         double *gScore = <double *>malloc(M * sizeof(double))
 
     cdef:
@@ -473,7 +471,6 @@ cpdef int path_finding_a_star(long origin,
     for i in range(M):
         pred[i] = -1
         connectors[i] = -1
-        reached_first[i] = -1
         gScore[i] = INFINITY
 
     # initialization of the heap elements
@@ -488,8 +485,6 @@ cpdef int path_finding_a_star(long origin,
     # main loop
     while pqueue.size > 0:
         current = extract_min(&pqueue)
-        reached_first[found] = current
-        found += 1
 
         if current == destination_vert:
             break
@@ -515,4 +510,3 @@ cpdef int path_finding_a_star(long origin,
 
     free_heap(&pqueue)
     free(gScore)
-    return found - 1

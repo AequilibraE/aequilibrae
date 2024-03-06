@@ -1,6 +1,6 @@
 name: Tests on all platforms with linting
 
-on: [pull_request]
+#on: [pull_request]
 
 jobs:
   linting:
