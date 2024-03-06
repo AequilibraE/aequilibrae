@@ -8,6 +8,7 @@ from aequilibrae.paths.traffic_class import TrafficClass, TransitClass
 from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssignment
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph, TransitGraph
+from aequilibrae.paths.route_choice import RouteChoice
 
 from aequilibrae import global_logger
 

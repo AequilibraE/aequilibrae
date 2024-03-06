@@ -52,7 +52,7 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 
 """
 
-from aequilibrae import Graph
+from aequilibrae.paths.graph import Graph
 
 from libc.math cimport INFINITY, pow, exp
 from libc.string cimport memcpy
@@ -846,10 +846,13 @@ cdef class RouteChoiceSet:
                 deref(self.prob_set),
                 cores,
             )
+
+            # FIXME, write out path files
             tmp = []
             for vec in deref(path_files):
                 tmp.append(deref(vec))
             print(tmp)
+
 
         def apply_link_loading_func(m):
             if generate_path_files:
@@ -860,16 +863,20 @@ cdef class RouteChoiceSet:
             else:
                 ll = self.apply_link_loading(m)
 
+            # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without transferring owner ship.
+            compressed = <double[:ll.size(), :1]>&deref(ll)[0]
+
             actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
             assign_link_loads_cython(
                 actual,
-                # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without transferring owner ship.
-                <double[:ll.size(), :1]>&deref(ll)[0],
+                compressed,
                 self.graph_compressed_id_view,
                 cores
             )
+            compressed = np.array(compressed, copy=True)
             del ll
-            return actual
+            return actual.reshape(-1), compressed.reshape(-1)
+
 
         if len(matrix.view_names) == 1:
             link_loads = apply_link_loading_func(matrix.matrix_view)
@@ -1137,11 +1144,11 @@ cdef class RouteChoiceSet:
     def get_results(self):  # Cython doesn't like this type annotation... -> pa.Table:
         """
         :Returns:
-            **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of compact link IDs for
-                each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``. None if ``where`` was not None.
+            **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of link IDs for
+                each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
         """
         if self.results == nullptr or self.ods == nullptr:
-            raise ValueError("Route Choice results not computed yet")
+            raise RuntimeError("Route Choice results not computed yet")
 
         table = libpa.pyarrow_wrap_table(
             self.make_table_from_results(

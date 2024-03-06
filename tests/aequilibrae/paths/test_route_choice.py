@@ -10,6 +10,7 @@ import pyarrow as pa
 
 from aequilibrae import Graph, Project
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.route_choice import RouteChoice
 
 from ...data import siouxfalls_project
 
