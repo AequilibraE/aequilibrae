@@ -532,6 +532,9 @@ class GraphBase(ABC):  # noqa: B024
             **data** (:obj:`np.array`): array of link ids
         """
 
+        # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
+        # bother redoing sorting it. This method would be faster using a Cython module but it's a one time compute
+
         # Some links are completely removed from the network, they are assigned ID `self.compact_graph.id.max() + 1`,
         # we skip them.
         filtered = self.graph[self.graph.__compressed_id__ != self.compact_graph.id.max() + 1]
@@ -543,13 +546,25 @@ class GraphBase(ABC):  # noqa: B024
         for compressed_id, df in gb:
             idx[compressed_id] = i
             values = df.link_id.values
-            for j in range(len(values)):
-                data[i + j] = values[j]
+            a = df.a_node.values
+            b = df.b_node.values
+
+            # In order to ensure that the link IDs come out in the correct order we must walk the links
+            # we do this assuming the `a` array is sorted.
+            j = 0
+            x = self.compact_graph.a_node.iat[compressed_id]
+            while True:
+                tmp = a.searchsorted(x)
+                if tmp < len(a) and a[tmp] == x:
+                    x = b[tmp]
+                    data[i + j] = values[tmp]
+                else:
+                    break
+                j += 1
 
             i += len(values)
 
         idx[-1] = i
-        return idx, data
 
 
 class Graph(GraphBase):
