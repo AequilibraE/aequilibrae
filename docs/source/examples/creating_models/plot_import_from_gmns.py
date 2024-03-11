@@ -21,9 +21,9 @@ import folium
 
 # %%
 # We load the example file from the GMNS GitHub repository
-link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/link.csv"
-node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/node.csv"
-use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/develop/examples/Arlington_Signals/use_group.csv"
+link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/link.csv"
+node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/node.csv"
+use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/use_group.csv"
 
 # %%
 # We create the example project inside our temp folder
