@@ -186,7 +186,7 @@ class TestRouteChoiceSet(TestCase):
         for od, df in gb:
             for route, cost in zip(df["route set"].values, df["cost"].values):
                 np.testing.assert_almost_equal(
-                    self.graph.cost[self.graph.graph.link_id.isin(route).values.nonzero()[0]].sum(),
+                    self.graph.network.set_index("link_id").loc[route][self.graph.cost_field].sum(),
                     cost,
                     err_msg=f", cost differs for OD {od}",
                 )

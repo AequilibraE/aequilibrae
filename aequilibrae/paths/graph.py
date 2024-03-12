@@ -558,7 +558,8 @@ class GraphBase(ABC):  # noqa: B024
             # In order to ensure that the link IDs come out in the correct order we must walk the links
             # we do this assuming the `a` array is sorted.
             j = 0
-            x = self.compact_graph.a_node.iat[compressed_id]
+            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
+            x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
             while True:
                 tmp = a.searchsorted(x)
                 if tmp < len(a) and a[tmp] == x:
