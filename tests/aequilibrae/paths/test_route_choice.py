@@ -191,7 +191,7 @@ class TestRouteChoiceSet(TestCase):
                     err_msg=f", cost differs for OD {od}",
                 )
 
-    def test_gamma_results(self):
+    def test_path_overlap_results(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
@@ -200,7 +200,7 @@ class TestRouteChoiceSet(TestCase):
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
-            self.assertTrue(all((df["gamma"] > 0) & (df["gamma"] <= 1)))
+            self.assertTrue(all((df["path overlap"] > 0) & (df["path overlap"] <= 1)))
 
     def test_prob_results(self):
         np.random.seed(0)

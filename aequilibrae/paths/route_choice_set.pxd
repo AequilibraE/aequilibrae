@@ -147,7 +147,7 @@ cdef class RouteChoiceSet:
         vector[RouteSet_t *] *results
         vector[vector[long long] *] *link_union_set
         vector[vector[double] *] *cost_set
-        vector[vector[double] *] *gamma_set
+        vector[vector[double] *] *path_overlap_set
         vector[vector[double] *] *prob_set
 
         unsigned int [:] mapping_idx
@@ -200,7 +200,7 @@ cdef class RouteChoiceSet:
     cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
 
     @staticmethod
-    cdef vector[double] *compute_gamma(
+    cdef vector[double] *compute_path_overlap(
         RouteSet_t *route_set,
         pair[vector[long long] *, vector[long long] *] &freq_set,
         vector[double] &total_cost,
@@ -210,7 +210,7 @@ cdef class RouteChoiceSet:
     @staticmethod
     cdef vector[double] *compute_prob(
         vector[double] &total_cost,
-        vector[double] &gamma_vec,
+        vector[double] &path_overlap_vec,
         double beta,
         double theta
     ) noexcept nogil
@@ -232,7 +232,7 @@ cdef class RouteChoiceSet:
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
-        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     )
 

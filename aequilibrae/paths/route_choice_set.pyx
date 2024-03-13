@@ -110,7 +110,7 @@ cdef class RouteChoiceSet:
         pa.field("destination id", pa.uint32(), nullable=False),
         pa.field("route set", route_set_dtype, nullable=False),
         pa.field("cost", pa.float64(), nullable=False),
-        pa.field("gamma", pa.float64(), nullable=False),
+        pa.field("path overlap", pa.float64(), nullable=False),
         pa.field("probability", pa.float64(), nullable=False),
     ])
 
@@ -119,7 +119,7 @@ cdef class RouteChoiceSet:
         results = <vector[RouteSet_t *] *>nullptr
         link_union_set = <vector[vector[long long] *] *>nullptr
         cost_set = <vector[vector[double] *] *>nullptr
-        gamma_set = <vector[vector[double] *] *>nullptr
+        path_overlap_set = <vector[vector[double] *] *>nullptr
         prob_set = <vector[vector[double] *] *>nullptr
         ods = <vector[pair[long long, long long]] *>nullptr
 
@@ -181,11 +181,11 @@ cdef class RouteChoiceSet:
             del self.cost_set
             self.cost_set = <vector[vector[double] *] *>nullptr
 
-        if self.gamma_set != nullptr:
-            for double_vec in deref(self.gamma_set):
+        if self.path_overlap_set != nullptr:
+            for double_vec in deref(self.path_overlap_set):
                 del double_vec
-            del self.gamma_set
-            self.gamma_set = <vector[vector[double] *] *>nullptr
+            del self.path_overlap_set
+            self.path_overlap_set = <vector[vector[double] *] *>nullptr
 
         if self.prob_set != nullptr:
             for double_vec in deref(self.prob_set):
@@ -330,13 +330,13 @@ cdef class RouteChoiceSet:
             vector[long long] *link_union_scratch = <vector[long long] *>nullptr
             vector[vector[long long] *] *link_union_set = <vector[vector[long long] *] *>nullptr
             vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
-            vector[vector[double] *] *gamma_set = <vector[vector[double] *] *>nullptr
+            vector[vector[double] *] *path_overlap_set = <vector[vector[double] *] *>nullptr
             vector[vector[double] *] *prob_set = <vector[vector[double] *] *>nullptr
 
         if path_size_logit:
             link_union_set = new vector[vector[long long] *](max_results_len)
             cost_set = new vector[vector[double] *](max_results_len)
-            gamma_set = new vector[vector[double] *](max_results_len)
+            path_overlap_set = new vector[vector[double] *](max_results_len)
             prob_set = new vector[vector[double] *](max_results_len)
 
         self.deallocate_results()  # We have be storing results from a previous run
@@ -352,12 +352,12 @@ cdef class RouteChoiceSet:
                 # - the internal objects were freed by the previous iteration
                 link_union_set.clear()
                 cost_set.clear()
-                gamma_set.clear()
+                path_overlap_set.clear()
                 prob_set.clear()
 
                 link_union_set.resize(batch_len)
                 cost_set.resize(batch_len)
-                gamma_set.resize(batch_len)
+                path_overlap_set.resize(batch_len)
                 prob_set.resize(batch_len)
 
             with nogil, parallel(num_threads=c_cores):
@@ -415,8 +415,8 @@ cdef class RouteChoiceSet:
                         freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union_scratch))
                         deref(link_union_set)[i] = freq_pair.first
                         deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        deref(gamma_set)[i] = RouteChoiceSet.compute_gamma(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
-                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(gamma_set)[i]), beta, theta)
+                        deref(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
+                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(path_overlap_set)[i]), beta, theta)
                         del freq_pair.second  # While we need the unique sorted links (.first), we don't need the frequencies (.second)
 
                     deref(results)[i] = route_set
@@ -435,14 +435,14 @@ cdef class RouteChoiceSet:
                     del link_union_scratch
 
             if where is not None:
-                table = libpa.pyarrow_wrap_table(self.make_table_from_results(c_ods, deref(results), cost_set, gamma_set, prob_set))
+                table = libpa.pyarrow_wrap_table(self.make_table_from_results(c_ods, deref(results), cost_set, path_overlap_set, prob_set))
 
                 # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
                 if path_size_logit:
                     for j in range(batch_len):
                         del deref(link_union_set)[j]
                         del deref(cost_set)[j]
-                        del deref(gamma_set)[j]
+                        del deref(path_overlap_set)[j]
                         del deref(prob_set)[j]
 
                 for j in range(batch_len):
@@ -462,13 +462,13 @@ cdef class RouteChoiceSet:
             if path_size_logit:
                 del link_union_set
                 del cost_set
-                del gamma_set
+                del path_overlap_set
                 del prob_set
         else:
             self.results = results
             self.link_union_set = link_union_set
             self.cost_set = cost_set
-            self.gamma_set = gamma_set
+            self.path_overlap_set = path_overlap_set
             self.prob_set = prob_set
 
             # Copy the c_ods vector, it was provided by the auto Cython conversion and is allocated on the stack,
@@ -748,7 +748,7 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[double] *compute_gamma(
+    cdef vector[double] *compute_path_overlap(
         RouteSet_t *route_set,
         pair[vector[long long] *, vector[long long] *] &freq_set,
         vector[double] &total_cost,
@@ -764,32 +764,32 @@ cdef class RouteChoiceSet:
             sum_{k in R}: delta_{a,k}: freq_set
         """
         cdef:
-            vector[double] *gamma_vec
+            vector[double] *path_overlap_vec
 
             # Scratch objects
             vector[long long].const_iterator link_iter
-            double gamma
+            double path_overlap
             long long link, j
             size_t i
 
-        gamma_vec = new vector[double]()
-        gamma_vec.reserve(route_set.size())
+        path_overlap_vec = new vector[double]()
+        path_overlap_vec.reserve(route_set.size())
 
         j = 0
         for route in deref(route_set):
-            gamma = 0.0
+            path_overlap = 0.0
             for link in deref(route):
                 # We know the frequency table is ordered and contains every link in the union of the routes.
                 # We want to find the index of the link, and use that to look up it's frequency
                 link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
 
-                gamma = gamma + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+                path_overlap = path_overlap + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
 
-            gamma_vec.push_back(gamma / total_cost[j])
+            path_overlap_vec.push_back(path_overlap / total_cost[j])
 
             j = j + 1
 
-        return gamma_vec
+        return path_overlap_vec
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -798,7 +798,7 @@ cdef class RouteChoiceSet:
     @staticmethod
     cdef vector[double] *compute_prob(
         vector[double] &total_cost,
-        vector[double] &gamma_vec,
+        vector[double] &path_overlap_vec,
         double beta,
         double theta
     ) noexcept nogil:
@@ -816,7 +816,7 @@ cdef class RouteChoiceSet:
         for i in range(total_cost.size()):
             inv_prob = 0.0
             for j in range(total_cost.size()):
-                inv_prob = inv_prob + pow(gamma_vec[j] / gamma_vec[i], beta) * exp(-theta * (total_cost[j] - total_cost[i]))
+                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) * exp(-theta * (total_cost[j] - total_cost[i]))
 
             prob_vec.push_back(1.0 / inv_prob)
 
@@ -1048,7 +1048,7 @@ cdef class RouteChoiceSet:
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
-        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     ):
         cdef:
@@ -1060,7 +1060,7 @@ cdef class RouteChoiceSet:
             # Custom imports, these are declared in route_choice.pxd *not* libarrow.
             CUInt32Builder *path_builder = new CUInt32Builder(pool)
             CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
-            CDoubleBuilder *gamma_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr
             CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
 
             libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
@@ -1073,19 +1073,19 @@ cdef class RouteChoiceSet:
 
             int offset = 0
             size_t network_link_begin, network_link_end, link
-            bint psl = (cost_set != nullptr and gamma_set != nullptr and prob_set != nullptr)
+            bint psl = (cost_set != nullptr and path_overlap_set != nullptr and prob_set != nullptr)
 
-        # Origins, Destination, Route set, [Cost for route, Gamma for route, Probability for route]
+        # Origins, Destination, Route set, [Cost for route, Path_Overlap for route, Probability for route]
         columns.resize(6 if psl else 3)
 
         if psl:
             cost_col = new CDoubleBuilder(pool)
-            gamma_col = new CDoubleBuilder(pool)
+            path_overlap_col = new CDoubleBuilder(pool)
             prob_col = new CDoubleBuilder(pool)
 
             for i in range(ods.size()):
                 cost_col.AppendValues(deref(deref(cost_set)[i]))
-                gamma_col.AppendValues(deref(deref(gamma_set)[i]))
+                path_overlap_col.AppendValues(deref(deref(path_overlap_set)[i]))
                 prob_col.AppendValues(deref(deref(prob_set)[i]))
 
         for i in range(ods.size()):
@@ -1123,7 +1123,7 @@ cdef class RouteChoiceSet:
 
         if psl:
             cost_col.Finish(&columns[3])
-            gamma_col.Finish(&columns[4])
+            path_overlap_col.Finish(&columns[4])
             prob_col.Finish(&columns[5])
 
         cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema)
@@ -1136,7 +1136,7 @@ cdef class RouteChoiceSet:
 
         if psl:
             del cost_col
-            del gamma_col
+            del path_overlap_col
             del prob_col
 
         return table
@@ -1155,7 +1155,7 @@ cdef class RouteChoiceSet:
                 deref(self.ods),
                 deref(self.results),
                 self.cost_set,
-                self.gamma_set,
+                self.path_overlap_set,
                 self.prob_set
             )
         )
