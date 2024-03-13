@@ -4,12 +4,33 @@ from abc import ABC
 from datetime import datetime
 from os.path import join
 from typing import List, Tuple, Optional
+import dataclasses
 
 import numpy as np
 import pandas as pd
 from aequilibrae.paths.graph_building import build_compressed_graph
 
 from aequilibrae.context import get_logger
+
+
+@dataclasses.dataclass
+class NetworkGraphIndices:
+    network_ab_idx: np.array
+    network_ba_idx: np.array
+    graph_ab_idx: np.array
+    graph_ba_idx: np.array
+
+
+def _get_graph_to_network_mapping(lids, direcs):
+    num_uncompressed_links = int(np.unique(lids).shape[0])
+    indexing = np.zeros(int(lids.max()) + 1, np.uint64)
+    indexing[np.unique(lids)[:]] = np.arange(num_uncompressed_links)
+
+    graph_ab_idx = direcs > 0
+    graph_ba_idx = direcs < 0
+    network_ab_idx = indexing[lids[graph_ab_idx]]
+    network_ba_idx = indexing[lids[graph_ba_idx]]
+    return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
 
 
 class GraphBase(ABC):  # noqa: B024
@@ -173,6 +194,7 @@ class GraphBase(ABC):  # noqa: B024
         # The cache property should be recalculated when the graph has been re-prepared
         self.compressed_link_network_mapping_idx = None
         self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -535,8 +557,13 @@ class GraphBase(ABC):  # noqa: B024
         if (
             self.compressed_link_network_mapping_idx is not None
             and self.compressed_link_network_mapping_data is not None
+            and self.network_compressed_node_mapping is not None
         ):
-            return self.compressed_link_network_mapping_idx, self.compressed_link_network_mapping_data
+            return (
+                self.compressed_link_network_mapping_idx,
+                self.compressed_link_network_mapping_data,
+                self.network_compressed_node_mapping,
+            )
 
         # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
         # bother redoing sorting it. This method would be faster using a Cython module but it's a one time compute
@@ -547,6 +574,8 @@ class GraphBase(ABC):  # noqa: B024
         gb = filtered.groupby(by="__compressed_id__", sort=True)
         idx = np.zeros(self.compact_num_links + 1, dtype=np.uint32)
         data = np.zeros(len(filtered), dtype=np.uint32)
+
+        node_mapping = np.full(self.num_nodes, -1)
 
         i = 0
         for compressed_id, df in gb:
@@ -559,7 +588,8 @@ class GraphBase(ABC):  # noqa: B024
             # we do this assuming the `a` array is sorted.
             j = 0
             # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
-            x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
+
+            a_node = x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
             while True:
                 tmp = a.searchsorted(x)
                 if tmp < len(a) and a[tmp] == x:
@@ -569,14 +599,19 @@ class GraphBase(ABC):  # noqa: B024
                     break
                 j += 1
 
+            b_node = x
+            node_mapping[a_node] = self.compact_graph["a_node"].iat[compressed_id]
+            node_mapping[b_node] = self.compact_graph["b_node"].iat[compressed_id]
+
             i += len(values)
 
         idx[-1] = i
 
         self.compressed_link_network_mapping_idx = idx
         self.compressed_link_network_mapping_data = data
+        self.network_compressed_node_mapping = node_mapping
 
-        return idx, data
+        return idx, data, node_mapping
 
 
 class Graph(GraphBase):

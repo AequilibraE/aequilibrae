@@ -143,7 +143,7 @@ cdef class RouteChoiceSet:
         self.zones = graph.num_zones
         self.block_flows_through_centroids = graph.block_centroid_flows
 
-        self.mapping_idx, self.mapping_data = graph.create_compressed_link_network_mapping()
+        self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
 
     def __dealloc__(self):
         """

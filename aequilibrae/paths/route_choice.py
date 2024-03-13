@@ -1,11 +1,13 @@
 import numpy as np
 import socket
 from aequilibrae.context import get_active_project
-from aequilibrae.paths.graph import Graph
+from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
-from typing import Optional
+from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+from typing import Optional, Union, Tuple, List
 import pyarrow as pa
 import pathlib
+import itertools
 
 import logging
 
@@ -21,7 +23,7 @@ class RouteChoice:
         "max_depth": 0,
     }
 
-    def __init__(self, graph: Graph, project=None):
+    def __init__(self, graph: Graph, matrix: AequilibraeMatrix, project=None):
         self.paramaters = self.default_paramaters.copy()
 
         proj = project or get_active_project(must_exist=False)
@@ -31,7 +33,8 @@ class RouteChoice:
 
         self.cores: int = 0
         self.graph = graph
-        self.__rc = RouteChoiceSet(graph)
+        self.matrix = matrix
+        self.__rc = None
 
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
@@ -40,6 +43,8 @@ class RouteChoice:
         self.link_loads: Optional[np.array] = None
         self.results: Optional[pa.Table] = None
         self.where: Optional[pathlib.Path] = None
+
+        self.nodes = Optional[Union[List[int], List[Tuple[int, int]]]] = None
 
     def set_algorithm(self, algorithm: str):
         """
@@ -113,6 +118,7 @@ class RouteChoice:
             **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved
         """
         self.save_path_files = save_it
+        raise NotImplementedError()
 
     def set_save_routes(self, where: Optional[str] = None) -> None:
         """
@@ -125,6 +131,42 @@ class RouteChoice:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
         """
         self.where = pathlib.Path(where) if where is not None else None
+
+    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]):
+        """
+        Prepare OD pairs for batch computation.
+
+        :Arguments:
+            **nodes** (:obj:`Union[list[int], list[tuple[int, int]]]`): List of node IDs to operate on. If a 1D list is
+                provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
+                OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
+                always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+        """
+        if len(nodes) == 0:
+            raise ValueError("`nodes` list-like empty.")
+
+        if isinstance(nodes[0], tuple):
+            # Selection of OD pairs
+            if any(len(x) != 2 for x in nodes):
+                raise ValueError("`nodes` list contains non-pair elements")
+            self.nodes = nodes
+
+        elif isinstance(nodes[0], int):
+            self.nodes = list(itertools.permutations(nodes, r=2))
+
+    def execute_single(self, origin: int, destination: int):
+        if self.__rc is None:
+            self.__rc = RouteChoiceSet(self.graph)
+
+        return self.__rc.run(origin, destination, **self.paramaters)
+
+    def execute(self, path_size_logit: bool = False):
+        if self.__rc is None:
+            self.__rc = RouteChoiceSet(self.graph)
+
+        return self.__rc.batched(
+            self.nodes, bfsle=self.algorithm == "bfsle", path_size_logit=path_size_logit, **self.paramaters
+        )
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
@@ -173,3 +215,79 @@ class RouteChoice:
                 )
 
         return self.results
+
+    def get_load_results(
+        self, which: str = "uncompressed"
+    ) -> Union[Tuple[AequilibraeData, AequilibraeData], Tuple[AequilibraeData]]:
+        """
+        Translates the link loading results from the graph format into the network format.
+
+        :Returns:
+            **dataset** (:obj:`tuple[AequilibraeData]`): Tuple of uncompressed and compressed AequilibraE data with the link loading results.
+        """
+
+        if not isinstance(which, str) or which not in ["uncompressed", "compressed", "both"]:
+            raise ValueError("`which` argumnet must be one of ['uncompressed', 'compressed', 'both']")
+
+        compressed = which == "both" or which == "compressed"
+        uncompressed = which == "both" or which == "uncompressed"
+
+        fields = self.matrix.names
+
+        tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
+        if isinstance(tmp, dict):
+            self.link_loads = {k: v[0] for k, v in tmp.items()}
+            self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
+        else:
+            self.link_loads = {fields[0]: tmp[0]}
+            self.compact_link_loads = {fields[0]: tmp[1]}
+
+        # Get a mapping from the compressed graph to/from the network graph
+        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+
+        # Create a data store with a row for each uncompressed link
+
+        if uncompressed:
+            uncompressed_res = AequilibraeData.empty(
+                memory_mode=True,
+                entries=self.graph.num_links,
+                field_names=fields,
+                data_types=[np.float64] * len(fields),
+                fill=np.nan,
+                index=self.graph.graph.link_id.values,
+            )
+
+            for k, v in self.link_loads:
+                # Directional Flows
+                uncompressed_res.data[k + "_ab"][m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
+                uncompressed_res.data[k + "_ba"][m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
+
+                # Tot Flow
+                uncompressed_res.data[k + "_tot"] = np.nan_to_num(uncompressed_res.data[k + "_ab"]) + np.nan_to_num(
+                    uncompressed_res.data[k + "_ba"]
+                )
+
+        if compressed:
+            compressed_res = AequilibraeData.empty(
+                memory_mode=True,
+                entries=self.graph.compact_num_links,
+                field_names=fields,
+                data_types=[np.float64] * len(fields),
+                fill=np.nan,
+                index=self.graph.compact_graph.id.values,
+            )
+
+            for k, v in self.compact_link_loads:
+                # Directional Flows
+                compressed_res.data[k + "_ab"][m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
+                compressed_res.data[k + "_ba"][m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
+
+                # Tot Flow
+                compressed_res.data[k + "_tot"] = np.nan_to_num(compressed_res.data[k + "_ab"]) + np.nan_to_num(
+                    compressed_res.data[k + "_ba"]
+                )
+
+        return ((uncompressed_res,) if uncompressed else ()) + ((compressed_res,) if compressed else ())
+
+    def get_select_link_results(self) -> AequilibraeData:
+        raise NotImplementedError()
