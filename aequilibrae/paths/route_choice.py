@@ -13,7 +13,7 @@ import logging
 
 
 class RouteChoice:
-    all_algorithms = ["bfsle", "lp", "link-penalisation"]
+    all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
     default_paramaters = {
         "beta": 1.0,
         "theta": 1.0,
@@ -49,7 +49,11 @@ class RouteChoice:
     def set_algorithm(self, algorithm: str):
         """
         Chooses the assignment algorithm.
-        Options are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'
+        Options are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
+
+        BFSLE implemenation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
+        Michael Balmer & Kay W. Axhausen (2013).
+        https://doi.org/10.1080/18128602.2012.671383
 
         'lp' is also accepted as an alternative to 'link-penalisation'
 
@@ -58,6 +62,7 @@ class RouteChoice:
         """
         algo_dict = {i: i for i in self.all_algorithms}
         algo_dict["lp"] = "link-penalisation"
+        algo_dict["link-penalization"] = "link-penalisation"
         algo = algo_dict.get(algorithm.lower())
 
         if algo is None:
@@ -81,7 +86,7 @@ class RouteChoice:
 
     def set_paramaters(self, par: dict):
         """
-        Sets the parameters for the route choice  TODO, do we want link specific values?
+        Sets the parameters for the route choice.
 
         "beta", "theta", and "seed" are BFSLE specific parameters and will have no effect on link penalisation.
         "penalty" is a link penalisation specific parameter and will have no effect on BFSLE.
@@ -96,11 +101,6 @@ class RouteChoice:
         - When using LP, `max_depth` corresponds to the maximum number of iterations performed. While not enforced,
             it should be higher than `max_routes`. It's value is dependent on the magnitude of the cost field,
             specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
-
-
-        Parameter values can be scalars (same values for the entire network) or network field names
-        (link-specific values) - Examples: {'alpha': 0.15, 'beta': 4.0} or  {'alpha': 'alpha', 'beta': 'beta'}
-
 
         :Arguments:
             **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
