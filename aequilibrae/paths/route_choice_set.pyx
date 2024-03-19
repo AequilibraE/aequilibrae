@@ -289,6 +289,10 @@ cdef class RouteChoiceSet:
             if self.nodes_to_indices_view[d] == -1:
                 raise ValueError(f"Destination {d} is not present within the compact graph")
 
+
+        if where is not None and cores != 1:
+            raise NotImplementedError("current implementation suffers from a deadlock when using multithreading and writing to disk")
+
         cdef:
             long long origin_index, dest_index, i
             unsigned int c_max_routes = max_routes
