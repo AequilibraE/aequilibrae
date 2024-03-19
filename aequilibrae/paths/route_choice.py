@@ -1,15 +1,17 @@
-import numpy as np
+import itertools
+import logging
+import pathlib
 import socket
+from typing import List, Optional, Tuple, Union
+from uuid import uuid4
+
+import numpy as np
+import pandas as pd
+import pyarrow as pa
 from aequilibrae.context import get_active_project
+from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
-from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from typing import Optional, Union, Tuple, List
-import pyarrow as pa
-import pathlib
-import itertools
-
-import logging
 
 
 class RouteChoice:
@@ -25,6 +27,7 @@ class RouteChoice:
 
     def __init__(self, graph: Graph, matrix: AequilibraeMatrix, project=None):
         self.paramaters = self.default_paramaters.copy()
+        self.procedure_id = uuid4().hex
 
         proj = project or get_active_project(must_exist=False)
         self.project = proj
@@ -43,8 +46,11 @@ class RouteChoice:
         self.link_loads: Optional[np.array] = None
         self.results: Optional[pa.Table] = None
         self.where: Optional[pathlib.Path] = None
+        self.save_path_files: bool = False
 
-        self.nodes = Optional[Union[List[int], List[Tuple[int, int]]]] = None
+        self.nodes: Optional[Union[List[int], List[Tuple[int, int]]]] = None
+
+        self._config = {}
 
     def set_algorithm(self, algorithm: str):
         """
@@ -79,12 +85,9 @@ class RouteChoice:
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
         """
-        if not self.classes:
-            raise RuntimeError("You need load transit classes before overwriting the number of cores")
-
         self.cores = cores
 
-    def set_paramaters(self, par: dict):
+    def set_paramaters(self, **kwargs):
         """
         Sets the parameters for the route choice.
 
@@ -103,13 +106,13 @@ class RouteChoice:
             specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
 
         :Arguments:
-            **par** (:obj:`dict`): Dictionary with all parameters for the chosen VDF
+            **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
         """
 
-        if any(key not in self.default_paramaters for key in par.keys()):
+        if any(key not in self.default_paramaters for key in kwargs.keys()):
             raise ValueError("Invalid parameter provided")
 
-        self.paramaters = self.default_paramaters | par
+        self.paramaters = self.default_paramaters | kwargs
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -154,18 +157,31 @@ class RouteChoice:
         elif isinstance(nodes[0], int):
             self.nodes = list(itertools.permutations(nodes, r=2))
 
-    def execute_single(self, origin: int, destination: int):
+    def execute_single(self, origin: int, destination: int, path_size_logit: bool = False):
         if self.__rc is None:
             self.__rc = RouteChoiceSet(self.graph)
 
-        return self.__rc.run(origin, destination, **self.paramaters)
+        self.results = None
+        return self.__rc.run(
+            origin,
+            destination,
+            bfsle=self.algorithm == "bfsle",
+            path_size_logit=path_size_logit,
+            cores=self.cores,
+            **self.paramaters,
+        )
 
     def execute(self, path_size_logit: bool = False):
         if self.__rc is None:
             self.__rc = RouteChoiceSet(self.graph)
 
+        self.results = None
         return self.__rc.batched(
-            self.nodes, bfsle=self.algorithm == "bfsle", path_size_logit=path_size_logit, **self.paramaters
+            self.nodes,
+            bfsle=self.algorithm == "bfsle",
+            path_size_logit=path_size_logit,
+            cores=self.cores,
+            **self.paramaters,
         )
 
     def info(self) -> dict:
@@ -195,7 +211,7 @@ class RouteChoice:
         self.logger.info("Route Choice specification")
         self.logger.info(self._config)
 
-    def results(self):
+    def get_results(self):
         """Returns the results of the route choice procedure
 
         Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
@@ -217,17 +233,19 @@ class RouteChoice:
         return self.results
 
     def get_load_results(
-        self, which: str = "uncompressed"
-    ) -> Union[Tuple[AequilibraeData, AequilibraeData], Tuple[AequilibraeData]]:
+        self,
+        which: str = "uncompressed",
+        clamp: bool = True,
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame]]:
         """
         Translates the link loading results from the graph format into the network format.
 
         :Returns:
-            **dataset** (:obj:`tuple[AequilibraeData]`): Tuple of uncompressed and compressed AequilibraE data with the link loading results.
+            **dataset** (:obj:`tuple[pd.DataFrame]`): Tuple of uncompressed and compressed AequilibraE data with the link loading results.
         """
 
         if not isinstance(which, str) or which not in ["uncompressed", "compressed", "both"]:
-            raise ValueError("`which` argumnet must be one of ['uncompressed', 'compressed', 'both']")
+            raise ValueError("`which` argument must be one of ['uncompressed', 'compressed', 'both']")
 
         compressed = which == "both" or which == "compressed"
         uncompressed = which == "both" or which == "uncompressed"
@@ -242,52 +260,58 @@ class RouteChoice:
             self.link_loads = {fields[0]: tmp[0]}
             self.compact_link_loads = {fields[0]: tmp[1]}
 
+        if clamp:
+            for v in itertools.chain(self.link_loads.values(), self.compact_link_loads.values()):
+                v[(v < 1e-15)] = 0.0
+
         # Get a mapping from the compressed graph to/from the network graph
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+        m_compact = _get_graph_to_network_mapping(
+            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
+        )
 
+        lids = np.unique(self.graph.graph.link_id.values)
+        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
         # Create a data store with a row for each uncompressed link
-
         if uncompressed:
-            uncompressed_res = AequilibraeData.empty(
-                memory_mode=True,
-                entries=self.graph.num_links,
-                field_names=fields,
-                data_types=[np.float64] * len(fields),
-                fill=np.nan,
-                index=self.graph.graph.link_id.values,
+            uncompressed_df = pd.DataFrame(
+                {"link_id": lids}
+                | {k + dir: np.zeros(lids.shape) for k in self.link_loads.keys() for dir in ["_ab", "_ba"]}
             )
-
-            for k, v in self.link_loads:
+            for k, v in self.link_loads.items():
                 # Directional Flows
-                uncompressed_res.data[k + "_ab"][m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
-                uncompressed_res.data[k + "_ba"][m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
+                uncompressed_df[k + "_ab"].values[m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
+                uncompressed_df[k + "_ba"].values[m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
 
                 # Tot Flow
-                uncompressed_res.data[k + "_tot"] = np.nan_to_num(uncompressed_res.data[k + "_ab"]) + np.nan_to_num(
-                    uncompressed_res.data[k + "_ba"]
+                uncompressed_df[k + "_tot"] = np.nan_to_num(uncompressed_df[k + "_ab"].values) + np.nan_to_num(
+                    uncompressed_df[k + "_ba"].values
                 )
 
         if compressed:
-            compressed_res = AequilibraeData.empty(
-                memory_mode=True,
-                entries=self.graph.compact_num_links,
-                field_names=fields,
-                data_types=[np.float64] * len(fields),
-                fill=np.nan,
-                index=self.graph.compact_graph.id.values,
+            compressed_df = pd.DataFrame(
+                {"link_id": compact_lids}
+                | {
+                    k + dir: np.zeros(compact_lids.shape)
+                    for k in self.compact_link_loads.keys()
+                    for dir in ["_ab", "_ba"]
+                }
             )
-
-            for k, v in self.compact_link_loads:
-                # Directional Flows
-                compressed_res.data[k + "_ab"][m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
-                compressed_res.data[k + "_ba"][m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
+            for k, v in self.compact_link_loads.items():
+                compressed_df[k + "_ab"].values[m_compact.network_ab_idx] = np.nan_to_num(v[m_compact.graph_ab_idx])
+                compressed_df[k + "_ba"].values[m_compact.network_ba_idx] = np.nan_to_num(v[m_compact.graph_ba_idx])
 
                 # Tot Flow
-                compressed_res.data[k + "_tot"] = np.nan_to_num(compressed_res.data[k + "_ab"]) + np.nan_to_num(
-                    compressed_res.data[k + "_ba"]
+                compressed_df[k + "_tot"] = np.nan_to_num(compressed_df[k + "_ab"].values) + np.nan_to_num(
+                    compressed_df[k + "_ba"].values
                 )
 
-        return ((uncompressed_res,) if uncompressed else ()) + ((compressed_res,) if compressed else ())
+        if uncompressed and not compressed:
+            return uncompressed_df
+        elif not uncompressed and compressed:
+            return compressed_df
+        else:
+            return uncompressed_df, compressed_df
 
-    def get_select_link_results(self) -> AequilibraeData:
+    def get_select_link_results(self) -> pd.DataFrame:
         raise NotImplementedError()
