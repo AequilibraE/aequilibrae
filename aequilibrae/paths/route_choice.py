@@ -16,13 +16,11 @@ from aequilibrae.paths.route_choice_set import RouteChoiceSet
 
 class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
+
     default_paramaters = {
-        "beta": 1.0,
-        "theta": 1.0,
-        "penalty": 1.1,
-        "seed": 0,
-        "max_routes": 0,
-        "max_depth": 0,
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0},
+        "link-penalisation": {"penalty": 1.1},
+        "bfsle": {"beta": 1.0, "theta": 1.0},
     }
 
     def __init__(self, graph: Graph, matrix: AequilibraeMatrix, project=None):
@@ -52,10 +50,10 @@ class RouteChoice:
 
         self._config = {}
 
-    def set_algorithm(self, algorithm: str):
+    def set_choice_set_generation(self, algorithm: str, **kwargs) -> None:
         """
-        Chooses the assignment algorithm.
-        Options are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
+        Chooses the assignment algorithm and set parameters.
+        Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
 
         BFSLE implemenation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
         Michael Balmer & Kay W. Axhausen (2013).
@@ -63,36 +61,10 @@ class RouteChoice:
 
         'lp' is also accepted as an alternative to 'link-penalisation'
 
-        :Arguments:
-            **algorithm** (:obj:`str`): Algorithm to be used
-        """
-        algo_dict = {i: i for i in self.all_algorithms}
-        algo_dict["lp"] = "link-penalisation"
-        algo_dict["link-penalization"] = "link-penalisation"
-        algo = algo_dict.get(algorithm.lower())
+        Setting the parameters for the route choice:
 
-        if algo is None:
-            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
-
-        self.algorithm = algo
-        self._config["Algorithm"] = algo
-
-    def set_cores(self, cores: int) -> None:
-        """Allows one to set the number of cores to be used
-
-            Inherited from :obj:`AssignmentResultsBase`
-
-        :Arguments:
-            **cores** (:obj:`int`): Number of CPU cores to use
-        """
-        self.cores = cores
-
-    def set_paramaters(self, **kwargs):
-        """
-        Sets the parameters for the route choice.
-
-        "beta", "theta", and "seed" are BFSLE specific parameters and will have no effect on link penalisation.
-        "penalty" is a link penalisation specific parameter and will have no effect on BFSLE.
+        `beta`, `theta`, and `seed` are BFSLE specific parameters.
+        `penalty` is a link penalisation specific parameter.
 
         Setting `max_depth`, while not required, is strongly recommended to prevent runaway algorithms.
 
@@ -106,13 +78,36 @@ class RouteChoice:
             specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
 
         :Arguments:
+            **algorithm** (:obj:`str`): Algorithm to be used
             **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
         """
+        algo_dict = {i: i for i in self.all_algorithms}
+        algo_dict["lp"] = "link-penalisation"
+        algo_dict["link-penalization"] = "link-penalisation"
+        algo = algo_dict.get(algorithm.lower())
 
-        if any(key not in self.default_paramaters for key in kwargs.keys()):
-            raise ValueError("Invalid parameter provided")
+        if algo is None:
+            raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        self.paramaters = self.default_paramaters | kwargs
+        defaults = self.default_paramaters["generic"] | self.default_paramaters[algo].keys()
+        for key in kwargs.keys():
+            if key not in defaults:
+                raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")
+
+        self.algorithm = algo
+        self._config["Algorithm"] = algo
+
+        self.paramaters = defaults | kwargs
+
+    def set_cores(self, cores: int) -> None:
+        """Allows one to set the number of cores to be used
+
+            Inherited from :obj:`AssignmentResultsBase`
+
+        :Arguments:
+            **cores** (:obj:`int`): Number of CPU cores to use
+        """
+        self.cores = cores
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -135,7 +130,7 @@ class RouteChoice:
         """
         self.where = pathlib.Path(where) if where is not None else None
 
-    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]):
+    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]) -> None:
         """
         Prepare OD pairs for batch computation.
 
@@ -157,7 +152,23 @@ class RouteChoice:
         elif isinstance(nodes[0], int):
             self.nodes = list(itertools.permutations(nodes, r=2))
 
-    def execute_single(self, origin: int, destination: int, path_size_logit: bool = False):
+    def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
+        """
+        Generate route choice sets between `origin` and `destination`, potentially performing an assignment.
+
+        Does not require preparation.
+
+        Node IDs must be present in the compressed graph. To make a node ID always appear in the compressed
+        graph add it as a centroid.
+
+        :Arguments:
+            **origin** (:obj:`int`): Origin node ID.
+            **destination** (:obj:`int`): Destination node ID.
+            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
+
+        :Returns:
+            ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
+        """
         if self.__rc is None:
             self.__rc = RouteChoiceSet(self.graph)
 
@@ -166,20 +177,36 @@ class RouteChoice:
             origin,
             destination,
             bfsle=self.algorithm == "bfsle",
-            path_size_logit=path_size_logit,
+            path_size_logit=perform_assignment,
             cores=self.cores,
             **self.paramaters,
         )
 
-    def execute(self, path_size_logit: bool = False):
+    def execute(self, perform_assignment: bool = False) -> None:
+        """
+        Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
+
+        Node IDs must be present in the compressed graph. To make a node ID always appear in the compressed
+        graph add it as a centroid.
+
+        To access results see `RouteChoice.get_results()`.
+
+        :Arguments:
+            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
+        """
+        if self.nodes is None:
+            raise ValueError(
+                "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
+            )
+
         if self.__rc is None:
             self.__rc = RouteChoiceSet(self.graph)
 
         self.results = None
-        return self.__rc.batched(
+        self.__rc.batched(
             self.nodes,
             bfsle=self.algorithm == "bfsle",
-            path_size_logit=path_size_logit,
+            path_size_logit=perform_assignment,
             cores=self.cores,
             **self.paramaters,
         )
@@ -211,14 +238,13 @@ class RouteChoice:
         self.logger.info("Route Choice specification")
         self.logger.info(self._config)
 
-    def get_results(self):
+    def get_results(self) -> pa.Table:
         """Returns the results of the route choice procedure
 
         Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
-
         """
         if self.results is None:
             try:
@@ -236,12 +262,19 @@ class RouteChoice:
         self,
         which: str = "uncompressed",
         clamp: bool = True,
-    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame]]:
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Translates the link loading results from the graph format into the network format.
 
+        :Arguments:
+            **which** (:obj:`str`): Which results to return: only `"uncompressed"`, only `"compressed"` or `"both"`.
+            **clamp** (:obj:`bool`): Whether or not to treat values `< 1e-15` as `0.0`.
+
         :Returns:
-            **dataset** (:obj:`tuple[pd.DataFrame]`): Tuple of uncompressed and compressed AequilibraE data with the link loading results.
+            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
+                A tuple of uncompressed and compressed DataFrames with the link loading results. Or
+                the requested link loading result.s
+
         """
 
         if not isinstance(which, str) or which not in ["uncompressed", "compressed", "both"]:
