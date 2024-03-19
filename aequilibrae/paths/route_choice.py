@@ -23,7 +23,7 @@ class RouteChoice:
         "bfsle": {"beta": 1.0, "theta": 1.0},
     }
 
-    def __init__(self, graph: Graph, matrix: AequilibraeMatrix, project=None):
+    def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
         self.paramaters = self.default_paramaters.copy()
         self.procedure_id = uuid4().hex
 
@@ -55,7 +55,7 @@ class RouteChoice:
         Chooses the assignment algorithm and set parameters.
         Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
 
-        BFSLE implemenation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
+        BFSLE implementation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
         Michael Balmer & Kay W. Axhausen (2013).
         https://doi.org/10.1080/18128602.2012.671383
 
@@ -89,7 +89,7 @@ class RouteChoice:
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        defaults = self.default_paramaters["generic"] | self.default_paramaters[algo].keys()
+        defaults = self.default_paramaters["generic"] | self.default_paramaters[algo]
         for key in kwargs.keys():
             if key not in defaults:
                 raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")
@@ -120,7 +120,7 @@ class RouteChoice:
 
     def set_save_routes(self, where: Optional[str] = None) -> None:
         """
-        Set save path for route choice resutls. Provide ``None`` to disable.
+        Set save path for route choice results. Provide ``None`` to disable.
 
         **warning** enabling route saving will disable in memory results. Viewing the results will read the results
         from disk first.
@@ -128,7 +128,11 @@ class RouteChoice:
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
         """
-        self.where = pathlib.Path(where) if where is not None else None
+        if where is not None:
+            where = pathlib.Path(where)
+            if not where.exists():
+                raise ValueError(f"Path does not exist `{where}`")
+        self.where = where
 
     def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]) -> None:
         """
@@ -149,7 +153,7 @@ class RouteChoice:
                 raise ValueError("`nodes` list contains non-pair elements")
             self.nodes = nodes
 
-        elif isinstance(nodes[0], int):
+        elif isinstance(nodes[0], (int, np.unsignedinteger)):
             self.nodes = list(itertools.permutations(nodes, r=2))
 
     def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
@@ -179,6 +183,7 @@ class RouteChoice:
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
+            where=str(self.where) if self.where is not None else None,
             **self.paramaters,
         )
 
@@ -208,6 +213,7 @@ class RouteChoice:
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
+            where=str(self.where) if self.where is not None else None,
             **self.paramaters,
         )
 
@@ -223,7 +229,11 @@ class RouteChoice:
             **info** (:obj:`dict`): Dictionary with summary information
         """
 
-        matrix_totals = {nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)}
+        matrix_totals = (
+            {nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)}
+            if self.matrix is not None
+            else None
+        )
 
         info = {
             "Algorithm": self.algorithm,
@@ -238,10 +248,12 @@ class RouteChoice:
         self.logger.info("Route Choice specification")
         self.logger.info(self._config)
 
-    def get_results(self) -> pa.Table:
+    def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
         """Returns the results of the route choice procedure
 
         Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
+
+        If `save_routes` was specified then a Pyarrow dataset is returned. The call is responsible for reading this dataset.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
@@ -251,7 +263,7 @@ class RouteChoice:
                 self.results = self.__rc.get_results()
             except RuntimeError as err:
                 if self.where is None:
-                    raise ValueError("Route choice results not computed and read/save path not specificed") from err
+                    raise ValueError("Route choice results not computed and read/save path not specified") from err
                 self.results = pa.dataset.dataset(
                     self.where, format="parquet", partitioning=pa.dataset.HivePartitioning(self.schema)
                 )
@@ -279,6 +291,11 @@ class RouteChoice:
 
         if not isinstance(which, str) or which not in ["uncompressed", "compressed", "both"]:
             raise ValueError("`which` argument must be one of ['uncompressed', 'compressed', 'both']")
+
+        if self.matrix is None:
+            raise ValueError(
+                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
+            )
 
         compressed = which == "both" or which == "compressed"
         uncompressed = which == "both" or which == "uncompressed"

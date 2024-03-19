@@ -217,7 +217,15 @@ cdef class RouteChoiceSet:
                                                          Represents paths from ``origin`` to ``destination``.
         """
         self.batched([(origin, destination)], *args, **kwargs)
-        return [tuple(x) for x in self.get_results().column("route set").to_pylist()]
+        where = kwargs.get("where", None)
+        if where is not None:
+            schema = self.psl_schema if kwargs.get("path_size_logit", False) else self.schema
+            results = pa.dataset.dataset(
+                where, format="parquet", partitioning=pa.dataset.HivePartitioning(schema)
+            ).to_table()
+        else:
+            results = self.get_results()
+        return [tuple(x) for x in results.column("route set").to_pylist()]
 
     # Bounds checking doesn't really need to be disabled here but the warning is annoying
     @cython.boundscheck(False)
@@ -315,7 +323,7 @@ cdef class RouteChoiceSet:
             warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
         if where is not None:
-            checkpoint = Checkpoint(where, self.schema, partition_cols=["origin id"])
+            checkpoint = Checkpoint(where, self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"])
             batches = list(Checkpoint.batches(list(set_ods)))
             max_results_len = <size_t>max(len(batch) for batch in batches)
         else:
