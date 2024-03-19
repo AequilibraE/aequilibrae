@@ -160,7 +160,7 @@ class TestRouteChoiceSet(TestCase):
         path = join(self.project.project_base_path, "batched results")
         rc.batched(nodes, max_routes=max_routes, max_depth=10)
         table = rc.get_results().to_pandas()
-        rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path, cores=1)
 
         dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
         new_table = (
