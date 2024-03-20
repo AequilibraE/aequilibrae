@@ -225,6 +225,73 @@ class TestRouteChoiceSet(TestCase):
         np.testing.assert_array_almost_equal(link_loads, link_loads2)
 
 
+class TestRouteChoice(TestCase):
+    def setUp(self) -> None:
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+
+        proj_path = os.path.join(gettempdir(), "test_route_choice" + uuid.uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
+
+        self.project = Project()
+        self.project.open(proj_path)
+        self.project.network.build_graphs(fields=["distance"], modes=["c"])
+        self.graph = self.project.network.graphs["c"]  # type: Graph
+        self.graph.set_graph("distance")
+        self.graph.set_blocked_centroid_flows(False)
+
+        self.mat = self.project.matrices.get_matrix("demand_omx")
+        self.mat.computational_view()
+
+    def test_prepare(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        with self.assertRaises(ValueError):
+            rc.prepare([])
+
+        with self.assertRaises(ValueError):
+            rc.prepare(["1", "2"])
+
+        with self.assertRaises(ValueError):
+            rc.prepare([("1", "2")])
+
+        with self.assertRaises(ValueError):
+            rc.prepare([1])
+
+        rc.prepare([1, 2])
+        self.assertListEqual(rc.nodes, [(1, 2), (2, 1)])
+        rc.prepare([(1, 2)])
+        self.assertListEqual(rc.nodes, [(1, 2)])
+
+    def test_set_save_routes(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        with self.assertRaises(ValueError):
+            rc.set_save_routes("/non-existent-path")
+
+    def test_set_choice_set_generation(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.assertDictEqual(
+            rc.paramaters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
+        )
+
+        rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
+        self.assertDictEqual(
+            rc.paramaters, {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0}
+        )
+
+        with self.assertRaises(ValueError):
+            rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
+
+        with self.assertRaises(ValueError):
+            rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1)
+
+        with self.assertRaises(AttributeError):
+            rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
+
+
 def generate_line_strings(project, graph, results):
     """Debug method"""
     import geopandas as gpd

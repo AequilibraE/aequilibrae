@@ -151,14 +151,19 @@ class RouteChoice:
         if len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 
-        if isinstance(nodes[0], tuple):
-            # Selection of OD pairs
-            if any(len(x) != 2 for x in nodes):
-                raise ValueError("`nodes` list contains non-pair elements")
+        if all(
+            isinstance(pair, tuple)
+            and len(pair) == 2
+            and isinstance(pair[0], (int, np.unsignedinteger))
+            and isinstance(pair[1], (int, np.unsignedinteger))
+            for pair in nodes
+        ):
             self.nodes = nodes
 
-        elif isinstance(nodes[0], (int, np.unsignedinteger)):
+        elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
             self.nodes = list(itertools.permutations(nodes, r=2))
+        else:
+            raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
 
     def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
         """
