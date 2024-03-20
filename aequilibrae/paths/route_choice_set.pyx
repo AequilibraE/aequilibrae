@@ -316,6 +316,8 @@ cdef class RouteChoiceSet:
 
         # self.a_star = a_star
 
+        pa.set_io_thread_count(cores)
+
         if self.a_star:
             _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing
         else:
@@ -620,7 +622,7 @@ cdef class RouteChoiceSet:
 
                     # The deduplication of routes occurs here
                     status = route_set.insert(vec)
-                    miss_count += not status.second
+                    miss_count = miss_count + (not status.second)
                     if miss_count > max_misses or route_set.size() >= max_routes:
                         break
 
@@ -692,7 +694,7 @@ cdef class RouteChoiceSet:
 
                 # To prevent runaway algorithms if we find a n duplicate routes we should stop
                 status = route_set.insert(vec)
-                miss_count += not status.second
+                miss_count = miss_count + (not status.second)
                 if miss_count > max_misses:
                     break
             else:
