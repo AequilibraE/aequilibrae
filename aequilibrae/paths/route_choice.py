@@ -18,7 +18,7 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0},
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100},
         "link-penalisation": {"penalty": 1.1},
         "bfsle": {"beta": 1.0, "theta": 1.0},
     }
@@ -66,16 +66,20 @@ class RouteChoice:
         `beta`, `theta`, and `seed` are BFSLE specific parameters.
         `penalty` is a link penalisation specific parameter.
 
-        Setting `max_depth`, while not required, is strongly recommended to prevent runaway algorithms.
+        Setting `max_depth` or `max_misses`, while not required, is strongly recommended to prevent runaway algorithms.
+        `max_misses` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set
+        if returned with fewer than `max_routes`. It has a default value of `100`.
 
         - When using BFSLE `max_depth` corresponds to the maximum height of the graph of graphs. It's value is
             largely dependent on the size of the paths within the network. For very small networks a value of 10
             is a recommended starting point. For large networks a good starting value is 5. Increase the value
-            until the number of desired routes is being consistently returned.
+            until the number of desired routes is being consistently returned. If it is exceeded then the route set
+            if returned with fewer than `max_routes`.
 
         - When using LP, `max_depth` corresponds to the maximum number of iterations performed. While not enforced,
             it should be higher than `max_routes`. It's value is dependent on the magnitude of the cost field,
             specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
+            If it is exceeded then the route set if returned with fewer than `max_routes`.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used

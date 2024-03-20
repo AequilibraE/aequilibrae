@@ -237,6 +237,7 @@ cdef class RouteChoiceSet:
             ods: List[Tuple[int, int]],
             max_routes: int = 0,
             max_depth: int = 0,
+            max_misses: int = 100,
             seed: int = 0,
             cores: int = 0,
             a_star: bool = True,
@@ -259,6 +260,7 @@ cdef class RouteChoiceSet:
             **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
             **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link penalisation.
                                         Must be non-negative. Default of ``0`` for unlimited.
+            **max_misses** (:obj:`int`): Maximum number of collective duplicate routes found for a single OD pair. Terminates if exceeded.
             **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
             **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``0`` for all available.
             **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
@@ -289,14 +291,11 @@ cdef class RouteChoiceSet:
             if self.nodes_to_indices_view[d] == -1:
                 raise ValueError(f"Destination {d} is not present within the compact graph")
 
-
-        if where is not None and cores != 1:
-            raise NotImplementedError("current implementation suffers from a deadlock when using multithreading and writing to disk")
-
         cdef:
             long long origin_index, dest_index, i
             unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
+            unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
             unsigned int c_cores = cores if cores > 0 else openmp.omp_get_num_threads()
 
@@ -399,6 +398,7 @@ cdef class RouteChoiceSet:
                             dest_index,
                             c_max_routes,
                             c_max_depth,
+                            c_max_misses,
                             cost_matrix[threadid()],
                             predecessors_matrix[threadid()],
                             conn_matrix[threadid()],
@@ -413,6 +413,7 @@ cdef class RouteChoiceSet:
                             dest_index,
                             c_max_routes,
                             c_max_depth,
+                            c_max_misses,
                             cost_matrix[threadid()],
                             predecessors_matrix[threadid()],
                             conn_matrix[threadid()],
@@ -539,6 +540,7 @@ cdef class RouteChoiceSet:
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
+        unsigned int max_misses,
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
@@ -558,6 +560,8 @@ cdef class RouteChoiceSet:
             unordered_set[long long] *banned
             unordered_set[long long] *new_banned
             vector[long long] *vec
+            pair[RouteSet_t.iterator, bool] status
+            unsigned int miss_count = 0
             long long p, connector
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
@@ -615,8 +619,9 @@ cdef class RouteChoiceSet:
                             next_queue.push_back(new_banned)
 
                     # The deduplication of routes occurs here
-                    route_set.insert(vec)
-                    if route_set.size() >= max_routes:
+                    status = route_set.insert(vec)
+                    miss_count += not status.second
+                    if miss_count > max_misses or route_set.size() >= max_routes:
                         break
 
             queue.swap(next_queue)
@@ -642,6 +647,7 @@ cdef class RouteChoiceSet:
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
+        unsigned int max_misses,
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
@@ -656,6 +662,8 @@ cdef class RouteChoiceSet:
             # Scratch objects
             vector[long long] *vec
             long long p, connector
+            pair[RouteSet_t.iterator, bool] status
+            unsigned int miss_count = 0
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -682,7 +690,11 @@ cdef class RouteChoiceSet:
                 for connector in deref(vec):
                     thread_cost[connector] *= penatly
 
-                route_set.insert(vec)
+                # To prevent runaway algorithms if we find a n duplicate routes we should stop
+                status = route_set.insert(vec)
+                miss_count += not status.second
+                if miss_count > max_misses:
+                    break
             else:
                 break
 
