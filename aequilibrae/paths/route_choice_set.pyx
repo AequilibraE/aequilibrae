@@ -316,7 +316,7 @@ cdef class RouteChoiceSet:
 
         # self.a_star = a_star
 
-        pa.set_io_thread_count(cores)
+        pa.set_io_thread_count(c_cores)
 
         if self.a_star:
             _reached_first_matrix = np.zeros((c_cores, 1), dtype=np.int64)  # Dummy array to allow slicing

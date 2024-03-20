@@ -106,7 +106,7 @@ class TestRouteChoiceSet(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
-        rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, max_misses=200)
         results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
