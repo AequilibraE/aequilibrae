@@ -24,7 +24,7 @@ class RouteChoice:
     }
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
-        self.paramaters = self.default_paramaters.copy()
+        self.parameters = self.default_paramaters.copy()
         self.procedure_id = uuid4().hex
 
         proj = project or get_active_project(must_exist=False)
@@ -50,7 +50,7 @@ class RouteChoice:
 
         self._config = {}
 
-    def set_choice_set_generation(self, algorithm: str, **kwargs) -> None:
+    def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """
         Chooses the assignment algorithm and set parameters.
         Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
@@ -101,7 +101,7 @@ class RouteChoice:
         self.algorithm = algo
         self._config["Algorithm"] = algo
 
-        self.paramaters = defaults | kwargs
+        self.parameters = defaults | kwargs
 
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used
@@ -154,8 +154,8 @@ class RouteChoice:
         if all(
             isinstance(pair, tuple)
             and len(pair) == 2
-            and isinstance(pair[0], (int, np.unsignedinteger))
-            and isinstance(pair[1], (int, np.unsignedinteger))
+            and isinstance(pair[0], (int, np.integer))
+            and isinstance(pair[1], (int, np.integer))
             for pair in nodes
         ):
             self.nodes = nodes
@@ -193,7 +193,7 @@ class RouteChoice:
             path_size_logit=perform_assignment,
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
-            **self.paramaters,
+            **self.parameters,
         )
 
     def execute(self, perform_assignment: bool = False) -> None:
@@ -223,7 +223,7 @@ class RouteChoice:
             path_size_logit=perform_assignment,
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
-            **self.paramaters,
+            **self.parameters,
         )
 
     def info(self) -> dict:
@@ -249,7 +249,7 @@ class RouteChoice:
             "Matrix totals": matrix_totals,
             "Computer name": socket.gethostname(),
             "Procedure ID": self.procedure_id,
-            "Parameters": self.paramaters,
+            "Parameters": self.parameters,
         }
         return info
 
@@ -289,7 +289,6 @@ class RouteChoice:
 
         :Arguments:
             **which** (:obj:`str`): Which results to return: only `"uncompressed"`, only `"compressed"` or `"both"`.
-            **clamp** (:obj:`bool`): Whether or not to treat values `< 1e-15` as `0.0`.
 
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
@@ -318,10 +317,6 @@ class RouteChoice:
         else:
             self.link_loads = {fields[0]: tmp[0]}
             self.compact_link_loads = {fields[0]: tmp[1]}
-
-        if clamp:
-            for v in itertools.chain(self.link_loads.values(), self.compact_link_loads.values()):
-                v[(v < 1e-15)] = 0.0
 
         # Get a mapping from the compressed graph to/from the network graph
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)

@@ -274,12 +274,12 @@ class TestRouteChoice(TestCase):
 
         rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
         self.assertDictEqual(
-            rc.paramaters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
+            rc.parameters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
         )
 
         rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
         self.assertDictEqual(
-            rc.paramaters, {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0}
+            rc.parameters, {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0}
         )
 
         with self.assertRaises(ValueError):
