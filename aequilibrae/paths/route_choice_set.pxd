@@ -196,7 +196,7 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil
 
     @staticmethod
     cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil

@@ -1,14 +1,43 @@
 # cython: language_level=3str
 
+from aequilibrae.paths.graph import Graph
+
+from cython.operator cimport dereference as deref
+from cython.operator cimport preincrement as inc
+from cython.parallel cimport parallel, prange, threadid
+from libc.limits cimport UINT_MAX
+from libc.math cimport INFINITY, exp, pow
+from libc.stdlib cimport abort
+from libc.string cimport memcpy
+from libcpp cimport nullptr
+from libcpp.algorithm cimport lower_bound, reverse, sort
+from libcpp.unordered_map cimport unordered_map
+from libcpp.unordered_set cimport unordered_set
+from libcpp.utility cimport pair
+from libcpp.vector cimport vector
+from openmp cimport omp_get_num_threads
+
+import itertools
+import logging
+import pathlib
+import warnings
+from typing import List, Tuple
+
+import numpy as np
+import pyarrow as pa
+from aequilibrae.matrix import AequilibraeMatrix
+
+cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
+cimport pyarrow as pa
+cimport pyarrow.lib as libpa
+
 """This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
 Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
 
-A rough overview of the algorithm is as follows.
-    1. Prepare the initial graph, this is depth 0 with no links removed.
-    2. Find a short path, P. If P is not empty add P to the path set.
-    3. For all links p in P, remove p from E, compounding with the previously removed links.
-    4. De-duplicate the sub-graphs, we only care about unique sub-graphs.
-    5. Go to 2.
+A rough overview of the algorithm is as follows.  1. Prepare the initial graph, this is depth 0 with no links removed.
+    2. Find a short path, P. If P is not empty add P to the path set.  3. For all links p in P, remove p from E,
+    compounding with the previously removed links.  4. De-duplicate the sub-graphs, we only care about unique
+    sub-graphs.  5. Go to 2.
 
 Details: The general idea of the algorithm is pretty simple, as is the implementation. The caveats here is that there is
 a lot of cpp interop and memory management. A description of the purpose of variables is in order:
@@ -26,20 +55,20 @@ independent and should only use commutative operations. The comparator is the sa
 removed link sets we've seen before. This allows us to detected duplicated graphs.
 
 rng: A custom imported version of std::linear_congruential_engine. libcpp doesn't provide one so we do. It should be
-significantly faster than the std::mersenne_twister_engine without sacrificing much. We don't need amazing RNG, just
-ok and fast. This is only used to shuffle the queue.
+significantly faster than the std::mersenne_twister_engine without sacrificing much. We don't need amazing RNG, just ok
+and fast. This is only used to shuffle the queue.
 
-queue, next_queue: These are vectors of pointers to sets of removed links. We never need to push to the front of these so a
-vector is best. We maintain two queues, one that we are currently iterating over, and one that we can add to, building
-up with all the newly removed link sets. These two are swapped at the end of an iteration, next_queue is then
+queue, next_queue: These are vectors of pointers to sets of removed links. We never need to push to the front of these
+so a vector is best. We maintain two queues, one that we are currently iterating over, and one that we can add to,
+building up with all the newly removed link sets. These two are swapped at the end of an iteration, next_queue is then
 cleared. These store sets of removed links.
 
 banned, next_banned: `banned` is the iterator variable for `queue`. `banned` is copied into `next_banned` where another
-link can be added without mutating `banned`. If we've already seen this set of removed links `next_banned` is immediately
-deallocated. Otherwise it's placed into `next_queue`.
+link can be added without mutating `banned`. If we've already seen this set of removed links `next_banned` is
+immediately deallocated. Otherwise it's placed into `next_queue`.
 
-vec: `vec` is a scratch variable to store pointers to new vectors, or rather, paths while we are building them. Each time a path
-is found a new one is allocated, built, and stored in the route_set.
+vec: `vec` is a scratch variable to store pointers to new vectors, or rather, paths while we are building them. Each
+time a path is found a new one is allocated, built, and stored in the route_set.
 
 p, connector: Scratch variables for iteration.
 
@@ -52,43 +81,11 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 
 """
 
-from aequilibrae.paths.graph import Graph
-
-from libc.math cimport INFINITY, pow, exp
-from libc.string cimport memcpy
-from libc.limits cimport UINT_MAX
-from libc.stdlib cimport abort
-from libcpp cimport nullptr
-from libcpp.vector cimport vector
-from libcpp.unordered_set cimport unordered_set
-from libcpp.unordered_map cimport unordered_map
-from libcpp.utility cimport pair
-from libcpp.algorithm cimport sort, lower_bound, reverse
-from cython.operator cimport dereference as deref, preincrement as inc
-from cython.parallel cimport parallel, prange, threadid
-cimport openmp
-
-import numpy as np
-import pyarrow as pa
-from typing import List, Tuple
-import itertools
-import pathlib
-import logging
-import warnings
-from aequilibrae.matrix import AequilibraeMatrix
-
-cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
-cimport pyarrow as pa
-cimport pyarrow.lib as libpa
-import pyarrow.dataset
-import pyarrow.parquet as pq
-from libcpp.memory cimport shared_ptr
-
-from libc.stdio cimport fprintf, printf, stderr
-
-# It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation times
+# It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation
+# times
 include 'basic_path_finding.pyx'
 include 'parallel_numpy.pyx'
+
 
 @cython.embedsignature(True)
 cdef class RouteChoiceSet:
@@ -197,24 +194,24 @@ cdef class RouteChoiceSet:
             del self.ods
             self.ods = prob_set = <vector[pair[long long, long long]] *>nullptr
 
-
     @cython.embedsignature(True)
     def run(self, origin: int, destination: int, *args, **kwargs):
-        """
-        Compute the a route set for a single OD pair.
+        """Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
         unique possible paths have been found then a smaller set will be returned.
 
-        Thin wrapper around ``RouteChoiceSet.batched``. Additional arguments are forwarded to ``RouteChoiceSet.batched``.
+        Additional arguments are forwarded to ``RouteChoiceSet.batched``.
 
         :Arguments:
-            **origin** (:obj:`int`): Origin node ID. Must be present within compact graph. Recommended to choose a centroid.
-            **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to choose a centroid.
+            **origin** (:obj:`int`): Origin node ID. Must be present within compact graph. Recommended to choose a
+                centroid.
+            **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to
+                choose a centroid.
 
-        :Returns:
-            **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of compact link IDs.
-                                                         Represents paths from ``origin`` to ``destination``.
+        :Returns: **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of
+        compact link IDs. Represents paths from ``origin`` to ``destination``.
+
         """
         self.batched([(origin, destination)], *args, **kwargs)
         where = kwargs.get("where", None)
@@ -248,24 +245,29 @@ cdef class RouteChoiceSet:
             beta: float = 1.0,
             theta: float = 1.0,
     ):
-        """
-        Compute the a route set for a list of OD pairs.
+        """Compute the a route set for a list of OD pairs.
 
-        Often the returned list for each OD pair's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
-        unique possible paths have been found then a smaller set will be returned.
+        Often the returned list for each OD pair's length is ``max_routes``, however, it may be limited by ``max_depth``
+        or if all unique possible paths have been found then a smaller set will be returned.
 
         :Arguments:
-            **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination node ID must be
-                                                    present within compact graph. Recommended to choose a centroids.
-            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of ``0`` for unlimited.
-            **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link penalisation.
-                                        Must be non-negative. Default of ``0`` for unlimited.
-            **max_misses** (:obj:`int`): Maximum number of collective duplicate routes found for a single OD pair. Terminates if exceeded.
+            **ods** (:obj:`list[tuple[int, int]]`): List of OD pairs ``(origin, destination)``. Origin and destination
+                node ID must be present within compact graph. Recommended to choose a centroids.
+            **max_routes** (:obj:`int`): Maximum size of the generated route set. Must be non-negative. Default of
+                ``0`` for unlimited.
+            **max_depth** (:obj:`int`): Maximum depth BFSLE can explore, or maximum number of iterations for link
+                penalisation. Must be non-negative. Default of ``0`` for unlimited.
+            **max_misses** (:obj:`int`): Maximum number of collective duplicate routes found for a single OD pair.
+                Terminates if exceeded.
             **seed** (:obj:`int`): Seed used for rng. Must be non-negative. Default of ``0``.
-            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative. Default of ``0`` for all available.
-            **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link penalisation. Default ``True``.
-            **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible with ``bfsle=True``.
+            **cores** (:obj:`int`): Number of cores to use when parallelising over OD pairs. Must be non-negative.
+                Default of ``0`` for all available.
+            **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link
+                penalisation. Default ``True``.
+            **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible
+                with ``bfsle=True``.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
+
         """
         cdef:
             long long o, d
@@ -297,15 +299,19 @@ cdef class RouteChoiceSet:
             unsigned int c_max_depth = max_depth
             unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
-            unsigned int c_cores = cores if cores > 0 else openmp.omp_get_num_threads()
+            unsigned int c_cores = cores if cores > 0 else omp_get_num_threads()
 
             vector[pair[long long, long long]] c_ods
 
-            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this memory
+            # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this
+            # memory
             double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
             long long [:, :] predecessors_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
             long long [:, :] conn_matrix = np.empty((c_cores, self.num_nodes + 1), dtype=np.int64)
-            long long [:, :] b_nodes_matrix = np.broadcast_to(self.b_nodes_view, (c_cores, self.b_nodes_view.shape[0])).copy()
+            long long [:, :] b_nodes_matrix = np.broadcast_to(
+                self.b_nodes_view,
+                (c_cores, self.b_nodes_view.shape[0])
+            ).copy()
 
             # This matrix is never read from, it exists to allow using the Dijkstra's method without changing the
             # interface.
@@ -328,7 +334,10 @@ cdef class RouteChoiceSet:
             warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
         if where is not None:
-            checkpoint = Checkpoint(where, self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"])
+            checkpoint = Checkpoint(
+                where,
+                self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"]
+            )
             batches = list(Checkpoint.batches(list(set_ods)))
             max_results_len = <size_t>max(len(batch) for batch in batches)
         else:
@@ -340,7 +349,6 @@ cdef class RouteChoiceSet:
         cdef:
             RouteSet_t *route_set
             pair[vector[long long] *, vector[long long] *] freq_pair
-            vector[long long] *link_union_scratch = <vector[long long] *>nullptr
             vector[vector[long long] *] *link_union_set = <vector[vector[long long] *] *>nullptr
             vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
             vector[vector[double] *] *path_overlap_set = <vector[vector[double] *] *>nullptr
@@ -357,7 +365,9 @@ cdef class RouteChoiceSet:
         for batch in batches:
             c_ods = batch  # Convert the batch to a cpp vector, this isn't strictly efficient but is nicer
             batch_len = c_ods.size()
-            results.resize(batch_len)  # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not needed
+            # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not
+            # needed
+            results.resize(batch_len)
 
             if path_size_logit:
                 # we may clear these objects because it's either:
@@ -374,11 +384,6 @@ cdef class RouteChoiceSet:
                 prob_set.resize(batch_len)
 
             with nogil, parallel(num_threads=c_cores):
-                # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
-                # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
-                if path_size_logit:
-                    link_union_scratch = new vector[long long]()
-
                 for i in prange(batch_len):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
                     dest_index = self.nodes_to_indices_view[c_ods[i].second]
@@ -426,13 +431,23 @@ cdef class RouteChoiceSet:
                         )
 
                     if path_size_logit:
-                        link_union_scratch.clear()
-                        freq_pair = RouteChoiceSet.compute_frequency(route_set, deref(link_union_scratch))
+                        freq_pair = RouteChoiceSet.compute_frequency(route_set)
                         deref(link_union_set)[i] = freq_pair.first
                         deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        deref(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(route_set, freq_pair, deref(deref(cost_set)[i]), self.cost_view)
-                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(deref(deref(cost_set)[i]), deref(deref(path_overlap_set)[i]), beta, theta)
-                        del freq_pair.second  # While we need the unique sorted links (.first), we don't need the frequencies (.second)
+                        deref(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(
+                            route_set,
+                            freq_pair,
+                            deref(deref(cost_set)[i]),
+                            self.cost_view
+                        )
+                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(
+                            deref(deref(cost_set)[i]),
+                            deref(deref(path_overlap_set)[i]),
+                            beta,
+                            theta
+                        )
+                        # While we need the unique sorted links (.first), we don't need the frequencies (.second)
+                        del freq_pair.second
 
                     deref(results)[i] = route_set
 
@@ -446,13 +461,13 @@ cdef class RouteChoiceSet:
                             self.b_nodes_view,
                         )
 
-                if path_size_logit:
-                    del link_union_scratch
-
             if where is not None:
-                table = libpa.pyarrow_wrap_table(self.make_table_from_results(c_ods, deref(results), cost_set, path_overlap_set, prob_set))
+                table = libpa.pyarrow_wrap_table(
+                    self.make_table_from_results(c_ods, deref(results), cost_set, path_overlap_set, prob_set)
+                )
 
-                # Once we've made the table all results have been copied into some pyarrow structure, we can free our inner internal structures
+                # Once we've made the table all results have been copied into some pyarrow structure, we can free our
+                # inner internal structures
                 if path_size_logit:
                     for j in range(batch_len):
                         del deref(link_union_set)[j]
@@ -468,7 +483,9 @@ cdef class RouteChoiceSet:
                 checkpoint.write(table)
                 del table
             else:
-                pass  # where is None ==> len(batches) == 1, i.e. there was only one batch and we should keep everything in memory
+                # where is None ==> len(batches) == 1, i.e. there was only one batch and we should keep everything in
+                # memory
+                pass
 
         # Here we decide if we wish to preserve our results for later saving/link loading
         if where is not None:
@@ -489,8 +506,6 @@ cdef class RouteChoiceSet:
             # Copy the c_ods vector, it was provided by the auto Cython conversion and is allocated on the stack,
             # we should copy it to keep it around
             self.ods = new vector[pair[long long, long long]](c_ods)
-
-            # self.link_union ?? This could be saved as a partial results from the computation above, although it isn't easy to get out rn
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -569,13 +584,14 @@ cdef class RouteChoiceSet:
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
 
-        queue.push_back(new unordered_set[long long]()) # Start with no edges banned
+        queue.push_back(new unordered_set[long long]())  # Start with no edges banned
         route_set = new RouteSet_t()
         rng.seed(seed)
 
-        # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned edges to consider
+        # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned
+        # edges to consider
         for depth in range(max_depth):
-            if route_set.size() >= max_routes or queue.size() == 0:
+            if miss_count > max_misses or route_set.size() >= max_routes or queue.size() == 0:
                 break
 
             # If we could potentially fill the route_set after this depth, shuffle the queue
@@ -583,13 +599,23 @@ cdef class RouteChoiceSet:
                 shuffle(queue.begin(), queue.end(), rng)
 
             for banned in queue:
-                # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and reverse them as well
+                # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and
+                # reverse them as well
                 memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
 
-                RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
+                RouteChoiceSet.path_find(
+                    self,
+                    origin_index,
+                    dest_index,
+                    thread_cost,
+                    thread_predecessors,
+                    thread_conn,
+                    thread_b_nodes,
+                    _thread_reached_first
+                )
 
                 # Mark this set of banned links as seen
                 removed_links.insert(banned)
@@ -597,7 +623,8 @@ cdef class RouteChoiceSet:
                 # If the destination is reachable we must build the path and readd
                 if thread_predecessors[dest_index] >= 0:
                     vec = new vector[long long]()
-                    # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
+                    # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know
+                    # how long it'll be
                     p = dest_index
                     while p != origin_index:
                         connector = thread_conn[p]
@@ -607,14 +634,16 @@ cdef class RouteChoiceSet:
                     reverse(vec.begin(), vec.end())
 
                     for connector in deref(vec):
-                        # This is one area for potential improvement. Here we construct a new set from the old one, copying all the elements
-                        # then add a single element. An incremental set hash function could be of use. However, the since of this set is
-                        # directly dependent on the current depth and as the route set size grows so incredibly fast the depth will rarely get
-                        # high enough for this to matter.
-                        # Copy the previously banned links, then for each vector in the path we add one and push it onto our queue
+                        # This is one area for potential improvement. Here we construct a new set from the old one,
+                        # copying all the elements then add a single element. An incremental set hash function could be
+                        # of use. However, the since of this set is directly dependent on the current depth and as the
+                        # route set size grows so incredibly fast the depth will rarely get high enough for this to
+                        # matter. Copy the previously banned links, then for each vector in the path we add one and
+                        # push it onto our queue
                         new_banned = new unordered_set[long long](deref(banned))
                         new_banned.insert(connector)
-                        # If we've already seen this set of removed links before we already know what the path is and its in our route set
+                        # If we've already seen this set of removed links before we already know what the path is and
+                        # its in our route set
                         if removed_links.find(new_banned) != removed_links.end():
                             del new_banned
                         else:
@@ -676,11 +705,21 @@ cdef class RouteChoiceSet:
             if route_set.size() >= max_routes:
                 break
 
-            RouteChoiceSet.path_find(self, origin_index, dest_index, thread_cost, thread_predecessors, thread_conn, thread_b_nodes, _thread_reached_first)
+            RouteChoiceSet.path_find(
+                self,
+                origin_index,
+                dest_index,
+                thread_cost,
+                thread_predecessors,
+                thread_conn,
+                thread_b_nodes,
+                _thread_reached_first
+            )
 
             if thread_predecessors[dest_index] >= 0:
                 vec = new vector[long long]()
-                # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how long it'll be
+                # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how
+                # long it'll be
                 p = dest_index
                 while p != origin_index:
                     connector = thread_conn[p]
@@ -707,16 +746,17 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil:
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil:
         cdef:
             vector[long long] *keys
             vector[long long] *counts
+            vector[long long] link_union
+            vector[long long].const_iterator union_iter
+            vector[long long] *route
 
             # Scratch objects
             size_t length, count
             long long link, i
-
-        link_union.clear()
 
         keys = new vector[long long]()
         counts = new vector[long long]()
@@ -731,8 +771,8 @@ cdef class RouteChoiceSet:
 
         sort(link_union.begin(), link_union.end())
 
-        union_iter = link_union.begin()
-        while union_iter != link_union.end():
+        union_iter = link_union.cbegin()
+        while union_iter != link_union.cend():
             count = 0
             link = deref(union_iter)
             while link == deref(union_iter):
@@ -809,7 +849,8 @@ cdef class RouteChoiceSet:
                 # We want to find the index of the link, and use that to look up it's frequency
                 link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
 
-                path_overlap = path_overlap + cost_view[link] / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+                path_overlap = path_overlap + cost_view[link] \
+                    / deref(freq_set.second)[link_iter - freq_set.first.begin()]
 
             path_overlap_vec.push_back(path_overlap / total_cost[j])
 
@@ -838,11 +879,13 @@ cdef class RouteChoiceSet:
         prob_vec = new vector[double]()
         prob_vec.reserve(total_cost.size())
 
-        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will lead to NaN results
+        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will
+        # lead to NaN results
         for i in range(total_cost.size()):
             inv_prob = 0.0
             for j in range(total_cost.size()):
-                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) * exp(-theta * (total_cost[j] - total_cost[i]))
+                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
+                    * exp(-theta * (total_cost[j] - total_cost[i]))
 
             prob_vec.push_back(1.0 / inv_prob)
 
@@ -858,7 +901,7 @@ cdef class RouteChoiceSet:
         if not isinstance(matrix, AequilibraeMatrix):
             raise ValueError("`matrix` is not an AequilibraE matrix")
 
-        cores = cores if cores > 0 else openmp.omp_get_num_threads()
+        cores = cores if cores > 0 else omp_get_num_threads()
 
         cdef:
             vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
@@ -879,7 +922,6 @@ cdef class RouteChoiceSet:
                 tmp.append(deref(vec))
             print(tmp)
 
-
         def apply_link_loading_func(m):
             if generate_path_files:
                 ll = self.apply_link_loading_from_path_files(
@@ -889,7 +931,8 @@ cdef class RouteChoiceSet:
             else:
                 ll = self.apply_link_loading(m)
 
-            # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without transferring owner ship.
+            # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
+            # transferring owner ship.
             compressed = <double[:ll.size(), :1]>&deref(ll)[0]
 
             actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
@@ -902,7 +945,6 @@ cdef class RouteChoiceSet:
             compressed = np.array(compressed, copy=True)
             del ll
             return actual.reshape(-1), compressed.reshape(-1)
-
 
         if len(matrix.view_names) == 1:
             link_loads = apply_link_loading_func(matrix.matrix_view)
@@ -945,9 +987,6 @@ cdef class RouteChoiceSet:
             long long i
 
         with parallel(num_threads=cores):
-            # The link union needs to be allocated per thread as scratch space, as its of unknown length we can't allocated a matrix of them.
-            # Additionally getting them to be reused between batches is complicated, instead we just get a new one each batch
-
             for i in prange(ods.size()):
                 link_union = link_union_set[i]
                 loads = new vector[double](link_union.size(), 0.0)  # FIXME FREE ME
@@ -961,15 +1000,18 @@ cdef class RouteChoiceSet:
                     if prob == 0.0:
                         continue
 
-                    # For each link in the route, we need to assign the appropriate demand * prob
-                    # Because the link union is known to be sorted, if the links in the route are also sorted we can just step
-                    # along both arrays simultaneously, skipping elements in the link_union when appropriate. This allows us
-                    # to operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense formulation.
-                    # This is also incredibly cache efficient, the only downsides are that the code is harder to read
-                    # and it requires sorting the route. NOTE: the sorting of routes is technically something that is already
-                    # computed, during the computation of the link frequency we merge and sort all links, if we instead sorted
-                    # then used an N-way merge we could reuse the sorted routes and the sorted link union.
-                    links = new vector[long long](deref(route))  # we copy the links in case the routes haven't already been saved  # FIXME FREE ME
+                    # For each link in the route, we need to assign the appropriate demand * prob Because the link union
+                    # is known to be sorted, if the links in the route are also sorted we can just step along both
+                    # arrays simultaneously, skipping elements in the link_union when appropriate. This allows us to
+                    # operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense
+                    # formulation.  This is also incredibly cache efficient, the only downsides are that the code is
+                    # harder to read and it requires sorting the route. NOTE: the sorting of routes is technically
+                    # something that is already computed, during the computation of the link frequency we merge and sort
+                    # all links, if we instead sorted then used an N-way merge we could reuse the sorted routes and the
+                    # sorted link union.
+
+                    # We copy the links in case the routes haven't already been saved  # FIXME FREE ME
+                    links = new vector[long long](deref(route))
                     sort(links.begin(), links.end())
 
                     # links and link_union are sorted, and links is a subset of link_union
@@ -1024,7 +1066,7 @@ cdef class RouteChoiceSet:
 
             for j in range(link_union.size()):
                 link = deref(link_union)[j]
-                deref(link_loads)[link] = deref(link_loads)[link] + demand * deref(loads)[j]  # += here results in all zeros? Odd
+                deref(link_loads)[link] = deref(link_loads)[link] + demand * deref(loads)[j]
 
         return link_loads
 
@@ -1117,8 +1159,9 @@ cdef class RouteChoiceSet:
         for i in range(ods.size()):
             route_set = route_sets[i]
 
-            # Instead of construction a "list of lists" style object for storing the route sets we instead will construct one big array of link ids
-            # with a corresponding offsets array that indicates where each new row (path) starts.
+            # Instead of construction a "list of lists" style object for storing the route sets we instead will
+            # construct one big array of link ids with a corresponding offsets array that indicates where each new row
+            # (path) starts.
             for route in deref(route_set):
                 o_col.Append(ods[i].first)
                 d_col.Append(ods[i].second)
@@ -1141,7 +1184,13 @@ cdef class RouteChoiceSet:
         offset_builder.Append(offset)  # Mark the end of the array in offsets
         offset_builder.Finish(&offsets)
 
-        route_set_results = libpa.CListArray.FromArraysAndType(route_set_dtype, deref(offsets.get()), deref(paths.get()), pool, shared_ptr[libpa.CBuffer]())
+        route_set_results = libpa.CListArray.FromArraysAndType(
+            route_set_dtype,
+            deref(offsets.get()),
+            deref(paths.get()),
+            pool,
+            shared_ptr[libpa.CBuffer]()
+        )
 
         o_col.Finish(&columns[0])
         d_col.Finish(&columns[1])
@@ -1152,7 +1201,9 @@ cdef class RouteChoiceSet:
             path_overlap_col.Finish(&columns[4])
             prob_col.Finish(&columns[5])
 
-        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema)
+        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
+            RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema
+        )
         cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
 
         del path_builder
@@ -1195,7 +1246,7 @@ cdef class Checkpoint:
     A small wrapper class to write a dataset partition by partition
     """
 
-    def __init__(self, where, schema, partition_cols = None):
+    def __init__(self, where, schema, partition_cols=None):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
         self.where = pathlib.Path(where)
         self.schema = schema
