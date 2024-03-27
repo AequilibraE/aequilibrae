@@ -325,6 +325,10 @@ def build_compressed_graph(graph):
             "link_id": np.arange(slink),
         }
     )
+
+    # Link compression can introduce new simple cycles into the graph
+    comp_lnk = comp_lnk[comp_lnk.a_node != comp_lnk.b_node]
+
     max_link_id = link_id_max * 10
     comp_lnk.link_id += max_link_id
 

@@ -9,13 +9,14 @@ import numpy as np
 import pyarrow as pa
 
 from aequilibrae import Graph, Project
-from aequilibrae.paths.route_choice import RouteChoiceSet
+from aequilibrae.paths.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.route_choice import RouteChoice
 
 from ...data import siouxfalls_project
 
 
 # In these tests `max_depth` should be provided to prevent a runaway test case and just burning CI time
-class TestRouteChoice(TestCase):
+class TestRouteChoiceSet(TestCase):
     def setUp(self) -> None:
         os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
 
@@ -30,7 +31,11 @@ class TestRouteChoice(TestCase):
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
 
+        self.mat = self.project.matrices.get_matrix("demand_omx")
+        self.mat.computational_view()
+
     def tearDown(self) -> None:
+        self.mat.close()
         self.project.close()
 
     def test_route_choice(self):
@@ -47,7 +52,7 @@ class TestRouteChoice(TestCase):
                 results = rc.run(a, b, max_routes=0, max_depth=1)
                 self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
                 self.assertListEqual(
-                    results, [(1, 5, 8, 12, 24, 29, 52, 58)], "Initial route isn't the shortest A* route"
+                    results, [(2, 6, 9, 13, 25, 30, 53, 59)], "Initial route isn't the shortest A* route"
                 )
 
                 # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
@@ -72,8 +77,9 @@ class TestRouteChoice(TestCase):
                 rc = RouteChoiceSet(self.graph)
                 a = 1
 
+                rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs)
                 self.assertFalse(
-                    rc.batched([(a, a)], max_routes=0, max_depth=3, **kwargs),
+                    rc.get_results(),
                     "Route set from self to self should be empty",
                 )
 
@@ -100,7 +106,8 @@ class TestRouteChoice(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
-        results = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, max_misses=200)
+        results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
         self.assertEqual(len(gb), len(nodes), "Requested number of route sets not returned")
@@ -118,7 +125,8 @@ class TestRouteChoice(TestCase):
 
         max_routes = 20
         with self.assertWarns(UserWarning):
-            results = rc.batched(nodes, max_routes=max_routes, max_depth=10)
+            rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
         self.assertEqual(len(gb), 1, "Duplicates not dropped")
@@ -150,8 +158,9 @@ class TestRouteChoice(TestCase):
         max_routes = 20
 
         path = join(self.project.project_base_path, "batched results")
-        table = rc.batched(nodes, max_routes=max_routes, max_depth=10)
-        rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path)
+        rc.batched(nodes, max_routes=max_routes, max_depth=10)
+        table = rc.get_results().to_pandas()
+        rc.batched(nodes, max_routes=max_routes, max_depth=10, where=path, cores=1)
 
         dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
         new_table = (
@@ -161,7 +170,7 @@ class TestRouteChoice(TestCase):
             .reset_index(drop=True)
         )
 
-        table = table.to_pandas().sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
+        table = table.sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
 
@@ -169,35 +178,118 @@ class TestRouteChoice(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+        table = rc.get_results().to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
             for route, cost in zip(df["route set"].values, df["cost"].values):
-                np.testing.assert_almost_equal(self.graph.cost[route].sum(), cost, err_msg=f"Cost differs for OD {od}")
+                np.testing.assert_almost_equal(
+                    self.graph.network.set_index("link_id").loc[route][self.graph.cost_field].sum(),
+                    cost,
+                    err_msg=f", cost differs for OD {od}",
+                )
 
-    def test_gamma_results(self):
+    def test_path_overlap_results(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        table = rc.get_results().to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
-            self.assertTrue(all((df["gamma"] > 0) & (df["gamma"] <= 1)))
+            self.assertTrue(all((df["path overlap"] > 0) & (df["path overlap"] <= 1)))
 
     def test_prob_results(self):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        table = rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = table.to_pandas()
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        table = rc.get_results().to_pandas()
 
         gb = table.groupby(by=["origin id", "destination id"])
         for od, df in gb:
-            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg="Probability not close to 1.0")
+            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
+
+    def test_link_loading(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+        link_loads = rc.link_loading(self.mat)
+        link_loads2 = rc.link_loading(self.mat, generate_path_files=True)
+
+        np.testing.assert_array_almost_equal(link_loads, link_loads2)
+
+
+class TestRouteChoice(TestCase):
+    def setUp(self) -> None:
+        os.environ["PATH"] = os.path.join(gettempdir(), "temp_data") + ";" + os.environ["PATH"]
+
+        proj_path = os.path.join(gettempdir(), "test_route_choice" + uuid.uuid4().hex)
+        os.mkdir(proj_path)
+        zipfile.ZipFile(join(dirname(siouxfalls_project), "sioux_falls_single_class.zip")).extractall(proj_path)
+
+        self.project = Project()
+        self.project.open(proj_path)
+        self.project.network.build_graphs(fields=["distance"], modes=["c"])
+        self.graph = self.project.network.graphs["c"]  # type: Graph
+        self.graph.set_graph("distance")
+        self.graph.set_blocked_centroid_flows(False)
+
+        self.mat = self.project.matrices.get_matrix("demand_omx")
+        self.mat.computational_view()
+
+    def test_prepare(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        with self.assertRaises(ValueError):
+            rc.prepare([])
+
+        with self.assertRaises(ValueError):
+            rc.prepare(["1", "2"])
+
+        with self.assertRaises(ValueError):
+            rc.prepare([("1", "2")])
+
+        with self.assertRaises(ValueError):
+            rc.prepare([1])
+
+        rc.prepare([1, 2])
+        self.assertListEqual(rc.nodes, [(1, 2), (2, 1)])
+        rc.prepare([(1, 2)])
+        self.assertListEqual(rc.nodes, [(1, 2)])
+
+    def test_set_save_routes(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        with self.assertRaises(ValueError):
+            rc.set_save_routes("/non-existent-path")
+
+    def test_set_choice_set_generation(self):
+        rc = RouteChoice(self.graph, self.mat)
+
+        rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.assertDictEqual(
+            rc.parameters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
+        )
+
+        rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
+        self.assertDictEqual(
+            rc.parameters, {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0}
+        )
+
+        with self.assertRaises(ValueError):
+            rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
+
+        with self.assertRaises(ValueError):
+            rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1)
+
+        with self.assertRaises(AttributeError):
+            rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
 
 
 def generate_line_strings(project, graph, results):
