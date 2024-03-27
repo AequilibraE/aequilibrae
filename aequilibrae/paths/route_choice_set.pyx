@@ -1,6 +1,7 @@
 # cython: language_level=3str
 
 from aequilibrae.paths.graph import Graph
+from aequilibrae.matrix import AequilibraeMatrix
 
 from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as inc
@@ -25,7 +26,8 @@ from typing import List, Tuple
 
 import numpy as np
 import pyarrow as pa
-from aequilibrae.matrix import AequilibraeMatrix
+import pyarrow.dataset
+import pyarrow.parquet as pq
 
 cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
 cimport pyarrow as pa
