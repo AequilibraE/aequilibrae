@@ -777,7 +777,7 @@ cdef class RouteChoiceSet:
         while union_iter != link_union.cend():
             count = 0
             link = deref(union_iter)
-            while link == deref(union_iter):
+            while link == deref(union_iter) and union_iter != link_union.cend():
                 count = count + 1
                 inc(union_iter)
 
@@ -1022,7 +1022,7 @@ cdef class RouteChoiceSet:
 
                     while link_iter != links.cend():
                         # Find the next location for the current link in links
-                        while deref(link_iter) != deref(link_union_iter):
+                        while deref(link_iter) != deref(link_union_iter) and link_iter != links.cend():
                             inc(link_union_iter)
 
                         link_loc = link_union_iter - link_union.cbegin()
