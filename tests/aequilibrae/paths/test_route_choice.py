@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import pyarrow as pa
 
-from aequilibrae import Graph, Project
+from aequilibrae import Project
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.route_choice import RouteChoice
 
@@ -55,7 +55,8 @@ class TestRouteChoiceSet(TestCase):
                     results, [(2, 6, 9, 13, 25, 30, 53, 59)], "Initial route isn't the shortest A* route"
                 )
 
-                # A depth of 2 should yield the same initial route plus the length of that route more routes minus duplicates and unreachable paths
+                # A depth of 2 should yield the same initial route plus the length of that route more routes minus
+                # duplicates and unreachable paths
                 results2 = rc.run(a, b, max_routes=0, max_depth=2, **kwargs)
                 self.assertTrue(results[0] in results2, "Initial route isn't present in a lower depth")
 

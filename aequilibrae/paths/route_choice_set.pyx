@@ -16,7 +16,7 @@ from libcpp.unordered_map cimport unordered_map
 from libcpp.unordered_set cimport unordered_set
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
-from openmp cimport omp_get_num_threads
+from openmp cimport omp_get_max_threads
 
 import itertools
 import logging
@@ -147,14 +147,12 @@ cdef class RouteChoiceSet:
     def __dealloc__(self):
         """
         C level deallocation. For freeing memory allocated by this object. *Must* have GIL, `self` may be in a
-        partially deallocated state already.
+        partially deallocated state already. Do not call any other Python method.
         """
-        self.deallocate_results()
+        self.deallocate()
 
-    def deallocate_results(self):
-        """
-        Deallocate stored results, existing extracted results are not invalidated.
-        """
+    cdef void deallocate(RouteChoiceSet self) nogil:
+        """__dealloc__ cannot be called from normal code."""
         cdef:
             RouteSet_t *route_set
             vector[long long] *link_vec
@@ -212,8 +210,7 @@ cdef class RouteChoiceSet:
                 choose a centroid.
 
         :Returns: **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of
-        compact link IDs. Represents paths from ``origin`` to ``destination``.
-
+            link IDs. Represents paths from ``origin`` to ``destination``.
         """
         self.batched([(origin, destination)], *args, **kwargs)
         where = kwargs.get("where", None)
@@ -269,7 +266,6 @@ cdef class RouteChoiceSet:
             **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible
                 with ``bfsle=True``.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
-
         """
         cdef:
             long long o, d
@@ -301,7 +297,7 @@ cdef class RouteChoiceSet:
             unsigned int c_max_depth = max_depth
             unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
-            unsigned int c_cores = cores if cores > 0 else omp_get_num_threads()
+            unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             vector[pair[long long, long long]] c_ods
 
@@ -362,10 +358,10 @@ cdef class RouteChoiceSet:
             path_overlap_set = new vector[vector[double] *](max_results_len)
             prob_set = new vector[vector[double] *](max_results_len)
 
-        self.deallocate_results()  # We have be storing results from a previous run
+        self.deallocate()  # We may be storing results from a previous run
 
         for batch in batches:
-            c_ods = batch  # Convert the batch to a cpp vector, this isn't strictly efficient but is nicer
+            c_ods = batch  # Convert the batch to a C++ vector, this isn't strictly efficient but is nicer
             batch_len = c_ods.size()
             # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not
             # needed
@@ -485,8 +481,8 @@ cdef class RouteChoiceSet:
                 checkpoint.write(table)
                 del table
             else:
-                # where is None ==> len(batches) == 1, i.e. there was only one batch and we should keep everything in
-                # memory
+                # where is None implies len(batches) == 1, i.e. there was only one batch and we should keep everything
+                # in memory
                 pass
 
         # Here we decide if we wish to preserve our results for later saving/link loading
@@ -625,7 +621,7 @@ cdef class RouteChoiceSet:
                 # If the destination is reachable we must build the path and readd
                 if thread_predecessors[dest_index] >= 0:
                     vec = new vector[long long]()
-                    # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know
+                    # Walk the predecessors tree to find our path, we build it up in a C++ vector because we can't know
                     # how long it'll be
                     p = dest_index
                     while p != origin_index:
@@ -689,6 +685,7 @@ cdef class RouteChoiceSet:
         double penatly,
         unsigned int seed
     ) noexcept nogil:
+        """Link penalisation algorithm for choice set generation."""
         cdef:
             RouteSet_t *route_set
 
@@ -720,7 +717,7 @@ cdef class RouteChoiceSet:
 
             if thread_predecessors[dest_index] >= 0:
                 vec = new vector[long long]()
-                # Walk the predecessors tree to find our path, we build it up in a cpp vector because we can't know how
+                # Walk the predecessors tree to find our path, we build it up in a C++ vector because we can't know how
                 # long it'll be
                 p = dest_index
                 while p != origin_index:
@@ -728,12 +725,12 @@ cdef class RouteChoiceSet:
                     p = thread_predecessors[p]
                     vec.push_back(connector)
 
-                reverse(vec.begin(), vec.end())
-
                 for connector in deref(vec):
                     thread_cost[connector] *= penatly
 
-                # To prevent runaway algorithms if we find a n duplicate routes we should stop
+                reverse(vec.begin(), vec.end())
+
+                # To prevent runaway algorithms if we find N duplicate routes we should stop
                 status = route_set.insert(vec)
                 miss_count = miss_count + (not status.second)
                 if miss_count > max_misses:
@@ -749,6 +746,11 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     @staticmethod
     cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil:
+        """
+        Compute a frequency map for each route.
+
+        Each node at index i in the first returned vector has frequency at index i in the second vector.
+        """
         cdef:
             vector[long long] *keys
             vector[long long] *counts
@@ -792,6 +794,7 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     @staticmethod
     cdef vector[double] *compute_cost(RouteSet_t *route_set, double[:] cost_view) noexcept nogil:
+        """Compute the cost each route."""
         cdef:
             vector[double] *cost_vec
 
@@ -823,6 +826,8 @@ cdef class RouteChoiceSet:
         double[:] cost_view
     ) noexcept nogil:
         """
+        Compute the path overlap figure based on the route cost and frequency.
+
         Notation changes:
             i: j
             a: link
@@ -871,6 +876,7 @@ cdef class RouteChoiceSet:
         double beta,
         double theta
     ) noexcept nogil:
+        """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
             # Scratch objects
             vector[double] *prob_vec
@@ -895,6 +901,9 @@ cdef class RouteChoiceSet:
 
     @cython.embedsignature(True)
     def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
+        """
+        Apply link loading to the network using the demand matrix and the previously computed route sets.
+        """
         if self.ods == nullptr \
            or self.link_union_set == nullptr \
            or self.prob_set == nullptr:
@@ -903,11 +912,12 @@ cdef class RouteChoiceSet:
         if not isinstance(matrix, AequilibraeMatrix):
             raise ValueError("`matrix` is not an AequilibraE matrix")
 
-        cores = cores if cores > 0 else omp_get_num_threads()
+        cores = cores if cores > 0 else omp_get_max_threads()
 
         cdef:
             vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
             vector[double] *ll
+            vector[double] *vec
 
         if generate_path_files:
             path_files = RouteChoiceSet.compute_path_files(
@@ -918,45 +928,48 @@ cdef class RouteChoiceSet:
                 cores,
             )
 
-            # FIXME, write out path files
-            tmp = []
-            for vec in deref(path_files):
-                tmp.append(deref(vec))
-            print(tmp)
-
-        def apply_link_loading_func(m):
-            if generate_path_files:
-                ll = self.apply_link_loading_from_path_files(
-                    m,
-                    deref(path_files),
-                )
-            else:
-                ll = self.apply_link_loading(m)
-
-            # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
-            # transferring owner ship.
-            compressed = <double[:ll.size(), :1]>&deref(ll)[0]
-
-            actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
-            assign_link_loads_cython(
-                actual,
-                compressed,
-                self.graph_compressed_id_view,
-                cores
-            )
-            compressed = np.array(compressed, copy=True)
-            del ll
-            return actual.reshape(-1), compressed.reshape(-1)
+            # # FIXME, write out path files
+            # tmp = []
+            # for vec in deref(path_files):
+            #     tmp.append(deref(vec))
+            # print(tmp)
 
         if len(matrix.view_names) == 1:
-            link_loads = apply_link_loading_func(matrix.matrix_view)
+            link_loads = self.apply_link_loading_func(matrix.matrix_view, path_files, generate_path_files, cores)
         else:
             link_loads = {
-                name: apply_link_loading_func(matrix.matrix_view[:, :, i])
+                name: self.apply_link_loading_func(matrix.matrix_view[:, :, i], path_files, generate_path_files, cores)
                 for i, name in enumerate(matrix.names)
             }
 
+        if generate_path_files:
+            for vec in deref(path_files):
+                del vec
+            del path_files
+
         return link_loads
+
+    cdef apply_link_loading_func(RouteChoiceSet self, double[:, :] m, vector[vector[double] *] *pf, bint generate_path_files, int cores):
+        """Helper function for self.link_loading. Cannot free a pointer captured in a local scope by a lambda."""
+        if generate_path_files:
+            ll = self.apply_link_loading_from_path_files(m, deref(pf))
+        else:
+            ll = self.apply_link_loading(m)
+
+        # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
+        # transferring ownership.
+        compressed = <double[:ll.size(), :1]>&deref(ll)[0]
+
+        actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
+        assign_link_loads_cython(
+            actual,
+            compressed,
+            self.graph_compressed_id_view,
+            cores
+        )
+        compressed = np.array(compressed, copy=True)
+        del ll
+        return actual.reshape(-1), compressed.reshape(-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -976,10 +989,10 @@ cdef class RouteChoiceSet:
         Returns vector of vectors of link loads corresponding to each link in it's link_union_set.
         """
         cdef:
-            vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())  # FIXME FREE ME
+            vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())
             vector[long long] *link_union
             vector[double] *loads
-            vector[double] *link
+            vector[long long] *links
 
             vector[long long].const_iterator link_union_iter
             vector[long long].const_iterator link_iter
@@ -991,7 +1004,7 @@ cdef class RouteChoiceSet:
         with parallel(num_threads=cores):
             for i in prange(ods.size()):
                 link_union = link_union_set[i]
-                loads = new vector[double](link_union.size(), 0.0)  # FIXME FREE ME
+                loads = new vector[double](link_union.size(), 0.0)
 
                 # We now iterate over all routes in the route_set, each route has an associated probability
                 route_prob_iter = prob_set[i].cbegin()
@@ -1006,13 +1019,14 @@ cdef class RouteChoiceSet:
                     # is known to be sorted, if the links in the route are also sorted we can just step along both
                     # arrays simultaneously, skipping elements in the link_union when appropriate. This allows us to
                     # operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense
-                    # formulation.  This is also incredibly cache efficient, the only downsides are that the code is
-                    # harder to read and it requires sorting the route. NOTE: the sorting of routes is technically
-                    # something that is already computed, during the computation of the link frequency we merge and sort
-                    # all links, if we instead sorted then used an N-way merge we could reuse the sorted routes and the
-                    # sorted link union.
+                    # formulation. This is also more cache efficient, the only downsides are that the code is
+                    # harder to read and it requires sorting the route.
 
-                    # We copy the links in case the routes haven't already been saved  # FIXME FREE ME
+                    # NOTE: the sorting of routes is technically something that is already computed, during the
+                    # computation of the link frequency we merge and sort all links, if we instead sorted then used an
+                    # N-way merge we could reuse the sorted routes and the sorted link union.
+
+                    # We copy the links in case the routes haven't already been saved
                     links = new vector[long long](deref(route))
                     sort(links.begin(), links.end())
 
@@ -1029,6 +1043,8 @@ cdef class RouteChoiceSet:
                         deref(loads)[link_loc] = deref(loads)[link_loc] + prob  # += here results in all zeros? Odd
 
                         inc(link_iter)
+
+                    del links
 
                 deref(link_loads)[i] = loads
 
@@ -1056,7 +1072,7 @@ cdef class RouteChoiceSet:
             long origin_index, dest_index
             double demand
 
-            vector[double] *link_loads = new vector[double](self.num_links)  # FIXME FREE ME
+            vector[double] *link_loads = new vector[double](self.num_links)
 
         for i in range(self.ods.size()):
             loads = path_files[i]
@@ -1088,7 +1104,7 @@ cdef class RouteChoiceSet:
             long origin_index, dest_index
             double demand, prob, load
 
-            vector[double] *link_loads = new vector[double](self.num_links)  # FIXME FREE ME
+            vector[double] *link_loads = new vector[double](self.num_links)
 
         for i in range(self.ods.size()):
             route_set = deref(self.results)[i]
@@ -1121,6 +1137,15 @@ cdef class RouteChoiceSet:
         vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     ):
+        """
+        Construct an Arrow table from C++ stdlib structures.
+
+        Note: this function directly utilises the Arrow C++ API, the Arrow Cython API is not sufficient.
+        See `route_choice_set.pxd` for Cython declarations.
+
+        Returns a shared pointer to a Arrow CTable. This should be wrapped in a Python table before use.
+        Compressed link IDs are expanded to full network link IDs.
+        """
         cdef:
             shared_ptr[libpa.CArray] paths
             shared_ptr[libpa.CArray] offsets
@@ -1162,7 +1187,7 @@ cdef class RouteChoiceSet:
             route_set = route_sets[i]
 
             # Instead of construction a "list of lists" style object for storing the route sets we instead will
-            # construct one big array of link ids with a corresponding offsets array that indicates where each new row
+            # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
             # (path) starts.
             for route in deref(route_set):
                 o_col.Append(ods[i].first)

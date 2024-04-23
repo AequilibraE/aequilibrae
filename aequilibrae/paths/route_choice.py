@@ -229,7 +229,7 @@ class RouteChoice:
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
 
-        Dictionary contains keys  'Algorithm', 'Matrix totals', 'Computer name', 'Procedure ID'.
+        Dictionary contains keys  'Algorithm', 'Matrix totals', 'Computer name', 'Procedure ID', and 'Parameters'.
 
         The classes key is also a dictionary with all the user classes per transit class and their respective
         matrix totals
@@ -260,9 +260,10 @@ class RouteChoice:
     def get_results(self) -> Union[pa.Table, pa.dataset.Dataset]:
         """Returns the results of the route choice procedure
 
-        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
+        Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).
+        Represents paths from ``origin`` to ``destination``.
 
-        If `save_routes` was specified then a Pyarrow dataset is returned. The call is responsible for reading this dataset.
+        If `save_routes` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this dataset.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
@@ -292,8 +293,8 @@ class RouteChoice:
 
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
-                A tuple of uncompressed and compressed DataFrames with the link loading results. Or
-                the requested link loading result.s
+                A tuple of uncompressed and compressed link loading results as DataFrames. Or
+                the requested link loading results.
 
         """
 

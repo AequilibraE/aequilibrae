@@ -43,7 +43,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 cdef extern from "<utility>" namespace "std" nogil:
     pair[T, U] make_pair[T, U](T&& t, U&& u)
 
-# To define our own hashing functions we have to write a little cpp. The string is inlined directly into route_choice.cpp
+# To define our own hashing functions we have to write a little C++. The string is inlined directly into route_choice.cpp
 # To make Cython aware of our hash types we also must declare them with the right signatures
 #
 # OrderedVectorPointerHasher: This hash function is for hashing the routes, thus it should be order *DEPENDENT*.
@@ -55,8 +55,8 @@ cdef extern from "<utility>" namespace "std" nogil:
 # New hash functions and their use in authentication and set equality
 # https://doi.org/10.1016/0022-0000(81)90033-7
 #
-# PointerDereferenceEqualTo: Because we are storing and hashing the pointers to objects to avoid unnessecary copies we must
-# define our own comparitor to resolve hash collisions. Without this equaility operator the bare pointers are compared.
+# PointerDereferenceEqualTo: Because we are storing and hashing the pointers to objects to avoid unnecessary copies we must
+# define our own comparator to resolve hash collisions. Without this equality operator the bare pointers are compared.
 cdef extern from * nogil:
     """
     // Source: https://stackoverflow.com/a/72073933
@@ -104,7 +104,7 @@ cdef extern from * nogil:
         bool operator()(const T& lhs, const T& rhs) const
 
 
-# For typing (haha) convenince, the types names are getting long
+# For typing (haha) convenience, the types names are getting long
 ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerDereferenceEqualTo[vector[long long] *]] RouteSet_t
 ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
@@ -152,6 +152,8 @@ cdef class RouteChoiceSet:
 
         unsigned int [:] mapping_idx
         unsigned int [:] mapping_data
+
+    cdef void deallocate(RouteChoiceSet self) nogil
 
     cdef void path_find(
         RouteChoiceSet self,
@@ -228,6 +230,7 @@ cdef class RouteChoiceSet:
 
     cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
     cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
+    cdef apply_link_loading_func(RouteChoiceSet self, double[:, :] m, vector[vector[double] *] *pf, bint generate_path_files, int cores)
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(
         RouteChoiceSet self,
