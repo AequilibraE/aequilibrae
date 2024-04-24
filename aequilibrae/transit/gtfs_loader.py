@@ -1,11 +1,10 @@
-from datetime import datetime
 import hashlib
 import logging
 import zipfile
 from copy import deepcopy
+from datetime import datetime
 from os.path import splitext, basename
 from typing import Dict
-import importlib.util as iutil
 
 import numpy as np
 import pandas as pd
@@ -13,32 +12,20 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import LineString
 
-from aequilibrae.transit.constants import AGENCY_MULTIPLIER
-from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.column_order import column_order
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
+from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.worker_thread import WorkerThread
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SignalImpl
-else:
-
-    class SignalImpl:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def emit(*args, **kwargs):
-            pass
 
 
 class GTFSReader(WorkerThread):
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
-    signal = SignalImpl(object)
+    signal = SIGNAL(object)
 
     logger = logging.getLogger("GTFS Reader")
 

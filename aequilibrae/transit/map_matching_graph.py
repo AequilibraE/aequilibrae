@@ -1,5 +1,4 @@
 import hashlib
-import importlib.util as iutil
 import math
 from contextlib import closing
 from copy import deepcopy
@@ -19,12 +18,8 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
+from aequilibrae.utils.signal import SIGNAL
 from ..utils import WorkerThread
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
@@ -33,8 +28,7 @@ CONNECTOR_SPEED = 1
 class MMGraph(WorkerThread):
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
-    if pyqt:
-        signal = pyqtSignal(object)
+    signal = SIGNAL(object)
 
     def __init__(self, lib_gtfs, mtmm):
         WorkerThread.__init__(self, None)
@@ -125,24 +119,20 @@ class MMGraph(WorkerThread):
         self.max_link_id = self.df.link_id.max() + 1
         self.max_node_id = self.df[["a_node", "b_node"]].max().max() + 1
         # Build initial index
-        if pyqt:
-            self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
+        self.signal.emit(["start", "secondary", self.df.shape[0], f"Indexing links - {self.__mode}", self.__mtmm])
         self._idx = GeoIndex()
         for counter, (_, record) in enumerate(self.df.iterrows()):
-            if pyqt:
-                self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
+            self.signal.emit(["update", "secondary", counter + 1, f"Indexing links - {self.__mode}", self.__mtmm])
             self._idx.insert(feature_id=record.link_id, geometry=record.geo)
         # We will progressively break links at stops' projection
         # But only on the right side of the link (no boarding at the opposing link's side)
         centroids = []
         self.node_corresp = []
-        if pyqt:
-            self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
+        self.signal.emit(["start", "secondary", len(self.stops), f"Breaking links - {self.__mode}", self.__mtmm])
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            if pyqt:
-                self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
+            self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
             stop.___map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
             centroids.append(stop.___map_matching_id__[self.mode_id])
@@ -305,5 +295,4 @@ class MMGraph(WorkerThread):
         return g
 
     def finished(self):
-        if pyqt:
-            self.signal.emit(["finished_building_mm_graph_procedure"])
+        self.signal.emit(["finished_building_mm_graph_procedure"])

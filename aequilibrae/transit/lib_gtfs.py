@@ -1,35 +1,22 @@
 from contextlib import closing
 from copy import deepcopy
-import importlib.util as iutil
 
 import pandas as pd
 import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
-from aequilibrae.context import get_active_project
-from aequilibrae.project.database_connection import database_connection
 
+from aequilibrae.context import get_active_project
+from aequilibrae.log import logger
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
+from aequilibrae.utils.signal import SIGNAL as SignalImpl
 from .functions import PathStorage
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 from ..utils.worker_thread import WorkerThread
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SignalImpl
-else:
-
-    class SignalImpl:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def emit(*args, **kwargs):
-            pass
 
 
 class GTFSRouteSystemBuilder(WorkerThread):

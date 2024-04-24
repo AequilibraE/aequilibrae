@@ -19,14 +19,11 @@ from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_co
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
-pyqt = iutil.find_spec("PyQt5") is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
+from aequilibrae.utils.signal import SIGNAL
 
 
 class OSMBuilder(WorkerThread):
-    if pyqt:
-        building = pyqtSignal(object)
+    building = SIGNAL(object)
 
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
@@ -52,8 +49,7 @@ class OSMBuilder(WorkerThread):
         self.links_df = data["links"]
 
     def __emit_all(self, *args):
-        if pyqt:
-            self.building.emit(*args)
+        self.building.emit(*args)
 
     def doWork(self):
         with commit_and_close(connect_spatialite(self.path)) as conn:

@@ -40,7 +40,7 @@ if False:
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+    from aequilibrae.utils.signal import SIGNAL
 
 
 class LinearApproximation(WorkerThread):

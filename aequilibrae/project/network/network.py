@@ -30,7 +30,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
 if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+    from aequilibrae.utils.signal import SIGNAL
 
 
 class Network(WorkerThread):
