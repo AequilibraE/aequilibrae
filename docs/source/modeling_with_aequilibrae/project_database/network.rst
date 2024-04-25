@@ -120,21 +120,21 @@ each of the changes to see how they are treated through triggers.
 .. table::
    :align: center
 
-+--------------------------------------+-----------------------------------+
-| Nodes                                |     Links                         |
-+======================================+===================================+
-| :ref:`net_creating_nodes`            | :ref:`net_deleting_link`          |
-+--------------------------------------+-----------------------------------+
-| :ref:`net_deleting_nodes`            | :ref:`net_moving_link_extremity`  |
-+--------------------------------------+-----------------------------------+
-| :ref:`net_moving_node`               | :ref:`net_reshaping_link`         |
-+--------------------------------------+-----------------------------------+
-| :ref:`net_add_node_field`            | :ref:`net_deleting_reqfield_link` |
-+--------------------------------------+-----------------------------------+
-| :ref:`net_deleting_node_field`       |                                   |
-+--------------------------------------+-----------------------------------+
-| :ref:`net_modifying_node_data_entry` |                                   |
-+--------------------------------------+-----------------------------------+
+   +--------------------------------------+-----------------------------------+
+   | Nodes                                |     Links                         |
+   +======================================+===================================+
+   | :ref:`net_creating_nodes`            | :ref:`net_deleting_link`          |
+   +--------------------------------------+-----------------------------------+
+   | :ref:`net_deleting_nodes`            | :ref:`net_moving_link_extremity`  |
+   +--------------------------------------+-----------------------------------+
+   | :ref:`net_moving_node`               | :ref:`net_reshaping_link`         |
+   +--------------------------------------+-----------------------------------+
+   | :ref:`net_add_node_field`            | :ref:`net_deleting_reqfield_link` |
+   +--------------------------------------+-----------------------------------+
+   | :ref:`net_deleting_node_field`       |                                   |
+   +--------------------------------------+-----------------------------------+
+   | :ref:`net_modifying_node_data_entry` |                                   |
+   +--------------------------------------+-----------------------------------+
 
 .. _net_section.1.1:
 
@@ -340,12 +340,14 @@ A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_modes`.
 
 .. _net_change_link_ltypes:
+
 *link_type* field (Links layer) & *link_types* field (Nodes layer)
 ``````````````````````````````````````````````````````````````````
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_link_types`.
 
 .. _net_change_link_node_ids:
+
 a_node and b_node
 `````````````````
 The user should not change the a_node and b_node fields, as they are controlled

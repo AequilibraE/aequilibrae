@@ -17,7 +17,7 @@ from networks that are :ref:`NOT housed inside an AequilibraE model <plot_assign
 .. _aequilibrae-graphs:
 
 AequilibraE Graphs
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 As mentioned above, AequilibraE's graphs are the backbone of path computation,
 skimming and Traffic Assignment. Besides handling the selection of links available to
@@ -46,7 +46,7 @@ potentially bi-directional, and the directions allowed for traversal are dictate
 field *direction*, where -1 and 1 denote only BA and AB traversal respectively and 0 denotes
 bi-directionality.
 
-Direction-specific fields must be coded in fields **_AB* and **_BA*, where the name of
+Direction-specific fields must be coded in fields **_AB** and **_BA**, where the name of
 the field in the *graph* will be equal to the prefix of the directional fields. For example:
 
 The fields **free_flow_travel_time_AB** and **free_flow_travel_time_BA** provide the same

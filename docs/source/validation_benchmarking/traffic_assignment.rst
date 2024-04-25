@@ -24,17 +24,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Sioux Falls MSA 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_bfw-500_iter.png
     :align: center
     :width: 590
@@ -52,17 +58,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Anaheim MSA 500 iterations
+
 |
+
 .. image:: ../images/anaheim_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/anaheim_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/anaheim_bfw-500_iter.png
     :align: center
     :width: 590
@@ -80,17 +92,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Winnipeg MSA 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_bfw-500_iter.png
     :align: center
     :width: 590
@@ -113,17 +131,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Barcelona MSA 500 iterations
+
 |
+
 .. image:: ../images/barcelona_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/barcelona_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/barcelona_bfw-500_iter.png
     :align: center
     :width: 590
@@ -141,17 +165,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Chicago MSA 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Chicago Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_bfw-500_iter.png
     :align: center
     :width: 590
@@ -168,6 +198,7 @@ Regional), as that instance has a comparable size to real-world models.
     :align: center
     :width: 590
     :alt: Algorithm convergence comparison
+
 |
 
 Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
@@ -214,6 +245,7 @@ In the first part of the code, we'll parse TNTP instances to a format Aequilibra
 understand, and then we'll perform the assignment.
 
 .. _code-block-for-convergence-study:
+
 .. code-block:: python
 
     # Imports

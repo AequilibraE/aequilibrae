@@ -28,6 +28,7 @@ the modes table is kept consistent with the links table through the use of
 database triggers.
 
 .. _changing_modes_for_link:
+
 Changing the modes allowed in a certain link
 ''''''''''''''''''''''''''''''''''''''''''''
 Whenever we change the modes allowed on a link, we need to check for two
@@ -52,12 +53,14 @@ the values found in the associated links' modes field. If the user attempts to
 overwrite this value, it will automatically be set back to the appropriate value.
 
 .. _adding_new_link:
+
 Adding a new link
 '''''''''''''''''
 The exact same behaviour as for :ref:`changing_modes_for_link` applies in this
 case, but it requires specific new triggers on the **creation** of the link.
 
 .. _editing_mode:
+
 Editing a mode in the modes table
 '''''''''''''''''''''''''''''''''
 Whenever we want to edit a mode in the modes table, we need to check for two
@@ -73,6 +76,7 @@ The requirements for uniqueness and non-absent values are guaranteed during the
 construction of the modes table by using the keys **UNIQUE** and **NOT NULL**.
 
 .. _adding_new_mode:
+
 Adding a new mode to the modes table
 ''''''''''''''''''''''''''''''''''''
 In this case, only the first behaviour mentioned above on
@@ -80,6 +84,7 @@ In this case, only the first behaviour mentioned above on
 exactly one character long. Therefore only one new trigger is required.
 
 .. _deleting_a_mode:
+
 Removing a mode from the modes table
 ''''''''''''''''''''''''''''''''''''
 In counterpoint, only the second behaviour mentioned above on

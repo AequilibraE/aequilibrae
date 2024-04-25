@@ -2,7 +2,7 @@
 .. _example_usage_skimming:
 
 Network skimming
-=================
+================
 
 In this example, we show how to perform network skimming for Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
@@ -31,7 +31,7 @@ logger.addHandler(stdout_handler)
 
 #%%
 # Network Skimming
-# ---------------
+# ----------------
 
 # %%
 from aequilibrae.paths import NetworkSkimming
