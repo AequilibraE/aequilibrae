@@ -7,7 +7,6 @@ AequilibraE is organized in submodules organized around common workflows
 used in transport modeling, as well as connected to the maintenance and
 operation of models. The current modules are:
 
-- :ref:`overview_project`
 - :ref:`overview_parameters`
 - :ref:`overview_distribution`
 - :ref:`overview_paths`
@@ -74,8 +73,7 @@ release the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`_, which
 allows the users to get some performance gains using Python's threading module.
 
 A wealth of usage examples are available on the examples page under
-:ref:`example_usage_paths`.
-
+:ref:`examples_trip_distribution`.
 
 .. _overview_transit:
 

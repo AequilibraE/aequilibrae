@@ -7,7 +7,7 @@ such as the iterative proportional fitting (IPF). In this section, we compare th
 runtime of AequilibraE's current implementation of IPF, 
 with a general IPF algorithm, available `here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
 
-The figure below compares the :ref:`AequilibraE's IPF runtime` with one core with the benchmark Python
+The figure below compares AequilibraE's IPF runtime with one core with the benchmark Python
 code. From the figure below, we can notice that the runtimes were practically the same for the
 instances with 1,000 zones or less. As the number of zones increases, AequilibraE demonstrated to be faster
 than the benchmark python code in instances with 1,000 < zones < 10,000, but it was a
