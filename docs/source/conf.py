@@ -63,25 +63,27 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
-    "sphinx_gallery.gen_gallery",
+    # "sphinx_gallery.gen_gallery",
     "sphinx_design",
-    "sphinx_copybutton"
+    "sphinx_copybutton",
+    "sphinx_simplepdf",
+    "sphinx_git",
 ]
 
 # Change plot_gallery to True to start building examples again
-sphinx_gallery_conf = {
-    "examples_dirs": ["examples"],  # path to your example scripts
-    "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
-    'capture_repr': ('_repr_html_', '__repr__'),
-    'remove_config_comments': True,
-    "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/editing_networks",
-                                      "examples/trip_distribution",
-                                      "examples/visualization",
-                                      "examples/aequilibrae_without_a_model",
-                                      "examples/full_workflows",
-                                      "examples/other_applications"]),
-}
+# sphinx_gallery_conf = {
+#     "examples_dirs": ["examples"],  # path to your example scripts
+#     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
+#     'capture_repr': ('_repr_html_', '__repr__'),
+#     'remove_config_comments': True,
+#     "subsection_order": ExplicitOrder(["examples/creating_models",
+#                                       "examples/editing_networks",
+#                                       "examples/trip_distribution",
+#                                       "examples/visualization",
+#                                       "examples/aequilibrae_without_a_model",
+#                                       "examples/full_workflows",
+#                                       "examples/other_applications"]),
+# }
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -127,14 +129,13 @@ html_theme_options = {
     "navbar_center": ["navbar-nav"],
     "show_nav_level": 0,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
-    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
+    "navbar_end": ["theme-switcher"],
     "navbar_start": ["navbar-logo", "version-switcher"],
     "switcher": {
         "json_url": "./_static/switcher.json",
         "version_match": switcher_version,
     },
     "navbar_align": "left",
-    "search_bar_text": "Search",
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -153,6 +154,7 @@ latex_elements = {}
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
+# latex_appendices = ["validation"]
 
 # -- Options for manual page output ------------------------------------------
 
