@@ -1,3 +1,5 @@
+:orphan:
+
 .. _importing_from_osm:
 
 Importing from Open Street Maps

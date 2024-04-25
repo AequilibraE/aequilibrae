@@ -9,6 +9,7 @@ In this example, we import a GTFS feed to our model and perform map matching.
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from os import remove
@@ -26,7 +27,6 @@ from aequilibrae.utils.create_example import create_example
 # %%
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
-
 project = create_example(fldr, "coquimbo")
 
 # %%
@@ -38,7 +38,6 @@ remove(join(fldr, "public_transport.sqlite"))
 # %%
 # Let's import the GTFS feed.
 dest_path = join(fldr, "gtfs_coquimbo.zip")
-
 
 # %%
 # Now we create our Transit object and import the GTFS feed into our model.
@@ -104,15 +103,17 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
+#%%
+# Let's create the map!
+
 # %%
-# We create the map
 map_osm = folium.Map(location=[-29.9633719, -71.3242825], zoom_start=13)
 
 # add all layers
 for layer in layers:
     layer.add_to(map_osm)
 
-# And Add layer control before we display it
+# And add layer control before we display it
 folium.LayerControl().add_to(map_osm)
 map_osm
 

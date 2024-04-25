@@ -1,10 +1,11 @@
+:orphan:
+
 .. _getting_started:
 
-Getting started
-===============
+Installation
+============
 
 In this section we describe how to install AequilibraE.
-If you have already installed AequilibraE, you can move on to the :ref:`first steps <first_steps>` in modeling with AequilibraE page.
 
 .. note::
    Although AequilibraE is under intense development, we try to avoid making
@@ -118,9 +119,3 @@ modeling computers these days. In most cases 16Gb of RAM is enough even for
 large models (5,000+ zones). Computationally intensive procedures such as
 skimming and traffic assignment have been parallelized, so AequilibraE can make
 use of as many CPUs as there are available in the system for such procedures.
-
-.. toctree::
-    :maxdepth: 1
-    :hidden:
-
-    getting_started/first_steps
