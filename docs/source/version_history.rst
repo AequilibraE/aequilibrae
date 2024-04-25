@@ -1,3 +1,5 @@
+:orphan:
+
 .. _versionhistory:
 
 Older versions
@@ -118,9 +120,13 @@ documentation for all versions since 0.5.3.
 
     .. grid-item::
 
-    .. grid-item:: 
+    .. grid-item-card:: Develop branch
+        :link:  https://aequilibrae.com/python/develop/
+        :link-type: url
+        :text-align: center
 
-* `Develop Branch (upcoming version) <https://aequilibrae.com/python/develop/>`_
+        Upcoming version
+
 This documentation correspond to software version:
 
 .. git_commit_detail::

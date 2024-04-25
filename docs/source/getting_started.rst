@@ -124,4 +124,3 @@ use of as many CPUs as there are available in the system for such procedures.
     :hidden:
 
     getting_started/first_steps
-    getting_started/first_model
