@@ -2,7 +2,7 @@
 .. _example_gtfs_import_and_asssignment:
 
 Public transport assignment with Optimal Strategies
-===========
+===================================================
 
 In this example, we import a GTFS feed to our model, create a public transport network, create project match connectors, and perform a Spiess & Florian assignment.
 
@@ -60,12 +60,14 @@ transit.load_date("2016-04-13")
 # Let's save this model for later use.
 transit.save_to_disk()
 
-# %%
+#%%
 # Graph building
 # --------------
 # Let's build the transit network. We'll disable `outer_stop_transfers` and `walking_edges` because Coquimbo doesn't have any parent stations.
 # For the OD connections we'll use the `overlapping_regions` method and create some accurate line geometry later.
 # Creating the graph should only take a moment. By default zoning information is pulled from the project network. If you have your own zoning information add it using `graph.add_zones(zones)` then `graph.create_graph()`. We drop gemoetry here for the sake of display
+
+# %%
 graph = data.create_graph(with_outer_stop_transfers=False, with_walking_edges=False, blocking_centroid_flows=False, connector_method="overlapping_regions")
 
 # %%
@@ -91,7 +93,7 @@ graph.create_line_geometry(method="connector project match", graph="c")
 
 # %%
 # Saving and reloading
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~
 # Lets save all graphs to the `public_transport.sqlite` database.
 data.save_graphs()
 
