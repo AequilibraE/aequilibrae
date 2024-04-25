@@ -4,7 +4,7 @@ Multi-class Equilibrium assignment
 ----------------------------------
 
 While single-class equilibrium traffic assignment [1]_ is mathematically simple,
-multi-class traffic assignment [9]_, especially when including monetary costs
+multi-class traffic assignment [7]_, especially when including monetary costs
 (e.g. tolls) and multiple classes with different Passenger Car Equivalent (PCE)
 factors, requires more sophisticated mathematics.
 
@@ -67,17 +67,23 @@ All algorithms have been implemented as a single software class, as the
 differences between them are simply the step direction and step size after each
 iteration of all-or-nothing assignment, as shown in the table below
 
-+-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
-| Algorithm                     | Step direction                                            | Step Size                                       |
-+===============================+===========================================================+=================================================+
-| Method of Successive Averages | All-or-Nothing assignment (AoN)                           | function of the iteration number                |
-+-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
-| Frank-Wolfe                   | All-or-Nothing assignment                                 | Optimal value derived from Wardrop's principle  |
-+-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
-| Conjugate Frank-Wolfe         | Conjugate direction (Current and previous AoN)            | Optimal value derived from Wardrop's principle  |
-+-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
-| Biconjugate Frank-Wolfe       | Biconjugate direction (Current and two previous AoN)      | Optimal value derived from Wardrop's principle  |
-+-------------------------------+-----------------------------------------------------------+-------------------------------------------------+
++-------------------------------+-----------------------+----------------------------------+
+| Algorithm                     | Step direction        | Step size                        |
++===============================+=======================+==================================+
+| Method of Successive Avergaes | All-or-Nothing        | Function of the iteration number |
+|                               | Assignment (AoN)      |                                  |
++-------------------------------+-----------------------+----------------------------------+
+| Frank-Wolfe                   | All-or-Nothing        | Optimal value derived from       |
+|                               | Assignment (AoN)      | Wardrop's principle              |
++-------------------------------+-----------------------+----------------------------------+
+| Conjugate Frank-Wolfe         | Conjugate direction   | Optimal value derived from       |
+|                               | (Current and          | Wardrop's principle              |
+|                               | previous AoN)         |                                  |
++-------------------------------+-----------------------+----------------------------------+
+| Biconjugate Frank-Wolfe       | Biconjugate direction | Optimal value derived from       |
+|                               | (Current and two      | Wardrop's principle              |
+|                               | previous AoN)         |                                  |
++-------------------------------+-----------------------+----------------------------------+
 
 .. note::
    Our implementations of the conjudate and Biconjugate-Frank-Wolfe methods
@@ -197,11 +203,4 @@ Traffic assignment and equilibrium
 
 .. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment", Transportation Research Part B, 70:261-274. Available in: https://doi.org/10.1016/j.trb.2014.06.011
 
-.. [9] Marcotte, P., Patriksson, M. (2007) "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4
-
-Volume delay functions
-^^^^^^^^^^^^^^^^^^^^^^
-
-.. [7] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158. Available in: https://doi.org/10.1287/trsc.24.2.153
-
-.. [8] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
+.. [7] Marcotte, P., Patriksson, M. (2007) "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4

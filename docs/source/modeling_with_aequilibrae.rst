@@ -15,6 +15,7 @@ In this section you can find a deep dive into modeling with AequilibraE, from
 a start guide to a complete view into AequilibraE's data structure.
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
 
     modeling_with_aequilibrae/project
@@ -23,3 +24,5 @@ a start guide to a complete view into AequilibraE's data structure.
     modeling_with_aequilibrae/parameter_file
     modeling_with_aequilibrae/public_transport
     modeling_with_aequilibrae/transit_assignment
+
+.. include:: modeling_with_aequilibrae/software_components.rst

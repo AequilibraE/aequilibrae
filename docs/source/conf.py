@@ -61,7 +61,6 @@ extensions = [
     "sphinx_gallery.gen_gallery",
     "sphinx_design",
     "sphinx_copybutton",
-    # "sphinx_simplepdf",
     "sphinx_git",
 ]
 
@@ -124,7 +123,7 @@ html_static_path = ['_static']
 html_theme_options = {
     "show_nav_level": 0,
     "navbar_center": ["navbar-nav"],
-    "navbar_end": ["theme-switcher", "navbar-icon-links", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
     # "switcher": {

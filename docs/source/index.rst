@@ -14,7 +14,8 @@ resources not easily available from other open-source packages in the Python (Nu
 
 **Previous versions**: documentation for AequilibraE's versions before 0.9.0 are available :ref:`here <versionhistory>`.
 
-**Useful links**: :ref:`getting_started` | :ref:`validation` | :ref:`developing_aequilibrae` | :ref:`support`
+**Useful links**: :ref:`getting_started` | :ref:`validation` | :ref:`developing_aequilibrae` | :ref:`support` | 
+:ref:`history_of_aequilibrae`
 
 .. grid::
 

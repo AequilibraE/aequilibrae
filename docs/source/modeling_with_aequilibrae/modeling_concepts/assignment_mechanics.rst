@@ -189,11 +189,11 @@ Volume Delay Function
 
 For now, the only VDF functions available in AequilibraE are the
 
-* BPR [8]_
+* BPR [3]_
 
 .. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
 
-* Spiess' conical [7]_
+* Spiess' conical [2]_
 
 .. math:: CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)
 
@@ -249,7 +249,7 @@ Example:
   tc2 = TrafficClass("truck", graph_truck, matrix_truck)
 
 * **pce** - The passenger-car equivalent is the standard way of modeling
-  multi-class traffic assignment equilibrium in a consistent manner (see [4]_ for
+  multi-class traffic assignment equilibrium in a consistent manner (see [1]_ for
   the technical detail), and it is set to 1 by default. If the **pce** for a
   certain class should be different than one, one can make a quick method call.
 
@@ -333,3 +333,10 @@ Finally, one can execute assignment:
 
 :ref:`convergence_criteria` is discussed in a different section.
 
+References
+~~~~~~~~~~
+.. [1] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. Available in: https://doi.org/10.1177%2F0361198119837496
+
+.. [2] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158. Available in: https://doi.org/10.1287/trsc.24.2.153
+
+.. [3] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf

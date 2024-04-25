@@ -1,3 +1,5 @@
+:orphan:
+
 .. _importing_from_gmns:
 
 Importing from files in GMNS format
@@ -27,7 +29,7 @@ You can find the specification for all these tables in the GMNS documentation,
 By default, the method ``create_from_gmns()`` read all required and optional fields
 specified in the GMNS link and node tables specification. If you need it to read 
 any additional fields as well, you have to modify the AequilibraE parameters as
-shown in the :ref:`example <plot_import_from_gmns>`.
+shown in the :ref:`example <import_from_gmns>`.
 
 When adding a new field to be read in the parameters.yml file, it is important to 
 keep the "required" key set to False, since you will always be adding a non-required 

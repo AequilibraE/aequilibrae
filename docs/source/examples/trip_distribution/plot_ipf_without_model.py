@@ -9,7 +9,10 @@ This is a compliment to the application in :ref:`Trip Distribution <example_usag
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
 *How would your trip distribution matrix using IPF look like?*
-The data used in this example comes from Table 5.6 in [ORW2011]_.
+The data used in this example comes from Table 5.6 in Ortúzar & Willumsen (2011).
+
+Reference:
+ORTÚZAR, J.D., WILLUMSEN, L.G. (2011) *Modelling Transport* (4th ed.). Wiley-Blackwell.
 """
 
 # %%
