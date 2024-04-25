@@ -166,7 +166,7 @@ by the user, providing a complete specification of the assignment procedure:
 
 Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
-:ref:`example_usage_parameters` .
+:ref:`parameters_file` .
 
 There are also some strict technical requirements for formulating the
 multi-class equilibrium assignment as an unconstrained convex optimization problem,

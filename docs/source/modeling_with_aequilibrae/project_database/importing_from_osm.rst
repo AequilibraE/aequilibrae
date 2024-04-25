@@ -48,6 +48,7 @@ indices to the sqlite database.
     :alt: Adding Spatial indices with QGIS
 
 |
+
 If you are an expert user and made sure your Python installation was compiled
 against a complete SQLite set of extensions, then go ahead an import the network
 with the option for creating such indices.

@@ -119,7 +119,7 @@ html_theme = "pydata_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static', '_static/.htaccess', "_static/switcher.json"]
+html_static_path = ['_static']
 
 html_theme_options = {
     "show_nav_level": 0,
@@ -127,10 +127,10 @@ html_theme_options = {
     "navbar_end": ["theme-switcher", "navbar-icon-links", "version-switcher"],
     "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
-    "switcher": {
-        "json_url": "_static/switcher.json",
-        "version_match": "develop",
-    },
+    # "switcher": {
+    #     "json_url": "_static/switcher.json",
+    #     "version_match": "develop",
+    # },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
 }

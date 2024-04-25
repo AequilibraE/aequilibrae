@@ -194,6 +194,8 @@ Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago
 Regional), as that instance has a comparable size to real-world models.
 
+.. _algorithm_convergence_comparison:
+
 .. image:: ../images/convergence_comparison.png
     :align: center
     :width: 590
@@ -351,4 +353,4 @@ understand, and then we'll perform the assignment.
         assig.report().to_csv(os.path.join(data_folder, f"{algorithm}_computational_results.csv"))
 
 As we've exported the assignment's results into CSV files, we can use Pandas to read the files,
-and plot a graph just :ref:`like the one above <Algorithm convergence comparison>`.
+and plot a graph just :ref:`like the one above <algorithm_convergence_comparison>`.

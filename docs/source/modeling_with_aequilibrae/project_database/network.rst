@@ -259,11 +259,11 @@ Network links layer also has some possible changes of geographic and data-only n
 .. _net_deleting_link:
 
 Deleting a link
-`````````````````
+```````````````
 
 In case a link is deleted, it is necessary to check for orphan nodes, and deal
 with them as prescribed in :ref:`net_deleting_nodes`. In case one of the link
-extremities is a centroid (i.e. field *is_centroid*=1), then the node should not
+extremities is a centroid (i.e. field *is_centroid* =1), then the node should not
 be deleted even if orphaned.
 
 Behavior regarding the fields regarding modes and link types is discussed in
