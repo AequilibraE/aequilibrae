@@ -13,10 +13,7 @@ try:
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.signal import SIGNAL
 
 if False:
     from .results import AssignmentResults
@@ -24,8 +21,7 @@ if False:
 
 
 class allOrNothing(WorkerThread):
-    if pyqt:
-        assignment = SIGNAL(object)
+    assignment = SIGNAL(object)
 
     def __init__(self, matrix, graph, results):
         # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
@@ -56,8 +52,7 @@ class allOrNothing(WorkerThread):
         self.report = []
         self.cumulative = 0
 
-        if pyqt:
-            self.assignment.emit(["zones finalized", 0])
+        self.assignment.emit(["zones finalized", 0])
 
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
@@ -80,8 +75,7 @@ class allOrNothing(WorkerThread):
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        if pyqt:
-            self.assignment.emit(["finished_threaded_procedure", None])
+        self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -94,6 +88,5 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        if pyqt:
-            self.assignment.emit(["zones finalized", self.cumulative])
-            self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])
+        self.assignment.emit(["zones finalized", self.cumulative])
+        self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])

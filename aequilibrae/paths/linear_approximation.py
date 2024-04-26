@@ -37,16 +37,12 @@ else:
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.signal import SIGNAL
 
 
 class LinearApproximation(WorkerThread):
-    if pyqt:
-        equilibration = SIGNAL(object)
-        assignment = SIGNAL(object)
+    equilibration = SIGNAL(object)
+    assignment = SIGNAL(object)
 
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
@@ -486,9 +482,8 @@ class LinearApproximation(WorkerThread):
         self.logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
-            if pyqt:
-                self.equilibration.emit(["rgap", self.rgap])
-                self.equilibration.emit(["iterations", self.iter])
+            self.equilibration.emit(["rgap", self.rgap])
+            self.equilibration.emit(["iterations", self.iter])
 
             aon_flows = []
 
@@ -500,8 +495,7 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                if pyqt:
-                    aon.assignment.connect(self.signal_handler)
+                aon.assignment.connect(self.signal_handler)
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
@@ -633,10 +627,9 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        if pyqt:
-            self.equilibration.emit(["rgap", self.rgap])
-            self.equilibration.emit(["iterations", self.iter])
-            self.equilibration.emit(["finished_threaded_procedure"])
+        self.equilibration.emit(["rgap", self.rgap])
+        self.equilibration.emit(["iterations", self.iter])
+        self.equilibration.emit(["finished_threaded_procedure"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
@@ -732,5 +725,4 @@ class LinearApproximation(WorkerThread):
         return False
 
     def signal_handler(self, val):
-        if pyqt:
-            self.assignment.emit(val)
+        self.assignment.emit(val)
