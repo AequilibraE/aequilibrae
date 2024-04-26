@@ -7,6 +7,8 @@ Trip Distribution
 In this example, we calibrate a Synthetic Gravity Model that same model plus IPF (Fratar/Furness).
 """
 
+# %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -22,18 +24,17 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 
 # %%
-
 # We get the demand matrix directly from the project record
 # so let's inspect what we have in the project
 proj_matrices = project.matrices
 print(proj_matrices.list())
 
 # %%
-
 # We get the demand matrix
 demand = proj_matrices.get_matrix("demand_omx")
 demand.computational_view(["matrix"])
 
+# %%
 # And the impedance
 impedance = proj_matrices.get_matrix("skims")
 impedance.computational_view(["time_final"])
@@ -43,7 +44,7 @@ impedance.computational_view(["time_final"])
 from math import log10, floor
 import matplotlib.pyplot as plt
 
-
+# %%
 def plot_tlfd(demand, skim, name):
     plt.clf()
     b = floor(log10(skim.shape[0]) * 10)
@@ -67,7 +68,6 @@ def plot_tlfd(demand, skim, name):
 from aequilibrae.distribution import GravityCalibration
 
 # %%
-
 for function in ["power", "expo"]:
     gc = GravityCalibration(matrix=demand, impedance=impedance, function=function, nan_as_zero=True)
     gc.calibrate()
@@ -86,9 +86,9 @@ for function in ["power", "expo"]:
 
 # %%
 # We save a trip length frequency distribution for the demand itself
-
 plt = plot_tlfd(demand.matrix_view, impedance.matrix_view, join(fldr, "demand_tfld.png"))
 plt.show()
+
 #%%
 # Forecast
 # --------
@@ -102,10 +102,10 @@ from aequilibrae.matrix import AequilibraeData
 import numpy as np
 
 # %%
-
 zonal_data = pd.read_sql("Select zone_id, population, employment from zones order by zone_id", project.conn)
-# We compute the vectors from our matrix
 
+# %%
+# We compute the vectors from our matrix
 args = {
     "file_path": join(fldr, "synthetic_future_vector.aed"),
     "entries": demand.zones,
@@ -125,7 +125,6 @@ vectors.destinations[:] = zonal_data.employment[:] * 1.87
 vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
 
 # %%
-
 # We simply apply the models to the same impedance matrix now
 for function in ["power", "expo"]:
     model = SyntheticGravityModel()
@@ -149,12 +148,9 @@ for function in ["power", "expo"]:
     gravity.save_to_project(name=f"demand_{function}_model_omx", file_name=f"demand_{function}_model.omx")
 
 # %%
-
 # We update the matrices table/records and verify that the new matrices are indeed there
 proj_matrices.update_database()
 print(proj_matrices.list())
-
-# %% md
 
 # %%
 # We now run IPF for the future vectors
@@ -176,9 +172,7 @@ ipf.save_to_project(name="demand_ipf", file_name="demand_ipf.aem")
 ipf.save_to_project(name="demand_ipf_omx", file_name="demand_ipf.omx")
 
 # %%
-
 print(proj_matrices.list())
 
 # %%
-
 project.close()
