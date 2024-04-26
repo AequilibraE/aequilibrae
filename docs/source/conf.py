@@ -156,7 +156,7 @@ latex_elements = {}
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
 latex_appendices = [
-    "getting_started",
+    "installation",
     "validation_benchmarking/ipf_performance",
     "validation_benchmarking/traffic_assignment",
     "modeling_with_aequilibrae/project_database/importing_from_osm",

@@ -1,5 +1,3 @@
-:orphan:
-
 .. _examples-visualization:
 
 Visualization
