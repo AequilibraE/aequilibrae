@@ -3,7 +3,7 @@
 Naming Conventions:
 - a_node/b_node is head/tail vertex
 
-TransitGraphBuilder Assumtions:
+TransitGraphBuilder Assumptions:
 - opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
 - all times are expressed in seconds [s], all frequencies in [1/s], and
 - headways are uniform for trips of the same pattern.
@@ -62,34 +62,34 @@ def shift_duplicate_geometry(df, shift=0.00001):
 class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
-    :Arguments:
-        **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+        :Arguments:
+            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
 
-        **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
+            **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
-        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
+            **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
 
-        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
+            **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
 
-        **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+            **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
 
-        **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+            **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
 
-        **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
+            **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
 
-        **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
+            **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
 
-        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
+            **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
 
-        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
+            **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
 
-        **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
+            **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
 
-        **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
+            **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
 
-        **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
+            **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
 
-        **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
+            **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
     """
 
     def __init__(
@@ -757,6 +757,7 @@ class TransitGraphBuilder:
 
         :Arguments:
            **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
+
            **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
         """
         if method is None:
@@ -1185,6 +1186,7 @@ class TransitGraphBuilder:
 
         :Arguments:
            **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
+
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
         if method not in ["direct", "connector project match"]:
@@ -1237,13 +1239,18 @@ class TransitGraphBuilder:
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for ``connector_rows`` that matches the line strings in ``project.network.graphs[graph_key]``.
+        """Create line string geometry for ``connector_rows`` that matches the line strings in 
+        ``project.network.graphs[graph_key]``.
 
         :Arguments:
            **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges`` to create line strings for.
+
            **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull the graph from.
+
            **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes. Must have columns ``geometry``, and an index of ``node_id``s.
+
            **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links. Must have columns ``geometry``, and an index of ``link_id``s.
+
            **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use for path finding.
         """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
@@ -1480,7 +1487,7 @@ class TransitGraphBuilder:
     def convert_demand_matrix_from_zone_to_node_ids(
         self, demand_matrix, o_zone_col="origin_zone_id", d_zone_col="destination_zone", demand_col="demand"
     ):
-        """Convert a sparse demand matrix from ``zone_id``s to the corresponding ``node_id``s."""
+        """Convert a sparse demand matrix from ``zone_id``\'s to the corresponding ``node_id``\'s."""
         if self.blocking_centroid_flows:
             od_matrix = pd.merge(
                 demand_matrix,

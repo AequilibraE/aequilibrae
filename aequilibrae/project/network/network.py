@@ -304,9 +304,10 @@ class Network(WorkerThread):
 
         :Arguments:
             **fields** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
-                                              database, it may be useful to specify which fields to use
+            database, it may be useful to specify which fields to use
+
             **modes** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
-                                              database, it may be useful to generate only those we need
+            database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
 

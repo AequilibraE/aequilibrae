@@ -25,8 +25,9 @@ class Pattern(BasicPTElement):
 
     def __init__(self, route_id, gtfs_feed) -> None:
         """
-        Args:
+        :Arguments:
             *pattern_id* (:obj:`str`): Pre-computed ID for this pattern
+            
             *geotool* (:obj:`Geo`): Suite of geographic utilities.
         """
         self.pattern_hash = ""
@@ -331,14 +332,12 @@ class Pattern(BasicPTElement):
         self.shape = LineString(shape)
 
     def get_error(self, what_to_get="culprit") -> Optional[tuple]:
-        """
-           Returns information on the  area of the network a map-matching error occurred
+        """Returns information on the area of the network a map-matching error occurred
 
-        Args:
-
+        :Arguments:
            *what_to_get* (:obj:`str`): The object you want returned. Options are 'culprit' and 'partial_path'
 
-           :return:
+        :Returns:
         """
         if not self.__map_matching_error:
             self.__logger.debug("No map-matching error recorded for this pattern")

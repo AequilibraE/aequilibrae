@@ -53,7 +53,6 @@ jobs:
 
     - name: Build documentation
       run: |
-        sphinx-apidoc -T -o docs/source/generated aequilibrae
         sphinx-build -M latexpdf docs/source docs/source/_static
         cd docs
         make html

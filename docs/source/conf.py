@@ -102,7 +102,7 @@ language = "en"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -124,12 +124,12 @@ html_theme_options = {
     "show_nav_level": 0,
     "navbar_center": ["navbar-nav"],
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    "navbar_start": ["navbar-logo"],
+    "navbar_start": ["navbar-logo", "version-switcher"],
     "navbar_align": "left",
-    # "switcher": {
-    #     "json_url": "_static/switcher.json",
-    #     "version_match": "develop",
-    # },
+    "switcher": {
+        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
+        "version_match": switcher_version,
+    },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
 }
@@ -150,7 +150,14 @@ latex_elements = {}
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
-# latex_appendices = ["validation"]
+
+latex_appendices = ["getting_started", 
+                    "validation_benchmarking/ipf_performance", 
+                    "validation_benchmarking/traffic_assignment",
+                    "modeling_with_aequilibrae/project_database/importing_from_osm",
+                    "modeling_with_aequilibrae/project_database/importing_from_gmns",
+                    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
+                    ]
 
 # -- Options for manual page output ------------------------------------------
 
@@ -161,15 +168,16 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    "members": "var1, var2",
+    "members": True, 
+    "inherited-members": True,
     "member-order": "bysource",
     "special-members": False,
     "private-members": False,
     "undoc-members": True,
-    "exclude-members": "__weakref__",
+    # "exclude-members": "__weakref__",
 }
 
-autodoc_member_order = "groupwise"
+# autodoc_member_order = "groupwise"
 
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
