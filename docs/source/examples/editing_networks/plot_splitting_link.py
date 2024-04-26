@@ -8,6 +8,7 @@ In this example, we split a link right in the middle, while keeping all fields
 in the database equal. Distance is proportionally computed automatically in the database.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -16,14 +17,15 @@ from aequilibrae.utils.create_example import create_example
 from shapely.ops import substring
 import matplotlib.pyplot as plt
 
+# %%
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 
 # %%
-# We will split link 37 right in the middle
-# Let's get the link and check its length
+# We will split link 37 right in the middle.
+# Let's get the link and check its length.
 links = project.network.links
 all_nodes = project.network.nodes
 
@@ -32,7 +34,7 @@ print(link.distance)
 
 # %%
 # The idea is basically to copy a link and allocate the appropriate geometries
-# to split the geometry we use Shapely's substring
+# to split the geometry we use Shapely's substring.
 
 new_link = links.copy_link(37)
 
@@ -44,7 +46,7 @@ new_link.geometry = second_geometry
 links.save()
 
 # %%
-# The link objects in memory still don't have their ID fields updated, so we refresh them
+# The link objects in memory still don't have their ID fields updated, so we refresh them.
 links.refresh()
 link = links.get(37)
 new_link = links.get(new_link.link_id)
