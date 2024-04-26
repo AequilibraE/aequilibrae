@@ -1,5 +1,5 @@
 agencies
-attribute_documentation
+attributes_documentation
 fare_attributes
 fare_rules
 fare_zones
