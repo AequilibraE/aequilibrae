@@ -466,7 +466,7 @@ class LinearApproximation(WorkerThread):
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
-                # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
+                # each occurrence in the objective function. TODO: Need to think about cost skims here, we do
                 # not want this there I think
                 v = c.graph.graph[c.fixed_cost_field].values[:]
                 c.fixed_cost[c.graph.graph.__supernet_id__] = v * c.fc_multiplier / c.vot
@@ -476,26 +476,31 @@ class LinearApproximation(WorkerThread):
             # Just need to create some arrays for cost
             c.graph.set_graph(self.time_field)
 
-            self.aons[c._id] = allOrNothing(c.matrix, c.graph, c._aon_results)
+            self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
+        self.equilibration.emit(["start", self.max_iter, "Equilibrium Assignment"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
-            self.equilibration.emit(["rgap", self.rgap])
-            self.equilibration.emit(["iterations", self.iter])
+            self.equilibration.emit(["key_value", "rgap", self.rgap])
+            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             aon_flows = []
 
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
+                if self.assignment.pbar is None:
+                    self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                aon.assignment.connect(self.signal_handler)
+                self.assignment.pbar.reset()
+                aon.assignment = self.assignment
+
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
@@ -579,7 +584,7 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-
+            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.6f}"])
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -627,9 +632,9 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        self.equilibration.emit(["rgap", self.rgap])
-        self.equilibration.emit(["iterations", self.iter])
-        self.equilibration.emit(["finished_threaded_procedure"])
+        self.assignment.emit(["key_value", "rgap", self.rgap])
+        self.assignment.emit(["key_value", "iterations", self.iter])
+        self.assignment.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,

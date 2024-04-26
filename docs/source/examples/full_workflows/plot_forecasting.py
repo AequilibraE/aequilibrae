@@ -23,11 +23,6 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 logger = project.logger
 
-# We get the project open, and we can tell the logger to direct all messages to the terminal as well
-stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
-stdout_handler.setFormatter(formatter)
-logger.addHandler(stdout_handler)
 
 #%%
 # Traffic assignment with skimming

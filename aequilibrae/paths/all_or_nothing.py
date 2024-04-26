@@ -21,13 +21,12 @@ if False:
 
 
 class allOrNothing(WorkerThread):
-    assignment = SIGNAL(object)
-
-    def __init__(self, matrix, graph, results):
+    def __init__(self, class_name, matrix, graph, results):
         # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
-
+        self.assignment: SIGNAL = None
         WorkerThread.__init__(self, None)
 
+        self.class_name = class_name
         self.matrix = matrix
         self.graph = graph
         self.results = results
@@ -49,11 +48,12 @@ class allOrNothing(WorkerThread):
         self.execute()
 
     def execute(self):
+        if self.assignment is None:
+            self.assignment = SIGNAL(object)
+            self.assignment.emit(["start", self.matrix.zones, self.class_name])
+
         self.report = []
         self.cumulative = 0
-
-        self.assignment.emit(["zones finalized", 0])
-
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
@@ -75,7 +75,8 @@ class allOrNothing(WorkerThread):
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        self.assignment.emit(["finished_threaded_procedure", None])
+
+        self.assignment.emit(["finished"])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -88,5 +89,5 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        self.assignment.emit(["zones finalized", self.cumulative])
-        self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])
+
+        self.assignment.emit(["update", self.cumulative, self.class_name])

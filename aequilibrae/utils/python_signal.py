@@ -38,39 +38,22 @@ class PythonSignal:  # type: ignore
 
     def __init__(self, object):
         self.color = choice(["green", "magenta", "cyan", "blue", "red", "yellow"])
-        self.masterbar = None  # type: tqdm
-        self.secondarybar = None  # type: tqdm
-
-        self.current_master_data = {}
+        self.pbar = None  # type: tqdm
+        self.keydata = {}
 
     def emit(self, val):
-        return
-        # if self.deactivate:
-        #     return
-        # if len(val) == 1:
-        #     if "finished_" not in val[0] or "_procedure" not in val[0]:
-        #         raise Exception("Wrong signal")
-        #     for bar in [self.masterbar, self.secondarybar]:
-        #         if bar is not None:
-        #             bar.close()
-        #     return
-        #
-        # action, bar, qty, txt = val[:4]
-        #
-        # if action == "start":
-        #     if bar == "master":
-        #         self.masterbar = tqdm(total=qty, colour=self.color, leave=False, desc=txt)
-        #     else:
-        #         self.secondarybar = tqdm(total=qty, colour=self.color, leave=False, desc=txt)
-        #
-        # elif action == "update":
-        #     do_bar = self.masterbar if bar == "master" else self.secondarybar
-        #     if do_bar is None:
-        #         return
-        #     if bar == "secondary":
-        #         if do_bar.n + 1 == do_bar.total and self.masterbar is not None:
-        #             self.masterbar.update(1)
-        #
-        #     do_bar.update(1)
-        #     if do_bar.n == do_bar.total:
-        #         do_bar.close()
+        if self.deactivate:
+            return
+
+        if val[0] == "finished":
+            self.pbar.close()
+
+        elif val[0] == "key_value":
+            self.keydata[val[1]] = val[2]
+
+        elif val[0] == "start":
+            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=val[2])
+        elif val[0] == "update":
+            self.pbar.update(1)
+            if self.pbar.desc != val[2]:
+                self.pbar.set_description(val[2])
