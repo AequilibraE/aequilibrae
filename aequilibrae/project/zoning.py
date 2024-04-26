@@ -113,7 +113,7 @@ class Zoning(BasicTable):
         :Arguments:
             **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
 
-        :Return:
+        :Returns:
             **zone_id** (:obj:`int`): ID of the zone applicable to the point provided
         """
 

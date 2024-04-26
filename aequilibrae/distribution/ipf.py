@@ -227,7 +227,9 @@ class Ipf:
 
         :Arguments:
             **name** (:obj:`str`): Name of the desired matrix record
+
             **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
+            
             **project** (:obj:`Project`, Optional): Project we want to save the results to.
             Defaults to the active project
         """

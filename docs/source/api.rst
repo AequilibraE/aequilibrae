@@ -8,7 +8,7 @@ API Reference
 
 Project
 -------
-.. current_module:: aequilibrae.project
+.. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
    :toctree: generated/

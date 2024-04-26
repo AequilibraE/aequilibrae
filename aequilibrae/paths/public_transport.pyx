@@ -250,7 +250,9 @@ class HyperpathGenerating:
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
+
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
+            
             **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 
