@@ -31,9 +31,9 @@ class Transit:
 
     def __init__(self, project):
         """
-            :Arguments:
-                **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
-                active project
+        :Arguments:
+            **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            active project
         """
 
         self.project_base_path = project.project_base_path

@@ -62,7 +62,7 @@ class FieldEditor:
             **field_name** (:obj:`str`): Field to be added to the table. Must be a valid SQLite field name
 
             **description** (:obj:`str`): Description of the field to be inserted in the metadata
-            
+
             **data_type** (:obj:`str`, optional): Valid SQLite Data type. Default: "NUMERIC"
         """
         if field_name.lower() in self._original_values.keys():

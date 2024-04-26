@@ -13,19 +13,19 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 class Periods(BasicTable):
     """Access to the API resources to manipulate the links table in the network
 
-        .. code-block:: python
+    .. code-block:: python
 
-            >>> from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-            >>> proj = Project.from_path("/tmp/test_project")
+        >>> proj = Project.from_path("/tmp/test_project")
 
-            >>> all_periods = proj.network.periods
+        >>> all_periods = proj.network.periods
 
-            # We can just get one link in specific
-            >>> period = all_periods.get(21)
+        # We can just get one link in specific
+        >>> period = all_periods.get(21)
 
-            # We can save changes for all periods we have edited so far
-            >>> all_periods.save()
+        # We can save changes for all periods we have edited so far
+        >>> all_periods.save()
     """
 
     #: Query sql for retrieving periods

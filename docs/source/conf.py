@@ -68,16 +68,20 @@ extensions = [
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
-    'capture_repr': ('_repr_html_', '__repr__'),
-    'remove_config_comments': True,
-    "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/editing_networks",
-                                      "examples/trip_distribution",
-                                      "examples/visualization",
-                                      "examples/aequilibrae_without_a_model",
-                                      "examples/full_workflows",
-                                      "examples/other_applications"]),
-    'plot_gallery': 'False',
+    "capture_repr": ("_repr_html_", "__repr__"),
+    "remove_config_comments": True,
+    "subsection_order": ExplicitOrder(
+        [
+            "examples/creating_models",
+            "examples/editing_networks",
+            "examples/trip_distribution",
+            "examples/visualization",
+            "examples/aequilibrae_without_a_model",
+            "examples/full_workflows",
+            "examples/other_applications",
+        ]
+    ),
+    "plot_gallery": "False",
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -118,7 +122,7 @@ html_theme = "pydata_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 html_theme_options = {
     "show_nav_level": 0,
@@ -151,13 +155,14 @@ latex_elements = {}
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
-latex_appendices = ["getting_started", 
-                    "validation_benchmarking/ipf_performance", 
-                    "validation_benchmarking/traffic_assignment",
-                    "modeling_with_aequilibrae/project_database/importing_from_osm",
-                    "modeling_with_aequilibrae/project_database/importing_from_gmns",
-                    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
-                    ]
+latex_appendices = [
+    "getting_started",
+    "validation_benchmarking/ipf_performance",
+    "validation_benchmarking/traffic_assignment",
+    "modeling_with_aequilibrae/project_database/importing_from_osm",
+    "modeling_with_aequilibrae/project_database/importing_from_gmns",
+    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
+]
 
 # -- Options for manual page output ------------------------------------------
 
@@ -168,7 +173,7 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    "members": True, 
+    "members": True,
     "inherited-members": True,
     "member-order": "bysource",
     "special-members": False,

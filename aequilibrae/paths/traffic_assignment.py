@@ -660,8 +660,8 @@ class TrafficAssignment(AssignmentBase):
         :Arguments:
             **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
 
-            **which_ones** (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results 
-            for all iterations, 'all': Saves skims for both the final iteration and the blended ones}. 
+            **which_ones** (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results
+            for all iterations, 'all': Saves skims for both the final iteration and the blended ones}.
             Default is 'final'
 
             **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
@@ -928,7 +928,7 @@ class TransitAssignment(AssignmentBase):
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
 
             **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            
+
             **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
         """
 

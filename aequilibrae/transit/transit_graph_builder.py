@@ -62,34 +62,34 @@ def shift_duplicate_geometry(df, shift=0.00001):
 class TransitGraphBuilder:
     """Graph builder for the transit assignment Spiess & Florian algorithm.
 
-        :Arguments:
-            **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+    :Arguments:
+        **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
 
-            **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
+        **period_id** (:obj:`int`): Period id for the period to be used. Preferred over start and end.
 
-            **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
+        **time_margin** (:obj:`int`): Time margin, extends the ``start`` and ``end`` times by ``time_margin`` ([``start``, ``end``] becomes [``start`` - ``time_margin``, ``end`` + ``time_margin``]), in order to include more trips when computing mean values. Defaults to ``0``.
 
-            **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
+        **projected_crs** (:obj:`str`): Projected CRS of the network, intended for more accurate distance calculations. Defaults to ``"EPSG:3857"``, Spherical Mercator.
 
-            **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
+        **num_threads** (:obj:`int`): Number of threads to be used where possible. Defaults to ``-1``, using all available threads.
 
-            **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
+        **seed** (:obj:`int`): Seed for ``self.rng``. Defaults to ``124``.
 
-            **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
+        **geometry_noise** (:obj:`bool`): Whether to use noise in geometry creation, in order to avoid colocated nodes. Defaults to ``True``.
 
-            **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
+        **noise_coef** (:obj:`float`): Scaling factor of the noise. Defaults to ``1.0e-5``.
 
-            **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
+        **with_inner_stop_transfers** (:obj:`bool`): Whether to create transfer edges within parent stations. Defaults to ``False``.
 
-            **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
+        **with_outer_stop_transfers** (:obj:`bool`): Whether to create transfer edges between parent stations. Defaults to ``False``.
 
-            **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
+        **with_walking_edges** (:obj:`bool`): Whether to create walking edges between distinct stops of each station. Defaults to ``True``.
 
-            **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
+        **distance_upper_bound** (:obj:`float`): Upper bound on connector distance. Defaults to ``np.inf``.
 
-            **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
+        **blocking_centroid_flows** (:obj:`bool`): Whether to block flow through centroids. Defaults to ``True``.
 
-            **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
+        **max_connectors_per_zone** (:obj:`int`): Maximum connectors per zone. Defaults to ``-1`` for unlimited.
     """
 
     def __init__(
@@ -1239,7 +1239,7 @@ class TransitGraphBuilder:
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for ``connector_rows`` that matches the line strings in 
+        """Create line string geometry for ``connector_rows`` that matches the line strings in
         ``project.network.graphs[graph_key]``.
 
         :Arguments:
