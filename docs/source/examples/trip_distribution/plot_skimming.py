@@ -26,6 +26,7 @@ import logging
 import sys
 
 # %%
+
 # We the project opens, we can tell the logger to direct all messages to the terminal as well
 logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -51,21 +52,18 @@ project.network.build_graphs()
 # We grab the graph for cars
 graph = project.network.graphs["c"]
 
-# %%
 # we also see what graphs are available
 project.network.graphs.keys()
 
-# %%
 # let's say we want to minimize the distance
 graph.set_graph("distance")
 
-# %%
 # And will skim distance while we are at it, other fields like `free_flow_time` or `travel_time` 
 # can be added here as well
 graph.set_skimming(["distance"])
 
-# %%
-# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), these happen to be a selection of western centroids.
+# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), 
+# these happen to be a selection of western centroids.
 graph.prepare_graph(np.array(list(range(28, 41)) + list(range(49, 91))))
 
 # %%
@@ -77,7 +75,6 @@ skm.execute()
 # The result is an AequilibraEMatrix object
 skims = skm.results.skims
 
-# %%
 # Which we can manipulate directly from its temp file, if we wish
 skims.matrices[:3, :3, :]
 

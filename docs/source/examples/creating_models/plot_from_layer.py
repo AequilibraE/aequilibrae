@@ -54,8 +54,8 @@ existing_types = [ltype.link_type for ltype in lt_dict.values()]
 
 #%%
 # We could also get it directly from the project database
-# 
-# ``existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]``
+
+# existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
 
 #%%
 # We add the link types that do not exist yet
@@ -73,7 +73,6 @@ for i, ltype in enumerate(types_to_add):
 
 # %%
 # We need to use a similar process for modes
-
 md = project.network.modes
 md_dict = md.all_modes()
 existing_modes = {k: v.mode_name for k, v in md_dict.items()}
@@ -86,7 +85,6 @@ existing_modes = {k: v.mode_name for k, v in md_dict.items()}
 # We get all the unique mode combinations and merge them into a single string
 all_variations_string = "".join(df.modes.unique())
 
-# %%
 # We then get all the unique modes in that string above
 all_modes = set(all_variations_string)
 
@@ -94,7 +92,6 @@ all_modes = set(all_variations_string)
 
 # %%
 # Now let's add any new mode to the project
-
 modes_to_add = [mode for mode in all_modes if mode not in existing_modes]
 for i, mode_id in enumerate(modes_to_add):
     new_mode = md.new(mode_id)
@@ -109,9 +106,9 @@ for i, mode_id in enumerate(modes_to_add):
 # %%
 # We cannot use the existing link_id, so we create a new field to not loose
 # this information
-
 links = project.network.links
 link_data = links.fields
+
 # Create the field and add a good description for it
 link_data.add("source_id", "link_id from the data source")
 
@@ -120,7 +117,6 @@ links.refresh_fields()
 
 # %%
 # We can now add all links to the project!
-
 for idx, record in df.iterrows():
     new_link = links.new()
 
@@ -141,9 +137,11 @@ links = project.network.links.data
 # We create a Folium layer
 network_links = folium.FeatureGroup("links")
 
-# %%
+#%%
 # We do some Python magic to transform this dataset into the format required by Folium.
-# We are only getting link_id and link_type into the map, but we could get other pieces of info as well
+# We are only getting `link_id` and `link_type` into the map, but we could get other pieces of info as well
+
+# %%
 for i, row in links.iterrows():
     points = row.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
     points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"

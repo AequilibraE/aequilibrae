@@ -75,7 +75,6 @@ for i, row in links.iterrows():
             points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="yellow", weight=4
         ).add_to(transit)
 
-# %%
 # And now we get the nodes
 for i, row in nodes.iterrows():
     point = (row.geometry.y, row.geometry.x)

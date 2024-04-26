@@ -33,11 +33,9 @@ from aequilibrae.utils.create_example import create_example, list_examples
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
-# %%
 # We can print the list of examples that ship with AequilibraE
 print(list_examples())
 
-# %%
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
 

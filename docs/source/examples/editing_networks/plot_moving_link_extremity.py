@@ -32,13 +32,13 @@ links = project.network.links
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom
 
 # %%
+
 # We edit the link that goes from node 1 to node 2
 link = links.get(1)
 node = all_nodes.get(1)
 new_extremity = Point(node.geometry.x + 0.02, node.geometry.y - 0.02)
 link.geometry = LineString([node.geometry, new_extremity])
 
-# %%
 # and the link that goes from node 2 to node 1
 link = links.get(3)
 node2 = all_nodes.get(2)
