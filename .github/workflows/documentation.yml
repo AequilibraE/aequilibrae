@@ -31,6 +31,7 @@ jobs:
         sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
         sudo apt install latexmk
+        sudo apt install texlive-latex-extra
 
     - name: Compile library
       run: |
