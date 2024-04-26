@@ -24,5 +24,3 @@ a start guide to a complete view into AequilibraE's data structure.
     modeling_with_aequilibrae/parameter_file
     modeling_with_aequilibrae/public_transport
     modeling_with_aequilibrae/transit_assignment
-
-.. include:: modeling_with_aequilibrae/software_components.rst

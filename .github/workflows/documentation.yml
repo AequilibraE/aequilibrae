@@ -53,6 +53,8 @@ jobs:
 
     - name: Build documentation
       run: |
+        python3 -m zipfile AequilibraE.zip docs/source
+        cp AequilibraE.zip docs/source/_static
         sphinx-build -M latexpdf docs/source docs/source/_static
         cd docs
         make html
