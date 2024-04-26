@@ -27,7 +27,7 @@ class Pattern(BasicPTElement):
         """
         :Arguments:
             *pattern_id* (:obj:`str`): Pre-computed ID for this pattern
-            
+
             *geotool* (:obj:`Geo`): Suite of geographic utilities.
         """
         self.pattern_hash = ""

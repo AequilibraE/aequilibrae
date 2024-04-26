@@ -6,25 +6,25 @@ from ...utils.spatialite_utils import connect_spatialite
 class Period(SafeClass):
     """A Period object represents a single record in the *periods* table
 
-        .. code-block:: python
+    .. code-block:: python
 
-            >>> from aequilibrae import Project
+        >>> from aequilibrae import Project
 
-            >>> proj = Project.from_path("/tmp/test_project")
+        >>> proj = Project.from_path("/tmp/test_project")
 
-            >>> all_periods = proj.network.periods
+        >>> all_periods = proj.network.periods
 
-            # We can just get one link in specific
-            >>> period1 = all_periods.get(1)
+        # We can just get one link in specific
+        >>> period1 = all_periods.get(1)
 
-            # We can find out which fields exist for the period
-            >>> which_fields_do_we_have = period1.data_fields()
+        # We can find out which fields exist for the period
+        >>> which_fields_do_we_have = period1.data_fields()
 
-            # It succeeds if the period_id already does not exist
-            >>> period1.renumber(998877)
+        # It succeeds if the period_id already does not exist
+        >>> period1.renumber(998877)
 
-            # We can just save the period
-            >>> period1.save()
+        # We can just save the period
+        >>> period1.save()
     """
 
     def __init__(self, dataset, project):
@@ -48,8 +48,8 @@ class Period(SafeClass):
     def data_fields(self) -> list:
         """Lists all data fields for the period, as available in the database
 
-            :Returns:
-                **data fields** (:obj:`list`): list of all fields available for editing
+        :Returns:
+            **data fields** (:obj:`list`): list of all fields available for editing
         """
 
         return list(self.__original__.keys())
@@ -57,10 +57,10 @@ class Period(SafeClass):
     def renumber(self, new_id: int):
         """Renumbers the period in the network
 
-            Logs a warning if another period already exists with this period_id
+        Logs a warning if another period already exists with this period_id
 
-            :Arguments:
-                **new_id** (:obj:`int`): New period_id
+        :Arguments:
+            **new_id** (:obj:`int`): New period_id
         """
 
         new_id = int(new_id)
