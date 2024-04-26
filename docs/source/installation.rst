@@ -1,6 +1,6 @@
 :orphan:
 
-.. _getting_started:
+.. _installation:
 
 Installation
 ============
