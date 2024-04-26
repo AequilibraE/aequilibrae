@@ -54,14 +54,11 @@ transit = data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
 
 transit.load_date("2016-04-13")
 
-# %%
 # Now we execute the map matching to find the real paths.
 # Depending on the GTFS size, this process can be really time-consuming.
-
 transit.set_allow_map_match(True)
 transit.map_match()
 
-# %%
 # Finally, we save our GTFS into our model.
 transit.save_to_disk()
 

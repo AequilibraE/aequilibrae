@@ -35,7 +35,6 @@ node = all_nodes.get(1)
 new_geo = Point(node.geometry.x + 0.02, node.geometry.y - 0.02)
 node.geometry = new_geo
 
-# %%
 # We can save changes for all nodes we have edited so far.
 node.save()
 

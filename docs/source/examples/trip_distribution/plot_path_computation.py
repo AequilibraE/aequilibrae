@@ -49,23 +49,17 @@ project.network.build_graphs()
 # We grab the graph for cars
 graph = project.network.graphs["c"]
 
-# %%
 # we also see what graphs are available
-# 
-# ``project.network.graphs.keys()``
+project.network.graphs.keys()
 
-# %%
 # let's say we want to minimize the distance
 graph.set_graph("distance")
 
-# %%
 # And will skim time and distance while we are at it
 graph.set_skimming(["travel_time", "distance"])
 
-# %%
 # And we will allow paths to be computed going through other centroids/centroid connectors.
 # We recommend you to `be extremely careful` with this setting.
-
 graph.set_blocked_centroid_flows(False)
 
 # %%
@@ -73,12 +67,10 @@ graph.set_blocked_centroid_flows(False)
 res = PathResults()
 res.prepare(graph)
 
-# %%
 # compute a path from node 32343 to 22041, thats from near the airport to Fort Lambert, 
 # a popular location due to its views of the Coquimbo bay.
 res.compute_path(32343, 22041)
 
-# %%
 # We can get the sequence of nodes we traverse
 res.path_nodes
 
@@ -139,7 +131,6 @@ from shapely.ops import linemerge
 # %%
 links = project.network.links
 
-# %%
 # We plot the entire network
 curr = project.conn.cursor()
 curr.execute("Select link_id from links;")

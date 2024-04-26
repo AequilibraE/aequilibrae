@@ -11,6 +11,7 @@ in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 import os
@@ -41,6 +42,8 @@ project.network.export_to_gmns(path=output_fldr)
 links = pd.read_csv(os.path.join(output_fldr, "link.csv"))
 nodes = pd.read_csv(os.path.join(output_fldr, "node.csv"))
 
+# %%
+
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")
 network_nodes = folium.FeatureGroup("nodes")
@@ -59,7 +62,6 @@ for i, row in links.iterrows():
     ).add_to(network_links)
 
 # And now we get the nodes
-
 for i, row in nodes.iterrows():
     point = (row.y_coord, row.x_coord)
 
@@ -75,12 +77,11 @@ for i, row in nodes.iterrows():
     ).add_to(network_nodes)
 
 # %%
+
 # We get the center of the region
 curr = project.conn.cursor()
 curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
-
-# %%
 
 # We create the map
 map_gmns = folium.Map(location=[lat, long], zoom_start=12)
@@ -92,7 +93,6 @@ for layer in layers:
 # And Add layer control before we display it
 folium.LayerControl().add_to(map_gmns)
 map_gmns
-
 
 # %%
 project.close()

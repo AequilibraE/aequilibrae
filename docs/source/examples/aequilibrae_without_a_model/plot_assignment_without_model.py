@@ -38,7 +38,6 @@ folder = gettempdir()
 # First we load our demand file. This file has three columns: O, D, and Ton. 
 # O and D stand for origin and destination, respectively, and Ton is the demand of each
 # OD pair.
-
 dem = pd.read_csv(demand_file)
 zones = int(max(dem.O.max(), dem.D.max()))
 index = np.arange(zones) + 1
@@ -90,6 +89,8 @@ geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set
 #%%
 # Let's build our Graph! In case you're in doubt about AequilibraE Graph, 
 # :ref:`click here <aequilibrae-graphs>` to read more about it.
+
+# %%
 g = Graph()
 g.cost = network['free_flow_time'].values
 g.capacity = network['capacity'].values
