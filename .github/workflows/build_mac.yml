@@ -4,7 +4,7 @@ on:  [pull_request, release]
 
 jobs:
   deploy:
-    runs-on:  macos-latest
+    runs-on:  macos-13
     env:
       # Note that compiler options for macos-latest are documented here:
       # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md
