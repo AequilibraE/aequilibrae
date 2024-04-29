@@ -1,5 +1,3 @@
-:orphan:
-
 Editing networks
 ----------------
 
