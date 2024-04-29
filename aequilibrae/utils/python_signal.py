@@ -54,6 +54,6 @@ class PythonSignal:  # type: ignore
         elif val[0] == "start":
             self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=val[2])
         elif val[0] == "update":
-            self.pbar.update(1)
+            self.pbar.update(val[1] - self.pbar.n)
             if self.pbar.desc != val[2]:
                 self.pbar.set_description(val[2])

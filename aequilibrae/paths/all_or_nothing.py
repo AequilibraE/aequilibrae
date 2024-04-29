@@ -44,14 +44,16 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
-    def doWork(self):
-        self.execute()
-
-    def execute(self):
+    def _build_signal(self):
         if self.assignment is None:
             self.assignment = SIGNAL(object)
             self.assignment.emit(["start", self.matrix.zones, self.class_name])
 
+    def doWork(self):
+        self.execute()
+
+    def execute(self):
+        self._build_signal()
         self.report = []
         self.cumulative = 0
         self.aux_res.prepare(self.graph, self.results)
@@ -76,8 +78,6 @@ class allOrNothing(WorkerThread):
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
 
-        self.assignment.emit(["finished"])
-
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
         th = all_threads.get(thread_id, all_threads["count"])
@@ -89,5 +89,5 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-
-        self.assignment.emit(["update", self.cumulative, self.class_name])
+        if self.cumulative % 10 == 0:
+            self.assignment.emit(["update", self.cumulative, self.class_name])

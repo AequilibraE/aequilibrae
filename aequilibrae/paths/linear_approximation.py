@@ -498,6 +498,7 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
+                self.assignment.pbar.refresh()
                 self.assignment.pbar.reset()
                 aon.assignment = self.assignment
 
@@ -603,6 +604,8 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
+            self.equilibration.emit(["key_value", "rgap", self.rgap])
+            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
@@ -632,9 +635,8 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        self.assignment.emit(["key_value", "rgap", self.rgap])
-        self.assignment.emit(["key_value", "iterations", self.iter])
         self.assignment.emit(["finished"])
+        self.equilibration.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
