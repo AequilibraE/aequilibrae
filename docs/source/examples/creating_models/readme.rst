@@ -1,4 +1,4 @@
-.. _examples_creating_models:
+:orphan:
 
 Creating Models
 ---------------

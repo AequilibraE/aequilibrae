@@ -1,4 +1,4 @@
-.. _examples_trip_distribution:
+:orphan:
 
 Trip Distribution
 -----------------

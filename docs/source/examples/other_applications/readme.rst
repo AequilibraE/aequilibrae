@@ -1,4 +1,4 @@
-.. _examples_other_applications:
+:orphan:
 
 Other Applications
 ------------------
