@@ -37,19 +37,20 @@ class AequilibraeData(object):
         Creates a new empty dataset
 
         :Arguments:
-            **file_path** (:obj:`str`, Optional): Full path for the output data file. If *memory_mode* is 'false' and
+            **file_path** (:obj:`str`, *Optional*): Full path for the output data file. If *memory_mode* is 'false' and
             path is missing, then the file is created in the temp folder
 
-            **entries** (:obj:`int`, Optional): Number of records in the dataset. Default is 1
+            **entries** (:obj:`int`, *Optional*): Number of records in the dataset. Default is 1
 
-            **field_names** (:obj:`list`, Optional): List of field names for this dataset. If no list is provided, the
+            **field_names** (:obj:`list`, *Optional*): List of field names for this dataset. If no list is provided, the
             field 'data' will be created
 
-            **data_types** (:obj:`np.dtype`, Optional): List of data types for the dataset. Types need to be NumPy data
-            types (e.g. np.int16, np.float64). If no list of types are provided, type will be *np.float64*
+            **data_types** (:obj:`np.dtype`, *Optional*): List of data types for the dataset.
+            Types need to be NumPy data types (e.g. ``np.int16``, ``np.float64``).
+            If no list of types are provided, type will be ``np.float64``
 
-            **memory_mode** (:obj:`bool`, Optional): If true, dataset will be kept in memory. If false, the dataset will
-            be a memory-mapped numpy array
+            **memory_mode** (:obj:`bool`, *Optional*): If ``True``, dataset will be kept in memory.
+            If ``False``, the dataset will be a memory-mapped numpy array
 
         .. code-block:: python
 

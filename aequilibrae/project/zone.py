@@ -56,8 +56,9 @@ class Zone(SafeClass):
         :Arguments:
             **point** (:obj:`Point`): Shapely Point corresponding to the desired centroid position.
             If None, uses the geometric center of the zone
-            **robust** (:obj:`Bool`, Optional): Moves the centroid location around to avoid node conflict.
-            Defaults to True.
+
+            **robust** (:obj:`Bool`, *Optional*): Moves the centroid location around to avoid node conflict.
+            Defaults to ``True``.
         """
 
         # This is VERY small in real-world terms (between zero and 11cm)
@@ -107,10 +108,10 @@ class Zone(SafeClass):
         :Arguments:
             **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
-            **link_types** (:obj:`str`, `Optional`): String with all the link type IDs that can be considered.
+            **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can be considered.
             eg: yCdR. Defaults to ALL link types
 
-            **connectors** (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+            **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
         """
         connector_creation(
             self.geometry,

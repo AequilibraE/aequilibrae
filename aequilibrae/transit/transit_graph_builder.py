@@ -213,7 +213,7 @@ class TransitGraphBuilder:
         """Add zones as ODs.
 
         :Arguments:
-            **zones** (:obj:`pd.DataFrame`): Dataframe containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
 
             **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
@@ -313,10 +313,12 @@ class TransitGraphBuilder:
         2   10001006000     3   180.000000
 
         :Arguments:
-           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day). Defaults to ``True``.
+           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the
+           [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day).
+           Defaults to ``True``.
 
         :Returns:
-           **tt** (:obj:`pd.DataFrame`): Dataframe containing the travel item for line segments.
+           **tt** (:obj:`pd.DataFrame`): DataFrame containing the travel item for line segments.
         """
 
         if time_filter:
@@ -756,9 +758,11 @@ class TransitGraphBuilder:
         Overlapping regions: Creates edges between all stops that lying within the circle centred on each OD whose radius is the distance to the next nearest OD.
 
         :Arguments:
-           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
+           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour".
+           Defaults to ``overlapping_regions``.
 
-           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
+           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not.
+           Defaults to ``True``.
         """
         if method is None:
             method = self.connector_method

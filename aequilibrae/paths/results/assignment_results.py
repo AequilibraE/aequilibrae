@@ -340,7 +340,7 @@ class AssignmentResults(AssignmentResultsBase):
         :Arguments:
             **file_name** (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
 
-            **output** (:obj:`str`, optional): Type of output ('loads', 'path_file'). Defaults to 'loads'
+            **output** (:obj:`str`, *Optional*): Type of output ('loads', 'path_file'). Defaults to 'loads'
         """
 
         if output == "loads":

@@ -140,8 +140,11 @@ class NetworkSkimming(WorkerThread):
 
         :Arguments:
             **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
-            **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            **project** (:obj:`Project`, `Optional`): Project we want to save the results to. Defaults to the active project
+
+            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is ``'omx'``
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         file_name = f"{name}.{format.lower()}"
