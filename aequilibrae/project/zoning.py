@@ -97,7 +97,7 @@ class Zoning(BasicTable):
         return self.__items[zone_id]
 
     def all_zones(self) -> dict:
-        """Returns a dictionary with all Zone objects available in the model. zone_id as key"""
+        """Returns a dictionary with all Zone objects available in the model. *zone_id* as key"""
         return self.__items
 
     def save(self):
@@ -113,7 +113,7 @@ class Zoning(BasicTable):
         :Arguments:
             **geometry** (:obj:`Point` or :obj:`LineString`): A Shapely geometry object
 
-        :Return:
+        :Returns:
             **zone_id** (:obj:`int`): ID of the zone applicable to the point provided
         """
 

@@ -30,6 +30,8 @@ jobs:
         sudo apt update
         sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
+        sudo apt install latexmk
+        sudo apt install texlive-latex-extra
 
     - name: Compile library
       run: |
@@ -49,10 +51,12 @@ jobs:
         python -m doctest -v ./aequilibrae/project/about.py
         python -m doctest -v ./aequilibrae/project/zoning.py
 
-
     - name: Build documentation
       run: |
-        sphinx-apidoc -T -o docs/source/generated aequilibrae
+        sphinx-build -M latexpdf docs/source docs/source/_static
+        sphinx-build -b html docs/source docs/build
+        python3 -m zipfile -c AequilibraE.zip docs/build
+        cp AequilibraE.zip docs/source/_static
         cd docs
         make html
 

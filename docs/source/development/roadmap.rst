@@ -1,5 +1,3 @@
-.. _development_roadmap:
-
 Development Roadmap
 ===================
 

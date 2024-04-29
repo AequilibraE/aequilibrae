@@ -1,5 +1,3 @@
-.. _software_development:
-
 Contributing to AequilibraE
 ===========================
 
@@ -76,7 +74,7 @@ Style
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. For that, we use `Black <https://github.com/ambv/black>`_
+* We are big fans of auto-code formatting. For that, we use `Black <https://black.readthedocs.io/en/stable/index.html/>`_
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports

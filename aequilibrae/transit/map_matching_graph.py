@@ -58,7 +58,9 @@ class MMGraph(WorkerThread):
 
         :Arguments:
             **mode_id** (:obj:`int`): Mode ID for which we will build the graph for
-            **distance_to_project** (:obj:`float`, `Optional`): Radius search for links to break at the stops. Defaults to 50m
+
+            **distance_to_project** (:obj:`float`, *Optional*): Radius search for links to break at the stops.
+            Defaults to 50m
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
         self.mode_id = mode_id

@@ -8,6 +8,7 @@ In this example, we present a full forecasting workflow for the Sioux Falls
 example model.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -52,7 +53,7 @@ graph.set_skimming(["free_flow_time", "distance"])
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# We get the demand matrix directly from the project record
+# We get the demand matrix directly from the project record.
 # So let's inspect what we have in the project
 proj_matrices = project.matrices
 print(proj_matrices.list())
@@ -93,6 +94,7 @@ assig.execute()  # we then execute the assignment
 # Convergence report is easy to see
 import pandas as pd
 
+# %%
 convergence_report = assig.report()
 print(convergence_report.head())
 
@@ -127,6 +129,7 @@ print(proj_matrices.list())
 # We need the demand
 demand = proj_matrices.get_matrix("demand_aem")
 
+# %%
 # And the skims
 imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 
@@ -134,11 +137,12 @@ imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 # We can check which matrix cores were created for our skims to decide which one to use
 imped.names
 
+#%%
 # Where ``free_flow_time_final`` is actually the congested time for the last iteration
 
 # %%
-# But before using the data, let's get some impedance for the intrazonals
-# Let's assume it is 75% of the closest zone
+# But before using the data, let's get some impedance for the intrazonals.
+# Let's assume it is 75% of the closest zone.
 imped_core = "free_flow_time_final"
 imped.computational_view([imped_core])
 
@@ -160,7 +164,7 @@ imped.save(names=["final_time_with_intrazonals"])
 
 # %%
 # This also updates these new matrices as those being used for computation
-# As one can verify below
+# as one can verify below
 imped.view_names
 
 # %%
@@ -223,8 +227,10 @@ vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
 imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 imped.computational_view(["final_time_with_intrazonals"])
 
+# %%
 # If we wanted the main diagonal to not be considered...
-# ``np.fill_diagonal(imped.matrix_view, np.nan)`` 
+
+# np.fill_diagonal(imped.matrix_view, np.nan)
 
 # %%
 for function in ["power", "expo"]:
@@ -296,6 +302,7 @@ demand.names
 # Let's use the IPF matrix
 demand.computational_view("matrix")
 
+# %%
 assig = TrafficAssignment()
 
 # Creates the assignment class
@@ -320,10 +327,11 @@ assig.max_iter = 500
 assig.rgap_target = 0.00001
 
 #%%
-# **OPTIONAL**
-
+# Optional: Select link analysis
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
 # If we want to execute select link analysis on a particular TrafficClass, we set the links we are analyzing.
-# The format of the input select links is a dictionary (str: list[tuple]).
+# The format of the input select links is a ``dictionary (str: list[tuple])``.
 # Each entry represents a separate set of selected links to compute. The str name will name the set of links.
 # The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph.
 # Direction can be 0, 1, -1. 0 denotes bi-directionality
@@ -334,6 +342,8 @@ select_links = {
     "Leaving node 1": [(1, 1), (2, 1)],
     "Random nodes": [(3, 1), (5, 1)],
 }
+
+# %%
 # We call this command on the class we are analyzing with our dictionary of values
 assigclass.set_select_links(select_links)
 
@@ -352,9 +362,11 @@ assig.save_select_link_flows("just_flows")
 assig.save_select_link_matrices("just_matrices")
 # Internally, the save_select_link_results calls both of these methods at once.
 
+# %%
 # We could export it to CSV or AequilibraE data, but let's put it directly into the results database
 assig.save_results("future_year_assignment")
 
+# %%
 # And save the skims
 assig.save_skims("future_year_assignment_skims", which_ones="all", format="omx")
 
@@ -363,6 +375,7 @@ assig.save_skims("future_year_assignment_skims", which_ones="all", format="omx")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import matplotlib.pyplot as plt
 
+# %%
 df = assig.report()
 x = df.iteration.values
 y = df.rgap.values

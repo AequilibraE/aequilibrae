@@ -72,7 +72,7 @@ class AssignmentPaths(object):
         :Arguments:
             **table_name** (str): Name of the traffic assignment result table used to generate the required path files
 
-            **project** (:obj:`Project`, optional): The Project to connect to.
+            **project** (:obj:`Project`, *Optional*): The Project to connect to.
             By default, uses the currently active project
 
         """

@@ -134,10 +134,10 @@ class Node(SafeClass):
 
             **mode_id** (:obj:`str`): Mode ID we are trying to connect
 
-            **link_types** (:obj:`str`, `Optional`): String with all the link type IDs that can
+            **link_types** (:obj:`str`, *Optional*): String with all the link type IDs that can
             be considered. eg: yCdR. Defaults to ALL link types
 
-            **connectors** (:obj:`int`, `Optional`): Number of connectors to add. Defaults to 1
+            **connectors** (:obj:`int`, *Optional*): Number of connectors to add. Defaults to 1
         """
         if self.is_centroid != 1 or self.__original__["is_centroid"] != 1:
             self._logger.warning("Connecting a mode only makes sense for centroids and not for regular nodes")

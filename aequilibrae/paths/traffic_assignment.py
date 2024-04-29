@@ -97,7 +97,7 @@ class AssignmentBase(ABC):
         Sets Transport classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TransportClassBase]`:) List of TransportClass's for assignment
+            **classes** (:obj:`List[TransportClassBase]`): List of TransportClass's for assignment
         """
 
         ids = {x._id for x in classes}
@@ -110,7 +110,7 @@ class AssignmentBase(ABC):
         Adds a Transport class to the assignment
 
         :Arguments:
-            **transport_class** (:obj:`TransportClassBase`:) Transport class
+            **transport_class** (:obj:`TransportClassBase`): Transport class
         """
 
         ids = [x._id for x in self.classes if x._id == transport_class._id]
@@ -296,7 +296,7 @@ class TrafficAssignment(AssignmentBase):
         Sets the Volume-delay function to be used
 
         :Arguments:
-            **vdf_function** (:obj:`str`:) Name of the VDF to be used
+            **vdf_function** (:obj:`str`): Name of the VDF to be used
         """
         self.vdf = vdf_function
 
@@ -305,7 +305,7 @@ class TrafficAssignment(AssignmentBase):
         Sets Traffic classes to be assigned
 
         :Arguments:
-            **classes** (:obj:`List[TrafficClass]`:) List of Traffic classes for assignment
+            **classes** (:obj:`List[TrafficClass]`): List of Traffic classes for assignment
         """
 
         ids = {x._id for x in classes}
@@ -318,7 +318,7 @@ class TrafficAssignment(AssignmentBase):
         Adds a traffic class to the assignment
 
         :Arguments:
-            **traffic_class** (:obj:`TrafficClass`:) Traffic class
+            **traffic_class** (:obj:`TrafficClass`): Traffic class
         """
 
         ids = [x._id for x in self.classes if x._id == traffic_class._id]
@@ -406,7 +406,7 @@ class TrafficAssignment(AssignmentBase):
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER traffic classes have been added
 
-            Inherited from :obj:`AssignmentResultsBase`
+        Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
@@ -513,8 +513,11 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         df = self.results()
@@ -542,7 +545,7 @@ class TrafficAssignment(AssignmentBase):
         """Prepares the assignment results as a Pandas DataFrame
 
         :Returns:
-            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on `link_id`
         """
 
         idx = self.classes[0].graph.graph.__supernet_id__
@@ -657,10 +660,15 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **name** (:obj:`str`): Name of the matrix record to hold this matrix (same name used for file name)
-            **which_ones** (:obj:`str`,optional): {'final': Results of the final iteration, 'blended': Averaged results for
-            all iterations, 'all': Saves skims for both the final iteration and the blended ones} Default is 'final'
-            **format** (:obj:`str`, `Optional`): File format ('aem' or 'omx'). Default is 'omx'
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **which_ones** (:obj:`str`, *Optional*): {'final': Results of the final iteration, 'blended': Averaged results
+            for all iterations, 'all': Saves skims for both the final iteration and the blended ones}.
+            Default is 'final'
+
+            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
         mat_format = format.lower()
         if mat_format not in ["omx", "aem"]:
@@ -767,7 +775,8 @@ class TrafficAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to. Note the traffic class
-            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project
         """
 
@@ -857,7 +866,7 @@ class TransitAssignment(AssignmentBase):
     def set_cores(self, cores: int) -> None:
         """Allows one to set the number of cores to be used AFTER transit classes have been added
 
-            Inherited from :obj:`AssignmentResultsBase`
+        Inherited from :obj:`AssignmentResultsBase`
 
         :Arguments:
             **cores** (:obj:`int`): Number of CPU cores to use
@@ -919,8 +928,11 @@ class TransitAssignment(AssignmentBase):
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table to hold this assignment result
-            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to True
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+
+            **keep_zero_flows** (:obj:`bool`): Whether we should keep records for zero flows. Defaults to ``True``
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         df = self.results()
@@ -948,7 +960,7 @@ class TransitAssignment(AssignmentBase):
         """Prepares the assignment results as a Pandas DataFrame
 
         :Returns:
-            **DataFrame** (:obj:`pd.DataFrame`): Pandas dataframe with all the assignment results indexed on link_id
+            **DataFrame** (:obj:`pd.DataFrame`): Pandas DataFrame with all the assignment results indexed on *link_id*
         """
         assig_results = [
             pd.DataFrame(cls.results.get_load_results().data)

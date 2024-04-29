@@ -103,11 +103,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         return deepcopy(self.gtfs_data.feed_dates)
 
     def set_allow_map_match(self, allow=True):
-        """Changes behavior for finding transit-link shapes. Defaults to True.
+        """Changes behavior for finding transit-link shapes. Defaults to ``True``.
 
         :Arguments:
-              **allow** (:obj:`bool` *optional*): If True, allows uses map-matching in search of precise
-              transit_link shapes. If False, sets transit_link shapes equal to straight lines between
+              **allow** (:obj:`bool` *Optional*): If ``True``, allows uses map-matching in search of precise
+              transit_link shapes. If ``False``, sets transit_link shapes equal to straight lines between
               stops. In the presence of GTFS raw shapes it has no effect.
         """
 

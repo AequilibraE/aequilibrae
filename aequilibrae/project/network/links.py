@@ -110,7 +110,8 @@ class Links(BasicTable):
         """Removes the link with **link_id** from the project
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of a link to delete"""
+            **link_id** (:obj:`int`): Id of a link to delete
+        """
         d = 1
         link_id = int(link_id)
         if link_id in self.__items:
@@ -135,7 +136,7 @@ class Links(BasicTable):
 
     @property
     def data(self) -> pd.DataFrame:
-        """Returns all links data as a Pandas dataFrame
+        """Returns all links data as a Pandas DataFrame
 
         :Returns:
             **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry

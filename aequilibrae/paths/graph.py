@@ -330,7 +330,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         Sets the list of skims to be computed
 
-        Skimming with A* may produce results that differ from tradditional Dijkstra's due to its use a heuristic.
+        Skimming with A* may produce results that differ from traditional Dijkstra's due to its use a heuristic.
 
         :Arguments:
             **skim_fields** (:obj:`list`): Fields must be numeric
@@ -369,7 +369,7 @@ class GraphBase(ABC):  # noqa: B024
         """
         Chooses whether we want to block paths to go through centroids or not.
 
-        Default value is True
+        Default value is ``True``
 
         :Arguments:
             **block_centroid_flows** (:obj:`bool`): Blocking or not

@@ -143,7 +143,9 @@ The **GMNS** group of parameters has four specifications: **critical_dist**, **l
 .. image:: ../images/parameter_yaml_files_gmns.png
     :align: center
     :alt: GMNS parameter group
+
 |
+
 **critical_dist** is a numeric threshold for the distance.
 
 Under the keys **links**, **nodes**, and **use_definition** there are the fields 

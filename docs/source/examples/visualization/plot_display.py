@@ -10,6 +10,7 @@ We will need Folium for this example, and we will focus on creating a layer for
 each mode in the network, a layer for all links and a layer for all nodes.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -22,6 +23,7 @@ import folium
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
+# %%
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
 
@@ -30,6 +32,7 @@ project = create_example(fldr, "nauru")
 links = project.network.links.data
 nodes = project.network.nodes.data
 
+# %%
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")
 network_nodes = folium.FeatureGroup("nodes")
@@ -39,6 +42,7 @@ bike = folium.FeatureGroup("Bike")
 transit = folium.FeatureGroup("Transit")
 layers = [network_links, network_nodes, car, walk, bike, transit]
 
+# %%
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
@@ -72,7 +76,6 @@ for i, row in links.iterrows():
         ).add_to(transit)
 
 # And now we get the nodes
-
 for i, row in nodes.iterrows():
     point = (row.geometry.y, row.geometry.x)
 
@@ -94,7 +97,6 @@ curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%
-
 # We create the map
 map_osm = folium.Map(location=[lat, long], zoom_start=14)
 
@@ -105,7 +107,6 @@ for layer in layers:
 # And Add layer control before we display it
 folium.LayerControl().add_to(map_osm)
 map_osm
-
 
 # %%
 project.close()
