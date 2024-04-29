@@ -97,7 +97,7 @@ class Zoning(BasicTable):
         return self.__items[zone_id]
 
     def all_zones(self) -> dict:
-        """Returns a dictionary with all Zone objects available in the model. zone_id as key"""
+        """Returns a dictionary with all Zone objects available in the model. *zone_id* as key"""
         return self.__items
 
     def save(self):

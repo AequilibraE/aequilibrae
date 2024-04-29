@@ -99,7 +99,7 @@ class GravityApplication:
 
     def __init__(self, project=None, **kwargs):
         """
-        Instantiates the Ipf problem
+        Instantiates the IPF problem
 
         :Arguments:
             **model** (:obj:`SyntheticGravityModel`): Synthetic gravity model to apply
@@ -114,14 +114,14 @@ class GravityApplication:
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
 
-            **core_name** (:obj:`str`, optional): Name for the output matrix core. Defaults to "gravity"
+            **core_name** (:obj:`str`, *Optional*): Name for the output matrix core. Defaults to "gravity"
 
-            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
-            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, *Optional*): If NaN values should be treated as zero. Defaults to ``True``
 
         :Results:
             **output** (:obj:`AequilibraeMatrix`): Result Matrix
@@ -226,7 +226,8 @@ class GravityApplication:
 
             **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
 
-            **project** (:obj:`Project`, Optional): Project we want to save the results to. Defaults to the active project
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
+            Defaults to the active project
         """
 
         project = project or get_active_project()

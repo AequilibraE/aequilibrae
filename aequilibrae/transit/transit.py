@@ -32,7 +32,7 @@ class Transit:
     def __init__(self, project):
         """
         :Arguments:
-            **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
 
