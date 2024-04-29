@@ -4,7 +4,7 @@ The Transit assignment graph
 This page is a description of a graph structure for a *transit network*,
 used for *static*, *link-based*, *frequency-based* *assignment*. Our
 focus is the classic algorithm “Optimal strategies” by Spiess & Florian
-[1].
+[1]_.
 
 Let’s start by giving a few definitions:
 
@@ -279,7 +279,7 @@ example featuring four stops and four lines.
 A Small example : Spiess and Florian
 ------------------------------------
 
-This illustrative example is taken from *Spiess and Florian* [1]:
+This illustrative example is taken from *Spiess and Florian* [1]_:
 
 .. image:: ../../images/transit_graph_spiess_florian_1.png
    :width: 600
@@ -477,7 +477,6 @@ od          517
 References
 ----------
 
-[1] Heinz Spiess, Michael Florian, *Optimal strategies: A new assignment
-model for transit networks,* Transportation Research Part B:
-Methodological, Volume 23, Issue 2, 1989, Pages 83-102, ISSN 0191-2615,
-https://doi.org/10.1016/0191-2615(89)90034-9.
+.. [1] Spiess, H., Florian, M. (1989) "Optimal strategies: A new assignment model for transit networks". 
+       Transportation Research Part B: Methodological, 23(2), 83-102. 
+       Available in: https://doi.org/10.1016/0191-2615(89)90034-9

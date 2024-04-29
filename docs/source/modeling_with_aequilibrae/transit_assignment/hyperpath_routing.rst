@@ -28,12 +28,12 @@ cost. This type of model is suitable for transit systems with rather
 frequent services.
 
 To illustrate how hyperpath routing works in frequency-based models, we
-will use the classic algorithm by Spiess & Florian [1] implemented in AequilibraE.
+will use the classic algorithm by Spiess & Florian [1]_ implemented in AequilibraE.
 
 We will use a simple grid network as an Python example to demonstrate how a
 hyperpath depends on link frequency for a given origin-destination pair.
 Note that it can be extended to other contexts such as risk-averse
-vehicle navigation [2].
+vehicle navigation [2]_.
 
 Let’s start by importing some Python packages.
 
@@ -70,7 +70,7 @@ assumptions). A walking edge has no exposure to delay, so its frequency
 is assumed to be infinite.
 
 Bell’s network is a synthetic network: it is a :math:`n`-by-:math:`n`
-grid bi-directional network [2, 3]. The edge travel time is taken as
+grid bi-directional network [2]_, [3]_. The edge travel time is taken as
 random number following a uniform distribution:
 
 .. math:: u_a \sim \mathbf{U}[0,1)
@@ -498,15 +498,14 @@ apparent as we further increase :math:`\alpha`:
 References
 ----------
 
-[1] Spiess, Heinz & Florian, Michael, *Optimal strategies: A new
-assignment model for transit networks*, Transportation Research Part B:
-Methodological, Volume 23, Issue 2, 1989, Pages 83-102.
+.. [1] Spiess, H., Florian, M. (1989) "Optimal strategies: A new assignment model for transit networks". 
+       Transportation Research Part B: Methodological, 23(2), 83-102. 
+       Available in: https://doi.org/10.1016/0191-2615(89)90034-9
 
-[2] Ma, Jiangshan & Fukuda, Daisuke & Schmöcker, Jan-Dirk. *Faster
-hyperpath generating algorithms for vehicle navigation*,
-Transportmetrica, Volume 149, 2012, Pages 1-24.
+.. [2] Ma, J., Fukuda, D., Schmöcker, J. D. (2012) "Faster hyperpath generating algorithms for vehicle navigation",
+       Transportmetrica A: Transport Science, 9(10), 925–948. 
+       Available in: https://doi.org/10.1080/18128602.2012.719165
 
-[3] Bell, Michael G.H., *Hyperstar: A multi-path Astar algorithm for
-risk averse vehicle navigation*, Transportation Research Part B:
-Methodological, Volume 43, Issue 1, 2009, Pages 97-107, ISSN 0191-2615,
-https://doi.org/10.1016/j.trb.2008.05.010.
+.. [3] Bell, M. G. H. (2009) "Hyperstar: A multi-path Astar algorithm for risk averse vehicle navigation", 
+       Transportation Research Part B: Methodological, 43(1), 97-107.
+       Available in: https://doi.org/10.1016/j.trb.2008.05.010.

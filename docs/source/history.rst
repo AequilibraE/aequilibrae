@@ -1,3 +1,7 @@
+:orphan:
+
+.. _history_of_aequilibrae:
+
 History
 =======
 

@@ -56,7 +56,7 @@ class Ipf:
 
     def __init__(self, project=None, **kwargs):
         """
-        Instantiates the Ipf problem
+        Instantiates the IPF problem
 
         :Arguments:
             **matrix** (:obj:`AequilibraeMatrix`): Seed Matrix
@@ -69,9 +69,9 @@ class Ipf:
 
             **column_field** (:obj:`str`): Field name that contains the data for the column totals
 
-            **parameters** (:obj:`str`, optional): Convergence parameters. Defaults to those in the parameter file
+            **parameters** (:obj:`str`, *Optional*): Convergence parameters. Defaults to those in the parameter file
 
-            **nan_as_zero** (:obj:`bool`, optional): If Nan values should be treated as zero. Defaults to True
+            **nan_as_zero** (:obj:`bool`, *Optional*): If Nan values should be treated as zero. Defaults to ``True``
 
         :Results:
             **output** (:obj:`AequilibraeMatrix`): Result Matrix
@@ -227,8 +227,10 @@ class Ipf:
 
         :Arguments:
             **name** (:obj:`str`): Name of the desired matrix record
+
             **file_name** (:obj:`str`): Name for the matrix file name. AEM and OMX supported
-            **project** (:obj:`Project`, Optional): Project we want to save the results to.
+
+            **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project
         """
 

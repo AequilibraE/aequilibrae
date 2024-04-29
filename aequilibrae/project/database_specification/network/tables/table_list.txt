@@ -1,4 +1,4 @@
-attribute_documentation
+attributes_documentation
 about
 link_types
 modes

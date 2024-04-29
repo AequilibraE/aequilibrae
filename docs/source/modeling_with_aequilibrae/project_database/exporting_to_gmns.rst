@@ -1,3 +1,5 @@
+:orphan:
+
 .. _exporting_to_gmns:
 
 Exporting AequilibraE model to GMNS format
@@ -11,6 +13,7 @@ After loading an existing AequilibraE project, you can export it to GMNS format.
     :target: _auto_examples/plot_export_to_gmns.html
 
 |
+
 As of July 2022, it is possible to export an AequilibraE network to the following
 tables in GMNS format:
 

@@ -32,7 +32,7 @@ class Transit:
     def __init__(self, project):
         """
         :Arguments:
-             **project** (:obj:`Project`, optional): The Project to connect to. By default, uses the currently
+            **project** (:obj:`Project`, *Optional*): The Project to connect to. By default, uses the currently
             active project
         """
 
@@ -45,7 +45,7 @@ class Transit:
         self.pt_con = database_connection("transit")
 
     def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
-        """Returns a GTFSRouteSystemBuilder object compatible with the project
+        """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
             **agency** (:obj:`str`): Name for the agency this feed refers to (e.g. 'CTA')
@@ -56,7 +56,7 @@ class Transit:
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
-        :Return:
+        :Returns:
             **gtfs_feed** (:obj:`StaticGTFS`): A GTFS feed that can be added to this network
         """
         gtfs = GTFSRouteSystemBuilder(

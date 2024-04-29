@@ -61,8 +61,10 @@ class GeoIndex:
 
         :Arguments:
             **geo** (:obj:`Shapely geometry`): Any valid shapely geometry
+
             **num_results** (:obj:`int`): A positive integer for the number of neighbors to return
-        :Return:
+
+        :Returns:
             **neighbors** (:obj:`List[int]`): List of IDs of the closest neighbors in the index
         """
         if env == "QGIS":

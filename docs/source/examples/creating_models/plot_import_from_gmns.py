@@ -10,6 +10,7 @@ Here's the repository: https://github.com/zephyr-data-specs/GMNS
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from os.path import join
@@ -65,11 +66,13 @@ project.network.create_from_gmns(
 links = project.network.links.data
 nodes = project.network.nodes.data
 
+# %%
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")
 network_nodes = folium.FeatureGroup("nodes")
 layers = [network_links, network_nodes]
 
+# %%
 # We do some Python magic to transform this dataset into the format required by Folium
 # We are only getting link_id and link_type into the map, but we could get other pieces of info as well
 for i, row in links.iterrows():
@@ -82,6 +85,7 @@ for i, row in links.iterrows():
         points, popup=f"<b>link_id: {row.link_id}</b>", tooltip=f"{row.modes}", color="black", weight=2
     ).add_to(network_links)
 
+# %%
 # And now we get the nodes
 
 for i, row in nodes.iterrows():

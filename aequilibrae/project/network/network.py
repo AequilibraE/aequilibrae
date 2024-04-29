@@ -132,18 +132,17 @@ class Network(WorkerThread):
         Downloads the network from Open-Street Maps
 
         :Arguments:
-
-            **area** (:obj:`Polygon`, Optional): Polygon for which the network will be downloaded. If not provided,
+            **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,
             a place name would be required
 
-            **place_name** (:obj:`str`, Optional): If not downloading with East-West-North-South boundingbox, this is
+            **place_name** (:obj:`str`, *Optional*): If not downloading with East-West-North-South boundingbox, this is
             required
 
-            **modes** (:obj:`tuple`, Optional): List of all modes to be downloaded. Defaults to the modes in the parameter
-            file
+            **modes** (:obj:`tuple`, *Optional*): List of all modes to be downloaded. Defaults to the modes in the
+            parameter file
 
-            **clean** (:obj:`bool`, Optional): Keeps only the links that intersects the model area polygon. Defaults to
-            True. Does not apply to networks downloaded with a place name
+            **clean** (:obj:`bool`, *Optional*): Keeps only the links that intersects the model area polygon.
+            Defaults to ``True``. Does not apply to networks downloaded with a place name
 
         .. code-block:: python
 
@@ -265,13 +264,13 @@ class Network(WorkerThread):
 
             **node_file_path** (:obj:`str`): Path to a nodes csv file in GMNS format
 
-            **use_group_path** (:obj:`str`, Optional): Path to a csv table containing groupings of uses. This helps AequilibraE
-            know when a GMNS use is actually a group of other GMNS uses
+            **use_group_path** (:obj:`str`, *Optional*): Path to a csv table containing groupings of uses.
+            This helps AequilibraE know when a GMNS use is actually a group of other GMNS uses
 
-            **geometry_path** (:obj:`str`, Optional): Path to a csv file containing geometry information for a line object, if not
-            specified in the link table
+            **geometry_path** (:obj:`str`, *Optional*): Path to a csv file containing geometry information for a line
+            object, if not specified in the link table
 
-            **srid** (:obj:`int`, Optional): Spatial Reference ID in which the GMNS geometries were created
+            **srid** (:obj:`int`, *Optional*): Spatial Reference ID in which the GMNS geometries were created
         """
 
         gmns_builder = GMNSBuilder(self, link_file_path, node_file_path, use_group_path, geometry_path, srid)
@@ -303,10 +302,11 @@ class Network(WorkerThread):
         dictionary of graphs
 
         :Arguments:
-            **fields** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
-                                              database, it may be useful to specify which fields to use
-            **modes** (:obj:`list`, optional): When working with very large graphs with large number of fields in the
-                                              database, it may be useful to generate only those we need
+            **fields** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
+            database, it may be useful to specify which fields to use
+
+            **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
+            database, it may be useful to generate only those we need
 
         To use the *fields* parameter, a minimalistic option is the following
 

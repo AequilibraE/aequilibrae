@@ -17,7 +17,7 @@ from networks that are :ref:`NOT housed inside an AequilibraE model <plot_assign
 .. _aequilibrae-graphs:
 
 AequilibraE Graphs
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 As mentioned above, AequilibraE's graphs are the backbone of path computation,
 skimming and Traffic Assignment. Besides handling the selection of links available to
@@ -46,7 +46,7 @@ potentially bi-directional, and the directions allowed for traversal are dictate
 field *direction*, where -1 and 1 denote only BA and AB traversal respectively and 0 denotes
 bi-directionality.
 
-Direction-specific fields must be coded in fields **_AB* and **_BA*, where the name of
+Direction-specific fields must be coded in fields **_AB** and **_BA**, where the name of
 the field in the *graph* will be equal to the prefix of the directional fields. For example:
 
 The fields **free_flow_travel_time_AB** and **free_flow_travel_time_BA** provide the same
@@ -166,7 +166,7 @@ by the user, providing a complete specification of the assignment procedure:
 
 Assignment parameters such as maximum number of iterations and target relative
 gap come from the global software parameters, that can be set using the
-:ref:`example_usage_parameters` .
+:ref:`parameters_file` .
 
 There are also some strict technical requirements for formulating the
 multi-class equilibrium assignment as an unconstrained convex optimization problem,
@@ -189,11 +189,11 @@ Volume Delay Function
 
 For now, the only VDF functions available in AequilibraE are the
 
-* BPR [8]_
+* BPR [3]_
 
 .. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
 
-* Spiess' conical [7]_
+* Spiess' conical [2]_
 
 .. math:: CongestedTime_{i} = FreeFlowTime_{i} * (2 + \sqrt[2][\alpha^2*(1- \frac{Volume_{i}}{Capacity_{i}})^2 + \beta^2] - \alpha *(1-\frac{Volume_{i}}{Capacity_{i}})-\beta)
 
@@ -249,7 +249,7 @@ Example:
   tc2 = TrafficClass("truck", graph_truck, matrix_truck)
 
 * **pce** - The passenger-car equivalent is the standard way of modeling
-  multi-class traffic assignment equilibrium in a consistent manner (see [4]_ for
+  multi-class traffic assignment equilibrium in a consistent manner (see [1]_ for
   the technical detail), and it is set to 1 by default. If the **pce** for a
   certain class should be different than one, one can make a quick method call.
 
@@ -333,3 +333,14 @@ Finally, one can execute assignment:
 
 :ref:`convergence_criteria` is discussed in a different section.
 
+References
+~~~~~~~~~~
+.. [1] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: 
+       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
+       Available in: https://doi.org/10.1177%2F0361198119837496
+
+.. [2] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158.
+       Available in: https://doi.org/10.1287/trsc.24.2.153
+
+.. [3] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
+       Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf

@@ -15,37 +15,37 @@ class PathResults:
 
     .. code-block:: python
 
-          >>> from aequilibrae import Project
-          >>> from aequilibrae.paths.results import PathResults
+        >>> from aequilibrae import Project
+        >>> from aequilibrae.paths.results import PathResults
 
-          >>> proj = Project.from_path("/tmp/test_project")
-          >>> proj.network.build_graphs()
+        >>> proj = Project.from_path("/tmp/test_project")
+        >>> proj.network.build_graphs()
 
-          # Mode c is car in this project
-          >>> car_graph = proj.network.graphs['c']
+        # Mode c is car in this project
+        >>> car_graph = proj.network.graphs['c']
 
-          # minimize distance
-          >>> car_graph.set_graph('distance')
+        # minimize distance
+        >>> car_graph.set_graph('distance')
 
-          # If you want to compute skims
-          # It does increase path computation time substantially
-          >>> car_graph.set_skimming(['distance', 'free_flow_time'])
+        # If you want to compute skims
+        # It does increase path computation time substantially
+        >>> car_graph.set_skimming(['distance', 'free_flow_time'])
 
-          >>> res = PathResults()
-          >>> res.prepare(car_graph)
-          >>> res.compute_path(1, 17)
+        >>> res = PathResults()
+        >>> res.prepare(car_graph)
+        >>> res.compute_path(1, 17)
 
-          # res.milepost contains the milepost corresponding to each node along the path
-          # res.path_nodes contains the sequence of nodes that form the path
-          # res.path  contains the sequence of links that form the path
-          # res.path_link_directions contains the link directions corresponding to the above links
-          # res.skims contain all skims requested when preparing the graph
+        # res.milepost contains the milepost corresponding to each node along the path
+        # res.path_nodes contains the sequence of nodes that form the path
+        # res.path  contains the sequence of links that form the path
+        # res.path_link_directions contains the link directions corresponding to the above links
+        # res.skims contain all skims requested when preparing the graph
 
-          # Update all the outputs mentioned above for destination 9. Same origin: 1
-          >>> res.update_trace(9)
+        # Update all the outputs mentioned above for destination 9. Same origin: 1
+        >>> res.update_trace(9)
 
-          # clears all computation results
-          >>> res.reset()
+        # clears all computation results
+        >>> res.reset()
     """
 
     def __init__(self) -> None:
@@ -83,10 +83,9 @@ class PathResults:
         a_star: bool = False,
         heuristic: Union[str, None] = None,
     ) -> None:
-        """
-        Computes the path between two nodes in the network.
+        """Computes the path between two nodes in the network.
 
-        A* heuristics are currently only valid distance cost fields.
+        `A*` heuristics are currently only valid distance cost fields.
 
         :Arguments:
             **origin** (:obj:`int`): Origin for the path
@@ -94,11 +93,12 @@ class PathResults:
             **destination** (:obj:`int`): Destination for the path
 
             **early_exit** (:obj:`bool`): Stop constructing the shortest path tree once the destination is found.
-                                          Doing so may cause subsequent calls to `update_trace` to recompute the tree.
-                                          Default is `False`.
-            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm. When `True`, `early_exit`
-                                      is always `True`. Default is `False`.
-            **heuristic** (:obj:`str`): Heuristic to use if `a_star` is enabled. Default is `None`.
+            Doing so may cause subsequent calls to ``update_trace`` to recompute the tree. Default is ``False``.
+
+            **a_star** (:obj:`bool`): Whether or not to use A* over Dijkstra's algorithm.
+            When ``True``, ``early_exit`` is always ``True``. Default is ``False``.
+
+            **heuristic** (:obj:`str`): Heuristic to use if ``a_star`` is enabled. Default is ``None``.
         """
 
         if self.graph is None:

@@ -3,7 +3,7 @@
 Naming Conventions:
 - a_node/b_node is head/tail vertex
 
-TransitGraphBuilder Assumtions:
+TransitGraphBuilder Assumptions:
 - opposite directions are not supported. In the GTFS files, this corresponds to direction_id from trips.txt (indicates the direction of travel for a trip),
 - all times are expressed in seconds [s], all frequencies in [1/s], and
 - headways are uniform for trips of the same pattern.
@@ -213,7 +213,7 @@ class TransitGraphBuilder:
         """Add zones as ODs.
 
         :Arguments:
-            **zones** (:obj:`pd.DataFrame`): Dataframe containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
+            **zones** (:obj:`pd.DataFrame`): DataFrame containing the zoning information. Columns must include ``zone_id`` and ``geometry``.
 
             **from_crs** (:obj:`str`): The CRS of the ``geometry`` column of ``zones``. If not provided it's assumed that the geometry is already in ``self.projected_crs``. If provided, the geometry will be projected to ``self.projected_crs``. Defaults to ``None``.
         """
@@ -313,10 +313,12 @@ class TransitGraphBuilder:
         2   10001006000     3   180.000000
 
         :Arguments:
-           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day). Defaults to ``True``.
+           **time_filter** (:obj:`bool`): If time_filter is True, the mean travel time is computed over the
+           [start, end] time range, otherwise it is computed over all the available data (e.g. a whole day).
+           Defaults to ``True``.
 
         :Returns:
-           **tt** (:obj:`pd.DataFrame`): Dataframe containing the travel item for line segments.
+           **tt** (:obj:`pd.DataFrame`): DataFrame containing the travel item for line segments.
         """
 
         if time_filter:
@@ -756,8 +758,11 @@ class TransitGraphBuilder:
         Overlapping regions: Creates edges between all stops that lying within the circle centred on each OD whose radius is the distance to the next nearest OD.
 
         :Arguments:
-           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour". Defaults to ``overlapping_regions``.
-           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not. Defaults to ``True``.
+           **method** (:obj:`str`): Must either be "overlapping_regions", or "nearest_neighbour".
+           Defaults to ``overlapping_regions``.
+
+           **allow_missing_connections** (:obj:`bool`): Whether to allow missing connections or not.
+           Defaults to ``True``.
         """
         if method is None:
             method = self.connector_method
@@ -1185,6 +1190,7 @@ class TransitGraphBuilder:
 
         :Arguments:
            **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
+
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
         if method not in ["direct", "connector project match"]:
@@ -1237,13 +1243,18 @@ class TransitGraphBuilder:
             self.edges.loc[connector_rows, ("trav_time", "geometry")] = lines
 
     def __connector_project_match(self, connector_rows, project, nodes, links, graph_key):
-        """Create line string geometry for ``connector_rows`` that matches the line strings in ``project.network.graphs[graph_key]``.
+        """Create line string geometry for ``connector_rows`` that matches the line strings in
+        ``project.network.graphs[graph_key]``.
 
         :Arguments:
            **connector_rows** (:obj:`pd.Series`): Boolean series for the rows of ``self.edges`` to create line strings for.
+
            **project** (:obj:`Aequilibrae.project.Project`): Reference to the project to pull the graph from.
+
            **nodes** (:obj:`pd.DataFrame`): A Dataframe containing the project nodes. Must have columns ``geometry``, and an index of ``node_id``s.
+
            **links** (:obj:`pd.DataFrame`): A Dataframe containing the project links. Must have columns ``geometry``, and an index of ``link_id``s.
+
            **graph_key** (:obj:`str`): The key of the ``project.network.graphs`` graph to use for path finding.
         """
         # Create kdtree for fast nearest neighbour lookup on the project db nodes
@@ -1480,7 +1491,7 @@ class TransitGraphBuilder:
     def convert_demand_matrix_from_zone_to_node_ids(
         self, demand_matrix, o_zone_col="origin_zone_id", d_zone_col="destination_zone", demand_col="demand"
     ):
-        """Convert a sparse demand matrix from ``zone_id``s to the corresponding ``node_id``s."""
+        """Convert a sparse demand matrix from ``zone_id``\'s to the corresponding ``node_id``\'s."""
         if self.blocking_centroid_flows:
             od_matrix = pd.merge(
                 demand_matrix,

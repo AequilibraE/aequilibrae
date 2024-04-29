@@ -1,3 +1,5 @@
+:orphan:
+
 .. _importing_from_gmns:
 
 Importing from files in GMNS format
@@ -13,6 +15,7 @@ is different than 4326, it must be passed as an input using the argument 'srid'.
     :target: _auto_examples/plot_import_from_gmns.html
 
 |
+
 As of July 2022, it is possible to import the following files from a GMNS source:
 
 * link table;
@@ -26,7 +29,8 @@ You can find the specification for all these tables in the GMNS documentation,
 By default, the method ``create_from_gmns()`` read all required and optional fields
 specified in the GMNS link and node tables specification. If you need it to read 
 any additional fields as well, you have to modify the AequilibraE parameters as
-shown in the :ref:`example <sphx_glr__auto_examples_plot_import_from_gmns.py>`.
+shown in the :ref:`example <import_from_gmns>`.
+
 When adding a new field to be read in the parameters.yml file, it is important to 
 keep the "required" key set to False, since you will always be adding a non-required 
 field. Required fields for a specific table are only those defined in the GMNS

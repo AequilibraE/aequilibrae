@@ -11,8 +11,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Periods(BasicTable):
-    """
-    Access to the API resources to manipulate the links table in the network
+    """Access to the API resources to manipulate the links table in the network
 
     .. code-block:: python
 
@@ -97,8 +96,11 @@ class Periods(BasicTable):
 
         :Arguments:
             **period_id** (:obj:`int`): Id of the centroid to be created
+
             **start** (:obj:`int`): Start time of the period to be created
+
             **end** (:obj:`int`): End time of the period to be created
+
             **description** (:obj:`str`): Optional human readable description of the time period e.g. '1pm - 5pm'
         """
 

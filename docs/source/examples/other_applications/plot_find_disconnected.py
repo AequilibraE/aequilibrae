@@ -4,11 +4,12 @@
 Finding disconnected links
 ==========================
 
-In this example, we show how to find disconnected links in an AequilibraE network
+In this example, we show how to find disconnected links in an AequilibraE network..
 
-We use the Nauru example to find disconnected links
+We use the Nauru example to find disconnected links.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -31,7 +32,7 @@ project = create_example(fldr, "nauru")
 mode = "c"
 
 # %%
-# We need to create the graph, but before that, we need to have at least one centroid in our network
+# We need to create the graph, but before that, we need to have at least one centroid in our network.
 
 # We get an arbitrary node to set as centroid and allow for the construction of graphs
 centroid_count = project.conn.execute("select count(*) from nodes where is_centroid=1").fetchone()[0]
@@ -56,16 +57,17 @@ if centroid_count == 0:
 
 # %%
 # We set the graph for computation
-
 graph.set_graph("distance")
 graph.set_skimming("distance")
 
+# %%
 # Get the nodes that are part of the car network
 missing_nodes = [
     x[0] for x in project.conn.execute(f"Select node_id from nodes where instr(modes, '{mode}')").fetchall()
 ]
 missing_nodes = np.array(missing_nodes)
 
+# %%
 # And prepare the path computation structure
 res = PathResults()
 res.prepare(graph)
@@ -75,7 +77,7 @@ res.prepare(graph)
 
 islands = []
 idx_islands = 0
-#
+
 while missing_nodes.shape[0] >= 2:
     print(datetime.now().strftime("%H:%M:%S"), f" - Computing island: {idx_islands}")
     res.reset()
@@ -90,8 +92,9 @@ while missing_nodes.shape[0] >= 2:
     idx_islands += 1
 
 print(f"\nWe found {idx_islands} islands")
+
 # %%
-# consolidate everything into a single DataFrame
+# Let's consolidate everything into a single DataFrame
 islands = pd.concat(islands)
 
 # And save to disk alongside our model
@@ -99,7 +102,7 @@ islands.to_csv(join(fldr, "island_outputs_complete.csv"), index=False)
 
 #%%
 # If you join the node_id field in the csv file generated above with the a_node or b_node fields
-# in the links table, you will have the corresponding links in each disjoint island found
+# in the links table, you will have the corresponding links in each disjoint island found.
 
 # %%
 project.close()

@@ -29,7 +29,7 @@ class Log:
     def contents(self) -> list:
         """Returns contents of log file
 
-        :Return:
+        :Returns:
             **log_contents** (:obj:`list`): List with all entries in the log file
         """
 

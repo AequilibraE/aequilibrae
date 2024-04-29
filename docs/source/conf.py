@@ -58,29 +58,30 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
-    "sphinx.ext.doctest",
-    "sphinx.ext.intersphinx",
-    "sphinx.ext.todo",
-    "sphinx.ext.coverage",
-    "sphinx.ext.mathjax",
     "sphinx_gallery.gen_gallery",
     "sphinx_design",
-    "sphinx_copybutton"
+    "sphinx_copybutton",
+    "sphinx_git",
 ]
 
 # Change plot_gallery to True to start building examples again
 sphinx_gallery_conf = {
     "examples_dirs": ["examples"],  # path to your example scripts
     "gallery_dirs": ["_auto_examples"],  # path to where to save gallery generated output
-    'capture_repr': ('_repr_html_', '__repr__'),
-    'remove_config_comments': True,
-    "subsection_order": ExplicitOrder(["examples/creating_models",
-                                      "examples/editing_networks",
-                                      "examples/trip_distribution",
-                                      "examples/visualization",
-                                      "examples/aequilibrae_without_a_model",
-                                      "examples/full_workflows",
-                                      "examples/other_applications"]),
+    "capture_repr": ("_repr_html_", "__repr__"),
+    "remove_config_comments": True,
+    "subsection_order": ExplicitOrder(
+        [
+            "examples/creating_models",
+            "examples/editing_networks",
+            "examples/trip_distribution",
+            "examples/visualization",
+            "examples/aequilibrae_without_a_model",
+            "examples/full_workflows",
+            "examples/other_applications",
+        ]
+    ),
+    # "plot_gallery": "False",
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -105,7 +106,7 @@ language = "en"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "*.pyx"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -121,20 +122,21 @@ html_theme = "pydata_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static', '_static/.htaccess', "_static/switcher.json"]
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 
 html_theme_options = {
-    "navbar_center": ["navbar-nav"],
     "show_nav_level": 0,
-    "github_url": "https://github.com/AequilibraE/aequilibrae",
-    "navbar_end": ["theme-switcher", "navbar-icon-links.html"],
-    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_center": ["navbar-nav"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links", "version-switcher"],
+    "navbar_start": ["navbar-logo"],
+    "navbar_align": "left",
     "switcher": {
-        "json_url": "./_static/switcher.json",
+        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
         "version_match": switcher_version,
     },
-    "navbar_align": "left",
-    "search_bar_text": "Search",
+    # "check_switcher": False,
+    "github_url": "https://github.com/AequilibraE/aequilibrae",
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -154,6 +156,15 @@ latex_elements = {}
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
+latex_appendices = [
+    "installation",
+    "validation_benchmarking/ipf_performance",
+    "validation_benchmarking/traffic_assignment",
+    "modeling_with_aequilibrae/project_database/importing_from_osm",
+    "modeling_with_aequilibrae/project_database/importing_from_gmns",
+    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
+]
+
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
@@ -163,15 +174,16 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 # -- Options for Texinfo output ----------------------------------------------
 
 autodoc_default_options = {
-    "members": "var1, var2",
+    "members": True,
+    "inherited-members": True,
     "member-order": "bysource",
     "special-members": False,
     "private-members": False,
     "undoc-members": True,
-    "exclude-members": "__weakref__",
+    # "exclude-members": "__weakref__",
 }
 
-autodoc_member_order = "groupwise"
+# autodoc_member_order = "groupwise"
 
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
