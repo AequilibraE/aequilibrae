@@ -1,4 +1,4 @@
-.. _full_workflows:
+:orphan:
 
 Full Workflows
 --------------

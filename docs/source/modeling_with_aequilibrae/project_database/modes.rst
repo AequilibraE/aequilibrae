@@ -52,8 +52,6 @@ A trigger guarantees that the value being inserted in the field is according to
 the values found in the associated links' modes field. If the user attempts to
 overwrite this value, it will automatically be set back to the appropriate value.
 
-.. _adding_new_link:
-
 Adding a new link
 '''''''''''''''''
 The exact same behaviour as for :ref:`changing_modes_for_link` applies in this

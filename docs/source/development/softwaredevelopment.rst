@@ -1,5 +1,3 @@
-.. _software_development:
-
 Contributing to AequilibraE
 ===========================
 

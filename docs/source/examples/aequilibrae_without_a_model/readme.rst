@@ -1,4 +1,4 @@
-.. _aequilibrae_without_a_model:
+:orphan:
 
 AequilibraE without a Model
 ---------------------------

@@ -1,4 +1,4 @@
-.. _examples_editing_networks:
+:orphan:
 
 Editing networks
 ----------------
