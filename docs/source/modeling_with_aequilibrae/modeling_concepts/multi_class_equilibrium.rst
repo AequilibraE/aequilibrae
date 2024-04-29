@@ -191,16 +191,34 @@ References
 Traffic assignment and equilibrium
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
+.. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
+       Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. 
+       Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
 
-.. [2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) "An efficient approach to solving the road network equilibrium traffic assignment problem". Transportation Research, 9(5):309-318. Available in: https://doi.org/10.1016/0041-1647(75)90030-1
+.. [2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) 
+       "An efficient approach to solving the road network equilibrium traffic assignment problem". 
+       Transportation Research, 9(5):309-318. 
+       Available in: https://doi.org/10.1016/0041-1647(75)90030-1
 
-.. [3] Mitradjieva, M. and Lindberg, P.O. (2013) "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment". Transportation Science, 47(2):280-293. Available in: https://doi.org/10.1287/trsc.1120.0409
+.. [3] Mitradjieva, M. and Lindberg, P.O. (2013) 
+       "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment".
+       Transportation Science, 47(2):280-293. 
+       Available in: https://doi.org/10.1287/trsc.1120.0409
 
-.. [4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. Available in: https://doi.org/10.1177%2F0361198119837496
+.. [4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) 
+       "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes",
+       Transportation Research Record, 2673(4):930-940. 
+       Available in: https://doi.org/10.1177%2F0361198119837496
 
-.. [5] Rose, G., Daskin, M., Koppelman, F. (1988) "An examination of convergence error in equilibrium traffic assignment models",  Transportation Res. B, 22(4):261-274. Available in: https://doi.org/10.1016/0191-2615(88)90003-3
+.. [5] Rose, G., Daskin, M., Koppelman, F. (1988) 
+       "An examination of convergence error in equilibrium traffic assignment models", 
+       Transportation Research Part B, 22(4):261-274. 
+       Available in: https://doi.org/10.1016/0191-2615(88)90003-3
 
-.. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment", Transportation Research Part B, 70:261-274. Available in: https://doi.org/10.1016/j.trb.2014.06.011
+.. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment",
+       Transportation Research Part B, 70:261-274. 
+       Available in: https://doi.org/10.1016/j.trb.2014.06.011
 
-.. [7] Marcotte, P., Patriksson, M. (2007) "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4
+.. [7] Marcotte, P., Patriksson, M. (2007) 
+       "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", 
+       Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4

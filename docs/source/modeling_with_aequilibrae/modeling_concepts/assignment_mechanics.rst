@@ -335,8 +335,12 @@ Finally, one can execute assignment:
 
 References
 ~~~~~~~~~~
-.. [1] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. Available in: https://doi.org/10.1177%2F0361198119837496
+.. [1] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: 
+       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
+       Available in: https://doi.org/10.1177%2F0361198119837496
 
-.. [2] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158. Available in: https://doi.org/10.1287/trsc.24.2.153
+.. [2] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158.
+       Available in: https://doi.org/10.1287/trsc.24.2.153
 
-.. [3] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
+.. [3] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
+       Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
