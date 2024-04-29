@@ -5,7 +5,7 @@ pyshp
 cython
 enum34
 Sphinx
-pydata-sphinx-theme
+pydata-sphinx-theme==0.13.3
 sphinx_autodoc_annotation
 pillow
 matplotlib

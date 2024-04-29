@@ -128,8 +128,8 @@ html_css_files = ["custom.css"]
 html_theme_options = {
     "show_nav_level": 0,
     "navbar_center": ["navbar-nav"],
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links", "version-switcher"],
+    "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
     "switcher": {
         "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
