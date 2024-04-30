@@ -11,6 +11,7 @@ import pyarrow as pa
 from aequilibrae import Project
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.route_choice import RouteChoice
+from aequilibrae.matrix import AequilibraeMatrix
 
 from ...data import siouxfalls_project
 
@@ -224,6 +225,53 @@ class TestRouteChoiceSet(TestCase):
         link_loads2 = rc.link_loading(self.mat, generate_path_files=True)
 
         np.testing.assert_array_almost_equal(link_loads, link_loads2)
+
+    def test_known_results(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+        mat = AequilibraeMatrix()
+        mat.create_empty(
+            memory_only=True,
+            zones=self.graph.num_zones,
+            matrix_names=["all zeros", "single one"],
+        )
+        mat.index = self.graph.centroids[:]
+        mat.computational_view()
+        mat.matrix_view[:, :, 0] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
+        mat.matrix_view[:, :, 1] = np.zeros((self.graph.num_zones, self.graph.num_zones))
+
+        for od in nodes:
+            mat.matrix_view[:, :, 0][od[0] - 1, od[1] - 1] = 0.0
+
+        mat.matrix_view[:, :, 1][nodes[0][0] - 1, nodes[0][1] - 1] = 1.0
+
+        link_loads = rc.link_loading(mat)
+
+        with self.subTest(matrix="all zeros"):
+            u, c = link_loads["all zeros"]
+            np.testing.assert_allclose(u, 0.0)
+            np.testing.assert_allclose(c, 0.0)
+
+        with self.subTest(matrix="single one"):
+            u, c = link_loads["single one"]
+            link = self.graph.graph[
+                (self.graph.graph.a_node == nodes[0][0] - 1) & (self.graph.graph.b_node == nodes[0][1] - 1)
+            ]
+
+            lid = link.link_id.values[0]
+            c_lid = link.__compressed_id__.values[0]
+
+            self.assertAlmostEqual(u[lid - 1], 1.0)
+            self.assertAlmostEqual(c[c_lid], 1.0)
+
+            u[lid - 1] = 0.0
+            c[c_lid] = 0.0
+
+            np.testing.assert_allclose(u, 0.0)
+            np.testing.assert_allclose(c, 0.0)
 
 
 class TestRouteChoice(TestCase):
