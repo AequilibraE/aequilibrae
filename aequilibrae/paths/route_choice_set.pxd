@@ -1,5 +1,7 @@
 # cython: language_level=3str
 from aequilibrae.paths.results import PathResults
+from aequilibrae.matrix.sparse_matrix cimport COO
+
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
@@ -230,7 +232,14 @@ cdef class RouteChoiceSet:
 
     cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
     cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
-    cdef apply_link_loading_func(RouteChoiceSet self, double[:, :] m, vector[vector[double] *] *pf, bint generate_path_files, int cores)
+    cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
+
+    cdef vector[double] *apply_select_link_loading(
+        RouteChoiceSet self,
+        COO sparse_mat,
+        double[:, :] matrix_view,
+        unordered_set[long] &select_link_set
+    ) noexcept nogil
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(
         RouteChoiceSet self,

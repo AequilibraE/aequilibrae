@@ -1,9 +1,11 @@
 import itertools
+import warnings
 import logging
 import pathlib
 import socket
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict
 from uuid import uuid4
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -35,13 +37,16 @@ class RouteChoice:
         self.cores: int = 0
         self.graph = graph
         self.matrix = matrix
-        self.__rc = None
 
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
 
-        self.compact_link_loads: Optional[np.array] = None
-        self.link_loads: Optional[np.array] = None
+        self.compact_link_loads: Optional[Dict[str, np.array]] = None
+        self.link_loads: Optional[Dict[str, np.array]] = None
+
+        self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
+        self.sl_link_loads: Optional[Dict[str, np.array]] = None
+
         self.results: Optional[pa.Table] = None
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
@@ -49,6 +54,11 @@ class RouteChoice:
         self.nodes: Optional[Union[List[int], List[Tuple[int, int]]]] = None
 
         self._config = {}
+        self._selected_links = {}
+
+    @cached_property
+    def __rc(self) -> RouteChoiceSet:
+        return RouteChoiceSet(self.graph)
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """
@@ -182,8 +192,6 @@ class RouteChoice:
         :Returns:
             ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
         """
-        if self.__rc is None:
-            self.__rc = RouteChoiceSet(self.graph)
 
         self.results = None
         return self.__rc.run(
@@ -213,9 +221,6 @@ class RouteChoice:
                 "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
             )
 
-        if self.__rc is None:
-            self.__rc = RouteChoiceSet(self.graph)
-
         self.results = None
         self.__rc.batched(
             self.nodes,
@@ -229,7 +234,8 @@ class RouteChoice:
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
 
-        Dictionary contains keys  'Algorithm', 'Matrix totals', 'Computer name', 'Procedure ID', and 'Parameters'.
+        Dictionary contains keys  'Algorithm', 'Matrix totals', 'Computer name', 'Procedure ID', 'Parameters', and
+        'Select links'.
 
         The classes key is also a dictionary with all the user classes per transit class and their respective
         matrix totals
@@ -250,6 +256,7 @@ class RouteChoice:
             "Computer name": socket.gethostname(),
             "Procedure ID": self.procedure_id,
             "Parameters": self.parameters,
+            "Select links": self._selected_links,
         }
         return info
 
@@ -280,93 +287,139 @@ class RouteChoice:
 
         return self.results
 
-    def get_load_results(
-        self,
-        which: str = "uncompressed",
-        clamp: bool = True,
-    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+    def get_load_results(self) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Translates the link loading results from the graph format into the network format.
 
-        :Arguments:
-            **which** (:obj:`str`): Which results to return: only `"uncompressed"`, only `"compressed"` or `"both"`.
-
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
-                A tuple of uncompressed and compressed link loading results as DataFrames. Or
-                the requested link loading results.
-
+                A tuple of uncompressed and compressed link loading results as DataFrames.
+                Columns are the matrix name concatenated direction.
         """
-
-        if not isinstance(which, str) or which not in ["uncompressed", "compressed", "both"]:
-            raise ValueError("`which` argument must be one of ['uncompressed', 'compressed', 'both']")
 
         if self.matrix is None:
             raise ValueError(
                 "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
             )
 
-        compressed = which == "both" or which == "compressed"
-        uncompressed = which == "both" or which == "uncompressed"
-
-        fields = self.matrix.names
-
         tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
-        if isinstance(tmp, dict):
-            self.link_loads = {k: v[0] for k, v in tmp.items()}
-            self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
-        else:
-            self.link_loads = {fields[0]: tmp[0]}
-            self.compact_link_loads = {fields[0]: tmp[1]}
+        self.link_loads = {k: v[0] for k, v in tmp.items()}
+        self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
 
-        # Get a mapping from the compressed graph to/from the network graph
+        # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+        lids = np.unique(self.graph.graph.link_id.values)
+        uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
+
         m_compact = _get_graph_to_network_mapping(
             self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
         )
-
-        lids = np.unique(self.graph.graph.link_id.values)
         compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        # Create a data store with a row for each uncompressed link
-        if uncompressed:
-            uncompressed_df = pd.DataFrame(
-                {"link_id": lids}
-                | {k + dir: np.zeros(lids.shape) for k in self.link_loads.keys() for dir in ["_ab", "_ba"]}
-            )
-            for k, v in self.link_loads.items():
-                # Directional Flows
-                uncompressed_df[k + "_ab"].values[m.network_ab_idx] = np.nan_to_num(v[m.graph_ab_idx])
-                uncompressed_df[k + "_ba"].values[m.network_ba_idx] = np.nan_to_num(v[m.graph_ba_idx])
+        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
 
-                # Tot Flow
-                uncompressed_df[k + "_tot"] = np.nan_to_num(uncompressed_df[k + "_ab"].values) + np.nan_to_num(
-                    uncompressed_df[k + "_ba"].values
-                )
+        return uncompressed_df, compressed_df
 
-        if compressed:
-            compressed_df = pd.DataFrame(
-                {"link_id": compact_lids}
-                | {
-                    k + dir: np.zeros(compact_lids.shape)
-                    for k in self.compact_link_loads.keys()
-                    for dir in ["_ab", "_ba"]
-                }
-            )
-            for k, v in self.compact_link_loads.items():
-                compressed_df[k + "_ab"].values[m_compact.network_ab_idx] = np.nan_to_num(v[m_compact.graph_ab_idx])
-                compressed_df[k + "_ba"].values[m_compact.network_ba_idx] = np.nan_to_num(v[m_compact.graph_ba_idx])
+    def __link_loads_to_df(self, mapping, lids, link_loads):
+        df = pd.DataFrame(
+            {"link_id": lids} | {k + dir: np.zeros(lids.shape) for k in link_loads.keys() for dir in ["_ab", "_ba"]}
+        )
+        for k, v in link_loads.items():
+            # Directional Flows
+            df[k + "_ab"].values[mapping.network_ab_idx] = np.nan_to_num(v[mapping.graph_ab_idx])
+            df[k + "_ba"].values[mapping.network_ba_idx] = np.nan_to_num(v[mapping.graph_ba_idx])
 
-                # Tot Flow
-                compressed_df[k + "_tot"] = np.nan_to_num(compressed_df[k + "_ab"].values) + np.nan_to_num(
-                    compressed_df[k + "_ba"].values
-                )
+            # Tot Flow
+            df[k + "_tot"] = np.nan_to_num(df[k + "_ab"].values) + np.nan_to_num(df[k + "_ba"].values)
 
-        if uncompressed and not compressed:
-            return uncompressed_df
-        elif not uncompressed and compressed:
-            return compressed_df
-        else:
-            return uncompressed_df, compressed_df
+        return df
+
+    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
+        """
+        Set the selected links. Checks if the links and directions are valid. Translates `links=None` and
+        direction into unique link ID used in compact graph.
+
+        Supply `links=None` to disable select link analysis.
+
+        :Arguments:
+            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
+             Link IDs and directions to be used in select link analysis.
+        """
+        self._selected_links = {}
+
+        if links is None:
+            del self._config["select_links"]
+            return
+
+        max_id = self.graph.compact_graph.id.max() + 1
+
+        for name, link_set in links.items():
+            if len(name.split(" ")) != 1:
+                warnings.warn("Input string name has a space in it. Replacing with _")
+                name = str.join("_", name.split(" "))
+
+            link_ids = []
+            for link, dir in link_set:
+                if dir == 0:
+                    query = (self.graph.graph["link_id"] == link) & (
+                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+                    )
+                else:
+                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
+                if not query.any():
+                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+                    # Check for duplicate compressed link ids in the current link set
+                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                    if comp_id == max_id:
+                        raise ValueError(
+                            f"link ID {link} and direction {dir} is not present in compressed graph. "
+                            "It may have been removed during dead-end removal."
+                        )
+                    elif comp_id in link_ids:
+                        warnings.warn(
+                            "Two input links map to the same compressed link in the network"
+                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                        )
+                    else:
+                        link_ids.append(comp_id)
+            self._selected_links[name] = link_ids
+        self._config["select_links"] = str(links)
 
     def get_select_link_results(self) -> pd.DataFrame:
-        raise NotImplementedError()
+        """
+        Get the select link loading results.
+
+        :Returns:
+            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
+                A tuple of uncompressed and compressed select link loading results as DataFrames.
+                Columns are the matrix name concatenated with the select link set and direction.
+        """
+
+        if self.matrix is None:
+            raise ValueError(
+                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
+            )
+
+        tmp = self.__rc.select_link_loading(self.matrix, self._selected_links)
+
+        self.sl_link_loads = {}
+        self.sl_compact_link_loads = {}
+        self.sl_od_matrix = {}
+        for name, sl_res in tmp.items():
+            for sl_name, res in sl_res.items():
+                mat, (u, c) = res
+                self.sl_od_matrix[name + "_" + sl_name] = mat
+                self.sl_link_loads[name + "_" + sl_name] = u
+                self.sl_compact_link_loads[name + "_" + sl_name] = c
+
+        # Create a data store with a row for each uncompressed link
+        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+        lids = np.unique(self.graph.graph.link_id.values)
+        uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
+
+        m_compact = _get_graph_to_network_mapping(
+            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
+        )
+        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
+        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
+
+        return uncompressed_df, compressed_df

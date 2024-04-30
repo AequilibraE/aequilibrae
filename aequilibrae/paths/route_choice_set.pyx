@@ -2,6 +2,7 @@
 
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix.sparse_matrix cimport COO
 
 from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as inc
@@ -916,7 +917,6 @@ cdef class RouteChoiceSet:
 
         cdef:
             vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
-            vector[double] *ll
             vector[double] *vec
 
         if generate_path_files:
@@ -934,13 +934,15 @@ cdef class RouteChoiceSet:
             #     tmp.append(deref(vec))
             # print(tmp)
 
-        if len(matrix.view_names) == 1:
-            link_loads = self.apply_link_loading_func(matrix.matrix_view, path_files, generate_path_files, cores)
-        else:
-            link_loads = {
-                name: self.apply_link_loading_func(matrix.matrix_view[:, :, i], path_files, generate_path_files, cores)
-                for i, name in enumerate(matrix.names)
-            }
+        link_loads = {}
+        for i, name in enumerate(matrix.names):
+            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
+
+            ll = self.apply_link_loading_from_path_files(m, deref(path_files)) \
+                if generate_path_files else self.apply_link_loading(m)
+
+            link_loads[name] = self.apply_link_loading_func(ll, cores)
+            del ll
 
         if generate_path_files:
             for vec in deref(path_files):
@@ -949,13 +951,8 @@ cdef class RouteChoiceSet:
 
         return link_loads
 
-    cdef apply_link_loading_func(RouteChoiceSet self, double[:, :] m, vector[vector[double] *] *pf, bint generate_path_files, int cores):
-        """Helper function for self.link_loading. Cannot free a pointer captured in a local scope by a lambda."""
-        if generate_path_files:
-            ll = self.apply_link_loading_from_path_files(m, deref(pf))
-        else:
-            ll = self.apply_link_loading(m)
-
+    cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
+        """Helper function for link_loading."""
         # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
         # transferring ownership.
         compressed = <double[:ll.size(), :1]>&deref(ll)[0]
@@ -968,7 +965,6 @@ cdef class RouteChoiceSet:
             cores
         )
         compressed = np.array(compressed, copy=True)
-        del ll
         return actual.reshape(-1), compressed.reshape(-1)
 
     @cython.boundscheck(False)
@@ -1062,8 +1058,6 @@ cdef class RouteChoiceSet:
         """
         Apply link loading from path files.
 
-        If path files have already been computed then this is a more efficient manner for the link loading.
-
         Returns a vector of link loads indexed by compressed link ID.
         """
         cdef:
@@ -1101,6 +1095,7 @@ cdef class RouteChoiceSet:
         cdef:
             RouteSet_t *route_set
             vector[double] *route_set_prob
+            vector[double].const_iterator route_prob_iter
             long origin_index, dest_index
             double demand, prob, load
 
@@ -1122,6 +1117,102 @@ cdef class RouteChoiceSet:
                 load = prob * demand
                 for link in deref(route):
                     deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
+
+        return link_loads
+
+    @cython.embedsignature(True)
+    def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, List[long]], cores: int = 0):
+        """
+        Apply link loading to the network using the demand matrix and the previously computed route sets.
+        """
+        if self.ods == nullptr \
+           or self.link_union_set == nullptr \
+           or self.prob_set == nullptr:
+            raise ValueError("select link loading requires Route Choice path_size_logit results")
+
+        if not isinstance(matrix, AequilibraeMatrix):
+            raise ValueError("`matrix` is not an AequilibraE matrix")
+
+        cores = cores if cores > 0 else omp_get_max_threads()
+
+        cdef:
+            unordered_set[long] select_link_set
+            vector[double] *ll
+
+        link_loads = {}
+
+        for i, name in enumerate(matrix.names):
+            matrix_ll = {}
+            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
+            for (k, v) in select_links.items():
+                select_link_set = <unordered_set[long]> v
+
+                coo = COO((self.zones, self.zones))
+
+                ll = self.apply_select_link_loading(coo, m, select_link_set)
+                res = self.apply_link_loading_func(ll, cores)
+                del ll
+
+                matrix_ll[k] = (coo, res)
+            link_loads[name] = matrix_ll
+
+        return link_loads
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.initializedcheck(False)
+    cdef vector[double] *apply_select_link_loading(
+        RouteChoiceSet self,
+        COO sparse_mat,
+        double[:, :] matrix_view,
+        unordered_set[long] &select_link_set
+    ) noexcept nogil:
+        """
+        Apply select link loading.
+
+        Returns a vector of link loads indexed by compressed link ID.
+        """
+        cdef:
+            RouteSet_t *route_set
+            vector[double] *route_set_prob
+            vector[double].const_iterator route_prob_iter
+            long origin_index, dest_index, o, d
+            double demand, prob, load
+
+            vector[double] *link_loads = new vector[double](self.num_links)
+
+            bool link_present = False
+
+        # For each OD pair, if a route contains one or more links in a select link set, add that ODs demand to
+        # a sparse matrix of Os to Ds
+
+        # For each route, if it contains one or more links in a select link set, apply the link loading for
+        # that route
+
+        for i in range(self.ods.size()):
+            route_set = deref(self.results)[i]
+            route_set_prob = deref(self.prob_set)[i]
+
+            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            demand = matrix_view[origin_index, dest_index]
+
+            route_prob_iter = route_set_prob.cbegin()
+            for route in deref(route_set):
+                prob = deref(route_prob_iter)
+                inc(route_prob_iter)
+                load = prob * demand
+
+                for link in deref(route):
+                    if select_link_set.find(link) != select_link_set.end():
+                        sparse_mat.append(origin_index, dest_index, load)
+                        link_present = True
+                        break
+
+                if link_present:
+                    for link in deref(route):
+                        deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
 
         return link_loads
 

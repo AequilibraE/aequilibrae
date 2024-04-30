@@ -221,10 +221,12 @@ class TestRouteChoiceSet(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
         rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
 
-        link_loads = rc.link_loading(self.mat)
-        link_loads2 = rc.link_loading(self.mat, generate_path_files=True)
+        n = self.mat.names[0]
 
-        np.testing.assert_array_almost_equal(link_loads, link_loads2)
+        ll = rc.link_loading(self.mat)[n]
+        ll2 = rc.link_loading(self.mat, generate_path_files=True)[n]
+
+        np.testing.assert_array_almost_equal(ll, ll2)
 
     def test_known_results(self):
         np.random.seed(0)
