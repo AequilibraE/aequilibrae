@@ -8,7 +8,7 @@ import dataclasses
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph_building import build_compressed_graph
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
 
@@ -553,65 +553,7 @@ class GraphBase(ABC):  # noqa: B024
             **data** (:obj:`np.array`): array of link ids
         """
 
-        # Cache the result, this isn't a huge computation but isn't worth doing twice
-        if (
-            self.compressed_link_network_mapping_idx is not None
-            and self.compressed_link_network_mapping_data is not None
-            and self.network_compressed_node_mapping is not None
-        ):
-            return (
-                self.compressed_link_network_mapping_idx,
-                self.compressed_link_network_mapping_data,
-                self.network_compressed_node_mapping,
-            )
-
-        # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
-        # bother redoing sorting it. This method would be faster using a Cython module but it's a one time compute
-
-        # Some links are completely removed from the network, they are assigned ID `self.compact_graph.id.max() + 1`,
-        # we skip them.
-        filtered = self.graph[self.graph.__compressed_id__ != self.compact_graph.id.max() + 1]
-        gb = filtered.groupby(by="__compressed_id__", sort=True)
-        idx = np.zeros(self.compact_num_links + 1, dtype=np.uint32)
-        data = np.zeros(len(filtered), dtype=np.uint32)
-
-        node_mapping = np.full(self.num_nodes, -1)
-
-        i = 0
-        for compressed_id, df in gb:
-            idx[compressed_id] = i
-            values = df.link_id.values
-            a = df.a_node.values
-            b = df.b_node.values
-
-            # In order to ensure that the link IDs come out in the correct order we must walk the links
-            # we do this assuming the `a` array is sorted.
-            j = 0
-            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
-
-            a_node = x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
-            while True:
-                tmp = a.searchsorted(x)
-                if tmp < len(a) and a[tmp] == x:
-                    x = b[tmp]
-                    data[i + j] = values[tmp]
-                else:
-                    break
-                j += 1
-
-            b_node = x
-            node_mapping[a_node] = self.compact_graph["a_node"].iat[compressed_id]
-            node_mapping[b_node] = self.compact_graph["b_node"].iat[compressed_id]
-
-            i += len(values)
-
-        idx[-1] = i
-
-        self.compressed_link_network_mapping_idx = idx
-        self.compressed_link_network_mapping_data = data
-        self.network_compressed_node_mapping = node_mapping
-
-        return idx, data, node_mapping
+        return create_compressed_link_network_mapping(self)
 
 
 class Graph(GraphBase):

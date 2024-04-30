@@ -381,3 +381,76 @@ def build_compressed_graph(graph):
     # If will refer all the links that have no correlation to an element beyond the last link
     # This element will always be zero during assignment
     graph.graph.__compressed_id__ = graph.graph.__compressed_id__.fillna(graph.compact_graph.id.max() + 1).astype(np.int64)
+
+
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+@cython.initializedcheck(False)
+def create_compressed_link_network_mapping(graph):
+        # Cache the result, this isn't a huge computation but isn't worth doing twice
+        if (
+            graph.compressed_link_network_mapping_idx is not None
+            and graph.compressed_link_network_mapping_data is not None
+            and graph.network_compressed_node_mapping is not None
+        ):
+            return (
+                graph.compressed_link_network_mapping_idx,
+                graph.compressed_link_network_mapping_data,
+                graph.network_compressed_node_mapping,
+            )
+
+        cdef:
+            long long i, j, a_node, x, b_node, tmp, compressed_id
+            long long[:] b
+            long long[:] values
+            np.uint32_t[:] idx
+            np.uint32_t[:] data
+            np.int32_t[:] node_mapping
+
+        # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
+        # bother redoing sorting it.
+
+        # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
+        # we skip them.
+        filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
+        gb = filtered.groupby(by="__compressed_id__", sort=True)
+        idx = np.zeros(graph.compact_num_links + 1, dtype=np.uint32)
+        data = np.zeros(len(filtered), dtype=np.uint32)
+
+        node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
+
+        i = 0
+        for compressed_id, df in gb:
+            idx[compressed_id] = i
+            values = df.link_id.values
+            a = df.a_node.values
+            b = df.b_node.values
+
+            # In order to ensure that the link IDs come out in the correct order we must walk the links
+            # we do this assuming the `a` array is sorted.
+            j = 0
+            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
+
+            a_node = x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
+            while True:
+                tmp = a.searchsorted(x)
+                if tmp < len(a) and a[tmp] == x:
+                    x = b[tmp]
+                    data[i + j] = values[tmp]
+                else:
+                    break
+                j += 1
+
+            b_node = x
+            node_mapping[a_node] = graph.compact_graph["a_node"].iat[compressed_id]
+            node_mapping[b_node] = graph.compact_graph["b_node"].iat[compressed_id]
+
+            i += len(values)
+
+        idx[-1] = i
+
+        graph.compressed_link_network_mapping_idx = idx
+        graph.compressed_link_network_mapping_data = data
+        graph.network_compressed_node_mapping = node_mapping
+
+        return idx, data, node_mapping
