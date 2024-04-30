@@ -5,12 +5,6 @@
         "url": "https://aequilibrae.com/python/develop/"
     },
     {
-        "name": "stable",
-        "version": "1.0.1",
-        "url": "https://aequilibrae.com/python/V.1.0.1/",
-        "preferred": true
-    },
-    {
         "name": "1.0.2",
         "version": "1.0.2",
         "url": "https://aequilibrae.com/python/V.1.0.2/"
