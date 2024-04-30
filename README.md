@@ -1,5 +1,7 @@
 # AequilibraE
 
+[![Downloads](https://img.shields.io/pypi/dm/aequilibrae.svg?maxAge=2592000)](https://pypi.python.org/pypi/aequilibrae)
+
 [![Documentation](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/documentation.yml)
 
 [![unit tests](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/AequilibraE/aequilibrae/actions/workflows/unit_tests.yml)
