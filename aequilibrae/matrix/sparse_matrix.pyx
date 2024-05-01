@@ -4,6 +4,7 @@ from cython.operator cimport dereference as d
 
 import scipy.sparse
 import numpy as np
+import openmatrix as omx
 
 cdef class Sparse:
     """
@@ -24,6 +25,13 @@ cdef class Sparse:
         partially deallocated state already.
         """
         pass
+
+    def to_disk(self, path, name: str):
+        f = omx.open_file(path, "a")
+        try:
+            f[name] = self.to_scipy().tocsr().toarray()
+        finally:
+            f.close()
 
 
 cdef class COO(Sparse):
@@ -58,7 +66,7 @@ cdef class COO(Sparse):
         del self.data
         self.data = <vector[double] *>nullptr
 
-    def to_scipy(self, shape=None):
+    def to_scipy(self, shape=None, dtype=np.float64):
         row = <size_t[:self.row.size()]>&d(self.row)[0]
         col = <size_t[:self.col.size()]>&d(self.col)[0]
         data = <double[:self.data.size()]>&d(self.data)[0]
@@ -66,7 +74,7 @@ cdef class COO(Sparse):
         if shape is None:
             shape = self.shape
 
-        return scipy.sparse.coo_matrix((data, (row, col)), dtype=np.float64, shape=shape)
+        return scipy.sparse.coo_matrix((data, (row, col)), dtype=dtype, shape=shape)
 
     cdef void append(COO self, size_t i, size_t j, double v) noexcept nogil:
         self.row.push_back(i)
