@@ -1182,7 +1182,7 @@ cdef class RouteChoiceSet:
 
             vector[double] *link_loads = new vector[double](self.num_links)
 
-            bool link_present = False
+            bool link_present
 
         # For each OD pair, if a route contains one or more links in a select link set, add that ODs demand to
         # a sparse matrix of Os to Ds
@@ -1204,6 +1204,7 @@ cdef class RouteChoiceSet:
                 inc(route_prob_iter)
                 load = prob * demand
 
+                link_present = False
                 for link in deref(route):
                     if select_link_set.find(link) != select_link_set.end():
                         sparse_mat.append(origin_index, dest_index, load)

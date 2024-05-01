@@ -27,7 +27,7 @@ class TestRouteChoiceSet(TestCase):
 
         self.project = Project()
         self.project.open(proj_path)
-        self.project.network.build_graphs(fields=["distance"], modes=["c"])
+        self.project.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
         self.graph = self.project.network.graphs["c"]  # type: Graph
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
@@ -229,51 +229,106 @@ class TestRouteChoiceSet(TestCase):
         np.testing.assert_array_almost_equal(ll, ll2)
 
     def test_known_results(self):
-        np.random.seed(0)
-        rc = RouteChoiceSet(self.graph)
-        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+        for cost in ["distance", "free_flow_time"]:
+            with self.subTest(cost=cost):
+                self.graph.set_graph(cost)
 
-        mat = AequilibraeMatrix()
-        mat.create_empty(
-            memory_only=True,
-            zones=self.graph.num_zones,
-            matrix_names=["all zeros", "single one"],
-        )
-        mat.index = self.graph.centroids[:]
-        mat.computational_view()
-        mat.matrix_view[:, :, 0] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
-        mat.matrix_view[:, :, 1] = np.zeros((self.graph.num_zones, self.graph.num_zones))
+                np.random.seed(0)
+                rc = RouteChoiceSet(self.graph)
+                nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+                rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
 
-        for od in nodes:
-            mat.matrix_view[:, :, 0][od[0] - 1, od[1] - 1] = 0.0
+                mat = AequilibraeMatrix()
+                mat.create_empty(
+                    memory_only=True,
+                    zones=self.graph.num_zones,
+                    matrix_names=["all zeros", "single one"],
+                )
+                mat.index = self.graph.centroids[:]
+                mat.computational_view()
+                mat.matrix_view[:, :, 0] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
+                mat.matrix_view[:, :, 1] = np.zeros((self.graph.num_zones, self.graph.num_zones))
 
-        mat.matrix_view[:, :, 1][nodes[0][0] - 1, nodes[0][1] - 1] = 1.0
+                for od in nodes:
+                    mat.matrix_view[:, :, 0][od[0] - 1, od[1] - 1] = 0.0
 
-        link_loads = rc.link_loading(mat)
+                mat.matrix_view[:, :, 1][nodes[0][0] - 1, nodes[0][1] - 1] = 1.0
 
-        with self.subTest(matrix="all zeros"):
-            u, c = link_loads["all zeros"]
-            np.testing.assert_allclose(u, 0.0)
-            np.testing.assert_allclose(c, 0.0)
+                link_loads = rc.link_loading(mat)
+                table = rc.get_results().to_pandas()
 
-        with self.subTest(matrix="single one"):
-            u, c = link_loads["single one"]
-            link = self.graph.graph[
-                (self.graph.graph.a_node == nodes[0][0] - 1) & (self.graph.graph.b_node == nodes[0][1] - 1)
-            ]
+                with self.subTest(matrix="all zeros"):
+                    u, c = link_loads["all zeros"]
+                    np.testing.assert_allclose(u, 0.0)
+                    np.testing.assert_allclose(c, 0.0)
 
-            lid = link.link_id.values[0]
-            c_lid = link.__compressed_id__.values[0]
+                with self.subTest(matrix="single one"):
+                    u, c = link_loads["single one"]
+                    link = self.graph.graph[
+                        (self.graph.graph.a_node == nodes[0][0] - 1) & (self.graph.graph.b_node == nodes[0][1] - 1)
+                    ]
 
-            self.assertAlmostEqual(u[lid - 1], 1.0)
-            self.assertAlmostEqual(c[c_lid], 1.0)
+                    lid = link.link_id.values[0]
+                    c_lid = link.__compressed_id__.values[0]
+                    t = table[table["route set"].apply(lambda x, lid=lid: lid in set(x))]
+                    v = t.probability.sum()
 
-            u[lid - 1] = 0.0
-            c[c_lid] = 0.0
+                    self.assertAlmostEqual(u[lid - 1], v, places=6)
+                    self.assertAlmostEqual(c[c_lid], v, places=6)
 
-            np.testing.assert_allclose(u, 0.0)
-            np.testing.assert_allclose(c, 0.0)
+    def test_select_link(self):
+        for cost in ["distance", "free_flow_time"]:
+            with self.subTest(cost=cost):
+                self.graph.set_graph(cost)
+
+                np.random.seed(0)
+                rc = RouteChoiceSet(self.graph)
+                nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+                rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
+
+                mat = AequilibraeMatrix()
+                mat.create_empty(
+                    memory_only=True,
+                    zones=self.graph.num_zones,
+                    matrix_names=["all ones"],
+                )
+                mat.index = self.graph.centroids[:]
+                mat.computational_view()
+                mat.matrix_view[:, :] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
+
+                table = rc.get_results().to_pandas()
+
+                # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and 17-9
+                # 20-4 also shares 11 with 5-3
+                ods = [(20, 4), (21, 2), (10, 8), (17, 9)]
+                sl_link_loads = rc.select_link_loading(
+                    mat,
+                    {
+                        "sl1": self.graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__.to_list(),
+                        "sl2": self.graph.graph.set_index("link_id").loc[[11]].__compressed_id__.to_list(),
+                    },
+                )
+
+                m, (u, c) = sl_link_loads["all ones"]["sl1"]
+                m2, (u2, c2) = sl_link_loads["all ones"]["sl2"]
+                m = m.to_scipy()
+                m2 = m2.to_scipy()
+                self.assertSetEqual(set(zip(*(m > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})
+                self.assertSetEqual(set(zip(*(m2 > 0.0001).nonzero())), {(20 - 1, 4 - 1), (5 - 1, 3 - 1)})
+
+                t1 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: bool(set(x) & {23, 26}))]
+                t2 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: 11 in set(x))]
+                sl1_link_union = np.unique(np.hstack(t1["route set"].values))
+                sl2_link_union = np.unique(np.hstack(t2["route set"].values))
+
+                np.testing.assert_equal(u.nonzero()[0] + 1, sl1_link_union)
+                np.testing.assert_equal(u2.nonzero()[0] + 1, sl2_link_union)
+
+                np.testing.assert_allclose(u, c)
+                np.testing.assert_allclose(u2, c2)
+
+                self.assertAlmostEqual(u.sum(), (t1["route set"].apply(len) * t1.probability).sum())
+                self.assertAlmostEqual(u2.sum(), (t2["route set"].apply(len) * t2.probability).sum())
 
 
 class TestRouteChoice(TestCase):
