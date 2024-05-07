@@ -1,10 +1,11 @@
-"""
-.. _example_usage_route_choice:
+""".. _example_usage_route_choice:
 
 Route Choice
 =================
 
-In this example, we show how to perform route choice set generation using BFSLE and Link penalisation, for a city in La Serena Metropolitan Area in Chile.
+In this example, we show how to perform route choice set generation using BFSLE and Link penalisation, for a city in La
+Serena Metropolitan Area in Chile.
+
 """
 
 # Imports
@@ -52,7 +53,8 @@ project.network.graphs.keys()
 # let's say we want to minimize the distance
 graph.set_graph("distance")
 
-# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), these happen to be a selection of western centroids.
+# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), these happen to be a selection of
+# western centroids.
 graph.prepare_graph(np.array(list(range(28, 41)) + list(range(49, 91))))
 
 # %%
@@ -77,13 +79,15 @@ mat.computational_view()
 from aequilibrae.paths import RouteChoice
 
 # %%
-# This object construct might take a minute depending on the size of the graph due to the construction of the compressed link to network link mapping that's required.
-# This is a one time operation per graph and is cached.
-# We need to supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
+# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
+# link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to
+# supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
 rc = RouteChoice(graph, mat)
 
 # %%
-# Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE based on the paper
+
+# Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE
+# based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
 # https://doi.org/10.1080/18128602.2012.671383
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
@@ -96,7 +100,8 @@ rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1, theta=1.1)
 print(rc.default_paramaters)
 
 # %%
-# We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid as well an an assignment.
+# We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
+# as well an an assignment.
 results = rc.execute_single(28, 90, perform_assignment=True)
 print(results[0])
 
@@ -106,8 +111,8 @@ print(results[0])
 rc.get_results().to_pandas()
 
 # %%
-# To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD pairs we'd like to use, or we can provided a 1D list
-# and the generation will be run on all permutations.
+# To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
+# pairs we'd like to use, or we can provided a 1D list and the generation will be run on all permutations.
 rc.prepare(graph.centroids[:5])  # You can inspect the result with rc.nodes
 
 # %%
@@ -117,8 +122,28 @@ rc.get_results().to_pandas()
 
 # %%
 # Since we provided a matrix initially we can also perform link loading based on our assignment results.
-# We can specify which link loading we want, either just uncompressed, just compressed, or both.
-rc.get_load_results(which="both")
+rc.get_load_results()
+
+# %%
+# Select link analysis
+# ~~~~~~~~~~~~~~~~~~
+# We can also enable select link analysis by providing the links and the directions that we are interested in
+rc.set_select_links({"sl1": [(5372, 1), (5374, 1)], "sl2": [(23845, 0)]})
+
+# %%
+# We can get then the results in a Pandas data frame for both the network and compressed graph.
+u_sl, c_sl = rc.get_select_link_results()
+u_sl
+
+# %%
+# We can also access the OD matrices for this link loading. These matrices are sparse and can be converted to
+# scipy.sparse matrices for ease of use. They're stored in a dictionary where the key is the matrix name concatenated
+# wit the select link set name via an underscore. These matrices are constructed during `get_select_link_results`.
+list(rc.sl_od_matrix.keys())
+
+# %%
+od_matrix = rc.sl_od_matrix["demand_sl1"]
+od_matrix.to_scipy()
 
 # %%
 project.close()

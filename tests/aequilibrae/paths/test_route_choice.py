@@ -349,53 +349,84 @@ class TestRouteChoice(TestCase):
         self.mat = self.project.matrices.get_matrix("demand_omx")
         self.mat.computational_view()
 
+        self.rc = RouteChoice(self.graph, self.mat)
+
     def test_prepare(self):
-        rc = RouteChoice(self.graph, self.mat)
+        with self.assertRaises(ValueError):
+            self.rc.prepare([])
 
         with self.assertRaises(ValueError):
-            rc.prepare([])
+            self.rc.prepare(["1", "2"])
 
         with self.assertRaises(ValueError):
-            rc.prepare(["1", "2"])
+            self.rc.prepare([("1", "2")])
 
         with self.assertRaises(ValueError):
-            rc.prepare([("1", "2")])
+            self.rc.prepare([1])
 
-        with self.assertRaises(ValueError):
-            rc.prepare([1])
-
-        rc.prepare([1, 2])
-        self.assertListEqual(rc.nodes, [(1, 2), (2, 1)])
-        rc.prepare([(1, 2)])
-        self.assertListEqual(rc.nodes, [(1, 2)])
+        self.rc.prepare([1, 2])
+        self.assertListEqual(self.rc.nodes, [(1, 2), (2, 1)])
+        self.rc.prepare([(1, 2)])
+        self.assertListEqual(self.rc.nodes, [(1, 2)])
 
     def test_set_save_routes(self):
-        rc = RouteChoice(self.graph, self.mat)
+        self.rc = RouteChoice(self.graph, self.mat)
 
         with self.assertRaises(ValueError):
-            rc.set_save_routes("/non-existent-path")
+            self.rc.set_save_routes("/non-existent-path")
 
     def test_set_choice_set_generation(self):
-        rc = RouteChoice(self.graph, self.mat)
-
-        rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
         self.assertDictEqual(
-            rc.parameters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
+            self.rc.parameters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
         )
 
-        rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
+        self.rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
         self.assertDictEqual(
-            rc.parameters, {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0}
+            self.rc.parameters,
+            {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0},
         )
 
         with self.assertRaises(ValueError):
-            rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
+            self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
 
         with self.assertRaises(ValueError):
-            rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1)
+            self.rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1)
 
         with self.assertRaises(AttributeError):
-            rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
+            self.rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
+
+    def test_link_results(self):
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+
+        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
+
+        self.rc.prepare(self.graph.centroids)
+
+        self.rc.execute(perform_assignment=True)
+
+        u, c = self.rc.get_load_results()
+        u_sl, c_sl = self.rc.get_select_link_results()
+
+        pd.testing.assert_frame_equal(u, c)
+        pd.testing.assert_frame_equal(u_sl, c_sl)
+
+        self.assertListEqual(
+            list(u.columns),
+            ["link_id"] + [mat_name + "_" + dir for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names],
+        )
+
+        self.assertListEqual(
+            list(u_sl.columns),
+            ["link_id"]
+            + [
+                mat_name + "_" + sl_name + "_" + dir
+                for sl_name in ["sl1", "sl2"]
+                for dir in ["ab", "ba"]
+                for mat_name in self.mat.names
+            ]
+            + [mat_name + "_" + sl_name + "_tot" for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names],
+        )
 
 
 def generate_line_strings(project, graph, results):
