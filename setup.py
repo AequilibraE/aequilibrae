@@ -70,9 +70,7 @@ ext_mod_graph_building = Extension(
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
-pkgs = find_packages(
-    exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE
-)
+pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
