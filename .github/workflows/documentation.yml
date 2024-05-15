@@ -43,7 +43,7 @@ jobs:
 
     - name: Test docstrings
       run: |
-        # python -m pytest --doctest-modules ./aequilibrae --ignore=aequilibrae/distribution/setup_ipf.py --ignore=aequilibrae/paths/setup_assignment.py --doctest-continue-on-failure
+        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
 
     - name: Build documentation
       run: |
