@@ -46,7 +46,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
-        pip install -r tests/requirements_tests.txt
+        pip install -r tests/requirements_tests.txt --upgrade
 
     - name: Download spatialite on Linux
       if: matrix.os == 'ubuntu-latest'
