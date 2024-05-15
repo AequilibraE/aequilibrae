@@ -1,4 +1,4 @@
-setuptools>69.0
+setuptools
 codecov
 pytest
 pytest-cov
