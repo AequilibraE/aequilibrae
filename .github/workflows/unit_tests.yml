@@ -53,7 +53,6 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y libsqlite3-mod-spatialite libspatialite-dev
-        pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
     - name: Download spatialite on Windows
