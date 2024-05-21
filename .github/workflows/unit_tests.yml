@@ -4,13 +4,13 @@ on: [pull_request]
 
 jobs:
   linting:
-    runs-on: ubuntu-latest
+    runs-on: Olympus
     steps:
       - uses: actions/checkout@v4
       - name: Set Python environment
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: 3.11
           architecture: x64
 
       - name: Install dependencies
@@ -52,8 +52,7 @@ jobs:
       if: matrix.os == 'Olympus'
       run: |
         sudo apt update
-        sudo apt install libsqlite3-mod-spatialite
-        sudo apt install -y libspatialite-dev
+        sudo apt install -y libsqlite3-mod-spatialite libspatialite-dev
         pip3 install spatialite
         sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
 
