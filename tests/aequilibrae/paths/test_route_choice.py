@@ -2,6 +2,8 @@ import os
 import uuid
 import zipfile
 from os.path import join, dirname
+import pathlib
+import sqlite3
 from tempfile import gettempdir
 from unittest import TestCase
 import pandas as pd
@@ -11,7 +13,7 @@ import pyarrow as pa
 from aequilibrae import Project
 from aequilibrae.paths.route_choice_set import RouteChoiceSet
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.matrix import AequilibraeMatrix
+from aequilibrae.matrix import AequilibraeMatrix, Sparse
 
 from ...data import siouxfalls_project
 
@@ -427,6 +429,36 @@ class TestRouteChoice(TestCase):
             ]
             + [mat_name + "_" + sl_name + "_tot" for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names],
         )
+
+    def test_saving(self):
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
+        self.rc.prepare(self.graph.centroids)
+        self.rc.execute(perform_assignment=True)
+        u, c = self.rc.get_load_results()
+        u_sl, c_sl = self.rc.get_select_link_results()
+
+        self.rc.save_link_flows("ll")
+        self.rc.save_select_link_flows("sl")
+
+        conn = sqlite3.connect(pathlib.Path(self.project.project_base_path) / "results_database.sqlite")
+        with conn:
+            for table, df in [
+                ("ll_uncompressed", u),
+                ("ll_compressed", c),
+                ("sl_uncompressed", u_sl),
+                ("sl_compressed", c_sl),
+            ]:
+                with self.subTest(table=table):
+                    pd.testing.assert_frame_equal(pd.read_sql(f"select * from {table}", conn), df)
+        conn.close()
+
+        matrices = Sparse.from_disk(
+            (pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx")
+        )
+
+        for name, matrix in self.rc.sl_od_matrix.items():
+            np.testing.assert_allclose(matrix.to_scipy().A, matrices[name].A)
 
 
 def generate_line_strings(project, graph, results):

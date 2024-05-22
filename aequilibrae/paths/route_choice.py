@@ -3,6 +3,8 @@ import warnings
 import logging
 import pathlib
 import socket
+import sqlite3
+from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
 from uuid import uuid4
 from functools import cached_property
@@ -27,7 +29,8 @@ class RouteChoice:
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
         self.parameters = self.default_paramaters.copy()
-        self.procedure_id = uuid4().hex
+        self.procedure_id = None
+        self.procedure_date = None
 
         proj = project or get_active_project(must_exist=False)
         self.project = proj
@@ -192,6 +195,8 @@ class RouteChoice:
         :Returns:
             ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
         """
+        self.procedure_id = uuid4().hex
+        self.procedure_date = str(datetime.today())
 
         self.results = None
         return self.__rc.run(
@@ -221,6 +226,8 @@ class RouteChoice:
                 "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
             )
 
+        self.procedure_date = str(datetime.today())
+
         self.results = None
         self.__rc.batched(
             self.nodes,
@@ -244,11 +251,14 @@ class RouteChoice:
             **info** (:obj:`dict`): Dictionary with summary information
         """
 
-        matrix_totals = (
-            {nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)}
-            if self.matrix is not None
-            else None
-        )
+        if self.matrix is None:
+            matrix_totals = {}
+        elif len(self.matrix.view_names) == 1:
+            matrix_totals = {self.matrix.view_names[0]: np.sum(self.matrix.matrix_view[:, :])}
+        else:
+            matrix_totals = {
+                nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)
+            }
 
         info = {
             "Algorithm": self.algorithm,
@@ -389,7 +399,7 @@ class RouteChoice:
         Get the select link loading results.
 
         :Returns:
-            **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
+            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`):
                 A tuple of uncompressed and compressed select link loading results as DataFrames.
                 Columns are the matrix name concatenated with the select link set and direction.
         """
@@ -423,3 +433,98 @@ class RouteChoice:
         compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
 
         return uncompressed_df, compressed_df
+
+    def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
+        self.procedure_id = uuid4().hex
+        data = [
+            table_name,
+            "select link",
+            self.procedure_id,
+            str(report),
+            self.procedure_date,
+            description,
+        ]
+
+        # sqlite3 context managers only commit, they don't close, oh well
+        conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
+        with conn:
+            df.to_sql(table_name, conn, index=False)
+        conn.close()
+
+        conn = project.connect()
+        with conn:
+            conn.execute(
+                """Insert into results(table_name, procedure, procedure_id, procedure_report, timestamp,
+                                                description) Values(?,?,?,?,?,?)""",
+                data,
+            )
+        conn.close()
+
+    def save_link_flows(self, table_name: str, project=None) -> None:
+        """
+        Saves the link link flows for all classes into the results database.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table being inserted to.
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+            Defaults to the active project
+        """
+        if not project:
+            project = self.project or get_active_project()
+
+        u, c = self.get_load_results()
+        info = self.info()
+        self.__save_dataframe(
+            u,
+            "Link loading",
+            "Uncompressed link loading results",
+            table_name + "_uncompressed",
+            info,
+            project=project,
+        )
+
+        self.__save_dataframe(
+            c,
+            "Link loading",
+            "Compressed link loading results",
+            table_name + "_compressed",
+            info,
+            project=project,
+        )
+
+    def save_select_link_flows(self, table_name: str, project=None) -> None:
+        """
+        Saves the select link link flows for all classes into the results database. Additionally, it exports
+        the OD matrices into OMX format.
+
+        :Arguments:
+            **table_name** (:obj:`str`): Name of the table being inserted to and the name of the
+            OpenMatrix file used for OD matrices.
+            **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
+            Defaults to the active project
+        """
+        if not project:
+            project = self.project or get_active_project()
+
+        u, c = self.get_select_link_results()
+        info = self.info()
+        self.__save_dataframe(
+            u,
+            "Select link analysis",
+            "Uncompressed select link analysis results",
+            table_name + "_uncompressed",
+            info,
+            project=project,
+        )
+
+        self.__save_dataframe(
+            c,
+            "Select link analysis",
+            "Compressed select link analysis results",
+            table_name + "_compressed",
+            info,
+            project=project,
+        )
+
+        for k, v in self.sl_od_matrix.items():
+            v.to_disk((pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"), k)
