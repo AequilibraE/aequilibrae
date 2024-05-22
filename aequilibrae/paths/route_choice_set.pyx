@@ -12,7 +12,7 @@ from libc.math cimport INFINITY, exp, pow
 from libc.stdlib cimport abort
 from libc.string cimport memcpy
 from libcpp cimport nullptr
-from libcpp.algorithm cimport lower_bound, reverse, sort
+from libcpp.algorithm cimport lower_bound, reverse, sort, copy
 from libcpp.unordered_map cimport unordered_map
 from libcpp.unordered_set cimport unordered_set
 from libcpp.utility cimport pair
@@ -277,11 +277,11 @@ cdef class RouteChoiceSet:
         if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
-        if penalty != 0.0 and bfsle:
-            raise ValueError("Link penalisation (`penalty` > 1.0) and `bfsle` cannot be enabled at once")
+        # if penalty != 0.0 and bfsle:
+        #     raise ValueError("Link penalisation (`penalty` > 1.0) and `bfsle` cannot be enabled at once")
 
-        if not bfsle and penalty <= 1.0:
-            raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
+        # if penalty <= 1.0:
+        #     raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
 
         if path_size_logit and (beta < 0 or theta <= 0):
             raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
@@ -410,6 +410,7 @@ cdef class RouteChoiceSet:
                             conn_matrix[threadid()],
                             b_nodes_matrix[threadid()],
                             _reached_first_matrix[threadid()],
+                            penalty,
                             c_seed,
                         )
                     else:
@@ -562,6 +563,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        double penatly,
         unsigned int seed
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
@@ -579,6 +581,11 @@ cdef class RouteChoiceSet:
             pair[RouteSet_t.iterator, bool] status
             unsigned int miss_count = 0
             long long p, connector
+            vector[double] penalised_cost = vector[double](self.cost_view.shape[0])
+            vector[double] next_penalised_cost = vector[double](self.cost_view.shape[0])
+
+        copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], penalised_cost.begin())
+        copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], next_penalised_cost.begin())
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -600,7 +607,7 @@ cdef class RouteChoiceSet:
             for banned in queue:
                 # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and
                 # reverse them as well
-                memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
+                memcpy(&thread_cost[0], &penalised_cost[0], penalised_cost.size() * sizeof(double))
 
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
@@ -628,6 +635,7 @@ cdef class RouteChoiceSet:
                     while p != origin_index:
                         connector = thread_conn[p]
                         p = thread_predecessors[p]
+                        next_penalised_cost[connector] *= penatly
                         vec.push_back(connector)
 
                     reverse(vec.begin(), vec.end())
@@ -656,6 +664,8 @@ cdef class RouteChoiceSet:
 
             queue.swap(next_queue)
             next_queue.clear()
+
+            copy(next_penalised_cost.cbegin(), next_penalised_cost.cend(), penalised_cost.begin())
 
         # We may have added more banned link sets to the queue then found out we hit the max depth, we should free those
         for banned in queue:
@@ -899,6 +909,8 @@ cdef class RouteChoiceSet:
             prob_vec.push_back(1.0 / inv_prob)
 
         return prob_vec
+
+TODO: Reverse binary logit to solve for an absolute max cost based on a probability and min cost. Use this to filter out particular routes when assiging (Will need to adjust path overlap/compute a mask to determine which routes to skip later)
 
     @cython.embedsignature(True)
     def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):

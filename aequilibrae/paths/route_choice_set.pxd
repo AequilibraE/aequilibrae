@@ -180,6 +180,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        double penatly,
         unsigned int seed
     ) noexcept nogil
 
