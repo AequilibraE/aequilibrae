@@ -72,6 +72,7 @@ class allOrNothing(WorkerThread):
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
+        self.assignment.emit(["update", self.matrix.index.shape[0], self.class_name])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(

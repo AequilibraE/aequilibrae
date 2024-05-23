@@ -36,15 +36,15 @@ class PythonSignal:  # type: ignore
 
     deactivate = missing_tqdm  # by default don't use progress bars in tests
 
-    def __init__(self, object):
+    def __init__(self, object, position=1):
         self.color = choice(["green", "magenta", "cyan", "blue", "red", "yellow"])
         self.pbar = None  # type: tqdm
         self.keydata = {}
+        self.pos = position
 
     def emit(self, val):
         if self.deactivate:
             return
-
         if val[0] == "finished":
             self.pbar.close()
 
@@ -52,8 +52,10 @@ class PythonSignal:  # type: ignore
             self.keydata[val[1]] = val[2]
 
         elif val[0] == "start":
-            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=val[2])
+            desc = str(val[2]).rjust(50)
+            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=desc, position=self.pos)
         elif val[0] == "update":
             self.pbar.update(val[1] - self.pbar.n)
-            if self.pbar.desc != val[2]:
-                self.pbar.set_description(val[2])
+            desc = str(val[2]).rjust(50)
+            if self.pbar.desc != desc:
+                self.pbar.set_description(desc, refresh=True)

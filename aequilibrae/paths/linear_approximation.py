@@ -41,11 +41,10 @@ from aequilibrae.utils.signal import SIGNAL
 
 
 class LinearApproximation(WorkerThread):
-    equilibration = SIGNAL(object)
-    assignment = SIGNAL(object)
-
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
+        self.equilibration = SIGNAL(object, 0)
+        self.assignment = SIGNAL(object, 1)
 
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
@@ -585,7 +584,7 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.6f}"])
+            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -635,6 +634,7 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
+        self.equilibration.emit(["update", self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
         self.assignment.emit(["finished"])
         self.equilibration.emit(["finished"])
 
