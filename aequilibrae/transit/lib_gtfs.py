@@ -149,7 +149,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
                     self.logger.warning(msg)
-        self.path_store.clear()
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -219,12 +218,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.signal.emit(["start", "master", 1, self.day, self.__mt])
 
         self.save_to_disk()
-
-        if self.__do_execute_map_matching:
-            self.logger.info(
-                f"{self.path_store.uses:,} paths requested. {self.path_store.total_paths:,} objects created"
-            )
-        self.path_store.clear()
 
     def save_to_disk(self):
         """Saves all transit elements built in memory to disk"""
