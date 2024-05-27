@@ -9,6 +9,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import substring
 
 from aequilibrae.log import logger
+from aequilibrae.paths import PathResults
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.utils.geo_index import GeoIndex
 from .basic_element import BasicPTElement
@@ -146,10 +147,6 @@ class Pattern(BasicPTElement):
         if mode_correspondence[self.route_type] not in self.__feed.graphs:
             return
 
-        self.__feed.path_store.add_graph(
-            self.__feed.graphs[mode_correspondence[self.route_type]], mode_correspondence[self.route_type]
-        )
-
         self.__map_matching_error.clear()
         df = self.__map_matching_complete_path_building()
         if df.shape[0] == 0:
@@ -189,12 +186,16 @@ class Pattern(BasicPTElement):
 
         node0 = graph.network.a_node[~graph.network.a_node.isin(graph.centroids)].min()
         connected_stops = []
+
+        res = PathResults()
+        res.prepare(graph)
+        res1 = PathResults()
+        res1.prepare(graph)
+
         for i, stop in enumerate(candidate_stops):
             node_o = stop.___map_matching_id__[self.route_type]
             logger.debug(f"Computing paths between {node_o} and {node0}")
-            res = self.__feed.path_store.get_path_results(node_o, mode_)
-            res.update_trace(int(node0))
-
+            res.compute_path(node_o, int(node0), early_exit=True)
             # Get skims, as proxy for connectivity, for all stops other than the origin
             other_nodes = stop_node_idxs[:i] + stop_node_idxs[i + 1 :]
             dest_skim = res.skims[other_nodes, 0]
@@ -220,8 +221,7 @@ class Pattern(BasicPTElement):
         if len(connected_stops) == 2:
             nstop = connected_stops[1].___map_matching_id__[self.route_type]
             logger.debug(f"Computing paths between {fstop.___map_matching_id__[self.route_type]} and {nstop}")
-            res = self.__feed.path_store.get_path_results(fstop.___map_matching_id__[self.route_type], mode_)
-            res.update_trace(int(nstop))
+            res.compute_path(fstop.___map_matching_id__[self.route_type], int(nstop), early_exit=True)
             if res.milepost is None:
                 return empty_frame
             pdist = list(res.milepost[1:-1] - res.milepost[:-2])[1:]
@@ -242,8 +242,7 @@ class Pattern(BasicPTElement):
                 following_stop = connected_stops[idx + 2]
                 n_end = following_stop.___map_matching_id__[self.route_type]
             logger.debug(f"Computing paths between {start} and {end}")
-            res = self.__feed.path_store.get_path_results(start, mode_)
-            res.update_trace(int(end))
+            res.compute_path(start, int(end), early_exit=True)
             connection_candidates = graph.network[graph.network.a_node == end].b_node.values
             min_cost = np.inf
             access_node = -1
@@ -252,8 +251,7 @@ class Pattern(BasicPTElement):
                 if connec == start:
                     continue
                 if not_last:
-                    res1 = self.__feed.path_store.get_path_results(connec, mode_)
-                    res1.update_trace(int(n_end))
+                    res1.compute_path(int(connec), int(n_end), early_exit=True)
                     if res1.milepost is None:
                         continue
                     follow_val = res1.milepost[-1]

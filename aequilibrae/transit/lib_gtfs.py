@@ -1,19 +1,18 @@
+import importlib.util as iutil
 from contextlib import closing
 from copy import deepcopy
-import importlib.util as iutil
 
 import pandas as pd
 import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
-from aequilibrae.context import get_active_project
-from aequilibrae.project.database_connection import database_connection
 
+from aequilibrae.context import get_active_project
+from aequilibrae.log import logger
+from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
-from aequilibrae.log import logger
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
-from .functions import PathStorage
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 from ..utils.worker_thread import WorkerThread
@@ -72,7 +71,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__target_date__ = None
         self.__outside_zones = 0
         self.__has_taz = 1 if len(self.geotool.zoning.all_zones()) > 0 else 0
-        self.path_store = PathStorage()
 
         if file_path is not None:
             self.logger.info(f"Creating GTFS feed object for {file_path}")
@@ -448,7 +446,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
 
         route_types = list({r.route_type for r in self.select_routes.values()})
-        route_types = [mode_id for mode_id in route_types if mode_correspondence[mode_id] not in self.graphs]
+        route_types = [mode_id for mode_id in route_types if
+                       mode_id in mode_correspondence and mode_correspondence[mode_id] not in self.graphs]
         if not route_types:
             return
         mm = MMGraph(self, self.__mt)
