@@ -446,8 +446,11 @@ class GTFSRouteSystemBuilder(WorkerThread):
         """
 
         route_types = list({r.route_type for r in self.select_routes.values()})
-        route_types = [mode_id for mode_id in route_types if
-                       mode_id in mode_correspondence and mode_correspondence[mode_id] not in self.graphs]
+        route_types = [
+            mode_id
+            for mode_id in route_types
+            if mode_id in mode_correspondence and mode_correspondence[mode_id] not in self.graphs
+        ]
         if not route_types:
             return
         mm = MMGraph(self, self.__mt)
