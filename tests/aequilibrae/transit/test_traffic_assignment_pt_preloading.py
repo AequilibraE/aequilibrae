@@ -38,8 +38,11 @@ class TestPTPreloaing:
         project.network.build_graphs()
         graph = project.network.graphs["c"]
 
-        # Get preload info from somewhere
-        pre_load = project.network.build_pt_preload(graph, start_time=7*60*60, end_time=9*60*60, default_pce=3.0, inclusion_cond="start")
+        # Preload parameters
+        period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
+        period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
+        # Get preload info from network
+        pre_load = project.network.build_pt_preload(graph, period_start, period_end)
 
         assignment = TrafficAssignment()
 
