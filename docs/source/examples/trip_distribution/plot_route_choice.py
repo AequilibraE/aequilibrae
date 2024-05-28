@@ -90,6 +90,23 @@ rc = RouteChoice(graph, mat)
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
 # https://doi.org/10.1080/18128602.2012.671383
+#
+# Our BFSLE implementation is slightly different and has extended to allow applying link penalisation as well. Every
+# link in all routes found at a depth are penalised with the `penalty` factor for the next depth. So at a depth of 0 no
+# links are penalised nor removed. At depth 1, all links found at depth 0 are penalised, then the links marked for
+# removal are removed. All links in the routes found at depth 1 are then penalised for the next depth. The penalisation
+# compounds. Pass set `penalty=1.0` to disable.
+#
+# To assist in filtering out bad results during the assignment, a `cutoff_prob` parameter can be provided to exclude
+# routes from the path-sized logit model. The `cutoff_prob` is used to compute an inverse binary logit and obtain a max
+# difference in utilities. If a paths total cost is greater than the minimum cost path in the route set plus the max
+# difference, the route is excluded from the PSL calculations. The route is still returned, but with a probability of
+# 0.0.
+#
+# The `cutoff_prob` should be in the range [0, 1]. It is then rescaled internally to [0.5, 1] as probabilities below 0.5
+# produce negative differences in utilities. A higher `cutoff_prob` includes more routes. A value of `0.0` will only
+# include the minimum cost route. A value of `1.0` includes all routes.
+#
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
 
 # rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.1)
