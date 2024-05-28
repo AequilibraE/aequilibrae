@@ -22,7 +22,7 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01},
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 1.0},
         "link-penalisation": {},
         "bfsle": {"beta": 1.0, "theta": 1.0},
     }
@@ -98,6 +98,15 @@ class RouteChoice:
         All links in the routes found at depth 1 are then penalised for the next depth. The penalisation compounds.
         Pass set `penalty=1.0` to disable.
 
+        When performing an assignment, `cutoff_prob` can be provided to exclude routes from the path-sized logit model.
+        The `cutoff_prob` is used to compute an inverse binary logit and obtain a max difference in utilities. If a
+        paths total cost is greater than the minimum cost path in the route set plus the max difference, the route is
+        excluded from the PSL calculations. The route is still returned, but with a probability of 0.0.
+
+        The `cutoff_prob` should be in the range [0, 1]. It is then rescaled internally to [0.5, 1] as probabilities
+        below 0.5 produce negative differences in utilities. A higher `cutoff_prob` includes more routes. A value of
+        `0.0` will only include the minimum cost route. A value of `1.0` includes all routes.
+
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
             **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
@@ -131,7 +140,7 @@ class RouteChoice:
         self.cores = cores
 
     def set_save_path_files(self, save_it: bool) -> None:
-        """Turn path saving on or off.
+        """turn path saving on or off.
 
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether paths should be saved

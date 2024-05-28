@@ -8,11 +8,11 @@ from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
-from libc.math cimport INFINITY, exp, pow
+from libc.math cimport INFINITY, exp, pow, log
 from libc.stdlib cimport abort
 from libc.string cimport memcpy
 from libcpp cimport nullptr
-from libcpp.algorithm cimport lower_bound, reverse, sort, copy
+from libcpp.algorithm cimport lower_bound, reverse, sort, copy, min_element
 from libcpp.unordered_map cimport unordered_map
 from libcpp.unordered_set cimport unordered_set
 from libcpp.utility cimport pair
@@ -246,6 +246,7 @@ cdef class RouteChoiceSet:
             path_size_logit: bool = False,
             beta: float = 1.0,
             theta: float = 1.0,
+            cutoff_prob: float = 1.0,
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -281,6 +282,9 @@ cdef class RouteChoiceSet:
         if path_size_logit and (beta < 0 or theta <= 0):
             raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
 
+        if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
+            raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
+
         for o, d in ods:
             if self.nodes_to_indices_view[o] == -1:
                 raise ValueError(f"Origin {o} is not present within the compact graph")
@@ -294,6 +298,9 @@ cdef class RouteChoiceSet:
             unsigned int c_max_misses = max_misses
             unsigned int c_seed = seed
             unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
+
+            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values
+            double scaled_cutoff_prob = cutoff_prob * 0.5 + 0.5
 
             vector[pair[long long, long long]] c_ods
 
@@ -439,7 +446,8 @@ cdef class RouteChoiceSet:
                             deref(deref(cost_set)[i]),
                             deref(deref(path_overlap_set)[i]),
                             beta,
-                            theta
+                            theta,
+                            scaled_cutoff_prob
                         )
                         # While we need the unique sorted links (.first), we don't need the frequencies (.second)
                         del freq_pair.second
@@ -909,9 +917,15 @@ cdef class RouteChoiceSet:
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
         double beta,
-        double theta
+        double theta,
+        double cutoff_prob
     ) noexcept nogil:
-        """Compute a probability for each route in the route set based on the path overlap."""
+        """Compute a probability for each route in the route set based on the path overlap.
+
+        Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
+        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
+        the route set.
+        """
         cdef:
             # Scratch objects
             vector[double] *prob_vec
@@ -919,22 +933,30 @@ cdef class RouteChoiceSet:
             long long route_set_idx
             size_t i, j
 
+            vector[bool] route_mask = vector[bool](total_cost.size())
+            double cutoff_cost = deref(min_element(total_cost.cbegin(), total_cost.cend())) \
+                + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
+
         prob_vec = new vector[double]()
         prob_vec.reserve(total_cost.size())
+
+        for i in range(total_cost.size()):
+            route_mask[i] = total_cost[i] <= cutoff_cost
 
         # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will
         # lead to NaN results
         for i in range(total_cost.size()):
-            inv_prob = 0.0
-            for j in range(total_cost.size()):
-                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                    * exp(-theta * (total_cost[j] - total_cost[i]))
-
-            prob_vec.push_back(1.0 / inv_prob)
+            if route_mask[i]:
+                inv_prob = 0.0
+                for j in range(total_cost.size()):
+                    if route_mask[j]:
+                        inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
+                            * exp(-theta * (total_cost[j] - total_cost[i]))
+                prob_vec.push_back(1.0 / inv_prob)
+            else:
+                prob_vec.push_back(0.0)
 
         return prob_vec
-
-# TODO: Reverse binary logit to solve for an absolute max cost based on a probability and min cost. Use this to filter out particular routes when assiging (Will need to adjust path overlap/compute a mask to determine which routes to skip later)
 
     @cython.embedsignature(True)
     def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
@@ -1426,3 +1448,12 @@ cdef class Checkpoint:
     @staticmethod
     def batches(ods: List[Tuple[int, int]]):
         return (list(g) for k, g in itertools.groupby(sorted(ods), key=lambda x: x[0]))
+
+
+cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
+    if prob == 1.0:
+        return INFINITY
+    elif prob == 0.0:
+        return -INFINITY
+    else:
+        return (log(prob / (1.0 - prob)) - beta0) / beta1
