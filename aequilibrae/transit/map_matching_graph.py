@@ -38,7 +38,7 @@ class MMGraph(WorkerThread):
 
     def __init__(self, lib_gtfs, mtmm):
         WorkerThread.__init__(self, None)
-        self.geotool = lib_gtfs.geotool
+        self.geotool = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs
         self.__mtmm = mtmm

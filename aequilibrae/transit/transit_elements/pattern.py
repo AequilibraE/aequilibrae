@@ -27,9 +27,9 @@ class Pattern(BasicPTElement):
     def __init__(self, route_id, gtfs_feed) -> None:
         """
         :Arguments:
-            *pattern_id* (:obj:`str`): Pre-computed ID for this pattern
+            *route_id* (:obj:`str`): route ID for which this stop pattern belongs
 
-            *geotool* (:obj:`Geo`): Suite of geographic utilities.
+            *gtfs_feed* (:obj:`Geo`): Parent feed object
         """
         self.pattern_hash = ""
         self.pattern_id = -1
@@ -42,8 +42,7 @@ class Pattern(BasicPTElement):
         self.seated_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
-        self.__geotool = gtfs_feed.geotool
-        self.__geolinks = self.__geotool.network.links.data
+        self.__geolinks = gtfs_feed.geo_links
         self.__logger = logger
 
         self.__feed = gtfs_feed
