@@ -26,6 +26,7 @@ from aequilibrae.project.project_creation import req_link_flds, req_node_flds, p
 from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+from aequilibrae.project.database_connection import database_connection
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
@@ -426,3 +427,44 @@ class Network(WorkerThread):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
+
+    def build_pt_preload(
+            graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
+            ) -> dict[(int, int), int]:
+        """
+        NOT YET COMPLETED!!!
+        """
+        transit_conn = database_connection("transit")
+
+        # Get list of trip_id's, whose start time is within the period
+        select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start_time} AND {end_time}"
+
+        # Convert the trip_id's to their corresponding pattern_id's
+        select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
+        period_patterns = map(lambda x: x[0], transit_conn.execute(select_pattern_ids).fetchall())
+
+        # For each pattern id get the corresponding list of link/dir'select_pattern_ids
+        select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
+        period_links = lambda pattern: transit_conn.execute(select_links(pattern)).fetchall()
+
+        # Create dictionary of link, dirs in the graph
+        proj_conn = database_connection("project_database")
+        links = proj_conn.execute("SELECT link_id, direction FROM links").fetchall()
+        proj_conn.close()
+
+        links_dict = dict()
+        for link, dir in links:
+            if dir == 0: # Means both directions
+                links_dict[(link, 1)] = 0
+                links_dict[(link, -1)] = 0
+            else:
+                links_dict[(link, dir)] = 0
+        
+        # Iterate through pattern id's and for each link in the sequence, increment the coresponding dictionary value
+        for pattern_id in period_patterns:
+            pattern_links = period_links(pattern_id)
+            for link, d in pattern_links:
+                dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, ask Pedro when this will be fixed (is supposed to be +-1)
+                links_dict[(link, dir)] += 1
+
+        return links_dict

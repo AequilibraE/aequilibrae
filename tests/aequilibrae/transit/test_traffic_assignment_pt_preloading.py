@@ -39,10 +39,13 @@ class TestPTPreloaing:
         graph = project.network.graphs["c"]
 
         # Get preload info from somewhere
+        pre_load = project.network.build_pt_preload(graph, start_time=7*60*60, end_time=9*60*60, default_pce=3.0, inclusion_cond="start")
 
-        assig = TrafficAssignment()
+        assignment = TrafficAssignment()
+
         # Set preload info into assig
-        # assig.set_pt_preload(preload)
+        assignment.set_pt_preload(pre_load)
+        
         # Set other assignment parameters
 
         # Run assignment
