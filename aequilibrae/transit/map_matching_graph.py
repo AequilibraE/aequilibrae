@@ -38,7 +38,7 @@ class MMGraph(WorkerThread):
 
     def __init__(self, lib_gtfs, mtmm):
         WorkerThread.__init__(self, None)
-        self.geotool = lib_gtfs.project
+        self.project = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs
         self.__mtmm = mtmm
@@ -73,7 +73,7 @@ class MMGraph(WorkerThread):
         self.distance_to_project = distance_to_project
         self.__mode = mode_correspondence[self.mode_id]
         self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
-        modename = self.geotool.network.modes.get(self.__mode).mode_name
+        modename = self.project.network.modes.get(self.__mode).mode_name
 
         with closing(database_connection("network")) as conn:
             get_qry = f"""Select link_id, a_node, b_node, max(speed_ab, speed_ba) speed,
