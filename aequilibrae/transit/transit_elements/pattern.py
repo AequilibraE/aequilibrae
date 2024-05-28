@@ -303,8 +303,8 @@ class Pattern(BasicPTElement):
 
         df = df[["original_id", "direction"]]
         df.columns = ["link_id", "dir"]
-        df.loc[df.link_id > 0, "dir"] = 0
-        df.loc[df.link_id < 0, "dir"] = 1
+        df.loc[df.link_id > 0, "dir"] = 1
+        df.loc[df.link_id < 0, "dir"] = -1
         df.reset_index(drop=True, inplace=True)
         has_issues = True
         while has_issues:
