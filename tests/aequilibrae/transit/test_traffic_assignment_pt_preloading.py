@@ -41,6 +41,8 @@ class TestPTPreloaing:
         # Preload parameters
         period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
         period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
+        # What if someone wants timings between 11pm and 1am (ie around midnight), how do I detemine these instead.
+
         # Get preload info from network
         pre_load = project.network.build_pt_preload(graph, period_start, period_end)
 
