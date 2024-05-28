@@ -45,7 +45,7 @@ class TestRouteChoiceSet(TestCase):
         rc = RouteChoiceSet(self.graph)
         a, b = 1, 20
 
-        for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
+        for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}, {"bfsle": True, "penalty": 1.1}]:
             with self.subTest(**kwargs):
                 results = rc.run(a, b, max_routes=10, **kwargs)
                 self.assertEqual(len(results), 10, "Returned more routes than expected")
@@ -150,10 +150,6 @@ class TestRouteChoiceSet(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
 
-        with self.assertRaises(ValueError):
-            rc.run(1, 1, max_routes=1, max_depth=1, bfsle=True, penalty=1.5)
-            rc.run(1, 1, max_routes=1, max_depth=1, bfsle=False, penalty=0.1)
-
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
@@ -210,12 +206,15 @@ class TestRouteChoiceSet(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True)
-        table = rc.get_results().to_pandas()
 
-        gb = table.groupby(by=["origin id", "destination id"])
-        for od, df in gb:
-            self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
+        for kwargs in [{"cutoff_prob": 0.0}, {"cutoff_prob": 0.5}, {"cutoff_prob": 1.0}]:
+            with self.subTest(**kwargs):
+                rc.batched(nodes, max_routes=20, max_depth=10, path_size_logit=True, **kwargs)
+                table = rc.get_results().to_pandas()
+
+                gb = table.groupby(by=["origin id", "destination id"])
+                for od, df in gb:
+                    self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
     def test_link_loading(self):
         np.random.seed(0)
@@ -380,20 +379,27 @@ class TestRouteChoice(TestCase):
     def test_set_choice_set_generation(self):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
         self.assertDictEqual(
-            self.rc.parameters, {"max_routes": 20, "penalty": 1.1, "max_depth": 0, "max_misses": 100, "seed": 0}
+            self.rc.parameters,
+            {"seed": 0, "max_routes": 20, "max_depth": 0, "max_misses": 100, "penalty": 1.1, "cutoff_prob": 1.0},
         )
 
         self.rc.set_choice_set_generation("bfsle", max_routes=20, beta=1.1)
         self.assertDictEqual(
             self.rc.parameters,
-            {"max_routes": 20, "beta": 1.1, "theta": 1.0, "max_depth": 0, "max_misses": 100, "seed": 0},
+            {
+                "seed": 0,
+                "max_routes": 20,
+                "max_depth": 0,
+                "max_misses": 100,
+                "beta": 1.1,
+                "theta": 1.0,
+                "penalty": 1.0,
+                "cutoff_prob": 1.0,
+            },
         )
 
         with self.assertRaises(ValueError):
             self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
-
-        with self.assertRaises(ValueError):
-            self.rc.set_choice_set_generation("bfsle", max_routes=20, penalty=1.1)
 
         with self.assertRaises(AttributeError):
             self.rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)

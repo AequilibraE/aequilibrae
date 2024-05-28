@@ -24,7 +24,7 @@ class RouteChoice:
     default_paramaters = {
         "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 1.0},
         "link-penalisation": {},
-        "bfsle": {"beta": 1.0, "theta": 1.0},
+        "bfsle": {"beta": 1.0, "theta": 1.0, "penalty": 1.0},
     }
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
