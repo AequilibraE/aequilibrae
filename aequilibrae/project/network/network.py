@@ -429,7 +429,7 @@ class Network(WorkerThread):
         return c
 
     def build_pt_preload(
-            graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
+            self, graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
             ) -> dict[(int, int), int]:
         """
         NOT YET COMPLETED!!!
