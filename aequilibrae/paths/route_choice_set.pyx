@@ -299,7 +299,7 @@ cdef class RouteChoiceSet:
             unsigned int c_seed = seed
             unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
 
-            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values
+            # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = cutoff_prob * 0.5 + 0.5
 
             vector[pair[long long, long long]] c_ods
@@ -371,7 +371,7 @@ cdef class RouteChoiceSet:
             results.resize(batch_len)
 
             if path_size_logit:
-                # we may clear these objects because it's either:
+                # We may clear these objects because it's either:
                 # - the first iteration and they contain no elements, thus no memory to leak
                 # - the internal objects were freed by the previous iteration
                 link_union_set.clear()
@@ -621,10 +621,10 @@ cdef class RouteChoiceSet:
 
             for banned in queue:
                 if lp:
-                    # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link penalisation
+                    # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link penalisation,
                     copy(penalised_cost.cbegin(), penalised_cost.cend(), &thread_cost[0])
                 else:
-                    # Otherwise we just copy directly from the cost view
+                    # ...otherwise we just copy directly from the cost view.
                     memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
                 for connector in deref(banned):
@@ -940,6 +940,7 @@ cdef class RouteChoiceSet:
         prob_vec = new vector[double]()
         prob_vec.reserve(total_cost.size())
 
+        # The route mask should be True for the routes we wish to include.
         for i in range(total_cost.size()):
             route_mask[i] = total_cost[i] <= cutoff_cost
 
@@ -949,11 +950,14 @@ cdef class RouteChoiceSet:
             if route_mask[i]:
                 inv_prob = 0.0
                 for j in range(total_cost.size()):
+                    # We must skip any other routes that are not included in the mask otherwise our probabilities
+                    # won't add up.
                     if route_mask[j]:
                         inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
                             * exp(-theta * (total_cost[j] - total_cost[i]))
                 prob_vec.push_back(1.0 / inv_prob)
             else:
+                # Anything that has been excluded gets a probability of 0 rather than be removed entirely.
                 prob_vec.push_back(0.0)
 
         return prob_vec
@@ -1336,7 +1340,7 @@ cdef class RouteChoiceSet:
         for i in range(ods.size()):
             route_set = route_sets[i]
 
-            # Instead of construction a "list of lists" style object for storing the route sets we instead will
+            # Instead of constructing a "list of lists" style object for storing the route sets we instead will
             # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
             # (path) starts.
             for route in deref(route_set):
