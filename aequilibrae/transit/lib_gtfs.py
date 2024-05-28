@@ -1,7 +1,7 @@
-import importlib.util as iutil
 from contextlib import closing
 from copy import deepcopy
 
+import geopandas as gpd
 import pandas as pd
 import pyproj
 from pyproj import Transformer
@@ -36,7 +36,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.__network = network
         self.project = get_active_project(False)
-        self.geo_links = self.project.network.links.data
         self.archive_dir = None  # type: str
         self.day = day
         self.logger = logger
@@ -68,7 +67,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_stops = {}
         self.select_patterns = {}
         self.select_links = {}
-        self.__mt = ""
+
+        links = self.project.network.links.data
+        self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
+        # Approximately 40 meter buffer
+        buff_geo = self.geo_links.to_crs(3857).buffer(40).geometry
+        self.geo_links_buffer = gpd.GeoDataFrame(links, geometry=buff_geo.to_crs(4326), crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.
@@ -196,7 +200,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             return
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
-        self.__mt = f"Importing {self.gtfs_data.agency.agency} to supply"
 
         self.save_to_disk()
 
@@ -409,7 +412,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         ]
         if not route_types:
             return
-        mm = MMGraph(self, self.__mt)
+        mm = MMGraph(self)
         for mode_id in route_types:
             mode = mode_correspondence[mode_id]
             graph = mm.build_graph_with_broken_stops(mode_id)
