@@ -57,3 +57,5 @@ class TestPTPreloaing:
 
         # Check results
         assert False  # Ensure test fails for now
+    
+    # Figure out more specific tests for creation of pre-load vector!
