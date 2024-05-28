@@ -56,7 +56,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
-        self.__has_taz = 1 if len(self.project.zoning.all_zones()) > 0 else 0
+        self.__has_taz = len(self.project.zoning.all_zones()) > 0
 
         if file_path is not None:
             self.logger.info(f"Creating GTFS feed object for {file_path}")
