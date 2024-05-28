@@ -19,6 +19,8 @@ from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
+from libc.stdio cimport fprintf, stderr
+
 import itertools
 import logging
 import pathlib
@@ -239,7 +241,7 @@ cdef class RouteChoiceSet:
             cores: int = 0,
             a_star: bool = True,
             bfsle: bool = True,
-            penalty: float = 0.0,
+            penalty: float = 1.0,
             where: Optional[str] = None,
             path_size_logit: bool = False,
             beta: float = 1.0,
@@ -264,8 +266,7 @@ cdef class RouteChoiceSet:
                 Default of ``0`` for all available.
             **bfsle** (:obj:`bool`): Whether to use Breadth First Search with Link Removal (BFSLE) over link
                 penalisation. Default ``True``.
-            **penalty** (:obj:`float`): Penalty to use for Link Penalisation. Must be ``> 1.0``. Not compatible
-                with ``bfsle=True``.
+            **penalty** (:obj:`float`): Penalty to use for Link Penalisation and BFSLE with LP.
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
         """
         cdef:
@@ -276,12 +277,6 @@ cdef class RouteChoiceSet:
 
         if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
-
-        # if penalty != 0.0 and bfsle:
-        #     raise ValueError("Link penalisation (`penalty` > 1.0) and `bfsle` cannot be enabled at once")
-
-        # if penalty <= 1.0:
-        #     raise ValueError("`penalty` must be > 1.0. `penalty=1.1` is recommended")
 
         if path_size_logit and (beta < 0 or theta <= 0):
             raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
@@ -568,24 +563,29 @@ cdef class RouteChoiceSet:
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
         cdef:
+            # Output
             RouteSet_t *route_set
+
+            # Scratch objects
             LinkSet_t removed_links
             minstd_rand rng
 
-            # Scratch objects
+            # These objects are juggled to prevent more allocations than necessary
             vector[unordered_set[long long] *] queue
             vector[unordered_set[long long] *] next_queue
             unordered_set[long long] *banned
             unordered_set[long long] *new_banned
+
+            # Local variables, Cython doesn't allow conditional declarations
             vector[long long] *vec
             pair[RouteSet_t.iterator, bool] status
             unsigned int miss_count = 0
             long long p, connector
-            vector[double] penalised_cost = vector[double](self.cost_view.shape[0])
-            vector[double] next_penalised_cost = vector[double](self.cost_view.shape[0])
 
-        copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], penalised_cost.begin())
-        copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], next_penalised_cost.begin())
+            # Link penalisation, only used when penalty != 1.0
+            bint lp = penatly != 1.0
+            vector[double] *penalised_cost = <vector[double] *>nullptr
+            vector[double] *next_penalised_cost = <vector[double] *>nullptr
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
@@ -593,6 +593,13 @@ cdef class RouteChoiceSet:
         queue.push_back(new unordered_set[long long]())  # Start with no edges banned
         route_set = new RouteSet_t()
         rng.seed(seed)
+
+        if lp:
+            # Although we don't need the dynamic ability of vectors here, Cython doesn't have the std::array module.
+            penalised_cost = new vector[double](self.cost_view.shape[0])
+            next_penalised_cost = new vector[double](self.cost_view.shape[0])
+            copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], penalised_cost.begin())
+            copy(&self.cost_view[0], &self.cost_view[0] + self.cost_view.shape[0], next_penalised_cost.begin())
 
         # We'll go at most `max_depth` iterations down, at each depth we maintain a queue of the next set of banned
         # edges to consider
@@ -605,9 +612,12 @@ cdef class RouteChoiceSet:
                 shuffle(queue.begin(), queue.end(), rng)
 
             for banned in queue:
-                # Copying the costs back into the scratch costs buffer. We could keep track of the modifications and
-                # reverse them as well
-                memcpy(&thread_cost[0], &penalised_cost[0], penalised_cost.size() * sizeof(double))
+                if lp:
+                    # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link penalisation
+                    copy(penalised_cost.cbegin(), penalised_cost.cend(), &thread_cost[0])
+                else:
+                    # Otherwise we just copy directly from the cost view
+                    memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
                 for connector in deref(banned):
                     thread_cost[connector] = INFINITY
@@ -635,8 +645,14 @@ cdef class RouteChoiceSet:
                     while p != origin_index:
                         connector = thread_conn[p]
                         p = thread_predecessors[p]
-                        next_penalised_cost[connector] *= penatly
                         vec.push_back(connector)
+
+                    if lp:
+                        # Here we penalise all seen links for the *next* depth. If we penalised on the current depth
+                        # then we would introduce a bias for earlier seen paths
+                        for connector in deref(vec):
+                            # *= does not work
+                            deref(next_penalised_cost)[connector] = penatly * deref(next_penalised_cost)[connector]
 
                     reverse(vec.begin(), vec.end())
 
@@ -665,7 +681,10 @@ cdef class RouteChoiceSet:
             queue.swap(next_queue)
             next_queue.clear()
 
-            copy(next_penalised_cost.cbegin(), next_penalised_cost.cend(), penalised_cost.begin())
+            if lp:
+                # Update the penalised_cost vector, since next_penalised_cost is always the one updated we just need to
+                # bring penalised_cost up to date.
+                copy(next_penalised_cost.cbegin(), next_penalised_cost.cend(), penalised_cost.begin())
 
         # We may have added more banned link sets to the queue then found out we hit the max depth, we should free those
         for banned in queue:
@@ -674,6 +693,11 @@ cdef class RouteChoiceSet:
         # We should also free all the sets in removed_links, we don't be needing them
         for banned in removed_links:
             del banned
+
+        if lp:
+            # If we had enabled link penalisation, we'll need to free those vectors as well
+            del penalised_cost
+            del next_penalised_cost
 
         return route_set
 
@@ -737,7 +761,7 @@ cdef class RouteChoiceSet:
                     vec.push_back(connector)
 
                 for connector in deref(vec):
-                    thread_cost[connector] *= penatly
+                    thread_cost[connector] = penatly * thread_cost[connector]
 
                 reverse(vec.begin(), vec.end())
 
@@ -910,7 +934,7 @@ cdef class RouteChoiceSet:
 
         return prob_vec
 
-TODO: Reverse binary logit to solve for an absolute max cost based on a probability and min cost. Use this to filter out particular routes when assiging (Will need to adjust path overlap/compute a mask to determine which routes to skip later)
+# TODO: Reverse binary logit to solve for an absolute max cost based on a probability and min cost. Use this to filter out particular routes when assiging (Will need to adjust path overlap/compute a mask to determine which routes to skip later)
 
     @cython.embedsignature(True)
     def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):

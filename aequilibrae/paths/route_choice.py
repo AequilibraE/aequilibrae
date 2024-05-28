@@ -22,7 +22,7 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.1},
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01},
         "link-penalisation": {},
         "bfsle": {"beta": 1.0, "theta": 1.0},
     }
@@ -64,8 +64,7 @@ class RouteChoice:
         return RouteChoiceSet(self.graph)
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
-        """
-        Chooses the assignment algorithm and set parameters.
+        """Chooses the assignment algorithm and set parameters.
         Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
@@ -77,7 +76,6 @@ class RouteChoice:
         Setting the parameters for the route choice:
 
         `beta`, `theta`, and `seed` are BFSLE specific parameters.
-        `penalty` is a link penalisation specific parameter.
 
         Setting `max_depth` or `max_misses`, while not required, is strongly recommended to prevent runaway algorithms.
         `max_misses` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set
@@ -93,6 +91,12 @@ class RouteChoice:
             it should be higher than `max_routes`. It's value is dependent on the magnitude of the cost field,
             specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
             If it is exceeded then the route set if returned with fewer than `max_routes`.
+
+        Additionally BFSLE has the option to incorporate link penalisation. Every link in all routes found at a depth
+        are penalised with the `penalty` factor for the next depth. So at a depth of 0 no links are penalised nor
+        removed. At depth 1, all links found at depth 0 are penalised, then the links marked for removal are removed.
+        All links in the routes found at depth 1 are then penalised for the next depth. The penalisation compounds.
+        Pass set `penalty=1.0` to disable.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
