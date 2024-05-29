@@ -61,8 +61,8 @@ ext_mod_put = Extension(
 )
 
 ext_mod_bfs_le = Extension(
-    "aequilibrae.paths.route_choice",
-    [join("aequilibrae", "paths", "route_choice.pyx")],
+    "aequilibrae.paths.route_choice_set",
+    [join("aequilibrae", "paths", "route_choice_set.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -75,6 +75,16 @@ ext_mod_bfs_le = Extension(
 ext_mod_graph_building = Extension(
     "aequilibrae.paths.graph_building",
     [join("aequilibrae", "paths", "graph_building.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
+
+ext_mod_sparse_matrix = Extension(
+    "aequilibrae.matrix.sparse_matrix",
+    [join("aequilibrae", "matrix", "sparse_matrix.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -123,7 +133,6 @@ if __name__ == "__main__":
         license_files=("LICENSE.TXT",),
         classifiers=[
             "Programming Language :: Python",
-            "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
@@ -131,7 +140,7 @@ if __name__ == "__main__":
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
-            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_bfs_le, ext_mod_graph_building],
+            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_bfs_le, ext_mod_graph_building, ext_mod_sparse_matrix],
             compiler_directives={"language_level": "3str"},
         ),
     )

@@ -4,12 +4,33 @@ from abc import ABC
 from datetime import datetime
 from os.path import join
 from typing import List, Tuple, Optional
+import dataclasses
 
 import numpy as np
 import pandas as pd
-from aequilibrae.paths.graph_building import build_compressed_graph
+from aequilibrae.paths.graph_building import build_compressed_graph, create_compressed_link_network_mapping
 
 from aequilibrae.context import get_logger
+
+
+@dataclasses.dataclass
+class NetworkGraphIndices:
+    network_ab_idx: np.array
+    network_ba_idx: np.array
+    graph_ab_idx: np.array
+    graph_ba_idx: np.array
+
+
+def _get_graph_to_network_mapping(lids, direcs):
+    num_uncompressed_links = int(np.unique(lids).shape[0])
+    indexing = np.zeros(int(lids.max()) + 1, np.uint64)
+    indexing[np.unique(lids)[:]] = np.arange(num_uncompressed_links)
+
+    graph_ab_idx = direcs > 0
+    graph_ba_idx = direcs < 0
+    network_ab_idx = indexing[lids[graph_ab_idx]]
+    network_ba_idx = indexing[lids[graph_ba_idx]]
+    return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
 
 
 class GraphBase(ABC):  # noqa: B024
@@ -95,6 +116,9 @@ class GraphBase(ABC):  # noqa: B024
 
         self.dead_end_links = np.array([])
 
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
+
         # Randomly generate a unique Graph ID randomly
         self._id = uuid.uuid4().hex
 
@@ -166,6 +190,11 @@ class GraphBase(ABC):  # noqa: B024
         if self.centroids.shape[0]:
             self.__build_compressed_graph()
             self.compact_num_links = self.compact_graph.shape[0]
+
+        # The cache property should be recalculated when the graph has been re-prepared
+        self.compressed_link_network_mapping_idx = None
+        self.compressed_link_network_mapping_data = None
+        self.network_compressed_node_mapping = None
 
     def __build_compressed_graph(self):
         build_compressed_graph(self)
@@ -504,6 +533,27 @@ class GraphBase(ABC):  # noqa: B024
         self.graph.to_feather(graph_path)
         node_path = join(path, f"nodes_to_indices_c{mode_name}_{mode_id}.feather")
         pd.DataFrame(self.nodes_to_indices, columns=["node_index"]).to_feather(node_path)
+
+    def create_compressed_link_network_mapping(self):
+        """
+        Create two arrays providing a mapping of compressed id to link id.
+
+        Uses sparse compression. Index ``idx`` by the by compressed id and compressed id + 1, the
+        network IDs are then in the range ``idx[id]:idx[id + 1]``.
+
+        .. code-block:: python
+
+            >>> idx, data = graph.compressed_link_network_mapping
+            >>> data[idx[id]:idx[id + 1]]  # ==> Slice of network ID's corresponding to the compressed ID
+
+        Links not in the compressed graph are not contained within the ``data`` array.
+
+        :Returns:
+            **idx** (:obj:`np.array`): index array for ``data``
+            **data** (:obj:`np.array`): array of link ids
+        """
+
+        return create_compressed_link_network_mapping(self)
 
 
 class Graph(GraphBase):

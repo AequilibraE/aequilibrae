@@ -1,5 +1,7 @@
 # cython: language_level=3str
 from aequilibrae.paths.results import PathResults
+from aequilibrae.matrix.sparse_matrix cimport COO
+
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
@@ -43,7 +45,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 cdef extern from "<utility>" namespace "std" nogil:
     pair[T, U] make_pair[T, U](T&& t, U&& u)
 
-# To define our own hashing functions we have to write a little cpp. The string is inlined directly into route_choice.cpp
+# To define our own hashing functions we have to write a little C++. The string is inlined directly into route_choice.cpp
 # To make Cython aware of our hash types we also must declare them with the right signatures
 #
 # OrderedVectorPointerHasher: This hash function is for hashing the routes, thus it should be order *DEPENDENT*.
@@ -55,8 +57,8 @@ cdef extern from "<utility>" namespace "std" nogil:
 # New hash functions and their use in authentication and set equality
 # https://doi.org/10.1016/0022-0000(81)90033-7
 #
-# PointerDereferenceEqualTo: Because we are storing and hashing the pointers to objects to avoid unnessecary copies we must
-# define our own comparitor to resolve hash collisions. Without this equaility operator the bare pointers are compared.
+# PointerDereferenceEqualTo: Because we are storing and hashing the pointers to objects to avoid unnecessary copies we must
+# define our own comparator to resolve hash collisions. Without this equality operator the bare pointers are compared.
 cdef extern from * nogil:
     """
     // Source: https://stackoverflow.com/a/72073933
@@ -104,7 +106,7 @@ cdef extern from * nogil:
         bool operator()(const T& lhs, const T& rhs) const
 
 
-# For typing (haha) convenince, the types names are getting long
+# For typing (haha) convenience, the types names are getting long
 ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerDereferenceEqualTo[vector[long long] *]] RouteSet_t
 ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
@@ -118,6 +120,7 @@ cdef extern from "arrow/builder.h" namespace "arrow" nogil:
         libpa.CStatus Append(const uint32_t value)
         libpa.CStatus AppendValues(const vector[uint32_t] &values)
         libpa.CStatus AppendValues(vector[uint32_t].const_reverse_iterator values_begin, vector[uint32_t].const_reverse_iterator values_end)
+        libpa.CStatus AppendValues(const uint32_t *values, int64_t length, const uint8_t *valid_bytes = nullptr)
 
     cdef cppclass CDoubleBuilder" arrow::DoubleBuilder"(libpa.CArrayBuilder):
         CDoubleBuilder(libpa.CMemoryPool* pool)
@@ -134,11 +137,25 @@ cdef class RouteChoiceSet:
         double [:] lat_view
         double [:] lon_view
         long long [:] ids_graph_view
+        long long [:] graph_compressed_id_view
         long long [:] compressed_link_ids
         long long num_nodes
+        long long num_links
         long long zones
         bint block_flows_through_centroids
         bint a_star
+
+        vector[pair[long long, long long]] *ods
+        vector[RouteSet_t *] *results
+        vector[vector[long long] *] *link_union_set
+        vector[vector[double] *] *cost_set
+        vector[vector[double] *] *path_overlap_set
+        vector[vector[double] *] *prob_set
+
+        unsigned int [:] mapping_idx
+        unsigned int [:] mapping_data
+
+    cdef void deallocate(RouteChoiceSet self) nogil
 
     cdef void path_find(
         RouteChoiceSet self,
@@ -157,11 +174,13 @@ cdef class RouteChoiceSet:
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
+        unsigned int max_misses,
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
+        double penatly,
         unsigned int seed
     ) noexcept nogil
 
@@ -171,6 +190,7 @@ cdef class RouteChoiceSet:
         long dest_index,
         unsigned int max_routes,
         unsigned int max_depth,
+        unsigned int max_misses,
         double [:] thread_cost,
         long long [:] thread_predecessors,
         long long [:] thread_conn,
@@ -181,13 +201,13 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[long long] &link_union) noexcept nogil
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil
 
     @staticmethod
     cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
 
     @staticmethod
-    cdef vector[double] *compute_gamma(
+    cdef vector[double] *compute_path_overlap(
         RouteSet_t *route_set,
         pair[vector[long long] *, vector[long long] *] &freq_set,
         vector[double] &total_cost,
@@ -197,17 +217,38 @@ cdef class RouteChoiceSet:
     @staticmethod
     cdef vector[double] *compute_prob(
         vector[double] &total_cost,
-        vector[double] &gamma_vec,
+        vector[double] &path_overlap_vec,
         double beta,
-        double theta
+        double theta,
+        double cutoff_prob
     ) noexcept nogil
 
     @staticmethod
+    cdef vector[vector[double] *] *compute_path_files(
+        vector[pair[long long, long long]] &ods,
+        vector[RouteSet_t *] &results,
+        vector[vector[long long] *] &link_union_set,
+        vector[vector[double] *] &prob_set,
+        unsigned int cores
+    ) noexcept nogil
+
+    cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
+    cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
+    cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
+
+    cdef vector[double] *apply_select_link_loading(
+        RouteChoiceSet self,
+        COO sparse_mat,
+        double[:, :] matrix_view,
+        unordered_set[long] &select_link_set
+    ) noexcept nogil
+
     cdef shared_ptr[libpa.CTable] make_table_from_results(
+        RouteChoiceSet self,
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
-        vector[vector[double] *] *gamma_set,
+        vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     )
 
