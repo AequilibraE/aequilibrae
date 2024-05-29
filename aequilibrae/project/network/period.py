@@ -28,6 +28,7 @@ class Period(SafeClass):
     """
 
     def __init__(self, dataset, project):
+        """"""
         super().__init__(dataset, project)
         self.__fields = list(dataset.keys())
         self._table = "periods"

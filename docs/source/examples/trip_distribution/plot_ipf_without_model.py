@@ -9,10 +9,12 @@ This is a compliment to the application in :ref:`Trip Distribution <example_usag
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
 *How would your trip distribution matrix using IPF look like?*
-The data used in this example comes from Table 5.6 in [ORW2011]_.
+The data used in this example comes from Table 5.6 in Ortúzar & Willumsen (2011).
+
 """
 
 # %%
+
 # Imports
 import numpy as np
 
@@ -25,7 +27,8 @@ from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 folder = gettempdir()
 
 # %%
-matrix = np.array([[5, 50, 100, 200], [50, 5, 100, 300], [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
+matrix = np.array([[5, 50, 100, 200], [50, 5, 100, 300], 
+                   [50, 100, 5, 100], [100, 200, 250, 20]], dtype="float64")
 future_prod = np.array([400, 460, 400, 702], dtype="float64")
 future_attr = np.array([260, 400, 500, 802], dtype="float64")
 
@@ -72,3 +75,9 @@ fratar.output.matrix_view
 # %%
 for line in fratar.report:
     print(line)
+
+#%%
+# Reference
+# ~~~~~~~~~
+# 
+# ORTÚZAR, J.D., WILLUMSEN, L.G. (2011) *Modelling Transport* (4th ed.). Wiley-Blackwell.

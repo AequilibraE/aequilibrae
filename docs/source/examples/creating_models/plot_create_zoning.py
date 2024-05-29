@@ -18,6 +18,7 @@ We also add centroid connectors to our network to make it a pretty complete exam
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -51,6 +52,7 @@ zones = 100
 # One of them is the area you want to cover.
 network = project.network
 
+# %%
 # So we use the convenient network method ``convex_hull()`` (it may take some time for very large networks)
 geo = network.convex_hull()
 
@@ -58,6 +60,8 @@ geo = network.convex_hull()
 # The second thing is the side of the hex bin, which we can compute from its area.
 # The approximate area of the desired hex bin is
 zone_area = geo.area / zones
+
+# %%
 # Since the area of the hexagon is **3 * sqrt(3) * side^2 / 2**
 # is side is equal to  **sqrt(2 * sqrt(3) * A/9)**
 zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
@@ -69,6 +73,7 @@ zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 # For which we will use the entire network bounding box to make sure we cover everything
 extent = network.extent()
 
+# %%
 curr = project.conn.cursor()
 b = extent.bounds
 curr.execute(
@@ -83,6 +88,7 @@ grid = shapely.wkb.loads(grid)
 # by only keeping those that intersect the network convex hull.
 grid = [p for p in grid.geoms if p.intersects(geo)]
 
+# %%
 # Let's re-number all nodes with IDs smaller than 300 to something bigger as to free space to our centroids to go from 1
 # to N
 nodes = network.nodes
@@ -125,11 +131,13 @@ for zone_id, zone in zoning.all_zones().items():
 # We also add a centroid at the airport terminal
 nodes = project.network.nodes
 
+# %%
 # Let's use some silly number for its ID, like 10,000, just so we can easily differentiate it
 airport = nodes.new_centroid(10000)
 airport.geometry = Point(166.91749582, -0.54472590)
 airport.save()
 
+# %%
 # When connecting a centroid not associated with a zone, we need to tell AequilibraE what is the initial area around
 # the centroid that needs to be considered when looking for candidate nodes.
 # Distance here is in degrees, so 0.01 is equivalent to roughly 1.1km

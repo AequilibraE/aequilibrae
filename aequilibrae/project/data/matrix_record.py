@@ -51,7 +51,7 @@ class MatrixRecord(SafeClass):
         """Returns the actual matrix for further computation
 
         Returns:
-            matrix (:obj:`AequilibraeMatrix`:) Matrix object
+            **matrix** (:obj:`AequilibraeMatrix`): Matrix object
         """
         mat = AequilibraeMatrix()
         mat.load(join(self.fldr, self.file_name))

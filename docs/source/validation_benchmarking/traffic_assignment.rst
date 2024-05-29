@@ -3,13 +3,13 @@
 Traffic Assignment
 ==================
 
-Similar to other complex algorthms that handle a large amount of data through
+Similar to other complex algorithms that handle a large amount of data through
 complex computations, traffic assignment procedures can always be subject to at
 least one very reasonable question: Are the results right?
 
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
-comparing algorithm results, some of which have are available with highly
+comparing algorithm results, some of which achieve
 converged solutions (~1e-14). Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 Sioux Falls
@@ -24,17 +24,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Sioux Falls MSA 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Sioux Falls Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/sioux_falls_bfw-500_iter.png
     :align: center
     :width: 590
@@ -52,17 +58,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Anaheim MSA 500 iterations
+
 |
+
 .. image:: ../images/anaheim_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Anaheim Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/anaheim_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/anaheim_bfw-500_iter.png
     :align: center
     :width: 590
@@ -80,17 +92,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Winnipeg MSA 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Winnipeg Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/winnipeg_bfw-500_iter.png
     :align: center
     :width: 590
@@ -113,17 +131,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Barcelona MSA 500 iterations
+
 |
+
 .. image:: ../images/barcelona_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Barcelona Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/barcelona_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/barcelona_bfw-500_iter.png
     :align: center
     :width: 590
@@ -141,17 +165,23 @@ Network has:
     :align: center
     :width: 590
     :alt: Chicago MSA 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_frank-wolfe-500_iter.png
     :align: center
     :width: 590
     :alt: Chicago Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_cfw-500_iter.png
     :align: center
     :width: 590
     :alt: Chicago Conjugate Frank-Wolfe 500 iterations
+
 |
+
 .. image:: ../images/chicago_regional_bfw-500_iter.png
     :align: center
     :width: 590
@@ -164,13 +194,16 @@ Besides validating the final results from the algorithms, we have also compared
 how well they converge for the largest instance we have tested (Chicago
 Regional), as that instance has a comparable size to real-world models.
 
+.. _algorithm_convergence_comparison:
+
 .. image:: ../images/convergence_comparison.png
     :align: center
     :width: 590
     :alt: Algorithm convergence comparison
+
 |
 
-Not surprinsingly, one can see that Frank-Wolfe far outperforms the Method of
+Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25, and is capable of
 reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
 after 1,000 iterations.
@@ -214,6 +247,7 @@ In the first part of the code, we'll parse TNTP instances to a format Aequilibra
 understand, and then we'll perform the assignment.
 
 .. _code-block-for-convergence-study:
+
 .. code-block:: python
 
     # Imports
@@ -319,4 +353,4 @@ understand, and then we'll perform the assignment.
         assig.report().to_csv(os.path.join(data_folder, f"{algorithm}_computational_results.csv"))
 
 As we've exported the assignment's results into CSV files, we can use Pandas to read the files,
-and plot a graph just :ref:`like the one above <Algorithm convergence comparison>`.
+and plot a graph just :ref:`like the one above <algorithm_convergence_comparison>`.

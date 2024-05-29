@@ -1,16 +1,21 @@
+:orphan:
+
 .. _support:
 
+Support & Sponsors
+==================
+
 Support
-=======
+-------
 
 AequilibraE is developed by a small but dedicated team of professionals with
 limited funding.
 
 Free support
-------------
+~~~~~~~~~~~~
 
 There are two mechanisms to obtain free support that also allow you to check whether your question was
-already asked in the past, with the the first option being the most often used as of December/2023:
+already asked in the past, with the first option being the most often used as of December/2023:
 
 1. Joining the `AequilibraE Google Group <https://groups.google.com/forum/#!forum/aequilibrae>`_
    and sending your question there.
@@ -19,7 +24,7 @@ already asked in the past, with the the first option being the most often used a
 Please note that all questions and answers in both forums are public.
 
 Paid support
-------------
+~~~~~~~~~~~~
 
 Paid support for AequilibraE is offered by Outer Loop Consulting, an Australia-based consulting company,
 with support available in English, Portuguese, German & Spanish.
@@ -32,14 +37,14 @@ To acquire a paid support package for AequilibraE, please e-mail aequilibrae@out
 .. _sponsors:
 
 Sponsors
-========
+--------
 
 Sponsoring AequilibraE's maintenance and new features is the best way to guarantee that the bugs you need
 fixed and the features your projects require are incorporated quickly into the software. Please contact
 aequilibrae@outerloop.io for sponsoring opportunities.
 
 Maintenance sponsors
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 2024:
 
@@ -65,7 +70,7 @@ Maintenance sponsors
 
 
 Feature sponsors
-----------------
+~~~~~~~~~~~~~~~~
 
 2023:
 

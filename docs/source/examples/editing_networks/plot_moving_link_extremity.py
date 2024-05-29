@@ -9,6 +9,7 @@ and see what happens to the network.
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -27,7 +28,10 @@ project = create_example(fldr)
 all_nodes = project.network.nodes
 links = project.network.links
 
+#%%
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom
+
+# %%
 
 # We edit the link that goes from node 1 to node 2
 link = links.get(1)
@@ -43,11 +47,13 @@ link.geometry = LineString([new_extremity, node2.geometry])
 links.save()
 links.refresh()
 
-# Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously
+#%%
+# Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously.
 
 # %%
-# We do NOT recommend this, though....  It is very slow for real networks
-# We plot the entire network
+# We do NOT recommend this, though.... It is very slow for real networks.
+# 
+# We plot the entire network.
 curr = project.conn.cursor()
 curr.execute("Select link_id from links;")
 
@@ -65,7 +71,7 @@ for nid in curr.fetchall():
 
 plt.show()
 
-# Now look at the network and how it used to be
+# Now look at the network and how it used to be.
 
 # %%
 project.close()

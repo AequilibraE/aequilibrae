@@ -92,7 +92,7 @@ class AequilibraeMatrix(object):
         If working with AEM file, it flushes data to disk. If working with OMX, requires new names.
 
         :Arguments:
-            **names** (:obj:`tuple(str)`, `Optional`): New names for the matrices. Required if working with OMX files
+            **names** (:obj:`tuple(str)`, *Optional*): New names for the matrices. Required if working with OMX files
         """
         if file_name is not None:
             cores = names if len(names) else self.names
@@ -175,16 +175,17 @@ class AequilibraeMatrix(object):
             **matrix_names** (:obj:`list`): A regular Python list of names of the matrix. Limit is 50 characters each.
             Maximum number of cores per matrix is 256
 
-            **data_type** (:obj:`np.dtype`, optional): Data type of the matrix as NUMPY data types (NP.int32, np.int64,
-            np.float32, np.float64). Defaults to np.float64
+            **data_type** (:obj:`np.dtype`, *Optional*): Data type of the matrix as NUMPY data types
+            (``np.int32``, ``np.int64``, ``np.float32``, ``np.float64``). Defaults to ``np.float64``
 
-            **index_names** (:obj:`list`, optional):  A regular Python list of names for indices. Limit is 20 characters
-            each). Maximum number of indices per matrix is 256
+            **index_names** (:obj:`list`, *Optional*):  A regular Python list of names for indices.
+            Limit is 20 characters each. Maximum number of indices per matrix is 256
 
-            **compressed** (:obj:`bool`, optional): Whether it is a flat matrix or a compressed one (Boolean - Not yet
-            implemented)
+            **compressed** (:obj:`bool`, *Optional*): Whether it is a flat matrix or a compressed one
+            (Boolean - Not yet implemented)
 
-            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only.
+            Defaults to ``True``
 
         .. code-block:: python
 
@@ -263,11 +264,10 @@ class AequilibraeMatrix(object):
         :Arguments:
             **core** (:obj:`str`): name of the matrix core to be returned
 
-            **copy** (:obj:`bool`, optional): return a copy of the data. Defaults to False
+            **copy** (:obj:`bool`, *Optional*): return a copy of the data. Defaults to False
 
         :Returns:
-
-            *object* (:obj:`np.ndarray`): NumPy array
+            **object** (:obj:`np.ndarray`): NumPy array
         """
         if core not in self.names:
             raise AttributeError("Matrix core does not exist in this matrix")
@@ -301,13 +301,13 @@ class AequilibraeMatrix(object):
 
             **mappings** (:obj:`list`): List of the matrix mappings (i.e. indices, centroid numbers) to be imported
 
-            **robust** (:obj:`bool`, optional): Boolean for whether AequilibraE should try to adjust the names for cores
+            **robust** (:obj:`bool`, *Optional*): Boolean for whether AequilibraE should try to adjust the names for cores
             and indices in case they are too long. Defaults to True
 
-            **compressed** (:obj:`bool`, optional): Boolean for whether we should compress the output matrix.
+            **compressed** (:obj:`bool`, *Optional*): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to True
 
         """
 
@@ -840,7 +840,7 @@ class AequilibraeMatrix(object):
             self.__load_aem__()
 
     def is_omx(self):
-        """Returns True if matrix data source is OMX, False otherwise"""
+        """Returns ``True`` if matrix data source is OMX, False otherwise"""
         return self.__omx
 
     def computational_view(self, core_list: List[str] = None):
@@ -917,17 +917,18 @@ class AequilibraeMatrix(object):
         Copies a list of cores (or all cores) from one matrix file to another one
 
         :Arguments:
-            **output_name** (:obj:`str`): Name of the new matrix file. If none is provided, returns a copy in memory only
+            **output_name** (:obj:`str`): Name of the new matrix file.
+            If none is provided, returns a copy in memory only
 
             **cores** (:obj:`list`):List of the matrix cores to be copied
 
-            **names** (:obj:`list`, optional): List with the new names for the cores. Defaults to current names
+            **names** (:obj:`list`, *Optional*): List with the new names for the cores. Defaults to current names
 
-            **compress** (:obj:`bool`, optional): Whether you want to compress the matrix or not. Defaults to False
-            Not yet implemented
+            **compress** (:obj:`bool`, *Optional*): Whether you want to compress the matrix or not.
+            Defaults to ``False``. Not yet implemented
 
-            **memory_only** (:obj:`bool`, optional): Whether you want to keep the matrix copy in memory only.
-            Defaults to True
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only.
+            Defaults to ``True``
 
         .. code-block:: python
 
@@ -1022,7 +1023,7 @@ class AequilibraeMatrix(object):
 
         :Returns:
 
-            *object* (:obj:`np.ndarray`): the column totals for the matrix currently on the computational view
+            **object** (:obj:`np.ndarray`): the column totals for the matrix currently on the computational view
 
         .. code-block:: python
 
@@ -1120,7 +1121,7 @@ class AequilibraeMatrix(object):
         Sets description for the matrix
 
         :Arguments:
-            **matrix_description** (:obj:`str`): Text with matrix description . Maximum length is 144 characters
+            **matrix_description** (:obj:`str`): Text with matrix description. Maximum length is 144 characters
 
         .. code-block:: python
 

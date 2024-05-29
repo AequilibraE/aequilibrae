@@ -12,6 +12,8 @@ We use the Sioux Falls example once again.
 """
 
 # %%
+
+# Imports
 import pandas as pd
 from uuid import uuid4
 from os.path import join
@@ -41,6 +43,7 @@ da.create_network("zones")
 demand = project.matrices.get_matrix("demand_omx")
 demand.computational_view(["matrix"])
 
+# %%
 # And we will call it 'delaunay_test'./ It will also be saved in the results_database.sqlite
 da.assign_matrix(demand, "delaunay_test")
 

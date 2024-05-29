@@ -8,6 +8,7 @@ In this example, we show how to make all log messages show in the terminal.
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir

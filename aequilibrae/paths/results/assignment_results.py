@@ -122,7 +122,7 @@ class AssignmentResults(AssignmentResultsBase):
             **graph** (:obj:`Graph`): Needs to have been set with number of centroids and list of skims (if any)
 
             **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
-             matrix.computational_view(:obj:`list`)
+            ``matrix.computational_view(:obj:`list`)``
         """
 
         self.__float_type = graph.default_types("float")
@@ -322,7 +322,8 @@ class AssignmentResults(AssignmentResultsBase):
 
         :Arguments:
             **file_name** (:obj:`str`): Name of the file, with extension. Valid extensions are: ['aed', 'csv', 'sqlite']
-            **output** (:obj:`str`, optional): Type of output ('loads', 'path_file'). Defaults to 'loads'
+
+            **output** (:obj:`str`, *Optional*): Type of output ('loads', 'path_file'). Defaults to 'loads'
         """
 
         if output == "loads":
@@ -353,7 +354,7 @@ class TransitAssignmentResults(AssignmentResultsBase):
             **graph** (:obj:`TransitGraph`): Needs to have been set with number of centroids
 
             **matrix** (:obj:`AequilibraeMatrix`): Matrix properly set for computation with
-             matrix.computational_view(:obj:`list`)
+            ``matrix.computational_view(:obj:`list`)``
         """
         self.reset()
         self.nodes = graph.num_nodes

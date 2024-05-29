@@ -1,5 +1,3 @@
-.. _software_development:
-
 Contributing to AequilibraE
 ===========================
 
@@ -15,7 +13,7 @@ Software Design and requirements
 The most important piece of AequilibraE's backend is, without a doubt, `numpy <http://numpy.org>`__.
 
 Whenever vectorization is not possible through the use of NumPy functions, compiled code is developed in order to
-accelerate computation. All compiled code is written in `Cython <www.cython.org>`_.
+accelerate computation. All compiled code is written in `Cython <https://cython.org/>`_.
 
 We have not yet found an ideal source of recommendations for developing AequilibraE, but a good initial take can be
 found in `this article. <http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.1001745>`__
@@ -76,7 +74,7 @@ Style
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. For that, we use `Black <https://github.com/ambv/black>`_
+* We are big fans of auto-code formatting. For that, we use `Black <https://black.readthedocs.io/en/stable/index.html/>`_
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports

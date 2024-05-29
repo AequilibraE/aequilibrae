@@ -12,7 +12,8 @@ class Log:
 
         >>> from aequilibrae import Project
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = Project()
+        >>> project.new(tmp_path_empty)
 
         >>> log = project.log()
 
@@ -29,7 +30,7 @@ class Log:
     def contents(self) -> list:
         """Returns contents of log file
 
-        :Return:
+        :Returns:
             **log_contents** (:obj:`list`): List with all entries in the log file
         """
 
