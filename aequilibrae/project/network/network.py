@@ -459,7 +459,7 @@ class Network(WorkerThread):
         # Create dictionary of link/dir to preload for each link in the network
         links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
-        # Build the preload vectors for each graph
+        # Build the preload vectors for each graph (and placeholder if not specified to build)
         preloads = []
         for graph, build in zip(graphs, to_build):
             if build:
@@ -468,6 +468,8 @@ class Network(WorkerThread):
                 for i, (link, dir) in links.iterrows():
                     preload[i] = links_dict[(link, dir)]
                 preloads.append(preload)
+            else:
+                preloads.append(None)
 
         return preloads
 
