@@ -440,6 +440,7 @@ class Network(WorkerThread):
         if not any(to_build): # short circuit
             return [None for _ in graphs]
 
+        # Create dictionary
         links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
         # Build the preload vectors for each graph
@@ -495,3 +496,5 @@ class Network(WorkerThread):
             for link, d in pattern_links:
                 dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, NEEDS UPDATING WITH FIXED GTFS IMPORT STRUCTURE!!!
                 links_dict[(link, dir)] += 1
+
+        return links_dict
