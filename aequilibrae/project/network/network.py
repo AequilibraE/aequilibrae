@@ -542,4 +542,5 @@ class Network(WorkerThread):
                 dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, NEEDS UPDATING WITH FIXED GTFS IMPORT STRUCTURE!!!
                 links_dict[(link, dir)] += 1
 
+        transit_conn.close()
         return links_dict

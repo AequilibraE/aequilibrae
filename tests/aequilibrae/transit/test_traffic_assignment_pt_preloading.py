@@ -16,20 +16,25 @@ from ...data import siouxfalls_project
 
 # Overall TODO:
 # 1) Create test structure for the API for PT Preloading
-# 2) Figure out how to extract PT network data from public_transport.sqlite (NOT GTFS!!!)
 # 3) Modify database structure to store PCE value for a service and have default info
-# 4) Create algorithm to turn PT network data into a pre-load vector (of size no. edges in graph) with no. vehicles * PCE
 # 5) Create modification to current traffic assignment algorithm to reduce capacity at end of each assignment iteration
 # 6) Consider simple example scenarios to test correctness of algorithms
 # 7) Decide whether more complex tests are necessary
 # 8) Performance testing and speed ups in cython
 
 
-# Today TODO:
-# 3. Write docstring for built_pt_preload
-# 4. Pull in latest addition to develop (fixed GTFS importer) and change relevant lines in function
-# 4. Write simple test(s) based off coquimbo network for built_pt_preload
-# 6. Start adding this into the TrafficAssignment...
+# Build TODO:
+# 1. Pull in latest addition to develop (fixed GTFS importer) and change relevant lines in function when Coquimbo Project updated
+# 2. Write simple test(s) based off coquimbo network for built_pt_preload
+# 3. Implement inclusion condition into build for start, end, middle
+# 4. Figure out how pce factors into build stage
+# 5. Implement default pce
+# 6. Optimisation & Additional Testing
+
+# Set TODO:
+# 1. Start adding this into the TrafficAssignment...
+# 2. Figure out where this needs to be stored in TrafficAssignment
+# 3. Modify 1 algorithm at a time to add this in.
 
 
 
