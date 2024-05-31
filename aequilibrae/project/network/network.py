@@ -1,6 +1,6 @@
 import importlib.util as iutil
 import math
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -429,11 +429,17 @@ class Network(WorkerThread):
         return c
 
     def build_pt_preload(
-            self, graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
-            ) -> dict[(int, int), int]:
+            self, graphs, to_build, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
+            ) -> List[np.ndarray]:
         """
         NOT YET COMPLETED!!!
         """
+        if len(graphs) != len(to_build):
+            raise ValueError("Need to specify which graphs to build pt preloads for!")
+        
+        if not any(to_build): # short circuit
+            return [None for _ in graphs]
+
         transit_conn = database_connection("transit")
 
         # Get list of trip_id's, whose start time is within the period
@@ -447,11 +453,14 @@ class Network(WorkerThread):
         select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
         period_links = lambda pattern: transit_conn.execute(select_links(pattern)).fetchall()
 
-        # Create dictionary of link, dirs in the graph
+        # CAN THE REST OF THIS BE REPLACED BY JUST LOOKING AT THE OVERALL NETWORK
+        # MAYBE JUST CREATE A BIG VECTOR INSTEAD
+        # Extract link/dir data from database
         proj_conn = database_connection("project_database")
         links = proj_conn.execute("SELECT link_id, direction FROM links").fetchall()
         proj_conn.close()
 
+        # Create dictionary of link, dirs in the network
         links_dict = dict()
         for link, dir in links:
             if dir == 0: # Means both directions
@@ -464,7 +473,17 @@ class Network(WorkerThread):
         for pattern_id in period_patterns:
             pattern_links = period_links(pattern_id)
             for link, d in pattern_links:
-                dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, ask Pedro when this will be fixed (is supposed to be +-1)
+                dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, NEEDS UPDATING WITH FIXED GTFS IMPORT STRUCTURE!!!
                 links_dict[(link, dir)] += 1
 
-        return links_dict
+        # Build the preload vectors for each graph
+        preloads = []
+        for graph, build in zip(graphs, to_build):
+            if build:
+                links = graph.graph[["link_id", "direction"]]
+                preload = np.zeros(len(links), dtype=int)
+                for i, (link, dir) in links.iterrows():
+                    preload[i] = links_dict[(link, dir)]
+                preloads.append(preload)
+
+        return preloads
