@@ -431,8 +431,24 @@ class Network(WorkerThread):
     def build_pt_preload(
             self, graphs, to_build, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> List[np.ndarray]:
-        """
-        NOT YET COMPLETED!!!
+        """Builds a preload vector for each specified graph in network
+
+        :Arguments: NOT YET COMPLETED! ->
+            **fields** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
+            database, it may be useful to specify which fields to use
+
+            **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
+            database, it may be useful to generate only those we need
+
+        To use the *fields* parameter, a minimalistic option is the following
+
+        .. code-block:: python NOT YET COMPLETED ->
+
+            >>> from aequilibrae import Project
+
+            >>> p = Project.from_path("/tmp/test_project")
+            >>> fields = ['distance']
+            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
         """
         if len(graphs) != len(to_build):
             raise ValueError("Need to specify which graphs to build pt preloads for!")
