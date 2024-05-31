@@ -480,6 +480,11 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
+    # NOT YET IMPLEMENTED
+    def set_pt_preload(self, preloads: List[np.ndarray]) -> None:
+        """NOT YET IMPLEMENTED"""
+        raise NotImplementedError
+
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
     # def load_assignment_spec(self, specs: dict) -> None:
