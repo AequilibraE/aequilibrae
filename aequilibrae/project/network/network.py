@@ -429,7 +429,7 @@ class Network(WorkerThread):
         return c
 
     def build_pt_preload(
-            self, graphs, to_build, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str ="start"
+            self, graphs, to_build, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> List[np.ndarray]:
         """
         NOT YET COMPLETED!!!
@@ -440,10 +440,30 @@ class Network(WorkerThread):
         if not any(to_build): # short circuit
             return [None for _ in graphs]
 
+        links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
+        
+        # Build the preload vectors for each graph
+        preloads = []
+        for graph, build in zip(graphs, to_build):
+            if build:
+                links = graph.graph[["link_id", "direction"]]
+                preload = np.zeros(len(links), dtype=int)
+                for i, (link, dir) in links.iterrows():
+                    preload[i] = links_dict[(link, dir)]
+                preloads.append(preload)
+
+        return preloads
+
+    def __build_pt_preload_dict(
+        self, start: int, end: int, inclusion_cond
+        ) -> Dict[(int, int), int]:
+        """
+        NOT YET COMPLETED!!!
+        """
         transit_conn = database_connection("transit")
 
         # Get list of trip_id's, whose start time is within the period
-        select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start_time} AND {end_time}"
+        select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
 
         # Convert the trip_id's to their corresponding pattern_id's
         select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
@@ -475,15 +495,3 @@ class Network(WorkerThread):
             for link, d in pattern_links:
                 dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, NEEDS UPDATING WITH FIXED GTFS IMPORT STRUCTURE!!!
                 links_dict[(link, dir)] += 1
-
-        # Build the preload vectors for each graph
-        preloads = []
-        for graph, build in zip(graphs, to_build):
-            if build:
-                links = graph.graph[["link_id", "direction"]]
-                preload = np.zeros(len(links), dtype=int)
-                for i, (link, dir) in links.iterrows():
-                    preload[i] = links_dict[(link, dir)]
-                preloads.append(preload)
-
-        return preloads
