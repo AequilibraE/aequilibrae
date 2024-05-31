@@ -538,8 +538,7 @@ class Network(WorkerThread):
         # Iterate through pattern id's and for each link in the sequence, increment the coresponding dictionary value
         for pattern_id in period_patterns:
             pattern_links = period_links(pattern_id)
-            for link, d in pattern_links:
-                dir = -1 if d == 1 else 1 # Changes direction of 0 to 1, NEEDS UPDATING WITH FIXED GTFS IMPORT STRUCTURE!!!
+            for link, dir in pattern_links:
                 links_dict[(link, dir)] += 1
 
         transit_conn.close()

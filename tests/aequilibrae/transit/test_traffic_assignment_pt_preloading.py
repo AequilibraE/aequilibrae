@@ -16,12 +16,11 @@ from aequilibrae.utils.create_example import create_example
 
 
 # Build TODO:
-# 1. Pull in latest addition to develop (fixed GTFS importer) and change relevant lines in function when Coquimbo Project updated
-# 2. Write simple test(s) based off coquimbo network for built_pt_preload
-# 3. Implement inclusion condition into build for start, end, middle
-# 4. Figure out how pce factors into build stage
-# 5. Implement default pce
-# 6. Optimisation & Additional Testing
+# 1. Write simple test(s) based off coquimbo network for built_pt_preload
+# 2. Implement inclusion condition into build for start, end, middle
+# 3. Figure out how pce factors into build stage
+# 4. Implement default pce
+# 5. Optimisation & Additional Testing
 
 # Set TODO:
 # 1. Start adding this into the TrafficAssignment...
