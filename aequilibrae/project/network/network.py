@@ -1,6 +1,6 @@
 import importlib.util as iutil
 import math
-from typing import Dict, Optional, List
+from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -501,9 +501,7 @@ class Network(WorkerThread):
 
         return preloads
 
-    def __build_pt_preload_dict(
-        self, start: int, end: int, inclusion_cond
-        ) -> Dict[(int, int), int]:
+    def __build_pt_preload_dict(self, start: int, end: int, inclusion_cond) -> Dict[Tuple[int, int], int]:
         """Creates a dictionary from link/dir to preload value.
         
         Helper method for build_pt_preload
