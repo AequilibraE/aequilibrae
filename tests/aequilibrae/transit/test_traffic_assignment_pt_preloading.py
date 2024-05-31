@@ -28,8 +28,6 @@ from aequilibrae.utils.create_example import create_example
 # 2. Figure out where this needs to be stored in TrafficAssignment
 # 3. Modify one algorithm at a time to add this in.
 
-
-
 @pytest.fixture
 def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
