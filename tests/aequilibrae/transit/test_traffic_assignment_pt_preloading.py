@@ -34,7 +34,7 @@ from ...data import siouxfalls_project
 # Set TODO:
 # 1. Start adding this into the TrafficAssignment...
 # 2. Figure out where this needs to be stored in TrafficAssignment
-# 3. Modify 1 algorithm at a time to add this in.
+# 3. Modify one algorithm at a time to add this in.
 
 
 
@@ -56,38 +56,25 @@ def graphs(project: Project):
 class TestPTPreloaing:
 
     def test_run(self, project: Project, graphs: List[Graph]):
-        # Preload parameters
-        period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
-        period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
-        # What if someone wants timings between 11pm and 1am (ie around midnight), 
-        # how do I detemine these instead.
+        """Tests a full run through of pt preloading."""
+        # NOT YET COMPLETED!
 
-        # Get preload info from network
-        to_build = [True, False, False, False]
-        preloads = project.network.build_pt_preload(graphs, to_build, period_start, period_end)
-
-        # Create Assignment object
-        assignment = TrafficAssignment()
-
-        # Set Traffic Classes
-
-        # Set preload info into assig
-        assignment.set_pt_preload(preloads) # NOT YET IMPLEMENTED!
+        # Get preloads (test will not run if prior test fails)
+        preloads = self.test_built_pt_preload(project, graphs)
         
-        # Set other assignment parameters
+        # Run preloaded assignment (test will fail if this cannot be run)
+        self.__run_preloaded_assig(project, graphs, preloads)
 
-        # Run assignment
-
-        # Check results
-        assert False  # Ensure test fails for now
-    
-    # Figure out more specific tests for creation of pre-load vector!
+        # Check results (NOT AS RIGOROUS AS test_preloaded_assignment)
+        assert False  # PLACEHOLDER
 
     def test_built_pt_preload(self, project: Project, graphs: List[Graph]):
         """
         Check that building pt preload works correctly for a basic example from
-        the coquimbo network (FIGURE OUT SPECIFIC TEST FOR THIS!)
+        the coquimbo network.
         """
+        # NOT YET COMPLETED!
+
         # Preload parameters
         period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
         period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
@@ -99,4 +86,42 @@ class TestPTPreloaing:
         preloads = project.network.build_pt_preload(graphs, to_build, period_start, period_end)
 
         # Assertions about the preload and coquimbo network:
+        assert False # PLACEHOLDER
+
+        # Return preloads for further testing
+        return preloads
+
+    def test_preloaded_assignment(self, project: Project, graphs: List[Graph]):
+        """Check that the setting a preload and running an assignment works as intended."""
+        # NOT YET COMPLETED!
+        
+        # Create custom preload data
+        preloads = None # PLACEHOLDER [np.ndarray]
+
+        # Run preloaded assignment
+        assignment = self.__run_preloaded_assig(project, graphs, preloads)
+
+        # Check results
         assert False
+
+    def __run_preloaded_assig(
+        self, proj: Project, all_graphs: List[Graph], preloads: List[np.ndarray]
+        ) -> TrafficAssignment:
+        """Runs an assignment with a pt preload"""
+        # NEED TO CHECK WHICH INPUT PARAMETERS ARE ACTUALLY NEEDED!
+        # MAY NEED TO ADD MORE TO ALLOW FOR MORE TESTING!
+        # NOT YET COMPLETED!
+
+        # Create Assignment object
+        assignment = TrafficAssignment()
+
+        # Set Traffic Classes
+
+        # Set preload info into assig
+        assignment.set_pt_preload(preloads) # NOT YET IMPLEMENTED!
+        
+        # Set other assignment parameters
+
+        # Run and return assignment object
+        assignment.execute()
+        return assignment
