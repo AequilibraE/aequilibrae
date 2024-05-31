@@ -433,22 +433,50 @@ class Network(WorkerThread):
             ) -> List[np.ndarray]:
         """Builds a preload vector for each specified graph in network
 
-        :Arguments: NOT YET COMPLETED! ->
-            **fields** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
-            database, it may be useful to specify which fields to use
+        :Arguments:
+            **graphs** (List[Graph]): These graphs specify the ordering of the preload vectors
 
-            **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
-            database, it may be useful to generate only those we need
+            **to_build** (List[Bool]): The user may only want to build preload vectors for a subset
+                of the graphs
 
-        To use the *fields* parameter, a minimalistic option is the following
+            **start_time** (int): The start of the period for which to check pt schedules, in 
+                seconds from midnight
 
-        .. code-block:: python NOT YET COMPLETED ->
+            **end_time** (int): The end of the period for which to check pt schedules, in 
+                seconds from midnight
+
+            **default_pce** (float): NOT YET IMPLEMENTED!
+
+            **inclusion_cond** (str): NOT YET IMPLEMENTED! Specifies condition with which to 
+                include/exclude pt trips from the preload. "start"/"end" means those who start/end
+                in the given period, "middle" means those whose central time lies in the period.
+                !Currently just including any trip with any time in the period!
+
+        :Returns:
+            **preloads** (List[np.ndarray]): A list of preloads, with None as a placeholder
+                wherever it is not specified to build a preload.
+
+        Minimal example:
+        .. code-block:: python
 
             >>> from aequilibrae import Project
+            >>> from aequilibrae.utils.create_example import create_example
 
-            >>> p = Project.from_path("/tmp/test_project")
-            >>> fields = ['distance']
-            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
+            >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
+            >>> proj.network.build_graphs()
+
+            >>> car_graph = project.network.graphs["c"]
+            >>> transit_graph = project.network.graphs["t"]
+            >>> walk_graph = project.network.graphs["w"]
+            >>> bike_graph = project.network.graphs["b"]
+
+            >>> graphs = [car_graph, transit_graph, walk_graph, bike_graph]
+            >>> to_build = [True, False, False, False]
+
+            >>> start = int(6.5 * 60 * 60)
+            >>> end = int(8.5 * 60 * 60)
+
+            >>> preloads = proj.network.build_pt_preload(graphs, to_build, start, end)
         """
         if len(graphs) != len(to_build):
             raise ValueError("Need to specify which graphs to build pt preloads for!")
