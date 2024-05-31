@@ -8,6 +8,7 @@ from random import choice
 import numpy as np
 import pandas as pd
 import pytest
+from typing import List
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
 from aequilibrae.utils.create_example import create_example
@@ -39,21 +40,22 @@ def project(tmp_path):
     proj.activate()
     return proj
 
+@pytest.fixture
+def graphs(project: Project):
+    car_graph = project.network.graphs["c"]
+    transit_graph = project.network.graphs["t"]
+    walk_graph = project.network.graphs["w"]
+    bike_graph = project.network.graphs["b"]
+    return [car_graph, transit_graph, walk_graph, bike_graph]
 
 class TestPTPreloaing:
 
-    def test_run(self, project: Project):
-        project.network.build_graphs()
-        car_graph = project.network.graphs["c"]
-        transit_graph = project.network.graphs["t"]
-        walk_graph = project.network.graphs["w"]
-        bike_graph = project.network.graphs["b"]
-        graphs = [car_graph, transit_graph, walk_graph, bike_graph]
-
+    def test_run(self, project: Project, graphs: List[Graph]):
         # Preload parameters
         period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
         period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
-        # What if someone wants timings between 11pm and 1am (ie around midnight), how do I detemine these instead.
+        # What if someone wants timings between 11pm and 1am (ie around midnight), 
+        # how do I detemine these instead.
 
         # Get preload info from network
         to_build = [True, False, False, False]
@@ -65,7 +67,7 @@ class TestPTPreloaing:
         # Set Traffic Classes
 
         # Set preload info into assig
-        assignment.set_pt_preload(preloads)
+        assignment.set_pt_preload(preloads) # NOT YET IMPLEMENTED!
         
         # Set other assignment parameters
 
@@ -76,9 +78,20 @@ class TestPTPreloaing:
     
     # Figure out more specific tests for creation of pre-load vector!
 
-    def test_built_pt_preload(self, project: Project):
+    def test_built_pt_preload(self, project: Project, graphs: List[Graph]):
         """
         Check that building pt preload works correctly for a basic example from
-        the coquimbo network (FIGURE OUT SPECIFICS FOR THIS!)
+        the coquimbo network (FIGURE OUT SPECIFIC TEST FOR THIS!)
         """
+        # Preload parameters
+        period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
+        period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
+        # What if someone wants timings between 11pm and 1am (ie around midnight), 
+        # how do I detemine these instead.
+
+        # Get preload info from network
+        to_build = [True, False, False, False]
+        preloads = project.network.build_pt_preload(graphs, to_build, period_start, period_end)
+
+        # Assertions about the preload and coquimbo network:
         assert False
