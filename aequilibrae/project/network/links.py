@@ -40,6 +40,7 @@ class Links(BasicTable):
         self.__table_type__ = "links"
         self.__fields = []
         self.__items = {}
+        self.__data = None
 
         if self.sql == "":
             self.refresh_fields()

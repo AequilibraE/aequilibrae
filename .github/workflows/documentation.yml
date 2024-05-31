@@ -16,22 +16,20 @@ jobs:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.9
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: 3.9
+        python-version: '3.10'
     - name: Install dependencies
       run: |
+        sudo apt-get update
+        sudo apt-get install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc latexmk texlive-latex-extra
         python -m pip install --upgrade pip
-        pip install wheel openmatrix
+        pip install wheel openmatrix pytest
         pip install -r requirements.txt
         pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
-        sudo apt update
-        sudo apt install -y --fix-missing libsqlite3-mod-spatialite libspatialite-dev pandoc
-        sudo ln -s /usr/lib/x86_64-linux-gnu/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite
-        sudo apt install latexmk
-        sudo apt install texlive-latex-extra
+        
 
     - name: Compile library
       run: |
@@ -46,10 +44,7 @@ jobs:
 
     - name: Test docstrings
       run: |
-        echo "DOCUMENTATION TESTING GOES HERE"
-        python -m doctest -v ./aequilibrae/parameters.py
-        python -m doctest -v ./aequilibrae/project/about.py
-        python -m doctest -v ./aequilibrae/project/zoning.py
+        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
 
     - name: Build documentation
       run: |

@@ -7,6 +7,7 @@ from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from setuptools import Extension
 from setuptools import setup, find_packages
+from setuptools.discovery import FlatLayoutPackageFinder
 
 with open("__version__.py") as f:
     exec(f.read())
@@ -66,17 +67,16 @@ ext_mod_graph_building = Extension(
     language="c++",
 )
 
-
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
-pkgs = list(find_packages())
+pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
+    "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
@@ -84,7 +84,6 @@ pkg_data = {
         "database_specification/transit/triggers/*.*",
     ],
 }
-loose_modules = ["__version__", "parameters"]
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -96,7 +95,6 @@ if __name__ == "__main__":
         install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},
-        py_modules=loose_modules,
         package_data=pkg_data,
         zip_safe=False,
         description="A package for transportation modeling",
@@ -108,7 +106,6 @@ if __name__ == "__main__":
         license_files=("LICENSE.TXT",),
         classifiers=[
             "Programming Language :: Python",
-            "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",

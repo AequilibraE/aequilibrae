@@ -1,6 +1,8 @@
 import math
 import re
 from copy import deepcopy
+import csv
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -15,6 +17,35 @@ from aequilibrae import logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.spatialite_utils import connect_spatialite
+
+
+def __dfs(graph, start):
+    """A quick and dirty DFS implementation to return the leaves of a graph."""
+    visited = set()
+    real = []
+    stack = [start]
+    while len(stack) > 0:
+        vertex = stack.pop()
+        if vertex not in visited:
+            visited.add(vertex)
+            if vertex in graph:
+                stack.extend(graph[vertex])
+            else:
+                real.append(vertex)
+        else:
+            raise ValueError(f"Recursive use_group ('{vertex}') found")
+    return real
+
+
+def resolve_recusive_dict(base_dict):
+    """Resolve each entry in the graph."""
+    resolved = defaultdict(list)
+
+    for key, values in base_dict.items():
+        for value in values:
+            resolved[key].extend(__dfs(base_dict, value))
+
+    return dict(resolved)
 
 
 class GMNSBuilder(WorkerThread):
@@ -325,9 +356,9 @@ class GMNSBuilder(WorkerThread):
 
         if gmns_modes in self.link_df.columns.to_list():
             modes_list = self.link_df[gmns_modes].to_list()
-            if "" in modes_list:
-                modes_list = ["unspecified_mode" if x == "" else x for x in modes_list]
-
+            for i in range(len(modes_list)):
+                if modes_list[i] == "":
+                    modes_list[i] = "unspecified_mode"
         else:
             modes_list = ["unspecified_mode" for _ in range(len(self.link_df))]
 
@@ -343,35 +374,23 @@ class GMNSBuilder(WorkerThread):
             "8": "eight",
             "9": "nine",
         }
-        pattern = re.compile("|".join(char_replaces.keys()))
+        pattern = re.compile(r"\d")
 
         if self.uses_df is not None:
-            use_group = self.uses_df
-            groups_dict = dict(zip(use_group.use_group, use_group.uses))
-
-            for k, use in groups_dict.items():
-                grouped = True
-
-                while grouped:
-                    if re.search("|".join(list(groups_dict.keys())), use) is not None:
-                        group = re.search("|".join(list(groups_dict.keys())), use).group(0)
-                        use = use.replace(
-                            group,
-                            pattern.sub(lambda x: "_" + char_replaces[x.group()], groups_dict[group])
-                            .replace("+", "")
-                            .replace("-", "_"),
-                        )
-                        groups_dict[k] = use
-
-                    else:
-                        groups_dict[k] = (
-                            pattern.sub(lambda x: "_" + char_replaces[x.group()], use)
-                            .replace("+", "")
-                            .replace("-", "_")
-                        )
-                        grouped = False
-
-                use_group.loc[use_group.use_group == k, "uses"] = groups_dict[k]
+            uses = csv.reader(self.uses_df.uses)
+            uses = [
+                {
+                    pattern.sub(lambda x: "_" + char_replaces[x.group(0)], use)
+                    .strip()
+                    .replace("+", "")
+                    .replace("-", "_")
+                    .upper()
+                    for use in line
+                }
+                for line in uses
+            ]
+            groups_dict = dict(zip(self.uses_df.use_group.map(str.upper), uses))
+            resolved_groups = resolve_recusive_dict(groups_dict)
         else:
             groups_dict = {}
 
@@ -379,50 +398,59 @@ class GMNSBuilder(WorkerThread):
             pattern.sub(lambda x: "_" + char_replaces[x.group()], s).replace("+", "").replace("-", "_")
             for s in modes_list
         ]
-        mode_ids_list = deepcopy(modes_list)
 
-        saved_modes = list(self.modes.all_modes())
         with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
-            modes_df = pd.DataFrame(
-                conn.execute("select mode_name, mode_id from modes").fetchall(), columns=["name", "id"]
-            )
-        for mode in list(dict.fromkeys(modes_list)):
-            if mode in groups_dict.keys():
-                modes_gathered = [m.replace(" ", "") for m in groups_dict[mode].split(sep=",")]
-                desc_list = [
-                    f"GMNS use groups: {', '.join(list(use_group[use_group.uses.str.contains(m)].use_group))}"
-                    for m in modes_gathered
-                ]
+            existing_modes = dict(conn.execute("select mode_name, mode_id from modes").fetchall())
 
-            else:
-                modes_gathered = [m.replace(" ", "") for m in mode.split(sep=",")]
-                desc_list = (
-                    ["Mode not specified"]
-                    if mode == "unspecified_mode"
-                    else ["Mode from GMNS link table" for _ in modes_gathered]
-                )
+        # Invert the resolved_groups dictionary, we're interested in which use_groups contain our "use"
+        resolved_use_groups = defaultdict(list)
+        for group, values in resolved_groups.items():
+            for v in values:
+                resolved_use_groups[v].append(group)
 
-            mode_to_add = ""
-            for ind, m in enumerate(modes_gathered):
-                if m not in list(modes_df.name):
-                    letters = m.lower() + m.upper() + string.ascii_letters
-                    letters = "".join([lt for lt in letters if lt not in saved_modes and lt != "_"])
+        modes = deepcopy(existing_modes)
+        unused_chars = {x for x in string.ascii_letters if x not in existing_modes.values()}
 
-                    modes = self.modes
-                    new_mode = modes.new(letters[0])
-                    new_mode.mode_name = m
-                    modes.add(new_mode)
-                    new_mode.description = desc_list[ind]
-                    new_mode.save()
-
-                    mode_to_add += letters[0]
-                    saved_modes += list(mode_to_add)
+        # Create a new mode for the ones that don't exist. Use their first char (lower or upper), or a random unused one
+        # if neither are available.
+        for m in resolved_use_groups.keys():
+            if m not in existing_modes:
+                if m[0].lower() in unused_chars:
+                    char = m[0].lower()
+                    unused_chars.remove(char)
+                elif m[0].upper() in unused_chars:
+                    char = m[0].upper()
+                    unused_chars.remove(char)
                 else:
-                    mode_to_add += modes_df.loc[modes_df.name == m, "id"].item()
+                    char = unused_chars.pop()
 
-            mode_ids_list = [mode_to_add if x == mode else x for x in mode_ids_list]
+                new_mode = self.modes.new(char)
+                new_mode.mode_name = m
+                new_mode.description = f"GMNS use groups: {', '.join(resolved_use_groups[m])}"
+                self.modes.add(new_mode)
+                new_mode.save()
 
-        return mode_ids_list
+                modes[m] = char
+
+        # For each mode specified in the links we need to parse the mode, then attempt to resolve the real modes it
+        # corresponds to, i.e. map 'ALL' to all real modes and 'BIKE' to the bike mode
+        modes_gathered = []
+        for mode in modes_list:
+            ids = set()
+            if "," in mode:
+                unresolved_modes = (mode.strip() for mode in list(csv.reader([mode]))[0])
+            else:
+                unresolved_modes = [mode]
+
+            for mode in unresolved_modes:
+                if mode in resolved_groups:
+                    for resolved_mode in resolved_groups[mode]:
+                        ids.add(modes[resolved_mode])
+                else:
+                    ids.add(modes[mode])
+            modes_gathered.append("".join(sorted(ids)))
+
+        return modes_gathered
 
     def correct_geometries(self):
         p = self.p

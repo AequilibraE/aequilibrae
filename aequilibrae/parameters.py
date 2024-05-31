@@ -21,7 +21,8 @@ class Parameters:
 
         >>> from aequilibrae import Project, Parameters
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = Project()
+        >>> project.new(tmp_path_empty)
 
         >>> p = Parameters(project)
 
