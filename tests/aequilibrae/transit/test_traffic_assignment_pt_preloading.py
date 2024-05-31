@@ -1,10 +1,3 @@
-import random
-import sqlite3
-import string
-from os.path import join, isfile
-from pathlib import Path
-from random import choice
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,7 +5,6 @@ from typing import List
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
 from aequilibrae.utils.create_example import create_example
-from ...data import siouxfalls_project
 
 # Overall TODO:
 # 1) Create test structure for the API for PT Preloading
