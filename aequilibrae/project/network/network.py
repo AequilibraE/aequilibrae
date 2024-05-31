@@ -504,8 +504,9 @@ class Network(WorkerThread):
     def __build_pt_preload_dict(
         self, start: int, end: int, inclusion_cond
         ) -> Dict[(int, int), int]:
-        """
-        NOT YET COMPLETED!!!
+        """Creates a dictionary from link/dir to preload value.
+        
+        Helper method for build_pt_preload
         """
         transit_conn = database_connection("transit")
 
