@@ -440,7 +440,7 @@ class Network(WorkerThread):
         if not any(to_build): # short circuit
             return [None for _ in graphs]
 
-        # Create dictionary
+        # Create dictionary of link/dir to preload for each link in the network
         links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
         # Build the preload vectors for each graph
