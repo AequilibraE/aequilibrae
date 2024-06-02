@@ -38,6 +38,19 @@ logger.addHandler(stdout_handler)
 import numpy as np
 
 # %%
+# Model parameters
+# ~~~~~~~~~~~~~~~~
+# We'll set the parameters for our route choice model. These are the parameters that will be used to calculate the
+# utility of each path. In our example, the utility is equal to *theta* * distance
+# And the path overlap factor (PSL) is equal to *beta*.
+
+# Distance factor
+theta=0.011
+
+# PSL parameter
+beta = 1.1
+
+# %%
 # Let's build all graphs
 project.network.build_graphs()
 # We get warnings that several fields in the project are filled with NaNs.
@@ -51,7 +64,8 @@ graph = project.network.graphs["c"]
 project.network.graphs.keys()
 
 # let's say we want to minimize the distance
-graph.set_graph("distance")
+graph.network = graph.network.assign(utility=graph.network.distance * theta)
+graph.set_graph("utility")
 
 # But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), these happen to be a selection of
 # western centroids.
@@ -109,8 +123,8 @@ rc = RouteChoice(graph, mat)
 #
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
 
-# rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.1)
-rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1, theta=1.1)
+# rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02)
+rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1)
 
 # %%
 # All parameters are optional, the defaults are:
