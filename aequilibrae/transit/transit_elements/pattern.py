@@ -112,7 +112,7 @@ class Pattern(BasicPTElement):
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
         shp = self._stop_based_shape if self.raw_shape is None else self.raw_shape
-        shp = shp if self.shape is None else self.shape
+        # shp = shp if self.shape is None else self.shape
         return shp
 
     def map_match(self):

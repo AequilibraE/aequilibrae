@@ -114,9 +114,9 @@ class GTFSReader(WorkerThread):
         self.__load_routes_table()
         self.__load_stops_table()
         self.__load_stop_times()
+        self.__load_shapes_table()
         self.__load_trips_table()
         self.__deconflict_stop_times()
-        self.__load_shapes_table()
         self.__load_fare_data()
 
         self.zip_archive.close()
@@ -346,7 +346,7 @@ class GTFSReader(WorkerThread):
                 trip.source_time = list(stop_times.source_time.values)
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
-                trip.shape = self.shapes.get(trip.shape)
+                # trip.shape = self.shapes.get(trip.shape)
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
@@ -454,7 +454,7 @@ class GTFSReader(WorkerThread):
         self.data_arrays[stopstxt] = stops
 
         if np.unique(stops["stop_id"]).shape[0] < stops.shape[0]:
-            self.__fail("There are repeated Stop IDs in stops.txt")
+            self.__fail("There are repeated stop IDs in stops.txt")
 
         lats, lons = self.transformer.transform(stops[:]["stop_lat"], stops[:]["stop_lon"])
         stops[:]["stop_lat"][:] = lats[:]
