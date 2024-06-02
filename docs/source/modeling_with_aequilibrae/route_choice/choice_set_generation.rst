@@ -1,6 +1,7 @@
 Choice set generation algorithms
 ================================
 
+BRING TEXT FROM THE PAPER
 XXXXXXXXXXXXXX
 
 Imports
@@ -22,4 +23,4 @@ References
        https://doi.org/10.1080/18128602.2012.671383
 
 .. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
-       Large Networks. Presented at the ATRF, Melbourne, 2024.
+       Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.

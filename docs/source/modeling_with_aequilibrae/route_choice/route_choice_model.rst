@@ -1,6 +1,7 @@
 Route choice models
 ===================
 
+BRING TEXT FROM THE PAPER
 XXXXXXXXXXXXXX
 
 Imports
@@ -43,6 +44,6 @@ References
 
 .. [1] Ramming, M. S. Network Knowledge and Route Choice. Massachusetts Institute of Technology, 2002.
 
-.. [2] Zill, J. C., and P. V. de Camargo. State-Wide Route Choice Models.
+.. [2] Zill, J. C., and P. V. de Camargo. State-Wide Route Choice Models. (Submitted)
        Presented at the ATRF, Melbourne, Australia, 2024.
 
