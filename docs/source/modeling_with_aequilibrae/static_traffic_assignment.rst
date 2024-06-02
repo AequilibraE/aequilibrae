@@ -1,14 +1,14 @@
-.. _modeling_concepts:
+.. _static_traffic_assignment:
 
-Modeling Concepts
-=================
+Static Traffic Assignment
+=========================
 
-Modeling with AequilibraE is not dissimilar than modeling with traditional commercial packages,
+Performing static traffic assignment with AequilibraE is not dissimilar than doing so with traditional commercial packages,
 as we strive to make it as easy as possible for seasoned modelers to migrate their models and
 workflows to AequilibraE.
 
 Although modeling with AequilibraE should feel somewhat familiar to seasoned modelers, especially
-those used to programming, the mechanics of some of AequilibraE procedures might be foreign to
+those used to programming, the mechanics of traffic assignment in AequilibraE might be foreign to
 some users, so this section of the documentation will include discussions of the mechanics
 of some of these procedures and some light discussion on its motivation.
 
@@ -20,6 +20,6 @@ we detail how these concepts are translated into the AequilibraE tools and recom
 .. toctree::
     :maxdepth: 1
 
-    modeling_concepts/multi_class_equilibrium
-    modeling_concepts/assignment_mechanics
+    static_traffic_assignment/multi_class_equilibrium
+    static_traffic_assignment/assignment_mechanics
 
