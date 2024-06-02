@@ -222,7 +222,7 @@ class RouteChoice:
             **self.parameters,
         )
 
-    def execute(self, perform_assignment: bool = False) -> None:
+    def execute(self, perform_assignment: bool = True) -> None:
         """
         Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
 

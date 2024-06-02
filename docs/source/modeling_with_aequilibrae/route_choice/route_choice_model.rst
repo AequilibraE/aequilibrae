@@ -18,24 +18,19 @@ Imports
    proj.network.build_graphs()
    graph = proj.network.graphs['c']
 
-   graph.prepare_graph(centroids=[list_of_all_nodes_which_are_origin_or_destination_in_the_observed_dataset])
-
    # Measure that will be used to compute paths
-   graph.set_graph('free_flow_time')
+   graph.network = graph.network.assign(utility=graph.network.distance * theta)
+   graph.set_graph('utility')
 
-   nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
-   max_routes = 10  # Maximum number of routes to be computed for each OD pair
-   penalty = 1.01  # Penalty to be applied to links used in paths.
-   cores = 60  # Number of cores to be used in the computation
-   psl = True  # If True, the path size logit will be used to compute probabilities already
-   bfsle=True # Should we use BFSLE? If False, defaults to Link Penalization
-   # This is only useful if you are already using an utility measure to compute paths
+   graph.prepare_graph(centroids=[list_of_all_nodes_network_centroids])
 
-   rc = RouteChoiceSet(graph)  # Builds data structures -> can take a minute
-   rc.batched(nodes, max_routes=max_routes, cores=cores, bfsle=bfsle, penalty=penalty, path_size_logit=psl)
+   rc = RouteChoice(graph, mat)
+   rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1)
+   rc.execute(perform_assignment=True)
 
-   results = rc.get_results().to_pandas()
-   results.to_parquet(Path(r"/my_choice_set.parquet")
+
+
+
 
 
 
