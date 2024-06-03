@@ -12,6 +12,7 @@ a city in La Serena Metropolitan Area in Chile.
 from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
+import numpy as np
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_set.png'
 
@@ -23,9 +24,6 @@ project = create_example(fldr, "coquimbo")
 # %%
 # Choice set generation
 # ---------------------
-
-# %%
-import numpy as np
 
 
 # %%

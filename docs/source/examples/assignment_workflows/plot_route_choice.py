@@ -13,6 +13,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
+# sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
 
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
@@ -63,12 +64,15 @@ graph = project.network.graphs["c"]
 # we also see what graphs are available
 project.network.graphs.keys()
 
+od_pairs_of_interest = [(71645, 79385), (77011, 74089)]
+nodes_of_interest = (71645, 74089, 77011, 79385)
+
 # let's say that utility is just a function of distance
 # So we build our *utility* field as the distance times theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
 
 # Prepare the graph with all nodes of interest as centroids
-graph.prepare_graph(np.array(list(range(28, 41)) + list(range(49, 91))))
+graph.prepare_graph(np.array(nodes_of_interest))
 
 # And set the cost of the graph the as the utility field just created
 graph.set_graph("utility")
@@ -84,8 +88,8 @@ names_list = ["demand", "5x demand"]
 mat = AequilibraeMatrix()
 mat.create_empty(zones=graph.num_zones, matrix_names=names_list, memory_only=True)
 mat.index = graph.centroids[:]
-mat.matrices[:, :, 0] = np.full((graph.num_zones, graph.num_zones), 1.0)
-mat.matrices[:, :, 1] = np.full((graph.num_zones, graph.num_zones), 5.0)
+mat.matrices[:, :, 0] = np.full((graph.num_zones, graph.num_zones), 10.0)
+mat.matrices[:, :, 1] = np.full((graph.num_zones, graph.num_zones), 50.0)
 mat.computational_view()
 
 # %%
@@ -135,7 +139,7 @@ print(rc.default_paramaters)
 # %%
 # We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
 # as well an an assignment.
-results = rc.execute_single(28, 90, perform_assignment=True)
+results = rc.execute_single(77011, 74089, perform_assignment=True)
 print(results[0])
 
 # %%
@@ -156,6 +160,44 @@ rc.get_results().to_pandas()
 # %%
 # Since we provided a matrix initially we can also perform link loading based on our assignment results.
 rc.get_load_results()
+
+# %%
+# We can also plot these results
+import folium
+import geopandas as gpd
+
+link_loads = rc.get_load_results()[0]
+link_loads =link_loads[["link_id", "demand_tot"]]
+max_load = link_loads["demand_tot"].max()
+
+links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
+links = links.merge(link_loads, on="link_id")
+
+links = links[links["demand_tot"] > 0]
+
+# %%
+loads_lyr = folium.FeatureGroup("link_loads")
+
+# Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
+factor = 10 / max_load
+
+# Let's create the layers
+for _, rec in links.iterrows():
+    points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
+    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
+    # we need to take from x/y to lat/long
+    points = [[x[1], x[0]] for x in eval(points)]
+    _ = folium.vector_layers.PolyLine(points, color="red", weight=factor * rec.demand_tot).add_to(loads_lyr)
+
+# %%
+# Create the map and center it in the correct place
+long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
+
+map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
+loads_lyr.add_to(map_osm)
+folium.LayerControl().add_to(map_osm)
+map_osm
+
 
 # %%
 # Select link analysis
