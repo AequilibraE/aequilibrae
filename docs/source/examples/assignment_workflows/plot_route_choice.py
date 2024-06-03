@@ -7,6 +7,7 @@ In this example, we show how to perform route choice set generation using BFSLE 
 Serena Metropolitan Area in Chile.
 
 """
+# %%
 
 # Imports
 from uuid import uuid4
@@ -14,6 +15,8 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
+
+# %%
 
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
@@ -147,6 +150,45 @@ print(results[0])
 # The default return is a Pyarrow Table but Pandas is nicer for viewing.
 rc.get_results().to_pandas()
 
+
+# %%
+# let's define a function to plot assignment results
+
+def plot_results(link_loads):
+    import folium
+    import geopandas as gpd
+
+
+    link_loads =link_loads[["link_id", "demand_tot"]]
+    max_load = link_loads["demand_tot"].max()
+    links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
+    links = links.merge(link_loads, on="link_id")
+    links = links[links["demand_tot"] > 0]
+
+    loads_lyr = folium.FeatureGroup("link_loads")
+
+    # Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
+    factor = 10 / max_load
+
+    # Let's create the layers
+    for _, rec in links.iterrows():
+        points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
+        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
+        # we need to take from x/y to lat/long
+        points = [[x[1], x[0]] for x in eval(points)]
+        _ = folium.vector_layers.PolyLine(points, color="red", weight=factor * rec.demand_tot).add_to(loads_lyr)
+
+    long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
+
+    map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
+    loads_lyr.add_to(map_osm)
+    folium.LayerControl().add_to(map_osm)
+    return map_osm
+
+# %%
+plot_results(rc.get_load_results()[0])
+
+
 # %%
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
 # pairs we'd like to use, or we can provided a 1D list and the generation will be run on all permutations.
@@ -161,42 +203,8 @@ rc.get_results().to_pandas()
 # Since we provided a matrix initially we can also perform link loading based on our assignment results.
 rc.get_load_results()
 
-# %%
-# We can also plot these results
-import folium
-import geopandas as gpd
-
-link_loads = rc.get_load_results()[0]
-link_loads =link_loads[["link_id", "demand_tot"]]
-max_load = link_loads["demand_tot"].max()
-
-links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
-links = links.merge(link_loads, on="link_id")
-
-links = links[links["demand_tot"] > 0]
-
-# %%
-loads_lyr = folium.FeatureGroup("link_loads")
-
-# Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
-factor = 10 / max_load
-
-# Let's create the layers
-for _, rec in links.iterrows():
-    points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-    points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-    # we need to take from x/y to lat/long
-    points = [[x[1], x[0]] for x in eval(points)]
-    _ = folium.vector_layers.PolyLine(points, color="red", weight=factor * rec.demand_tot).add_to(loads_lyr)
-
-# %%
-# Create the map and center it in the correct place
-long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
-
-map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-loads_lyr.add_to(map_osm)
-folium.LayerControl().add_to(map_osm)
-map_osm
+# %% we can plot these as well
+plot_results(rc.get_load_results()[0])
 
 
 # %%

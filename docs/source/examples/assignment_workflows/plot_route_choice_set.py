@@ -8,6 +8,8 @@ a city in La Serena Metropolitan Area in Chile.
 
 """
 
+# %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -16,6 +18,7 @@ import numpy as np
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_set.png'
 
+# %%
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
