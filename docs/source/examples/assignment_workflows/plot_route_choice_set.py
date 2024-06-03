@@ -13,6 +13,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
+# sphinx_gallery_thumbnail_path = 'images/plot_route_choice_set.png'
 
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
@@ -153,7 +154,7 @@ for i, row in nodes[nodes.node_id.isin((77011, 74089))].iterrows():
 # Create the map and center it in the correct place
 long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
-map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=13)
+map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
 for routes_layer in layers:
     routes_layer.add_to(map_osm)
 od_lyr.add_to(map_osm)
