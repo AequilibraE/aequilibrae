@@ -99,6 +99,7 @@ Code example
 
    graph.prepare_graph(np.array([1, 2, 3, 50, 100, 150))
 
+
    nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
    max_routes = 10  # Maximum number of routes to be computed for each OD pair
    penalty = 1.01  # Penalty to be applied to links used in paths.
