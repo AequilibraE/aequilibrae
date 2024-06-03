@@ -63,13 +63,15 @@ graph = project.network.graphs["c"]
 # we also see what graphs are available
 project.network.graphs.keys()
 
-# let's say we want to minimize the distance
+# let's say that utility is just a function of distance
+# So we build our *utility* field as the distance times theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
-graph.set_graph("utility")
 
-# But let's say we only want a skim matrix for nodes 28-40, and 49-60 (inclusive), these happen to be a selection of
-# western centroids.
+# Prepare the graph with all nodes of interest as centroids
 graph.prepare_graph(np.array(list(range(28, 41)) + list(range(49, 91))))
+
+# And set the cost of the graph the as the utility field just created
+graph.set_graph("utility")
 
 # %%
 # Mock demand matrix
