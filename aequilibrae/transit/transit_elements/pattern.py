@@ -109,6 +109,7 @@ class Pattern(BasicPTElement):
         if commit:
             conn.commit()
 
+    # TODO: reuse maybe?
     def best_shape(self) -> LineString:
         """Gets the best version of shape available for this pattern"""
         shp = self._stop_based_shape if self.raw_shape is None else self.raw_shape
@@ -171,7 +172,7 @@ class Pattern(BasicPTElement):
 
         # We search for disconnected stops:
         candidate_stops = list(self.stops)
-        stop_node_idxs = [stop.___map_matching_id__[self.route_type] for stop in candidate_stops]
+        stop_node_idxs = [stop.__map_matching_id__[self.route_type] for stop in candidate_stops]
 
         node0 = graph.network.a_node[~graph.network.a_node.isin(graph.centroids)].min()
         connected_stops = []
@@ -182,7 +183,7 @@ class Pattern(BasicPTElement):
         res1.prepare(graph)
 
         for i, stop in enumerate(candidate_stops):
-            node_o = stop.___map_matching_id__[self.route_type]
+            node_o = stop.__map_matching_id__[self.route_type]
             logger.debug(f"Computing paths between {node_o} and {node0}")
             res.compute_path(node_o, int(node0), early_exit=False)
             # Get skims, as proxy for connectivity, for all stops other than the origin
@@ -208,9 +209,9 @@ class Pattern(BasicPTElement):
             return empty_frame
 
         if len(connected_stops) == 2:
-            nstop = connected_stops[1].___map_matching_id__[self.route_type]
-            logger.debug(f"Computing paths between {fstop.___map_matching_id__[self.route_type]} and {nstop}")
-            res.compute_path(fstop.___map_matching_id__[self.route_type], int(nstop), early_exit=True)
+            nstop = connected_stops[1].__map_matching_id__[self.route_type]
+            logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
+            res.compute_path(fstop.__map_matching_id__[self.route_type], int(nstop), early_exit=True)
             if res.milepost is None:
                 return empty_frame
             pdist = list(res.milepost[1:-1] - res.milepost[:-2])[1:]
@@ -221,15 +222,15 @@ class Pattern(BasicPTElement):
         path_links = []
         path_directions = []
         path_distances = []
-        start = fstop.___map_matching_id__[self.route_type]
+        start = fstop.__map_matching_id__[self.route_type]
         for idx, tstop in enumerate(connected_stops[1:]):
-            end = tstop.___map_matching_id__[self.route_type]
+            end = tstop.__map_matching_id__[self.route_type]
 
             not_last = idx + 2 <= len(connected_stops) - 1
 
             if not_last:
                 following_stop = connected_stops[idx + 2]
-                n_end = following_stop.___map_matching_id__[self.route_type]
+                n_end = following_stop.__map_matching_id__[self.route_type]
             logger.debug(f"Computing paths between {start} and {end}")
             res.compute_path(start, int(end), early_exit=True)
             connection_candidates = graph.network[graph.network.a_node == end].b_node.values
