@@ -155,7 +155,8 @@ print(results[0])
 # %%
 # Because we asked it to also perform an assignment we can access the various results from that
 # The default return is a Pyarrow Table but Pandas is nicer for viewing.
-rc.get_results().to_pandas()
+res = rc.get_results().to_pandas()
+res.head()
 
 
 # %%
@@ -167,10 +168,10 @@ def plot_results(link_loads):
     import geopandas as gpd
 
     link_loads = link_loads[["link_id", "demand_tot"]]
+    link_loads = link_loads[link_loads.demand_tot > 0]
     max_load = link_loads["demand_tot"].max()
     links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
-    links = links.merge(link_loads, on="link_id")
-    links = links[links["demand_tot"] > 0]
+    loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
     loads_lyr = folium.FeatureGroup("link_loads")
 
@@ -178,13 +179,14 @@ def plot_results(link_loads):
     factor = 10 / max_load
 
     # Let's create the layers
-    for _, rec in links.iterrows():
+    for _, rec in loaded_links.iterrows():
         points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
         points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
         # we need to take from x/y to lat/long
         points = [[x[1], x[0]] for x in eval(points)]
-        _ = folium.vector_layers.PolyLine(points, color="red", weight=factor * rec.demand_tot).add_to(loads_lyr)
-
+        _ = folium.vector_layers.PolyLine(points, tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
+                                          color="red",
+                                          weight=factor * rec.demand_tot).add_to(loads_lyr)
     long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
     map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
@@ -194,8 +196,7 @@ def plot_results(link_loads):
 
 
 # %%
-plot_results(rc.get_load_results()[0])
-
+plot_results(rc.get_load_results()[0]).show_in_browser()
 
 # %%
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
@@ -212,8 +213,7 @@ rc.get_results().to_pandas()
 rc.get_load_results()
 
 # %% we can plot these as well
-plot_results(rc.get_load_results()[0])
-
+plot_results(rc.get_load_results()[0]).show_in_browser()
 
 # %%
 # Select link analysis
