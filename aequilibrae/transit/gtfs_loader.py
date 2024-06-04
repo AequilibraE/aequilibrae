@@ -278,7 +278,7 @@ class GTFSReader(WorkerThread):
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
-            shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
+            shape = LineString(list(zip(items["shape_pt_lat"], items["shape_pt_lon"])))
             self.shapes[shape_id] = shape
 
     def __load_trips_table(self):

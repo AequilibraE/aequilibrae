@@ -158,7 +158,8 @@ class Pattern(BasicPTElement):
         logger.info(f"Map-matched pattern {self.pattern_id}")
 
     def __graph_discount(self, connected_stops):
-        gdf = gpd.GeoDataFrame(geometry=gpd.GeoSeries([stop.geo for stop in connected_stops], crs=self.__geolinks.crs))
+        geom = [stop.geo for stop in connected_stops] if self.raw_shape is None else [self.raw_shape]
+        gdf = gpd.GeoDataFrame(geometry=gpd.GeoSeries(geom, crs=self.__geolinks.crs))
         gdf = self.__geolinks_buffer.sjoin(gdf, how="inner", predicate="intersects")
 
         gdf = gdf[gdf.modes.str.contains(mode_correspondence[self.route_type])]
