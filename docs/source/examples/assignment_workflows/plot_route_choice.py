@@ -196,7 +196,7 @@ def plot_results(link_loads):
 
 
 # %%
-plot_results(rc.get_load_results()[0]).show_in_browser()
+plot_results(rc.get_load_results()[0])
 
 # %%
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
@@ -213,7 +213,7 @@ rc.get_results().to_pandas()
 rc.get_load_results()
 
 # %% we can plot these as well
-plot_results(rc.get_load_results()[0]).show_in_browser()
+plot_results(rc.get_load_results()[0])
 
 # %%
 # Select link analysis
