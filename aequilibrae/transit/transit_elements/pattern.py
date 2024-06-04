@@ -162,7 +162,7 @@ class Pattern(BasicPTElement):
         gdf = self.__reprojected_links.overlay(gdf, how="intersection")
 
         gdf = gdf[gdf.modes.str.contains(mode_correspondence[self.route_type])]
-        gdf.loc[:, "intersect"] = 1/(gdf["geometry"].length / gdf["repr_length"])
+        gdf.loc[:, "intersect"] = 1 / (gdf["geometry"].length / gdf["repr_length"])
         return gdf
 
     def __map_matching_complete_path_building(self):
@@ -207,7 +207,7 @@ class Pattern(BasicPTElement):
         g = graph.graph[links_in_graph]
         g.loc[:, "abs_id"] = g["original_id"].abs()
         g = g.merge(likely_links[["link_id", "intersect"]], left_on="abs_id", right_on="link_id")
-        graph.cost[links_in_graph] *= (g["intersect"] * 0.1)
+        graph.cost[links_in_graph] *= g["intersect"] * 0.1
 
         fstop = connected_stops[0]
 
