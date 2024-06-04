@@ -111,6 +111,10 @@ ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerD
 ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
+# A (known 2016) bug in the Cython compiler means it incorrectly parses the following type when used in a cdef
+# https://github.com/cython/cython/issues/534
+ctypedef vector[bool]* vector_bool_ptr
+
 # Pyarrow's Cython API does not provide all the functions available in the C++ API, some of them are really useful.
 # Here we redeclare the classes with the functions we want, these are available in the current namespace, *not* libarrow
 cdef extern from "arrow/builder.h" namespace "arrow" nogil:
@@ -126,6 +130,11 @@ cdef extern from "arrow/builder.h" namespace "arrow" nogil:
         CDoubleBuilder(libpa.CMemoryPool* pool)
         libpa.CStatus Append(const double value)
         libpa.CStatus AppendValues(const vector[double] &values)
+
+    cdef cppclass CBooleanBuilder" arrow::BooleanBuilder"(libpa.CArrayBuilder):
+        CBooleanBuilder(libpa.CMemoryPool* pool)
+        libpa.CStatus Append(const bool value)
+        libpa.CStatus AppendValues(const vector[bool] &values)
 
 
 cdef class RouteChoiceSet:
@@ -149,6 +158,7 @@ cdef class RouteChoiceSet:
         vector[RouteSet_t *] *results
         vector[vector[long long] *] *link_union_set
         vector[vector[double] *] *cost_set
+        vector[vector_bool_ptr] *mask_set
         vector[vector[double] *] *path_overlap_set
         vector[vector[double] *] *prob_set
 
@@ -201,16 +211,20 @@ cdef class RouteChoiceSet:
     ) noexcept nogil
 
     @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[bool] &route_mask) noexcept nogil
 
     @staticmethod
     cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
+
+    @staticmethod
+    cdef vector[bool] *compute_mask(RouteSet_t *route_sets, double cutoff_prob, vector[double] &total_cost) noexcept nogil
 
     @staticmethod
     cdef vector[double] *compute_path_overlap(
         RouteSet_t *route_set,
         pair[vector[long long] *, vector[long long] *] &freq_set,
         vector[double] &total_cost,
+        vector[bool] &route_mask,
         double[:] cost_view
     ) noexcept nogil
 
@@ -218,9 +232,9 @@ cdef class RouteChoiceSet:
     cdef vector[double] *compute_prob(
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
+        vector[bool] &route_mask,
         double beta,
-        double theta,
-        double cutoff_prob
+        double theta
     ) noexcept nogil
 
     @staticmethod
@@ -248,6 +262,7 @@ cdef class RouteChoiceSet:
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
+        vector[vector_bool_ptr] *mask_set,
         vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     )

@@ -4,8 +4,8 @@ from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.matrix.sparse_matrix cimport COO
 
-from cython.operator cimport dereference as deref
-from cython.operator cimport preincrement as inc
+from cython.operator cimport dereference as d
+from cython.operator cimport postincrement as inc
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
 from libc.math cimport INFINITY, exp, pow, log
@@ -112,6 +112,7 @@ cdef class RouteChoiceSet:
         pa.field("destination id", pa.uint32(), nullable=False),
         pa.field("route set", route_set_dtype, nullable=False),
         pa.field("cost", pa.float64(), nullable=False),
+        pa.field("mask", pa.bool_(), nullable=False),
         pa.field("path overlap", pa.float64(), nullable=False),
         pa.field("probability", pa.float64(), nullable=False),
     ])
@@ -121,6 +122,7 @@ cdef class RouteChoiceSet:
         results = <vector[RouteSet_t *] *>nullptr
         link_union_set = <vector[vector[long long] *] *>nullptr
         cost_set = <vector[vector[double] *] *>nullptr
+        mask_set = <vector[vector_bool_ptr] *>nullptr
         path_overlap_set = <vector[vector[double] *] *>nullptr
         prob_set = <vector[vector[double] *] *>nullptr
         ods = <vector[pair[long long, long long]] *>nullptr
@@ -160,35 +162,42 @@ cdef class RouteChoiceSet:
             RouteSet_t *route_set
             vector[long long] *link_vec
             vector[double] *double_vec
+            vector[bool] *bool_vec
 
         if self.results != nullptr:
-            for route_set in deref(self.results):
-                for link_vec in deref(route_set):
+            for route_set in d(self.results):
+                for link_vec in d(route_set):
                     del link_vec
                 del route_set
             del self.results
             self.results = <vector[RouteSet_t *] *>nullptr
 
         if self.link_union_set != nullptr:
-            for link_vec in deref(self.link_union_set):
+            for link_vec in d(self.link_union_set):
                 del link_vec
             del self.link_union_set
             self.link_union_set = <vector[vector[long long] *] *>nullptr
 
         if self.cost_set != nullptr:
-            for double_vec in deref(self.cost_set):
+            for double_vec in d(self.cost_set):
                 del double_vec
             del self.cost_set
             self.cost_set = <vector[vector[double] *] *>nullptr
 
+        if self.mask_set != nullptr:
+            for bool_vec in d(self.mask_set):
+                del bool_vec
+            del self.mask_set
+            self.mask_set = <vector[vector_bool_ptr] *>nullptr
+
         if self.path_overlap_set != nullptr:
-            for double_vec in deref(self.path_overlap_set):
+            for double_vec in d(self.path_overlap_set):
                 del double_vec
             del self.path_overlap_set
             self.path_overlap_set = <vector[vector[double] *] *>nullptr
 
         if self.prob_set != nullptr:
-            for double_vec in deref(self.prob_set):
+            for double_vec in d(self.prob_set):
                 del double_vec
             del self.prob_set
             self.prob_set = <vector[vector[double] *] *>nullptr
@@ -271,7 +280,7 @@ cdef class RouteChoiceSet:
             **where** (:obj:`str`): Optional file path to save results to immediately. Will return None.
         """
         cdef:
-            long long o, d
+            long long origin, dest
 
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be > 0")
@@ -285,11 +294,11 @@ cdef class RouteChoiceSet:
         if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
             raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
 
-        for o, d in ods:
-            if self.nodes_to_indices_view[o] == -1:
-                raise ValueError(f"Origin {o} is not present within the compact graph")
-            if self.nodes_to_indices_view[d] == -1:
-                raise ValueError(f"Destination {d} is not present within the compact graph")
+        for origin, dest in ods:
+            if self.nodes_to_indices_view[origin] == -1:
+                raise ValueError(f"Origin {origin} is not present within the compact graph")
+            if self.nodes_to_indices_view[dest] == -1:
+                raise ValueError(f"Destination {dest} is not present within the compact graph")
 
         cdef:
             long long origin_index, dest_index, i
@@ -352,12 +361,14 @@ cdef class RouteChoiceSet:
             pair[vector[long long] *, vector[long long] *] freq_pair
             vector[vector[long long] *] *link_union_set = <vector[vector[long long] *] *>nullptr
             vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
+            vector[vector_bool_ptr] *mask_set = <vector[vector_bool_ptr] *>nullptr
             vector[vector[double] *] *path_overlap_set = <vector[vector[double] *] *>nullptr
             vector[vector[double] *] *prob_set = <vector[vector[double] *] *>nullptr
 
         if path_size_logit:
             link_union_set = new vector[vector[long long] *](max_results_len)
             cost_set = new vector[vector[double] *](max_results_len)
+            mask_set = new vector[vector_bool_ptr](max_results_len)
             path_overlap_set = new vector[vector[double] *](max_results_len)
             prob_set = new vector[vector[double] *](max_results_len)
 
@@ -376,11 +387,13 @@ cdef class RouteChoiceSet:
                 # - the internal objects were freed by the previous iteration
                 link_union_set.clear()
                 cost_set.clear()
+                mask_set.clear()
                 path_overlap_set.clear()
                 prob_set.clear()
 
                 link_union_set.resize(batch_len)
                 cost_set.resize(batch_len)
+                mask_set.resize(batch_len)
                 path_overlap_set.resize(batch_len)
                 prob_set.resize(batch_len)
 
@@ -433,26 +446,29 @@ cdef class RouteChoiceSet:
                         )
 
                     if path_size_logit:
-                        freq_pair = RouteChoiceSet.compute_frequency(route_set)
-                        deref(link_union_set)[i] = freq_pair.first
-                        deref(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        deref(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(
+                        d(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
+                        d(mask_set)[i] = RouteChoiceSet.compute_mask(route_set, scaled_cutoff_prob, d(d(cost_set)[i]))
+
+                        freq_pair = RouteChoiceSet.compute_frequency(route_set, d(d(mask_set)[i]))
+                        d(link_union_set)[i] = freq_pair.first
+                        d(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(
                             route_set,
                             freq_pair,
-                            deref(deref(cost_set)[i]),
+                            d(d(cost_set)[i]),
+                            d(d(mask_set)[i]),
                             self.cost_view
                         )
-                        deref(prob_set)[i] = RouteChoiceSet.compute_prob(
-                            deref(deref(cost_set)[i]),
-                            deref(deref(path_overlap_set)[i]),
+                        d(prob_set)[i] = RouteChoiceSet.compute_prob(
+                            d(d(cost_set)[i]),
+                            d(d(path_overlap_set)[i]),
+                            d(d(mask_set)[i]),
                             beta,
-                            theta,
-                            scaled_cutoff_prob
+                            theta
                         )
                         # While we need the unique sorted links (.first), we don't need the frequencies (.second)
                         del freq_pair.second
 
-                    deref(results)[i] = route_set
+                    d(results)[i] = route_set
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
@@ -466,22 +482,23 @@ cdef class RouteChoiceSet:
 
             if where is not None:
                 table = libpa.pyarrow_wrap_table(
-                    self.make_table_from_results(c_ods, deref(results), cost_set, path_overlap_set, prob_set)
+                    self.make_table_from_results(c_ods, d(results), cost_set, mask_set, path_overlap_set, prob_set)
                 )
 
                 # Once we've made the table all results have been copied into some pyarrow structure, we can free our
                 # inner internal structures
                 if path_size_logit:
                     for j in range(batch_len):
-                        del deref(link_union_set)[j]
-                        del deref(cost_set)[j]
-                        del deref(path_overlap_set)[j]
-                        del deref(prob_set)[j]
+                        del d(link_union_set)[j]
+                        del d(cost_set)[j]
+                        del d(mask_set)[j]
+                        del d(path_overlap_set)[j]
+                        del d(prob_set)[j]
 
                 for j in range(batch_len):
-                    for route in deref(deref(results)[j]):
+                    for route in d(d(results)[j]):
                         del route
-                    del deref(results)[j]
+                    del d(results)[j]
 
                 checkpoint.write(table)
                 del table
@@ -497,12 +514,14 @@ cdef class RouteChoiceSet:
             if path_size_logit:
                 del link_union_set
                 del cost_set
+                del mask_set
                 del path_overlap_set
                 del prob_set
         else:
             self.results = results
             self.link_union_set = link_union_set
             self.cost_set = cost_set
+            self.mask_set = mask_set
             self.path_overlap_set = path_overlap_set
             self.prob_set = prob_set
 
@@ -627,7 +646,7 @@ cdef class RouteChoiceSet:
                     # ...otherwise we just copy directly from the cost view.
                     memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
-                for connector in deref(banned):
+                for connector in d(banned):
                     thread_cost[connector] = INFINITY
 
                 RouteChoiceSet.path_find(
@@ -658,20 +677,20 @@ cdef class RouteChoiceSet:
                     if lp:
                         # Here we penalise all seen links for the *next* depth. If we penalised on the current depth
                         # then we would introduce a bias for earlier seen paths
-                        for connector in deref(vec):
+                        for connector in d(vec):
                             # *= does not work
-                            deref(next_penalised_cost)[connector] = penatly * deref(next_penalised_cost)[connector]
+                            d(next_penalised_cost)[connector] = penatly * d(next_penalised_cost)[connector]
 
                     reverse(vec.begin(), vec.end())
 
-                    for connector in deref(vec):
+                    for connector in d(vec):
                         # This is one area for potential improvement. Here we construct a new set from the old one,
                         # copying all the elements then add a single element. An incremental set hash function could be
                         # of use. However, the since of this set is directly dependent on the current depth and as the
                         # route set size grows so incredibly fast the depth will rarely get high enough for this to
                         # matter. Copy the previously banned links, then for each vector in the path we add one and
                         # push it onto our queue
-                        new_banned = new unordered_set[long long](deref(banned))
+                        new_banned = new unordered_set[long long](d(banned))
                         new_banned.insert(connector)
                         # If we've already seen this set of removed links before we already know what the path is and
                         # its in our route set
@@ -768,7 +787,7 @@ cdef class RouteChoiceSet:
                     p = thread_predecessors[p]
                     vec.push_back(connector)
 
-                for connector in deref(vec):
+                for connector in d(vec):
                     thread_cost[connector] = penatly * thread_cost[connector]
 
                 reverse(vec.begin(), vec.end())
@@ -788,9 +807,9 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set) noexcept nogil:
+    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[bool] &route_mask) noexcept nogil:
         """
-        Compute a frequency map for each route.
+        Compute a frequency map for each route with the route_mask applied.
 
         Each node at index i in the first returned vector has frequency at index i in the second vector.
         """
@@ -802,18 +821,32 @@ cdef class RouteChoiceSet:
             vector[long long] *route
 
             # Scratch objects
-            size_t length, count
-            long long link, i
+            size_t length, count, i
+            long long link
+            bool route_present = False
 
         keys = new vector[long long]()
         counts = new vector[long long]()
 
+        # When calculating the frequency of routes, we need to exclude those not in the mask.
+        i = 0
         length = 0
-        for route in deref(route_set):
+        for route in d(route_set):
+            # We do so here ...
+            route_present = route_mask[inc(i)]
+            if not route_present:
+                continue
+
             length = length + route.size()
         link_union.reserve(length)
 
-        for route in deref(route_set):
+        i = 0
+        for route in d(route_set):
+            # ... and here.
+            route_present = route_mask[inc(i)]
+            if not route_present:
+                continue
+
             link_union.insert(link_union.end(), route.begin(), route.end())
 
         sort(link_union.begin(), link_union.end())
@@ -821,8 +854,8 @@ cdef class RouteChoiceSet:
         union_iter = link_union.cbegin()
         while union_iter != link_union.cend():
             count = 0
-            link = deref(union_iter)
-            while link == deref(union_iter) and union_iter != link_union.cend():
+            link = d(union_iter)
+            while link == d(union_iter) and union_iter != link_union.cend():
                 count = count + 1
                 inc(union_iter)
 
@@ -848,9 +881,9 @@ cdef class RouteChoiceSet:
         cost_vec = new vector[double]()
         cost_vec.reserve(route_set.size())
 
-        for route in deref(route_set):
+        for route in d(route_set):
             cost = 0.0
-            for link in deref(route):
+            for link in d(route):
                 cost = cost + cost_view[link]
 
             cost_vec.push_back(cost)
@@ -862,17 +895,45 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
+    cdef vector[bool] *compute_mask(RouteSet_t *route_set, double cutoff_prob, vector[double] &total_cost) noexcept nogil:
+        """
+        Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
+        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
+        the route set.
+        """
+        cdef:
+            size_t i
+
+            vector[bool] *route_mask = new vector[bool](total_cost.size())
+            vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
+            double cutoff_cost = d(min) \
+                + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
+
+        # The route mask should be True for the routes we wish to include.
+        for i in range(total_cost.size()):
+            d(route_mask)[i] = (total_cost[i] <= cutoff_cost)
+
+        # Always include the min element. It should already be but I don't trust floating math to do this correctly.
+        d(route_mask)[min - total_cost.cbegin()] = True
+
+        return route_mask
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
     cdef vector[double] *compute_path_overlap(
         RouteSet_t *route_set,
         pair[vector[long long] *, vector[long long] *] &freq_set,
         vector[double] &total_cost,
+        vector[bool] &route_mask,
         double[:] cost_view
     ) noexcept nogil:
         """
         Compute the path overlap figure based on the route cost and frequency.
 
         Notation changes:
-            i: j
             a: link
             t_a: cost_view
             c_i: total_costs
@@ -880,31 +941,35 @@ cdef class RouteChoiceSet:
             sum_{k in R}: delta_{a,k}: freq_set
         """
         cdef:
-            vector[double] *path_overlap_vec
+            vector[double] *path_overlap_vec  = new vector[double](route_set.size())
 
             # Scratch objects
             vector[long long].const_iterator link_iter
             double path_overlap
-            long long link, j
-            size_t i
+            long long link
+            size_t i = 0
 
-        path_overlap_vec = new vector[double]()
-        path_overlap_vec.reserve(route_set.size())
+        for route in d(route_set):
+            # Skip masked routes
+            if not route_mask[i]:
+                inc(i)
+                continue
 
-        j = 0
-        for route in deref(route_set):
             path_overlap = 0.0
-            for link in deref(route):
+            for link in d(route):
                 # We know the frequency table is ordered and contains every link in the union of the routes.
                 # We want to find the index of the link, and use that to look up it's frequency
                 link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
 
+                # lower_bound returns freq_set.first.end() when no link is found.
+                # This /should/ never happen.
+                if link_iter == freq_set.first.end():
+                    continue
                 path_overlap = path_overlap + cost_view[link] \
-                    / deref(freq_set.second)[link_iter - freq_set.first.begin()]
+                    / d(freq_set.second)[link_iter - freq_set.first.begin()]
 
-            path_overlap_vec.push_back(path_overlap / total_cost[j])
-
-            j = j + 1
+            d(path_overlap_vec)[i] = path_overlap / total_cost[i]
+            inc(i)
 
         return path_overlap_vec
 
@@ -916,49 +981,39 @@ cdef class RouteChoiceSet:
     cdef vector[double] *compute_prob(
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
+        vector[bool] &route_mask,
         double beta,
-        double theta,
-        double cutoff_prob
+        double theta
     ) noexcept nogil:
-        """Compute a probability for each route in the route set based on the path overlap.
-
-        Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
-        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
-        the route set.
-        """
+        """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
             # Scratch objects
-            vector[double] *prob_vec
+            vector[double] *prob_vec = new vector[double](total_cost.size())
             double inv_prob
-            long long route_set_idx
             size_t i, j
-
-            vector[bool] route_mask = vector[bool](total_cost.size())
-            double cutoff_cost = deref(min_element(total_cost.cbegin(), total_cost.cend())) \
-                + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
-
-        prob_vec = new vector[double]()
-        prob_vec.reserve(total_cost.size())
-
-        # The route mask should be True for the routes we wish to include.
-        for i in range(total_cost.size()):
-            route_mask[i] = total_cost[i] <= cutoff_cost
 
         # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will
         # lead to NaN results
         for i in range(total_cost.size()):
-            if route_mask[i]:
-                inv_prob = 0.0
-                for j in range(total_cost.size()):
-                    # We must skip any other routes that are not included in the mask otherwise our probabilities
-                    # won't add up.
-                    if route_mask[j]:
-                        inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                            * exp(-theta * (total_cost[j] - total_cost[i]))
-                prob_vec.push_back(1.0 / inv_prob)
-            else:
-                # Anything that has been excluded gets a probability of 0 rather than be removed entirely.
-                prob_vec.push_back(0.0)
+            # The probability of choosing a route that has been masked out is 0.
+            if not route_mask[i]:
+                continue
+
+            inv_prob = 0.0
+            for j in range(total_cost.size()):
+                # We must skip any other routes that are not included in the mask otherwise our probabilities won't
+                # add up.
+                if not route_mask[j]:
+                    continue
+
+                if path_overlap_vec[i] == 0.0:
+                    fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
+                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
+                    * exp(-theta * (total_cost[j] - total_cost[i]))
+
+            if inv_prob == 0.0:
+                fprintf(stderr, "inv_prob == 0.0\n")
+            d(prob_vec)[i] = 1.0 / inv_prob
 
         return prob_vec
 
@@ -983,31 +1038,31 @@ cdef class RouteChoiceSet:
 
         if generate_path_files:
             path_files = RouteChoiceSet.compute_path_files(
-                deref(self.ods),
-                deref(self.results),
-                deref(self.link_union_set),
-                deref(self.prob_set),
+                d(self.ods),
+                d(self.results),
+                d(self.link_union_set),
+                d(self.prob_set),
                 cores,
             )
 
             # # FIXME, write out path files
             # tmp = []
-            # for vec in deref(path_files):
-            #     tmp.append(deref(vec))
+            # for vec in d(path_files):
+            #     tmp.append(d(vec))
             # print(tmp)
 
         link_loads = {}
         for i, name in enumerate(matrix.names):
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
 
-            ll = self.apply_link_loading_from_path_files(m, deref(path_files)) \
+            ll = self.apply_link_loading_from_path_files(m, d(path_files)) \
                 if generate_path_files else self.apply_link_loading(m)
 
             link_loads[name] = self.apply_link_loading_func(ll, cores)
             del ll
 
         if generate_path_files:
-            for vec in deref(path_files):
+            for vec in d(path_files):
                 del vec
             del path_files
 
@@ -1017,7 +1072,7 @@ cdef class RouteChoiceSet:
         """Helper function for link_loading."""
         # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
         # transferring ownership.
-        compressed = <double[:ll.size(), :1]>&deref(ll)[0]
+        compressed = <double[:ll.size(), :1]>&d(ll)[0]
 
         actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
         assign_link_loads_cython(
@@ -1066,8 +1121,8 @@ cdef class RouteChoiceSet:
 
                 # We now iterate over all routes in the route_set, each route has an associated probability
                 route_prob_iter = prob_set[i].cbegin()
-                for route in deref(results[i]):
-                    prob = deref(route_prob_iter)
+                for route in d(results[i]):
+                    prob = d(route_prob_iter)
                     inc(route_prob_iter)
 
                     if prob == 0.0:
@@ -1085,7 +1140,7 @@ cdef class RouteChoiceSet:
                     # N-way merge we could reuse the sorted routes and the sorted link union.
 
                     # We copy the links in case the routes haven't already been saved
-                    links = new vector[long long](deref(route))
+                    links = new vector[long long](d(route))
                     sort(links.begin(), links.end())
 
                     # links and link_union are sorted, and links is a subset of link_union
@@ -1094,17 +1149,17 @@ cdef class RouteChoiceSet:
 
                     while link_iter != links.cend():
                         # Find the next location for the current link in links
-                        while deref(link_iter) != deref(link_union_iter) and link_iter != links.cend():
+                        while d(link_iter) != d(link_union_iter) and link_iter != links.cend():
                             inc(link_union_iter)
 
                         link_loc = link_union_iter - link_union.cbegin()
-                        deref(loads)[link_loc] = deref(loads)[link_loc] + prob  # += here results in all zeros? Odd
+                        d(loads)[link_loc] = d(loads)[link_loc] + prob  # += here results in all zeros? Odd
 
                         inc(link_iter)
 
                     del links
 
-                deref(link_loads)[i] = loads
+                d(link_loads)[i] = loads
 
         return link_loads
 
@@ -1132,15 +1187,15 @@ cdef class RouteChoiceSet:
 
         for i in range(self.ods.size()):
             loads = path_files[i]
-            link_union = deref(self.link_union_set)[i]
+            link_union = d(self.link_union_set)[i]
 
-            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
             demand = matrix_view[origin_index, dest_index]
 
             for j in range(link_union.size()):
-                link = deref(link_union)[j]
-                deref(link_loads)[link] = deref(link_loads)[link] + demand * deref(loads)[j]
+                link = d(link_union)[j]
+                d(link_loads)[link] = d(link_loads)[link] + demand * d(loads)[j]
 
         return link_loads
 
@@ -1164,21 +1219,21 @@ cdef class RouteChoiceSet:
             vector[double] *link_loads = new vector[double](self.num_links)
 
         for i in range(self.ods.size()):
-            route_set = deref(self.results)[i]
-            route_set_prob = deref(self.prob_set)[i]
+            route_set = d(self.results)[i]
+            route_set_prob = d(self.prob_set)[i]
 
-            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
             demand = matrix_view[origin_index, dest_index]
 
             route_prob_iter = route_set_prob.cbegin()
-            for route in deref(route_set):
-                prob = deref(route_prob_iter)
+            for route in d(route_set):
+                prob = d(route_prob_iter)
                 inc(route_prob_iter)
 
                 load = prob * demand
-                for link in deref(route):
-                    deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
+                for link in d(route):
+                    d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
 
         return link_loads
 
@@ -1253,29 +1308,29 @@ cdef class RouteChoiceSet:
         # that route
 
         for i in range(self.ods.size()):
-            route_set = deref(self.results)[i]
-            route_set_prob = deref(self.prob_set)[i]
+            route_set = d(self.results)[i]
+            route_set_prob = d(self.prob_set)[i]
 
-            origin_index = self.nodes_to_indices_view[deref(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[deref(self.ods)[i].second]
+            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
             demand = matrix_view[origin_index, dest_index]
 
             route_prob_iter = route_set_prob.cbegin()
-            for route in deref(route_set):
-                prob = deref(route_prob_iter)
+            for route in d(route_set):
+                prob = d(route_prob_iter)
                 inc(route_prob_iter)
                 load = prob * demand
 
                 link_present = False
-                for link in deref(route):
+                for link in d(route):
                     if select_link_set.find(link) != select_link_set.end():
                         sparse_mat.append(origin_index, dest_index, load)
                         link_present = True
                         break
 
                 if link_present:
-                    for link in deref(route):
-                        deref(link_loads)[link] = deref(link_loads)[link] + load  # += here results in all zeros? Odd
+                    for link in d(route):
+                        d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
 
         return link_loads
 
@@ -1288,6 +1343,7 @@ cdef class RouteChoiceSet:
         vector[pair[long long, long long]] &ods,
         vector[RouteSet_t *] &route_sets,
         vector[vector[double] *] *cost_set,
+        vector[vector_bool_ptr] *mask_set,
         vector[vector[double] *] *path_overlap_set,
         vector[vector[double] *] *prob_set
     ):
@@ -1309,6 +1365,7 @@ cdef class RouteChoiceSet:
             # Custom imports, these are declared in route_choice.pxd *not* libarrow.
             CUInt32Builder *path_builder = new CUInt32Builder(pool)
             CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
+            CBooleanBuilder *mask_col = <CBooleanBuilder *>nullptr
             CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr
             CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
 
@@ -1324,18 +1381,20 @@ cdef class RouteChoiceSet:
             size_t network_link_begin, network_link_end, link
             bint psl = (cost_set != nullptr and path_overlap_set != nullptr and prob_set != nullptr)
 
-        # Origins, Destination, Route set, [Cost for route, Path_Overlap for route, Probability for route]
-        columns.resize(6 if psl else 3)
+        # Origins, Destination, Route set, [Cost for route, Mask, Path_Overlap for route, Probability for route]
+        columns.resize(7 if psl else 3)
 
         if psl:
             cost_col = new CDoubleBuilder(pool)
+            mask_col = new CBooleanBuilder(pool)
             path_overlap_col = new CDoubleBuilder(pool)
             prob_col = new CDoubleBuilder(pool)
 
             for i in range(ods.size()):
-                cost_col.AppendValues(deref(deref(cost_set)[i]))
-                path_overlap_col.AppendValues(deref(deref(path_overlap_set)[i]))
-                prob_col.AppendValues(deref(deref(prob_set)[i]))
+                cost_col.AppendValues(d(d(cost_set)[i]))
+                mask_col.AppendValues(d(d(mask_set)[i]))
+                path_overlap_col.AppendValues(d(d(path_overlap_set)[i]))
+                prob_col.AppendValues(d(d(prob_set)[i]))
 
         for i in range(ods.size()):
             route_set = route_sets[i]
@@ -1343,13 +1402,13 @@ cdef class RouteChoiceSet:
             # Instead of constructing a "list of lists" style object for storing the route sets we instead will
             # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
             # (path) starts.
-            for route in deref(route_set):
+            for route in d(route_set):
                 o_col.Append(ods[i].first)
                 d_col.Append(ods[i].second)
 
                 offset_builder.Append(offset)
 
-                for link in deref(route):
+                for link in d(route):
                     # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
                     network_link_begin = self.mapping_idx[link]
                     network_link_end = self.mapping_idx[link + 1]
@@ -1367,20 +1426,21 @@ cdef class RouteChoiceSet:
 
         route_set_results = libpa.CListArray.FromArraysAndType(
             route_set_dtype,
-            deref(offsets.get()),
-            deref(paths.get()),
+            d(offsets.get()),
+            d(paths.get()),
             pool,
             shared_ptr[libpa.CBuffer]()
         )
 
         o_col.Finish(&columns[0])
         d_col.Finish(&columns[1])
-        columns[2] = deref(route_set_results)
+        columns[2] = d(route_set_results)
 
         if psl:
             cost_col.Finish(&columns[3])
-            path_overlap_col.Finish(&columns[4])
-            prob_col.Finish(&columns[5])
+            mask_col.Finish(&columns[4])
+            path_overlap_col.Finish(&columns[5])
+            prob_col.Finish(&columns[6])
 
         cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
             RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema
@@ -1394,6 +1454,7 @@ cdef class RouteChoiceSet:
 
         if psl:
             del cost_col
+            del mask_col
             del path_overlap_col
             del prob_col
 
@@ -1410,9 +1471,10 @@ cdef class RouteChoiceSet:
 
         table = libpa.pyarrow_wrap_table(
             self.make_table_from_results(
-                deref(self.ods),
-                deref(self.results),
+                d(self.ods),
+                d(self.results),
                 self.cost_set,
+                self.mask_set,
                 self.path_overlap_set,
                 self.prob_set
             )
