@@ -7,6 +7,7 @@ In this example, we show how to perform route choice set generation using BFSLE 
 Serena Metropolitan Area in Chile.
 
 """
+
 # %%
 
 # Imports
@@ -14,6 +15,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
 
 # %%
@@ -49,7 +51,7 @@ import numpy as np
 # And the path overlap factor (PSL) is equal to *beta*.
 
 # Distance factor
-theta=0.011
+theta = 0.00011
 
 # PSL parameter
 beta = 1.1
@@ -159,12 +161,12 @@ rc.get_results().to_pandas()
 # %%
 # let's define a function to plot assignment results
 
+
 def plot_results(link_loads):
     import folium
     import geopandas as gpd
 
-
-    link_loads =link_loads[["link_id", "demand_tot"]]
+    link_loads = link_loads[["link_id", "demand_tot"]]
     max_load = link_loads["demand_tot"].max()
     links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
     links = links.merge(link_loads, on="link_id")
@@ -189,6 +191,7 @@ def plot_results(link_loads):
     loads_lyr.add_to(map_osm)
     folium.LayerControl().add_to(map_osm)
     return map_osm
+
 
 # %%
 plot_results(rc.get_load_results()[0])

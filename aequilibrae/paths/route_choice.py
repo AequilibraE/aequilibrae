@@ -22,7 +22,7 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 1.0},
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0},
         "link-penalisation": {},
         "bfsle": {"beta": 1.0, "theta": 1.0, "penalty": 1.0},
     }
@@ -104,8 +104,8 @@ class RouteChoice:
         excluded from the PSL calculations. The route is still returned, but with a probability of 0.0.
 
         The `cutoff_prob` should be in the range [0, 1]. It is then rescaled internally to [0.5, 1] as probabilities
-        below 0.5 produce negative differences in utilities. A higher `cutoff_prob` includes more routes. A value of
-        `0.0` will only include the minimum cost route. A value of `1.0` includes all routes.
+        below 0.5 produce negative differences in utilities. A higher `cutoff_prob` includes less routes. A value of
+        `1.0` will only include the minimum cost route. A value of `0.0` includes all routes.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used

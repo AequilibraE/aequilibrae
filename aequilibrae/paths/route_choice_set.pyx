@@ -300,7 +300,7 @@ cdef class RouteChoiceSet:
             unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            double scaled_cutoff_prob = cutoff_prob * 0.5 + 0.5
+            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
             vector[pair[long long, long long]] c_ods
 
