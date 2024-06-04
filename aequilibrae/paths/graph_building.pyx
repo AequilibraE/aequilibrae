@@ -449,8 +449,8 @@ def create_compressed_link_network_mapping(graph):
 
         idx[-1] = i
 
-        graph.compressed_link_network_mapping_idx = idx
-        graph.compressed_link_network_mapping_data = data
-        graph.network_compressed_node_mapping = node_mapping
+        graph.compressed_link_network_mapping_idx = np.array(idx)
+        graph.compressed_link_network_mapping_data = np.array(data)
+        graph.network_compressed_node_mapping = np.array(node_mapping)
 
         return idx, data, node_mapping
