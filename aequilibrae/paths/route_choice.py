@@ -310,9 +310,15 @@ class RouteChoice:
 
         return self.results
 
-    def get_load_results(self) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+    def get_load_results(
+        self, compressed_graph_results=False
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Translates the link loading results from the graph format into the network format.
+
+        :Arguments:
+            **compressed_graph_results** (:obj:`bool`): Whether we should return assignment results for the
+            compressed graph. Only use this option if you are SURE you know what you are doing. Default `False`.
 
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
@@ -339,8 +345,9 @@ class RouteChoice:
         )
         compact_lids = np.unique(self.graph.compact_graph.link_id.values)
         compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
-
-        return uncompressed_df, compressed_df
+        if compressed_graph_results:
+            return compressed_df
+        return uncompressed_df
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
@@ -485,22 +492,13 @@ class RouteChoice:
         if not project:
             project = self.project or get_active_project()
 
-        u, c = self.get_load_results()
+        df = self.get_load_results()
         info = self.info()
         self.__save_dataframe(
-            u,
+            df,
             "Link loading",
             "Uncompressed link loading results",
             table_name + "_uncompressed",
-            info,
-            project=project,
-        )
-
-        self.__save_dataframe(
-            c,
-            "Link loading",
-            "Compressed link loading results",
-            table_name + "_compressed",
             info,
             project=project,
         )

@@ -413,14 +413,13 @@ class TestRouteChoice(TestCase):
 
         self.rc.execute(perform_assignment=True)
 
-        u, c = self.rc.get_load_results()
+        df = self.rc.get_load_results()
         u_sl, c_sl = self.rc.get_select_link_results()
 
-        pd.testing.assert_frame_equal(u, c)
         pd.testing.assert_frame_equal(u_sl, c_sl)
 
         self.assertListEqual(
-            list(u.columns),
+            list(df.columns),
             ["link_id"] + [mat_name + "_" + dir for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names],
         )
 
@@ -441,7 +440,7 @@ class TestRouteChoice(TestCase):
         self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
         self.rc.prepare(self.graph.centroids)
         self.rc.execute(perform_assignment=True)
-        u, c = self.rc.get_load_results()
+        lloads = self.rc.get_load_results()
         u_sl, c_sl = self.rc.get_select_link_results()
 
         self.rc.save_link_flows("ll")
@@ -450,8 +449,7 @@ class TestRouteChoice(TestCase):
         conn = sqlite3.connect(pathlib.Path(self.project.project_base_path) / "results_database.sqlite")
         with conn:
             for table, df in [
-                ("ll_uncompressed", u),
-                ("ll_compressed", c),
+                ("ll_uncompressed", lloads),
                 ("sl_uncompressed", u_sl),
                 ("sl_compressed", c_sl),
             ]:
