@@ -255,7 +255,7 @@ cdef class RouteChoiceSet:
             path_size_logit: bool = False,
             beta: float = 1.0,
             theta: float = 1.0,
-            cutoff_prob: float = 1.0,
+            cutoff_prob: float = 0.0,
     ):
         """Compute the a route set for a list of OD pairs.
 
