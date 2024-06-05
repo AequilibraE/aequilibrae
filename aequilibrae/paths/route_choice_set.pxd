@@ -217,7 +217,7 @@ cdef class RouteChoiceSet:
     cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
 
     @staticmethod
-    cdef vector[bool] *compute_mask(RouteSet_t *route_sets, double cutoff_prob, vector[double] &total_cost) noexcept nogil
+    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost) noexcept nogil
 
     @staticmethod
     cdef vector[double] *compute_path_overlap(

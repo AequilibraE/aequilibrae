@@ -329,8 +329,10 @@ class RouteChoice:
         self.link_loads = {k: v[0] for k, v in tmp.items()}
         self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
 
+        filtered_graph = self.graph.graph[self.graph.graph.__compressed_id__ != self.graph.compact_graph.id.max() + 1]
+
         # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+        m = _get_graph_to_network_mapping(filtered_graph.link_id.values, filtered_graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
         uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
 
@@ -348,11 +350,11 @@ class RouteChoice:
         )
         for k, v in link_loads.items():
             # Directional Flows
-            df[k + "_ab"].values[mapping.network_ab_idx] = np.nan_to_num(v[mapping.graph_ab_idx])
-            df[k + "_ba"].values[mapping.network_ba_idx] = np.nan_to_num(v[mapping.graph_ba_idx])
+            df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
+            df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            df[k + "_tot"] = np.nan_to_num(df[k + "_ab"].values) + np.nan_to_num(df[k + "_ba"].values)
+            df[k + "_tot"] = df[k + "_ab"] + df[k + "_ba"]
 
         return df
 

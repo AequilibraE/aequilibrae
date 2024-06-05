@@ -141,7 +141,11 @@ cdef class RouteChoiceSet:
         self.a_star = False
 
         self.ids_graph_view = graph.compact_graph.id.values
-        self.graph_compressed_id_view = graph.graph.__compressed_id__.values
+
+        # We explicitly don't want the links that have been removed from the graph
+        self.graph_compressed_id_view = graph.graph[
+            graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1
+        ].__compressed_id__.values
         self.num_nodes = graph.compact_num_nodes
         self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
@@ -447,7 +451,7 @@ cdef class RouteChoiceSet:
 
                     if path_size_logit:
                         d(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        d(mask_set)[i] = RouteChoiceSet.compute_mask(route_set, scaled_cutoff_prob, d(d(cost_set)[i]))
+                        d(mask_set)[i] = RouteChoiceSet.compute_mask(scaled_cutoff_prob, d(d(cost_set)[i]))
 
                         freq_pair = RouteChoiceSet.compute_frequency(route_set, d(d(mask_set)[i]))
                         d(link_union_set)[i] = freq_pair.first
@@ -895,7 +899,7 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[bool] *compute_mask(RouteSet_t *route_set, double cutoff_prob, vector[double] &total_cost) noexcept nogil:
+    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
         minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
@@ -914,7 +918,9 @@ cdef class RouteChoiceSet:
             d(route_mask)[i] = (total_cost[i] <= cutoff_cost)
 
         # Always include the min element. It should already be but I don't trust floating math to do this correctly.
-        d(route_mask)[min - total_cost.cbegin()] = True
+        # But only if there actually was a min element (i.e. empty route set)
+        if min != total_cost.cend():
+            d(route_mask)[min - total_cost.cbegin()] = True
 
         return route_mask
 
@@ -1070,18 +1076,16 @@ cdef class RouteChoiceSet:
 
     cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
         """Helper function for link_loading."""
-        # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
-        # transferring ownership.
-        compressed = <double[:ll.size(), :1]>&d(ll)[0]
-
+        compressed = np.array(d(ll)).reshape(ll.size(), 1)
         actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
+
         assign_link_loads_cython(
             actual,
             compressed,
             self.graph_compressed_id_view,
             cores
         )
-        compressed = np.array(compressed, copy=True)
+
         return actual.reshape(-1), compressed.reshape(-1)
 
     @cython.boundscheck(False)
