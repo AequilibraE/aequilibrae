@@ -143,9 +143,7 @@ cdef class RouteChoiceSet:
         self.ids_graph_view = graph.compact_graph.id.values
 
         # We explicitly don't want the links that have been removed from the graph
-        self.graph_compressed_id_view = graph.graph[
-            graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1
-        ].__compressed_id__.values
+        self.graph_compressed_id_view = graph.graph.__compressed_id__.values
         self.num_nodes = graph.compact_num_nodes
         self.num_links = graph.compact_num_links
         self.zones = graph.num_zones
@@ -1076,7 +1074,7 @@ cdef class RouteChoiceSet:
 
     cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
         """Helper function for link_loading."""
-        compressed = np.array(d(ll)).reshape(ll.size(), 1)
+        compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
         actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
 
         assign_link_loads_cython(
@@ -1086,7 +1084,7 @@ cdef class RouteChoiceSet:
             cores
         )
 
-        return actual.reshape(-1), compressed.reshape(-1)
+        return actual.reshape(-1), compressed[:-1].reshape(-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

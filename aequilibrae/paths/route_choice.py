@@ -329,10 +329,8 @@ class RouteChoice:
         self.link_loads = {k: v[0] for k, v in tmp.items()}
         self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
 
-        filtered_graph = self.graph.graph[self.graph.graph.__compressed_id__ != self.graph.compact_graph.id.max() + 1]
-
         # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(filtered_graph.link_id.values, filtered_graph.direction.values)
+        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
         uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
 
@@ -436,10 +434,8 @@ class RouteChoice:
                 self.sl_link_loads[name + "_" + sl_name] = u
                 self.sl_compact_link_loads[name + "_" + sl_name] = c
 
-        filtered_graph = self.graph.graph[self.graph.graph.__compressed_id__ != self.graph.compact_graph.id.max() + 1]
-
         # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(filtered_graph.link_id.values, filtered_graph.direction.values)
+        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
         uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
 
