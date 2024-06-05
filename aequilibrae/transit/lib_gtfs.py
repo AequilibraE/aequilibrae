@@ -70,11 +70,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         links = self.project.network.links.data
         self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
-        self.reprojected_links = self.geo_links.to_crs(3857)
-        self.reprojected_links["repr_length"] = self.reprojected_links["geometry"].length
-        # Approximately 40 meter buffer
-        # buff_geo = self.geo_links.to_crs(3857).buffer(40).geometry
-        # self.geo_links_buffer = gpd.GeoDataFrame(links, geometry=buff_geo.to_crs(4326), crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.

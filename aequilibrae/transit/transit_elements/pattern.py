@@ -43,8 +43,6 @@ class Pattern(BasicPTElement):
         self.total_capacity = None
         self.__srid = get_srid()
         self.__geolinks = gtfs_feed.geo_links
-        # self.__geolinks_buffer = gtfs_feed.geo_links_buffer
-        self.__reprojected_links = gtfs_feed.reprojected_links
         self.__logger = logger
 
         self.__feed = gtfs_feed
@@ -156,14 +154,15 @@ class Pattern(BasicPTElement):
         self.__build_pattern_mapping()
         logger.info(f"Map-matched pattern {self.pattern_id}")
 
+    # TODO: consider improving the link selection for discount applying an overlay and use a cost proportional to the
+    # link length in the route (raw_shape) buffer.
     def __graph_discount(self):
         buff = gpd.GeoSeries(self.raw_shape, crs="EPSG:4326").to_crs(3857).buffer(20).geometry
-        gdf = gpd.GeoDataFrame(geometry=buff, crs=self.__reprojected_links.crs)
-        gdf = self.__reprojected_links.overlay(gdf, how="intersection")
+        gdf = gpd.GeoDataFrame(geometry=buff.to_crs(4326), crs=self.__geolinks.crs)
+        gdf = self.__geolinks.overlay(gdf, how="intersection")
 
-        gdf = gdf[gdf.modes.str.contains(mode_correspondence[self.route_type])]
-        gdf.loc[:, "intersect"] = 1 / (gdf["geometry"].length / gdf["repr_length"])
-        return gdf
+        gdf = gdf.loc[gdf.modes.str.contains(mode_correspondence[self.route_type])]
+        return gdf.link_id.tolist()
 
     def __map_matching_complete_path_building(self):
         mode_ = mode_correspondence[self.route_type]
@@ -202,12 +201,7 @@ class Pattern(BasicPTElement):
 
         graph.cost = np.array(graph.graph.distance)
         likely_links = self.__graph_discount()
-        lnks = likely_links.link_id.tolist()
-        links_in_graph = graph.graph.original_id.abs().isin(lnks)
-        g = graph.graph[links_in_graph]
-        g.loc[:, "abs_id"] = g["original_id"].abs()
-        g = g.merge(likely_links[["link_id", "intersect"]], left_on="abs_id", right_on="link_id")
-        graph.cost[links_in_graph] *= g["intersect"] * 0.1
+        graph.cost[graph.graph.original_id.abs().isin(likely_links)] *= 0.1
 
         fstop = connected_stops[0]
 
