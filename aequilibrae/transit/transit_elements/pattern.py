@@ -1,15 +1,11 @@
-import math
 from sqlite3 import Connection
 from typing import List, Tuple, Optional
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import shapely.wkb
 from shapely.geometry import LineString
-from shapely.ops import substring
 
-from aequilibrae.log import logger
 from aequilibrae.paths import PathResults
 from aequilibrae.transit.functions.get_srid import get_srid
 from .basic_element import BasicPTElement
@@ -43,7 +39,7 @@ class Pattern(BasicPTElement):
         self.total_capacity = None
         self.__srid = get_srid()
         self.__geolinks = gtfs_feed.geo_links
-        self.__logger = logger
+        self.__logger = gtfs_feed.logger
 
         self.__feed = gtfs_feed
         # For map matching
@@ -146,13 +142,13 @@ class Pattern(BasicPTElement):
         self.__map_matching_error.clear()
         df = self.__map_matching_complete_path_building()
         if df.shape[0] == 0:
-            logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
+            self.__logger.warning(f"Could not rebuild path for pattern {self.pattern_id}")
             return
         self.full_path = df.link_id.to_list()
         self.fpath_dir = df.dir.to_list()
         self.__assemble__mm_shape(df)
         self.__build_pattern_mapping()
-        logger.info(f"Map-matched pattern {self.pattern_id}")
+        self.__logger.info(f"Map-matched pattern {self.pattern_id}")
 
     # TODO: consider improving the link selection for discount applying an overlay and use a cost proportional to the
     # link length in the route (raw_shape) buffer.
@@ -184,7 +180,7 @@ class Pattern(BasicPTElement):
 
         for i, stop in enumerate(candidate_stops):
             node_o = stop.__map_matching_id__[self.route_type]
-            logger.debug(f"Computing paths between {node_o} and {node0}")
+            self.__logger.debug(f"Computing paths between {node_o} and {node0}")
             res.compute_path(node_o, int(node0), early_exit=False)
             # Get skims, as proxy for connectivity, for all stops other than the origin
             other_nodes = stop_node_idxs[:i] + stop_node_idxs[i + 1 :]
@@ -210,7 +206,7 @@ class Pattern(BasicPTElement):
 
         if len(connected_stops) == 2:
             nstop = connected_stops[1].__map_matching_id__[self.route_type]
-            logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
+            self.__logger.debug(f"Computing paths between {fstop.__map_matching_id__[self.route_type]} and {nstop}")
             res.compute_path(fstop.__map_matching_id__[self.route_type], int(nstop), early_exit=True)
             if res.milepost is None:
                 return empty_frame
@@ -231,7 +227,7 @@ class Pattern(BasicPTElement):
             if not_last:
                 following_stop = connected_stops[idx + 2]
                 n_end = following_stop.__map_matching_id__[self.route_type]
-            logger.debug(f"Computing paths between {start} and {end}")
+            self.__logger.debug(f"Computing paths between {start} and {end}")
             res.compute_path(start, int(end), early_exit=True)
             connection_candidates = graph.network[graph.network.a_node == end].b_node.values
             min_cost = np.inf

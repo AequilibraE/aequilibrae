@@ -7,8 +7,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
-from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
+from aequilibrae.context import get_active_project, get_logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -38,7 +37,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = logger
+        self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()

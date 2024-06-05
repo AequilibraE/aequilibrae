@@ -1,6 +1,5 @@
 from datetime import datetime
 import hashlib
-import logging
 import zipfile
 from copy import deepcopy
 from os.path import splitext, basename
@@ -13,6 +12,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import LineString
 
+from aequilibrae.context import get_logger
 from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.column_order import column_order
@@ -40,8 +40,6 @@ class GTFSReader(WorkerThread):
 
     signal = SignalImpl(object)
 
-    logger = logging.getLogger("GTFS Reader")
-
     def __init__(self):
         WorkerThread.__init__(self, None)
         self.__capacities__ = {}
@@ -63,6 +61,7 @@ class GTFSReader(WorkerThread):
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.__mt = ""
+        self.logger = get_logger()
 
     def set_feed_path(self, file_path):
         """Sets GTFS feed source to be used
