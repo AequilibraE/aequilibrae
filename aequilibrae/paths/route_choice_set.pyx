@@ -257,7 +257,6 @@ cdef class RouteChoiceSet:
             where: Optional[str] = None,
             path_size_logit: bool = False,
             beta: float = 1.0,
-            theta: float = 1.0,
             cutoff_prob: float = 0.0,
     ):
         """Compute the a route set for a list of OD pairs.
@@ -291,8 +290,8 @@ cdef class RouteChoiceSet:
         if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
-        if path_size_logit and (beta < 0 or theta <= 0):
-            raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
+        if path_size_logit and beta < 0:
+            raise ValueError("`beta` must be >= 0 for path sized logit model")
 
         if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
             raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
@@ -467,8 +466,7 @@ cdef class RouteChoiceSet:
                             d(d(cost_set)[i]),
                             d(d(path_overlap_set)[i]),
                             d(d(mask_set)[i]),
-                            beta,
-                            theta
+                            beta
                         )
                         # While we need the unique sorted links (.first), we don't need the frequencies (.second)
                         del freq_pair.second
@@ -989,8 +987,7 @@ cdef class RouteChoiceSet:
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
         vector[bool] &route_mask,
-        double beta,
-        double theta
+        double beta
     ) noexcept nogil:
         """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
@@ -1016,7 +1013,7 @@ cdef class RouteChoiceSet:
                 if path_overlap_vec[i] == 0.0:
                     fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
                 inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                    * exp(-theta * (total_cost[j] - total_cost[i]))
+                    * exp((total_cost[j] - total_cost[i]))
 
             if inv_prob == 0.0:
                 fprintf(stderr, "inv_prob == 0.0\n")
