@@ -7,8 +7,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
-from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
+from aequilibrae.context import get_active_project, get_logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -38,7 +37,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = logger
+        self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()
@@ -70,9 +69,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         links = self.project.network.links.data
         self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
-        # Approximately 40 meter buffer
-        buff_geo = self.geo_links.to_crs(3857).buffer(40).geometry
-        self.geo_links_buffer = gpd.GeoDataFrame(links, geometry=buff_geo.to_crs(4326), crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.

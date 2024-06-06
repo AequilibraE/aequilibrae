@@ -106,7 +106,7 @@ class MMGraph(WorkerThread):
         centroids = np.copy(centroid_corresp.centroid_id.values)
         centroid_corresp.set_index("node_id", inplace=True)
         for stop in self.stops.values():
-            stop.___map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
+            stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
@@ -128,9 +128,9 @@ class MMGraph(WorkerThread):
         self.df = self.df.assign(direction=1, free_flow_time=np.inf, wrong_side=0, closest=1, to_remove=0)
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
-            stop.___map_matching_id__[self.mode_id] = self.max_node_id
+            stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
-            centroids.append(stop.___map_matching_id__[self.mode_id])
+            centroids.append(stop.__map_matching_id__[self.mode_id])
             self.max_node_id += 1
             self.connect_node(stop)
         self.df = pd.concat([pd.DataFrame(rec).transpose() for rec in self.__all_links.values()])
@@ -245,7 +245,7 @@ class MMGraph(WorkerThread):
             connector = deepcopy(link)
             connector.link_id = self.max_link_id
             connector.original_id = -1
-            connector.a_node = stop.___map_matching_id__[self.mode_id]
+            connector.a_node = stop.__map_matching_id__[self.mode_id]
             connector.b_node = intersec_node
             connector.wrong_side = wrong_side
             connector.direction = 0
