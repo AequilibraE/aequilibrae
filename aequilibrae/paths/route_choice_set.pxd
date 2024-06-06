@@ -233,8 +233,7 @@ cdef class RouteChoiceSet:
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
         vector[bool] &route_mask,
-        double beta,
-        double theta
+        double beta
     ) noexcept nogil
 
     @staticmethod
