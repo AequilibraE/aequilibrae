@@ -21,6 +21,7 @@ from openmp cimport omp_get_max_threads
 
 from libc.stdio cimport fprintf, stderr
 
+import random
 import itertools
 import logging
 import pathlib
@@ -341,7 +342,8 @@ cdef class RouteChoiceSet:
         else:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
-        set_ods = set(ods)
+        # Shuffling the jobs improves load balancing where nodes pairs are geographically ordered
+        set_ods = list(set(ods))
         if len(set_ods) != len(ods):
             warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
@@ -350,10 +352,11 @@ cdef class RouteChoiceSet:
                 where,
                 self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"]
             )
-            batches = list(Checkpoint.batches(list(set_ods)))
+            batches = list(Checkpoint.batches(set_ods))
             max_results_len = <size_t>max(len(batch) for batch in batches)
         else:
-            batches = [list(set_ods)]
+            random.shuffle(set_ods)
+            batches = [set_ods]
             max_results_len = len(set_ods)
 
         results = new vector[RouteSet_t *](max_results_len)
