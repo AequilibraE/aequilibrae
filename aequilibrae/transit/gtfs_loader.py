@@ -497,6 +497,7 @@ class GTFSReader(WorkerThread):
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
 
+    # TODO:
     def __load_feed_calendar(self):
         self.logger.debug("Starting __load_feed_calendar")
 
