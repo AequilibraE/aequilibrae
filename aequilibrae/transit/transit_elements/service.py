@@ -36,7 +36,7 @@ class Service:
         self.dates = []  # type: List[str]
 
     def _populate(self, record: tuple, headers: list, from_cal: bool) -> None:
-        file = "calendar.txt" if from_cal == True else "calendar_dates.txt"
+        file = "calendar.txt" if from_cal else "calendar_dates.txt"
 
         for key, value in zip(headers, record):
             if key not in self.__dict__.keys():
