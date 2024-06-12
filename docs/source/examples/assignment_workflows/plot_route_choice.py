@@ -66,22 +66,27 @@ project.network.build_graphs()
 # We grab the graph for cars
 graph = project.network.graphs["c"]
 
-# we also see what graphs are available
+# %%
+# We also see what graphs are available
 project.network.graphs.keys()
 
 od_pairs_of_interest = [(71645, 79385), (77011, 74089)]
 nodes_of_interest = (71645, 74089, 77011, 79385)
 
+# %%
 # let's say that utility is just a function of distance
 # So we build our *utility* field as the distance times theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
 
+# %%
 # Prepare the graph with all nodes of interest as centroids
 graph.prepare_graph(np.array(nodes_of_interest))
 
+# %%
 # And set the cost of the graph the as the utility field just created
 graph.set_graph("utility")
 
+# %%
 # We allow flows through "centroid connectors" because our centroids are not really centroids
 # If we have actual centroid connectors in the network (and more than one per centroid) , then we
 # should remove them from the graph
@@ -115,7 +120,6 @@ from aequilibrae.paths import RouteChoice
 rc = RouteChoice(graph, mat)
 
 # %%
-
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -184,9 +188,12 @@ def plot_results(link_loads):
         points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
         # we need to take from x/y to lat/long
         points = [[x[1], x[0]] for x in eval(points)]
-        _ = folium.vector_layers.PolyLine(points, tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
-                                          color="blue",
-                                          weight=factor * rec.demand_tot).add_to(loads_lyr)
+        _ = folium.vector_layers.PolyLine(
+            points,
+            tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
+            color="red",
+            weight=factor * rec.demand_tot,
+        ).add_to(loads_lyr)
     long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
     map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
