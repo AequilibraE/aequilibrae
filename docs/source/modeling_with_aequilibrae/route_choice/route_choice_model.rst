@@ -96,7 +96,7 @@ Imports
    graph.prepare_graph(centroids=[list_of_all_nodes_network_centroids])
 
    rc = RouteChoice(graph, mat)
-   rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1)
+   rc.set_choice_set_generation("bfsle", max_routes=5)
    rc.execute(perform_assignment=True)
 
 

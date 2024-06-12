@@ -84,6 +84,7 @@ Code example
 ------------
 
 .. code:: python
+
    from uuid import uuid4
    from tempfile import gettempdir
    from os.path import join
