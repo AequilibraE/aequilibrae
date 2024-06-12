@@ -1013,7 +1013,7 @@ cdef class RouteChoiceSet:
                 if path_overlap_vec[i] == 0.0:
                     fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
                 inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                    * exp((total_cost[j] - total_cost[i]))
+                    * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
             if inv_prob == 0.0:
                 fprintf(stderr, "inv_prob == 0.0\n")

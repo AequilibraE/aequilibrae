@@ -392,7 +392,6 @@ class TestRouteChoice(TestCase):
                 "max_depth": 0,
                 "max_misses": 100,
                 "beta": 1.1,
-                "theta": 1.0,
                 "penalty": 1.0,
                 "cutoff_prob": 0.0,
             },
