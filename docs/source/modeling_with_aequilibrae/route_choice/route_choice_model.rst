@@ -17,11 +17,11 @@ account for the correlation of alternatives, Ramming (Ramming, 2002) introduced 
 overlap of each route with all other routes in a choice set based on shared link attributes, which gives rise to the PSL
 model. The PSL model’s utility function is defined by
 
-.. math:: U_i = V_i + \beta_{PSL} \cross \log{\gamma_i} + \varepsilon_i
+.. math:: U_{i} = V_{i} + \beta_{PSL} \times \log{\gamma_i} + \varepsilon_{i}
 
 with path overlap correction factor
 
-.. math:: \gamma_i = \sum_{a \in A_i} \frac{l_a}{L_i} \cross \frac{1}{\sum_{k \in R} \delta_{a,k}}
+.. math:: \gamma_i = \sum_{a \in A_i} \frac{l_a}{L_i} \times \frac{1}{\sum_{k \in R} \delta_{a,k}}
 
 Here, :math:`U_i` is the total utility of alternative :math:`i`, :math:`V_i` is the observed utility,
 :math:`\varepsilon_i` is an identical and independently distributed random variable with a Gumbel distribution,
@@ -99,18 +99,12 @@ Imports
    rc.set_choice_set_generation("bfsle", max_routes=5)
    rc.execute(perform_assignment=True)
 
-
-
-
-
-
-
 References
 ----------
 
-.. [1] Ramming, M. S. Network Knowledge and Route Choice. Massachusetts Institute of Technology, 2002.
+.. .. [1] Ramming, M. S. Network Knowledge and Route Choice. Massachusetts Institute of Technology, 2002.
 
-.. [2] Zill, J. C., and P. V. de Camargo. State-Wide Route Choice Models. (Submitted)
+.. .. [2] Zill, J. C., and P. V. de Camargo. State-Wide Route Choice Models. (Submitted)
        Presented at the ATRF, Melbourne, Australia, 2024.
 
 .. [3] Camargo, P.V. (2014) ReMulAA - a New Algorithm for the Route Choice Problem. Available at:

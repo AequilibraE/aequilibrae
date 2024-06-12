@@ -98,7 +98,7 @@ Code example
    graph = project.network.graphs["c"]
    graph.set_graph("free_flow_time")
 
-   graph.prepare_graph(np.array([1, 2, 3, 50, 100, 150))
+   graph.prepare_graph(np.array([1, 2, 3, 50, 100, 150]))
 
 
    nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
@@ -113,7 +113,7 @@ Code example
    rc.batched(nodes, max_routes=max_routes, cores=cores, bfsle=bfsle, penalty=penalty, path_size_logit=psl)
 
    results = rc.get_results().to_pandas()
-   results.to_parquet(Path(r"/my_choice_set.parquet")
+   results.to_parquet(Path("/my_choice_set.parquet"))
 
 References
 ----------
@@ -122,5 +122,5 @@ References
        Transportmetrica A: Transport Science, 9(9), 825–845.
        https://doi.org/10.1080/18128602.2012.671383
 
-.. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
-       Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.
+.. .. [2] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
+..       Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.
