@@ -25,7 +25,7 @@ with path overlap correction factor
 
 Here, :math:`U_i` is the total utility of alternative :math:`i`, :math:`V_i` is the observed utility,
 :math:`\varepsilon_i` is an identical and independently distributed random variable with a Gumbel distribution,
-:math:`\delta_{a,k}` is the Kronecker delta, :math:`l_a` is length of link :math:`a`, :math:`L_i` is total length of
+:math:`\delta_{a,k}` is the Kronecker delta, :math:`l_a` is cost of link :math:`a`, :math:`L_i` is total cost of
 route :math:`i`, :math:`A_i` is the link set and :math:`R` is the route choice set for individual :math:`j` (index
 :math:`j` suppressed for readability). The path overlap correction factor :math:`\gamma` can be theoretically derived by
 aggregation of alternatives under certain assumptions, see [5]_ and references therein.
@@ -89,6 +89,7 @@ Imports
    graph = proj.network.graphs['c']
 
    # Measure that will be used to compute paths
+   theta = 0.0014
    graph.network = graph.network.assign(utility=graph.network.distance * theta)
    graph.set_graph('utility')
 

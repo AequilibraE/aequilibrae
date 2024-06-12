@@ -24,7 +24,7 @@ class RouteChoice:
     default_paramaters = {
         "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0},
         "link-penalisation": {},
-        "bfsle": {"beta": 1.0, "penalty": 1.0},
+        "bfsle": {"penalty": 1.0},
     }
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
@@ -75,7 +75,7 @@ class RouteChoice:
 
         Setting the parameters for the route choice:
 
-        `beta` and `seed` are BFSLE specific parameters.
+        `seed` is a BFSLE specific parameters.
 
         Setting `max_depth` or `max_misses`, while not required, is strongly recommended to prevent runaway algorithms.
         `max_misses` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set

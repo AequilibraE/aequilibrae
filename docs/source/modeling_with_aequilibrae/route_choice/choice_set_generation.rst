@@ -71,7 +71,7 @@ recommended by Rieser-Schüssler et al. [1]_, which is also a reference for furt
 Experiment
 ----------
 
-In an experiment of with nearly 9,000 observed vehicle GPS routes covering a large Australian State, we found that
+In an experiment with nearly 9,000 observed vehicle GPS routes covering a large Australian State, we found that
 all three algorithms (LP, BFS-LE, and BFS-LE+LP) had excellent performance in reproducing the observed routes. However,
 the computational overhead of BFS-LE is substantial enough to recommend always verifying if LP is fit-for-purpose.
 
@@ -103,7 +103,7 @@ Code example
    nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
    max_routes = 10  # Maximum number of routes to be computed for each OD pair
    penalty = 1.01  # Penalty to be applied to links used in paths.
-   cores = 60  # Number of cores to be used in the computation
+   cores = 60  # Number of threads to be used in the computation
    psl = True  # If True, the path size logit will be used to compute probabilities already
    bfsle = True # Should we use BFSLE? If False, defaults to Link Penalization
    # This is only useful if you are already using an utility measure to compute paths
