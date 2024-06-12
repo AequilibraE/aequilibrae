@@ -1,12 +1,12 @@
 [tool.black]
 line-length = 120
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''docs/*'''
 
 
 [build-system]
-requires = ["setuptools", "numpy", "cython", "pyaml", "requests", "scipy", "shapely", "pandas", "pyarrow==15.0.0", "pyproj", "wheel"]
+requires = ["setuptools", "numpy", "cython", "pyarrow==15.0.0", "wheel"]
 
 
 [tool.ruff]
