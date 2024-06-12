@@ -144,7 +144,7 @@ rc = RouteChoice(graph, mat)
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
 
 # rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02)
-rc.set_choice_set_generation("bfsle", max_routes=5, beta=1.1)
+rc.set_choice_set_generation("bfsle", max_routes=5)
 
 # %%
 # All parameters are optional, the defaults are:
