@@ -1,7 +1,8 @@
-""".. _example_usage_route_choice:
+"""
+.. _example_usage_route_choice:
 
 Route Choice
-=================
+============
 
 In this example, we show how to perform route choice set generation using BFSLE and Link penalisation, for a city in La
 Serena Metropolitan Area in Chile.
@@ -38,7 +39,7 @@ logger.addHandler(stdout_handler)
 
 # %%
 # Route Choice
-# ---------------
+# ------------
 
 # %%
 import numpy as np
@@ -119,7 +120,7 @@ from aequilibrae.paths import RouteChoice
 # supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
 rc = RouteChoice(graph, mat)
 
-# %%
+#%%
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -143,6 +144,7 @@ rc = RouteChoice(graph, mat)
 #
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
 
+# %%
 # rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02)
 rc.set_choice_set_generation("bfsle", max_routes=5)
 
@@ -225,7 +227,7 @@ plot_results(rc.get_load_results())
 
 # %%
 # Select link analysis
-# ~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~
 # We can also enable select link analysis by providing the links and the directions that we are interested in
 rc.set_select_links({"sl1": [(5372, 1), (5374, 1)], "sl2": [(23845, 0)]})
 

@@ -1,4 +1,5 @@
-""".. _example_usage_route_choice_generation:
+"""
+.. _example_usage_route_choice_generation:
 
 Route Choice set generation
 ===========================
@@ -70,8 +71,7 @@ from aequilibrae.paths.route_choice_set import RouteChoiceSet
 # supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
 rc = RouteChoiceSet(graph)
 
-# %%
-
+#%%
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, and BFSLE
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -86,6 +86,8 @@ rc = RouteChoiceSet(graph)
 # It is highly recommended to set either `max_routes` or `max_depth` to prevent runaway results.
 
 # rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02)
+
+# %%
 # The 5% penalty (1.05) is likely a little too large, but it create routes that are distinct enough to make this simple
 # example more interesting
 rc.batched(od_pairs_of_interest, max_routes=5, cores=10, bfsle=False, penalty=1.05, path_size_logit=True)
