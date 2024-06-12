@@ -185,7 +185,7 @@ def plot_results(link_loads):
         # we need to take from x/y to lat/long
         points = [[x[1], x[0]] for x in eval(points)]
         _ = folium.vector_layers.PolyLine(points, tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
-                                          color="red",
+                                          color="blue",
                                           weight=factor * rec.demand_tot).add_to(loads_lyr)
     long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
@@ -206,7 +206,8 @@ rc.prepare(graph.centroids[:5])  # You can inspect the result with rc.nodes
 # %%
 # Now we can perform a batch computation with an assignment
 rc.execute(perform_assignment=True)
-rc.get_results().to_pandas()
+res = rc.get_results().to_pandas()
+res.head()
 
 # %%
 # Since we provided a matrix initially we can also perform link loading based on our assignment results.

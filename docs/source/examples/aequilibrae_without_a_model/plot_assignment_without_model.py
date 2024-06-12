@@ -21,6 +21,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths import Graph
 from aequilibrae.paths import TrafficAssignment
 from aequilibrae.paths.traffic_class import TrafficClass
+# sphinx_gallery_thumbnail_path = 'images/assignment_plot.png'
 
 # %%
 # We load the example file from the GMNS GitHub repository
