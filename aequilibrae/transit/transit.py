@@ -44,7 +44,7 @@ class Transit:
         self.create_transit_database()
         self.pt_con = database_connection("transit")
 
-    def new_gtfs_builder(self, agency, file_path, day="", description="") -> GTFSRouteSystemBuilder:
+    def new_gtfs_builder(self, file_path, day="", description="") -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
@@ -59,7 +59,6 @@ class Transit:
         """
         gtfs = GTFSRouteSystemBuilder(
             network=self.project_base_path,
-            agency_identifier=agency,
             file_path=file_path,
             day=day,
             description=description,

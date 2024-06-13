@@ -9,6 +9,7 @@ TRANSIT_STOP_RANGE = 1000000
 WALK_LINK_RANGE = 30000000
 TRANSIT_LINK_RANGE = 20000000
 WALK_AGENCY_ID = 1
+STOP_ID = 1
 
 # 1 for right, -1 for wrong (left)
 DRIVING_SIDE = 1
@@ -21,7 +22,7 @@ class Constants:
     trips: Dict[int, int] = {}
     patterns: Dict[int, int] = {}
     pattern_lookup: Dict[int, int] = {}
-    stops: Dict[int, int] = {}
+    stops: Dict[int, Any] = {}
     fares: Dict[int, int] = {}
     links: Dict[int, int] = {}
     transit_links: Dict[int, int] = {}

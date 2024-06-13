@@ -45,7 +45,7 @@ class GTFSReader(WorkerThread):
         self.__capacities__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
-        self.agency = Agency()
+        self.agency: Dict[int, Agency] = {}
         self.services = {}
         self.routes: Dict[int, Route] = {}
         self.trips: Dict[int, Dict[Route]] = {}
@@ -80,7 +80,7 @@ class GTFSReader(WorkerThread):
         self.zip_archive.close()
 
         self.feed_date = splitext(basename(file_path))[0]
-        self.__mt = f"Reading GTFS for {self.agency.agency}"
+        self.__mt = "Reading GTFS"
 
     def _set_capacities(self, capacities: dict):
         self.__capacities__ = capacities
@@ -94,10 +94,10 @@ class GTFSReader(WorkerThread):
         :Arguments:
             **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
-        ag_id = self.agency.agency
-        self.logger.info(f"Loading data for {service_date} from the {ag_id} GTFS feed. This may take some time")
+        self.service_date = service_date
+        self.logger.info(f"Loading data for {self.service_date} from the GTFS feed. This may take some time")
 
-        self.__mt = f"Reading GTFS for {ag_id}"
+        self.__mt = "Reading GTFS"
         self.signal.emit(["start", "master", 6, self.__mt, self.__mt])
 
         self.__load_date()
@@ -110,6 +110,8 @@ class GTFSReader(WorkerThread):
     def __load_date(self):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
+
+        self.__load_agencies()
         self.__load_routes_table()
         self.__load_stops_table()
         self.__load_stop_times()
@@ -123,7 +125,7 @@ class GTFSReader(WorkerThread):
     def __deconflict_stop_times(self) -> None:
         self.logger.info("Starting deconflict_stop_times")
 
-        msg_txt = f"Interpolating stop times for {self.agency.agency}"
+        msg_txt = "Interpolating stop times for feed agencies"
         self.signal.emit(["start", "secondary", len(self.trips), msg_txt, self.__mt])
         total_fast = 0
         for prog_counter, route in enumerate(self.trips):
@@ -218,10 +220,10 @@ class GTFSReader(WorkerThread):
             for line in range(fareatt.shape[0]):
                 data = tuple(fareatt[line][list(column_order[fareatttxt].keys())])
                 headers = ["fare_id", "price", "currency", "payment_method", "transfer", "transfer_duration"]
-                f = Fare(self.agency.agency_id)
+                f = Fare(self.agency[fareatt[line]["agency_id"]].agency_id)
                 f.populate(data, headers)
                 if f.fare in self.fare_attributes:
-                    self.__fail(f"Fare ID {f.fare} for {self.agency.agency} is duplicated")
+                    self.__fail(f"Fare ID {f.fare} for {self.agency[fareatt[line]['agency_id']].agency} is duplicated")
                 self.fare_attributes[f.fare] = f
 
         farerltxt = "fare_rules.txt"
@@ -266,7 +268,7 @@ class GTFSReader(WorkerThread):
             shapes = parse_csv(file, column_order[shapestxt])
 
         all_shape_ids = np.unique(shapes["shape_id"]).tolist()
-        msg_txt = f"Load shapes - {self.agency.agency}"
+        msg_txt = f"Load shapes"
         self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
 
         self.data_arrays[shapestxt] = shapes
@@ -291,7 +293,7 @@ class GTFSReader(WorkerThread):
             trips_array = parse_csv(file, column_order[tripstxt])
         self.data_arrays[tripstxt] = trips_array
 
-        msg_txt = f"Load trips - {self.agency.agency}"
+        msg_txt = f"Load trips"
         self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
         if np.unique(trips_array["trip_id"]).shape[0] < trips_array.shape[0]:
             self.__fail("There are repeated trip IDs in trips.txt")
@@ -345,7 +347,6 @@ class GTFSReader(WorkerThread):
                 trip.source_time = list(stop_times.source_time.values)
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
-                # trip.shape = self.shapes.get(trip.shape)
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
@@ -398,7 +399,7 @@ class GTFSReader(WorkerThread):
         with self.zip_archive.open(stoptimestxt, "r") as file:
             stoptimes = parse_csv(file, column_order[stoptimestxt])
         self.data_arrays[stoptimestxt] = stoptimes
-        msg_txt = f"Load stop times - {self.agency.agency}"
+        msg_txt = "Load stop times"
 
         df = pd.DataFrame(stoptimes)
         for col in ["arrival_time", "departure_time"]:
@@ -459,12 +460,11 @@ class GTFSReader(WorkerThread):
         stops[:]["stop_lat"][:] = lats[:]
         stops[:]["stop_lon"][:] = lons[:]
 
-        msg_txt = f"Load stops - {self.agency.agency}"
+        msg_txt = "Load stops"
         self.signal.emit(["start", "secondary", stops.shape[0], msg_txt, self.__mt])
         for i, line in enumerate(stops):
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
-            s = Stop(self.agency.agency_id, line, stops.dtype.names)
-            s.agency = self.agency.agency
+            s = Stop(line, stops.dtype.names)
             s.srid = self.srid
             s.get_node_id()
             self.stops[s.stop_id] = s
@@ -482,7 +482,7 @@ class GTFSReader(WorkerThread):
         if np.unique(routes["route_id"]).shape[0] < routes.shape[0]:
             self.__fail("There are repeated route IDs in routes.txt")
 
-        msg_txt = f"Load Routes - {self.agency.agency}"
+        msg_txt = "Load Routes"
         self.signal.emit(["start", "secondary", len(routes), msg_txt, self.__mt])
 
         cap = self.__capacities__.get("other", [None, None, None])
@@ -493,7 +493,7 @@ class GTFSReader(WorkerThread):
 
         for i, line in routes.iterrows():
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
-            r = Route(self.agency.agency_id)
+            r = Route(self.agency[line["agency_id"]].agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
 
@@ -569,6 +569,27 @@ class GTFSReader(WorkerThread):
                 self.__fail(f"illegal service exception type. {service.service_id}")
         if exception_inconsistencies:
             self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+
+    def __load_agencies(self):
+        self.logger.debug("Starting __load_agencies")
+        agencytxt = "agency.txt"
+
+        self.logger.debug('    Loading "agency" table')
+        self.agency = {}
+        with self.zip_archive.open(agencytxt, "r") as file:
+            agencies = parse_csv(file, column_order[agencytxt])
+        self.data_arrays[agencytxt] = agencies
+
+        msg_txt = "Load Agencies"
+        self.signal.emit(["start", "secondary", len(agencies), msg_txt, self.__mt])
+
+        for i, line in enumerate(agencies):
+            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
+            a = Agency()
+            a.agency = line["agency_name"]
+            a.feed_date = self.feed_date
+            a.service_date = self.service_date
+            self.agency[line["agency_id"]] = a
 
     def __fail(self, msg: str) -> None:
         self.logger.error(msg)

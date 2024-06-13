@@ -4,7 +4,11 @@ from typing import Dict, Any, Optional
 
 from shapely.geometry import Point
 
-from aequilibrae.transit.constants import Constants, AGENCY_MULTIPLIER
+from contextlib import closing
+
+from aequilibrae.project.database_connection import database_connection
+
+from aequilibrae.transit.constants import Constants, STOP_ID
 from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 
 
@@ -12,7 +16,7 @@ from aequilibrae.transit.transit_elements.basic_element import BasicPTElement
 class Stop(BasicPTElement):
     """Transit stop as read from the GTFS feed"""
 
-    def __init__(self, agency_id: int, record: tuple, headers: list):
+    def __init__(self, record: tuple, headers: list):
         self.stop_id = -1
         self.stop = ""
         self.stop_code = ""
@@ -30,8 +34,6 @@ class Stop(BasicPTElement):
 
         # Not part of GTFS
         self.taz = None
-        self.agency = ""
-        self.agency_id = agency_id
         self.link = None
         self.dir = None
         self.srid = -1
@@ -55,9 +57,9 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
+        sql = """insert into stops (stop_id, stop, link, dir, name,
                                     parent_station, description, street, fare_zone_id, transit_zone, route_type, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+                 values (?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)
@@ -69,7 +71,6 @@ class Stop(BasicPTElement):
         return [
             self.stop_id,
             self.stop,
-            self.agency_id,
             self.link,
             self.dir,
             self.stop_name,
@@ -84,8 +85,10 @@ class Stop(BasicPTElement):
         ]
 
     def get_node_id(self):
-        c = Constants()
+        with closing(database_connection("transit")) as conn:
+            sql = "Select coalesce(max(distinct(stop_id)), 0) from stops;"
+            max_db = int(conn.execute(sql).fetchone()[0])
 
-        val = 1 + c.stops.get(self.agency_id, AGENCY_MULTIPLIER * self.agency_id)
-        c.stops[self.agency_id] = val
-        self.stop_id = c.stops[self.agency_id]
+        c = Constants()
+        c.stops["stops"] = max(c.stops.get("stops", 0), max_db) + 1
+        self.stop_id = c.stops["stops"]

@@ -7,10 +7,10 @@ column_order = {
             ("agency_name", str),
             ("agency_url", str),
             ("agency_timezone", str),
-            ("agency_lang", str),
-            ("agency_phone", str),
-            ("agency_fare_url", str),
-            ("agency_email", str),
+            # ("agency_lang", str),
+            # ("agency_phone", str),
+            # ("agency_fare_url", str),
+            # ("agency_email", str),
         ]
     ),
     "routes.txt": OrderedDict(
@@ -24,7 +24,7 @@ column_order = {
             # ("route_color", str),
             # ("route_text_color", str),
             # ("route_sort_order", int),
-            # ("agency_id", str),
+            ("agency_id", str),
         ]
     ),
     "trips.txt": OrderedDict(
@@ -76,7 +76,7 @@ column_order = {
             ("currency_type", str),
             ("payment_method", int),
             ("transfers", int),
-            # ("agency_id", str),
+            ("agency_id", str),
             ("transfer_duration", float),
         ]
     ),

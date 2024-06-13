@@ -20,13 +20,12 @@ from ..utils.worker_thread import WorkerThread
 class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(self, network, file_path, day="", description="", capacities={}):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
-            **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
@@ -48,8 +47,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.graphs = {}
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
-        self.gtfs_data.agency.agency = agency_identifier
-        self.gtfs_data.agency.description = description
         self.__default_capacities = capacities
         self.__do_execute_map_matching = False
         self.__target_date__ = None
@@ -133,13 +130,13 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 if msg is not None:
                     self.logger.warning(msg)
 
-    def set_agency_identifier(self, agency_id: str) -> None:
-        """Adds agency ID to this GTFS for use on import.
+    # def set_agency_identifier(self, agency_id: str) -> None:
+    #     """Adds agency ID to this GTFS for use on import.
 
-        :Arguments:
-            **agency_id** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
-        """
-        self.gtfs_data.agency.agency = agency_id
+    #     :Arguments:
+    #         **agency_id** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
+    #     """
+    #     self.gtfs_data.agency.agency = agency_id
 
     def set_feed(self, feed_path: str) -> None:
         """Sets GTFS feed source to be used.
@@ -180,7 +177,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.logger.info("  Building data structures")
         self.__build_data()
-        self.gtfs_data.agency.service_date = self.day
 
     def doWork(self):
         """Alias for execute_import"""
@@ -192,10 +188,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if self.__target_date__ is not None:
             self.load_date(self.__target_date__)
         if not self.select_routes:
-            self.logger.warning(f"Nothing to import for {self.gtfs_data.agency.agency} on {self.day}")
+            self.logger.warning(f"Nothing to import on {self.day}")
             return
 
-        self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
+        self.logger.info(f"  Importing GTFS feed on {self.day}")
 
         self.save_to_disk()
 
@@ -207,7 +203,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 pattern.save_to_database(conn, commit=False)
             conn.commit()
 
-            self.gtfs_data.agency.save_to_database(conn)
+            for counter, (_, agency) in enumerate(self.gtfs_data.agency.items()):
+                agency.save_to_database(conn)
 
             for counter, trip in enumerate(self.select_trips):
                 trip.save_to_database(conn, commit=False)
@@ -222,11 +219,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
 
-            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
-            if zones:
-                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
-                conn.executemany(sql, zones)
-            conn.commit()
+            # fix
+            # zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            # if zones:
+            #     sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+            #     conn.executemany(sql, zones)
+            # conn.commit()
 
             for fare in self.gtfs_data.fare_attributes.values():
                 fare.save_to_database(conn)
@@ -365,9 +363,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                         break
         if not routes:
             self.logger.warning("NO ROUTES OPERATING FOR THIS DATE")
-
-        for route_id, route in routes.items():
-            route.agency = self.gtfs_data.agency.agency
 
         self.select_routes = routes
 

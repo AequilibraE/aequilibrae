@@ -41,7 +41,7 @@ class MMGraph(WorkerThread):
         self.mode_id = -1
         self.__mode = ""
         self.__df_file = ""
-        self.__agency = lib_gtfs.gtfs_data.agency.agency
+        self.__agency = '-'.join([key for key in lib_gtfs.gtfs_data.agency.keys()])
         self.__centroids_file = ""
         self.__mm_graph_file = ""
         self.node_corresp = []
