@@ -7,8 +7,6 @@
 --@ 
 --@ **stop** idenfifies a stop, statio, or station entrance
 --@ 
---@ **agency_id** identifies the agency fot the specified route
---@ 
 --@ **link** identifies the *link_id* in the links table that corresponds to the
 --@ pattern matching
 --@ 
@@ -32,7 +30,6 @@
 CREATE TABLE IF NOT EXISTS stops (
 	stop_id           TEXT     PRIMARY KEY,
 	stop              TEXT     NOT NULL ,
-	agency_id         INTEGER  NOT NULL,
 	link              INTEGER,
 	dir               INTEGER,
 	name              TEXT,
@@ -42,7 +39,6 @@ CREATE TABLE IF NOT EXISTS stops (
 	fare_zone_id      INTEGER,
 	transit_zone      TEXT,
 	route_type        INTEGER  NOT NULL DEFAULT -1,
-	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id),
 	FOREIGN KEY("fare_zone_id") REFERENCES fare_zones("fare_zone_id")
 );
 

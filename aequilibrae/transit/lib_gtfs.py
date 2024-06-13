@@ -219,7 +219,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
 
-            # fix
+            # TODO
             # zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
             # if zones:
             #     sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"

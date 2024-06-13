@@ -61,6 +61,7 @@ class GTFSReader(WorkerThread):
         self.srid = get_srid()
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.__mt = ""
+        self.agency_correspondence = {}
         self.logger = get_logger()
 
     def set_feed_path(self, file_path):
@@ -491,9 +492,12 @@ class GTFSReader(WorkerThread):
         for route_type, cap in self.__capacities__.items():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
 
+        agency_finder = routes["agency_id"].values.tolist()
+        routes.drop(columns="agency_id", inplace=True)
+
         for i, line in routes.iterrows():
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
-            r = Route(self.agency[line["agency_id"]].agency_id)
+            r = Route(self.agency_correspondence[agency_finder[i]])
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
 
@@ -589,7 +593,8 @@ class GTFSReader(WorkerThread):
             a.agency = line["agency_name"]
             a.feed_date = self.feed_date
             a.service_date = self.service_date
-            self.agency[line["agency_id"]] = a
+            self.agency[a.agency_id] = a
+            self.agency_correspondence[line["agency_id"]] = a.agency_id
 
     def __fail(self, msg: str) -> None:
         self.logger.error(msg)

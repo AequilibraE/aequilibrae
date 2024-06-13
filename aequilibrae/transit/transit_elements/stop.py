@@ -86,7 +86,7 @@ class Stop(BasicPTElement):
 
     def get_node_id(self):
         with closing(database_connection("transit")) as conn:
-            sql = "Select coalesce(max(distinct(stop_id)), 0) from stops;"
+            sql = "Select count(stop_id) from stops;"
             max_db = int(conn.execute(sql).fetchone()[0])
 
         c = Constants()
