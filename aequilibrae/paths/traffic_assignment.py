@@ -480,9 +480,15 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    # NOT YET IMPLEMENTED
+    # TODO:
+    # This function needs to store the preload vector in way such that it can simply
+    # be added/subtracted to the relevant capacity vector during assignment.
     def set_pt_preload(self, preloads: List[np.ndarray]) -> None:
         """NOT YET IMPLEMENTED"""
+        if len(self.classes) != len(preloads):
+            raise ValueError("Require a preload for each class (use None values for classes where a preload is not relevant)")
+        self.preloads = preloads
+
         raise NotImplementedError
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
