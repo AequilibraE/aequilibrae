@@ -429,15 +429,12 @@ class Network(WorkerThread):
         return c
 
     def build_pt_preload(
-            self, graphs, to_build, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str = "start"
-            ) -> List[np.ndarray]:
+            self, graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str = "start"
+            ) -> np.ndarray:
         """Builds a preload vector for each specified graph in network
 
         :Arguments:
-            **graphs** (List[Graph]): These graphs specify the ordering of the preload vectors
-
-            **to_build** (List[Bool]): The user may only want to build preload vectors for a subset
-                of the graphs
+            **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
 
             **start_time** (int): The start of the period for which to check pt schedules, in 
                 seconds from midnight
@@ -453,7 +450,7 @@ class Network(WorkerThread):
                 !Currently just including any trip with any time in the period!
 
         :Returns:
-            **preloads** (List[np.ndarray]): A list of preloads, with None as a placeholder
+            **preloads** (np.ndarray): A list of preloads, with None as a placeholder
                 wherever it is not specified to build a preload.
 
         Minimal example:
@@ -470,34 +467,26 @@ class Network(WorkerThread):
             >>> walk_graph = project.network.graphs["w"]
             >>> bike_graph = project.network.graphs["b"]
 
-            >>> graphs = [car_graph, transit_graph, walk_graph, bike_graph]
             >>> to_build = [True, False, False, False]
 
             >>> start = int(6.5 * 60 * 60)
             >>> end = int(8.5 * 60 * 60)
 
-            >>> preloads = proj.network.build_pt_preload(graphs, to_build, start, end)
+            >>> preloads = proj.network.build_pt_preload(graph, start, end)
         """
-        if len(graphs) != len(to_build):
-            raise ValueError("Need to specify which graphs to build pt preloads for!")
-        
-        if not any(to_build): # short circuit
-            return [None for _ in graphs]
-
         # Create dictionary of link/dir to preload for each link in the network
         links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
         # Build the preload vectors for each graph (and placeholder if not specified to build)
         preloads = []
-        for graph, build in zip(graphs, to_build):
-            if build:
-                links = graph.graph[["link_id", "direction"]]
-                preload = np.zeros(len(links), dtype=int)
-                for i, (link, dir) in links.iterrows():
-                    preload[i] = links_dict[(link, dir)]
-                preloads.append(preload)
-            else:
-                preloads.append(None)
+        
+        links = graph.graph[["link_id", "direction"]]
+        preload = np.zeros(len(links), dtype=int)
+        for i, (link, dir) in links.iterrows():
+            preload[i] = links_dict[(link, dir)]
+            preloads.append(preload)
+        else:
+            preloads.append(None)
 
         return preloads
 
@@ -519,8 +508,6 @@ class Network(WorkerThread):
         select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
         period_links = lambda pattern: transit_conn.execute(select_links(pattern)).fetchall()
 
-        # CAN THE REST OF THIS BE REPLACED BY JUST LOOKING AT THE OVERALL NETWORK
-        # MAYBE JUST CREATE A BIG VECTOR INSTEAD
         # Extract link/dir data from database
         proj_conn = database_connection("project_database")
         links = proj_conn.execute("SELECT link_id, direction FROM links").fetchall()
@@ -540,6 +527,10 @@ class Network(WorkerThread):
             pattern_links = period_links(pattern_id)
             for link, dir in pattern_links:
                 links_dict[(link, dir)] += 1
+
+
+        # Get the __supernet_id__ which would allow me to map from links/dir to index in the list.
+        # Then I can just update directly into the vector.
 
         transit_conn.close()
         return links_dict

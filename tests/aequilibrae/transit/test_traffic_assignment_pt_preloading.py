@@ -14,6 +14,18 @@ from aequilibrae.utils.create_example import create_example
 # 7) Decide whether more complex tests are necessary
 # 8) Performance testing and speed ups in cython
 
+# DECISION:
+# It appears that each graph must be an identical copy of the same dataframe, 
+# hence the links are in the same order. Also the capacity vector is a single vector
+# used across all links, hence the build preload only needs to build a single preload vector!
+
+# Question - how does the program differentiate between a link that goes in 1 direction
+# vs both directions, the capacity vector appears to be a single vector in the direction
+# provided in the database, which could be both directions!
+
+# Question - how exactly does the indexing into numpy array with pandas series work in the traffic_assignment.py
+# set_capacity_field method?
+
 
 # Build TODO:
 # 1. Write simple test(s) based off coquimbo network for built_pt_preload
@@ -26,6 +38,10 @@ from aequilibrae.utils.create_example import create_example
 # 1. Start adding this into the TrafficAssignment...
 # 2. Figure out where this needs to be stored in TrafficAssignment
 # 3. Modify one algorithm at a time to add this in.
+
+# Questions:
+# Is the capacity vector always the same length? 
+# If so, do we not need to account for different classes working over different underlying graphs?
 
 @pytest.fixture
 def project(tmp_path):

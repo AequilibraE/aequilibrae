@@ -236,6 +236,7 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
+        self.apply_pt_preload = False #type: bool
 
         self.steps_below_needed_to_terminate = 1
 
@@ -487,6 +488,7 @@ class TrafficAssignment(AssignmentBase):
         """NOT YET IMPLEMENTED"""
         if len(self.classes) != len(preloads):
             raise ValueError("Require a preload for each class (use None values for classes where a preload is not relevant)")
+        self.apply_pt_preload = True
         self.preloads = preloads
 
         raise NotImplementedError
