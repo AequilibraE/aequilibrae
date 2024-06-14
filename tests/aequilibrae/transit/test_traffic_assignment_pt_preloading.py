@@ -87,14 +87,13 @@ class TestPTPreloaing:
         # how do I detemine these instead.
 
         # Get preload info from network
-        to_build = [True, False, False, False]
-        preloads = project.network.build_pt_preload(graphs, to_build, period_start, period_end)
+        preload = project.network.build_pt_preload(graphs[0], period_start, period_end)
 
         # Assertions about the preload and coquimbo network:
         assert False # PLACEHOLDER
 
         # Return preloads for further testing
-        return preloads
+        return preload
 
     def test_preloaded_assignment(self, project: Project, graphs: List[Graph]):
         """Check that the setting a preload and running an assignment works as intended."""

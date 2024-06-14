@@ -481,15 +481,16 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    # TODO:
-    # This function needs to store the preload vector in way such that it can simply
-    # be added/subtracted to the relevant capacity vector during assignment.
-    def set_pt_preload(self, preloads: List[np.ndarray]) -> None:
-        """NOT YET IMPLEMENTED"""
-        if len(self.classes) != len(preloads):
-            raise ValueError("Require a preload for each class (use None values for classes where a preload is not relevant)")
+    def set_pt_preload(self, preload: np.ndarray) -> None:
+        """
+        Sets the field that contains preload values for the assignment period.
+        Should have identical ordering to self.capacity.
+
+        :Arguments:
+            **preload** (:obj:`np.ndarray`): Field name
+        """
         self.apply_pt_preload = True
-        self.preloads = preloads
+        self.preload = preload
 
         raise NotImplementedError
 

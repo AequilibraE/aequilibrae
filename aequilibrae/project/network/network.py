@@ -475,6 +475,7 @@ class Network(WorkerThread):
             >>> preloads = proj.network.build_pt_preload(graph, start, end)
         """
         # Create dictionary of link/dir to preload for each link in the network
+        id_to_links = graph.graph[["link_id", "direction", "__supernet_id__"]]
         links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
         # Build the preload vectors for each graph (and placeholder if not specified to build)
@@ -528,9 +529,9 @@ class Network(WorkerThread):
             for link, dir in pattern_links:
                 links_dict[(link, dir)] += 1
 
-
         # Get the __supernet_id__ which would allow me to map from links/dir to index in the list.
         # Then I can just update directly into the vector.
+        # Return that preload vector (don't need to connect to the project database at all!)
 
         transit_conn.close()
         return links_dict

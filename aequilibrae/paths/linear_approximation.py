@@ -113,11 +113,11 @@ class LinearApproximation(WorkerThread):
         self.betas = np.array([1.0, 0.0, 0.0])
 
         # Instantiates the arrays that we will use over and over
+        self.capacity = assig_spec.capacity
         if assig_spec.apply_pt_preload: 
+            self.capacity -= assig_spec.preload
             raise NotImplementedError # Need to subtract preloads from capacity
-            self.preloads = assig_spec.preloads
-        else:
-            self.capacity = assig_spec.capacity
+        
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
