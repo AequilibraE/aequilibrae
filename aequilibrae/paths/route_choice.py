@@ -104,8 +104,9 @@ class RouteChoice:
         excluded from the PSL calculations. The route is still returned, but with a probability of 0.0.
 
         The `cutoff_prob` should be in the range [0, 1]. It is then rescaled internally to [0.5, 1] as probabilities
-        below 0.5 produce negative differences in utilities. A higher `cutoff_prob` includes less routes. A value of
-        `1.0` will only include the minimum cost route. A value of `0.0` includes all routes.
+        below 0.5 produce negative differences in utilities because the choice is between two routes only, one of
+        which is the shortest path. A higher `cutoff_prob` includes less routes. A value of `1.0` will only include
+        the minimum cost route. A value of `0.0` includes all routes.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
