@@ -89,13 +89,14 @@ class GTFSReader(WorkerThread):
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
 
-    def load_data(self, service_date: str):
+    def load_data(self, service_date: str, description: str):
         """Loads the data for a respective service date.
 
         :Arguments:
             **service_date** (:obj:`str`): service date. e.g. "2020-04-01".
         """
         self.service_date = service_date
+        self.description = description
         self.logger.info(f"Loading data for {self.service_date} from the GTFS feed. This may take some time")
 
         self.__mt = "Reading GTFS"
@@ -218,13 +219,19 @@ class GTFSReader(WorkerThread):
                 fareatt = parse_csv(file, column_order[fareatttxt])
             self.data_arrays[fareatttxt] = fareatt
 
+            existing_agencies = np.unique(fareatt["agency_id"])
+            if existing_agencies.shape[0] != len(self.agency):
+                self.logger.debug("agency_id exists on fare_attributes.txt but not in agency.txt")
+            elif existing_agencies.shape[0] == 1 and existing_agencies[0] == "":
+                fareatt["agency_id"] = list(self.agency.keys())[0]
+
             for line in range(fareatt.shape[0]):
                 data = tuple(fareatt[line][list(column_order[fareatttxt].keys())])
                 headers = ["fare_id", "price", "currency", "payment_method", "transfer", "transfer_duration"]
-                f = Fare(self.agency[fareatt[line]["agency_id"]].agency_id)
+                f = Fare(fareatt[line]["agency_id"])
                 f.populate(data, headers)
                 if f.fare in self.fare_attributes:
-                    self.__fail(f"Fare ID {f.fare} for {self.agency[fareatt[line]['agency_id']].agency} is duplicated")
+                    self.__fail(f"Fare ID {f.fare} for {fareatt[line]['agency_id']} is duplicated")
                 self.fare_attributes[f.fare] = f
 
         farerltxt = "fare_rules.txt"
@@ -238,8 +245,7 @@ class GTFSReader(WorkerThread):
             farerl = parse_csv(file, column_order[farerltxt])
         self.data_arrays[farerltxt] = farerl
 
-        corresp = {}
-        zone_id = self.agency.agency_id * AGENCY_MULTIPLIER + 1
+        # corresp = {}
         for line in range(farerl.shape[0]):
             data = tuple(farerl[line][list(column_order[farerltxt].keys())])
             fr = FareRule()
@@ -247,14 +253,15 @@ class GTFSReader(WorkerThread):
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
             if fr.route in self.routes:
                 fr.route_id = self.routes[fr.route].route_id
-            fr.agency_id = self.agency.agency_id
-            for x in [fr.origin, fr.destination]:
-                if x not in corresp:
-                    corresp[x] = zone_id
-                    zone_id += 1
-            fr.origin_id = corresp[fr.origin]
-            fr.destination_id = corresp[fr.destination] if fr.destination == "" else fr.destination_id
-            self.fare_rules.append(fr) if fr.origin == "" else fr.origin_id
+            # fr.agency_id = self.fare_attributes[fr.fare].agency_id
+            # zone_id = fr.agency_id * AGENCY_MULTIPLIER + 1
+            # for x in [fr.origin, fr.destination]:
+            #     if x not in corresp:
+            #         corresp[x] = zone_id
+            #         zone_id += 1
+            fr.origin_id = None if fr.origin == "" else int(fr.origin)
+            fr.destination_id = None if fr.destination == "" else int(fr.destination)
+            self.fare_rules.append(fr)
 
     def __load_shapes_table(self):
         self.logger.debug("Starting __load_shapes_table")
@@ -269,7 +276,7 @@ class GTFSReader(WorkerThread):
             shapes = parse_csv(file, column_order[shapestxt])
 
         all_shape_ids = np.unique(shapes["shape_id"]).tolist()
-        msg_txt = f"Load shapes"
+        msg_txt = "Load shapes"
         self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
 
         self.data_arrays[shapestxt] = shapes
@@ -294,7 +301,7 @@ class GTFSReader(WorkerThread):
             trips_array = parse_csv(file, column_order[tripstxt])
         self.data_arrays[tripstxt] = trips_array
 
-        msg_txt = f"Load trips"
+        msg_txt = "Load trips"
         self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
         if np.unique(trips_array["trip_id"]).shape[0] < trips_array.shape[0]:
             self.__fail("There are repeated trip IDs in trips.txt")
@@ -620,6 +627,7 @@ class GTFSReader(WorkerThread):
             a.agency = line["agency_name"]
             a.feed_date = self.feed_date
             a.service_date = self.service_date
+            a.description = self.description
             self.agency[a.agency_id] = a
             self.agency_correspondence[line["agency_id"]] = a.agency_id
 

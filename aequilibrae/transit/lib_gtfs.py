@@ -20,14 +20,15 @@ from ..utils.worker_thread import WorkerThread
 class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(self, network, file_path, description="", capacities={}):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         WorkerThread.__init__(self, None)
@@ -35,7 +36,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
-        self.day = day
+        self.day = None
         self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
@@ -45,6 +46,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.trip_by_service = {}
         self.patterns = {}
         self.graphs = {}
+        self.description = description
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.__default_capacities = capacities
@@ -72,8 +74,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         :Arguments:
             **capacities** (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
-                                        of 3 items for values for capacities: seated and total
-                                        i.e. -> "{0: [150, 300],...}"
+            of 3 items for values for capacities: seated and total i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
 
@@ -130,14 +131,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 if msg is not None:
                     self.logger.warning(msg)
 
-    # def set_agency_identifier(self, agency_id: str) -> None:
-    #     """Adds agency ID to this GTFS for use on import.
-
-    #     :Arguments:
-    #         **agency_id** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
-    #     """
-    #     self.gtfs_data.agency.agency = agency_id
-
     def set_feed(self, feed_path: str) -> None:
         """Sets GTFS feed source to be used.
 
@@ -173,7 +166,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             raise ValueError("The date chosen is not available in this GTFS feed")
         self.day = service_date
 
-        self.gtfs_data.load_data(service_date)
+        self.gtfs_data.load_data(service_date, self.description)
 
         self.logger.info("  Building data structures")
         self.__build_data()
@@ -219,10 +212,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
 
-            # TODO
-            # zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            # zones = [[y, x] for x, y in list(zone_ids.items())]
             # if zones:
-            #     sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+            #     sql = "Insert into fare_zones (fare_zone_id, transit_zone) values(?, ?);"
             #     conn.executemany(sql, zones)
             # conn.commit()
 

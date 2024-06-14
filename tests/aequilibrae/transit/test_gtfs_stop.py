@@ -18,7 +18,6 @@ def data():
         "stop_desc": randomword(randint(0, 40)),
         "stop_lat": uniform(0, 30000),
         "stop_lon": uniform(0, 30000),
-        "stop_street": randomword(randint(0, 40)),
         "zone_id": randomword(randint(0, 40)),
         "stop_url": randomword(randint(0, 40)),
         "location_type": choice((0, 1)),
@@ -51,7 +50,6 @@ def test_save_to_database(data, transit_conn):
     s = Stop(1, tuple(data.values()), list(data.keys()))
     s.link = link = randint(1, 30000)
     s.dir = direc = choice((0, 1))
-    s.agency = randint(5, 100000)
     s.route_type = randint(0, 13)
     s.srid = get_srid()
     s.get_node_id()
@@ -61,7 +59,7 @@ def test_save_to_database(data, transit_conn):
                 VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"""
     transit_conn.execute(sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line])
 
-    sql = "Select agency_id, link, dir, description, street from stops where stop=?"
+    sql = "Select link, dir, description, street from stops where stop=?"
     result = list(transit_conn.execute(sql, [data["stop_id"]]).fetchone())
-    expected = [s.agency_id, link, direc, data["stop_desc"], data["stop_street"]]
+    expected = [link, direc, data["stop_desc"], data["stop_street"]]
     assert result == expected, "Saving Stop to the database failed"

@@ -19,8 +19,6 @@
 --@ 
 --@ **description** provides useful description of the stop location
 --@ 
---@ **street** identifies the address of a stop
---@ 
 --@ **fare_zone_id** identifies the fare zone for a stop
 --@ 
 --@ **transit_zone** identifies the TAZ for a fare zone
@@ -35,7 +33,6 @@ CREATE TABLE IF NOT EXISTS stops (
 	name              TEXT,
 	parent_station    TEXT,
 	description       TEXT,
-	street            TEXT,
 	fare_zone_id      INTEGER,
 	transit_zone      TEXT,
 	route_type        INTEGER  NOT NULL DEFAULT -1,

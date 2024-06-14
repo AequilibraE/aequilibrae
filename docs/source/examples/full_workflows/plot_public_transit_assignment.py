@@ -47,7 +47,7 @@ dest_path = join(fldr, "gtfs_coquimbo.zip")
 # This will automatically create a new public transport database.
 data = Transit(project)
 
-transit = data.new_gtfs_builder(agency="LISANCO", file_path=dest_path)
+transit = data.new_gtfs_builder(file_path=dest_path)
 
 # %%
 # To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free

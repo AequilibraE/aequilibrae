@@ -44,13 +44,11 @@ class Transit:
         self.create_transit_database()
         self.pt_con = database_connection("transit")
 
-    def new_gtfs_builder(self, file_path, day="", description="") -> GTFSRouteSystemBuilder:
+    def new_gtfs_builder(self, file_path, description="") -> GTFSRouteSystemBuilder:
         """Returns a ``GTFSRouteSystemBuilder`` object compatible with the project
 
         :Arguments:
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-
-            **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA2019 fixed by John Doe')
 
@@ -60,7 +58,6 @@ class Transit:
         gtfs = GTFSRouteSystemBuilder(
             network=self.project_base_path,
             file_path=file_path,
-            day=day,
             description=description,
             capacities=self.default_capacities,
         )

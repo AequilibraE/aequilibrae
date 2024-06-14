@@ -12,7 +12,7 @@ def gtfs_file(create_path):
 @pytest.fixture
 def system_builder(transit_conn, gtfs_file):
     yield GTFSRouteSystemBuilder(
-        network=transit_conn, agency_identifier="LISERCO, LISANCO, LINCOSUR", file_path=gtfs_file
+        network=transit_conn, file_path=gtfs_file
     )
 
 
@@ -51,12 +51,6 @@ def test_map_match(transit_conn, system_builder):
     assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
 
 
-def test_set_agency_identifier(system_builder):
-    assert system_builder.gtfs_data.agency.agency != "CTA"
-    system_builder.set_agency_identifier("CTA")
-    assert system_builder.gtfs_data.agency.agency == "CTA"
-
-
 def test_set_feed(gtfs_file, system_builder):
     system_builder.set_feed(gtfs_file)
     assert system_builder.gtfs_data.archive_dir == gtfs_file
@@ -74,7 +68,6 @@ def test_set_date(system_builder):
 
 def test_load_date(system_builder):
     system_builder.load_date("2016-04-13")
-    assert system_builder.gtfs_data.agency.service_date == "2016-04-13"
     assert "101387" in system_builder.select_routes.keys()
 
 

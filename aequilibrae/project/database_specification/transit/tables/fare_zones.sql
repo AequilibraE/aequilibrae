@@ -4,12 +4,8 @@
 --@ **fare_zone_id** identifies the fare zone for a stop
 --@ 
 --@ **transit_zone** identifies the TAZ for a fare zone
---@ 
---@ **agency_id** identifies the agency fot the specified route
 
 CREATE TABLE IF NOT EXISTS fare_zones (
-	fare_zone_id    INTEGER  PRIMARY KEY,
-	transit_zone    TEXT     NOT NULL,
-	agency_id       INTEGER  NOT NULL,
-	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
+	fare_zone_id    INTEGER  NOT NULL PRIMARY KEY,
+	transit_zone    TEXT     NOT NULL
 );

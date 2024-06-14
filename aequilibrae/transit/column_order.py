@@ -113,13 +113,14 @@ column_order = {
             ("stop_desc", str),
             ("stop_lat", float),
             ("stop_lon", float),
-            ("stop_street", str),
             ("zone_id", str),
             # ("stop_url", str),
             # ("location_type", int),
             ("parent_station", str),
             # ("stop_timezone", str),
             # ("wheelchair_boarding", int),
+            # ("level_id", int),
+            # ("platform_code", str)
         ]
     ),
     "shapes.txt": OrderedDict(
