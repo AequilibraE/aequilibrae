@@ -106,9 +106,9 @@ Code example
    penalty = 1.01  # Penalty to be applied to links used in paths.
    cores = 60  # Number of threads to be used in the computation
    psl = True  # If True, the path size logit will be used to compute probabilities already
-   bfsle = True # Should we use BFSLE? If False, defaults to Link Penalization
    # This is only useful if you are already using an utility measure to compute paths
-
+   bfsle = True # Should we use BFSLE? If False, defaults to Link Penalization
+   
    rc = RouteChoiceSet(graph)  # Builds data structures -> can take a minute
    rc.batched(nodes, max_routes=max_routes, cores=cores, bfsle=bfsle, penalty=penalty, path_size_logit=psl)
 
