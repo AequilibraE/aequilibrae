@@ -66,7 +66,13 @@ class AssignmentBase(ABC):
         """Processes assignment"""
         if log_specification:
             self.log_specification()
+
+        self._prepare_execute()
         self.assignment.execute()
+
+    @abstractmethod
+    def _prepare_execute(self):
+        pass
 
     @abstractmethod
     def log_specification(self):
@@ -497,6 +503,20 @@ class TrafficAssignment(AssignmentBase):
         if len(q) > 0:
             raise ValueError("List of functions {} for vdf {} has an inadequate set of parameters".format(q, self.vdf))
         return True
+
+    def _prepare_execute(self) -> None:
+        """
+        Reset's arrays used relating to congested times in assignment algorithm.
+
+        Allows for re-use of assignment for ODME procedure.
+        """
+        self.__dict__["congested_time"] = np.array(self.free_flow_tt, copy=True)
+
+        # Re-instatiate arrays for use in assignment algorithm.
+        if self.algorithm in ["all-or-nothing", "msa", "frank-wolfe", "cfw", "bfw"]:
+            self.assignment = LinearApproximation(self, self.algorithm, project=self.project)
+        else:
+            raise ValueError("Algorithm not listed in the case selection")
 
     def log_specification(self):
         self.logger.info("Traffic Class specification")
@@ -990,3 +1010,7 @@ class TransitAssignment(AssignmentBase):
         """
         self._check_field(frequency_field)
         self._config["Frequency field"] = frequency_field
+
+    def _prepare_execute(self) -> None:
+        """Does nothing, included for base class compatibility"""
+        pass
