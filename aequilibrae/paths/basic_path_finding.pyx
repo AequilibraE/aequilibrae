@@ -348,7 +348,9 @@ cpdef int path_finding(long origin,
             vert_state = pqueue.Elements[head_vert_idx].state
             if vert_state != SCANNED:
                 head_vert_val = tail_vert_val + graph_costs[idx]
-                if vert_state == NOT_IN_HEAP:
+                if head_vert_val == INFINITY:
+                    continue
+                elif vert_state == NOT_IN_HEAP:
                     insert(&pqueue, head_vert_idx, head_vert_val)
                     pred[head_vert_idx] = tail_vert_idx
                     connectors[head_vert_idx] = ids[idx]

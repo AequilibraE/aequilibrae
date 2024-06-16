@@ -22,9 +22,9 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 1.0},
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0},
         "link-penalisation": {},
-        "bfsle": {"beta": 1.0, "theta": 1.0, "penalty": 1.0},
+        "bfsle": {"penalty": 1.0},
     }
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
@@ -75,7 +75,7 @@ class RouteChoice:
 
         Setting the parameters for the route choice:
 
-        `beta`, `theta`, and `seed` are BFSLE specific parameters.
+        `seed` is a BFSLE specific parameters.
 
         Setting `max_depth` or `max_misses`, while not required, is strongly recommended to prevent runaway algorithms.
         `max_misses` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set
@@ -104,8 +104,9 @@ class RouteChoice:
         excluded from the PSL calculations. The route is still returned, but with a probability of 0.0.
 
         The `cutoff_prob` should be in the range [0, 1]. It is then rescaled internally to [0.5, 1] as probabilities
-        below 0.5 produce negative differences in utilities. A higher `cutoff_prob` includes more routes. A value of
-        `0.0` will only include the minimum cost route. A value of `1.0` includes all routes.
+        below 0.5 produce negative differences in utilities because the choice is between two routes only, one of
+        which is the shortest path. A higher `cutoff_prob` includes less routes. A value of `1.0` will only include
+        the minimum cost route. A value of `0.0` includes all routes.
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
@@ -222,7 +223,7 @@ class RouteChoice:
             **self.parameters,
         )
 
-    def execute(self, perform_assignment: bool = False) -> None:
+    def execute(self, perform_assignment: bool = True) -> None:
         """
         Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
 
@@ -310,9 +311,15 @@ class RouteChoice:
 
         return self.results
 
-    def get_load_results(self) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+    def get_load_results(
+        self, compressed_graph_results=False
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Translates the link loading results from the graph format into the network format.
+
+        :Arguments:
+            **compressed_graph_results** (:obj:`bool`): Whether we should return assignment results for the
+            compressed graph. Only use this option if you are SURE you know what you are doing. Default `False`.
 
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
@@ -339,8 +346,9 @@ class RouteChoice:
         )
         compact_lids = np.unique(self.graph.compact_graph.link_id.values)
         compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
-
-        return uncompressed_df, compressed_df
+        if compressed_graph_results:
+            return compressed_df
+        return uncompressed_df
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
@@ -348,11 +356,11 @@ class RouteChoice:
         )
         for k, v in link_loads.items():
             # Directional Flows
-            df[k + "_ab"].values[mapping.network_ab_idx] = np.nan_to_num(v[mapping.graph_ab_idx])
-            df[k + "_ba"].values[mapping.network_ba_idx] = np.nan_to_num(v[mapping.graph_ba_idx])
+            df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
+            df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            df[k + "_tot"] = np.nan_to_num(df[k + "_ab"].values) + np.nan_to_num(df[k + "_ba"].values)
+            df[k + "_tot"] = df[k + "_ab"] + df[k + "_ba"]
 
         return df
 
@@ -485,22 +493,13 @@ class RouteChoice:
         if not project:
             project = self.project or get_active_project()
 
-        u, c = self.get_load_results()
+        df = self.get_load_results()
         info = self.info()
         self.__save_dataframe(
-            u,
+            df,
             "Link loading",
             "Uncompressed link loading results",
             table_name + "_uncompressed",
-            info,
-            project=project,
-        )
-
-        self.__save_dataframe(
-            c,
-            "Link loading",
-            "Compressed link loading results",
-            table_name + "_compressed",
             info,
             project=project,
         )

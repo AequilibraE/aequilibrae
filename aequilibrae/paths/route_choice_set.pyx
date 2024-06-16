@@ -21,6 +21,7 @@ from openmp cimport omp_get_max_threads
 
 from libc.stdio cimport fprintf, stderr
 
+import random
 import itertools
 import logging
 import pathlib
@@ -141,6 +142,8 @@ cdef class RouteChoiceSet:
         self.a_star = False
 
         self.ids_graph_view = graph.compact_graph.id.values
+
+        # We explicitly don't want the links that have been removed from the graph
         self.graph_compressed_id_view = graph.graph.__compressed_id__.values
         self.num_nodes = graph.compact_num_nodes
         self.num_links = graph.compact_num_links
@@ -254,8 +257,7 @@ cdef class RouteChoiceSet:
             where: Optional[str] = None,
             path_size_logit: bool = False,
             beta: float = 1.0,
-            theta: float = 1.0,
-            cutoff_prob: float = 1.0,
+            cutoff_prob: float = 0.0,
     ):
         """Compute the a route set for a list of OD pairs.
 
@@ -288,8 +290,8 @@ cdef class RouteChoiceSet:
         if max_routes < 0 or max_depth < 0:
             raise ValueError("`max_routes`, `max_depth`, and `cores` must be non-negative")
 
-        if path_size_logit and (beta < 0 or theta <= 0):
-            raise ValueError("`beta` must be >= 0 and `theta` > 0 for path sized logit model")
+        if path_size_logit and beta < 0:
+            raise ValueError("`beta` must be >= 0 for path sized logit model")
 
         if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
             raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
@@ -309,7 +311,7 @@ cdef class RouteChoiceSet:
             unsigned int c_cores = cores if cores > 0 else omp_get_max_threads()
 
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
-            double scaled_cutoff_prob = cutoff_prob * 0.5 + 0.5
+            double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
             vector[pair[long long, long long]] c_ods
 
@@ -339,7 +341,8 @@ cdef class RouteChoiceSet:
         else:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
-        set_ods = set(ods)
+        # Shuffling the jobs improves load balancing where nodes pairs are geographically ordered
+        set_ods = list(set(ods))
         if len(set_ods) != len(ods):
             warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
@@ -348,10 +351,11 @@ cdef class RouteChoiceSet:
                 where,
                 self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"]
             )
-            batches = list(Checkpoint.batches(list(set_ods)))
+            batches = list(Checkpoint.batches(set_ods))
             max_results_len = <size_t>max(len(batch) for batch in batches)
         else:
-            batches = [list(set_ods)]
+            random.shuffle(set_ods)
+            batches = [set_ods]
             max_results_len = len(set_ods)
 
         results = new vector[RouteSet_t *](max_results_len)
@@ -398,7 +402,7 @@ cdef class RouteChoiceSet:
                 prob_set.resize(batch_len)
 
             with nogil, parallel(num_threads=c_cores):
-                for i in prange(batch_len):
+                for i in prange(batch_len, schedule= "dynamic", chunksize=1):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
                     dest_index = self.nodes_to_indices_view[c_ods[i].second]
 
@@ -447,7 +451,7 @@ cdef class RouteChoiceSet:
 
                     if path_size_logit:
                         d(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        d(mask_set)[i] = RouteChoiceSet.compute_mask(route_set, scaled_cutoff_prob, d(d(cost_set)[i]))
+                        d(mask_set)[i] = RouteChoiceSet.compute_mask(scaled_cutoff_prob, d(d(cost_set)[i]))
 
                         freq_pair = RouteChoiceSet.compute_frequency(route_set, d(d(mask_set)[i]))
                         d(link_union_set)[i] = freq_pair.first
@@ -462,8 +466,7 @@ cdef class RouteChoiceSet:
                             d(d(cost_set)[i]),
                             d(d(path_overlap_set)[i]),
                             d(d(mask_set)[i]),
-                            beta,
-                            theta
+                            beta
                         )
                         # While we need the unique sorted links (.first), we don't need the frequencies (.second)
                         del freq_pair.second
@@ -895,7 +898,7 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[bool] *compute_mask(RouteSet_t *route_set, double cutoff_prob, vector[double] &total_cost) noexcept nogil:
+    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
         minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
@@ -914,7 +917,9 @@ cdef class RouteChoiceSet:
             d(route_mask)[i] = (total_cost[i] <= cutoff_cost)
 
         # Always include the min element. It should already be but I don't trust floating math to do this correctly.
-        d(route_mask)[min - total_cost.cbegin()] = True
+        # But only if there actually was a min element (i.e. empty route set)
+        if min != total_cost.cend():
+            d(route_mask)[min - total_cost.cbegin()] = True
 
         return route_mask
 
@@ -982,8 +987,7 @@ cdef class RouteChoiceSet:
         vector[double] &total_cost,
         vector[double] &path_overlap_vec,
         vector[bool] &route_mask,
-        double beta,
-        double theta
+        double beta
     ) noexcept nogil:
         """Compute a probability for each route in the route set based on the path overlap."""
         cdef:
@@ -1009,7 +1013,7 @@ cdef class RouteChoiceSet:
                 if path_overlap_vec[i] == 0.0:
                     fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
                 inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                    * exp(-theta * (total_cost[j] - total_cost[i]))
+                    * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
             if inv_prob == 0.0:
                 fprintf(stderr, "inv_prob == 0.0\n")
@@ -1070,19 +1074,17 @@ cdef class RouteChoiceSet:
 
     cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
         """Helper function for link_loading."""
-        # This incantation creates a 2d (ll.size() x 1) memory view object around the underlying vector data without
-        # transferring ownership.
-        compressed = <double[:ll.size(), :1]>&d(ll)[0]
-
+        compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
         actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
+
         assign_link_loads_cython(
             actual,
             compressed,
             self.graph_compressed_id_view,
             cores
         )
-        compressed = np.array(compressed, copy=True)
-        return actual.reshape(-1), compressed.reshape(-1)
+
+        return actual.reshape(-1), compressed[:-1].reshape(-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
