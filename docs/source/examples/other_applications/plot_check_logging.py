@@ -22,7 +22,7 @@ from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.paths import TrafficAssignment, TrafficClass
-# sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
+# sphinx_gallery_thumbnail_path = 'images/logs_image.png'
 
 # %%
 # We create an empty project on an arbitrary folder
