@@ -11,9 +11,7 @@ def gtfs_file(create_path):
 
 @pytest.fixture
 def system_builder(transit_conn, gtfs_file):
-    yield GTFSRouteSystemBuilder(
-        network=transit_conn, file_path=gtfs_file
-    )
+    yield GTFSRouteSystemBuilder(network=transit_conn, file_path=gtfs_file)
 
 
 def test_set_capacities(system_builder):
