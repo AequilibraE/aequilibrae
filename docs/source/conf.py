@@ -206,16 +206,3 @@ texinfo_documents = [
         "Miscellaneous",
     )
 ]
-
-# -- Google Analytics --------------------------------------------------------
-
-# html_js_files = [
-#     ('https://www.googletagmanager.com/gtag/js?id=G-0HRKZDXRZ7', {'async': True}),
-# ]
-
-# html_context = {
-#     'gtag_id': 'G-0HRKZDXRZ7',
-#     'gtag_config': {
-#         'anonymize_ip': True,
-#     },
-# }
