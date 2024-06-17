@@ -108,6 +108,11 @@ language = "en"
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+templates_path = ['_static']
+html_sidebars = {
+    '**': ['google_analytics.html']
+}
+
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
 highlight_language = "python3"
@@ -203,3 +208,15 @@ texinfo_documents = [
         "Miscellaneous",
     )
 ]
+
+# Google Analytics
+html_js_files = [
+    ('https://www.googletagmanager.com/gtag/js?id=G-0HRKZDXRZ7', {'async': True}),
+]
+
+html_context = {
+    'gtag_id': 'G-0HRKZDXRZ7',
+    'gtag_config': {
+        'anonymize_ip': True,
+    },
+}
