@@ -27,7 +27,7 @@ def data():
 
 
 def test__populate(data):
-    s = Stop(1, tuple(data.values()), list(data.keys()))
+    s = Stop(tuple(data.values()), list(data.keys()))
     xy = (s.geo.x, s.geo.y)
     assert xy == (data["stop_lon"], data["stop_lat"]), "Stop built geo wrongly"
     data["stop"] = data["stop_id"]
@@ -41,13 +41,13 @@ def test__populate(data):
     new_data = deepcopy(data)
     new_data[randomword(randint(1, 15))] = randomword(randint(1, 20))
     with pytest.raises(KeyError):
-        _ = Stop(1, tuple(new_data.values()), list(new_data.keys()))
+        _ = Stop(tuple(new_data.values()), list(new_data.keys()))
 
 
 def test_save_to_database(data, transit_conn):
     line = LineString([[-23.59, -46.64], [-23.43, -46.50]]).wkb
     tlink_id = randint(10000, 200000044)
-    s = Stop(1, tuple(data.values()), list(data.keys()))
+    s = Stop(tuple(data.values()), list(data.keys()))
     s.link = link = randint(1, 30000)
     s.dir = direc = choice((0, 1))
     s.route_type = randint(0, 13)
@@ -59,7 +59,7 @@ def test_save_to_database(data, transit_conn):
                 VALUES(?, ?, ?, ?, ?, ?, GeomFromWKB(?, 4326));"""
     transit_conn.execute(sql_tl, [tlink_id, randint(1, 1000000000), randint(1, 10), s.stop_id, s.stop_id + 1, 0, line])
 
-    sql = "Select link, dir, description, street from stops where stop=?"
+    sql = "Select link, dir, description from stops where stop=?"
     result = list(transit_conn.execute(sql, [data["stop_id"]]).fetchone())
-    expected = [link, direc, data["stop_desc"], data["stop_street"]]
+    expected = [link, direc, data["stop_desc"]]
     assert result == expected, "Saving Stop to the database failed"

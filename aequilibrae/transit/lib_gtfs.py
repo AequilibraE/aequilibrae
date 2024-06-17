@@ -138,7 +138,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
         """
         self.gtfs_data.set_feed_path(feed_path)
-        self.gtfs_data.agency.feed_date = self.gtfs_data.feed_date
 
     def set_description(self, description: str) -> None:
         """Adds description to be added to the imported layers metadata
