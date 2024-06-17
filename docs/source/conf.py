@@ -85,7 +85,7 @@ sphinx_gallery_conf = {
 }
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+templates_path = ["_static"]
 
 # The suffix(es) of source filenames.¶
 # You can specify multiple suffix as a list of string:
@@ -107,11 +107,6 @@ language = "en"
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-
-templates_path = ['_static']
-html_sidebars = {
-    '**': ['google_analytics.html']
-}
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -142,6 +137,9 @@ html_theme_options = {
     },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
+    "analytics": {
+        "google_analytics_id": "G-0HRKZDXRZ7",
+    },
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -209,14 +207,15 @@ texinfo_documents = [
     )
 ]
 
-# Google Analytics
-html_js_files = [
-    ('https://www.googletagmanager.com/gtag/js?id=G-0HRKZDXRZ7', {'async': True}),
-]
+# -- Google Analytics --------------------------------------------------------
 
-html_context = {
-    'gtag_id': 'G-0HRKZDXRZ7',
-    'gtag_config': {
-        'anonymize_ip': True,
-    },
-}
+# html_js_files = [
+#     ('https://www.googletagmanager.com/gtag/js?id=G-0HRKZDXRZ7', {'async': True}),
+# ]
+
+# html_context = {
+#     'gtag_id': 'G-0HRKZDXRZ7',
+#     'gtag_config': {
+#         'anonymize_ip': True,
+#     },
+# }
