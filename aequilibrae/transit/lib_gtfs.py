@@ -234,7 +234,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 sql = "insert into fare_zones (fare_zone_id, transit_zone) values(?, ?);"
                 conn.executemany(sql, zones)
             conn.commit()
-                
+
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"
