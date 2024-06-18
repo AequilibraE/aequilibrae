@@ -6,6 +6,7 @@ from aequilibrae.matrix.sparse_matrix cimport COO
 
 from cython.operator cimport dereference as d
 from cython.operator cimport postincrement as inc
+from cython.operator cimport predecrement as pre_dec
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
 from libc.math cimport INFINITY, exp, pow, log
@@ -26,7 +27,7 @@ import itertools
 import logging
 import pathlib
 import warnings
-from typing import List, Tuple
+from typing import List, Tuple, FrozenSet
 
 import numpy as np
 import pyarrow as pa
@@ -1074,7 +1075,10 @@ cdef class RouteChoiceSet:
 
     cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
         """Helper function for link_loading."""
-        compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
+        # push_back(0.0) and pop_back() are a hack to add a single element to the end of the link loading vector to
+        # prevent a OOB access the assign_link_loads_cython method.
+        ll.push_back(0.0)
+        compressed = np.array(d(ll)).reshape(ll.size(), 1)
         actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
 
         assign_link_loads_cython(
@@ -1083,6 +1087,9 @@ cdef class RouteChoiceSet:
             self.graph_compressed_id_view,
             cores
         )
+
+        # Let's remove that last element we added, just in case
+        ll.pop_back()
 
         return actual.reshape(-1), compressed[:-1].reshape(-1)
 
@@ -1240,7 +1247,7 @@ cdef class RouteChoiceSet:
         return link_loads
 
     @cython.embedsignature(True)
-    def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, List[long]], cores: int = 0):
+    def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, FrozenSet[FrozenSet[int]]], cores: int = 0):
         """
         Apply link loading to the network using the demand matrix and the previously computed route sets.
         """
@@ -1255,7 +1262,7 @@ cdef class RouteChoiceSet:
         cores = cores if cores > 0 else omp_get_max_threads()
 
         cdef:
-            unordered_set[long] select_link_set
+            LinkSet_t select_link_set
             vector[double] *ll
 
         link_loads = {}
@@ -1263,14 +1270,24 @@ cdef class RouteChoiceSet:
         for i, name in enumerate(matrix.names):
             matrix_ll = {}
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-            for (k, v) in select_links.items():
-                select_link_set = <unordered_set[long]> v
+            for k, or_set in select_links.items():
+                # select_link_set = <unordered_set[long]> v
+
+                select_link_set.reserve(len(or_set))
+                for and_set in or_set:
+                    select_link_set.insert(new unordered_set[long long](and_set))
 
                 coo = COO((self.zones, self.zones))
 
                 ll = self.apply_select_link_loading(coo, m, select_link_set)
                 res = self.apply_link_loading_func(ll, cores)
+
+                # Because we converted the python sets to C++ ourselves we have to clean them up as well
                 del ll
+                for cpp_and_set in select_link_set:
+                    del cpp_and_set
+
+                select_link_set.clear()
 
                 matrix_ll[k] = (coo, res)
             link_loads[name] = matrix_ll
@@ -1285,7 +1302,7 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         COO sparse_mat,
         double[:, :] matrix_view,
-        unordered_set[long] &select_link_set
+        LinkSet_t &select_link_set
     ) noexcept nogil:
         """
         Apply select link loading.
@@ -1301,13 +1318,13 @@ cdef class RouteChoiceSet:
 
             vector[double] *link_loads = new vector[double](self.num_links)
 
-            bool link_present
-
         # For each OD pair, if a route contains one or more links in a select link set, add that ODs demand to
         # a sparse matrix of Os to Ds
 
         # For each route, if it contains one or more links in a select link set, apply the link loading for
         # that route
+        with gil:
+            print("apply_select_link_loading was called")
 
         for i in range(self.ods.size()):
             route_set = d(self.results)[i]
@@ -1323,18 +1340,82 @@ cdef class RouteChoiceSet:
                 inc(route_prob_iter)
                 load = prob * demand
 
-                link_present = False
-                for link in d(route):
-                    if select_link_set.find(link) != select_link_set.end():
-                        sparse_mat.append(origin_index, dest_index, load)
-                        link_present = True
-                        break
-
-                if link_present:
+                if RouteChoiceSet.is_in_select_link(d(route), select_link_set):
+                    # fprintf(stderr, "Route matches a select link set\n")
+                    sparse_mat.append(origin_index, dest_index, load)
                     for link in d(route):
                         d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
+                # else:
+                #     fprintf(stderr, "Route DOES NOT match a select link set\n")
 
         return link_loads
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    @staticmethod
+    cdef bool is_in_select_link(
+        vector[long long] &route,
+        LinkSet_t &select_link_set
+    ) noexcept nogil:
+        """
+        Confirms if a given route satisfies the requirements of the select link set.
+
+        **Assumes the route contains unique links**. If a link is present >1 and is in the select link set, this method
+        will double count it.
+        """
+        with gil:
+            print("is_in_select_link was called")
+
+        cdef:
+            bool set_present
+            vector[size_t] link_counts
+            size_t select_link_set_idx
+            long long link
+            unordered_set[long long] *and_set
+
+        # A loop’s else clause runs when no break occurs
+        for and_set in select_link_set:
+            for selected_link in d(and_set):
+                for link in route:
+                    if selected_link == link:
+                        break # We found a matching link, break from checking this link on this route
+                else:
+                    # Selected link not found within route, this AND set cannot be true
+                    with gil:
+                        print(selected_link, "not found in route")
+                    break
+                # We found a matching link, just continue checking this AND set
+            else:
+                # All links in AND set found
+                return True
+        return False
+
+        # # We count the number of appearances of links within the AND set. Assuming we only see unique links, then if
+        # # that count goes to 0 we have seen all links present within the AND set. A shortest-path will contain only
+        # # unique links in paths. This may not be not be true for heuristics, but if the heuristic is that bad that it's
+        # # traversing a link twice I don't think we should be using it.
+
+        # fprintf(stderr, "here\n")
+        # link_counts.reserve(select_link_set.size())
+        # for and_set in select_link_set:
+        #     link_counts.push_back(and_set.size())
+        #     fprintf(stderr, "Select link AND set size: %d\n", and_set.size())
+
+        # for link in route:
+        #     select_link_set_idx = 0
+        #     for and_set in select_link_set:
+        #         # fprintf(stderr, "Link count: %d\n", link_counts[select_link_set_idx])
+        #         if and_set.find(link) != and_set.end():
+        #             fprintf(stderr, "Found a link!\n")
+        #             if pre_dec(link_counts[select_link_set_idx]) == 0:
+        #                 return True
+        #         else:
+        #             continue
+        #         inc(select_link_set_idx)
+
+        # return False
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

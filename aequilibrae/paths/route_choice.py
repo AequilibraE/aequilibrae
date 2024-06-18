@@ -333,22 +333,24 @@ class RouteChoice:
             )
 
         tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
-        self.link_loads = {k: v[0] for k, v in tmp.items()}
-        self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
 
-        # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
-        lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
+        if not compressed_graph_results:
+            self.link_loads = {k: v[0] for k, v in tmp.items()}
+            # Create a data store with a row for each uncompressed link
+            m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+            lids = np.unique(self.graph.graph.link_id.values)
+            uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
-        if compressed_graph_results:
+            return uncompressed_df
+        else:
+            self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
+            m_compact = _get_graph_to_network_mapping(
+                self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
+            )
+            compact_lids = np.unique(self.graph.compact_graph.link_id.values)
+            compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
+
             return compressed_df
-        return uncompressed_df
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
@@ -384,38 +386,51 @@ class RouteChoice:
         max_id = self.graph.compact_graph.id.max() + 1
 
         for name, link_set in links.items():
-            if len(name.split(" ")) != 1:
+            if " " in name:
                 warnings.warn("Input string name has a space in it. Replacing with _")
                 name = str.join("_", name.split(" "))
 
-            link_ids = []
-            for link, dir in link_set:
-                if dir == 0:
-                    query = (self.graph.graph["link_id"] == link) & (
-                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
-                    )
-                else:
-                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-                if not query.any():
-                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                    # Check for duplicate compressed link ids in the current link set
-                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
-                    if comp_id == max_id:
-                        raise ValueError(
-                            f"link ID {link} and direction {dir} is not present in compressed graph. "
-                            "It may have been removed during dead-end removal."
-                        )
-                    elif comp_id in link_ids:
-                        warnings.warn(
-                            "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+            or_set = set()
+            for link_ids in link_set:
+                # Allow a single int to represent a bidirectional single link AND set
+                if isinstance(link_ids, int):
+                    link_ids = (link_ids,)
+
+                and_set = set()
+                for link in link_ids:
+                    # Let a single int in place of an (link, dir) tuple represent a bidirectional link
+                    link, dir = (link, 0) if isinstance(link, int) else link
+
+                    if dir == 0:
+                        query = (self.graph.graph["link_id"] == link) & (
+                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
                         )
                     else:
-                        link_ids.append(comp_id)
-            self._selected_links[name] = link_ids
+                        query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
+
+                    if not query.any():
+                        raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+
+                    for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                        # Check for duplicate compressed link ids in the current link set
+                        if comp_id == max_id:
+                            raise ValueError(
+                                f"link ID {link} and direction {dir} is not present in compressed graph. "
+                                "It may have been removed during dead-end removal."
+                            )
+                        elif comp_id in and_set:
+                            warnings.warn(
+                                "Two input links map to the same compressed link in the network"
+                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                            )
+                        else:
+                            and_set.add(comp_id)
+
+                or_set.add(frozenset(and_set))
+            self._selected_links[name] = frozenset(or_set)
         self._config["select_links"] = str(links)
 
-    def get_select_link_results(self) -> pd.DataFrame:
+    def get_select_link_results(self, compressed_graph_results=False) -> pd.DataFrame:
         """
         Get the select link loading results.
 
@@ -442,18 +457,21 @@ class RouteChoice:
                 self.sl_link_loads[name + "_" + sl_name] = u
                 self.sl_compact_link_loads[name + "_" + sl_name] = c
 
-        # Create a data store with a row for each uncompressed link
-        m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
-        lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
+        if not compressed_graph_results:
+            # Create a data store with a row for each uncompressed link
+            m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
+            lids = np.unique(self.graph.graph.link_id.values)
+            uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
+            return uncompressed_df
+        else:
+            m_compact = _get_graph_to_network_mapping(
+                self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
+            )
+            compact_lids = np.unique(self.graph.compact_graph.link_id.values)
+            compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
 
-        return uncompressed_df, compressed_df
+            return compressed_df
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
