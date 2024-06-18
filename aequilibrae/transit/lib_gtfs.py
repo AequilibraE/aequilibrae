@@ -211,18 +211,13 @@ class GTFSRouteSystemBuilder(WorkerThread):
             zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
             zone_ids = {**zone_ids1, **zone_ids2}
 
-            # zones = [[y, x] for x, y in list(zone_ids.items())]
-            # if zones:
-            #     sql = "Insert into fare_zones (fare_zone_id, transit_zone) values(?, ?);"
-            #     conn.executemany(sql, zones)
-            # conn.commit()
-
             for fare in self.gtfs_data.fare_attributes.values():
                 fare.save_to_database(conn)
 
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
 
+            zones = []
             for counter, (_, stop) in enumerate(self.select_stops.items()):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
@@ -230,9 +225,16 @@ class GTFSRouteSystemBuilder(WorkerThread):
                     closest_zone = self.project.zoning.get_closest_zone(stop.geo)
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
+                        if zone_ids:
+                            zones.append([zone_ids[stop.zone], closest_zone])
                 stop.save_to_database(conn, commit=False)
             conn.commit()
 
+            if zones:
+                sql = "insert into fare_zones (fare_zone_id, transit_zone) values(?, ?);"
+                conn.executemany(sql, zones)
+            conn.commit()
+                
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
             msg = "    Some stops are outside the zoning system. Check the result on a map and see the log for info"

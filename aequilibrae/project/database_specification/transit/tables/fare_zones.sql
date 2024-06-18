@@ -6,6 +6,6 @@
 --@ **transit_zone** identifies the TAZ for a fare zone
 
 CREATE TABLE IF NOT EXISTS fare_zones (
-	fare_zone_id    INTEGER  NOT NULL PRIMARY KEY,
+	fare_zone_id    INTEGER  NOT NULL,
 	transit_zone    TEXT     NOT NULL
 );

@@ -253,12 +253,6 @@ class GTFSReader(WorkerThread):
             fr.fare_id = self.fare_attributes[fr.fare].fare_id
             if fr.route in self.routes:
                 fr.route_id = self.routes[fr.route].route_id
-            # fr.agency_id = self.fare_attributes[fr.fare].agency_id
-            # zone_id = fr.agency_id * AGENCY_MULTIPLIER + 1
-            # for x in [fr.origin, fr.destination]:
-            #     if x not in corresp:
-            #         corresp[x] = zone_id
-            #         zone_id += 1
             fr.origin_id = None if fr.origin == "" else int(fr.origin)
             fr.destination_id = None if fr.destination == "" else int(fr.destination)
             self.fare_rules.append(fr)

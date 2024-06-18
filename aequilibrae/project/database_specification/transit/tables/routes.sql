@@ -1,6 +1,6 @@
 --@ The *routes* table holds information on the available transit routes for a
 --@ specific day. This table information comes from the GTFS file *routes.txt*.
---@ You can find more information about it `here <https://developers.google.com/transit/gtfs/reference#routestxt>`_.
+--@ You can find more information about it `here <https://gtfs.org/schedule/reference/#routestxt>`_.
 --@
 --@ **pattern_id** is an unique pattern for the route
 --@
