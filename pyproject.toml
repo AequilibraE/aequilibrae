@@ -6,7 +6,7 @@ extend-exclude = '''docs/*'''
 
 
 [build-system]
-requires = ["setuptools", "numpy<1.99", "cython", "pyaml", "requests", "scipy", "shapely", "pandas", "pyarrow==15.0.0", "pyproj", "wheel"]
+requires = ["setuptools", "numpy<1.99", "cython", "pyarrow==16.1.0", "wheel"]
 
 
 [tool.ruff]
