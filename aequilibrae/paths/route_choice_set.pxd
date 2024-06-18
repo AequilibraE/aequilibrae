@@ -253,7 +253,13 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         COO sparse_mat,
         double[:, :] matrix_view,
-        unordered_set[long] &select_link_set
+        LinkSet_t &select_link_set
+    ) noexcept nogil
+
+    @staticmethod
+    cdef bool is_in_select_link(
+        vector[long long] &route,
+        LinkSet_t &select_link_set
     ) noexcept nogil
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(
