@@ -26,6 +26,7 @@ from aequilibrae.transit import Transit
 # Imports for SF transit graph construction
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
+# sphinx_gallery_thumbnail_path = 'images/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
 # Let's create an empty project on an arbitrary folder.

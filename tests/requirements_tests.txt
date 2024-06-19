@@ -6,4 +6,4 @@ pytest-subtests
 coveralls
 ruff==0.1.14
 wheel
-black==24.3.0
+black==24.4.2

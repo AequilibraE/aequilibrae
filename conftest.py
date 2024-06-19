@@ -104,4 +104,3 @@ def transit_conn(create_gtfs_project):
 def doctest_fixtures(doctest_namespace, tmp_path, create_path):
     doctest_namespace["tmp_path"] = tmp_path
     doctest_namespace["tmp_path_empty"] = str(create_path)
-    print(doctest_namespace)

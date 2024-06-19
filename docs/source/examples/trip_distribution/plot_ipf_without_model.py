@@ -22,6 +22,7 @@ from aequilibrae.distribution import Ipf
 from os.path import join
 from tempfile import gettempdir
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+# sphinx_gallery_thumbnail_path = 'images/ipf.png'
 
 # %%
 folder = gettempdir()

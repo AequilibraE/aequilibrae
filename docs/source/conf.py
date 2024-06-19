@@ -77,7 +77,7 @@ sphinx_gallery_conf = {
             "examples/trip_distribution",
             "examples/visualization",
             "examples/aequilibrae_without_a_model",
-            "examples/full_workflows",
+            "examples/assignment_workflows",
             "examples/other_applications",
         ]
     ),
