@@ -10,7 +10,6 @@ we can take full advantage of multi-core CPUs. We have also implemented the abil
 of using both 32-bit and 64-bit floating-point seed matrices, which has direct impact
 on cache use and consequently computational performance.
 
-
 In this section, we compare the
 runtime of AequilibraE's current implementation of IPF, 
 with a general IPF algorithm written in pure Python, available `here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
@@ -52,10 +51,12 @@ on cache size.
     :align: right
     :alt: number of cores used in IPF for 32 bit matrices
 
+In conclusion, AequilibraE's IPF implementation is over 11 times faster than its pure Python counterpart for
+large matrices on a workstation, largely due to the use of Cython and multi-threading, but also due to the use of a
+32-bit version of the algorithm.
 
 These tests were run on a Threadripper 3970x (released in 2019) workstation with 32 cores (64 threads) @ 3.7 GHz
-and 256 Gb of RAM. With 32 cores in use, performing IPF took 0.105s on a 10,000 zones matrix,
-and 0.224 seconds on a 15,000 matrix. The code is provided below for convenience
+and 256 Gb of RAM. The code is provided below for reference.
 
 .. _code-block-for-ipf-benchmarking:
 .. code-block:: python
