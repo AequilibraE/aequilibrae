@@ -20,7 +20,7 @@ from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 from openmp cimport omp_get_max_threads
 
-from libc.stdio cimport fprintf, stderr
+from libc.stdio cimport printf, fprintf, stderr
 
 import random
 import itertools
@@ -1011,13 +1011,9 @@ cdef class RouteChoiceSet:
                 if not route_mask[j]:
                     continue
 
-                if path_overlap_vec[i] == 0.0:
-                    fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
                 inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
                     * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
-            if inv_prob == 0.0:
-                fprintf(stderr, "inv_prob == 0.0\n")
             d(prob_vec)[i] = 1.0 / inv_prob
 
         return prob_vec
@@ -1091,7 +1087,7 @@ cdef class RouteChoiceSet:
         # Let's remove that last element we added, just in case
         ll.pop_back()
 
-        return actual.reshape(-1), compressed[:-1].reshape(-1)
+        return actual.reshape(-1), compressed.reshape(-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1262,35 +1258,58 @@ cdef class RouteChoiceSet:
         cores = cores if cores > 0 else omp_get_max_threads()
 
         cdef:
-            LinkSet_t select_link_set
+            vector[unordered_set[long long] *] *select_link_set
+            vector[size_t] *select_link_set_length
+
+            vector[vector[unordered_set[long long] *] *] select_link_sets
+            vector[vector[size_t] *] select_link_set_lengths
+
             vector[double] *ll
 
-        link_loads = {}
+        # Coerce the select link sets to their cpp structures ahead of time. We'll be using these a lot and they don't
+        # change. We allocate a vector of select link sets. These select link sets a vector representing an OR set,
+        # containing a unordered_set of links representing the AND set.
+        select_link_sets.reserve(len(select_links))
+        select_link_set_lengths.reserve(len(select_links))
+        for or_set in select_links.values():
+            select_link_set = new vector[unordered_set[long long] *](len(or_set))
+            select_link_set_length = new vector[size_t](len(or_set))
 
+            for i, and_set in enumerate(or_set):
+                d(select_link_set)[i] = new unordered_set[long long](and_set)
+                d(select_link_set_length)[i] = len(and_set)
+
+            select_link_sets.push_back(select_link_set)
+            select_link_set_lengths.push_back(select_link_set_length)
+
+        link_loads = {}
         for i, name in enumerate(matrix.names):
             matrix_ll = {}
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-            for k, or_set in select_links.items():
-                # select_link_set = <unordered_set[long]> v
-
-                select_link_set.reserve(len(or_set))
-                for and_set in or_set:
-                    select_link_set.insert(new unordered_set[long long](and_set))
+            for i, k in enumerate(select_links.keys()):
+                select_link_set = select_link_sets[i]
+                select_link_set_length = select_link_set_lengths[i]
 
                 coo = COO((self.zones, self.zones))
 
-                ll = self.apply_select_link_loading(coo, m, select_link_set)
+                ll = self.apply_select_link_loading(coo, m, d(select_link_set), d(select_link_set_length))
                 res = self.apply_link_loading_func(ll, cores)
 
                 # Because we converted the python sets to C++ ourselves we have to clean them up as well
                 del ll
-                for cpp_and_set in select_link_set:
-                    del cpp_and_set
-
-                select_link_set.clear()
 
                 matrix_ll[k] = (coo, res)
             link_loads[name] = matrix_ll
+
+
+        # Clean up our coercion
+        for select_link_set in select_link_sets:
+            for cpp_and_set in d(select_link_set):
+                del cpp_and_set
+            del select_link_set
+
+        for i in range(select_link_set_lengths.size()):
+            del select_link_set_lengths[i]
 
         return link_loads
 
@@ -1302,7 +1321,8 @@ cdef class RouteChoiceSet:
         RouteChoiceSet self,
         COO sparse_mat,
         double[:, :] matrix_view,
-        LinkSet_t &select_link_set
+        vector[unordered_set[long long] *] &select_link_set,
+        vector[size_t] select_link_set_lengths
     ) noexcept nogil:
         """
         Apply select link loading.
@@ -1323,8 +1343,6 @@ cdef class RouteChoiceSet:
 
         # For each route, if it contains one or more links in a select link set, apply the link loading for
         # that route
-        with gil:
-            print("apply_select_link_loading was called")
 
         for i in range(self.ods.size()):
             route_set = d(self.results)[i]
@@ -1340,13 +1358,10 @@ cdef class RouteChoiceSet:
                 inc(route_prob_iter)
                 load = prob * demand
 
-                if RouteChoiceSet.is_in_select_link(d(route), select_link_set):
-                    # fprintf(stderr, "Route matches a select link set\n")
+                if RouteChoiceSet.is_in_select_link(d(route), select_link_set, select_link_set_lengths):
                     sparse_mat.append(origin_index, dest_index, load)
                     for link in d(route):
                         d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
-                # else:
-                #     fprintf(stderr, "Route DOES NOT match a select link set\n")
 
         return link_loads
 
@@ -1357,7 +1372,8 @@ cdef class RouteChoiceSet:
     @staticmethod
     cdef bool is_in_select_link(
         vector[long long] &route,
-        LinkSet_t &select_link_set
+        vector[unordered_set[long long] *] &select_link_set,
+        vector[size_t] &select_link_set_lengths
     ) noexcept nogil:
         """
         Confirms if a given route satisfies the requirements of the select link set.
@@ -1365,8 +1381,6 @@ cdef class RouteChoiceSet:
         **Assumes the route contains unique links**. If a link is present >1 and is in the select link set, this method
         will double count it.
         """
-        with gil:
-            print("is_in_select_link was called")
 
         cdef:
             bool set_present
@@ -1375,47 +1389,25 @@ cdef class RouteChoiceSet:
             long long link
             unordered_set[long long] *and_set
 
-        # A loop’s else clause runs when no break occurs
+        # We count the number of appearances of links within the AND set. Assuming we only see unique links, then if
+        # that count goes to 0 we have seen all links present within the AND set. A shortest-path will contain only
+        # unique links in paths. This may not be not be true for heuristics, but if the heuristic is that bad that it's
+        # traversing a link twice I don't think we should be using it.
+        link_counts.insert(link_counts.begin(), select_link_set_lengths.cbegin(), select_link_set_lengths.cend())
+
+        # We iterate over an AND set first in hopes that a whole set is satisfied before checking another. This let's
+        # just "short circuit" in a sense
+        select_link_set_idx = 0
         for and_set in select_link_set:
-            for selected_link in d(and_set):
-                for link in route:
-                    if selected_link == link:
-                        break # We found a matching link, break from checking this link on this route
+            for link in route:
+                if and_set.find(link) != and_set.end():
+                    if pre_dec(link_counts[select_link_set_idx]) == 0:
+                        return True
                 else:
-                    # Selected link not found within route, this AND set cannot be true
-                    with gil:
-                        print(selected_link, "not found in route")
-                    break
-                # We found a matching link, just continue checking this AND set
-            else:
-                # All links in AND set found
-                return True
+                    continue
+            inc(select_link_set_idx)
+
         return False
-
-        # # We count the number of appearances of links within the AND set. Assuming we only see unique links, then if
-        # # that count goes to 0 we have seen all links present within the AND set. A shortest-path will contain only
-        # # unique links in paths. This may not be not be true for heuristics, but if the heuristic is that bad that it's
-        # # traversing a link twice I don't think we should be using it.
-
-        # fprintf(stderr, "here\n")
-        # link_counts.reserve(select_link_set.size())
-        # for and_set in select_link_set:
-        #     link_counts.push_back(and_set.size())
-        #     fprintf(stderr, "Select link AND set size: %d\n", and_set.size())
-
-        # for link in route:
-        #     select_link_set_idx = 0
-        #     for and_set in select_link_set:
-        #         # fprintf(stderr, "Link count: %d\n", link_counts[select_link_set_idx])
-        #         if and_set.find(link) != and_set.end():
-        #             fprintf(stderr, "Found a link!\n")
-        #             if pre_dec(link_counts[select_link_set_idx]) == 0:
-        #                 return True
-        #         else:
-        #             continue
-        #         inc(select_link_set_idx)
-
-        # return False
 
     @cython.wraparound(False)
     @cython.embedsignature(True)

@@ -392,8 +392,9 @@ class RouteChoice:
 
             or_set = set()
             for link_ids in link_set:
-                # Allow a single int to represent a bidirectional single link AND set
-                if isinstance(link_ids, int):
+                # Allow a single int to represent a bidirectional single link AND set. For compatibility, a tuple of
+                # length 2 is passed, we assume that's a single (link, dir) pair
+                if isinstance(link_ids, int) or (isinstance(link_ids, tuple) and len(link_ids) == 2):
                     link_ids = (link_ids,)
 
                 and_set = set()
