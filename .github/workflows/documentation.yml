@@ -27,7 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install wheel openmatrix pytest
         pip install -r requirements.txt
-        pip install -r requirements_additional.txt
         pip install -r docs/requirements-docs.txt
         
 
