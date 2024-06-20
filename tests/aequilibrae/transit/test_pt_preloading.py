@@ -26,6 +26,10 @@ from aequilibrae.utils.create_example import create_example
 #    both directions?) - this is important to understand just to make sure 
 #    everything is working correctly!
 
+# Extra TODO:
+# 1. Remove unecessary inputs to test functions
+# 2. Change fixtures to setUp and tearDown so project and matrices can be closed!
+
 
 @pytest.fixture
 def project(tmp_path):
@@ -90,15 +94,16 @@ def assignment(project: Project, graphs: List[Graph]):
 
 class TestPTPreloaing:
 
-    def test_run(self, project: Project, graphs: List[Graph]):
+    def test_run(self, project: Project, graphs: List[Graph], assignment: TrafficAssignment):
         """Tests a full run through of pt preloading."""
         # NOT YET COMPLETED!
 
-        # Get preload (test will not run if prior test fails)
+        # Get preload
         preload = self.test_built_pt_preload(project, graphs)
         
-        # Run preloaded assignment (test will fail if this cannot be run)
-        self.__run_preloaded_assig(project, graphs, preload)
+        # Run preloaded assignment
+        assignment.set_pt_preload(preload)
+        assignment.execute()
 
         # Check results (NOT AS RIGOROUS AS test_preloaded_assignment)
         assert False  # PLACEHOLDER
@@ -127,7 +132,7 @@ class TestPTPreloaing:
         # Return preloads for further testing
         return preload
 
-    def test_preloaded_assignment(self, project: Project, graphs: List[Graph]):
+    def test_preloaded_assignment(self, project: Project, graphs: List[Graph], assignment: TrafficAssignment):
         """
         Check that the setting a preload and running an assignment works as intended.
 
@@ -149,32 +154,9 @@ class TestPTPreloaing:
         preload[get_index(l1, d1)], preload[get_index(l2, d2)] = np.inf, np.inf
 
         # Run preloaded assignment
-        assignment = self.__run_preloaded_assig(project, graphs, preload)
+        assignment.set_pt_preload(preload) # NOT YET IMPLEMENTED!
+        assignment.execute()
 
         # Check results
         # ASSERT NO TRAFFIC ON THESE LINKS!
         assert False
-
-    def __run_preloaded_assig(
-        self, proj: Project, graphs: List[Graph], preload: np.ndarray
-        ) -> TrafficAssignment:
-        """Runs an assignment with a pt preload"""
-        # NEED TO CHECK WHICH INPUT PARAMETERS ARE ACTUALLY NEEDED!
-        # MAY NEED TO ADD MORE TO ALLOW FOR MORE TESTING!
-        # MAYBE MOVE THIS TO A FIXTURE INSTEAD?
-        # NOT YET COMPLETED!
-
-        # Create Assignment object
-        assignment = TrafficAssignment()
-
-        # Set Traffic Classes
-
-        # Set other assignment parameters
-
-        # Set preload info into assig
-        assignment.set_pt_preload(preload) # NOT YET IMPLEMENTED!
-        
-
-        # Run and return assignment object
-        assignment.execute()
-        return assignment
