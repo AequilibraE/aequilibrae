@@ -484,6 +484,15 @@ class Network(WorkerThread):
             select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
             period_links = lambda pattern: conn.execute(select_links(pattern)).fetchall()
 
+            # Speed Ups:
+            # Do 1 execute
+            # Join all patterns together, append a supernet column & pce
+            # Group by link/dir, sum pce
+            # Left join correct ordered link/dir with x = ^
+
+            # Test:
+            # Do aon, and check speed is reduced after preload on preloaded links.
+
             # Get index via supernet id (same index as used for capacity vectors in assignment)
             g = graph.graph
             get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
