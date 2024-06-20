@@ -42,6 +42,52 @@ def graphs(project: Project):
     bike_graph = project.network.graphs["b"]
     return [car_graph, transit_graph, walk_graph, bike_graph]
 
+@pytest.fixture
+def assignment(project: Project, graphs: List[Graph]):
+    # NOT YET COMPLETED - COPIED FROM test_mc_traffic_assignment.py - INTENDED TO REPLACE __run_preloaded_assig
+    for graph in graphs: # Do we ignore transit graph in this whole function?
+            graph.set_skimming(["free_flow_time"])
+            graph.set_graph("free_flow_time")
+            graph.set_blocked_centroid_flows(False)
+
+    car_matrix = project.matrices.get_matrix("demand_mc")
+    car_matrix.computational_view(["car"])
+
+    transit_matrix = project.matrices.get_matrix("demand_mc")
+    transit_matrix.computational_view(["transit"])
+
+    walk_matrix = project.matrices.get_matrix("demand_mc")
+    walk_matrix.computational_view(["walk"])
+
+    bike_matrix = project.matrices.get_matrix("demand_mc")
+    bike_matrix.computational_view(["bike"])
+
+    assignment = TrafficAssignment()
+    carclass = TrafficClass("car", graphs[0], car_matrix)
+    carclass.set_pce(1.0)
+    transitclass = TrafficClass("transit", graphs[1], transit_matrix)
+    transitclass.set_pce(0.2)
+    walkclass = TrafficClass("walk", graphs[2], walk_matrix)
+    walkclass.set_pce(2.5)
+    bikeclass = TrafficClass("bike", graphs[2], walk_matrix)
+    bikeclass.set_pce(2.5)
+
+    assignment.set_classes([carclass, transitclass, walkclass, bikeclass])
+
+    for cls in assignment.classes:
+            cls.graph.set_skimming(["free_flow_time", "distance"])
+    assignment.set_vdf("BPR")
+    assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
+    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
+
+    assignment.set_capacity_field("capacity")
+    assignment.set_time_field("free_flow_time")
+
+    assignment.max_iter = 20
+    assignment.set_algorithm("bfw")
+
+    return assignment
+
 class TestPTPreloaing:
 
     def test_run(self, project: Project, graphs: List[Graph]):
@@ -63,6 +109,7 @@ class TestPTPreloaing:
         the coquimbo network.
         """
         # NOT YET COMPLETED!
+        # TODO: Figure out a test that makes sense and is relatively simple to check build phase (maybe in a narrow time period?)
 
         # Preload parameters
         period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
@@ -75,7 +122,7 @@ class TestPTPreloaing:
 
         # Assertions about the preload and coquimbo network:
         assert len(preload) == len(graphs[0].graph)
-        assert False # PLACEHOLDER
+        assert False # NOT YET COMPLETED - DECIDE WHAT ELSE TO TEST FOR
 
         # Return preloads for further testing
         return preload
@@ -84,25 +131,37 @@ class TestPTPreloaing:
         """
         Check that the setting a preload and running an assignment works as intended.
 
-        Maybe put infinity on 1 or 2 links and check nothing is assigned to those links?
+        Preload several links with very high preload values and check nothing is assigned to those links.
         """
         # NOT YET COMPLETED!
         
         # Create custom preload data
-        preloads = None # type: np.ndarray
+        preload = np.zeros(len(graphs[0].graph)) # type: np.ndarray
+
+        # Links chosen: (2274, 1), (43, 1) - both have modes ct
+        l1, l2, d1, d2 = 2274, 10036, 1, 1
+
+        # Convert to supernet_id indexing
+        g = graphs[0].graph
+        get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
+
+        # Set values to infinity so no traffic can go onto them.
+        preload[get_index(l1, d1)], preload[get_index(l2, d2)] = np.inf, np.inf
 
         # Run preloaded assignment
-        assignment = self.__run_preloaded_assig(project, graphs, preloads)
+        assignment = self.__run_preloaded_assig(project, graphs, preload)
 
         # Check results
+        # ASSERT NO TRAFFIC ON THESE LINKS!
         assert False
 
     def __run_preloaded_assig(
-        self, proj: Project, all_graphs: List[Graph], preload: np.ndarray
+        self, proj: Project, graphs: List[Graph], preload: np.ndarray
         ) -> TrafficAssignment:
         """Runs an assignment with a pt preload"""
         # NEED TO CHECK WHICH INPUT PARAMETERS ARE ACTUALLY NEEDED!
         # MAY NEED TO ADD MORE TO ALLOW FOR MORE TESTING!
+        # MAYBE MOVE THIS TO A FIXTURE INSTEAD?
         # NOT YET COMPLETED!
 
         # Create Assignment object
@@ -110,10 +169,11 @@ class TestPTPreloaing:
 
         # Set Traffic Classes
 
+        # Set other assignment parameters
+
         # Set preload info into assig
         assignment.set_pt_preload(preload) # NOT YET IMPLEMENTED!
         
-        # Set other assignment parameters
 
         # Run and return assignment object
         assignment.execute()
