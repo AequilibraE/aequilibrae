@@ -15,3 +15,4 @@ sphinx-gallery
 sphinx-copybutton
 sphinx-design
 sphinx-git
+nbconvert
