@@ -429,17 +429,17 @@ class Network(WorkerThread):
         return c
 
     def build_pt_preload(
-            self, graph, start_time: int, end_time: int, default_pce: float = 1.0, inclusion_cond: str = "start"
+            self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> np.ndarray:
         """Builds a preload vector for each specified graph in network
 
         :Arguments:
             **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
 
-            **start_time** (int): The start of the period for which to check pt schedules, in 
+            **start** (int): The start of the period for which to check pt schedules, in 
                 seconds from midnight
 
-            **end_time** (int): The end of the period for which to check pt schedules, in 
+            **end** (int): The end of the period for which to check pt schedules, in 
                 seconds from midnight
 
             **default_pce** (float): NOT YET IMPLEMENTED!
@@ -462,41 +462,15 @@ class Network(WorkerThread):
             >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
             >>> proj.network.build_graphs()
 
-            >>> car_graph = project.network.graphs["c"]
-            >>> transit_graph = project.network.graphs["t"]
-            >>> walk_graph = project.network.graphs["w"]
-            >>> bike_graph = project.network.graphs["b"]
+            >>> graph = project.network.graphs["c"]
 
-            >>> to_build = [True, False, False, False]
+            >>> start = int(6.5 * 60 * 60) # 6.30am
+            >>> end = int(8.5 * 60 * 60)   # 8.30 am
 
-            >>> start = int(6.5 * 60 * 60)
-            >>> end = int(8.5 * 60 * 60)
-
-            >>> preloads = proj.network.build_pt_preload(graph, start, end)
+            >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
-        # Create dictionary of link/dir to preload for each link in the network
-        id_to_links = graph.graph[["link_id", "direction", "__supernet_id__"]]
-        links_dict = self.__build_pt_preload_dict(start_time, end_time, inclusion_cond)
         
-        # Build the preload vectors for each graph (and placeholder if not specified to build)
-        preloads = []
-        
-        links = graph.graph[["link_id", "direction"]]
-        preload = np.zeros(len(links), dtype=int)
-        for i, (link, dir) in links.iterrows():
-            preload[i] = links_dict[(link, dir)]
-            preloads.append(preload)
-        else:
-            preloads.append(None)
-
-        return preloads
-
-    def __build_pt_preload_dict(self, start: int, end: int, inclusion_cond) -> Dict[Tuple[int, int], int]:
-        """Creates a dictionary from link/dir to preload value.
-        
-        Helper method for build_pt_preload
-        """
-        transit_conn = database_connection("transit")
+        transit_conn = database_connection("transit") # Can I use with read_and_close as?
 
         # Get list of trip_id's, whose start time is within the period
         select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
@@ -509,29 +483,18 @@ class Network(WorkerThread):
         select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
         period_links = lambda pattern: transit_conn.execute(select_links(pattern)).fetchall()
 
-        # Extract link/dir data from database
-        proj_conn = database_connection("project_database")
-        links = proj_conn.execute("SELECT link_id, direction FROM links").fetchall()
-        proj_conn.close()
+        # Get index via supernet id (same index as used for capacity vectors in assignment)
+        g = graph.graph[["link_id", "direction", "__supernet_id__"]]
+        get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
 
-        # Create dictionary of link, dirs in the network
-        links_dict = dict()
-        for link, dir in links:
-            if dir == 0: # Means both directions
-                links_dict[(link, 1)] = 0
-                links_dict[(link, -1)] = 0
-            else:
-                links_dict[(link, dir)] = 0
-        
-        # Iterate through pattern id's and for each link in the sequence, increment the coresponding dictionary value
+        # Iterate through pattern id's and for each link in the sequence,
+        # increment the coresponding value (according to supernet id) in the preload vector
+        preload = np.zeros(len(graph.graph), dtype=int)
         for pattern_id in period_patterns:
             pattern_links = period_links(pattern_id)
             for link, dir in pattern_links:
-                links_dict[(link, dir)] += 1
-
-        # Get the __supernet_id__ which would allow me to map from links/dir to index in the list.
-        # Then I can just update directly into the vector.
-        # Return that preload vector (don't need to connect to the project database at all!)
+                preload[get_index(link, dir)] += 1
 
         transit_conn.close()
-        return links_dict
+
+        return preload
