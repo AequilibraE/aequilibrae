@@ -236,7 +236,7 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
-        self.apply_pt_preload = False #type: bool
+        self.apply_pt_preload = False # type: bool
 
         self.steps_below_needed_to_terminate = 1
 
@@ -487,12 +487,10 @@ class TrafficAssignment(AssignmentBase):
         Should have identical ordering to self.capacity.
 
         :Arguments:
-            **preload** (:obj:`np.ndarray`): Field name
+            **preload** (:obj:`np.ndarray`): Array of preload values, see Network.build_pt_preload for details
         """
         self.apply_pt_preload = True
         self.preload = preload
-
-        raise NotImplementedError
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
