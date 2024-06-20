@@ -489,7 +489,7 @@ class Network(WorkerThread):
             get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
 
             # For each link in the sequence of each pattern id, increment the coresponding preload value
-            preload = np.zeros(len(graph.graph), dtype=int)
+            preload = np.zeros(g.shape[0], graph.default_types("float")) # Use float since PCE may be non-integer
             for pattern_id in patterns:
                 pattern_links = period_links(pattern_id)
                 for link, dir in pattern_links:
