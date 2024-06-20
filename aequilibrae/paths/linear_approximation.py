@@ -116,7 +116,7 @@ class LinearApproximation(WorkerThread):
         self.capacity = assig_spec.capacity
         if assig_spec.apply_pt_preload: 
             self.capacity -= assig_spec.preload
-            raise NotImplementedError # Need to subtract preloads from capacity
+            raise NotImplementedError
         
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
