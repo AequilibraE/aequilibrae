@@ -90,17 +90,22 @@ class TestPTPreloaing:
         preload = project.network.build_pt_preload(graphs[0], period_start, period_end)
 
         # Assertions about the preload and coquimbo network:
+        assert len(preload) == len(graphs[0].graph)
         assert False # PLACEHOLDER
 
         # Return preloads for further testing
         return preload
 
     def test_preloaded_assignment(self, project: Project, graphs: List[Graph]):
-        """Check that the setting a preload and running an assignment works as intended."""
+        """
+        Check that the setting a preload and running an assignment works as intended.
+
+        Maybe put infinity on 1 or 2 links and check nothing is assigned to those links?
+        """
         # NOT YET COMPLETED!
         
         # Create custom preload data
-        preloads = None # PLACEHOLDER [np.ndarray]
+        preloads = None # type: np.ndarray
 
         # Run preloaded assignment
         assignment = self.__run_preloaded_assig(project, graphs, preloads)
@@ -109,7 +114,7 @@ class TestPTPreloaing:
         assert False
 
     def __run_preloaded_assig(
-        self, proj: Project, all_graphs: List[Graph], preloads: List[np.ndarray]
+        self, proj: Project, all_graphs: List[Graph], preload: np.ndarray
         ) -> TrafficAssignment:
         """Runs an assignment with a pt preload"""
         # NEED TO CHECK WHICH INPUT PARAMETERS ARE ACTUALLY NEEDED!
