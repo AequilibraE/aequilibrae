@@ -8,40 +8,24 @@ from aequilibrae.utils.create_example import create_example
 
 # Overall TODO:
 # 1) Create test structure for the API for PT Preloading
-# 3) Modify database structure to store PCE value for a service and have default info
-# 5) Create modification to current traffic assignment algorithm to reduce capacity at end of each assignment iteration
-# 6) Consider simple example scenarios to test correctness of algorithms
-# 7) Decide whether more complex tests are necessary
-# 8) Performance testing and speed ups in cython
-
-# DECISION:
-# It appears that each graph must be an identical copy of the same dataframe, 
-# hence the links are in the same order. Also the capacity vector is a single vector
-# used across all links, hence the build preload only needs to build a single preload vector!
-
-# Question - how does the program differentiate between a link that goes in 1 direction
-# vs both directions, the capacity vector appears to be a single vector in the direction
-# provided in the database, which could be both directions!
-
-# Question - how exactly does the indexing into numpy array with pandas series work in the traffic_assignment.py
-# set_capacity_field method?
-
+# 2) Modify database structure to store PCE value for a service and have default info
+# 3) Consider simple example scenarios to test correctness of algorithms
+# 4) Decide whether more complex tests are necessary
+# 5) Performance testing and speed ups in cython
 
 # Build TODO:
-# 1. Write simple test(s) based off coquimbo network for built_pt_preload
+# 1. Write assertions for build test.
 # 2. Implement inclusion condition into build for start, end, middle
-# 3. Figure out how pce factors into build stage
-# 4. Implement default pce
-# 5. Optimisation & Additional Testing
+# 3. Implement pce & default pce
+# 4. Optimisation & Additional Testing
 
-# Set TODO:
-# 1. Start adding this into the TrafficAssignment...
-# 2. Figure out where this needs to be stored in TrafficAssignment
-# 3. Modify one algorithm at a time to add this in.
+# Assignment TODO:
+# 1. Write test(s)
+# 2. Figure out where directions are accounted for (ie in the capacity vector 
+#    and graph building are the directions split to not include an option with
+#    both directions?) - this is important to understand just to make sure 
+#    everything is working correctly!
 
-# Questions:
-# Is the capacity vector always the same length? 
-# If so, do we not need to account for different classes working over different underlying graphs?
 
 @pytest.fixture
 def project(tmp_path):
@@ -64,11 +48,11 @@ class TestPTPreloaing:
         """Tests a full run through of pt preloading."""
         # NOT YET COMPLETED!
 
-        # Get preloads (test will not run if prior test fails)
-        preloads = self.test_built_pt_preload(project, graphs)
+        # Get preload (test will not run if prior test fails)
+        preload = self.test_built_pt_preload(project, graphs)
         
         # Run preloaded assignment (test will fail if this cannot be run)
-        self.__run_preloaded_assig(project, graphs, preloads)
+        self.__run_preloaded_assig(project, graphs, preload)
 
         # Check results (NOT AS RIGOROUS AS test_preloaded_assignment)
         assert False  # PLACEHOLDER
@@ -127,7 +111,7 @@ class TestPTPreloaing:
         # Set Traffic Classes
 
         # Set preload info into assig
-        assignment.set_pt_preload(preloads) # NOT YET IMPLEMENTED!
+        assignment.set_pt_preload(preload) # NOT YET IMPLEMENTED!
         
         # Set other assignment parameters
 
