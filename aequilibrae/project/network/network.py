@@ -24,7 +24,7 @@ from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
-from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.db_utils import commit_and_close, read_and_close
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from aequilibrae.project.database_connection import database_connection
 
@@ -428,6 +428,9 @@ class Network(WorkerThread):
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
 
+    # TODO:
+    #   = Update this to allow for different inclusion conditions
+    #   - Update this to allow for different PCE values
     def build_pt_preload(
             self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> np.ndarray:
@@ -469,32 +472,27 @@ class Network(WorkerThread):
 
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
-        
-        transit_conn = database_connection("transit") # Can I use with read_and_close as?
+        with read_and_close(database_connection("transit")) as conn:
+            # Get list of trip_id's, which begin within the period # TODO: Includion Conditions
+            select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
 
-        # Get list of trip_id's, whose start time is within the period
-        select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
+            # Convert trip_id's to corresponding pattern_id's
+            select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
+            patterns = map(lambda ps: ps[0], conn.execute(select_pattern_ids).fetchall())
 
-        # Convert the trip_id's to their corresponding pattern_id's
-        select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
-        period_patterns = map(lambda x: x[0], transit_conn.execute(select_pattern_ids).fetchall())
+            # For a given pattern id get the corresponding list of links 
+            select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
+            period_links = lambda pattern: conn.execute(select_links(pattern)).fetchall()
 
-        # For each pattern id get the corresponding list of link/dir'select_pattern_ids
-        select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
-        period_links = lambda pattern: transit_conn.execute(select_links(pattern)).fetchall()
+            # Get index via supernet id (same index as used for capacity vectors in assignment)
+            g = graph.graph
+            get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
 
-        # Get index via supernet id (same index as used for capacity vectors in assignment)
-        g = graph.graph[["link_id", "direction", "__supernet_id__"]]
-        get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
-
-        # Iterate through pattern id's and for each link in the sequence,
-        # increment the coresponding value (according to supernet id) in the preload vector
-        preload = np.zeros(len(graph.graph), dtype=int)
-        for pattern_id in period_patterns:
-            pattern_links = period_links(pattern_id)
-            for link, dir in pattern_links:
-                preload[get_index(link, dir)] += 1
-
-        transit_conn.close()
+            # For each link in the sequence of each pattern id, increment the coresponding preload value
+            preload = np.zeros(len(graph.graph), dtype=int)
+            for pattern_id in patterns:
+                pattern_links = period_links(pattern_id)
+                for link, dir in pattern_links:
+                    preload[get_index(link, dir)] += 1 # TODO: PCE Values
 
         return preload
