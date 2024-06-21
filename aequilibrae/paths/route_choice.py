@@ -22,7 +22,15 @@ class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
     default_parameters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0, "beta": 1.0},
+        "generic": {
+            "seed": 0,
+            "max_routes": 0,
+            "max_depth": 0,
+            "max_misses": 100,
+            "penalty": 1.01,
+            "cutoff_prob": 0.0,
+            "beta": 1.0,
+        },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
     }
