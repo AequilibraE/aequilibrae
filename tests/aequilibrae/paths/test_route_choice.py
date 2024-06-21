@@ -380,7 +380,15 @@ class TestRouteChoice(TestCase):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
         self.assertDictEqual(
             self.rc.parameters,
-            {"seed": 0, "max_routes": 20, "max_depth": 0, "max_misses": 100, "penalty": 1.1, "cutoff_prob": 0.0},
+            {
+                "seed": 0,
+                "max_routes": 20,
+                "max_depth": 0,
+                "max_misses": 100,
+                "penalty": 1.1,
+                "cutoff_prob": 0.0,
+                "beta": 1.0,
+            },
         )
 
         self.rc.set_choice_set_generation("bfsle", max_routes=20)
@@ -393,11 +401,9 @@ class TestRouteChoice(TestCase):
                 "max_misses": 100,
                 "penalty": 1.0,
                 "cutoff_prob": 0.0,
+                "beta": 1.0,
             },
         )
-
-        with self.assertRaises(ValueError):
-            self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, beta=1.0)
 
         with self.assertRaises(AttributeError):
             self.rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
