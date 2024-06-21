@@ -970,10 +970,13 @@ cdef class RouteChoiceSet:
                 # This /should/ never happen.
                 if link_iter == freq_set.first.end():
                     continue
-                path_overlap = path_overlap + cost_view[link] \
-                    / d(freq_set.second)[link_iter - freq_set.first.begin()]
+                if d(freq_set.second)[link_iter - freq_set.first.begin()] > 0:
+                    path_overlap = path_overlap + cost_view[link] / d(freq_set.second)[link_iter - freq_set.first.begin()]
+            if total_cost[i] ==0:
+                d(path_overlap_vec)[i] = 1.0
+            else:
+                d(path_overlap_vec)[i] = path_overlap / total_cost[i]
 
-            d(path_overlap_vec)[i] = path_overlap / total_cost[i]
             inc(i)
 
         return path_overlap_vec

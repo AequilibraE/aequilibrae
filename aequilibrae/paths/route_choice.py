@@ -21,14 +21,14 @@ from aequilibrae.paths.route_choice_set import RouteChoiceSet
 class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
-    default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0},
+    default_parameters = {
+        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0, "beta": 1.0},
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
     }
 
     def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
-        self.parameters = self.default_paramaters.copy()
+        self.parameters = self.default_parameters.copy()
         self.procedure_id = None
         self.procedure_date = None
 
@@ -120,7 +120,7 @@ class RouteChoice:
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        defaults = self.default_paramaters["generic"] | self.default_paramaters[algo]
+        defaults = self.default_parameters["generic"] | self.default_parameters[algo]
         for key in kwargs.keys():
             if key not in defaults:
                 raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")

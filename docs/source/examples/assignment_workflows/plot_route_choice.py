@@ -150,7 +150,7 @@ rc.set_choice_set_generation("bfsle", max_routes=5)
 
 # %%
 # All parameters are optional, the defaults are:
-print(rc.default_paramaters)
+print(rc.default_parameters)
 
 # %%
 # We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
