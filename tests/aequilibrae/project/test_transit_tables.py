@@ -18,7 +18,7 @@ def create_project(project: Project):
             ["fare_id", "fare", "agency_id", "price", "currency", "payment_method", "transfer", "transfer_duration"],
         ),
         ("fare_rules", ["fare_id", "route_id", "origin", "destination", "contains"]),
-        ("fare_zones", ["fare_zone_id", "transit_zone", "agency_id"]),
+        ("fare_zones", ["zone_id", "transit_zone", "agency_id"]),
         ("pattern_mapping", ["pattern_id", "seq", "link", "dir", "geometry"]),
         (
             "routes",
@@ -49,7 +49,7 @@ def create_project(project: Project):
                 "parent_station",
                 "description",
                 "street",
-                "fare_zone_id",
+                "zone_id",
                 "transit_zone",
                 "route_type",
                 "geometry",
