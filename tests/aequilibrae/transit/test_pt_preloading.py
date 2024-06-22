@@ -43,7 +43,7 @@ def project(tmp_path):
 
 @pytest.fixture
 def graphs(project: Project):
-    return [project.network.graphs[c] for c in "cwb"]
+    return [project.network.graphs[c] for c in "ctwb"]
 
 @pytest.fixture
 def assignment(project: Project, graphs: List[Graph]):
@@ -53,13 +53,16 @@ def assignment(project: Project, graphs: List[Graph]):
     #         graph.set_graph("free_flow_time")
     #         graph.set_blocked_centroid_flows(False)
 
-    # Need to rename stuff to continue!!!!
+    # Need to rename stuff to continue!!!! - use travel_time probably
     graphs[0].set_skimming(["free_flow_time"])
     graphs[0].set_graph("free_flow_time")
     graphs[0].set_blocked_centroid_flows(False)
 
     car_matrix = project.matrices.get_matrix("demand_mc")
     car_matrix.computational_view(["car"])
+
+    # transit_matrix = project.matrices.get_matrix("demand_mc")
+    # transit_matrix.computational_view(["transit"])
 
     # walk_matrix = project.matrices.get_matrix("demand_mc")
     # walk_matrix.computational_view(["walk"])
