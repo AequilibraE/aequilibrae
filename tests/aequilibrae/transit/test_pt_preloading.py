@@ -18,8 +18,7 @@ from aequilibrae.utils.create_example import create_example
 # 2. Implement inclusion condition into build for start, end, middle
 # 3. Implement pce & default pce
 # 4. Optimisation & Additional Testing
-# Test:
-# Do aon, and check speed is reduced after preload on preloaded links.
+# 5. Input timings surrounding midnight (ie going past 24hrs)
 
 # Assignment TODO:
 # 1. Write test(s)
@@ -27,6 +26,8 @@ from aequilibrae.utils.create_example import create_example
 #    and graph building are the directions split to not include an option with
 #    both directions?) - this is important to understand just to make sure 
 #    everything is working correctly!
+# Test:
+# Do aon, and check speed is reduced after preload on preloaded links.
 
 # Extra TODO:
 # 1. Remove unecessary inputs to test functions
@@ -115,24 +116,32 @@ class TestPTPreloaing:
         Check that building pt preload works correctly for a basic example from
         the coquimbo network.
         """
-        # NOT YET COMPLETED!
-        # TODO: Figure out a test that makes sense and is relatively simple to check build phase (maybe in a narrow time period?)
-
         # Preload parameters
-        period_start = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
-        period_end = int(8.5 * 60 * 60)   # 8:30am in seconds from midnight
-        # What if someone wants timings between 11pm and 1am (ie around midnight), 
-        # how do I detemine these instead.
+        wide_st = int(5 * 60 * 60)
+        st = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
+        narrow_st = int(8 * 60 * 60)
+        narrow_end = int(8 * 60 * 60)
+        end = int(8.5 * 60 * 60) # 8:30am in seconds from midnight
+        wide_end = int(10 * 60 * 60)
 
-        # Get preload info from network
-        preload = project.network.build_pt_preload(graphs[0], period_start, period_end)
+        periods = [(narrow_st, narrow_end), (st, end), (wide_st, wide_end)]
+
+        # Generate preloads
+        preload_with_period = lambda period: project.network.build_pt_preload(graphs[0], *period)
+        preloads = [preload_with_period(period) for period in periods]
 
         # Assertions about the preload and coquimbo network:
-        assert len(preload) == len(graphs[0].graph)
-        assert False # NOT YET COMPLETED - DECIDE WHAT ELSE TO TEST FOR
+        # Check correct size
+        for p in preloads:
+            assert len(p) == len(graphs[0].graph)
+        
+        # Check preloads increase in size as time period increases
+        for p1, p2 in zip(preloads, preloads[1:]):
+            assert np.all(p1 <= p2)
+            assert p1.sum() < p2.sum()
 
-        # Return preloads for further testing
-        return preload
+        # Return preload for further testing
+        return preloads[1]
 
     def test_preloaded_assignment(self, project: Project, graphs: List[Graph], assignment: TrafficAssignment):
         """
