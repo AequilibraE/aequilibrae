@@ -128,6 +128,21 @@ class TestPTPreloaing:
         preload = project.network.build_pt_preload(graphs[0], period_start, period_end)
         preload_old = project.network.old_build_pt_preload(graphs[0], period_start, period_end)
 
+        from time import time
+        
+        t_old, t_new, n = 0, 0, 10
+        for _ in range(n):
+            t0 = time()
+            project.network.build_pt_preload(graphs[0], period_start, period_end)
+            t1 = time()
+            t_new += t1 - t0
+            project.network.old_build_pt_preload(graphs[0], period_start, period_end)
+            t_old += time() - t1
+        t_old /= n
+        t_new /= n
+
+        speed_inc = t_old/t_new
+
         # Assertions about the preload and coquimbo network:
         assert len(preload) == len(graphs[0].graph)
         np.testing.assert_array_equal(preload, preload_old)
