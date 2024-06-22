@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from typing import List
 
-from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project
+from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
 from aequilibrae.utils.create_example import create_example
 
 # Overall TODO:
@@ -48,26 +48,40 @@ def graphs(project: Project):
 @pytest.fixture
 def assignment(project: Project, graphs: List[Graph]):
     # NOT YET COMPLETED - COPIED FROM test_mc_traffic_assignment.py
+    n = graphs[0].centroids.shape[0]
     for graph in graphs:
             graph.set_skimming(["travel_time"])
             graph.set_graph("travel_time")
             graph.set_blocked_centroid_flows(False)
+            graph.graph['capacity'] = graph.graph['capacity'].fillna(1.0)
+            graph.graph['travel_time'] = graph.graph['travel_time'].fillna(1.0)
 
     # THERE IS NO DEMAND MATRIX, WHAT SHOULD I DO?
-    car_matrix = project.matrices.get_matrix("demand_mc")
-    car_matrix.computational_view(["car"])
 
+    # Create a random matrix as a temporary fix so testing can begin!
+    matrices = AequilibraeMatrix()
+    matrices.create_empty(zones=n, matrix_names=['car', 'transit', 'walk', 'bike'])
+    matrices.index = graphs[0].centroids
+
+    np.random.seed(7)
+    matrices.matrices[:, :, 0] = np.random.uniform(0, 50, size=(n, n))
+    matrices.matrices[:, :, 1] = np.random.uniform(0, 50, size=(n, n))
+    matrices.matrices[:, :, 2] = np.random.uniform(0, 50, size=(n, n))
+    matrices.matrices[:, :, 3] = np.random.uniform(0, 50, size=(n, n))
+
+    matrices.computational_view(['car', 'transit', 'walk', 'bike'])
+
+    # car_matrix = project.matrices.get_matrix("demand_mc")
+    # car_matrix.computational_view(["car"])
     # transit_matrix = project.matrices.get_matrix("demand_mc")
     # transit_matrix.computational_view(["transit"])
-
     # walk_matrix = project.matrices.get_matrix("demand_mc")
     # walk_matrix.computational_view(["walk"])
-
     # bike_matrix = project.matrices.get_matrix("demand_mc")
     # bike_matrix.computational_view(["bike"])
 
     assignment = TrafficAssignment()
-    carclass = TrafficClass("car", graphs[0], car_matrix)
+    carclass = TrafficClass("car", graphs[0], matrices)
     carclass.set_pce(1.0)
     # transitclass = TrafficClass("transit", graphs[1], transit_matrix)
     # transitclass.set_pce(1.5)
@@ -83,7 +97,6 @@ def assignment(project: Project, graphs: List[Graph]):
             cls.graph.set_skimming(["travel_time", "distance"])
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-    assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("travel_time")
@@ -101,12 +114,22 @@ class TestPTPreloaing:
 
         # Get preload
         preload = self.test_built_pt_preload(project, graphs)
+
+        # Run non-preloaded assignment and get results
+        assignment.execute()
+        # without_preload = ... # dataframe containing all relevant fields for each link/dir
         
         # Run preloaded assignment
         assignment.set_pt_preload(preload)
         assignment.execute()
 
-        # Check results (NOT AS RIGOROUS AS test_preloaded_assignment)
+        # Get assignment results
+        # with_preload = ... # dataframe containing all relevant fields for each link/dir
+
+        # Check assignment run with preload gives lower speeds on preloaded links than without preload
+        # MAKE SURE THAT THE ASSIGNMENT ACTUALLY RESETS BETWEEN EXECUTIONS!
+        loaded = (preload != 0)
+
         assert False  # PLACEHOLDER
 
     def test_built_pt_preload(self, project: Project, graphs: List[Graph]):
