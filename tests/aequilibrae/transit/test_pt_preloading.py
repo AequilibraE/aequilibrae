@@ -69,7 +69,7 @@ def assignment(project: Project, graphs: List[Graph]):
     matrices.matrices[:, :, 2] = np.random.uniform(0, 50, size=(n, n))
     matrices.matrices[:, :, 3] = np.random.uniform(0, 50, size=(n, n))
 
-    matrices.computational_view(['car', 'transit', 'walk', 'bike'])
+    matrices.computational_view('car')
 
     # car_matrix = project.matrices.get_matrix("demand_mc")
     # car_matrix.computational_view(["car"])
@@ -83,11 +83,11 @@ def assignment(project: Project, graphs: List[Graph]):
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", graphs[0], matrices)
     carclass.set_pce(1.0)
-    # transitclass = TrafficClass("transit", graphs[1], transit_matrix)
+    # transitclass = TrafficClass("transit", graphs[1], matrices)
     # transitclass.set_pce(1.5)
-    # walkclass = TrafficClass("walk", graphs[2], walk_matrix)
+    # walkclass = TrafficClass("walk", graphs[2], matrices)
     # walkclass.set_pce(0.2)
-    # bikeclass = TrafficClass("bike", graphs[3], walk_matrix)
+    # bikeclass = TrafficClass("bike", graphs[3], matrices)
     # bikeclass.set_pce(0.5)
 
     # assignment.set_classes([carclass, transitclass, walkclass, bikeclass])
@@ -117,14 +117,12 @@ class TestPTPreloaing:
 
         # Run non-preloaded assignment and get results
         assignment.execute()
-        # without_preload = ... # dataframe containing all relevant fields for each link/dir
+        without_res = assignment.results() # dataframe containing all relevant fields for each link/dir
         
-        # Run preloaded assignment
+        # Run preloaded assignment and get results
         assignment.set_pt_preload(preload)
         assignment.execute()
-
-        # Get assignment results
-        # with_preload = ... # dataframe containing all relevant fields for each link/dir
+        with_res = assignment.results() # dataframe containing all relevant fields for each link/dir
 
         # Check assignment run with preload gives lower speeds on preloaded links than without preload
         # MAKE SURE THAT THE ASSIGNMENT ACTUALLY RESETS BETWEEN EXECUTIONS!
