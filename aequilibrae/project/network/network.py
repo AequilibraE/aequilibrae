@@ -429,9 +429,78 @@ class Network(WorkerThread):
         return c
 
     # TODO:
-    #   = Update this to allow for different inclusion conditions
+    #   - Update this to allow for different inclusion conditions
     #   - Update this to allow for different PCE values
+    # Speed Ups:
+    # Do 1 execute
+    # Join all patterns together, append a supernet column & pce
+    # Group by link/dir, sum pce
+    # Left join correct ordered link/dir with x = ^
     def build_pt_preload(
+        self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
+            ) -> np.ndarray:
+        """Builds a preload vector for each specified graph in network
+
+        :Arguments:
+            **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
+
+            **start** (int): The start of the period for which to check pt schedules, in 
+                seconds from midnight
+
+            **end** (int): The end of the period for which to check pt schedules, in 
+                seconds from midnight
+
+            **default_pce** (float): NOT YET IMPLEMENTED!
+
+            **inclusion_cond** (str): NOT YET IMPLEMENTED! Specifies condition with which to 
+                include/exclude pt trips from the preload. "start"/"end" means those who start/end
+                in the given period, "middle" means those whose central time lies in the period.
+                !Currently just including any trip with any time in the period!
+
+        :Returns:
+            **preloads** (np.ndarray): A list of preloads, with None as a placeholder
+                wherever it is not specified to build a preload.
+
+        Minimal example:
+        .. code-block:: python
+
+            >>> from aequilibrae import Project
+            >>> from aequilibrae.utils.create_example import create_example
+
+            >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
+            >>> proj.network.build_graphs()
+
+            >>> graph = project.network.graphs["c"]
+
+            >>> start = int(6.5 * 60 * 60) # 6.30am
+            >>> end = int(8.5 * 60 * 60)   # 8.30 am
+
+            >>> preload = proj.network.build_pt_preload(graph, start, end)
+        """
+        with read_and_close(database_connection("transit")) as conn:
+            select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
+
+            # Convert trip_id's to corresponding pattern_id's
+            select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
+
+            # Convert pattern id's to groups of link/dir's
+            select_links = f"WITH patterns AS ({select_pattern_ids}) SELECT pm.link, pm.dir FROM patterns p INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id"
+
+            # Get all link/dir's
+            links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=['link_id', 'direction'])
+
+            # Calculate non-zero preloads for each link
+            links['PCE'] = default_pce # Temporary until PCE field is added to database schema
+            links = links.groupby(['link_id', 'direction'], as_index=False)['PCE'].sum().rename(columns={'PCE': 'preload'})
+
+            # Merge preload onto all links/dir's in network to add 0 preloads, then
+            # extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
+            preload = pd.merge(graph.graph, links, on=['link_id', 'direction'], how='left')
+            preload['preload'] = preload['preload'].fillna(0)
+            preload = preload.sort_values(by='__supernet_id__')['preload'].to_numpy()
+        return preload
+
+    def old_build_pt_preload(
             self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> np.ndarray:
         """Builds a preload vector for each specified graph in network
@@ -483,15 +552,6 @@ class Network(WorkerThread):
             # For a given pattern id get the corresponding list of links 
             select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
             period_links = lambda pattern: conn.execute(select_links(pattern)).fetchall()
-
-            # Speed Ups:
-            # Do 1 execute
-            # Join all patterns together, append a supernet column & pce
-            # Group by link/dir, sum pce
-            # Left join correct ordered link/dir with x = ^
-
-            # Test:
-            # Do aon, and check speed is reduced after preload on preloaded links.
 
             # Get index via supernet id (same index as used for capacity vectors in assignment)
             g = graph.graph
