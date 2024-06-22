@@ -18,6 +18,8 @@ from aequilibrae.utils.create_example import create_example
 # 2. Implement inclusion condition into build for start, end, middle
 # 3. Implement pce & default pce
 # 4. Optimisation & Additional Testing
+# Test:
+# Do aon, and check speed is reduced after preload on preloaded links.
 
 # Assignment TODO:
 # 1. Write test(s)
