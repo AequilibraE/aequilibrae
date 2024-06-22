@@ -43,43 +43,40 @@ def project(tmp_path):
 
 @pytest.fixture
 def graphs(project: Project):
-    car_graph = project.network.graphs["c"]
-    transit_graph = project.network.graphs["t"]
-    walk_graph = project.network.graphs["w"]
-    bike_graph = project.network.graphs["b"]
-    return [car_graph, transit_graph, walk_graph, bike_graph]
+    return [project.network.graphs[c] for c in "cwb"]
 
 @pytest.fixture
 def assignment(project: Project, graphs: List[Graph]):
-    # NOT YET COMPLETED - COPIED FROM test_mc_traffic_assignment.py - INTENDED TO REPLACE __run_preloaded_assig
-    for graph in graphs: # Do we ignore transit graph in this whole function?
-            graph.set_skimming(["free_flow_time"])
-            graph.set_graph("free_flow_time")
-            graph.set_blocked_centroid_flows(False)
+    # NOT YET COMPLETED - COPIED FROM test_mc_traffic_assignment.py
+    # for graph in graphs:
+    #         graph.set_skimming(["free_flow_time"])
+    #         graph.set_graph("free_flow_time")
+    #         graph.set_blocked_centroid_flows(False)
+
+    # Need to rename stuff to continue!!!!
+    graphs[0].set_skimming(["free_flow_time"])
+    graphs[0].set_graph("free_flow_time")
+    graphs[0].set_blocked_centroid_flows(False)
 
     car_matrix = project.matrices.get_matrix("demand_mc")
     car_matrix.computational_view(["car"])
 
-    transit_matrix = project.matrices.get_matrix("demand_mc")
-    transit_matrix.computational_view(["transit"])
+    # walk_matrix = project.matrices.get_matrix("demand_mc")
+    # walk_matrix.computational_view(["walk"])
 
-    walk_matrix = project.matrices.get_matrix("demand_mc")
-    walk_matrix.computational_view(["walk"])
-
-    bike_matrix = project.matrices.get_matrix("demand_mc")
-    bike_matrix.computational_view(["bike"])
+    # bike_matrix = project.matrices.get_matrix("demand_mc")
+    # bike_matrix.computational_view(["bike"])
 
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", graphs[0], car_matrix)
     carclass.set_pce(1.0)
-    transitclass = TrafficClass("transit", graphs[1], transit_matrix)
-    transitclass.set_pce(0.2)
-    walkclass = TrafficClass("walk", graphs[2], walk_matrix)
-    walkclass.set_pce(2.5)
-    bikeclass = TrafficClass("bike", graphs[2], walk_matrix)
-    bikeclass.set_pce(2.5)
+    # walkclass = TrafficClass("walk", graphs[2], walk_matrix)
+    # walkclass.set_pce(2.5)
+    # bikeclass = TrafficClass("bike", graphs[2], walk_matrix)
+    # bikeclass.set_pce(2.5)
 
-    assignment.set_classes([carclass, transitclass, walkclass, bikeclass])
+    # assignment.set_classes([carclass, walkclass, bikeclass])
+    assignment.set_classes([carclass])
 
     for cls in assignment.classes:
             cls.graph.set_skimming(["free_flow_time", "distance"])
@@ -117,14 +114,8 @@ class TestPTPreloaing:
         the coquimbo network.
         """
         # Preload parameters
-        wide_st = int(5 * 60 * 60)
-        st = int(6.5 * 60 * 60) # 6:30am in seconds from midnight
-        narrow_st = int(8 * 60 * 60)
-        narrow_end = int(8 * 60 * 60)
-        end = int(8.5 * 60 * 60) # 8:30am in seconds from midnight
-        wide_end = int(10 * 60 * 60)
-
-        periods = [(narrow_st, narrow_end), (st, end), (wide_st, wide_end)]
+        to_24hrs = lambda hrs: int(hrs * 60 * 60) # hrs from midnight in seconds
+        periods = [(to_24hrs(start), to_24hrs(end)) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
         # Generate preloads
         preload_with_period = lambda period: project.network.build_pt_preload(graphs[0], *period)
