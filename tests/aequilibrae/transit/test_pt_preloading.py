@@ -48,16 +48,12 @@ def graphs(project: Project):
 @pytest.fixture
 def assignment(project: Project, graphs: List[Graph]):
     # NOT YET COMPLETED - COPIED FROM test_mc_traffic_assignment.py
-    # for graph in graphs:
-    #         graph.set_skimming(["free_flow_time"])
-    #         graph.set_graph("free_flow_time")
-    #         graph.set_blocked_centroid_flows(False)
+    for graph in graphs:
+            graph.set_skimming(["travel_time"])
+            graph.set_graph("travel_time")
+            graph.set_blocked_centroid_flows(False)
 
-    # Need to rename stuff to continue!!!! - use travel_time probably
-    graphs[0].set_skimming(["free_flow_time"])
-    graphs[0].set_graph("free_flow_time")
-    graphs[0].set_blocked_centroid_flows(False)
-
+    # THERE IS NO DEMAND MATRIX, WHAT SHOULD I DO?
     car_matrix = project.matrices.get_matrix("demand_mc")
     car_matrix.computational_view(["car"])
 
@@ -73,22 +69,24 @@ def assignment(project: Project, graphs: List[Graph]):
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", graphs[0], car_matrix)
     carclass.set_pce(1.0)
+    # transitclass = TrafficClass("transit", graphs[1], transit_matrix)
+    # transitclass.set_pce(1.5)
     # walkclass = TrafficClass("walk", graphs[2], walk_matrix)
-    # walkclass.set_pce(2.5)
-    # bikeclass = TrafficClass("bike", graphs[2], walk_matrix)
-    # bikeclass.set_pce(2.5)
+    # walkclass.set_pce(0.2)
+    # bikeclass = TrafficClass("bike", graphs[3], walk_matrix)
+    # bikeclass.set_pce(0.5)
 
-    # assignment.set_classes([carclass, walkclass, bikeclass])
+    # assignment.set_classes([carclass, transitclass, walkclass, bikeclass])
     assignment.set_classes([carclass])
 
     for cls in assignment.classes:
-            cls.graph.set_skimming(["free_flow_time", "distance"])
+            cls.graph.set_skimming(["travel_time", "distance"])
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
     assignment.set_vdf_parameters({"alpha": "b", "beta": "power"})
 
     assignment.set_capacity_field("capacity")
-    assignment.set_time_field("free_flow_time")
+    assignment.set_time_field("travel_time")
 
     assignment.max_iter = 20
     assignment.set_algorithm("bfw")
