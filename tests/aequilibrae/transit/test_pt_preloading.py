@@ -126,9 +126,11 @@ class TestPTPreloaing:
 
         # Get preload info from network
         preload = project.network.build_pt_preload(graphs[0], period_start, period_end)
+        preload_old = project.network.old_build_pt_preload(graphs[0], period_start, period_end)
 
         # Assertions about the preload and coquimbo network:
         assert len(preload) == len(graphs[0].graph)
+        np.testing.assert_array_equal(preload, preload_old)
         assert False # NOT YET COMPLETED - DECIDE WHAT ELSE TO TEST FOR
 
         # Return preloads for further testing
