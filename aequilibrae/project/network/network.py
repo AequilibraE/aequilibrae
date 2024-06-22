@@ -431,11 +431,6 @@ class Network(WorkerThread):
     # TODO:
     #   - Update this to allow for different inclusion conditions
     #   - Update this to allow for different PCE values
-    # Speed Ups:
-    # Do 1 execute
-    # Join all patterns together, append a supernet column & pce
-    # Group by link/dir, sum pce
-    # Left join correct ordered link/dir with x = ^
     def build_pt_preload(
         self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> np.ndarray:
@@ -498,70 +493,4 @@ class Network(WorkerThread):
             preload = pd.merge(graph.graph, links, on=['link_id', 'direction'], how='left')
             preload['preload'] = preload['preload'].fillna(0)
             preload = preload.sort_values(by='__supernet_id__')['preload'].to_numpy()
-        return preload
-
-    def old_build_pt_preload(
-            self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
-            ) -> np.ndarray:
-        """Builds a preload vector for each specified graph in network
-
-        :Arguments:
-            **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
-
-            **start** (int): The start of the period for which to check pt schedules, in 
-                seconds from midnight
-
-            **end** (int): The end of the period for which to check pt schedules, in 
-                seconds from midnight
-
-            **default_pce** (float): NOT YET IMPLEMENTED!
-
-            **inclusion_cond** (str): NOT YET IMPLEMENTED! Specifies condition with which to 
-                include/exclude pt trips from the preload. "start"/"end" means those who start/end
-                in the given period, "middle" means those whose central time lies in the period.
-                !Currently just including any trip with any time in the period!
-
-        :Returns:
-            **preloads** (np.ndarray): A list of preloads, with None as a placeholder
-                wherever it is not specified to build a preload.
-
-        Minimal example:
-        .. code-block:: python
-
-            >>> from aequilibrae import Project
-            >>> from aequilibrae.utils.create_example import create_example
-
-            >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
-            >>> proj.network.build_graphs()
-
-            >>> graph = project.network.graphs["c"]
-
-            >>> start = int(6.5 * 60 * 60) # 6.30am
-            >>> end = int(8.5 * 60 * 60)   # 8.30 am
-
-            >>> preload = proj.network.build_pt_preload(graph, start, end)
-        """
-        with read_and_close(database_connection("transit")) as conn:
-            # Get list of trip_id's, which begin within the period # TODO: Includion Conditions
-            select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
-
-            # Convert trip_id's to corresponding pattern_id's
-            select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
-            patterns = map(lambda ps: ps[0], conn.execute(select_pattern_ids).fetchall())
-
-            # For a given pattern id get the corresponding list of links 
-            select_links = lambda pattern: f"SELECT link, dir FROM pattern_mapping WHERE pattern_id = {pattern}"
-            period_links = lambda pattern: conn.execute(select_links(pattern)).fetchall()
-
-            # Get index via supernet id (same index as used for capacity vectors in assignment)
-            g = graph.graph
-            get_index = lambda link, dir: g[(g['link_id'] == link) & (g['direction'] == dir)]['__supernet_id__'].values[0]
-
-            # For each link in the sequence of each pattern id, increment the coresponding preload value
-            preload = np.zeros(g.shape[0], graph.default_types("float")) # Use float since PCE may be non-integer
-            for pattern_id in patterns:
-                pattern_links = period_links(pattern_id)
-                for link, dir in pattern_links:
-                    preload[get_index(link, dir)] += 1 # TODO: PCE Values
-
         return preload
