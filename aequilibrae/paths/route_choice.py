@@ -173,7 +173,7 @@ class RouteChoice:
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
 
-    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]) -> None:
+    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]], None] = None) -> None:
         """
         Prepare OD pairs for batch computation.
 
@@ -182,7 +182,21 @@ class RouteChoice:
                 provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
                 OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
                 always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+                If *None* is provided, all OD pairs with non-zero flows will be used.
         """
+        if nodes is None:
+            idx = self.matrix.index
+            if len(self.matrix.view_names) > 1:
+                m = self.matrix.matrix_view.sum(axis=2)
+            else:
+                m = self.matrix.matrix_view
+            non_zero = np.where(m > 0)
+            o = non_zero[0][non_zero[0] != non_zero[1]]
+            d = non_zero[1][non_zero[0] != non_zero[1]]
+            self.nodes = list(zip(idx[o], idx[d]))
+            logging.info(f"There {len(self.nodes):,} are OD pairs with non-zero flows")
+            return
+
         if len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 

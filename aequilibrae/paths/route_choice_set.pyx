@@ -400,11 +400,12 @@ cdef class RouteChoiceSet:
                 mask_set.resize(batch_len)
                 path_overlap_set.resize(batch_len)
                 prob_set.resize(batch_len)
-
             with nogil, parallel(num_threads=c_cores):
-                for i in prange(batch_len, schedule= "dynamic", chunksize=1):
+                for i in prange(batch_len):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
                     dest_index = self.nodes_to_indices_view[c_ods[i].second]
+                    if origin_index == dest_index:
+                        continue
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
