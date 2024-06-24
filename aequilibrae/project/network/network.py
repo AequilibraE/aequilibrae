@@ -437,19 +437,16 @@ class Network(WorkerThread):
         :Arguments:
             **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
 
-            **start** (int): The start of the period for which to check pt schedules, in
-                seconds from midnight
+            **start** (int): The start of the period for which to check pt schedules (seconds from midnight)
 
-            **end** (int): The end of the period for which to check pt schedules, in
-                seconds from midnight
+            **end** (int): The end of the period for which to check pt schedules, (seconds from midnight)
 
             **default_pce** (float): NOT YET IMPLEMENTED!
 
             **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
 
         :Returns:
-            **preloads** (np.ndarray): A list of preloads, with None as a placeholder
-                wherever it is not specified to build a preload.
+            **preloads** (np.ndarray): A vector of preload from transit vehicles that can be directly used in an assignment
 
         Minimal example:
         .. code-block:: python
@@ -468,38 +465,42 @@ class Network(WorkerThread):
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
         # Get trip_id based on specified inclusion condition
-        trip_start, trip_end = "MIN(departure)", "MAX(arrival)"
-        midpoint_time = f"({trip_start} + {trip_end}) / 2"
-        in_period = f"BETWEEN {start} AND {end}"
-        group_trips = "SELECT trip_id FROM trips_schedule GROUP BY trip_id"
-        conditions = {
-            "start": f"{group_trips} HAVING {trip_start} {in_period}",
-            "end": f"{group_trips} HAVING {trip_end} {in_period}",
-            "midpoint": f"{group_trips} HAVING {midpoint_time} {in_period}",
-            "any": f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}",
-        }
-        if inclusion_cond not in conditions:
-            raise ValueError(f"Inclusion condition must be one of {list(conditions.keys())}")
-        select_trip_ids = conditions[inclusion_cond]
-
-        # Convert trip_id's to link/dir's via pattern_id's
-        select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
-        select_links = f"WITH patterns AS ({select_pattern_ids}) SELECT pm.link, pm.dir FROM patterns p "
-        select_links += "INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id"
-
         with read_and_close(database_connection("transit")) as conn:
-            # Get all link/dir's
-            links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=["link_id", "direction"])
+            links = pd.read_sql(build_pt_preload_sql(start, end, inclusion_cond), conn)
 
         # Calculate non-zero preloads for each link
         links["PCE"] = default_pce  # Temporary until PCE field is added to database schema
-        links = links.groupby(["link_id", "direction"], as_index=False)["PCE"].sum().rename(columns={"PCE": "preload"})
+        links = links.groupby(["link_id", "direction"]).sum().rename(columns={"PCE": "preload"})
 
-        # Merge preload onto all links/dir's in network and add 0 preloads
+        # Merge preload onto all links/dir's in network and fill in 0 for links with no transit
         preload = pd.merge(graph[0].graph, links, on=["link_id", "direction"], how="left")
         preload["preload"] = preload["preload"].fillna(0)
 
         # Extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
-        preload = preload.sort_values(by="__supernet_id__")["preload"].to_numpy()
+        return preload.sort_values(by="__supernet_id__")["preload"].to_numpy()
 
-        return preload
+
+probe_point_lookup = {
+    "start": "MIN(departure)",
+    "end": "MAX(arrival)",
+    "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
+}
+
+
+def build_pt_preload_sql(start, end, inclusion_cond):
+
+    def select_trip_ids():
+        in_period = f"BETWEEN {start} AND {end}"
+        if inclusion_cond == "any":
+            return f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"
+        return f"""
+            SELECT trip_id FROM trips_schedule GROUP BY trip_id
+            HAVING {probe_point_lookup[inclusion_cond]} {in_period}
+        """
+
+    # Convert trip_id's to link/dir's via pattern_id's
+    return f"""
+        SELECT pm.link as link_id, pm.dir as direction
+        FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p 
+        INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id
+    """

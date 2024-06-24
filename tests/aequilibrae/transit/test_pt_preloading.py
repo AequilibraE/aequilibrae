@@ -70,6 +70,24 @@ def calc_preload(project, graph, start, end):
     return project.network.build_pt_preload([graph], hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
 
 
+def test_building_pt_preload(project: Project, graph: Graph):
+    """
+    Check that building pt preload works correctly for a basic example from
+    the coquimbo network.
+    """
+
+    preloads = [calc_preload(project, graph, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
+
+    # Check preloads increase in size as time period increases
+    assert preloads[0].sum() == 5804
+    assert preloads[1].sum() == 10280
+    assert preloads[2].sum() == 18596
+
+    # Check correct size
+    for preload in preloads:
+        assert len(preload) == len(graph.graph)
+
+
 def test_run(project: Project, graph: Graph, assignment: TrafficAssignment):
     """Tests a full run through of pt preloading."""
 
@@ -86,22 +104,3 @@ def test_run(project: Project, graph: Graph, assignment: TrafficAssignment):
 
     # Check that average delay increases (ie the preload has reduced speeds)
     assert with_res["Delay_factor_AB"].mean() > without_res["Delay_factor_AB"].mean()
-
-
-def test_built_pt_preload(project: Project, graph: Graph):
-    """
-    Check that building pt preload works correctly for a basic example from
-    the coquimbo network.
-    """
-
-    preloads = [calc_preload(project, graph, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
-
-    # Assertions about the preload and coquimbo network:
-    # Check correct size
-    for preload in preloads:
-        assert len(preload) == len(graph.graph)
-
-    # Check preloads increase in size as time period increases
-    for p1, p2 in zip(preloads, preloads[1:]):
-        assert np.all(p1 <= p2)
-        assert p1.sum() < p2.sum()
