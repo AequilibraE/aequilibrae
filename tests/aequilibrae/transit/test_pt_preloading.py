@@ -5,16 +5,10 @@ from typing import List
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
 from aequilibrae.utils.create_example import create_example
 
-# Overall TODO:
-# 1) Fix assignment object construction, and complete test (delete 3rd test)
+# TODO:
+# 1) Change fixtures to setUp and tearDown so project and matrices can be closed.
 # 2) Add PCE to transit database schema for each trip
-
-# Build TODO:
-# 1) Add PCE to transit database schema for each trip
-# 2) Input timings surrounding midnight (ie going past 24hrs)??
-
-# Extra TODO:
-# 2. Change fixtures to setUp and tearDown so project and matrices can be closed.
+# 3) Input timings surrounding midnight (ie going past 24hrs)??
 
 @pytest.fixture
 def project(tmp_path):
@@ -29,13 +23,13 @@ def graphs(project: Project):
 
 @pytest.fixture
 def assignment(graphs: List[Graph]):
-    graph = graphs[0]
-    n_zones = graph.centroids.shape[0]
-    graph.set_skimming(["travel_time"])
-    graph.set_graph("travel_time") # FIGURE OUT WHY THESE ARE ALL NAN AND DEAL WITH THEM!!!
-    graph.set_blocked_centroid_flows(False)
-    graph.graph['capacity'] = 500
-    graph.graph['travel_time'] = graph.graph['distance'] / 50
+    g = graphs[0]
+    n_zones = g.centroids.shape[0]
+    g.set_skimming(["travel_time"])
+    g.set_graph("travel_time") # FIGURE OUT WHY THESE ARE ALL NAN AND DEAL WITH THEM!!!
+    g.set_blocked_centroid_flows(False)
+    g.graph['capacity'] = 500
+    g.graph['travel_time'] = g.graph['distance'] / 50
 
     # Create a random matrix for testing
     matrices = AequilibraeMatrix()
