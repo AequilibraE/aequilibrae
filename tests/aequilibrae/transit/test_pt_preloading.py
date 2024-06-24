@@ -76,7 +76,6 @@ def assignment(graphs: List[Graph]):
 
     assignment = TrafficAssignment()
     carclass = TrafficClass("car", graphs[0], matrices)
-    carclass.set_pce(1.0)
 
     assignment.set_classes([carclass])
 

@@ -237,7 +237,7 @@ class TrafficAssignment(AssignmentBase):
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
         self.apply_pt_preload = False # type: bool
-        self.preload = None
+        self.preload = None # type: np.ndarray
 
         self.steps_below_needed_to_terminate = 1
 
