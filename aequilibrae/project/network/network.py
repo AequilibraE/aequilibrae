@@ -428,9 +428,7 @@ class Network(WorkerThread):
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
 
-    # TODO:
-    #   - Update this to allow for different inclusion conditions
-    #   - Update this to allow for different PCE values
+    # TODO: Add PCE value into transit database schema for trips, and extract below
     def build_pt_preload(
         self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
             ) -> np.ndarray:
@@ -496,13 +494,15 @@ class Network(WorkerThread):
             # Get all link/dir's
             links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=['link_id', 'direction'])
 
-            # Calculate non-zero preloads for each link
-            links['PCE'] = default_pce # Temporary until PCE field is added to database schema
-            links = links.groupby(['link_id', 'direction'], as_index=False)['PCE'].sum().rename(columns={'PCE': 'preload'})
+        # Calculate non-zero preloads for each link
+        links['PCE'] = default_pce # Temporary until PCE field is added to database schema
+        links = links.groupby(['link_id', 'direction'], as_index=False)['PCE'].sum().rename(columns={'PCE': 'preload'})
 
-            # Merge preload onto all links/dir's in network to add 0 preloads, then
-            # extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
-            preload = pd.merge(graph.graph, links, on=['link_id', 'direction'], how='left')
-            preload['preload'] = preload['preload'].fillna(0)
-            preload = preload.sort_values(by='__supernet_id__')['preload'].to_numpy()
+        # Merge preload onto all links/dir's in network and add 0 preloads
+        preload = pd.merge(graph.graph, links, on=['link_id', 'direction'], how='left')
+        preload['preload'] = preload['preload'].fillna(0)
+
+        # Extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
+        preload = preload.sort_values(by='__supernet_id__')['preload'].to_numpy()
+
         return preload

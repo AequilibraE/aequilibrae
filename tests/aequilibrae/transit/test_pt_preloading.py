@@ -97,8 +97,6 @@ class TestPTPreloaing:
 
     def test_run(self, project: Project, graphs: List[Graph], assignment: TrafficAssignment):
         """Tests a full run through of pt preloading."""
-        # NOT YET COMPLETED!
-
         # Get preload
         preload = self.test_built_pt_preload(project, graphs)
 
@@ -111,10 +109,8 @@ class TestPTPreloaing:
         assignment.execute()
         with_res = assignment.results() # dataframe containing all relevant fields for each link/dir
 
-        # Check assignment run with preload gives lower speeds on preloaded links than without preload
-        # Check that average delay increases
+        # Check that average delay increases (ie the preload has reduced speeds)
         assert with_res["Delay_factor_AB"].mean() > without_res["Delay_factor_AB"].mean()
-
 
     def test_built_pt_preload(self, project: Project, graphs: List[Graph]):
         """
@@ -126,7 +122,8 @@ class TestPTPreloaing:
         periods = [(to_24hrs(start), to_24hrs(end)) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
         # Generate preloads
-        preload_with_period = lambda period: project.network.build_pt_preload(graphs[0], *period, inclusion_cond="start")
+        preload_with_period = lambda period: project.network.build_pt_preload(
+            graphs[0], *period, inclusion_cond="start")
         preloads = list(map(preload_with_period, periods))
 
         # Assertions about the preload and coquimbo network:
