@@ -472,15 +472,27 @@ class Network(WorkerThread):
 
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
+        # Get trip_id based on specified inclusion condition
+        trip_start, trip_end = "MIN(departure)", "MAX(arrival)"
+        midpoint_time = f"({trip_start} + {trip_end}) / 2"
+        in_period = f"BETWEEN {start} AND {end}"
+        group_trips = "SELECT trip_id FROM trips_schedule GROUP BY trip_id"
+        conditions = {
+            "start": f"{group_trips} HAVING {trip_start} {in_period}", 
+            "end": f"{group_trips} HAVING {trip_end} {in_period}", 
+            "midpoint": f"{group_trips} HAVING {midpoint_time} {in_period}", 
+            "any": f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"
+        }
+        if inclusion_cond not in conditions:
+            raise ValueError(f"Inclusion condition must be one of {list(conditions.keys())}")
+        select_trip_ids = conditions[inclusion_cond]
+
+        # Convert trip_id's to link/dir's via pattern_id's
+        select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
+        select_links = f"WITH patterns AS ({select_pattern_ids}) SELECT pm.link, pm.dir FROM patterns p "
+        select_links += "INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id"
+
         with read_and_close(database_connection("transit")) as conn:
-            select_trip_ids = f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival BETWEEN {start} AND {end}"
-
-            # Convert trip_id's to corresponding pattern_id's
-            select_pattern_ids = f"SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids})"
-
-            # Convert pattern id's to groups of link/dir's
-            select_links = f"WITH patterns AS ({select_pattern_ids}) SELECT pm.link, pm.dir FROM patterns p INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id"
-
             # Get all link/dir's
             links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=['link_id', 'direction'])
 
