@@ -6,43 +6,38 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, Aequili
 from aequilibrae.utils.create_example import create_example
 
 # Overall TODO:
-# 1) Add in inclusion conditions
-# 2) Fix assignment object construction, and complete test (delete 3rd test)
-# 3) Add PCE to transit database schema for each trip
+# 1) Fix assignment object construction, and complete test (delete 3rd test)
+# 2) Add PCE to transit database schema for each trip
 
 # Build TODO:
-# 1. PCE in database schema
-# 2. Input timings surrounding midnight (ie going past 24hrs)
+# 1) Add PCE to transit database schema for each trip
+# 2) Input timings surrounding midnight (ie going past 24hrs)??
+
+# Extra TODO:
+# 2. Change fixtures to setUp and tearDown so project and matrices can be closed.
 
 # SQL Code for including all trips which cover greater than some threshold proportion of the period
+# Doesn't quite work exactly as intended
 #
 # WITH Intervals AS (
 #     SELECT 
 #         trip_id,
-#         MIN(departure) AS min_departure,
-#         MAX(arrival) AS max_arrival
+#         MIN(departure) AS trip_start,
+#         MAX(arrival) AS trip_end
 #     FROM trips_schedule
 #     GROUP BY trip_id
 # ),
-# Proportions AS (
+# Overlap AS (
 #     SELECT
 #         trip_id,
 #         LEAST(max_arrival, x2) - GREATEST(min_departure, x1) AS overlap
-#     FROM TripIntervals
-#     WHERE max_arrival > x1 AND min_departure < x2
+#     FROM Intervals
+#     WHERE trip_end > x1 AND trip_start < x2
 # )
 # SELECT
 #     trip_id
-# FROM Proportions
+# FROM Overlap
 # WHERE overlap / (x2 - x1) > threshold;
-
-# Assignment TODO:
-# Test: do aon, and check average delay (basically speed) is increased after preload.
-
-# Extra TODO:
-# 1. Remove unecessary inputs to test functions
-# 2. Change fixtures to setUp and tearDown so project and matrices can be closed.
-
 
 @pytest.fixture
 def project(tmp_path):
@@ -71,22 +66,21 @@ def assignment(graphs: List[Graph]):
     matrices.index = graphs[0].centroids
 
     np.random.seed(7)
-    matrices.matrices[:, :, 0] = np.random.uniform(0, 1, size=(n_zones, n_zones))
+    matrices.matrices[:, :, 0] = np.random.uniform(0, 50, size=(n_zones, n_zones))
     matrices.computational_view('car')
 
+    # Create assignment and set parameters
     assignment = TrafficAssignment()
+
     carclass = TrafficClass("car", graphs[0], matrices)
-
     assignment.set_classes([carclass])
-
     for cls in assignment.classes:
             cls.graph.set_skimming(["travel_time", "distance"])
+
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
-
     assignment.set_capacity_field("capacity")
     assignment.set_time_field("travel_time")
-
     assignment.max_iter = 1 # AON assignment
     assignment.set_algorithm("bfw")
 
