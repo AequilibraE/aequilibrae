@@ -6,9 +6,8 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, Aequili
 from aequilibrae.utils.create_example import create_example
 
 # TODO:
-# 1) Change fixtures to setUp and tearDown so project and matrices can be closed.
-# 2) Add PCE to transit database schema for each trip
-# 3) Input timings surrounding midnight (ie going past 24hrs)??
+# 1) Add PCE to transit database schema for each trip
+# 2) Input timings surrounding midnight (ie going past 24hrs)??
 
 @pytest.fixture
 def project(tmp_path):
