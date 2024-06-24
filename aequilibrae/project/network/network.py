@@ -431,21 +431,21 @@ class Network(WorkerThread):
     # TODO: Add PCE value into transit database schema for trips, and extract below
     def build_pt_preload(
         self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
-            ) -> np.ndarray:
+    ) -> np.ndarray:
         """Builds a preload vector for each specified graph in network
 
         :Arguments:
             **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
 
-            **start** (int): The start of the period for which to check pt schedules, in 
+            **start** (int): The start of the period for which to check pt schedules, in
                 seconds from midnight
 
-            **end** (int): The end of the period for which to check pt schedules, in 
+            **end** (int): The end of the period for which to check pt schedules, in
                 seconds from midnight
 
             **default_pce** (float): NOT YET IMPLEMENTED!
 
-            **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload. 
+            **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
 
         :Returns:
             **preloads** (np.ndarray): A list of preloads, with None as a placeholder
@@ -473,10 +473,10 @@ class Network(WorkerThread):
         in_period = f"BETWEEN {start} AND {end}"
         group_trips = "SELECT trip_id FROM trips_schedule GROUP BY trip_id"
         conditions = {
-            "start": f"{group_trips} HAVING {trip_start} {in_period}", 
-            "end": f"{group_trips} HAVING {trip_end} {in_period}", 
-            "midpoint": f"{group_trips} HAVING {midpoint_time} {in_period}", 
-            "any": f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"
+            "start": f"{group_trips} HAVING {trip_start} {in_period}",
+            "end": f"{group_trips} HAVING {trip_end} {in_period}",
+            "midpoint": f"{group_trips} HAVING {midpoint_time} {in_period}",
+            "any": f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}",
         }
         if inclusion_cond not in conditions:
             raise ValueError(f"Inclusion condition must be one of {list(conditions.keys())}")
@@ -489,17 +489,17 @@ class Network(WorkerThread):
 
         with read_and_close(database_connection("transit")) as conn:
             # Get all link/dir's
-            links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=['link_id', 'direction'])
+            links = pd.DataFrame(conn.execute(select_links).fetchall(), columns=["link_id", "direction"])
 
         # Calculate non-zero preloads for each link
-        links['PCE'] = default_pce # Temporary until PCE field is added to database schema
-        links = links.groupby(['link_id', 'direction'], as_index=False)['PCE'].sum().rename(columns={'PCE': 'preload'})
+        links["PCE"] = default_pce  # Temporary until PCE field is added to database schema
+        links = links.groupby(["link_id", "direction"], as_index=False)["PCE"].sum().rename(columns={"PCE": "preload"})
 
         # Merge preload onto all links/dir's in network and add 0 preloads
-        preload = pd.merge(graph.graph, links, on=['link_id', 'direction'], how='left')
-        preload['preload'] = preload['preload'].fillna(0)
+        preload = pd.merge(graph[0].graph, links, on=["link_id", "direction"], how="left")
+        preload["preload"] = preload["preload"].fillna(0)
 
         # Extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
-        preload = preload.sort_values(by='__supernet_id__')['preload'].to_numpy()
+        preload = preload.sort_values(by="__supernet_id__")["preload"].to_numpy()
 
         return preload
