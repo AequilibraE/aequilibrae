@@ -445,10 +445,7 @@ class Network(WorkerThread):
 
             **default_pce** (float): NOT YET IMPLEMENTED!
 
-            **inclusion_cond** (str): NOT YET IMPLEMENTED! Specifies condition with which to 
-                include/exclude pt trips from the preload. "start"/"end" means those who start/end
-                in the given period, "middle" means those whose central time lies in the period.
-                !Currently just including any trip with any time in the period!
+            **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload. 
 
         :Returns:
             **preloads** (np.ndarray): A list of preloads, with None as a placeholder

@@ -16,29 +16,6 @@ from aequilibrae.utils.create_example import create_example
 # Extra TODO:
 # 2. Change fixtures to setUp and tearDown so project and matrices can be closed.
 
-# SQL Code for including all trips which cover greater than some threshold proportion of the period
-# Doesn't quite work exactly as intended
-#
-# WITH Intervals AS (
-#     SELECT 
-#         trip_id,
-#         MIN(departure) AS trip_start,
-#         MAX(arrival) AS trip_end
-#     FROM trips_schedule
-#     GROUP BY trip_id
-# ),
-# Overlap AS (
-#     SELECT
-#         trip_id,
-#         LEAST(max_arrival, x2) - GREATEST(min_departure, x1) AS overlap
-#     FROM Intervals
-#     WHERE trip_end > x1 AND trip_start < x2
-# )
-# SELECT
-#     trip_id
-# FROM Overlap
-# WHERE overlap / (x2 - x1) > threshold;
-
 @pytest.fixture
 def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
@@ -115,8 +92,7 @@ class TestPTPreloaing:
         periods = [(to_24hrs(start), to_24hrs(end)) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
         # Generate preloads
-        preload_with_period = lambda period: project.network.build_pt_preload(
-            graphs[0], *period, inclusion_cond="start")
+        preload_with_period = lambda period: project.network.build_pt_preload(graphs[0], *period, inclusion_cond="start")
         preloads = list(map(preload_with_period, periods))
 
         # Assertions about the preload and coquimbo network:
