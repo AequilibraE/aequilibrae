@@ -492,7 +492,7 @@ class TrafficAssignment(AssignmentBase):
         """
         if len(preload) != len(self.classes[0].graph.graph):
             raise ValueError("Preload vector should have a value for each link in network and be ordered by __supernet_id__")
-
+        
         self.apply_pt_preload = True
         self.preload = preload
 
