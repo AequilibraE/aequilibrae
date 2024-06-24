@@ -34,8 +34,8 @@ def assignment(graphs: List[Graph]):
     graph.set_skimming(["travel_time"])
     graph.set_graph("travel_time") # FIGURE OUT WHY THESE ARE ALL NAN AND DEAL WITH THEM!!!
     graph.set_blocked_centroid_flows(False)
-    graph.graph['capacity'] = graph.graph['capacity'].fillna(1.0)
-    graph.graph['travel_time'] = graph.graph['travel_time'].fillna(1.0)
+    graph.graph['capacity'] = 500
+    graph.graph['travel_time'] = graph.graph['distance'] / 50
 
     # Create a random matrix for testing
     matrices = AequilibraeMatrix()
