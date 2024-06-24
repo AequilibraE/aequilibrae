@@ -15,7 +15,8 @@ def project(tmp_path):
     proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
     proj.network.build_graphs()
     proj.activate()
-    return proj
+    yield proj
+    proj.close()
 
 @pytest.fixture
 def graphs(project: Project):
@@ -32,18 +33,18 @@ def assignment(graphs: List[Graph]):
     g.graph['travel_time'] = g.graph['distance'] / 50
 
     # Create a random matrix for testing
-    matrices = AequilibraeMatrix()
-    matrices.create_empty(zones=n_zones, matrix_names=['car'])
-    matrices.index = graphs[0].centroids
+    matrix = AequilibraeMatrix()
+    matrix.create_empty(zones=n_zones, matrix_names=['car'])
+    matrix.index = graphs[0].centroids
 
     np.random.seed(7)
-    matrices.matrices[:, :, 0] = np.random.uniform(0, 50, size=(n_zones, n_zones))
-    matrices.computational_view('car')
+    matrix.matrices[:, :, 0] = np.random.uniform(0, 50, size=(n_zones, n_zones))
+    matrix.computational_view('car')
 
     # Create assignment and set parameters
     assignment = TrafficAssignment()
 
-    carclass = TrafficClass("car", graphs[0], matrices)
+    carclass = TrafficClass("car", graphs[0], matrix)
     assignment.set_classes([carclass])
     for cls in assignment.classes:
             cls.graph.set_skimming(["travel_time", "distance"])
@@ -55,7 +56,8 @@ def assignment(graphs: List[Graph]):
     assignment.max_iter = 1 # AON assignment
     assignment.set_algorithm("bfw")
 
-    return assignment
+    yield assignment
+    matrix.close()
 
 class TestPTPreloaing:
 
