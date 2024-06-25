@@ -77,7 +77,7 @@ sphinx_gallery_conf = {
             "examples/trip_distribution",
             "examples/visualization",
             "examples/aequilibrae_without_a_model",
-            "examples/full_workflows",
+            "examples/assignment_workflows",
             "examples/other_applications",
         ]
     ),
@@ -85,7 +85,7 @@ sphinx_gallery_conf = {
 }
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+templates_path = ["_static"]
 
 # The suffix(es) of source filenames.¶
 # You can specify multiple suffix as a list of string:
@@ -132,11 +132,14 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
     "switcher": {
-        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
+        "json_url": "_static/switcher.json",
         "version_match": switcher_version,
     },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
+    "analytics": {
+        "google_analytics_id": "G-0HRKZDXRZ7",
+    },
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to

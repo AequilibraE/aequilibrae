@@ -14,7 +14,7 @@ from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.spatialite_utils import ensure_spatialite_binaries
 
-from ..data import siouxfalls_project
+from tests.data import siouxfalls_project
 
 DEFAULT_PROJECT = siouxfalls_project
 ensure_spatialite_binaries()
@@ -98,3 +98,9 @@ def create_gtfs_project(create_path):
 @pytest.fixture
 def transit_conn(create_gtfs_project):
     return database_connection("transit")
+
+
+@pytest.fixture(autouse=True)
+def doctest_fixtures(doctest_namespace, tmp_path, create_path):
+    doctest_namespace["tmp_path"] = tmp_path
+    doctest_namespace["tmp_path_empty"] = str(create_path)

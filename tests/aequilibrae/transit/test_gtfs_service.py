@@ -36,7 +36,7 @@ class TestService:
     def test__populate(self, data_dict, today, past):
         s = Service()
 
-        s._populate(tuple(data_dict.values()), list(data_dict.keys()))
+        s._populate(tuple(data_dict.values()), list(data_dict.keys()), True)
         for key, val in s.__dict__.items():
             if key in data_dict:
                 assert val == data_dict[key], "Service population with record failed"
@@ -51,10 +51,10 @@ class TestService:
                 data_dict[key] = 0
 
         s = Service()
-        s._populate(tuple(data_dict.values()), list(data_dict.keys()))
+        s._populate(tuple(data_dict.values()), list(data_dict.keys()), True)
         assert 0 == len(s.dates), "Returned too many dates for service"
 
         data_dict[randomword(randint(1, 15))] = randomword(randint(1, 20))
         s = Service()
         with pytest.raises(KeyError):
-            s._populate(tuple(data_dict.values()), list(data_dict.keys()))
+            s._populate(tuple(data_dict.values()), list(data_dict.keys()), True)

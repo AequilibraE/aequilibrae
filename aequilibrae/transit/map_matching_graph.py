@@ -30,12 +30,11 @@ class MMGraph(WorkerThread):
 
     signal = SIGNAL(object)
 
-    def __init__(self, lib_gtfs, mtmm):
+    def __init__(self, lib_gtfs):
         WorkerThread.__init__(self, None)
-        self.geotool = lib_gtfs.geotool
+        self.project = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs
-        self.__mtmm = mtmm
         self._idx = None
         self.max_link_id = -1
         self.max_node_id = -1
@@ -67,7 +66,7 @@ class MMGraph(WorkerThread):
         self.distance_to_project = distance_to_project
         self.__mode = mode_correspondence[self.mode_id]
         self.__mm_graph_file = join(gettempdir(), f"map_matching_graph_{self.__agency}_{self.__mode}.csv")
-        modename = self.geotool.network.modes.get(self.__mode).mode_name
+        modename = self.project.network.modes.get(self.__mode).mode_name
 
         with closing(database_connection("network")) as conn:
             get_qry = f"""Select link_id, a_node, b_node, max(speed_ab, speed_ba) speed,
@@ -109,7 +108,7 @@ class MMGraph(WorkerThread):
         centroids = np.copy(centroid_corresp.centroid_id.values)
         centroid_corresp.set_index("node_id", inplace=True)
         for stop in self.stops.values():
-            stop.___map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
+            stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
@@ -135,9 +134,9 @@ class MMGraph(WorkerThread):
         self.__all_links = {rec.link_id: rec for _, rec in self.df.iterrows()}
         for counter, (stop_id, stop) in enumerate(self.stops.items()):
             self.signal.emit(["update", "secondary", counter + 1, f"Breaking links - {self.__mode}", self.__mtmm])
-            stop.___map_matching_id__[self.mode_id] = self.max_node_id
+            stop.__map_matching_id__[self.mode_id] = self.max_node_id
             self.node_corresp.append([stop_id, self.max_node_id])
-            centroids.append(stop.___map_matching_id__[self.mode_id])
+            centroids.append(stop.__map_matching_id__[self.mode_id])
             self.max_node_id += 1
             self.connect_node(stop)
         self.df = pd.concat([pd.DataFrame(rec).transpose() for rec in self.__all_links.values()])
@@ -252,7 +251,7 @@ class MMGraph(WorkerThread):
             connector = deepcopy(link)
             connector.link_id = self.max_link_id
             connector.original_id = -1
-            connector.a_node = stop.___map_matching_id__[self.mode_id]
+            connector.a_node = stop.__map_matching_id__[self.mode_id]
             connector.b_node = intersec_node
             connector.wrong_side = wrong_side
             connector.direction = 0

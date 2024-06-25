@@ -7,15 +7,21 @@ from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 from setuptools import Extension
 from setuptools import setup, find_packages
+from setuptools.discovery import FlatLayoutPackageFinder
 
 with open("__version__.py") as f:
     exec(f.read())
 
 include_dirs = [np.get_include()]
+libraries = []
+library_dirs = []
 if iutil.find_spec("pyarrow") is not None:
     import pyarrow as pa
 
+    pa.create_library_symlinks()
     include_dirs.append(pa.get_include())
+    libraries.extend(pa.get_libraries())
+    library_dirs.extend(pa.get_library_dirs())
 
 is_win = "WINDOWS" in platform.platform().upper()
 is_mac = any(e in platform.platform().upper() for e in ["MACOS", "DARWIN"])
@@ -34,7 +40,6 @@ ext_mod_aon = Extension(
     include_dirs=include_dirs,
     language="c++",
 )
-
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
@@ -56,6 +61,18 @@ ext_mod_put = Extension(
     language="c++",
 )
 
+ext_mod_bfs_le = Extension(
+    "aequilibrae.paths.route_choice_set",
+    [join("aequilibrae", "paths", "route_choice_set.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    libraries=libraries,
+    library_dirs=library_dirs,
+    language="c++",
+)
+
 ext_mod_graph_building = Extension(
     "aequilibrae.paths.graph_building",
     [join("aequilibrae", "paths", "graph_building.pyx")],
@@ -66,17 +83,26 @@ ext_mod_graph_building = Extension(
     language="c++",
 )
 
+ext_mod_sparse_matrix = Extension(
+    "aequilibrae.matrix.sparse_matrix",
+    [join("aequilibrae", "matrix", "sparse_matrix.pyx")],
+    extra_compile_args=compile_args,
+    extra_link_args=link_args,
+    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    include_dirs=include_dirs,
+    language="c++",
+)
 
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
-pkgs = list(find_packages())
+pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
+    "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
@@ -84,7 +110,6 @@ pkg_data = {
         "database_specification/transit/triggers/*.*",
     ],
 }
-loose_modules = ["__version__", "parameters"]
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -96,7 +121,6 @@ if __name__ == "__main__":
         install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},
-        py_modules=loose_modules,
         package_data=pkg_data,
         zip_safe=False,
         description="A package for transportation modeling",
@@ -108,7 +132,6 @@ if __name__ == "__main__":
         license_files=("LICENSE.TXT",),
         classifiers=[
             "Programming Language :: Python",
-            "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
@@ -116,7 +139,7 @@ if __name__ == "__main__":
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
-            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_graph_building],
+            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_bfs_le, ext_mod_graph_building, ext_mod_sparse_matrix],
             compiler_directives={"language_level": "3str"},
         ),
     )
