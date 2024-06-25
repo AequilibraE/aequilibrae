@@ -404,6 +404,11 @@ cdef class RouteChoiceSet:
                 for i in prange(batch_len):
                     origin_index = self.nodes_to_indices_view[c_ods[i].first]
                     dest_index = self.nodes_to_indices_view[c_ods[i].second]
+
+                    # Create an empty route set before doing anything else. Even if it ends up empty
+                    route_set = new RouteSet_t()
+                    d(results)[i] = route_set
+
                     if origin_index == dest_index:
                         continue
 
@@ -418,8 +423,9 @@ cdef class RouteChoiceSet:
                         )
 
                     if bfsle:
-                        route_set = RouteChoiceSet.bfsle(
+                        RouteChoiceSet.bfsle(
                             self,
+                            route_set,
                             origin_index,
                             dest_index,
                             c_max_routes,
@@ -434,8 +440,9 @@ cdef class RouteChoiceSet:
                             c_seed,
                         )
                     else:
-                        route_set = RouteChoiceSet.link_penalisation(
+                        RouteChoiceSet.link_penalisation(
                             self,
+                            route_set,
                             origin_index,
                             dest_index,
                             c_max_routes,
@@ -471,8 +478,6 @@ cdef class RouteChoiceSet:
                         )
                         # While we need the unique sorted links (.first), we don't need the frequencies (.second)
                         del freq_pair.second
-
-                    d(results)[i] = route_set
 
                     if self.block_flows_through_centroids:
                         blocking_centroid_flows(
@@ -577,8 +582,9 @@ cdef class RouteChoiceSet:
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.initializedcheck(False)
-    cdef RouteSet_t *bfsle(
+    cdef void bfsle(
         RouteChoiceSet self,
+        RouteSet_t *route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -594,9 +600,6 @@ cdef class RouteChoiceSet:
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
         cdef:
-            # Output
-            RouteSet_t *route_set
-
             # Scratch objects
             LinkSet_t removed_links
             minstd_rand rng
@@ -730,14 +733,13 @@ cdef class RouteChoiceSet:
             del penalised_cost
             del next_penalised_cost
 
-        return route_set
-
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef RouteSet_t *link_penalisation(
+    cdef void link_penalisation(
         RouteChoiceSet self,
+        RouteSet_t *route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -753,8 +755,6 @@ cdef class RouteChoiceSet:
     ) noexcept nogil:
         """Link penalisation algorithm for choice set generation."""
         cdef:
-            RouteSet_t *route_set
-
             # Scratch objects
             vector[long long] *vec
             long long p, connector
@@ -803,8 +803,6 @@ cdef class RouteChoiceSet:
                     break
             else:
                 break
-
-        return route_set
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -1524,6 +1522,45 @@ cdef class Checkpoint:
     @staticmethod
     def batches(ods: List[Tuple[int, int]]):
         return (list(g) for k, g in itertools.groupby(sorted(ods), key=lambda x: x[0]))
+
+
+@cython.embedsignature(True)
+cdef class RouteChoiceSetResults:
+    def __init__(self, ods: List[Tuple[int, int]], store_routes: bool = True, perform_assignment: bool = True, eager_link_load: bool = True):
+        self.store_routes = store_routes
+        self.perform_assignment = perform_assignment
+        self.eager_link_load = eager_link_load
+
+        if not store_routes and not perform_assignment:
+            raise ValueError("Either `store_routes` or `perform_assignment` must be True")
+        elif not perform_assignment and eager_link_load:
+            raise ValueError("Link loading requires PSL assignment")
+
+        self.ods = ods  # Python List[Tuple[int, int]] -> C++ vector[pair[long long, long long]]
+        cdef size_t size = self.ods.size()
+
+        # As the objects are attribute of the extension class they will be allocated before the object is
+        # initialised. This ensures that accessing them is always valid and that they are just empty. We resize the ones
+        # we will be using here and allocate the objects they store for the same reasons.
+        #
+        # We can't know how big they will be so we'll need to resize later as well.
+        if store_routes:
+            self.route_sets.resize(size)
+            for i in range(size):
+                self.route_sets[i] = new RouteSet_t()
+
+        if perform_assignment:
+            # self.link_union_set.resize(size)
+            self.cost_set.resize(size)
+            self.mask_set.resize(size)
+            self.path_overlap_set.resize(size)
+            self.prob_set.resize(size)
+            for i in range(size):
+                # self.link_union_set[i] =
+                self.cost_set[i] = new vector[double]()
+                self.mask_set[i] = new vector[bool]()
+                self.path_overlap_set[i] = new vector[double]()
+                self.prob_set[i] = new vector[double]()
 
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:

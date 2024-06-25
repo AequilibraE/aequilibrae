@@ -178,8 +178,9 @@ cdef class RouteChoiceSet:
         long long [:] thread_reached_first
     ) noexcept nogil
 
-    cdef RouteSet_t *bfsle(
+    cdef void bfsle(
         RouteChoiceSet self,
+        RouteSet_t *route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -194,8 +195,9 @@ cdef class RouteChoiceSet:
         unsigned int seed
     ) noexcept nogil
 
-    cdef RouteSet_t *link_penalisation(
+    cdef void link_penalisation(
         RouteChoiceSet self,
+        RouteSet_t *route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -271,3 +273,14 @@ cdef class Checkpoint:
         public object where
         public object schema
         public object partition_cols
+
+
+cdef class RouteChoiceSetResults:
+    cdef:
+        vector[pair[long long, long long]] ods
+        vector[RouteSet_t *] route_sets
+        vector[vector[long long] *] link_union_set
+        vector[vector[double] *] cost_set
+        vector[vector_bool_ptr] mask_set
+        vector[vector[double] *] path_overlap_set
+        vector[vector[double] *] prob_set
