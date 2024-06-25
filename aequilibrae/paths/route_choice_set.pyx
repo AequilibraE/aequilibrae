@@ -907,6 +907,7 @@ cdef class RouteChoiceSet:
         """
         cdef:
             size_t i
+            bool found_zero_cost = False
 
             vector[bool] *route_mask = new vector[bool](total_cost.size())
             vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
@@ -915,11 +916,22 @@ cdef class RouteChoiceSet:
 
         # The route mask should be True for the routes we wish to include.
         for i in range(total_cost.size()):
-            d(route_mask)[i] = (total_cost[i] <= cutoff_cost)
+            if total_cost[i] == 0.0:
+                found_zero_cost = True
+                break
+            elif total_cost[i] <= cutoff_cost:
+                d(route_mask)[i] = True
 
-        # Always include the min element. It should already be but I don't trust floating math to do this correctly.
-        # But only if there actually was a min element (i.e. empty route set)
-        if min != total_cost.cend():
+        if found_zero_cost:
+            # If we've found a zero cost path we must abandon the whole route set.
+            for i in range(total_cost.size()):
+                d(route_mask)[i] = False
+
+            with gil:
+                warnings.warning("Zero cost route found. Entire route set masked")
+        elif min != total_cost.cend():
+            # Always include the min element. It should already be but I don't trust floating math to do this correctly.
+            # But only if there actually was a min element (i.e. empty route set)
             d(route_mask)[min - total_cost.cbegin()] = True
 
         return route_mask
@@ -971,12 +983,8 @@ cdef class RouteChoiceSet:
                 # This /should/ never happen.
                 if link_iter == freq_set.first.end():
                     continue
-                if d(freq_set.second)[link_iter - freq_set.first.begin()] > 0:
-                    path_overlap = path_overlap + cost_view[link] / d(freq_set.second)[link_iter - freq_set.first.begin()]
-            if total_cost[i] ==0:
-                d(path_overlap_vec)[i] = 1.0
-            else:
-                d(path_overlap_vec)[i] = path_overlap / total_cost[i]
+                path_overlap = path_overlap + cost_view[link] / d(freq_set.second)[link_iter - freq_set.first.begin()]
+            d(path_overlap_vec)[i] = path_overlap / total_cost[i]
 
             inc(i)
 
@@ -1014,13 +1022,9 @@ cdef class RouteChoiceSet:
                 if not route_mask[j]:
                     continue
 
-                if path_overlap_vec[i] == 0.0:
-                    fprintf(stderr, "path_overlap_vec[%ld] == 0.0\n", i)
                 inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
                     * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
-            if inv_prob == 0.0:
-                fprintf(stderr, "inv_prob == 0.0\n")
             d(prob_vec)[i] = 1.0 / inv_prob
 
         return prob_vec
