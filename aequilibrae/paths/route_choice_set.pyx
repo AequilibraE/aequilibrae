@@ -452,7 +452,7 @@ cdef class RouteChoiceSet:
 
                     if path_size_logit:
                         d(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        d(mask_set)[i] = RouteChoiceSet.compute_mask(scaled_cutoff_prob, d(d(cost_set)[i]))
+                        d(mask_set)[i] = RouteChoiceSet.compute_mask(scaled_cutoff_prob, d(d(cost_set)[i]), c_ods[i].first, c_ods[i].second)
 
                         freq_pair = RouteChoiceSet.compute_frequency(route_set, d(d(mask_set)[i]))
                         d(link_union_set)[i] = freq_pair.first
@@ -899,7 +899,7 @@ cdef class RouteChoiceSet:
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
     @staticmethod
-    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost) noexcept nogil:
+    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost, long long origin, long long dest) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
         minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
@@ -928,7 +928,7 @@ cdef class RouteChoiceSet:
                 d(route_mask)[i] = False
 
             with gil:
-                warnings.warning("Zero cost route found. Entire route set masked")
+                warnings.warn(f"Zero cost route found for ({origin}, {dest}). Entire route set masked")
         elif min != total_cost.cend():
             # Always include the min element. It should already be but I don't trust floating math to do this correctly.
             # But only if there actually was a min element (i.e. empty route set)
