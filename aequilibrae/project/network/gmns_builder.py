@@ -1,17 +1,16 @@
+import csv
 import math
 import re
-from copy import deepcopy
-import csv
+import string
 from collections import defaultdict
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-import string
 import shapely.wkb
 import shapely.wkt
-from shapely.geometry import LineString, Point
 from pyproj import Transformer
-from ...utils import WorkerThread
+from shapely.geometry import LineString, Point
 
 from aequilibrae import logger
 from aequilibrae.parameters import Parameters
@@ -48,11 +47,10 @@ def resolve_recusive_dict(base_dict):
     return dict(resolved)
 
 
-class GMNSBuilder(WorkerThread):
+class GMNSBuilder:
     def __init__(
         self, net, link_path: str, node_path: str, uses_path: str = None, geom_path: str = None, srid: int = 4326
     ) -> None:
-        WorkerThread.__init__(self, None)
         self.p = Parameters()
         self.links = net.links
         self.nodes = net.nodes

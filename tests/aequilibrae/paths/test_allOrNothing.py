@@ -38,7 +38,7 @@ class TestAllOrNothing(TestCase):
 
         self.g.set_skimming([])
         self.g.set_blocked_centroid_flows(True)
-        assig = allOrNothing(self.matrix, self.g, res)
+        assig = allOrNothing("name", self.matrix, self.g, res)
         assig.execute()
 
         if res.skims.distance.sum() > 0:

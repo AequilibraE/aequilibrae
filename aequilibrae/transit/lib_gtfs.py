@@ -14,10 +14,9 @@ from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
-from ..utils.worker_thread import WorkerThread
 
 
-class GTFSRouteSystemBuilder(WorkerThread):
+class GTFSRouteSystemBuilder:
     """Container for GTFS feeds providing data retrieval for the importer"""
 
     def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
@@ -31,8 +30,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
-        WorkerThread.__init__(self, None)
-
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str

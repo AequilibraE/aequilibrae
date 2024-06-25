@@ -9,7 +9,6 @@ from aequilibrae import global_logger
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.utils import WorkerThread
 
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
@@ -21,7 +20,7 @@ from aequilibrae.utils.signal import SIGNAL
 sys.dont_write_bytecode = True
 
 
-class NetworkSkimming(WorkerThread):
+class NetworkSkimming:
     """
 
     .. code-block:: python
@@ -60,7 +59,6 @@ class NetworkSkimming(WorkerThread):
     skimming = SIGNAL(object)
 
     def __init__(self, graph, origins=None, project=None):
-        WorkerThread.__init__(self, None)
         self.project = project
         self.origins = origins
         self.graph = graph

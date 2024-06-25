@@ -1,12 +1,11 @@
-import importlib.util as iutil
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
+
 import numpy as np
 
-from .multi_threaded_aon import MultiThreadedAoN
-from ..utils import WorkerThread
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import global_logger
+from aequilibrae.matrix import AequilibraeMatrix
+from .multi_threaded_aon import MultiThreadedAoN
 
 try:
     from aequilibrae.paths.AoN import one_to_all, assign_link_loads

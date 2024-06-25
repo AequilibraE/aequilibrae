@@ -1,11 +1,10 @@
-import geopandas as gpd
 import gc
-import importlib.util as iutil
 import string
 from math import floor
 from pathlib import Path
 from typing import List, Tuple
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
@@ -14,19 +13,16 @@ from shapely.geometry import Polygon
 from aequilibrae.context import get_active_project
 from aequilibrae.parameters import Parameters
 from aequilibrae.project.project_creation import remove_triggers, add_triggers
-from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close, read_and_close, list_columns
+from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 from .model_area_gridding import geometry_grid
 
-from aequilibrae.utils.signal import SIGNAL
 
-
-class OSMBuilder(WorkerThread):
+class OSMBuilder:
     building = SIGNAL(object)
 
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
-        WorkerThread.__init__(self, None)
 
         project.logger.info("Preparing OSM builder")
         self.__emit_all(["text", "Preparing OSM builder"])
