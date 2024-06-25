@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import logging
 import os
 from functools import partial
@@ -7,44 +6,29 @@ from tempfile import gettempdir
 from typing import List, Dict
 
 import numpy as np
+from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
+from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
+from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
+from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+from scipy.optimize import root_scalar
 
-from aequilibrae import global_logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
-from ..utils import WorkerThread
-
-try:
-    from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-    from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
-    from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
-    from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
-import scipy
-
-if int(scipy.__version__.split(".")[1]) >= 3:
-    from scipy.optimize import root_scalar
-
-    recent_scipy = True
-else:
-    from scipy.optimize import root as root_scalar
-
-    recent_scipy = False
-    global_logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.python_signal import PythonSignal
 
 
-class LinearApproximation(WorkerThread):
+class LinearApproximation:
     def __init__(self, assig_spec, algorithm, project=None) -> None:
-        WorkerThread.__init__(self, None)
-        self.equilibration = SIGNAL(object, 0)
-        self.assignment = SIGNAL(object, 1)
+        self.equilibration = SIGNAL(object)
+        self.assignment = SIGNAL(object)
+        if isinstance(self.assignment, PythonSignal):
+            self.assignment.pos = 1
 
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
@@ -497,8 +481,8 @@ class LinearApproximation(WorkerThread):
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                self.assignment.pbar.refresh()
-                self.assignment.pbar.reset()
+                self.assignment.emit(["refresh"])
+                self.assignment.emit(["reset"])
                 aon.assignment = self.assignment
 
                 aon.execute()
@@ -676,18 +660,10 @@ class LinearApproximation(WorkerThread):
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
         try:
-            if recent_scipy:
-                min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-                self.stepsize = min_res.root
-                if not min_res.converged:
-                    self.logger.warning("Descent direction stepsize finder has not converged")
-            else:
-                min_res = root_scalar(derivative_of_objective, 1 / self.iter, xtol=x_tol)
-                if not min_res.success:
-                    self.logger.warning("Descent direction stepsize finder has not converged")
-                self.stepsize = min_res.x[0]
-                if self.stepsize <= 0.0 or self.stepsize >= 1.0:
-                    raise ValueError("wrong root")
+            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
+            self.stepsize = min_res.root
+            if not min_res.converged:
+                self.logger.warning("Descent direction stepsize finder has not converged")
 
             self.conjugate_failed = False
 

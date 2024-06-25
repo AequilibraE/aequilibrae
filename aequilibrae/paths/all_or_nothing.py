@@ -20,11 +20,10 @@ if False:
     from .graph import Graph
 
 
-class allOrNothing(WorkerThread):
+class allOrNothing:
     def __init__(self, class_name, matrix, graph, results):
         # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
         self.assignment: SIGNAL = None
-        WorkerThread.__init__(self, None)
 
         self.class_name = class_name
         self.matrix = matrix
