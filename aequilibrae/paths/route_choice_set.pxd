@@ -12,7 +12,8 @@ cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's not
 cimport pyarrow as pa
 cimport pyarrow.lib as libpa
 cimport pyarrow._dataset_parquet as pq
-from libcpp.memory cimport shared_ptr
+from libcpp.memory cimport shared_ptr, unique_ptr, make_shared, make_unique
+from libcpp.utility cimport move
 
 # std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
 # from libcpp.random cimport minstd_rand
@@ -110,6 +111,10 @@ cdef extern from * nogil:
 ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerDereferenceEqualTo[vector[long long] *]] RouteSet_t
 ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
 ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
+
+ctypedef vector[unique_ptr[vector[long long]]] RouteVec_t
+
+
 
 # A (known 2016) bug in the Cython compiler means it incorrectly parses the following type when used in a cdef
 # https://github.com/cython/cython/issues/534
@@ -277,10 +282,24 @@ cdef class Checkpoint:
 
 cdef class RouteChoiceSetResults:
     cdef:
+        bool store_routes
+        bool perform_assignment
+        bool eager_link_load
+        double cutoff_prob
         vector[pair[long long, long long]] ods
-        vector[RouteSet_t *] route_sets
-        vector[vector[long long] *] link_union_set
-        vector[vector[double] *] cost_set
-        vector[vector_bool_ptr] mask_set
-        vector[vector[double] *] path_overlap_set
-        vector[vector[double] *] prob_set
+        vector[shared_ptr[RouteVec_t]] __route_vecs
+        vector[vector[long long] *] __link_union_set
+        vector[shared_ptr[vector[double]]] __cost_set
+        vector[shared_ptr[vector[bool]]] __mask_set
+        vector[shared_ptr[vector[double]]] __path_overlap_set
+        vector[shared_ptr[vector[double]]] __prob_set
+
+    cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+
+    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, double[:] cost_view) noexcept nogil
+    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, RouteVec_t &route_set, double[:] cost_view) noexcept nogil
+    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, vector[double] &total_cost) noexcept nogil

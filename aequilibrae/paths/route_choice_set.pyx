@@ -1526,7 +1526,15 @@ cdef class Checkpoint:
 
 @cython.embedsignature(True)
 cdef class RouteChoiceSetResults:
-    def __init__(self, ods: List[Tuple[int, int]], store_routes: bool = True, perform_assignment: bool = True, eager_link_load: bool = True):
+    def __init__(
+            self,
+            ods: List[Tuple[int, int]],
+            cutoff_prob: float,
+            store_routes: bool = True,
+            perform_assignment: bool = True,
+            eager_link_load: bool = True
+    ):
+        self.cutoff_prob = cutoff_prob
         self.store_routes = store_routes
         self.perform_assignment = perform_assignment
         self.eager_link_load = eager_link_load
@@ -1537,30 +1545,156 @@ cdef class RouteChoiceSetResults:
             raise ValueError("Link loading requires PSL assignment")
 
         self.ods = ods  # Python List[Tuple[int, int]] -> C++ vector[pair[long long, long long]]
-        cdef size_t size = self.ods.size()
+        cdef size_t size = self.size()
 
         # As the objects are attribute of the extension class they will be allocated before the object is
         # initialised. This ensures that accessing them is always valid and that they are just empty. We resize the ones
         # we will be using here and allocate the objects they store for the same reasons.
         #
         # We can't know how big they will be so we'll need to resize later as well.
-        if store_routes:
-            self.route_sets.resize(size)
+        if self.store_routes:
+            self.__route_vecs.resize(size)
             for i in range(size):
-                self.route_sets[i] = new RouteSet_t()
+                self.__route_vecs[i] = make_shared[RouteVec_t]()
 
-        if perform_assignment:
+        if self.perform_assignment and self.store_routes:
             # self.link_union_set.resize(size)
-            self.cost_set.resize(size)
-            self.mask_set.resize(size)
-            self.path_overlap_set.resize(size)
-            self.prob_set.resize(size)
+            self.__cost_set.resize(size)
+            self.__mask_set.resize(size)
+            self.__path_overlap_set.resize(size)
+            self.__prob_set.resize(size)
             for i in range(size):
                 # self.link_union_set[i] =
-                self.cost_set[i] = new vector[double]()
-                self.mask_set[i] = new vector[bool]()
-                self.path_overlap_set[i] = new vector[double]()
-                self.prob_set[i] = new vector[double]()
+                self.__cost_set[i] = make_shared[vector[double]]()
+                self.__mask_set[i] = make_shared[vector[bool]]()
+                self.__path_overlap_set[i] = make_shared[vector[double]]()
+                self.__prob_set[i] = make_shared[vector[double]]()
+
+    def __dealloc__(self):
+        cdef size_t size = self.ods.size()
+
+        if self.store_routes:
+            # The route choice vector will be dropped at the deallocation of this object (after python deallocation), as
+            # the vector is dropped the reference counts of the shared pointers it contains will be decreased, if there
+            # are no live references to them they will be dropped as well, in turn dropping their contents (unique
+            # pointers).
+            pass
+
+        if self.perform_assignment:
+            pass
+            # for i in range(size):
+            #     del self.__cost_set[i]
+            #     del self.__mask_set[i]
+            #     del self.__path_overlap_set[i]
+            #     del self.__prob_set[i]
+
+    cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        """
+        Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
+
+        If `self.store_routes` is False no attempt is made to store the route set. The caller is responsible for maintaining
+        a reference to it.
+
+        Requires that 0 <= i < self.ods.size().
+        """
+        if self.store_routes:
+            # All elements of self.__route_vecs have been initialised in self.__init__.
+            return self.__route_vecs[i]
+        else:
+            # We make a new empty RouteSet_t here, we don't attempt to store it.
+            return make_shared[RouteVec_t]()
+
+    cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        return self.__cost_set[i] if self.store_routes else make_shared[vector[double]]()
+
+    cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        return self.__mask_set[i] if self.store_routes else make_shared[vector[bool]]()
+
+    cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        return self.__path_overlap_set[i] if self.store_routes else make_shared[vector[double]]()
+
+    cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+        return self.__prob_set[i] if self.store_routes else make_shared[vector[double]]()
+
+    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, double[:] cost_view) noexcept nogil:
+        """
+        Compute the desired results for the OD pair index with the provided route set. The route set is required as
+        an argument here to facilitate not storing them. The route set should correspond to the provided OD pair index,
+        however that is not enforced.
+
+        Requires that 0 <= i < self.ods.size().
+        """
+        cdef:
+            shared_ptr[vector[double]] cost_vec
+            shared_ptr[vector[bool]] route_mask
+
+        if self.perform_assignment:
+            cost_vec = self.__get_cost_set(i)
+            route_mask = self.__get_mask_set(i)
+
+            self.compute_cost(d(cost_vec), route_set, cost_view)
+            if self.compute_mask(d(route_mask), d(cost_vec)):
+                with gil:
+                    warnings.warn(f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). Entire route set masked")
+
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, RouteVec_t &route_set, double[:] cost_view) noexcept nogil:
+        """Compute the cost each route."""
+        cdef:
+            # Scratch objects
+            double cost
+            long long link
+            size_t i
+
+        cost_vec.reserve(route_set.size())
+
+        for i in range(route_set.size()):
+            cost = 0.0
+            for link in d(route_set[i]):
+                cost = cost + cost_view[link]
+
+            cost_vec.push_back(cost)
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, vector[double] &total_cost) noexcept nogil:
+        """
+        Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
+        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
+        the route set.
+        """
+        cdef:
+            bool found_zero_cost = False
+            size_t i
+
+            vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
+            double cutoff_cost = d(min) \
+                + inverse_binary_logit(self.cutoff_prob, 0.0, 1.0)
+
+        # The route mask should be True for the routes we wish to include.
+        for i in range(total_cost.size()):
+            if total_cost[i] == 0.0:
+                found_zero_cost = True
+                break
+            elif total_cost[i] <= cutoff_cost:
+               route_mask[i] = True
+
+        if found_zero_cost:
+            # If we've found a zero cost path we must abandon the whole route set.
+            for i in range(total_cost.size()):
+                route_mask[i] = False
+        elif min != total_cost.cend():
+            # Always include the min element. It should already be but I don't trust floating math to do this correctly.
+            # But only if there actually was a min element (i.e. empty route set)
+            route_mask[min - total_cost.cbegin()] = True
+
+        return found_zero_cost
 
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:

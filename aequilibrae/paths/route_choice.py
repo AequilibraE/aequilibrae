@@ -191,6 +191,7 @@ class RouteChoice:
             else:
                 m = self.matrix.matrix_view
             non_zero = np.where(m > 0)
+            # Remove intrazonals (elements on the diagonal)
             o = non_zero[0][non_zero[0] != non_zero[1]]
             d = non_zero[1][non_zero[0] != non_zero[1]]
             self.nodes = list(zip(idx[o], idx[d]))
