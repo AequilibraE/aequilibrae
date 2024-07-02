@@ -1530,11 +1530,13 @@ cdef class RouteChoiceSetResults:
             self,
             ods: List[Tuple[int, int]],
             cutoff_prob: float,
+            beta: float,
             store_routes: bool = True,
             perform_assignment: bool = True,
             eager_link_load: bool = True
     ):
         self.cutoff_prob = cutoff_prob
+        self.beta = beta
         self.store_routes = store_routes
         self.perform_assignment = perform_assignment
         self.eager_link_load = eager_link_load
@@ -1627,22 +1629,33 @@ cdef class RouteChoiceSetResults:
         cdef:
             shared_ptr[vector[double]] cost_vec
             shared_ptr[vector[bool]] route_mask
+            vector[long long] keys, counts
+            shared_ptr[vector[double]] path_overlap_vec
+            shared_ptr[vector[double]] prob_vec
 
         if self.perform_assignment:
             cost_vec = self.__get_cost_set(i)
             route_mask = self.__get_mask_set(i)
+            path_overlap_vec = self.__get_path_overlap_set(i)
+            prob_vec = self.__get_prob_set(i)
 
             self.compute_cost(d(cost_vec), route_set, cost_view)
             if self.compute_mask(d(route_mask), d(cost_vec)):
                 with gil:
-                    warnings.warn(f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). Entire route set masked")
+                    warnings.warn(
+                        f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). "
+                        "Entire route set masked"
+                    )
 
+            self.compute_frequency(keys, counts, route_set, d(route_mask))
+            self.compute_path_overlap(d(path_overlap_vec), route_set, keys, counts, d(cost_vec), d(route_mask), cost_view)
+            self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, RouteVec_t &route_set, double[:] cost_view) noexcept nogil:
+    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, const RouteVec_t &route_set, const double[:] cost_view) noexcept nogil:
         """Compute the cost each route."""
         cdef:
             # Scratch objects
@@ -1650,20 +1663,20 @@ cdef class RouteChoiceSetResults:
             long long link
             size_t i
 
-        cost_vec.reserve(route_set.size())
+        cost_vec.resize(route_set.size())
 
         for i in range(route_set.size()):
             cost = 0.0
             for link in d(route_set[i]):
                 cost = cost + cost_view[link]
 
-            cost_vec.push_back(cost)
+            cost_vec[i] = cost
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, vector[double] &total_cost) noexcept nogil:
+    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, const vector[double] &total_cost) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
         minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
@@ -1676,6 +1689,8 @@ cdef class RouteChoiceSetResults:
             vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
             double cutoff_cost = d(min) \
                 + inverse_binary_logit(self.cutoff_prob, 0.0, 1.0)
+
+        route_mask.resize(total_cost.size())
 
         # The route mask should be True for the routes we wish to include.
         for i in range(total_cost.size()):
@@ -1695,6 +1710,150 @@ cdef class RouteChoiceSetResults:
             route_mask[min - total_cost.cbegin()] = True
 
         return found_zero_cost
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void compute_frequency(
+        RouteChoiceSetResults self,
+        vector[long long] &keys,
+        vector[long long] &counts,
+        const RouteVec_t &route_set,
+        const vector[bool] &route_mask
+    ) noexcept nogil:
+        """
+        Compute a frequency map for each route with the route_mask applied.
+
+        Each node at index i in the first returned vector has frequency at index i in the second vector.
+        """
+        cdef:
+            vector[long long] link_union
+            vector[long long].const_iterator union_iter
+
+            # Scratch objects
+            size_t length, count, i
+            long long link
+
+        # When calculating the frequency of routes, we need to exclude those not in the mask.
+        length = 0
+        for i in range(route_set.size()):
+            # We do so here ...
+            if not route_mask[i]:
+                continue
+
+            length = length + d(route_set[i]).size()
+        link_union.reserve(length)
+
+        for i in range(route_set.size()):
+            # ... and here.
+            if not route_mask[i]:
+                continue
+
+            link_union.insert(link_union.end(), d(route_set[i]).begin(), d(route_set[i]).end())
+
+        sort(link_union.begin(), link_union.end())
+
+        union_iter = link_union.cbegin()
+        while union_iter != link_union.cend():
+            count = 0
+            link = d(union_iter)
+            while link == d(union_iter) and union_iter != link_union.cend():
+                count = count + 1
+                inc(union_iter)
+
+            keys.push_back(link)
+            counts.push_back(count)
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void compute_path_overlap(
+        RouteChoiceSetResults self,
+        vector[double] &path_overlap_vec,
+        const RouteVec_t &route_set,
+        const vector[long long] &keys,
+        const vector[long long] &counts,
+        const vector[double] &total_cost,
+        const vector[bool] &route_mask,
+        const double[:] cost_view
+    ) noexcept nogil:
+        """
+        Compute the path overlap figure based on the route cost and frequency.
+
+        Notation changes:
+            a: link
+            t_a: cost_view
+            c_i: total_costs
+            A_i: route
+            sum_{k in R}: delta_{a,k}: freq_set
+        """
+        cdef:
+            # Scratch objects
+            vector[long long].const_iterator link_iter
+            double path_overlap
+            long long link
+            size_t i
+
+        path_overlap_vec.resize(route_set.size())
+
+        for i in range(route_set.size()):
+            # Skip masked routes
+            if not route_mask[i]:
+                continue
+
+            path_overlap = 0.0
+            for link in d(route_set[i]):
+                # We know the frequency table is ordered and contains every link in the union of the routes.
+                # We want to find the index of the link, and use that to look up it's frequency
+                link_iter = lower_bound(keys.cbegin(), keys.cend(), link)
+
+                # lower_bound returns keys.end() when no link is found.
+                # This /should/ never happen.
+                if link_iter == keys.cend():
+                    continue
+                path_overlap = path_overlap + cost_view[link] / counts[link_iter - keys.cbegin()]
+
+            path_overlap_vec[i] = path_overlap / total_cost[i]
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void compute_prob(
+        RouteChoiceSetResults self,
+        vector[double] &prob_vec,
+        const vector[double] &total_cost,
+        const vector[double] &path_overlap_vec,
+        const vector[bool] &route_mask
+    ) noexcept nogil:
+        """Compute a probability for each route in the route set based on the path overlap."""
+        cdef:
+            # Scratch objects
+            double inv_prob
+            size_t i, j
+
+        prob_vec.resize(total_cost.size())
+
+        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will
+        # lead to NaN results
+        for i in range(total_cost.size()):
+            # The probability of choosing a route that has been masked out is 0.
+            if not route_mask[i]:
+                continue
+
+            inv_prob = 0.0
+            for j in range(total_cost.size()):
+                # We must skip any other routes that are not included in the mask otherwise our probabilities won't
+                # add up.
+                if not route_mask[j]:
+                    continue
+
+                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], self.beta) \
+                    * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
+
+            prob_vec[i] = 1.0 / inv_prob
 
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:

@@ -286,6 +286,7 @@ cdef class RouteChoiceSetResults:
         bool perform_assignment
         bool eager_link_load
         double cutoff_prob
+        double beta
         vector[pair[long long, long long]] ods
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set
@@ -300,6 +301,49 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil
 
-    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, double[:] cost_view) noexcept nogil
-    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, RouteVec_t &route_set, double[:] cost_view) noexcept nogil
-    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, vector[double] &total_cost) noexcept nogil
+    cdef void compute_result(
+        RouteChoiceSetResults self,
+        size_t i,
+        RouteVec_t &route_set,
+        double[:] cost_view
+    ) noexcept nogil
+
+    cdef void compute_cost(
+        RouteChoiceSetResults self,
+        vector[double] &cost_vec,
+        const RouteVec_t &route_set,
+        const double[:] cost_view
+    ) noexcept nogil
+
+    cdef bool compute_mask(
+        RouteChoiceSetResults self,
+        vector[bool] &route_mask,
+        const vector[double] &total_cost
+    ) noexcept nogil
+
+    cdef void compute_frequency(
+        RouteChoiceSetResults self,
+        vector[long long] &keys,
+        vector[long long] &counts,
+        const RouteVec_t &route_set,
+        const vector[bool] &route_mask
+    ) noexcept nogil
+
+    cdef void compute_path_overlap(
+        RouteChoiceSetResults self,
+        vector[double] &path_overlap_vec,
+        const RouteVec_t &route_set,
+        const vector[long long] &keys,
+        const vector[long long] &counts,
+        const vector[double] &total_cost,
+        const vector[bool] &route_mask,
+        const double[:] cost_view
+    ) noexcept nogil
+
+    cdef void compute_prob(
+        RouteChoiceSetResults self,
+        vector[double] &prob_vec,
+        const vector[double] &total_cost,
+        const vector[double] &path_overlap_vec,
+        const vector[bool] &route_mask
+    ) noexcept nogil
