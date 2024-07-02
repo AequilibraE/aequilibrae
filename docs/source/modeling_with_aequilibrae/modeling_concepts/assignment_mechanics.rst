@@ -329,11 +329,12 @@ There are still three parameters missing for the assignment.
 Setting Public Transport Preload
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Finally, optionally a public transport preload can be set. This accounts for 
+We can also optionally include a preload vector for constant flows from public transport 
+which are not being otherwise modelled. This accounts for 
 the predetermined public transport vehicles at their regularly scheduled times,
 and reduces the capacity on each link accordingly. AequilibraE supports various
-conditions for which trips to include in the preload, and allows the user to
-specify the pce for each type of vehicle in the public transport network.
+conditions for which PT trips to include in the preload, and allows the user to
+specify the PCE for each type of vehicle in the public transport network.
 
 To create a preload for public transport vehicles operating between 8am to
 10am, do the following:
