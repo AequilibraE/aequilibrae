@@ -325,6 +325,37 @@ There are still three parameters missing for the assignment.
   assig.set_time_field("free_flow_time")
   assig.set_algorithm(algorithm)
 
+
+Setting Public Transport Preload
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Finally, optionally a public transport preload can be set. This accounts for 
+the predetermined public transport vehicles at their regularly scheduled times,
+and reduces the capacity on each link accordingly. AequilibraE supports various
+conditions for which trips to include in the preload, and allows the user to
+specify the pce for each type of vehicle in the public transport network.
+
+To create a preload for public transport vehicles operating between 8am to
+10am, do the following:
+
+.. code-block:: python
+
+  # Time period, in seconds from midnight
+  start = 8 * 60 * 60
+  end = 10 * 60 * 60
+
+  preload = project.network.build_pt_preload(start, end)
+
+Next, set the preload vector in the assignment.
+
+.. code-block:: python
+
+  assig.set_pt_preload(preload)
+
+
+Executing an Assignment
+^^^^^^^^^^^^^^^^^^^^^^^
+
 Finally, one can execute assignment:
 
 .. code-block:: python
