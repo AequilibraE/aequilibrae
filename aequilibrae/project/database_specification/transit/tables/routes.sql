@@ -16,7 +16,7 @@
 --@ 
 --@ **description** provides useful description of a route
 --@ 
---@ **route_type** indicates the type of transporation used on a route
+--@ **route_type** indicates the type of transportation used on a route
 --@ 
 --@ **seated_capacity** indicates the seated capacity of a route
 --@ 
