@@ -1526,25 +1526,122 @@ cdef class Checkpoint:
 
 @cython.embedsignature(True)
 cdef class RouteChoiceSetResults:
+    """
+    This class is supposed to help manage and compute the results of the route choice set generation. It also
+    provides method to perform an assignment and link loading.
+    """
+
+    route_set_dtype = pa.list_(pa.uint32())
+
+    schema = pa.schema([
+        pa.field("origin id", pa.uint32(), nullable=False),
+        pa.field("destination id", pa.uint32(), nullable=False),
+        pa.field("route set", route_set_dtype, nullable=False),
+    ])
+
+    psl_schema = pa.schema([
+        pa.field("origin id", pa.uint32(), nullable=False),
+        pa.field("destination id", pa.uint32(), nullable=False),
+        pa.field("route set", route_set_dtype, nullable=False),
+        pa.field("cost", pa.float64(), nullable=False),
+        pa.field("mask", pa.bool_(), nullable=False),
+        pa.field("path overlap", pa.float64(), nullable=False),
+        pa.field("probability", pa.float64(), nullable=False),
+    ])
+
     def __init__(
             self,
             ods: List[Tuple[int, int]],
             cutoff_prob: float,
             beta: float,
-            store_routes: bool = True,
+            num_links: int,
+            double[:] cost_view,
+            double[:, :] matrix_view,
+            long long[:] nodes_to_indices_view,
+            unsigned int [:] mapping_idx,
+            unsigned int [:] mapping_data,
+            store_results: bool = True,
             perform_assignment: bool = True,
-            eager_link_load: bool = True
+            eager_link_loading: bool = True,
+            link_loading_reduction_threads: int = 1
     ):
+        """
+
+        :Arguments:
+            **ods** (`obj`: List[Tuple[int, int]]): A Python list of pairs of graph node ids. No verification of these is performed here.
+
+            **cutoff_prob** (`obj`: float): The cut-off probability for the inverse binary logit filter.
+
+            **beta** (`obj`: float): The beta parameter for the path-sized logit.
+
+            **store_results** (`obj`: bool): Whether or not to store the route set computation results. At a minimum stores
+              the route sets per OD. If `perform_assignment` is True then the assignment results are stored as well.
+
+            **perform_assignment** (`obj`: bool): Whether or not to perform a path-sized logit assignment.
+
+            **eager_link_loading** (`obj`: bool): If enabled link loading is immediately performed during the call the
+              `compute_results`. This allows only link loading results to be returned, removing the requirement of
+              `store_results=True` for link loading, significantly reducing total memory usage.
+
+            **link_loading_reduction_threads** (`obj`: int): As link loading is a reduction-style procedure, this parameter
+              controls how many thread buffers are allocated. These buffers should be reduced to a single result via the
+              `reduce_link_loading` method.
+
+        NOTE: This class makes no attempt to be thread safe when improperly accessed. Multithreaded accesses should be
+        coordinated to not collide. Each index of `ods` should only ever be accessed by a single thread.
+
+        NOTE: Depending on `store_results` the behaviour of accessing a single `ods` index multiple times will differ. When
+        True the previous internal buffers will be reused. This will highly likely result incorrect results. When False some
+        new internal buffers will used, link loading results will still be incorrect. Thus A SINGLE `ods` INDEX SHOULD NOT
+        BE ACCESSED MULTIPLE TIMES.
+
+        There are a couple ways this class can be used.
+          1. Plain route set computation.
+             Here we're only interested in the route set outputs. This object should be configured as
+             self.store_results = True
+             self.perform_assignment = False
+             self.eager_link_loading = False
+
+          2. Route set computation with assignment.
+             Here we're interested in the assignment with all outputs. This object should be configured as
+             self.store_results = True
+             self.perform_assignment = True
+             self.eager_link_loading = False
+
+          3. Route set computation with assignment with all outputs and eager link loading.
+             This object should be configured as
+             self.store_results = True
+             self.perform_assignment = True
+             self.eager_link_loading = True
+
+          4. Route set computation with only link loading.
+             This object should be configured as
+             self.store_results = False
+             self.perform_assignment = True
+             self.eager_link_loading = True
+
+        Eager link loading requires assignment. Link loading can be performed later if routes were stored and an assignment
+        was performed.
+        """
+
+        if not store_results and not perform_assignment:
+            raise ValueError("either `store_results` or `perform_assignment` must be True")
+        elif eager_link_loading and not perform_assignment:
+            raise ValueError("eager link loading requires assignment")
+        elif link_loading_reduction_threads <= 0:
+            raise ValueError("thread value must be > 0")
+
         self.cutoff_prob = cutoff_prob
         self.beta = beta
-        self.store_routes = store_routes
+        self.store_results = store_results
         self.perform_assignment = perform_assignment
-        self.eager_link_load = eager_link_load
-
-        if not store_routes and not perform_assignment:
-            raise ValueError("Either `store_routes` or `perform_assignment` must be True")
-        elif not perform_assignment and eager_link_load:
-            raise ValueError("Link loading requires PSL assignment")
+        self.eager_link_loading = eager_link_loading
+        self.link_loading_reduction_threads = link_loading_reduction_threads
+        self.cost_view = cost_view
+        self.matrix_view = matrix_view
+        self.nodes_to_indices_view = nodes_to_indices_view
+        self.mapping_idx = mapping_idx
+        self.mapping_data = mapping_data
 
         self.ods = ods  # Python List[Tuple[int, int]] -> C++ vector[pair[long long, long long]]
         cdef size_t size = self.size()
@@ -1554,12 +1651,12 @@ cdef class RouteChoiceSetResults:
         # we will be using here and allocate the objects they store for the same reasons.
         #
         # We can't know how big they will be so we'll need to resize later as well.
-        if self.store_routes:
+        if self.store_results:
             self.__route_vecs.resize(size)
             for i in range(size):
                 self.__route_vecs[i] = make_shared[RouteVec_t]()
 
-        if self.perform_assignment and self.store_routes:
+        if self.perform_assignment and self.store_results:
             # self.link_union_set.resize(size)
             self.__cost_set.resize(size)
             self.__mask_set.resize(size)
@@ -1572,10 +1669,14 @@ cdef class RouteChoiceSetResults:
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
+        # If we're eagerly link loading we must allocate this now while we still have the GIL, otherwise we'll allocate it later.
+        if self.eager_link_loading:
+           self.link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
+
     def __dealloc__(self):
         cdef size_t size = self.ods.size()
 
-        if self.store_routes:
+        if self.store_results:
             # The route choice vector will be dropped at the deallocation of this object (after python deallocation), as
             # the vector is dropped the reference counts of the shared pointers it contains will be decreased, if there
             # are no live references to them they will be dropped as well, in turn dropping their contents (unique
@@ -1594,12 +1695,12 @@ cdef class RouteChoiceSetResults:
         """
         Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
 
-        If `self.store_routes` is False no attempt is made to store the route set. The caller is responsible for maintaining
+        If `self.store_results` is False no attempt is made to store the route set. The caller is responsible for maintaining
         a reference to it.
 
         Requires that 0 <= i < self.ods.size().
         """
-        if self.store_routes:
+        if self.store_results:
             # All elements of self.__route_vecs have been initialised in self.__init__.
             return self.__route_vecs[i]
         else:
@@ -1607,18 +1708,18 @@ cdef class RouteChoiceSetResults:
             return make_shared[RouteVec_t]()
 
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
-        return self.__cost_set[i] if self.store_routes else make_shared[vector[double]]()
+        return self.__cost_set[i] if self.store_results else make_shared[vector[double]]()
 
     cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
-        return self.__mask_set[i] if self.store_routes else make_shared[vector[bool]]()
+        return self.__mask_set[i] if self.store_results else make_shared[vector[bool]]()
 
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
-        return self.__path_overlap_set[i] if self.store_routes else make_shared[vector[double]]()
+        return self.__path_overlap_set[i] if self.store_results else make_shared[vector[double]]()
 
     cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
-        return self.__prob_set[i] if self.store_routes else make_shared[vector[double]]()
+        return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, double[:] cost_view) noexcept nogil:
+    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, size_t thread_id) noexcept nogil:
         """
         Compute the desired results for the OD pair index with the provided route set. The route set is required as
         an argument here to facilitate not storing them. The route set should correspond to the provided OD pair index,
@@ -1633,23 +1734,31 @@ cdef class RouteChoiceSetResults:
             shared_ptr[vector[double]] path_overlap_vec
             shared_ptr[vector[double]] prob_vec
 
-        if self.perform_assignment:
-            cost_vec = self.__get_cost_set(i)
-            route_mask = self.__get_mask_set(i)
-            path_overlap_vec = self.__get_path_overlap_set(i)
-            prob_vec = self.__get_prob_set(i)
+        if not self.perform_assignment:
+            # If we're not performing an assignment then we must be storing the routes and the routes most already be
+            # stored when they were acquired, thus we don't need to do anything here.
+            return
 
-            self.compute_cost(d(cost_vec), route_set, cost_view)
-            if self.compute_mask(d(route_mask), d(cost_vec)):
-                with gil:
-                    warnings.warn(
-                        f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). "
-                        "Entire route set masked"
-                    )
+        cost_vec = self.__get_cost_set(i)
+        route_mask = self.__get_mask_set(i)
+        path_overlap_vec = self.__get_path_overlap_set(i)
+        prob_vec = self.__get_prob_set(i)
 
-            self.compute_frequency(keys, counts, route_set, d(route_mask))
-            self.compute_path_overlap(d(path_overlap_vec), route_set, keys, counts, d(cost_vec), d(route_mask), cost_view)
-            self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
+        self.compute_cost(d(cost_vec), route_set, self.cost_view)
+        if self.compute_mask(d(route_mask), d(cost_vec)):
+            with gil:
+                warnings.warn(
+                    f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). "
+                    "Entire route set masked"
+                )
+        self.compute_frequency(keys, counts, route_set, d(route_mask))
+        self.compute_path_overlap(d(path_overlap_vec), route_set, keys, counts, d(cost_vec), d(route_mask), self.cost_view)
+        self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
+
+        if not self.eager_link_loading:
+            return
+
+        self.link_load_single_route_set(i, route_set, d(prob_vec), thread_id)
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -1854,6 +1963,157 @@ cdef class RouteChoiceSetResults:
                     * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
 
             prob_vec[i] = 1.0 / inv_prob
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef void link_load_single_route_set(
+        RouteChoiceSetResults self,
+        const size_t od_idx,
+        const RouteVec_t &route_set,
+        const vector[double] &prob_vec,
+        const size_t thread_id
+    ) noexcept nogil:
+        cdef:
+            long long origin_index = self.nodes_to_indices_view[self.ods[od_idx].first]
+            long long dest_index = self.nodes_to_indices_view[self.ods[od_idx].second]
+            vector[double].const_iterator route_prob_iter
+            double demand = self.matrix_view[origin_index, dest_index]
+            double prob, load
+            size_t i
+
+        route_prob_iter = prob_vec.cbegin()
+        for i in range(route_set.size()):
+            prob = d(route_prob_iter)
+            inc(route_prob_iter)
+
+            load = prob * demand
+            for link in d(route_set[i]):
+                self.link_loading_matrix[thread_id, link] = self.link_loading_matrix[thread_id, link] + load
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self):
+        """
+        Construct an Arrow table from C++ stdlib structures.
+
+        Note: this function directly utilises the Arrow C++ API, the Arrow Cython API is not sufficient.
+        See `route_choice_set.pxd` for Cython declarations.
+
+        Returns a shared pointer to a Arrow CTable. This should be wrapped in a Python table before use.
+        Compressed link IDs are expanded to full network link IDs.
+        """
+
+        if not self.store_results:
+            raise RuntimeError("route set table construction requires `store_results` is True")
+
+        cdef:
+            shared_ptr[libpa.CArray] paths
+            shared_ptr[libpa.CArray] offsets
+
+            libpa.CMemoryPool *pool = libpa.c_get_memory_pool()
+
+            # Custom imports, these are declared in route_choice.pxd *not* libarrow.  We have to use new here because
+            # Cython doesn't support passing arguments to the default constructor as it implicitly constructs them and
+            # Pyarrow only exposes the single constructor in Cython.
+            CUInt32Builder *path_builder = new CUInt32Builder(pool)
+            CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
+            CBooleanBuilder *mask_col = <CBooleanBuilder *>nullptr
+            CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr
+            CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
+
+            libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
+            libpa.CUInt32Builder *o_col = new libpa.CUInt32Builder(pool)
+            libpa.CUInt32Builder *d_col = new libpa.CUInt32Builder(pool)
+            vector[shared_ptr[libpa.CArray]] columns
+            shared_ptr[libpa.CDataType] route_set_dtype = libpa.pyarrow_unwrap_data_type(self.route_set_dtype)
+
+            libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
+
+            int offset = 0
+            size_t network_link_begin, network_link_end, link
+
+        # Origins, Destination, Route set, [Cost for route, Mask, Path_Overlap for route, Probability for route]
+        columns.resize(len(self.psl_schema) if self.perform_assignment else len(self.schema))
+
+        if self.perform_assignment:
+            cost_col = new CDoubleBuilder(pool)
+            mask_col = new CBooleanBuilder(pool)
+            path_overlap_col = new CDoubleBuilder(pool)
+            prob_col = new CDoubleBuilder(pool)
+
+            for i in range(self.ods.size()):
+                cost_col.AppendValues(d(self.__cost_set[i]))
+                mask_col.AppendValues(d(self.__mask_set[i]))
+                path_overlap_col.AppendValues(d(self.__path_overlap_set[i]))
+                prob_col.AppendValues(d(self.__prob_set[i]))
+
+        for i in range(self.ods.size()):
+            route_set = self.__route_vecs[i]
+
+            # Instead of constructing a "list of lists" style object for storing the route sets we instead will
+            # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
+            # (path) starts.
+            for j in range(d(route_set).size()):
+                o_col.Append(self.ods[i].first)
+                d_col.Append(self.ods[i].second)
+
+                offset_builder.Append(offset)
+
+                for link in d(d(route_set)[j]):
+                    # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
+                    network_link_begin = self.mapping_idx[link]
+                    network_link_end = self.mapping_idx[link + 1]
+                    path_builder.AppendValues(
+                        &self.mapping_data[network_link_begin],
+                        network_link_end - network_link_begin
+                    )
+
+                    offset += network_link_end - network_link_begin
+
+        path_builder.Finish(&paths)
+
+        offset_builder.Append(offset)  # Mark the end of the array in offsets
+        offset_builder.Finish(&offsets)
+
+        route_set_results = libpa.CListArray.FromArraysAndType(
+            route_set_dtype,
+            d(offsets.get()),
+            d(paths.get()),
+            pool,
+            shared_ptr[libpa.CBuffer]()
+        )
+
+        o_col.Finish(&columns[0])
+        d_col.Finish(&columns[1])
+        columns[2] = d(route_set_results)
+
+        if self.perform_assignment:
+            cost_col.Finish(&columns[3])
+            mask_col.Finish(&columns[4])
+            path_overlap_col.Finish(&columns[5])
+            prob_col.Finish(&columns[6])
+
+        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
+            self.psl_schema if self.perform_assignment else self.schema
+        )
+        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
+
+        del path_builder
+        del offset_builder
+        del o_col
+        del d_col
+
+        if self.perform_assignment:
+            del cost_col
+            del mask_col
+            del path_overlap_col
+            del prob_col
+
+        return table
 
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:

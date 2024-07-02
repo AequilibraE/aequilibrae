@@ -282,11 +282,19 @@ cdef class Checkpoint:
 
 cdef class RouteChoiceSetResults:
     cdef:
-        bool store_routes
+        bool store_results
         bool perform_assignment
-        bool eager_link_load
+        bool eager_link_loading
         double cutoff_prob
         double beta
+        unsigned link_loading_reduction_threads
+        double[:, :] link_loading_matrix
+        double[:] cost_view
+        double[:, :] matrix_view
+        long long[:] nodes_to_indices_view
+        unsigned int [:] mapping_idx
+        unsigned int [:] mapping_data
+
         vector[pair[long long, long long]] ods
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set
@@ -305,7 +313,7 @@ cdef class RouteChoiceSetResults:
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
-        double[:] cost_view
+        size_t thread_id
     ) noexcept nogil
 
     cdef void compute_cost(
@@ -347,3 +355,13 @@ cdef class RouteChoiceSetResults:
         const vector[double] &path_overlap_vec,
         const vector[bool] &route_mask
     ) noexcept nogil
+
+    cdef void link_load_single_route_set(
+        RouteChoiceSetResults self,
+        const size_t i,
+        const RouteVec_t &route_set,
+        const vector[double] &prob_vec,
+        const size_t thread_id
+    ) noexcept nogil
+
+    cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self)
