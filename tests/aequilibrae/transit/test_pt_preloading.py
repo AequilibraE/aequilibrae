@@ -7,7 +7,6 @@ from aequilibrae.utils.create_example import create_example
 
 # TODO:
 # 1) Add PCE to transit database schema for each trip
-# 2) Input timings surrounding midnight (ie going past 24hrs)??
 
 
 @pytest.fixture
@@ -67,7 +66,7 @@ def hr_to_sec(e):
 
 
 def calc_preload(project, graph, start, end):
-    return project.network.build_pt_preload([graph], hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
+    return project.network.build_pt_preload(graph, hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
 
 
 def test_building_pt_preload(project: Project, graph: Graph):

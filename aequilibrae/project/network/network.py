@@ -464,6 +464,9 @@ class Network(WorkerThread):
 
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
+        if start > end:
+            raise ValueError("Ensure start time is before end time. For periods around midnight sum 2 preloads.")
+
         # Get trip_id based on specified inclusion condition
         with read_and_close(database_connection("transit")) as conn:
             links = pd.read_sql(build_pt_preload_sql(start, end, inclusion_cond), conn)
@@ -473,7 +476,7 @@ class Network(WorkerThread):
         links = links.groupby(["link_id", "direction"]).sum().rename(columns={"PCE": "preload"})
 
         # Merge preload onto all links/dir's in network and fill in 0 for links with no transit
-        preload = pd.merge(graph[0].graph, links, on=["link_id", "direction"], how="left")
+        preload = pd.merge(graph.graph, links, on=["link_id", "direction"], how="left")
         preload["preload"] = preload["preload"].fillna(0)
 
         # Extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
