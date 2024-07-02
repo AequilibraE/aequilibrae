@@ -224,7 +224,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
             if zones:
-                sql = "Insert into fare_zones (zone_id, transit_zone, agency_id) values(?, ?, ?);"
+                sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
             conn.commit()
 
