@@ -341,11 +341,8 @@ To create a preload for public transport vehicles operating between 8am to
 
 .. code-block:: python
 
-  # Time period, in seconds from midnight
-  start = 8 * 60 * 60
-  end = 10 * 60 * 60
-
-  preload = project.network.build_pt_preload(start, end)
+  # Times are specified in seconds from midnight
+  preload = project.network.build_pt_preload(start=8*3600, end=10*3600)
 
 Next, set the preload vector in the assignment.
 
