@@ -33,6 +33,7 @@ class Stop(BasicPTElement):
 
         # Not part of GTFS
         self.taz = None
+        self.agency_id = None
         self.link = None
         self.dir = None
         self.srid = -1
@@ -56,9 +57,9 @@ class Stop(BasicPTElement):
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
 
-        sql = """insert into stops (stop_id, stop, link, dir, name,
+        sql = """insert into stops (stop_id, stop, agency_id, link, dir, name,
                                     parent_station, description, fare_zone_id, transit_zone, route_type, geometry)
-                 values (?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
+                 values (?,?,?,?,?,?,?,?,?,?,?, GeomFromWKB(?, ?));"""
 
         dt = self.data
         conn.execute(sql, dt)

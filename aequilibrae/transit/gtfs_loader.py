@@ -245,7 +245,6 @@ class GTFSReader(WorkerThread):
             farerl = parse_csv(file, column_order[farerltxt])
         self.data_arrays[farerltxt] = farerl
 
-        # corresp = {}
         for line in range(farerl.shape[0]):
             data = tuple(farerl[line][list(column_order[farerltxt].keys())])
             fr = FareRule()
