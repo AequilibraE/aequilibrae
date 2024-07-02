@@ -185,7 +185,7 @@ cdef class RouteChoiceSet:
 
     cdef void bfsle(
         RouteChoiceSet self,
-        RouteSet_t *route_set,
+        RouteSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -202,7 +202,7 @@ cdef class RouteChoiceSet:
 
     cdef void link_penalisation(
         RouteChoiceSet self,
-        RouteSet_t *route_set,
+        RouteSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,

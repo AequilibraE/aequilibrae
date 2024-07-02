@@ -246,6 +246,7 @@ cdef class RouteChoiceSet:
     def batched(
             self,
             ods: List[Tuple[int, int]],
+            double[:, :] demand_view,
             max_routes: int = 0,
             max_depth: int = 0,
             max_misses: int = 100,
@@ -313,8 +314,6 @@ cdef class RouteChoiceSet:
             # Scale cutoff prob from [0, 1] -> [0.5, 1]. Values below 0.5 produce negative inverse binary logit values.
             double scaled_cutoff_prob = (1.0 - cutoff_prob) * 0.5 + 0.5
 
-            vector[pair[long long, long long]] c_ods
-
             # A* (and Dijkstra's) require memory views, so we must allocate here and take slices. Python can handle this
             # memory
             double [:, :] cost_matrix = np.empty((c_cores, self.cost_view.shape[0]), dtype=float)
@@ -329,7 +328,6 @@ cdef class RouteChoiceSet:
             # interface.
             long long [:, :] _reached_first_matrix
 
-            vector[RouteSet_t *] *results
             size_t max_results_len, batch_len, j
 
         # self.a_star = a_star
@@ -346,197 +344,106 @@ cdef class RouteChoiceSet:
         if len(set_ods) != len(ods):
             warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
 
-        if where is not None:
-            checkpoint = Checkpoint(
-                where,
-                self.psl_schema if path_size_logit else self.schema, partition_cols=["origin id"]
-            )
-            batches = list(Checkpoint.batches(set_ods))
-            max_results_len = <size_t>max(len(batch) for batch in batches)
-        else:
-            random.shuffle(set_ods)
-            batches = [set_ods]
-            max_results_len = len(set_ods)
+        random.shuffle(set_ods)
 
-        results = new vector[RouteSet_t *](max_results_len)
+        cdef RouteSet_t *route_set
+        cdef RouteChoiceSetResults results = RouteChoiceSetResults(
+            set_ods,
+            scaled_cutoff_prob,
+            beta,
+            self.num_links,
+            self.cost_view,
+            demand_view,
+            self.nodes_to_indices_view,
+            self.mapping_idx,
+            self.mapping_data,
+            True,  # store_results,
+            True,  # perform_assignment
+            True,  # eager_link_loading
+            cores
+        )
 
-        cdef:
-            RouteSet_t *route_set
-            pair[vector[long long] *, vector[long long] *] freq_pair
-            vector[vector[long long] *] *link_union_set = <vector[vector[long long] *] *>nullptr
-            vector[vector[double] *] *cost_set = <vector[vector[double] *] *>nullptr
-            vector[vector_bool_ptr] *mask_set = <vector[vector_bool_ptr] *>nullptr
-            vector[vector[double] *] *path_overlap_set = <vector[vector[double] *] *>nullptr
-            vector[vector[double] *] *prob_set = <vector[vector[double] *] *>nullptr
+        with nogil, parallel(num_threads=c_cores):
+            route_set = new RouteSet_t()
+            for i in prange(batch_len):
+                origin_index = self.nodes_to_indices_view[results.ods[i].first]
+                dest_index = self.nodes_to_indices_view[results.ods[i].second]
 
-        if path_size_logit:
-            link_union_set = new vector[vector[long long] *](max_results_len)
-            cost_set = new vector[vector[double] *](max_results_len)
-            mask_set = new vector[vector_bool_ptr](max_results_len)
-            path_overlap_set = new vector[vector[double] *](max_results_len)
-            prob_set = new vector[vector[double] *](max_results_len)
+                if origin_index == dest_index:
+                    continue
 
-        self.deallocate()  # We may be storing results from a previous run
+                route_vec = results.get_route_set(i)
 
-        for batch in batches:
-            c_ods = batch  # Convert the batch to a C++ vector, this isn't strictly efficient but is nicer
-            batch_len = c_ods.size()
-            # We know we've allocated enough size to store all max length batch but we resize to a smaller size when not
-            # needed
-            results.resize(batch_len)
+                if self.block_flows_through_centroids:
+                    blocking_centroid_flows(
+                        0,  # Always blocking
+                        origin_index,
+                        self.zones,
+                        self.graph_fs_view,
+                        b_nodes_matrix[threadid()],
+                        self.b_nodes_view,
+                    )
 
-            if path_size_logit:
-                # We may clear these objects because it's either:
-                # - the first iteration and they contain no elements, thus no memory to leak
-                # - the internal objects were freed by the previous iteration
-                link_union_set.clear()
-                cost_set.clear()
-                mask_set.clear()
-                path_overlap_set.clear()
-                prob_set.clear()
+                if bfsle:
+                    RouteChoiceSet.bfsle(
+                        self,
+                        d(route_set),
+                        origin_index,
+                        dest_index,
+                        c_max_routes,
+                        c_max_depth,
+                        c_max_misses,
+                        cost_matrix[threadid()],
+                        predecessors_matrix[threadid()],
+                        conn_matrix[threadid()],
+                        b_nodes_matrix[threadid()],
+                        _reached_first_matrix[threadid()],
+                        penalty,
+                        c_seed,
+                    )
+                else:
+                    RouteChoiceSet.link_penalisation(
+                        self,
+                        d(route_set),
+                        origin_index,
+                        dest_index,
+                        c_max_routes,
+                        c_max_depth,
+                        c_max_misses,
+                        cost_matrix[threadid()],
+                        predecessors_matrix[threadid()],
+                        conn_matrix[threadid()],
+                        b_nodes_matrix[threadid()],
+                        _reached_first_matrix[threadid()],
+                        penalty,
+                        c_seed,
+                    )
 
-                link_union_set.resize(batch_len)
-                cost_set.resize(batch_len)
-                mask_set.resize(batch_len)
-                path_overlap_set.resize(batch_len)
-                prob_set.resize(batch_len)
-            with nogil, parallel(num_threads=c_cores):
-                for i in prange(batch_len):
-                    origin_index = self.nodes_to_indices_view[c_ods[i].first]
-                    dest_index = self.nodes_to_indices_view[c_ods[i].second]
 
-                    # Create an empty route set before doing anything else. Even if it ends up empty
-                    route_set = new RouteSet_t()
-                    d(results)[i] = route_set
+                # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
+                # routes. This is done to simplify memory management later on.
+                d(route_vec).reserve(route_set.size())
+                for route in d(route_set):
+                    d(route_vec).emplace_back(route)
 
-                    if origin_index == dest_index:
-                        continue
+                # We most now drop all references to those raw pointers. The unique pointers now own those vectors.
+                route_set.clear()
 
-                    if self.block_flows_through_centroids:
-                        blocking_centroid_flows(
-                            0,  # Always blocking
-                            origin_index,
-                            self.zones,
-                            self.graph_fs_view,
-                            b_nodes_matrix[threadid()],
-                            self.b_nodes_view,
-                        )
+                results.compute_result(i, d(route_vec), threadid())
 
-                    if bfsle:
-                        RouteChoiceSet.bfsle(
-                            self,
-                            route_set,
-                            origin_index,
-                            dest_index,
-                            c_max_routes,
-                            c_max_depth,
-                            c_max_misses,
-                            cost_matrix[threadid()],
-                            predecessors_matrix[threadid()],
-                            conn_matrix[threadid()],
-                            b_nodes_matrix[threadid()],
-                            _reached_first_matrix[threadid()],
-                            penalty,
-                            c_seed,
-                        )
-                    else:
-                        RouteChoiceSet.link_penalisation(
-                            self,
-                            route_set,
-                            origin_index,
-                            dest_index,
-                            c_max_routes,
-                            c_max_depth,
-                            c_max_misses,
-                            cost_matrix[threadid()],
-                            predecessors_matrix[threadid()],
-                            conn_matrix[threadid()],
-                            b_nodes_matrix[threadid()],
-                            _reached_first_matrix[threadid()],
-                            penalty,
-                            c_seed,
-                        )
+                if self.block_flows_through_centroids:
+                    blocking_centroid_flows(
+                        1,  # Always unblocking
+                        origin_index,
+                        self.zones,
+                        self.graph_fs_view,
+                        b_nodes_matrix[threadid()],
+                        self.b_nodes_view,
+                    )
 
-                    if path_size_logit:
-                        d(cost_set)[i] = RouteChoiceSet.compute_cost(route_set, self.cost_view)
-                        d(mask_set)[i] = RouteChoiceSet.compute_mask(scaled_cutoff_prob, d(d(cost_set)[i]), c_ods[i].first, c_ods[i].second)
+            del route_set
+        print(libpa.pyarrow_wrap_table(results.make_table_from_results()).to_pandas())
 
-                        freq_pair = RouteChoiceSet.compute_frequency(route_set, d(d(mask_set)[i]))
-                        d(link_union_set)[i] = freq_pair.first
-                        d(path_overlap_set)[i] = RouteChoiceSet.compute_path_overlap(
-                            route_set,
-                            freq_pair,
-                            d(d(cost_set)[i]),
-                            d(d(mask_set)[i]),
-                            self.cost_view
-                        )
-                        d(prob_set)[i] = RouteChoiceSet.compute_prob(
-                            d(d(cost_set)[i]),
-                            d(d(path_overlap_set)[i]),
-                            d(d(mask_set)[i]),
-                            beta
-                        )
-                        # While we need the unique sorted links (.first), we don't need the frequencies (.second)
-                        del freq_pair.second
-
-                    if self.block_flows_through_centroids:
-                        blocking_centroid_flows(
-                            1,  # Always unblocking
-                            origin_index,
-                            self.zones,
-                            self.graph_fs_view,
-                            b_nodes_matrix[threadid()],
-                            self.b_nodes_view,
-                        )
-
-            if where is not None:
-                table = libpa.pyarrow_wrap_table(
-                    self.make_table_from_results(c_ods, d(results), cost_set, mask_set, path_overlap_set, prob_set)
-                )
-
-                # Once we've made the table all results have been copied into some pyarrow structure, we can free our
-                # inner internal structures
-                if path_size_logit:
-                    for j in range(batch_len):
-                        del d(link_union_set)[j]
-                        del d(cost_set)[j]
-                        del d(mask_set)[j]
-                        del d(path_overlap_set)[j]
-                        del d(prob_set)[j]
-
-                for j in range(batch_len):
-                    for route in d(d(results)[j]):
-                        del route
-                    del d(results)[j]
-
-                checkpoint.write(table)
-                del table
-            else:
-                # where is None implies len(batches) == 1, i.e. there was only one batch and we should keep everything
-                # in memory
-                pass
-
-        # Here we decide if we wish to preserve our results for later saving/link loading
-        if where is not None:
-            # We're done with everything now, we can free the outer internal structures
-            del results
-            if path_size_logit:
-                del link_union_set
-                del cost_set
-                del mask_set
-                del path_overlap_set
-                del prob_set
-        else:
-            self.results = results
-            self.link_union_set = link_union_set
-            self.cost_set = cost_set
-            self.mask_set = mask_set
-            self.path_overlap_set = path_overlap_set
-            self.prob_set = prob_set
-
-            # Copy the c_ods vector, it was provided by the auto Cython conversion and is allocated on the stack,
-            # we should copy it to keep it around
-            self.ods = new vector[pair[long long, long long]](c_ods)
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -584,7 +491,7 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     cdef void bfsle(
         RouteChoiceSet self,
-        RouteSet_t *route_set,
+        RouteSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -625,7 +532,6 @@ cdef class RouteChoiceSet:
         max_depth = max_depth if max_depth != 0 else UINT_MAX
 
         queue.push_back(new unordered_set[long long]())  # Start with no edges banned
-        route_set = new RouteSet_t()
         rng.seed(seed)
 
         if lp:
@@ -739,7 +645,7 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     cdef void link_penalisation(
         RouteChoiceSet self,
-        RouteSet_t *route_set,
+        RouteSet_t &route_set,
         long origin_index,
         long dest_index,
         unsigned int max_routes,
@@ -763,7 +669,6 @@ cdef class RouteChoiceSet:
 
         max_routes = max_routes if max_routes != 0 else UINT_MAX
         max_depth = max_depth if max_depth != 0 else UINT_MAX
-        route_set = new RouteSet_t()
         memcpy(&thread_cost[0], &self.cost_view[0], self.cost_view.shape[0] * sizeof(double))
 
         for depth in range(max_depth):
@@ -1580,7 +1485,7 @@ cdef class RouteChoiceSetResults:
             **perform_assignment** (`obj`: bool): Whether or not to perform a path-sized logit assignment.
 
             **eager_link_loading** (`obj`: bool): If enabled link loading is immediately performed during the call the
-              `compute_results`. This allows only link loading results to be returned, removing the requirement of
+              `compute_result`. This allows only link loading results to be returned, removing the requirement of
               `store_results=True` for link loading, significantly reducing total memory usage.
 
             **link_loading_reduction_threads** (`obj`: int): As link loading is a reduction-style procedure, this parameter
@@ -1657,13 +1562,11 @@ cdef class RouteChoiceSetResults:
                 self.__route_vecs[i] = make_shared[RouteVec_t]()
 
         if self.perform_assignment and self.store_results:
-            # self.link_union_set.resize(size)
             self.__cost_set.resize(size)
             self.__mask_set.resize(size)
             self.__path_overlap_set.resize(size)
             self.__prob_set.resize(size)
             for i in range(size):
-                # self.link_union_set[i] =
                 self.__cost_set[i] = make_shared[vector[double]]()
                 self.__mask_set[i] = make_shared[vector[bool]]()
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
