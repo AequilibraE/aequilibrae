@@ -1,6 +1,6 @@
 # cython: language_level=3str
 from aequilibrae.paths.results import PathResults
-from aequilibrae.matrix.sparse_matrix cimport COO
+from aequilibrae.matrix.sparse_matrix cimport COO, COO_struct
 
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
@@ -159,18 +159,10 @@ cdef class RouteChoiceSet:
         bint block_flows_through_centroids
         bint a_star
 
-        vector[pair[long long, long long]] *ods
-        vector[RouteSet_t *] *results
-        vector[vector[long long] *] *link_union_set
-        vector[vector[double] *] *cost_set
-        vector[vector_bool_ptr] *mask_set
-        vector[vector[double] *] *path_overlap_set
-        vector[vector[double] *] *prob_set
-
         unsigned int [:] mapping_idx
         unsigned int [:] mapping_data
 
-    cdef void deallocate(RouteChoiceSet self) nogil
+        readonly RouteChoiceSetResults results
 
     cdef void path_find(
         RouteChoiceSet self,
@@ -217,61 +209,26 @@ cdef class RouteChoiceSet:
         unsigned int seed
     ) noexcept nogil
 
-    @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[bool] &route_mask) noexcept nogil
+    # @staticmethod
+    # cdef vector[vector[double] *] *compute_path_files(
+    #     vector[pair[long long, long long]] &ods,
+    #     vector[RouteSet_t *] &results,
+    #     vector[vector[long long] *] &link_union_set,
+    #     vector[vector[double] *] &prob_set,
+    #     unsigned int cores
+    # ) noexcept nogil
 
-    @staticmethod
-    cdef vector[double] *compute_cost(RouteSet_t *route_sets, double[:] cost_view) noexcept nogil
+    # cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
+    # cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
+    # cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
 
-    @staticmethod
-    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost, long long origin, long long dest) noexcept nogil
+    # cdef vector[double] *apply_select_link_loading(
+    #     RouteChoiceSet self,
+    #     COO sparse_mat,
+    #     double[:, :] matrix_view,
+    #     unordered_set[long] &select_link_set
+    # ) noexcept nogil
 
-    @staticmethod
-    cdef vector[double] *compute_path_overlap(
-        RouteSet_t *route_set,
-        pair[vector[long long] *, vector[long long] *] &freq_set,
-        vector[double] &total_cost,
-        vector[bool] &route_mask,
-        double[:] cost_view
-    ) noexcept nogil
-
-    @staticmethod
-    cdef vector[double] *compute_prob(
-        vector[double] &total_cost,
-        vector[double] &path_overlap_vec,
-        vector[bool] &route_mask,
-        double beta
-    ) noexcept nogil
-
-    @staticmethod
-    cdef vector[vector[double] *] *compute_path_files(
-        vector[pair[long long, long long]] &ods,
-        vector[RouteSet_t *] &results,
-        vector[vector[long long] *] &link_union_set,
-        vector[vector[double] *] &prob_set,
-        unsigned int cores
-    ) noexcept nogil
-
-    cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
-    cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
-    cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
-
-    cdef vector[double] *apply_select_link_loading(
-        RouteChoiceSet self,
-        COO sparse_mat,
-        double[:, :] matrix_view,
-        unordered_set[long] &select_link_set
-    ) noexcept nogil
-
-    cdef shared_ptr[libpa.CTable] make_table_from_results(
-        RouteChoiceSet self,
-        vector[pair[long long, long long]] &ods,
-        vector[RouteSet_t *] &route_sets,
-        vector[vector[double] *] *cost_set,
-        vector[vector_bool_ptr] *mask_set,
-        vector[vector[double] *] *path_overlap_set,
-        vector[vector[double] *] *prob_set
-    )
 
 cdef class Checkpoint:
     cdef:
@@ -285,9 +242,11 @@ cdef class RouteChoiceSetResults:
         bool store_results
         bool perform_assignment
         bool eager_link_loading
+        bool eager_link_loading
         double cutoff_prob
         double beta
         unsigned link_loading_reduction_threads
+        double[:] link_loads
         double[:, :] link_loading_matrix
         double[:] cost_view
         double[:, :] matrix_view
@@ -302,6 +261,11 @@ cdef class RouteChoiceSetResults:
         vector[shared_ptr[vector[bool]]] __mask_set
         vector[shared_ptr[vector[double]]] __path_overlap_set
         vector[shared_ptr[vector[double]]] __prob_set
+
+        # vector[COO_struct] sl_od_sparse_matrix_matrix
+        # unordered_set[long] select_link_set
+        # double[:] sl_link_loads
+        # double[:, :] sl_link_loading_matrix
 
     cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
@@ -365,3 +329,6 @@ cdef class RouteChoiceSetResults:
     ) noexcept nogil
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self)
+
+    cdef void reduce_link_loading(RouteChoiceSetResults self)
+    cdef double[:] get_link_loading(RouteChoiceSetResults self)

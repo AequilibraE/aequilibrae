@@ -152,62 +152,7 @@ cdef class RouteChoiceSet:
 
         self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
 
-    def __dealloc__(self):
-        """
-        C level deallocation. For freeing memory allocated by this object. *Must* have GIL, `self` may be in a
-        partially deallocated state already. Do not call any other Python method.
-        """
-        self.deallocate()
-
-    cdef void deallocate(RouteChoiceSet self) nogil:
-        """__dealloc__ cannot be called from normal code."""
-        cdef:
-            RouteSet_t *route_set
-            vector[long long] *link_vec
-            vector[double] *double_vec
-            vector[bool] *bool_vec
-
-        if self.results != nullptr:
-            for route_set in d(self.results):
-                for link_vec in d(route_set):
-                    del link_vec
-                del route_set
-            del self.results
-            self.results = <vector[RouteSet_t *] *>nullptr
-
-        if self.link_union_set != nullptr:
-            for link_vec in d(self.link_union_set):
-                del link_vec
-            del self.link_union_set
-            self.link_union_set = <vector[vector[long long] *] *>nullptr
-
-        if self.cost_set != nullptr:
-            for double_vec in d(self.cost_set):
-                del double_vec
-            del self.cost_set
-            self.cost_set = <vector[vector[double] *] *>nullptr
-
-        if self.mask_set != nullptr:
-            for bool_vec in d(self.mask_set):
-                del bool_vec
-            del self.mask_set
-            self.mask_set = <vector[vector_bool_ptr] *>nullptr
-
-        if self.path_overlap_set != nullptr:
-            for double_vec in d(self.path_overlap_set):
-                del double_vec
-            del self.path_overlap_set
-            self.path_overlap_set = <vector[vector[double] *] *>nullptr
-
-        if self.prob_set != nullptr:
-            for double_vec in d(self.prob_set):
-                del double_vec
-            del self.prob_set
-            self.prob_set = <vector[vector[double] *] *>nullptr
-
-        if self.ods != nullptr:
-            del self.ods
-            self.ods = prob_set = <vector[pair[long long, long long]] *>nullptr
+        self.results = None
 
     @cython.embedsignature(True)
     def run(self, origin: int, destination: int, *args, **kwargs):
@@ -328,7 +273,7 @@ cdef class RouteChoiceSet:
             # interface.
             long long [:, :] _reached_first_matrix
 
-            size_t max_results_len, batch_len, j
+            size_t max_results_len, j
 
         # self.a_star = a_star
 
@@ -358,17 +303,21 @@ cdef class RouteChoiceSet:
             self.mapping_idx,
             self.mapping_data,
             True,  # store_results,
-            True,  # perform_assignment
+            path_size_logit,  # perform_assignment
             True,  # eager_link_loading
             cores
         )
+        self.results = results
+
+        print("Starting compute")
 
         with nogil, parallel(num_threads=c_cores):
             route_set = new RouteSet_t()
-            for i in prange(batch_len):
+            for i in prange(results.ods.size()):
                 origin_index = self.nodes_to_indices_view[results.ods[i].first]
                 dest_index = self.nodes_to_indices_view[results.ods[i].second]
 
+                # fprintf(stderr, "o: %lld, d: %lld\n", origin_index, dest_index)
                 if origin_index == dest_index:
                     continue
 
@@ -419,7 +368,6 @@ cdef class RouteChoiceSet:
                         c_seed,
                     )
 
-
                 # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
                 # routes. This is done to simplify memory management later on.
                 d(route_vec).reserve(route_set.size())
@@ -442,8 +390,7 @@ cdef class RouteChoiceSet:
                     )
 
             del route_set
-        print(libpa.pyarrow_wrap_table(results.make_table_from_results()).to_pandas())
-
+        self.results.reduce_link_loading()
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -709,669 +656,320 @@ cdef class RouteChoiceSet:
             else:
                 break
 
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef pair[vector[long long] *, vector[long long] *] compute_frequency(RouteSet_t *route_set, vector[bool] &route_mask) noexcept nogil:
-        """
-        Compute a frequency map for each route with the route_mask applied.
-
-        Each node at index i in the first returned vector has frequency at index i in the second vector.
-        """
-        cdef:
-            vector[long long] *keys
-            vector[long long] *counts
-            vector[long long] link_union
-            vector[long long].const_iterator union_iter
-            vector[long long] *route
-
-            # Scratch objects
-            size_t length, count, i
-            long long link
-            bool route_present = False
-
-        keys = new vector[long long]()
-        counts = new vector[long long]()
-
-        # When calculating the frequency of routes, we need to exclude those not in the mask.
-        i = 0
-        length = 0
-        for route in d(route_set):
-            # We do so here ...
-            route_present = route_mask[inc(i)]
-            if not route_present:
-                continue
-
-            length = length + route.size()
-        link_union.reserve(length)
-
-        i = 0
-        for route in d(route_set):
-            # ... and here.
-            route_present = route_mask[inc(i)]
-            if not route_present:
-                continue
-
-            link_union.insert(link_union.end(), route.begin(), route.end())
-
-        sort(link_union.begin(), link_union.end())
-
-        union_iter = link_union.cbegin()
-        while union_iter != link_union.cend():
-            count = 0
-            link = d(union_iter)
-            while link == d(union_iter) and union_iter != link_union.cend():
-                count = count + 1
-                inc(union_iter)
-
-            keys.push_back(link)
-            counts.push_back(count)
-
-        return make_pair(keys, counts)
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef vector[double] *compute_cost(RouteSet_t *route_set, double[:] cost_view) noexcept nogil:
-        """Compute the cost each route."""
-        cdef:
-            vector[double] *cost_vec
-
-            # Scratch objects
-            double cost
-            long long link, i
-
-        cost_vec = new vector[double]()
-        cost_vec.reserve(route_set.size())
-
-        for route in d(route_set):
-            cost = 0.0
-            for link in d(route):
-                cost = cost + cost_view[link]
-
-            cost_vec.push_back(cost)
-
-        return cost_vec
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef vector[bool] *compute_mask(double cutoff_prob, vector[double] &total_cost, long long origin, long long dest) noexcept nogil:
-        """
-        Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
-        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
-        the route set.
-        """
-        cdef:
-            size_t i
-            bool found_zero_cost = False
-
-            vector[bool] *route_mask = new vector[bool](total_cost.size())
-            vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
-            double cutoff_cost = d(min) \
-                + inverse_binary_logit(cutoff_prob, 0.0, 1.0)
-
-        # The route mask should be True for the routes we wish to include.
-        for i in range(total_cost.size()):
-            if total_cost[i] == 0.0:
-                found_zero_cost = True
-                break
-            elif total_cost[i] <= cutoff_cost:
-                d(route_mask)[i] = True
-
-        if found_zero_cost:
-            # If we've found a zero cost path we must abandon the whole route set.
-            for i in range(total_cost.size()):
-                d(route_mask)[i] = False
-
-            with gil:
-                warnings.warn(f"Zero cost route found for ({origin}, {dest}). Entire route set masked")
-        elif min != total_cost.cend():
-            # Always include the min element. It should already be but I don't trust floating math to do this correctly.
-            # But only if there actually was a min element (i.e. empty route set)
-            d(route_mask)[min - total_cost.cbegin()] = True
-
-        return route_mask
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef vector[double] *compute_path_overlap(
-        RouteSet_t *route_set,
-        pair[vector[long long] *, vector[long long] *] &freq_set,
-        vector[double] &total_cost,
-        vector[bool] &route_mask,
-        double[:] cost_view
-    ) noexcept nogil:
-        """
-        Compute the path overlap figure based on the route cost and frequency.
-
-        Notation changes:
-            a: link
-            t_a: cost_view
-            c_i: total_costs
-            A_i: route
-            sum_{k in R}: delta_{a,k}: freq_set
-        """
-        cdef:
-            vector[double] *path_overlap_vec  = new vector[double](route_set.size())
-
-            # Scratch objects
-            vector[long long].const_iterator link_iter
-            double path_overlap
-            long long link
-            size_t i = 0
-
-        for route in d(route_set):
-            # Skip masked routes
-            if not route_mask[i]:
-                inc(i)
-                continue
-
-            path_overlap = 0.0
-            for link in d(route):
-                # We know the frequency table is ordered and contains every link in the union of the routes.
-                # We want to find the index of the link, and use that to look up it's frequency
-                link_iter = lower_bound(freq_set.first.begin(), freq_set.first.end(), link)
-
-                # lower_bound returns freq_set.first.end() when no link is found.
-                # This /should/ never happen.
-                if link_iter == freq_set.first.end():
-                    continue
-                path_overlap = path_overlap + cost_view[link] / d(freq_set.second)[link_iter - freq_set.first.begin()]
-            d(path_overlap_vec)[i] = path_overlap / total_cost[i]
-
-            inc(i)
-
-        return path_overlap_vec
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef vector[double] *compute_prob(
-        vector[double] &total_cost,
-        vector[double] &path_overlap_vec,
-        vector[bool] &route_mask,
-        double beta
-    ) noexcept nogil:
-        """Compute a probability for each route in the route set based on the path overlap."""
-        cdef:
-            # Scratch objects
-            vector[double] *prob_vec = new vector[double](total_cost.size())
-            double inv_prob
-            size_t i, j
-
-        # Beware when refactoring the below, the scale of the costs may cause floating point errors. Large costs will
-        # lead to NaN results
-        for i in range(total_cost.size()):
-            # The probability of choosing a route that has been masked out is 0.
-            if not route_mask[i]:
-                continue
-
-            inv_prob = 0.0
-            for j in range(total_cost.size()):
-                # We must skip any other routes that are not included in the mask otherwise our probabilities won't
-                # add up.
-                if not route_mask[j]:
-                    continue
-
-                inv_prob = inv_prob + pow(path_overlap_vec[j] / path_overlap_vec[i], beta) \
-                    * exp((total_cost[i] - total_cost[j]))  # Assuming theta=1.0
-
-            d(prob_vec)[i] = 1.0 / inv_prob
-
-        return prob_vec
-
-    @cython.embedsignature(True)
-    def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
-        """
-        Apply link loading to the network using the demand matrix and the previously computed route sets.
-        """
-        if self.ods == nullptr \
-           or self.link_union_set == nullptr \
-           or self.prob_set == nullptr:
-            raise ValueError("link loading requires Route Choice path_size_logit results")
-
-        if not isinstance(matrix, AequilibraeMatrix):
-            raise ValueError("`matrix` is not an AequilibraE matrix")
-
-        cores = cores if cores > 0 else omp_get_max_threads()
-
-        cdef:
-            vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
-            vector[double] *vec
-
-        if generate_path_files:
-            path_files = RouteChoiceSet.compute_path_files(
-                d(self.ods),
-                d(self.results),
-                d(self.link_union_set),
-                d(self.prob_set),
-                cores,
-            )
-
-            # # FIXME, write out path files
-            # tmp = []
-            # for vec in d(path_files):
-            #     tmp.append(d(vec))
-            # print(tmp)
-
-        link_loads = {}
-        for i, name in enumerate(matrix.names):
-            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-
-            ll = self.apply_link_loading_from_path_files(m, d(path_files)) \
-                if generate_path_files else self.apply_link_loading(m)
-
-            link_loads[name] = self.apply_link_loading_func(ll, cores)
-            del ll
-
-        if generate_path_files:
-            for vec in d(path_files):
-                del vec
-            del path_files
-
-        return link_loads
-
-    cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
-        """Helper function for link_loading."""
-        compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
-        actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
-
-        assign_link_loads_cython(
-            actual,
-            compressed,
-            self.graph_compressed_id_view,
-            cores
-        )
-
-        return actual.reshape(-1), compressed[:-1].reshape(-1)
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.initializedcheck(False)
-    @staticmethod
-    cdef vector[vector[double] *] *compute_path_files(
-        vector[pair[long long, long long]] &ods,
-        vector[RouteSet_t *] &results,
-        vector[vector[long long] *] &link_union_set,
-        vector[vector[double] *] &prob_set,
-        unsigned int cores
-    ) noexcept nogil:
-        """
-        Computes the path files for the provided vector of RouteSets.
-
-        Returns vector of vectors of link loads corresponding to each link in it's link_union_set.
-        """
-        cdef:
-            vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())
-            vector[long long] *link_union
-            vector[double] *loads
-            vector[long long] *links
-
-            vector[long long].const_iterator link_union_iter
-            vector[long long].const_iterator link_iter
-
-            size_t link_loc
-            double prob
-            long long i
-
-        with parallel(num_threads=cores):
-            for i in prange(ods.size()):
-                link_union = link_union_set[i]
-                loads = new vector[double](link_union.size(), 0.0)
-
-                # We now iterate over all routes in the route_set, each route has an associated probability
-                route_prob_iter = prob_set[i].cbegin()
-                for route in d(results[i]):
-                    prob = d(route_prob_iter)
-                    inc(route_prob_iter)
-
-                    if prob == 0.0:
-                        continue
-
-                    # For each link in the route, we need to assign the appropriate demand * prob Because the link union
-                    # is known to be sorted, if the links in the route are also sorted we can just step along both
-                    # arrays simultaneously, skipping elements in the link_union when appropriate. This allows us to
-                    # operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense
-                    # formulation. This is also more cache efficient, the only downsides are that the code is
-                    # harder to read and it requires sorting the route.
-
-                    # NOTE: the sorting of routes is technically something that is already computed, during the
-                    # computation of the link frequency we merge and sort all links, if we instead sorted then used an
-                    # N-way merge we could reuse the sorted routes and the sorted link union.
-
-                    # We copy the links in case the routes haven't already been saved
-                    links = new vector[long long](d(route))
-                    sort(links.begin(), links.end())
-
-                    # links and link_union are sorted, and links is a subset of link_union
-                    link_union_iter = link_union.cbegin()
-                    link_iter = links.cbegin()
-
-                    while link_iter != links.cend():
-                        # Find the next location for the current link in links
-                        while d(link_iter) != d(link_union_iter) and link_iter != links.cend():
-                            inc(link_union_iter)
-
-                        link_loc = link_union_iter - link_union.cbegin()
-                        d(loads)[link_loc] = d(loads)[link_loc] + prob  # += here results in all zeros? Odd
-
-                        inc(link_iter)
-
-                    del links
-
-                d(link_loads)[i] = loads
-
-        return link_loads
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.initializedcheck(False)
-    cdef vector[double] *apply_link_loading_from_path_files(
-        RouteChoiceSet self,
-        double[:, :] matrix_view,
-        vector[vector[double] *] &path_files
-    ) noexcept nogil:
-        """
-        Apply link loading from path files.
-
-        Returns a vector of link loads indexed by compressed link ID.
-        """
-        cdef:
-            vector[double] *loads
-            vector[long long] *link_union
-            long origin_index, dest_index
-            double demand
-
-            vector[double] *link_loads = new vector[double](self.num_links)
-
-        for i in range(self.ods.size()):
-            loads = path_files[i]
-            link_union = d(self.link_union_set)[i]
-
-            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
-            demand = matrix_view[origin_index, dest_index]
-
-            for j in range(link_union.size()):
-                link = d(link_union)[j]
-                d(link_loads)[link] = d(link_loads)[link] + demand * d(loads)[j]
-
-        return link_loads
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.initializedcheck(False)
-    cdef vector[double] *apply_link_loading(self, double[:, :] matrix_view) noexcept nogil:
-        """
-        Apply link loading.
-
-        Returns a vector of link loads indexed by compressed link ID.
-        """
-        cdef:
-            RouteSet_t *route_set
-            vector[double] *route_set_prob
-            vector[double].const_iterator route_prob_iter
-            long origin_index, dest_index
-            double demand, prob, load
-
-            vector[double] *link_loads = new vector[double](self.num_links)
-
-        for i in range(self.ods.size()):
-            route_set = d(self.results)[i]
-            route_set_prob = d(self.prob_set)[i]
-
-            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
-            demand = matrix_view[origin_index, dest_index]
-
-            route_prob_iter = route_set_prob.cbegin()
-            for route in d(route_set):
-                prob = d(route_prob_iter)
-                inc(route_prob_iter)
-
-                load = prob * demand
-                for link in d(route):
-                    d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
-
-        return link_loads
-
-    @cython.embedsignature(True)
-    def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, List[long]], cores: int = 0):
-        """
-        Apply link loading to the network using the demand matrix and the previously computed route sets.
-        """
-        if self.ods == nullptr \
-           or self.link_union_set == nullptr \
-           or self.prob_set == nullptr:
-            raise ValueError("select link loading requires Route Choice path_size_logit results")
-
-        if not isinstance(matrix, AequilibraeMatrix):
-            raise ValueError("`matrix` is not an AequilibraE matrix")
-
-        cores = cores if cores > 0 else omp_get_max_threads()
-
-        cdef:
-            unordered_set[long] select_link_set
-            vector[double] *ll
-
-        link_loads = {}
-
-        for i, name in enumerate(matrix.names):
-            matrix_ll = {}
-            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-            for (k, v) in select_links.items():
-                select_link_set = <unordered_set[long]> v
-
-                coo = COO((self.zones, self.zones))
-
-                ll = self.apply_select_link_loading(coo, m, select_link_set)
-                res = self.apply_link_loading_func(ll, cores)
-                del ll
-
-                matrix_ll[k] = (coo, res)
-            link_loads[name] = matrix_ll
-
-        return link_loads
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.initializedcheck(False)
-    cdef vector[double] *apply_select_link_loading(
-        RouteChoiceSet self,
-        COO sparse_mat,
-        double[:, :] matrix_view,
-        unordered_set[long] &select_link_set
-    ) noexcept nogil:
-        """
-        Apply select link loading.
-
-        Returns a vector of link loads indexed by compressed link ID.
-        """
-        cdef:
-            RouteSet_t *route_set
-            vector[double] *route_set_prob
-            vector[double].const_iterator route_prob_iter
-            long origin_index, dest_index, o, d
-            double demand, prob, load
-
-            vector[double] *link_loads = new vector[double](self.num_links)
-
-            bool link_present
-
-        # For each OD pair, if a route contains one or more links in a select link set, add that ODs demand to
-        # a sparse matrix of Os to Ds
-
-        # For each route, if it contains one or more links in a select link set, apply the link loading for
-        # that route
-
-        for i in range(self.ods.size()):
-            route_set = d(self.results)[i]
-            route_set_prob = d(self.prob_set)[i]
-
-            origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
-            dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
-            demand = matrix_view[origin_index, dest_index]
-
-            route_prob_iter = route_set_prob.cbegin()
-            for route in d(route_set):
-                prob = d(route_prob_iter)
-                inc(route_prob_iter)
-                load = prob * demand
-
-                link_present = False
-                for link in d(route):
-                    if select_link_set.find(link) != select_link_set.end():
-                        sparse_mat.append(origin_index, dest_index, load)
-                        link_present = True
-                        break
-
-                if link_present:
-                    for link in d(route):
-                        d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
-
-        return link_loads
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
-    cdef shared_ptr[libpa.CTable] make_table_from_results(
-        RouteChoiceSet self,
-        vector[pair[long long, long long]] &ods,
-        vector[RouteSet_t *] &route_sets,
-        vector[vector[double] *] *cost_set,
-        vector[vector_bool_ptr] *mask_set,
-        vector[vector[double] *] *path_overlap_set,
-        vector[vector[double] *] *prob_set
-    ):
-        """
-        Construct an Arrow table from C++ stdlib structures.
-
-        Note: this function directly utilises the Arrow C++ API, the Arrow Cython API is not sufficient.
-        See `route_choice_set.pxd` for Cython declarations.
-
-        Returns a shared pointer to a Arrow CTable. This should be wrapped in a Python table before use.
-        Compressed link IDs are expanded to full network link IDs.
-        """
-        cdef:
-            shared_ptr[libpa.CArray] paths
-            shared_ptr[libpa.CArray] offsets
-
-            libpa.CMemoryPool *pool = libpa.c_get_memory_pool()
-
-            # Custom imports, these are declared in route_choice.pxd *not* libarrow.
-            CUInt32Builder *path_builder = new CUInt32Builder(pool)
-            CDoubleBuilder *cost_col = <CDoubleBuilder *>nullptr
-            CBooleanBuilder *mask_col = <CBooleanBuilder *>nullptr
-            CDoubleBuilder *path_overlap_col = <CDoubleBuilder *>nullptr
-            CDoubleBuilder *prob_col = <CDoubleBuilder *>nullptr
-
-            libpa.CInt32Builder *offset_builder = new libpa.CInt32Builder(pool)  # Must be Int32 *not* UInt32
-            libpa.CUInt32Builder *o_col = new libpa.CUInt32Builder(pool)
-            libpa.CUInt32Builder *d_col = new libpa.CUInt32Builder(pool)
-            vector[shared_ptr[libpa.CArray]] columns
-            shared_ptr[libpa.CDataType] route_set_dtype = libpa.pyarrow_unwrap_data_type(RouteChoiceSet.route_set_dtype)
-
-            libpa.CResult[shared_ptr[libpa.CArray]] route_set_results
-
-            int offset = 0
-            size_t network_link_begin, network_link_end, link
-            bint psl = (cost_set != nullptr and path_overlap_set != nullptr and prob_set != nullptr)
-
-        # Origins, Destination, Route set, [Cost for route, Mask, Path_Overlap for route, Probability for route]
-        columns.resize(7 if psl else 3)
-
-        if psl:
-            cost_col = new CDoubleBuilder(pool)
-            mask_col = new CBooleanBuilder(pool)
-            path_overlap_col = new CDoubleBuilder(pool)
-            prob_col = new CDoubleBuilder(pool)
-
-            for i in range(ods.size()):
-                cost_col.AppendValues(d(d(cost_set)[i]))
-                mask_col.AppendValues(d(d(mask_set)[i]))
-                path_overlap_col.AppendValues(d(d(path_overlap_set)[i]))
-                prob_col.AppendValues(d(d(prob_set)[i]))
-
-        for i in range(ods.size()):
-            route_set = route_sets[i]
-
-            # Instead of constructing a "list of lists" style object for storing the route sets we instead will
-            # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
-            # (path) starts.
-            for route in d(route_set):
-                o_col.Append(ods[i].first)
-                d_col.Append(ods[i].second)
-
-                offset_builder.Append(offset)
-
-                for link in d(route):
-                    # Translate the compressed link IDs in route to network link IDs, this is a 1:n mapping
-                    network_link_begin = self.mapping_idx[link]
-                    network_link_end = self.mapping_idx[link + 1]
-                    path_builder.AppendValues(
-                        &self.mapping_data[network_link_begin],
-                        network_link_end - network_link_begin
-                    )
-
-                    offset += network_link_end - network_link_begin
-
-        path_builder.Finish(&paths)
-
-        offset_builder.Append(offset)  # Mark the end of the array in offsets
-        offset_builder.Finish(&offsets)
-
-        route_set_results = libpa.CListArray.FromArraysAndType(
-            route_set_dtype,
-            d(offsets.get()),
-            d(paths.get()),
-            pool,
-            shared_ptr[libpa.CBuffer]()
-        )
-
-        o_col.Finish(&columns[0])
-        d_col.Finish(&columns[1])
-        columns[2] = d(route_set_results)
-
-        if psl:
-            cost_col.Finish(&columns[3])
-            mask_col.Finish(&columns[4])
-            path_overlap_col.Finish(&columns[5])
-            prob_col.Finish(&columns[6])
-
-        cdef shared_ptr[libpa.CSchema] schema = libpa.pyarrow_unwrap_schema(
-            RouteChoiceSet.psl_schema if psl else RouteChoiceSet.schema
-        )
-        cdef shared_ptr[libpa.CTable] table = libpa.CTable.MakeFromArrays(schema, columns)
-
-        del path_builder
-        del offset_builder
-        del o_col
-        del d_col
-
-        if psl:
-            del cost_col
-            del mask_col
-            del path_overlap_col
-            del prob_col
-
-        return table
+    # @cython.embedsignature(True)
+    # def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
+    #     """
+    #     Apply link loading to the network using the demand matrix and the previously computed route sets.
+    #     """
+    #     if self.ods == nullptr \
+    #        or self.link_union_set == nullptr \
+    #        or self.prob_set == nullptr:
+    #         raise ValueError("link loading requires Route Choice path_size_logit results")
+
+    #     if not isinstance(matrix, AequilibraeMatrix):
+    #         raise ValueError("`matrix` is not an AequilibraE matrix")
+
+    #     cores = cores if cores > 0 else omp_get_max_threads()
+
+    #     cdef:
+    #         vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
+    #         vector[double] *vec
+
+    #     if generate_path_files:
+    #         path_files = RouteChoiceSet.compute_path_files(
+    #             d(self.ods),
+    #             d(self.results),
+    #             d(self.link_union_set),
+    #             d(self.prob_set),
+    #             cores,
+    #         )
+
+    #         # # FIXME, write out path files
+    #         # tmp = []
+    #         # for vec in d(path_files):
+    #         #     tmp.append(d(vec))
+    #         # print(tmp)
+
+    #     link_loads = {}
+    #     for i, name in enumerate(matrix.names):
+    #         m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
+
+    #         ll = self.apply_link_loading_from_path_files(m, d(path_files)) \
+    #             if generate_path_files else self.apply_link_loading(m)
+
+    #         link_loads[name] = self.apply_link_loading_func(ll, cores)
+    #         del ll
+
+    #     if generate_path_files:
+    #         for vec in d(path_files):
+    #             del vec
+    #         del path_files
+
+    #     return link_loads
+
+    # cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
+    #     """Helper function for link_loading."""
+    #     compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
+    #     actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
+
+    #     assign_link_loads_cython(
+    #         actual,
+    #         compressed,
+    #         self.graph_compressed_id_view,
+    #         cores
+    #     )
+
+    #     return actual.reshape(-1), compressed[:-1].reshape(-1)
+
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # @cython.embedsignature(True)
+    # @cython.initializedcheck(False)
+    # @staticmethod
+    # cdef vector[vector[double] *] *compute_path_files(
+    #     vector[pair[long long, long long]] &ods,
+    #     vector[RouteSet_t *] &results,
+    #     vector[vector[long long] *] &link_union_set,
+    #     vector[vector[double] *] &prob_set,
+    #     unsigned int cores
+    # ) noexcept nogil:
+    #     """
+    #     Computes the path files for the provided vector of RouteSets.
+
+    #     Returns vector of vectors of link loads corresponding to each link in it's link_union_set.
+    #     """
+    #     cdef:
+    #         vector[vector[double] *] *link_loads = new vector[vector[double] *](ods.size())
+    #         vector[long long] *link_union
+    #         vector[double] *loads
+    #         vector[long long] *links
+
+    #         vector[long long].const_iterator link_union_iter
+    #         vector[long long].const_iterator link_iter
+
+    #         size_t link_loc
+    #         double prob
+    #         long long i
+
+    #     with parallel(num_threads=cores):
+    #         for i in prange(ods.size()):
+    #             link_union = link_union_set[i]
+    #             loads = new vector[double](link_union.size(), 0.0)
+
+    #             # We now iterate over all routes in the route_set, each route has an associated probability
+    #             route_prob_iter = prob_set[i].cbegin()
+    #             for route in d(results[i]):
+    #                 prob = d(route_prob_iter)
+    #                 inc(route_prob_iter)
+
+    #                 if prob == 0.0:
+    #                     continue
+
+    #                 # For each link in the route, we need to assign the appropriate demand * prob Because the link union
+    #                 # is known to be sorted, if the links in the route are also sorted we can just step along both
+    #                 # arrays simultaneously, skipping elements in the link_union when appropriate. This allows us to
+    #                 # operate on the link loads as a sparse map and avoid blowing up memory usage when using a dense
+    #                 # formulation. This is also more cache efficient, the only downsides are that the code is
+    #                 # harder to read and it requires sorting the route.
+
+    #                 # NOTE: the sorting of routes is technically something that is already computed, during the
+    #                 # computation of the link frequency we merge and sort all links, if we instead sorted then used an
+    #                 # N-way merge we could reuse the sorted routes and the sorted link union.
+
+    #                 # We copy the links in case the routes haven't already been saved
+    #                 links = new vector[long long](d(route))
+    #                 sort(links.begin(), links.end())
+
+    #                 # links and link_union are sorted, and links is a subset of link_union
+    #                 link_union_iter = link_union.cbegin()
+    #                 link_iter = links.cbegin()
+
+    #                 while link_iter != links.cend():
+    #                     # Find the next location for the current link in links
+    #                     while d(link_iter) != d(link_union_iter) and link_iter != links.cend():
+    #                         inc(link_union_iter)
+
+    #                     link_loc = link_union_iter - link_union.cbegin()
+    #                     d(loads)[link_loc] = d(loads)[link_loc] + prob  # += here results in all zeros? Odd
+
+    #                     inc(link_iter)
+
+    #                 del links
+
+    #             d(link_loads)[i] = loads
+
+    #     return link_loads
+
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # @cython.embedsignature(True)
+    # @cython.initializedcheck(False)
+    # cdef vector[double] *apply_link_loading_from_path_files(
+    #     RouteChoiceSet self,
+    #     double[:, :] matrix_view,
+    #     vector[vector[double] *] &path_files
+    # ) noexcept nogil:
+    #     """
+    #     Apply link loading from path files.
+
+    #     Returns a vector of link loads indexed by compressed link ID.
+    #     """
+    #     cdef:
+    #         vector[double] *loads
+    #         vector[long long] *link_union
+    #         long origin_index, dest_index
+    #         double demand
+
+    #         vector[double] *link_loads = new vector[double](self.num_links)
+
+    #     for i in range(self.ods.size()):
+    #         loads = path_files[i]
+    #         link_union = d(self.link_union_set)[i]
+
+    #         origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+    #         dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
+    #         demand = matrix_view[origin_index, dest_index]
+
+    #         for j in range(link_union.size()):
+    #             link = d(link_union)[j]
+    #             d(link_loads)[link] = d(link_loads)[link] + demand * d(loads)[j]
+
+    #     return link_loads
+
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # @cython.embedsignature(True)
+    # @cython.initializedcheck(False)
+    # cdef vector[double] *apply_link_loading(self, double[:, :] matrix_view) noexcept nogil:
+    #     """
+    #     Apply link loading.
+
+    #     Returns a vector of link loads indexed by compressed link ID.
+    #     """
+    #     cdef:
+    #         RouteSet_t *route_set
+    #         vector[double] *route_set_prob
+    #         vector[double].const_iterator route_prob_iter
+    #         long origin_index, dest_index
+    #         double demand, prob, load
+
+    #         vector[double] *link_loads = new vector[double](self.num_links)
+
+    #     for i in range(self.ods.size()):
+    #         route_set = d(self.results)[i]
+    #         route_set_prob = d(self.prob_set)[i]
+
+    #         origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+    #         dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
+    #         demand = matrix_view[origin_index, dest_index]
+
+    #         route_prob_iter = route_set_prob.cbegin()
+    #         for route in d(route_set):
+    #             prob = d(route_prob_iter)
+    #             inc(route_prob_iter)
+
+    #             load = prob * demand
+    #             for link in d(route):
+    #                 d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
+
+    #     return link_loads
+
+    # @cython.embedsignature(True)
+    # def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, List[long]], cores: int = 0):
+    #     """
+    #     Apply link loading to the network using the demand matrix and the previously computed route sets.
+    #     """
+    #     if self.ods == nullptr \
+    #        or self.link_union_set == nullptr \
+    #        or self.prob_set == nullptr:
+    #         raise ValueError("select link loading requires Route Choice path_size_logit results")
+
+    #     if not isinstance(matrix, AequilibraeMatrix):
+    #         raise ValueError("`matrix` is not an AequilibraE matrix")
+
+    #     cores = cores if cores > 0 else omp_get_max_threads()
+
+    #     cdef:
+    #         unordered_set[long] select_link_set
+    #         vector[double] *ll
+
+    #     link_loads = {}
+
+    #     for i, name in enumerate(matrix.names):
+    #         matrix_ll = {}
+    #         m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
+    #         for (k, v) in select_links.items():
+    #             select_link_set = <unordered_set[long]> v
+
+    #             coo = COO((self.zones, self.zones))
+
+    #             ll = self.apply_select_link_loading(coo, m, select_link_set)
+    #             res = self.apply_link_loading_func(ll, cores)
+    #             del ll
+
+    #             matrix_ll[k] = (coo, res)
+    #         link_loads[name] = matrix_ll
+
+    #     return link_loads
+
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # @cython.embedsignature(True)
+    # @cython.initializedcheck(False)
+    # cdef vector[double] *apply_select_link_loading(
+    #     RouteChoiceSet self,
+    #     COO sparse_mat,
+    #     double[:, :] matrix_view,
+    #     unordered_set[long] &select_link_set
+    # ) noexcept nogil:
+    #     """
+    #     Apply select link loading.
+
+    #     Returns a vector of link loads indexed by compressed link ID.
+    #     """
+    #     cdef:
+    #         RouteSet_t *route_set
+    #         vector[double] *route_set_prob
+    #         vector[double].const_iterator route_prob_iter
+    #         long origin_index, dest_index, o, d
+    #         double demand, prob, load
+
+    #         vector[double] *link_loads = new vector[double](self.num_links)
+
+    #         bool link_present
+
+    #     # For each OD pair, if a route contains one or more links in a select link set, add that ODs demand to
+    #     # a sparse matrix of Os to Ds
+
+    #     # For each route, if it contains one or more links in a select link set, apply the link loading for
+    #     # that route
+
+    #     for i in range(self.ods.size()):
+    #         route_set = d(self.results)[i]
+    #         route_set_prob = d(self.prob_set)[i]
+
+    #         origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
+    #         dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
+    #         demand = matrix_view[origin_index, dest_index]
+
+    #         route_prob_iter = route_set_prob.cbegin()
+    #         for route in d(route_set):
+    #             prob = d(route_prob_iter)
+    #             inc(route_prob_iter)
+    #             load = prob * demand
+
+    #             link_present = False
+    #             for link in d(route):
+    #                 if select_link_set.find(link) != select_link_set.end():
+    #                     sparse_mat.append(origin_index, dest_index, load)
+    #                     link_present = True
+    #                     break
+
+    #             if link_present:
+    #                 for link in d(route):
+    #                     d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
+
+    #     return link_loads
 
     def get_results(self):  # Cython doesn't like this type annotation... -> pa.Table:
         """
@@ -1379,21 +977,10 @@ cdef class RouteChoiceSet:
             **route sets** (:obj:`pyarrow.Table`): Returns a table of OD pairs to lists of link IDs for
                 each OD pair provided (as columns). Represents paths from ``origin`` to ``destination``.
         """
-        if self.results == nullptr or self.ods == nullptr:
+        if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        table = libpa.pyarrow_wrap_table(
-            self.make_table_from_results(
-                d(self.ods),
-                d(self.results),
-                self.cost_set,
-                self.mask_set,
-                self.path_overlap_set,
-                self.prob_set
-            )
-        )
-
-        return table
+        return libpa.pyarrow_wrap_table(self.results.make_table_from_results()).to_pandas()
 
 
 @cython.embedsignature(True)
@@ -1468,6 +1055,7 @@ cdef class RouteChoiceSetResults:
             store_results: bool = True,
             perform_assignment: bool = True,
             eager_link_loading: bool = True,
+            # select_links: Dict[str, List[long]] = None,
             link_loading_reduction_threads: int = 1
     ):
         """
@@ -1490,7 +1078,7 @@ cdef class RouteChoiceSetResults:
 
             **link_loading_reduction_threads** (`obj`: int): As link loading is a reduction-style procedure, this parameter
               controls how many thread buffers are allocated. These buffers should be reduced to a single result via the
-              `reduce_link_loading` method.
+              `get_link_loading` method.
 
         NOTE: This class makes no attempt to be thread safe when improperly accessed. Multithreaded accesses should be
         coordinated to not collide. Each index of `ods` should only ever be accessed by a single thread.
@@ -1549,7 +1137,7 @@ cdef class RouteChoiceSetResults:
         self.mapping_data = mapping_data
 
         self.ods = ods  # Python List[Tuple[int, int]] -> C++ vector[pair[long long, long long]]
-        cdef size_t size = self.size()
+        cdef size_t size = self.ods.size()
 
         # As the objects are attribute of the extension class they will be allocated before the object is
         # initialised. This ensures that accessing them is always valid and that they are just empty. We resize the ones
@@ -1572,27 +1160,23 @@ cdef class RouteChoiceSetResults:
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
+        if select_links is not None:
+
+
         # If we're eagerly link loading we must allocate this now while we still have the GIL, otherwise we'll allocate it later.
+        self.link_loads = None
+        # self.sl_link_loads = None
         if self.eager_link_loading:
-           self.link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
+            self.link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
 
-    def __dealloc__(self):
-        cdef size_t size = self.ods.size()
+            # if self.select_link:
+            #     self.sl_link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
+            #     for i in range(self.link_loading_reduction_threads):
+            #         COO.init_struct(self.sl_od_sparse_matrix_matrix[i])
 
-        if self.store_results:
-            # The route choice vector will be dropped at the deallocation of this object (after python deallocation), as
-            # the vector is dropped the reference counts of the shared pointers it contains will be decreased, if there
-            # are no live references to them they will be dropped as well, in turn dropping their contents (unique
-            # pointers).
-            pass
-
-        if self.perform_assignment:
-            pass
-            # for i in range(size):
-            #     del self.__cost_set[i]
-            #     del self.__mask_set[i]
-            #     del self.__path_overlap_set[i]
-            #     del self.__prob_set[i]
+        else:
+            self.link_loading_matrix = None
+            # self.sl_link_loading_matrix = None
 
     cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         """
@@ -2018,6 +1602,18 @@ cdef class RouteChoiceSetResults:
 
         return table
 
+    cdef void reduce_link_loading(RouteChoiceSetResults self):
+        if self.link_loads is None and self.link_loading_matrix is not None:
+            self.link_loads = np.sum(self.link_loading_matrix, axis=0)
+            self.link_loading_matrix = None
+
+        # if self.sl_link_loads is None and self.sl_link_loading_matrix is not None:
+        #     self.sl_link_loads = np.sum(self.sl_link_loading_matrix, axis=0)
+        #     self.sl_link_loading_matrix = None
+
+    cdef double[:] get_link_loading(RouteChoiceSetResults self):
+        self.reduce_link_loading()
+        return self.link_loads
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:

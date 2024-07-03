@@ -116,7 +116,28 @@ cdef class COO(Sparse):
 
         return self
 
+    @staticmethod
+    cdef void init_struct(COO_struct &struct) noexcept nogil:
+        struct.row = row = new vector[size_t]()
+        struct.col = new vector[size_t]()
+        struct.data = new vector[double]()
+
+    @staticmethod
+    cdef object from_struct(COO_struct &struct):
+        cdef COO self = COO.__new__(COO)
+        self.row = struct.row
+        self.col = struct.col
+        self.data = struct.data
+
+        return self
+
     cdef void append(COO self, size_t i, size_t j, double v) noexcept nogil:
         self.row.push_back(i)
         self.col.push_back(j)
         self.data.push_back(v)
+
+    @staticmethod
+    cdef void struct_append(COO_struct &struct, size_t i, size_t j, double v) noexcept nogil:
+        struct.row.push_back(i)
+        struct.col.push_back(j)
+        struct.data.push_back(v)
