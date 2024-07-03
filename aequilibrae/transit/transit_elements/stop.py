@@ -51,8 +51,8 @@ class Stop(BasicPTElement):
 
         if None not in [self.stop_lon, self.stop_lat]:
             self.geo = Point(self.stop_lon, self.stop_lat)
-        if len(str(self.zone_id)) == 0:
-            self.zone_id = None
+        if len(self.zone) > 0:
+            self.zone_id = int(self.zone)
 
     def save_to_database(self, conn: Connection, commit=True) -> None:
         """Saves Transit Stop to the database"""
@@ -71,6 +71,7 @@ class Stop(BasicPTElement):
         return [
             self.stop_id,
             self.stop,
+            self.agency_id,
             self.link,
             self.dir,
             self.stop_name,

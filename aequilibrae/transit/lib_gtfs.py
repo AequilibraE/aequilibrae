@@ -206,32 +206,51 @@ class GTFSRouteSystemBuilder(WorkerThread):
                 link.save_to_database(conn, commit=False)
             conn.commit()
 
-            self.__outside_zones = 0
-            zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
-            zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
-            zone_ids = {**zone_ids1, **zone_ids2}
-
             for fare in self.gtfs_data.fare_attributes.values():
                 fare.save_to_database(conn)
 
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
 
+            sql = """WITH t1 AS (
+                        SELECT from_stop stop_id, pattern_id FROM route_links
+                        UNION ALL
+                        SELECT to_stop stop_id, pattern_id FROM route_links
+                    ),
+                    t2 AS (
+                        SELECT route_id, pattern_id, agency_id FROM routes
+                    ),
+                    t3 AS (
+                        SELECT t1.stop_id, t2.agency_id, COUNT(*) as frequency
+                        FROM t1
+                        JOIN t2 ON t1.pattern_id = t2.pattern_id
+                        GROUP BY t1.stop_id, t2.agency_id
+                    )
+                    SELECT t3.stop_id, t3.agency_id
+                    FROM t3
+                    WHERE t3.frequency = (
+                        SELECT MAX(frequency)
+                        FROM t3 AS sub
+                        WHERE sub.stop_id = t3.stop_id
+                    );"""
+            frequent_agency = conn.execute(sql).fetchall()
+
             zones = []
             for counter, (_, stop) in enumerate(self.select_stops.items()):
-                if stop.zone in zone_ids:
-                    stop.zone_id = zone_ids[stop.zone]
                 if self.__has_taz:
                     closest_zone = self.project.zoning.get_closest_zone(stop.geo)
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
-                        if zone_ids:
-                            zones.append([zone_ids[stop.zone], closest_zone])
+                stop.agency_id = frequent_agency[counter][1]
+                if stop.zone_id:
+                    zones.append((stop.zone_id, "", stop.agency_id))
                 stop.save_to_database(conn, commit=False)
             conn.commit()
 
+            zones = list(set(zones))
+
             if zones:
-                sql = "insert into fare_zones (fare_zone_id, transit_zone) values(?, ?);"
+                sql = "insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?,?,?);"
                 conn.executemany(sql, zones)
             conn.commit()
 
