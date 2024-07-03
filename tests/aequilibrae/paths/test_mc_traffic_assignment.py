@@ -45,9 +45,9 @@ class TestMCTrafficAssignment(TestCase):
         self.carclass = TrafficClass("car", self.car_graph, self.car_matrix)
         self.carclass.set_pce(1.0)
         self.motoclass = TrafficClass("motorcycle", self.moto_graph, self.moto_matrix)
-        self.carclass.set_pce(0.2)
+        self.motoclass.set_pce(0.2)
         self.truckclass = TrafficClass("truck", self.truck_graph, self.truck_matrix)
-        self.carclass.set_pce(2.5)
+        self.truckclass.set_pce(2.5)
 
         self.algorithms = ["msa", "cfw", "bfw", "frank-wolfe"]
 

@@ -19,7 +19,6 @@ jobs:
         sudo apt install -y libspatialite-dev
         pip3 install setuptools --upgrade
         pip3 install -r requirements.txt
-        pip3 install -r requirements_additional.txt
         pip3 install spatialite
         pip3 install pytest
         pip3 install pytest-cov
