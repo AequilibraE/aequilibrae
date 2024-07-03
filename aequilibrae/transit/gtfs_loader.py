@@ -86,6 +86,9 @@ class GTFSReader(WorkerThread):
     def _set_capacities(self, capacities: dict):
         self.__capacities__ = capacities
 
+    def _set_pces(self, pces: dict):
+        self.__pces__ = pces
+
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
 

@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS routes (
 	longname        TEXT,
 	description     TEXT,
 	route_type      INTEGER  NOT NULL,
+	pce             NUMERIC  NOT NULL DEFAULT 2.0,
 	seated_capacity INTEGER,
 	total_capacity  INTEGER,
-	pce             NUMERIC  NOT NULL DEFAULT 2.0,
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
 );
 

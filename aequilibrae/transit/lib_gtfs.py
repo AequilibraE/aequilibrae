@@ -21,7 +21,7 @@ from ..utils.worker_thread import WorkerThread
 class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}, pces={}):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -52,6 +52,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
         self.__default_capacities = capacities
+        self.__default_pces = pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -61,6 +62,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
+            self.gtfs_data._set_pces(self.__default_pces)
 
         self.select_routes = {}
         self.select_trips = []
