@@ -460,7 +460,7 @@ class TestRouteChoice(TestCase):
         )
 
         for name, matrix in self.rc.sl_od_matrix.items():
-            np.testing.assert_allclose(matrix.to_scipy().A, matrices[name].A)
+            np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[name].toarray())
 
 
 def generate_line_strings(project, graph, results):
