@@ -489,11 +489,20 @@ class GTFSReader(WorkerThread):
         msg_txt = f"Load Routes - {self.agency.agency}"
         self.signal.emit(["start", "secondary", len(routes), msg_txt, self.__mt])
 
-        cap = self.__capacities__.get("other", [None, None, None])
+        cap = self.__capacities__.get(
+            "other", [None, None, None]
+        )  # Why does this default have 3 elements in the list instead of 2?
         routes = pd.DataFrame(routes)
         routes = routes.assign(seated_capacity=cap[0], total_capacity=cap[1], srid=self.srid)
         for route_type, cap in self.__capacities__.items():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
+
+        # Should this be other to be consistent with capacities?
+        # Should there be something somewhere else showing why the default is 2.0?
+        default_pce = self.__pces__.get("default", 2.0)
+        routes = routes.assign(pce=default_pce)
+        for route_type, pce in self.__pces__.items():
+            routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
         for i, line in routes.iterrows():
             self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])

@@ -21,7 +21,9 @@ from ..utils.worker_thread import WorkerThread
 class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}, pces={}):  # noqa: B006
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities={}, pces={}
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -85,6 +87,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
                                         i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
+
+    def set_pces(self, pces: dict):
+        """Sets default capacities for modes/vehicles.
+
+        :Arguments:
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys, each with float for
+                                    capacities i.e. -> "{0: 2.0,...}"
+        """
+        self.gtfs_data._set_pces(pces)
 
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
