@@ -495,63 +495,56 @@ class GTFSReader:
         if not has_cal and not has_caldate:
             raise FileNotFoundError('Missing "calendar" and "calendar_dates" in this feed')
 
-        if has_caldate:
-            self.logger.debug('    Loading "calendar dates" table')
+        if not has_caldate:
+            return
 
-            with self.zip_archive.open(caldatetxt, "r") as file:
-                caldates = parse_csv(file, column_order[caldatetxt])
+        self.logger.debug('    Loading "calendar dates" table')
+        with self.zip_archive.open(caldatetxt, "r") as file:
+            caldates = parse_csv(file, column_order[caldatetxt])
 
-            if caldates.shape[0] > 0 and not has_cal:
-                min_date = datetime.fromisoformat(format_date(min(caldates["date"].tolist())))
-                max_date = datetime.fromisoformat(format_date(max(caldates["date"].tolist())))
-                self.feed_dates = create_days_between(min_date, max_date)
-            else:
-                self.logger.warning('"calendar_dates.txt" file is empty')
-                return
+        if caldates.shape[0] == 0:
+            self.logger.warning('"calendar_dates.txt" file is empty')
+            return
 
-            exception_inconsistencies = 0
-            for line in caldates:
-                sd = format_date(line["date"])
+        if caldates.shape[0] > 0 and not has_cal:
+            min_date = datetime.fromisoformat(format_date(min(caldates["date"].tolist())))
+            max_date = datetime.fromisoformat(format_date(max(caldates["date"].tolist())))
+            self.feed_dates = create_days_between(min_date, max_date)
 
-                if has_cal:
-                    if line["service_id"] not in self.services:
-                        s = Service()
-                        s.service_id = line["service_id"]
-                        self.services[line["service_id"]] = s
-                        msg = "           Service ({}) exists on calendar_dates.txt but not on calendar.txt"
-                        self.logger.debug(msg.format(line["service_id"].service_id))
-                        exception_inconsistencies += 1
+        exception_inconsistencies = 0
+        svc_id_col = caldates.dtype.names.index("service_id")
+        xcpt_tp_col = caldates.dtype.names.index("exception_type")
+        for line in caldates:
+            sd = format_date(line["date"])
+            service_id = line[svc_id_col]
+            exception_type = line[xcpt_tp_col]
 
-                    service = self.services[line["service_id"]]
+            if service_id not in self.services:
+                s = Service()
+                s.service_id = service_id
+                self.services[service_id] = s
 
-                    if line["exception_type"] == 1:
-                        if sd not in service.dates:
-                            service.dates.append(sd)
-                        else:
-                            exception_inconsistencies += 1
-                            msg = "ignoring service ({}) addition on a day when the service is already active"
-                            self.logger.debug(msg.format(service.service_id))
-                    elif line["exception_type"] == 2:
-                        if sd in service.dates:
-                            _ = service.dates.remove(sd)
-                        else:
-                            exception_inconsistencies += 1
-                            msg = "ignoring service ({}) removal on a day from which the service was absent"
-                            self.logger.debug(msg.format(service.service_id))
-                    else:
-                        self.__fail(f"illegal service exception type. {service.service_id}")
+            service = self.services[service_id]
+
+            if exception_type == 1:
+                if sd not in service.dates:
+                    service.dates.append(sd)
                 else:
-                    # Insert only services available
-                    if line["exception_type"] == 1:
-                        if line["service_id"] not in self.services:
-                            s = Service()
-                            s._populate(line, caldates.dtype.names, False)
-                            self.services[s.service_id] = s
-                        else:
-                            self.services[line["service_id"]].dates.append(sd)
+                    exception_inconsistencies += 1
+                    msg = "ignoring service ({}) addition on a day when the service is already active"
+                    self.logger.debug(msg.format(service.service_id))
+            elif exception_type == 2:
+                if sd in service.dates:
+                    _ = service.dates.remove(sd)
+                else:
+                    exception_inconsistencies += 1
+                    msg = "ignoring service ({}) removal on a day from which the service was absent"
+                    self.logger.debug(msg.format(service.service_id))
+            else:
+                self.__fail(f"illegal service exception type. {service.service_id}")
 
-            if exception_inconsistencies:
-                self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+        if exception_inconsistencies:
+            self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
 
     def __fail(self, msg: str) -> None:
         self.logger.error(msg)
