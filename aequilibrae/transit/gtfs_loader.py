@@ -498,9 +498,7 @@ class GTFSReader(WorkerThread):
         for route_type, cap in self.__capacities__.items():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
 
-        # Should this be other to be consistent with capacities?
-        # Should there be something somewhere else showing why the default is 2.0?
-        default_pce = self.__pces__.get("default", 2.0)
+        default_pce = self.__pces__.get("other", 2.0)
         routes = routes.assign(pce=default_pce)
         for route_type, pce in self.__pces__.items():
             routes.loc[routes.route_type == route_type, ["pce"]] = pce
