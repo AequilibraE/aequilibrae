@@ -1,4 +1,4 @@
---@ The *fare_zones* table holds information on the transit fare zones and
+--@ The *fare_zones* table hold information on the transit fare zones and
 --@ the transit agencies that operate in it.
 --@
 --@ **transit_fare_zone** identifies the transit fare zones
