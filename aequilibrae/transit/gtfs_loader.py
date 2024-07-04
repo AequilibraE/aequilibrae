@@ -45,6 +45,7 @@ class GTFSReader(WorkerThread):
     def __init__(self):
         WorkerThread.__init__(self, None)
         self.__capacities__ = {}
+        self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
         self.agency = Agency()
