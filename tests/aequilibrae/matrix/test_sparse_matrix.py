@@ -34,5 +34,5 @@ class TestSparseMatrix(TestCase):
             self.assertIsInstance(coo1[m], scipy.sparse.csr_matrix)
             self.assertIsInstance(coo2[m], COO)
 
-            np.testing.assert_allclose(sp.A, coo1[m].A)
-            np.testing.assert_allclose(sp.A, coo2[m].to_scipy().A)
+            np.testing.assert_allclose(sp.toarray(), coo1[m].toarray())
+            np.testing.assert_allclose(sp.toarray(), coo2[m].to_scipy().toarray())
