@@ -7,6 +7,13 @@ from aequilibrae.utils.create_example import create_example
 
 # TODO:
 # 1) Add PCE to transit database schema for each trip
+#   - Need to update zip file to include pce column in routes table
+#   - Update preload numbers to account for pce in test_building...
+
+# 2) Figure out proper ordering for capacity vector with multiple classes and possible different graphs
+
+# 3) Once 2 is completed, update the build_pt_preload method as appropriate (attempt to remove 
+#    graph input if possible, since it should depend on overall network)
 
 
 @pytest.fixture
@@ -78,9 +85,9 @@ def test_building_pt_preload(project: Project, graph: Graph):
     preloads = [calc_preload(project, graph, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
     # Check preloads increase in size as time period increases
-    assert preloads[0].sum() == 5804
-    assert preloads[1].sum() == 10280
-    assert preloads[2].sum() == 18596
+    assert preloads[0].sum() == 12484
+    assert preloads[1].sum() == 21264
+    assert preloads[2].sum() == 39696
 
     # Check correct size
     for preload in preloads:

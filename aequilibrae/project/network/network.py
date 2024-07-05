@@ -428,12 +428,11 @@ class Network(WorkerThread):
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
 
-    # TODO: Add PCE value into transit database schema for trips, and extract below
-    # TODO: Should we pass in the character for mode, rather than the graph, e.g. "c" then set graph = self.graphs["c"]?
+    # TODO: Figure out how to extract the correct network graph, without having a particular graph being input
     def build_pt_preload(
-        self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
+        self, graph, start: int, end: int, inclusion_cond: str = "start"
     ) -> np.ndarray:
-        """Builds a preload vector for each specified graph in network
+        """Builds a preload vector for the network over the specified time period
 
         :Arguments:
             **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
@@ -441,8 +440,6 @@ class Network(WorkerThread):
             **start** (int): The start of the period for which to check pt schedules (seconds from midnight)
 
             **end** (int): The end of the period for which to check pt schedules, (seconds from midnight)
-
-            **default_pce** (float): NOT YET IMPLEMENTED!
 
             **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
 
@@ -456,25 +453,16 @@ class Network(WorkerThread):
             >>> from aequilibrae.utils.create_example import create_example
 
             >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
-            >>> proj.network.build_graphs()
-
-            >>> graph = project.network.graphs["c"]
+            >>> proj.network.build_graphs() # Must be built before assigning preload
 
             >>> start = int(6.5 * 60 * 60) # 6.30am
             >>> end = int(8.5 * 60 * 60)   # 8.30 am
 
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
-        if start > end:
-            raise ValueError("Ensure start time is before end time. For periods around midnight sum 2 preloads.")
-
         # Get trip_id based on specified inclusion condition
         with read_and_close(database_connection("transit")) as conn:
             links = pd.read_sql(build_pt_preload_sql(start, end, inclusion_cond), conn)
-
-        # Calculate non-zero preloads for each link
-        links["PCE"] = default_pce  # Temporary until PCE field is added to database schema
-        links = links.groupby(["link_id", "direction"]).sum().rename(columns={"PCE": "preload"})
 
         # Merge preload onto all links/dir's in network and fill in 0 for links with no transit
         preload = pd.merge(graph.graph, links, on=["link_id", "direction"], how="left")
@@ -490,7 +478,6 @@ probe_point_lookup = {
     "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
 }
 
-
 def build_pt_preload_sql(start, end, inclusion_cond):
 
     def select_trip_ids():
@@ -504,7 +491,9 @@ def build_pt_preload_sql(start, end, inclusion_cond):
 
     # Convert trip_id's to link/dir's via pattern_id's
     return f"""
-        SELECT pm.link as link_id, pm.dir as direction
+        SELECT pm.link as link_id, pm.dir as direction, SUM(r.pce) as preload
         FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p 
         INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id
+        INNER JOIN routes r ON p.pattern_id = r.pattern_id
+        GROUP BY pm.link, pm.dir
     """
