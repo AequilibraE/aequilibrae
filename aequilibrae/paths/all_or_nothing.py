@@ -1,37 +1,30 @@
-import importlib.util as iutil
 import threading
 from multiprocessing.dummy import Pool as ThreadPool
+
 import numpy as np
 
-from .multi_threaded_aon import MultiThreadedAoN
-from ..utils import WorkerThread
-from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae import global_logger
+from aequilibrae.matrix import AequilibraeMatrix
+from .multi_threaded_aon import MultiThreadedAoN
 
 try:
     from aequilibrae.paths.AoN import one_to_all, assign_link_loads
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+from aequilibrae.utils.signal import SIGNAL
 
 if False:
     from .results import AssignmentResults
     from .graph import Graph
 
 
-class allOrNothing(WorkerThread):
-    if pyqt:
-        assignment = SIGNAL(object)
-
-    def __init__(self, matrix, graph, results):
+class allOrNothing:
+    def __init__(self, class_name, matrix, graph, results):
         # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
+        self.assignment: SIGNAL = None
 
-        WorkerThread.__init__(self, None)
-
+        self.class_name = class_name
         self.matrix = matrix
         self.graph = graph
         self.results = results
@@ -49,16 +42,18 @@ class allOrNothing(WorkerThread):
         elif not np.array_equal(matrix.index, graph.centroids):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
+    def _build_signal(self):
+        if self.assignment is None:
+            self.assignment = SIGNAL(object)
+            self.assignment.emit(["start", self.matrix.zones, self.class_name])
+
     def doWork(self):
         self.execute()
 
     def execute(self):
+        self._build_signal()
         self.report = []
         self.cumulative = 0
-
-        if pyqt:
-            self.assignment.emit(["zones finalized", 0])
-
         self.aux_res.prepare(self.graph, self.results)
         self.matrix.matrix_view = self.matrix.matrix_view.reshape(
             (self.graph.num_zones, self.graph.num_zones, self.results.classes["number"])
@@ -75,13 +70,12 @@ class allOrNothing(WorkerThread):
                     pool.apply_async(self.func_assig_thread, args=(orig, all_threads))
         pool.close()
         pool.join()
+        self.assignment.emit(["update", self.matrix.index.shape[0], self.class_name])
         # TODO: Multi-thread this sum
         self.results.compact_link_loads = np.sum(self.aux_res.temp_link_loads, axis=0)
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
-        if pyqt:
-            self.assignment.emit(["finished_threaded_procedure", None])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
@@ -94,6 +88,5 @@ class allOrNothing(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        if pyqt:
-            self.assignment.emit(["zones finalized", self.cumulative])
-            self.assignment.emit(["text AoN", f"{self.cumulative:,}/{self.matrix.zones:,}"])
+        if self.cumulative % 10 == 0:
+            self.assignment.emit(["update", self.cumulative, self.class_name])

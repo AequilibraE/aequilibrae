@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import math
 from typing import Dict, Optional
 
@@ -23,23 +22,17 @@ from aequilibrae.project.network.osm.osm_downloader import OSMDownloader
 from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
-from aequilibrae.utils import WorkerThread
 from aequilibrae.utils.db_utils import commit_and_close
+from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
 
-
-class Network(WorkerThread):
+class Network:
     """
     Network class. Member of an AequilibraE Project
     """
 
-    if pyqt:
-        netsignal = SIGNAL(object)
+    netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
@@ -49,7 +42,6 @@ class Network(WorkerThread):
     def __init__(self, project) -> None:
         from aequilibrae.paths import Graph
 
-        WorkerThread.__init__(self, None)
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
         self.logger = project.logger
@@ -234,16 +226,13 @@ class Network(WorkerThread):
                         polygons.append(subarea)
         self.logger.info("Downloading data")
         dwnloader = OSMDownloader(polygons, modes, logger=self.logger)
-        if pyqt:
-            dwnloader.downloading.connect(self.signal_handler)
-
+        dwnloader.downloading = self.netsignal
         dwnloader.doWork()
 
         self.logger.info("Building Network")
         self.builder = OSMBuilder(dwnloader.data, project=self.project, model_area=model_area, clean=clean)
 
-        if pyqt:
-            self.builder.building.connect(self.signal_handler)
+        self.builder.building = self.netsignal
         self.builder.doWork()
 
         self.logger.info("Network built successfully")
@@ -290,10 +279,6 @@ class Network(WorkerThread):
         gmns_exporter.doWork()
 
         self.logger.info("Network exported successfully")
-
-    def signal_handler(self, val):
-        if pyqt:
-            self.netsignal.emit(val)
 
     def build_graphs(self, fields: list = None, modes: list = None) -> None:
         """Builds graphs for all modes currently available in the model

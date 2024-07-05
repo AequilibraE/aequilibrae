@@ -1,6 +1,5 @@
 numpy<1.99
 pyaml
-PyQt5
 pyshp
 cython
 enum34

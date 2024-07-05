@@ -12,13 +12,15 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
+from aequilibrae.utils.signal import SIGNAL
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
-from ..utils.worker_thread import WorkerThread
 
 
-class GTFSRouteSystemBuilder(WorkerThread):
+class GTFSRouteSystemBuilder:
     """Container for GTFS feeds providing data retrieval for the importer"""
+
+    signal = SIGNAL(object)
 
     def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
         """Instantiates a transit class for the network
@@ -31,8 +33,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
-        WorkerThread.__init__(self, None)
-
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
@@ -126,12 +126,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
+        self.signal.emit(["start", len(self.select_patterns), "Map-matching patterns"])
         for i, pat in enumerate(self.select_patterns.values()):
+            self.signal.emit(["update", i, f"Map-matching pattern {pat.pattern_id}"])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
                     self.logger.warning(msg)
+        self.signal.emit(["finished"])
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -261,7 +264,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = Constants()
+        self.signal.emit(["start", len(self.select_routes), f"Loading data for {self.day}"])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
+            self.signal.emit(["update", counter])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -286,6 +291,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             route.shape = self.__build_route_shape(patterns)
             route.pattern_id = trip.pattern_id
+        self.signal.emit(["finished"])
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
