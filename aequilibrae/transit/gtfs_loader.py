@@ -85,15 +85,31 @@ class GTFSReader:
     def __load_date(self):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
+
+        self.signal.emit(["start", 7, "Loading routes"])
         self.__load_routes_table()
+
+        self.signal.emit(["update", 1, "Loading stops"])
         self.__load_stops_table()
+
+        self.signal.emit(["update", 2, "Loading stop times"])
         self.__load_stop_times()
+
+        self.signal.emit(["update", 3, "Loading shapes"])
         self.__load_shapes_table()
+
+        self.signal.emit(["update", 4, "Loading trips"])
         self.__load_trips_table()
+
+        self.signal.emit(["update", 5, "De-conflicting stop times"])
         self.__deconflict_stop_times()
+
+        self.signal.emit(["update", 6, "Loading fares"])
         self.__load_fare_data()
 
         self.zip_archive.close()
+        self.signal.emit(["finished"])
+        self.signal = SIGNAL(object)
 
     def __deconflict_stop_times(self) -> None:
         self.logger.info("Starting deconflict_stop_times")
