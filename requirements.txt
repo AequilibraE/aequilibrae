@@ -10,3 +10,4 @@ rtree
 openmatrix
 pyarrow==16.1.0
 geopandas
+tqdm
