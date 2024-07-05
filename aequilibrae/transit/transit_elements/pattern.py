@@ -88,7 +88,7 @@ class Pattern(BasicPTElement):
         ]
 
         sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, pce, 
-                         seated_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
+                         seated_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
 
         if self.pattern_mapping.shape[0]:
