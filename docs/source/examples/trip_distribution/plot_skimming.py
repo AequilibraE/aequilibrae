@@ -14,6 +14,7 @@ from uuid import uuid4
 from tempfile import gettempdir
 from os.path import join
 from aequilibrae.utils.create_example import create_example
+# sphinx_gallery_thumbnail_path = 'images/skims.png'
 
 # %%
 # We create the example project inside our temp folder

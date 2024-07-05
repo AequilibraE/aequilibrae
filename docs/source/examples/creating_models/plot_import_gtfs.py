@@ -1,3 +1,20 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+# %%
 """
 .. _example_gtfs:
 
@@ -9,12 +26,13 @@ In this example, we import a GTFS feed to our model and perform map matching.
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 # %%
-
 # Imports
 from uuid import uuid4
 from os import remove
 from os.path import join
 from tempfile import gettempdir
+
+from pathlib import Path # Check filepaths...
 
 import folium
 import pandas as pd
@@ -22,7 +40,13 @@ from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
-# sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
+
+from aequilibrae import __file__ as f
+print(f)
+
+# %%
+import sys 
+print(sys.executable)
 
 # %%
 # Let's create an empty project on an arbitrary folder.
@@ -46,6 +70,9 @@ dest_path = join(fldr, "gtfs_coquimbo.zip")
 data = Transit(project)
 
 transit = data.new_gtfs_builder(agency="Lisanco", file_path=dest_path)
+
+# %%
+data.default_pces
 
 # %%
 # To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free 
@@ -105,7 +132,7 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
-#%%
+# %%
 # Let's create the map!
 
 # %%

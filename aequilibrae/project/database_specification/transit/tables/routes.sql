@@ -17,6 +17,8 @@
 --@ **description** provides useful description of a route
 --@ 
 --@ **route_type** indicates the type of transportation used on a route
+--@
+--@ **pce** indicates the passenger car equivalent for transportation used on a route
 --@ 
 --@ **seated_capacity** indicates the seated capacity of a route
 --@ 
@@ -31,9 +33,9 @@ CREATE TABLE IF NOT EXISTS routes (
 	longname        TEXT,
 	description     TEXT,
 	route_type      INTEGER  NOT NULL,
+	pce             NUMERIC  NOT NULL DEFAULT 2.0,
 	seated_capacity INTEGER,
 	total_capacity  INTEGER,
-	pce             NUMERIC  NOT NULL DEFAULT 2.0,
 	FOREIGN KEY(agency_id) REFERENCES agencies(agency_id) deferrable initially deferred
 );
 

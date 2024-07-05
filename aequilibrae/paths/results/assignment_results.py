@@ -1,10 +1,9 @@
-import dataclasses
 import multiprocessing as mp
 from abc import ABC, abstractmethod
 
 import numpy as np
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
-from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase
+from aequilibrae.paths.graph import Graph, TransitGraph, GraphBase, _get_graph_to_network_mapping
 from aequilibrae.parameters import Parameters
 from aequilibrae import global_logger
 from pathlib import Path
@@ -20,14 +19,6 @@ TO-DO:
    Same idea of the AequilibraEData container, but using the format.memmap from NumPy
 2. Make the writing to SQL faster by disabling all checks before the actual writing
 """
-
-
-@dataclasses.dataclass
-class NetworkGraphIndices:
-    network_ab_idx: np.array
-    network_ba_idx: np.array
-    graph_ab_idx: np.array
-    graph_ba_idx: np.array
 
 
 class AssignmentResultsBase(ABC):
@@ -249,15 +240,7 @@ class AssignmentResults(AssignmentResultsBase):
         sum_axis1(self.total_link_loads, self.link_loads, self.cores)
 
     def get_graph_to_network_mapping(self):
-        num_uncompressed_links = int(np.unique(self.lids).shape[0])
-        indexing = np.zeros(int(self.lids.max()) + 1, np.uint64)
-        indexing[np.unique(self.lids)[:]] = np.arange(num_uncompressed_links)
-
-        graph_ab_idx = self.direcs > 0
-        graph_ba_idx = self.direcs < 0
-        network_ab_idx = indexing[self.lids[graph_ab_idx]]
-        network_ba_idx = indexing[self.lids[graph_ba_idx]]
-        return NetworkGraphIndices(network_ab_idx, network_ba_idx, graph_ab_idx, graph_ba_idx)
+        return _get_graph_to_network_mapping(self.lids, self.direcs)
 
     def get_load_results(self) -> AequilibraeData:
         """

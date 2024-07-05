@@ -9,7 +9,7 @@ from aequilibrae.transit.transit_elements import Trip
 
 def read_trips(conn: sqlite3.Connection):
     data = get_table("transit_trips", conn).reset_index()
-    data.drop(columns=["seated_capacity", "design_capacity", "total_capacity", "is_artic"], inplace=True)
+    data.drop(columns=["pce", "seated_capacity", "design_capacity", "total_capacity", "is_artic"], inplace=True)
     data.drop(columns=["number_of_cars"], inplace=True)
 
     pats = pd.read_sql("Select pattern_id, route_id from Transit_Patterns", conn)

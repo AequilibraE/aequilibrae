@@ -52,6 +52,7 @@ class Trip(BasicPTElement):
         self.stops = []
         self.shape = None  # type: LineString
         self._stop_based_shape = None  # type: LineString
+        self.pce = 2.0
         self.seated_capacity = None
         self.total_capacity = None
         self.source_time = []

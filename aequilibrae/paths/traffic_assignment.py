@@ -236,8 +236,8 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
-        self.apply_pt_preload = False # type: bool
-        self.preload = None # type: np.ndarray
+        self.apply_pt_preload = False  # type: bool
+        self.preload = None  # type: np.ndarray
 
         self.steps_below_needed_to_terminate = 1
 
@@ -491,8 +491,10 @@ class TrafficAssignment(AssignmentBase):
             **preload** (:obj:`np.ndarray`): Array of preload values, see Network.build_pt_preload for details
         """
         if len(preload) != len(self.classes[0].graph.graph):
-            raise ValueError("Preload vector should have a value for each link in network and be ordered by __supernet_id__")
-        
+            raise ValueError(
+                "Preload vector should have a value for each link in network and be ordered by __supernet_id__"
+            )
+
         self.apply_pt_preload = True
         self.preload = preload
 

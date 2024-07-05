@@ -7,8 +7,7 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
-from aequilibrae.context import get_active_project
-from aequilibrae.log import logger
+from aequilibrae.context import get_active_project, get_logger
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -21,7 +20,9 @@ from ..utils.worker_thread import WorkerThread
 class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities={}, pces={}
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -38,7 +39,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = logger
+        self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()
@@ -52,6 +53,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
         self.__default_capacities = capacities
+        self.__default_pces = pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -61,6 +63,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
+            self.gtfs_data._set_pces(self.__default_pces)
 
         self.select_routes = {}
         self.select_trips = []
@@ -70,9 +73,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         links = self.project.network.links.data
         self.geo_links = gpd.GeoDataFrame(links, geometry=links.geometry, crs="EPSG:4326")
-        # Approximately 40 meter buffer
-        buff_geo = self.geo_links.to_crs(3857).buffer(40).geometry
-        self.geo_links_buffer = gpd.GeoDataFrame(links, geometry=buff_geo.to_crs(4326), crs="EPSG:4326")
 
     def set_capacities(self, capacities: dict):
         """Sets default capacities for modes/vehicles.
@@ -83,6 +83,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
                                         i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
+
+    def set_pces(self, pces: dict):
+        """Sets default capacities for modes/vehicles.
+
+        :Arguments:
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys, each with float for
+                                    capacities i.e. -> "{0: 2.0,...}"
+        """
+        self.gtfs_data._set_pces(pces)
 
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
@@ -303,6 +312,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
+        p.pce = route.pce
         p.seated_capacity = route.seated_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:
