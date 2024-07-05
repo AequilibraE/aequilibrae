@@ -429,6 +429,7 @@ class Network(WorkerThread):
         return c
 
     # TODO: Add PCE value into transit database schema for trips, and extract below
+    # TODO: Should we pass in the character for mode, rather than the graph, e.g. "c" then set graph = self.graphs["c"]?
     def build_pt_preload(
         self, graph, start: int, end: int, default_pce: float = 1.0, inclusion_cond: str = "start"
     ) -> np.ndarray:
