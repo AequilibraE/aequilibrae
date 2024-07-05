@@ -350,6 +350,7 @@ class GTFSReader(WorkerThread):
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
                 # trip.shape = self.shapes.get(trip.shape)
+                trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
