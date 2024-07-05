@@ -312,6 +312,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
+        p.pce = route.pce
         p.seated_capacity = route.seated_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:

@@ -8,7 +8,7 @@ from aequilibrae.transit.transit_elements import Route
 def read_routes(conn: sqlite3.Connection):
     data = get_table("transit_routes", conn).reset_index()
 
-    data.drop(columns=["seated_capacity", "design_capacity", "total_capacity", "number_of_cars", "geo"], inplace=True)
+    data.drop(columns=["pce", "seated_capacity", "design_capacity", "total_capacity", "number_of_cars", "geo"], inplace=True)
     data.rename(
         columns={
             "description": "route_desc",
