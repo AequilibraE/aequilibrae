@@ -46,20 +46,26 @@ class PythonSignal:  # type: ignore
         if self.deactivate:
             return
         if val[0] == "finished":
-            self.pbar.close()
+            if self.pbar is not None:
+                self.pbar.close()
 
         elif val[0] == "refresh":
-            self.pbar.refresh()
+            if self.pbar is not None:
+                self.pbar.refresh()
 
         elif val[0] == "reset":
-            self.pbar.reset()
+            if self.pbar is not None:
+                self.pbar.reset()
 
         elif val[0] == "key_value":
             self.keydata[val[1]] = val[2]
 
         elif val[0] == "start":
+            if self.pbar is not None:
+                self.pbar.close()
             desc = str(val[2]).rjust(50)
             self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=desc, position=self.pos)
+
         elif val[0] == "update":
             self.pbar.update(val[1] - self.pbar.n)
             if len(val) > 2:

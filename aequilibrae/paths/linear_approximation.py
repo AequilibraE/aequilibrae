@@ -474,8 +474,7 @@ class LinearApproximation:
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
-                if self.assignment.pbar is None:
-                    self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
+                self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
