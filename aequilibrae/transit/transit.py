@@ -26,7 +26,7 @@ class Transit:
         12: [50, 100],  # Monorail
         "other": [30, 60],
     }
-    default_pces = {"other": 2.0}  # TODO: Fill in defaults.
+    default_pces = {0: 5.0, 1: 5.0, 3: 4.0, 5: 4.0, 11: 3.0, "other": 2.0}
     graphs: Dict[str, TransitGraph] = {}
     pt_con: sqlite3.Connection
 
