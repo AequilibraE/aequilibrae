@@ -242,7 +242,6 @@ cdef class RouteChoiceSetResults:
         bool store_results
         bool perform_assignment
         bool eager_link_loading
-        bool eager_link_loading
         double cutoff_prob
         double beta
         unsigned link_loading_reduction_threads
@@ -332,3 +331,14 @@ cdef class RouteChoiceSetResults:
 
     cdef void reduce_link_loading(RouteChoiceSetResults self)
     cdef double[:] get_link_loading(RouteChoiceSetResults self)
+
+cdef class GeneralisedCOODemand:
+    cdef:
+        readonly object df
+        long long[:] origins
+        long long[:] destinations
+
+        vector[unique_ptr[vector[double]]] f64
+        vector[unique_ptr[vector[float]]] f32
+
+    cpdef _hello(GeneralisedCOODemand self)

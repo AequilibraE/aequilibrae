@@ -32,6 +32,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.dataset
 import pyarrow.parquet as pq
+import pandas as pd
 
 cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
 cimport pyarrow as pa
@@ -1614,6 +1615,45 @@ cdef class RouteChoiceSetResults:
     cdef double[:] get_link_loading(RouteChoiceSetResults self):
         self.reduce_link_loading()
         return self.link_loads
+
+
+cdef class GeneralisedCOODemand:
+    def __init__(self, df: pd.DataFrame, origin_col: str = "origin id", destination_col: str = "destination id", demand_cols = None):
+        self.df = df
+        self.origins = self.df[origin_col].to_numpy()
+        self.destinations = self.df[destination_col].to_numpy()
+
+        if demand_cols is None:
+            df = self.df.drop(columns=[origin_col, destination_col]).select_dtypes(["float64", "float32"])
+        else:
+            df = self.df[demand_cols]
+
+        cdef:
+            double[::1] f64_array
+            float[::1] f32_array
+            vector[double] *f64_vec
+            vector[float] *f32_vec
+
+        for col in df:
+            if df.dtypes[col] == "float64":
+                f64_array = df[col].to_numpy()
+
+                # The unique pointer will take ownership of this allocation
+                f64_vec = new vector[double]()
+                f64_vec.insert(f64_vec.begin(), &f64_array[0], &f64_array[0] + len(f64_array))
+                self.f64.emplace_back(f64_vec)  # From here f63_vec should not be accessed. It is owned by the unique pointer
+
+            elif df.dtypes[col] == "float32":
+                f32_array = df[col].to_numpy()
+
+                # The unique pointer will take ownership of this allocation
+                f32_vec = new vector[float]()
+                f32_vec.insert(f32_vec.begin(), &f32_array[0], &f32_array[0] + len(f32_array))
+                self.f32.emplace_back(f32_vec)  # From here f32_vec should not be accessed. It is owned by the unique pointer
+
+            else:
+                raise TypeError(f"demand column ({col}) is not a float64 or float32")
+
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:
