@@ -116,8 +116,8 @@ class LinearApproximation(WorkerThread):
         self.capacity = assig_spec.capacity
 
         # TODO: Change Assignment to loads instead of capacity summed b4 v/c ratios
-        if assig_spec.apply_pt_preload:
-            self.capacity = np.max(1.0, self.capacity - assig_spec.preload)
+        # if assig_spec.apply_pt_preload:
+        #     self.capacity = np.max(1.0, self.capacity - assig_spec.preload)
 
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow

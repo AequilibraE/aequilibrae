@@ -1,8 +1,7 @@
-import numpy as np
 import pytest
-from typing import List
 
 from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, AequilibraeMatrix
+from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
 # TODO:
@@ -24,6 +23,9 @@ def project(tmp_path):
     yield proj
     proj.close()
 
+@pytest.fixture
+def transit(project: Project):
+    return Transit(project)
 
 @pytest.fixture
 def graph(project: Project):
@@ -50,13 +52,13 @@ def demand(graph):
 
     matrix.close()
 
-
-@pytest.fixture
-def assignment(graph: Graph, demand):
-
+def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None,) -> TrafficAssignment:
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
+
+    if preload: # Note -> preload has to be added before we set the assignment algorithm
+        assignment.add_preload(preload)
 
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -67,22 +69,20 @@ def assignment(graph: Graph, demand):
 
     return assignment
 
-
 def hr_to_sec(e):
     return int(e * 60 * 60)
 
 
-def calc_preload(project, graph, start, end):
-    return project.network.build_pt_preload(graph, hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
+def calc_preload(transit: Transit, start, end):
+    return transit.build_pt_preload(hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
 
 
-def test_building_pt_preload(project: Project, graph: Graph):
+def test_building_pt_preload(graph: Graph, transit: Transit):
     """
     Check that building pt preload works correctly for a basic example from
     the coquimbo network.
     """
-
-    preloads = [calc_preload(project, graph, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
+    preloads = [calc_preload(transit, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
     # Check preloads increase in size as time period increases
     assert preloads[0].sum() == 12484
@@ -94,19 +94,20 @@ def test_building_pt_preload(project: Project, graph: Graph):
         assert len(preload) == len(graph.graph)
 
 
-def test_run(project: Project, graph: Graph, assignment: TrafficAssignment):
+def test_run(transit: Transit):
     """Tests a full run through of pt preloading."""
 
-    preload = calc_preload(project, graph, 7, 8)
+    preload = calc_preload(transit, 7, 8)
 
     # Run non-preloaded assignment and get results
-    assignment.execute()
-    without_res = assignment.results()
+    without_assig = _assignment()
+    without_assig.execute()
+    without_res = without_assig.results()
 
     # Run preloaded assignment and get results
-    assignment.set_pt_preload(preload)
-    assignment.execute()
-    with_res = assignment.results()
+    with_assig = _assignment(preload)
+    with_assig.execute()
+    with_res = with_assig.results()
 
     # Check that average delay increases (ie the preload has reduced speeds)
     assert with_res["Delay_factor_AB"].mean() > without_res["Delay_factor_AB"].mean()

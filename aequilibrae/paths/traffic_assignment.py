@@ -481,11 +481,7 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    # TODO:
-    # Rewrite documentation
-    # Change set up to have a dataframe with link_id, direction, and multiple possible columns for each preload
-    # Decide whether supernet_id is needed
-    # Decide whether to remove the naming input parameter
+    # TODO: decide whether to include the naming input parameter or not
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
         Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
@@ -494,15 +490,14 @@ class TrafficAssignment(AssignmentBase):
             **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
             **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
         """
-        # Create preloads dataframe if not already initialised
-        # NEED TO JUST MAKE SURE ORDERING IS CORRECT HERE!!! THEN ALL OTHERS WILL BE LEFT JOINED ANYWAY AND WILL HAVE CORRECT ORDERING!
+        # Create preloads dataframe in correct order if not already initialised
         if self.preloads is None:
-            c = self.classes[0]
-            return # Short circuit for now
+            g = self.classes[0].graph.graph
+            self.preloads = g.sort_values(by='__supernet_id__')[['link_id', 'direction']].copy() # .copy() may be unecessary
 
         # Check that columns of preload are link_id, direction, preload:
         expected = set(['link_id', 'direction', 'preload'])
-        missing = expected = set(preload.columns)
+        missing = expected - set(preload.columns)
         additional = set(preload.columns) - expected
         if missing:
             raise ValueError(f"Input preload dataframe is missing columns: {missing}\n"
@@ -516,13 +511,14 @@ class TrafficAssignment(AssignmentBase):
             raise ValueError(f"Cannot set empty preload!")
         
         # Check name is not already used (generate new name if needed):
-        name = name if name else f"preload_{len(self.preload.columns) - 1}" # -1 - remove keys to get 1 indexed preload columns
-        if name in self.preload.columns:
+        name = name if name else f"preload_{len(self.preloads.columns) - 1}" # -1 -> remove keys to get 1 indexed preload columns
+        if name in self.preloads.columns:
             raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
+        preload.rename(columns={'preload': name}, inplace=True)
 
-        # Merge onto current preload dataframe in correct order, and fill with zeros
+        # Merge onto current preload dataframe
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
-        self.preloads[name].fillna(0, inplace=True)
+        self.preloads[name] = self.preloads[name].fillna(0)
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
