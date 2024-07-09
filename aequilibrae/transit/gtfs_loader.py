@@ -463,7 +463,7 @@ class GTFSReader:
         if np.unique(routes["route_id"]).shape[0] < routes.shape[0]:
             self.__fail("There are repeated route IDs in routes.txt")
 
-        cap = self.__capacities__.get("other", [None, None, None])
+        seated_cap, total_cap = self.__capacities__.get("other", [None, None])
         routes = pd.DataFrame(routes)
         routes = routes.assign(seated_capacity=seated_cap, total_capacity=total_cap, srid=self.srid)
         for route_type, cap in self.__capacities__.items():

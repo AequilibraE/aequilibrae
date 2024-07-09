@@ -22,7 +22,9 @@ class GTFSRouteSystemBuilder:
 
     signal = SIGNAL(object)
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities={}, pces={}
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
