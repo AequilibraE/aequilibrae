@@ -326,15 +326,15 @@ There are still three parameters missing for the assignment.
   assig.set_algorithm(algorithm)
 
 
-Setting Public Transport Preload
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting Preloads
+^^^^^^^^^^^^^^^^
 
-We can also optionally include a preload vector for constant flows from public transport 
-which are not being otherwise modelled. This accounts for 
-the predetermined public transport vehicles at their regularly scheduled times,
-and reduces the capacity on each link accordingly. AequilibraE supports various
-conditions for which PT trips to include in the preload, and allows the user to
-specify the PCE for each type of vehicle in the public transport network.
+We can also optionally include a preload vector for constant flows which are not
+being otherwise modelled. For example, this accounts for predetermined public transport 
+vehicles at their regularly scheduled times, and reduces the capacity on each link 
+accordingly. AequilibraE supports various conditions for which PT trips to include 
+in the preload, and allows the user to specify the PCE for each type of vehicle in 
+the public transport network.
 
 To create a preload for public transport vehicles operating between 8am to
 10am, do the following:
@@ -342,13 +342,14 @@ To create a preload for public transport vehicles operating between 8am to
 .. code-block:: python
 
   # Times are specified in seconds from midnight
-  preload = project.network.build_pt_preload(start=8*3600, end=10*3600)
+  transit = Transit(project)
+  preload = transit.build_pt_preload(start=8*3600, end=10*3600)
 
-Next, set the preload vector in the assignment.
+Next, add the preload to the assignment.
 
 .. code-block:: python
 
-  assig.set_pt_preload(preload)
+  assig.add_preload(preload)
 
 
 Executing an Assignment
