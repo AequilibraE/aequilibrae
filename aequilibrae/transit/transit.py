@@ -146,10 +146,7 @@ class Transit:
 
             >>> preload = proj.network.build_pt_preload(graph, start, end)
         """
-        # Get trip_id based on specified inclusion condition
-        with read_and_close(self.pt_con) as conn:
-            links = pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), conn)
-        return links
+        return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self.pt_con)
 
     def __build_pt_preload_sql(self, start, end, inclusion_cond):
         probe_point_lookup = {

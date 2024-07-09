@@ -57,7 +57,8 @@ def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None,) -> Traff
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
 
-    if preload: # Note -> preload has to be added before we set the assignment algorithm
+    # Note: preload has to be added before we set the assignment algorithm
+    if preload is not None:
         assignment.add_preload(preload)
 
     assignment.set_vdf("BPR")
@@ -77,7 +78,7 @@ def calc_preload(transit: Transit, start, end):
     return transit.build_pt_preload(hr_to_sec(start), hr_to_sec(end), inclusion_cond="start")
 
 
-def test_building_pt_preload(graph: Graph, transit: Transit):
+def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
     """
     Check that building pt preload works correctly for a basic example from
     the coquimbo network.
@@ -85,27 +86,25 @@ def test_building_pt_preload(graph: Graph, transit: Transit):
     preloads = [calc_preload(transit, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
     # Check preloads increase in size as time period increases
-    assert preloads[0].sum() == 12484
-    assert preloads[1].sum() == 21264
-    assert preloads[2].sum() == 39696
+    assert preloads[0]['preload'].sum() == 12484
+    assert preloads[1]['preload'].sum() == 21264
+    assert preloads[2]['preload'].sum() == 39696
 
-    # Check correct size
-    for preload in preloads:
-        assert len(preload) == len(graph.graph)
+    assignment = _assignment(graph, demand, preload=preloads[0])
+    assert len(assignment.preloads) == len(graph.graph)
 
-
-def test_run(transit: Transit):
+def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
     """Tests a full run through of pt preloading."""
 
     preload = calc_preload(transit, 7, 8)
 
     # Run non-preloaded assignment and get results
-    without_assig = _assignment()
+    without_assig = _assignment(graph, demand)
     without_assig.execute()
     without_res = without_assig.results()
 
     # Run preloaded assignment and get results
-    with_assig = _assignment(preload)
+    with_assig = _assignment(graph, demand, preload=preload)
     with_assig.execute()
     with_res = with_assig.results()
 
