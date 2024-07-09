@@ -24,12 +24,6 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
 logger = project.logger
 
-# %%
-# We get the project open, and we can tell the logger to direct all messages to the terminal as well
-stdout_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
-stdout_handler.setFormatter(formatter)
-logger.addHandler(stdout_handler)
 
 #%%
 # Traffic assignment with skimming
@@ -59,7 +53,7 @@ graph.set_skimming(["free_flow_time", "distance"])
 graph.set_blocked_centroid_flows(False)
 
 # %%
-# We get the demand matrix directly from the project record. 
+# We get the demand matrix directly from the project record.
 # So let's inspect what we have in the project
 proj_matrices = project.matrices
 print(proj_matrices.list())
@@ -147,7 +141,7 @@ imped.names
 # Where ``free_flow_time_final`` is actually the congested time for the last iteration
 
 # %%
-# But before using the data, let's get some impedance for the intrazonals. 
+# But before using the data, let's get some impedance for the intrazonals.
 # Let's assume it is 75% of the closest zone.
 imped_core = "free_flow_time_final"
 imped.computational_view([imped_core])
@@ -335,7 +329,7 @@ assig.rgap_target = 0.00001
 #%%
 # Optional: Select link analysis
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 
+#
 # If we want to execute select link analysis on a particular TrafficClass, we set the links we are analyzing.
 # The format of the input select links is a ``dictionary (str: list[tuple])``.
 # Each entry represents a separate set of selected links to compute. The str name will name the set of links.

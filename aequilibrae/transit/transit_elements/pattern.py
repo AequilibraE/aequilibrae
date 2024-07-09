@@ -133,12 +133,12 @@ class Pattern(BasicPTElement):
         """
         if self.__map_matched:
             return
+        self.__map_matched = True
         self.__logger.debug(f"Map-matching pattern ID {self.pattern_id}")
 
         if not self.__feed.graphs:
             self.__feed.builds_link_graphs_with_broken_stops()
-
-        if mode_correspondence[self.route_type] not in self.__feed.graphs:
+        if self.route_type not in mode_correspondence or mode_correspondence[self.route_type] not in self.__feed.graphs:
             return
 
         self.__map_matching_error.clear()
