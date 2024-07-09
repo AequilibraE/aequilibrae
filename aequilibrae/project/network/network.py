@@ -24,9 +24,8 @@ from aequilibrae.project.network.osm.place_getter import placegetter
 from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils import WorkerThread
-from aequilibrae.utils.db_utils import commit_and_close, read_and_close
+from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.spatialite_utils import connect_spatialite
-from aequilibrae.project.database_connection import database_connection
 
 spec = iutil.find_spec("PyQt5")
 pyqt = spec is not None
