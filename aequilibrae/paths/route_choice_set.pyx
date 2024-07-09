@@ -156,7 +156,7 @@ cdef class RouteChoiceSet:
         self.results = None
 
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, *args, **kwargs):
+    def run(self, origin: int, destination: int, demand: float = 0.0, *args, **kwargs):
         """Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
@@ -169,11 +169,20 @@ cdef class RouteChoiceSet:
                 centroid.
             **destination** (:obj:`int`): Destination node ID. Must be present within compact graph. Recommended to
                 choose a centroid.
+            **demand** (:obj:`double`): Demand for this single OD pair.
 
         :Returns: **route set** (:obj:`list[tuple[int, ...]]): Returns a list of unique variable length tuples of
             link IDs. Represents paths from ``origin`` to ``destination``.
         """
-        self.batched([(origin, destination)], *args, **kwargs)
+        df = pd.DataFrame({
+            "origin id": [origin],
+            "destination id": [destination],
+            "demand": [demand]
+        })
+        demand = GeneralisedCOODemand()
+        demand.add_df(df)
+
+        self.batched(demand, *args, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
             schema = self.psl_schema if kwargs.get("path_size_logit", False) else self.schema
@@ -191,8 +200,7 @@ cdef class RouteChoiceSet:
     @cython.initializedcheck(False)
     def batched(
             self,
-            ods: List[Tuple[int, int]],
-            double[:, :] demand_view,
+            demand: GeneralisedCOODemand,
             max_routes: int = 0,
             max_depth: int = 0,
             max_misses: int = 100,
@@ -230,6 +238,7 @@ cdef class RouteChoiceSet:
         """
         cdef:
             long long origin, dest
+            size_t i
 
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be > 0")
@@ -243,14 +252,16 @@ cdef class RouteChoiceSet:
         if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
             raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
 
-        for origin, dest in ods:
+        for i in range(demand.ods.size()):
+            origin = demand.ods[i].first
+            dest = demand.ods[i].second
             if self.nodes_to_indices_view[origin] == -1:
                 raise ValueError(f"Origin {origin} is not present within the compact graph")
             if self.nodes_to_indices_view[dest] == -1:
                 raise ValueError(f"Destination {dest} is not present within the compact graph")
 
         cdef:
-            long long origin_index, dest_index, i
+            long long origin_index, dest_index
             unsigned int c_max_routes = max_routes
             unsigned int c_max_depth = max_depth
             unsigned int c_max_misses = max_misses
@@ -285,21 +296,13 @@ cdef class RouteChoiceSet:
         else:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
-        # Shuffling the jobs improves load balancing where nodes pairs are geographically ordered
-        set_ods = list(set(ods))
-        if len(set_ods) != len(ods):
-            warnings.warn(f"Duplicate OD pairs found, dropping {len(ods) - len(set_ods)} OD pairs")
-
-        random.shuffle(set_ods)
-
         cdef RouteSet_t *route_set
         cdef RouteChoiceSetResults results = RouteChoiceSetResults(
-            set_ods,
+            demand,
             scaled_cutoff_prob,
             beta,
             self.num_links,
             self.cost_view,
-            demand_view,
             self.nodes_to_indices_view,
             self.mapping_idx,
             self.mapping_data,
@@ -314,15 +317,13 @@ cdef class RouteChoiceSet:
 
         with nogil, parallel(num_threads=c_cores):
             route_set = new RouteSet_t()
-            for i in prange(results.ods.size()):
-                origin_index = self.nodes_to_indices_view[results.ods[i].first]
-                dest_index = self.nodes_to_indices_view[results.ods[i].second]
+            for i in prange(demand.ods.size()):
+                origin_index = self.nodes_to_indices_view[demand.ods[i].first]
+                dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
                 # fprintf(stderr, "o: %lld, d: %lld\n", origin_index, dest_index)
                 if origin_index == dest_index:
                     continue
-
-                route_vec = results.get_route_set(i)
 
                 if self.block_flows_through_centroids:
                     blocking_centroid_flows(
@@ -371,11 +372,9 @@ cdef class RouteChoiceSet:
 
                 # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
                 # routes. This is done to simplify memory management later on.
-                d(route_vec).reserve(route_set.size())
-                for route in d(route_set):
-                    d(route_vec).emplace_back(route)
-
-                # We most now drop all references to those raw pointers. The unique pointers now own those vectors.
+                route_vec = results.get_route_vec(i)
+                RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
+                # We now drop all references to those raw pointers. The unique pointers now own those vectors.
                 route_set.clear()
 
                 results.compute_result(i, d(route_vec), threadid())
@@ -1044,12 +1043,11 @@ cdef class RouteChoiceSetResults:
 
     def __init__(
             self,
-            ods: List[Tuple[int, int]],
+            demand: GeneralisedCOODemand,
             cutoff_prob: float,
             beta: float,
             num_links: int,
             double[:] cost_view,
-            double[:, :] matrix_view,
             long long[:] nodes_to_indices_view,
             unsigned int [:] mapping_idx,
             unsigned int [:] mapping_data,
@@ -1062,7 +1060,8 @@ cdef class RouteChoiceSetResults:
         """
 
         :Arguments:
-            **ods** (`obj`: List[Tuple[int, int]]): A Python list of pairs of graph node ids. No verification of these is performed here.
+            **demand** (`obj`: GeneralisedCOODemand): A GeneralisedCOODemand object stores the ODs pairs and various
+              demand values in a COO form. No verification of these is performed here.
 
             **cutoff_prob** (`obj`: float): The cut-off probability for the inverse binary logit filter.
 
@@ -1125,6 +1124,7 @@ cdef class RouteChoiceSetResults:
         elif link_loading_reduction_threads <= 0:
             raise ValueError("thread value must be > 0")
 
+        self.demand = demand
         self.cutoff_prob = cutoff_prob
         self.beta = beta
         self.store_results = store_results
@@ -1132,13 +1132,11 @@ cdef class RouteChoiceSetResults:
         self.eager_link_loading = eager_link_loading
         self.link_loading_reduction_threads = link_loading_reduction_threads
         self.cost_view = cost_view
-        self.matrix_view = matrix_view
         self.nodes_to_indices_view = nodes_to_indices_view
         self.mapping_idx = mapping_idx
         self.mapping_data = mapping_data
 
-        self.ods = ods  # Python List[Tuple[int, int]] -> C++ vector[pair[long long, long long]]
-        cdef size_t size = self.ods.size()
+        cdef size_t size = self.demand.ods.size()
 
         # As the objects are attribute of the extension class they will be allocated before the object is
         # initialised. This ensures that accessing them is always valid and that they are just empty. We resize the ones
@@ -1161,7 +1159,7 @@ cdef class RouteChoiceSetResults:
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
-        if select_links is not None:
+        # if select_links is not None:
 
 
         # If we're eagerly link loading we must allocate this now while we still have the GIL, otherwise we'll allocate it later.
@@ -1179,7 +1177,19 @@ cdef class RouteChoiceSetResults:
             self.link_loading_matrix = None
             # self.sl_link_loading_matrix = None
 
-    cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
+    @staticmethod
+    cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
+        """
+        Transform a set of raw pointers to routes (vectors) into a vector of unique points to
+        routes.
+        """
+        cdef vector[long long] *route
+
+        route_vec.reserve(route_set.size())
+        for route in route_set:
+            route_vec.emplace_back(route)
+
+    cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil:
         """
         Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
 
@@ -1236,7 +1246,7 @@ cdef class RouteChoiceSetResults:
         if self.compute_mask(d(route_mask), d(cost_vec)):
             with gil:
                 warnings.warn(
-                    f"Zero cost route found for ({self.ods[i].first}, {self.ods[i].second}). "
+                    f"Zero cost route found for ({self.demand.ods[i].first}, {self.demand.ods[i].second}). "
                     "Entire route set masked"
                 )
         self.compute_frequency(keys, counts, route_set, d(route_mask))
@@ -1467,7 +1477,7 @@ cdef class RouteChoiceSetResults:
             long long origin_index = self.nodes_to_indices_view[self.ods[od_idx].first]
             long long dest_index = self.nodes_to_indices_view[self.ods[od_idx].second]
             vector[double].const_iterator route_prob_iter
-            double demand = self.matrix_view[origin_index, dest_index]
+            double demand = d(self.demand.f64[0])[od_idx]  # TODO FIXME
             double prob, load
             size_t i
 
@@ -1618,15 +1628,70 @@ cdef class RouteChoiceSetResults:
 
 
 cdef class GeneralisedCOODemand:
-    def __init__(self, df: pd.DataFrame, origin_col: str = "origin id", destination_col: str = "destination id", demand_cols = None):
-        self.df = df
-        self.origins = self.df[origin_col].to_numpy()
-        self.destinations = self.df[destination_col].to_numpy()
+    def __init__(self, origin_col: str, destination_col: str):
+        """
+        A container for access to the float64 and float32 fields of a data frame.
+        """
+        self.df = pd.DataFrame(columns=[origin_col, destination_col]).set_index([origin_col, destination_col])
 
-        if demand_cols is None:
-            df = self.df.drop(columns=[origin_col, destination_col]).select_dtypes(["float64", "float32"])
+    def add_df(self, dfs: Union[pd.DataFrame, List[pd.DataFrame]], demand_cols=None, fill: float = 0.0):
+        """
+        Add a DataFrame to the existing ones.
+
+        Expects a DataFrame with a multi-index of (o, d).
+
+        If no demand cols are provided, all floating point columns are used.
+        """
+        if isinstance(dfs, pd.DataFrame):
+            dfs = [dfs]
+
+        for i in range(len(dfs)):
+            df = dfs[i]
+            if df.index.nlevels != 2:
+                raise ValueError("provided pd.DataFrame doesn't have a 2-level multi-index")
+
+            if demand_cols is None:
+                dfs[i] = df.select_dtypes(["float64", "float32"])
+            else:
+                for col in demand_cols:
+                    if not (df.dtypes[col] == "float64" or df.dtypes[col] == "float32"):
+                        raise TypeError(f"demand column ({col}) is not a float64 or float32")
+                dfs[i] = df[demand_cols]
+
+        self.df = pd.concat(dfs, axis=1).fillna(fill)
+
+    def add_matrix(self, matrix: AequilibraeMatrix, fill: float = 0.0):
+        """
+        Add an AequilibraE matrix to the existing demand in a sparse manner.
+        """
+        if len(matrix.view_names) > 1:
+            m = matrix.matrix_view.sum(axis=2)  # FIXME: is this index correct?
         else:
-            df = self.df[demand_cols]
+            m = matrix.matrix_view
+
+        non_zero = np.where(m > 0)
+        # Remove intrazonals (elements on the diagonal)
+        origins = non_zero[0][non_zero[0] != non_zero[1]]
+        destinations = non_zero[1][non_zero[0] != non_zero[1]]
+
+        self.add_df(
+            pd.DataFrame(
+                data={
+                    self.df.index.names[0]: m.index[origins],
+                    self.df.index.names[1]: m.index[destinations],
+                    matrix.view_names[0]: m[origins, destinations],
+                },
+                index=self.df.index,
+            ),
+            fill=fill,
+        )
+        logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
+
+    def _initalise_c_data(self):
+        self.ods = self.df.index  # MultiIndex[int, int] -> vector[pair[long long, long long]]
+
+        self.f64.clear()
+        self.f32.clear()
 
         cdef:
             double[::1] f64_array
@@ -1634,25 +1699,45 @@ cdef class GeneralisedCOODemand:
             vector[double] *f64_vec
             vector[float] *f32_vec
 
-        for col in df:
-            if df.dtypes[col] == "float64":
-                f64_array = df[col].to_numpy()
+        for col in self.df:
+            if self.df.dtypes[col] == "float64":
+                f64_array = self.df[col].to_numpy()
 
                 # The unique pointer will take ownership of this allocation
                 f64_vec = new vector[double]()
                 f64_vec.insert(f64_vec.begin(), &f64_array[0], &f64_array[0] + len(f64_array))
                 self.f64.emplace_back(f64_vec)  # From here f63_vec should not be accessed. It is owned by the unique pointer
 
-            elif df.dtypes[col] == "float32":
-                f32_array = df[col].to_numpy()
+            elif self.df.dtypes[col] == "float32":
+                f32_array = self.df[col].to_numpy()
 
                 # The unique pointer will take ownership of this allocation
                 f32_vec = new vector[float]()
                 f32_vec.insert(f32_vec.begin(), &f32_array[0], &f32_array[0] + len(f32_array))
                 self.f32.emplace_back(f32_vec)  # From here f32_vec should not be accessed. It is owned by the unique pointer
-
             else:
-                raise TypeError(f"demand column ({col}) is not a float64 or float32")
+                raise TypeError(f"non-floating point column ({col}) in self.df. Something has gone wrong")
+
+    cpdef bool no_demand(GeneralisedCOODemand self):
+        if self.ods.size() != 0:
+            return self.f64.size() == 0 and self.f32.size() == 0
+        else:
+            return bool(self.df.columns())
+
+    cpdef _hello(GeneralisedCOODemand self):
+        cdef size_t i
+
+        print(self.df)
+
+        print("ods:", self.ods.size(), self.ods)
+
+        for i in range(self.f64.size()):
+            array = np.asarray(d(self.f64[i]))
+            print("f64:", d(self.f64[i]).size(), array.dtype, array)
+
+        for i in range(self.f32.size()):
+            array = np.asarray(d(self.f32[i]), dtype=np.float32)
+            print("f32:", d(self.f32[i]).size(), array.dtype, array)
 
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:

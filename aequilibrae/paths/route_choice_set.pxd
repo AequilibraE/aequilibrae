@@ -239,6 +239,7 @@ cdef class Checkpoint:
 
 cdef class RouteChoiceSetResults:
     cdef:
+        GeneralisedCOODemand demand
         bool store_results
         bool perform_assignment
         bool eager_link_loading
@@ -248,7 +249,6 @@ cdef class RouteChoiceSetResults:
         double[:] link_loads
         double[:, :] link_loading_matrix
         double[:] cost_view
-        double[:, :] matrix_view
         long long[:] nodes_to_indices_view
         unsigned int [:] mapping_idx
         unsigned int [:] mapping_data
@@ -266,7 +266,10 @@ cdef class RouteChoiceSetResults:
         # double[:] sl_link_loads
         # double[:, :] sl_link_loading_matrix
 
-    cdef shared_ptr[RouteVec_t] get_route_set(RouteChoiceSetResults self, size_t i) noexcept nogil
+    @staticmethod
+    cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil
+
+    cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
@@ -334,10 +337,8 @@ cdef class RouteChoiceSetResults:
 
 cdef class GeneralisedCOODemand:
     cdef:
-        readonly object df
-        long long[:] origins
-        long long[:] destinations
-
+        public object df
+        vector[pair[long long, long long]] ods
         vector[unique_ptr[vector[double]]] f64
         vector[unique_ptr[vector[float]]] f32
 

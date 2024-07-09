@@ -15,7 +15,7 @@ import pyarrow as pa
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.paths.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.route_choice_set import RouteChoiceSet, GeneralisedCOODemand
 
 
 class RouteChoice:
@@ -35,7 +35,7 @@ class RouteChoice:
         "bfsle": {"penalty": 1.0},
     }
 
-    def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
+    def __init__(self, graph: Graph, project=None):
         self.parameters = self.default_parameters.copy()
         self.procedure_id = None
         self.procedure_date = None
@@ -47,7 +47,7 @@ class RouteChoice:
 
         self.cores: int = 0
         self.graph = graph
-        self.matrix = matrix
+        self.demand = None
 
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
@@ -173,6 +173,20 @@ class RouteChoice:
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
 
+    def add_demand(self, demand, origin_col: str = "origin id", destination_col: str = "destination id", **kwargs):
+        """
+        TODO
+        """
+        if self.demand is None:
+            self.demand = GeneralisedCOODemand(origin_col=origin_col, destination_col=destination_col)
+
+        if isinstance(demand, pd.DataFrame):
+            self.demand.add_df(demand, **kwargs)
+        elif isinstance(demand, AequilibraeMatrix):
+            self.demand.add_matrix(demand, **kwargs)
+        else:
+            raise TypeError(f"unknown argument type '{(type(demand).__name__)}'")
+
     def prepare(self, nodes: Union[List[int], List[Tuple[int, int]], None] = None) -> None:
         """
         Prepare OD pairs for batch computation.
@@ -184,21 +198,14 @@ class RouteChoice:
                 always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
                 If *None* is provided, all OD pairs with non-zero flows will be used.
         """
-        if nodes is None:
-            idx = self.matrix.index
-            if len(self.matrix.view_names) > 1:
-                m = self.matrix.matrix_view.sum(axis=2)
-            else:
-                m = self.matrix.matrix_view
-            non_zero = np.where(m > 0)
-            # Remove intrazonals (elements on the diagonal)
-            o = non_zero[0][non_zero[0] != non_zero[1]]
-            d = non_zero[1][non_zero[0] != non_zero[1]]
-            self.nodes = list(zip(idx[o], idx[d]))
-            logging.info(f"There {len(self.nodes):,} are OD pairs with non-zero flows")
+        if nodes is None and self.demand is None:
+            raise ValueError("nothing to prepare, either provide a node list or set a demand matrix")
+        elif nodes is not None and self.demand is not None:
+            raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
+        elif nodes is None and self.demand is not None:
+            self.demand._initalise_c_data()
             return
-
-        if len(nodes) == 0:
+        elif len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 
         if all(
@@ -209,7 +216,6 @@ class RouteChoice:
             for pair in nodes
         ):
             self.nodes = nodes
-
         elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
             self.nodes = list(itertools.permutations(nodes, r=2))
         else:
