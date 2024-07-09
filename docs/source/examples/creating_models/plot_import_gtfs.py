@@ -9,6 +9,7 @@ In this example, we import a GTFS feed to our model and perform map matching.
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 # %%
+
 # Imports
 from uuid import uuid4
 from os import remove
@@ -22,7 +23,6 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
-
 
 # %%
 # Let's create an empty project on an arbitrary folder.
