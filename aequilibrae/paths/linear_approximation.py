@@ -115,9 +115,11 @@ class LinearApproximation(WorkerThread):
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
 
-        # TODO: Change Assignment to loads instead of capacity summed b4 v/c ratios
-        # if assig_spec.apply_pt_preload:
-        #     self.capacity = np.max(1.0, self.capacity - assig_spec.preload)
+        # Creates preload vector from preloads
+        self.preload = None
+        if assig_spec.preloads is not None:
+            cols = assig_spec.preloads.columns.difference(['link_id', 'direction'])
+            self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
@@ -495,7 +497,7 @@ class LinearApproximation(WorkerThread):
                 self.equilibration.emit(["rgap", self.rgap])
                 self.equilibration.emit(["iterations", self.iter])
 
-            aon_flows = []
+            aon_flows = [] if self.preload is None else [self.preload]
 
             self.__maybe_create_path_file_directories()
 
@@ -512,7 +514,6 @@ class LinearApproximation(WorkerThread):
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)
 
-            # aon_flows += preloads
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             flows = []
