@@ -236,8 +236,7 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
-        self.apply_pt_preload = False  # type: bool
-        self.preload = None  # type: np.ndarray
+        self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
 
@@ -482,21 +481,48 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    def set_pt_preload(self, preload: np.ndarray) -> None:
+    # TODO:
+    # Rewrite documentation
+    # Change set up to have a dataframe with link_id, direction, and multiple possible columns for each preload
+    # Decide whether supernet_id is needed
+    # Decide whether to remove the naming input parameter
+    def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
-        Sets the field that contains preload values for the assignment period.
-        Should have identical ordering to self.capacity.
+        Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
 
         :Arguments:
-            **preload** (:obj:`np.ndarray`): Array of preload values, see Network.build_pt_preload for details
+            **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
+            **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
         """
-        if len(preload) != len(self.classes[0].graph.graph):
-            raise ValueError(
-                "Preload vector should have a value for each link in network and be ordered by __supernet_id__"
-            )
+        # Create preloads dataframe if not already initialised
+        # NEED TO JUST MAKE SURE ORDERING IS CORRECT HERE!!! THEN ALL OTHERS WILL BE LEFT JOINED ANYWAY AND WILL HAVE CORRECT ORDERING!
+        if self.preloads is None:
+            c = self.classes[0]
+            return # Short circuit for now
 
-        self.apply_pt_preload = True
-        self.preload = preload
+        # Check that columns of preload are link_id, direction, preload:
+        expected = set(['link_id', 'direction', 'preload'])
+        missing = expected = set(preload.columns)
+        additional = set(preload.columns) - expected
+        if missing:
+            raise ValueError(f"Input preload dataframe is missing columns: {missing}\n"
+                             f"expected columns are {expected}")
+        elif additional:
+            raise ValueError(f"Input preload dataframe has additional columns: {additional}\n"
+                             f"expected columns are {expected}")
+
+        # Reject empty preloads
+        if len(preload) == 0:
+            raise ValueError(f"Cannot set empty preload!")
+        
+        # Check name is not already used (generate new name if needed):
+        name = name if name else f"preload_{len(self.preload.columns) - 1}" # -1 - remove keys to get 1 indexed preload columns
+        if name in self.preload.columns:
+            raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
+
+        # Merge onto current preload dataframe in correct order, and fill with zeros
+        self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
+        self.preloads[name].fillna(0, inplace=True)
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above

@@ -350,6 +350,7 @@ class Network(WorkerThread):
         data = df[valid_fields]
         for m in modes:
             net = pd.DataFrame(data, copy=True)
+            # For all links in net, set a_node == b_node if it doesn't support m (these will be culled in compressed formats)
             net.loc[~net.modes.str.contains(m), "b_node"] = net.loc[~net.modes.str.contains(m), "a_node"]
             g = Graph()
             g.mode = m
@@ -427,73 +428,3 @@ class Network(WorkerThread):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             c = conn.execute(f"select count({field}) from {table} where {condition};").fetchone()[0]
         return c
-
-    # TODO: Figure out how to extract the correct network graph, without having a particular graph being input
-    def build_pt_preload(
-        self, graph, start: int, end: int, inclusion_cond: str = "start"
-    ) -> np.ndarray:
-        """Builds a preload vector for the network over the specified time period
-
-        :Arguments:
-            **graph** (Graph): The graph which contains a copy of the network with all links to check for preloading
-
-            **start** (int): The start of the period for which to check pt schedules (seconds from midnight)
-
-            **end** (int): The end of the period for which to check pt schedules, (seconds from midnight)
-
-            **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
-
-        :Returns:
-            **preloads** (np.ndarray): A vector of preload from transit vehicles that can be directly used in an assignment
-
-        Minimal example:
-        .. code-block:: python
-
-            >>> from aequilibrae import Project
-            >>> from aequilibrae.utils.create_example import create_example
-
-            >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
-            >>> proj.network.build_graphs() # Must be built before assigning preload
-
-            >>> start = int(6.5 * 60 * 60) # 6.30am
-            >>> end = int(8.5 * 60 * 60)   # 8.30 am
-
-            >>> preload = proj.network.build_pt_preload(graph, start, end)
-        """
-        # Get trip_id based on specified inclusion condition
-        with read_and_close(database_connection("transit")) as conn:
-            links = pd.read_sql(build_pt_preload_sql(start, end, inclusion_cond), conn)
-
-        # Merge preload onto all links/dir's in network and fill in 0 for links with no transit
-        preload = pd.merge(graph.graph, links, on=["link_id", "direction"], how="left")
-        preload["preload"] = preload["preload"].fillna(0)
-
-        # Extract preload sorted by __supernet_id__ (same ordering as used by capacity in assignment)
-        return preload.sort_values(by="__supernet_id__")["preload"].to_numpy()
-
-
-probe_point_lookup = {
-    "start": "MIN(departure)",
-    "end": "MAX(arrival)",
-    "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
-}
-
-def build_pt_preload_sql(start, end, inclusion_cond):
-
-    def select_trip_ids():
-        in_period = f"BETWEEN {start} AND {end}"
-        if inclusion_cond == "any":
-            return f"SELECT DISTINCT trip_id FROM trips_schedule WHERE arrival {in_period} OR departure {in_period}"
-        return f"""
-            SELECT trip_id FROM trips_schedule GROUP BY trip_id
-            HAVING {probe_point_lookup[inclusion_cond]} {in_period}
-        """
-
-    # Convert trip_id's to link/dir's via pattern_id's
-    return f"""
-        SELECT pm.link as link_id, pm.dir as direction, SUM(r.pce) as preload
-        FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p 
-        INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id
-        INNER JOIN routes r ON p.pattern_id = r.pattern_id
-        GROUP BY pm.link, pm.dir
-    """

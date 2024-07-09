@@ -114,6 +114,8 @@ class LinearApproximation(WorkerThread):
 
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
+
+        # TODO: Change Assignment to loads instead of capacity summed b4 v/c ratios
         if assig_spec.apply_pt_preload:
             self.capacity = np.max(1.0, self.capacity - assig_spec.preload)
 
@@ -510,6 +512,7 @@ class LinearApproximation(WorkerThread):
                 c._aon_results.total_flows()
                 aon_flows.append(c._aon_results.total_link_loads)
 
+            # aon_flows += preloads
             self.aon_total_flow = np.sum(aon_flows, axis=0)
 
             flows = []
