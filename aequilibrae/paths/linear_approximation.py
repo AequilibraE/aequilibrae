@@ -97,7 +97,7 @@ class LinearApproximation:
         # Creates preload vector from preloads
         self.preload = None
         if assig_spec.preloads is not None:
-            cols = assig_spec.preloads.columns.difference(['link_id', 'direction'])
+            cols = assig_spec.preloads.columns.difference(["link_id", "direction"])
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
 
         self.free_flow_tt = assig_spec.free_flow_tt

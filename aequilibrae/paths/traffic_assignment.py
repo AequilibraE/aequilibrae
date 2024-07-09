@@ -492,28 +492,34 @@ class TrafficAssignment(AssignmentBase):
         # Create preloads dataframe in correct order if not already initialised
         if self.preloads is None:
             g = self.classes[0].graph.graph
-            self.preloads = g.sort_values(by='__supernet_id__')[['link_id', 'direction']].copy() # .copy() may be unecessary
+            self.preloads = g.sort_values(by="__supernet_id__")[
+                ["link_id", "direction"]
+            ].copy()  # .copy() may be unecessary
 
         # Check that columns of preload are link_id, direction, preload:
-        expected = set(['link_id', 'direction', 'preload'])
+        expected = set(["link_id", "direction", "preload"])
         missing = expected - set(preload.columns)
         additional = set(preload.columns) - expected
         if missing:
-            raise ValueError(f"Input preload dataframe is missing columns: {missing}\n"
-                             f"expected columns are {expected}")
+            raise ValueError(
+                f"Input preload dataframe is missing columns: {missing}\n" f"expected columns are {expected}"
+            )
         elif additional:
-            raise ValueError(f"Input preload dataframe has additional columns: {additional}\n"
-                             f"expected columns are {expected}")
+            raise ValueError(
+                f"Input preload dataframe has additional columns: {additional}\n" f"expected columns are {expected}"
+            )
 
         # Reject empty preloads
         if len(preload) == 0:
             raise ValueError(f"Cannot set empty preload!")
-        
+
         # Check name is not already used (generate new name if needed):
-        name = name if name else f"preload_{len(self.preloads.columns) - 1}" # -1 -> remove keys to get 1 indexed preload columns
+        name = (
+            name if name else f"preload_{len(self.preloads.columns) - 1}"
+        )  # -1 -> remove keys to get 1 indexed preload columns
         if name in self.preloads.columns:
             raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
-        preload.rename(columns={'preload': name}, inplace=True)
+        preload.rename(columns={"preload": name}, inplace=True)
 
         # Merge onto current preload dataframe
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")

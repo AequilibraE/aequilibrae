@@ -11,7 +11,7 @@ from aequilibrae.utils.create_example import create_example
 
 # 2) Figure out proper ordering for capacity vector with multiple classes and possible different graphs
 
-# 3) Once 2 is completed, update the build_pt_preload method as appropriate (attempt to remove 
+# 3) Once 2 is completed, update the build_pt_preload method as appropriate (attempt to remove
 #    graph input if possible, since it should depend on overall network)
 
 
@@ -23,9 +23,11 @@ def project(tmp_path):
     yield proj
     proj.close()
 
+
 @pytest.fixture
 def transit(project: Project):
     return Transit(project)
+
 
 @pytest.fixture
 def graph(project: Project):
@@ -52,7 +54,12 @@ def demand(graph):
 
     matrix.close()
 
-def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None,) -> TrafficAssignment:
+
+def _assignment(
+    graph: Graph,
+    demand: AequilibraeMatrix,
+    preload=None,
+) -> TrafficAssignment:
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
@@ -70,6 +77,7 @@ def _assignment(graph: Graph, demand: AequilibraeMatrix, preload=None,) -> Traff
 
     return assignment
 
+
 def hr_to_sec(e):
     return int(e * 60 * 60)
 
@@ -86,12 +94,13 @@ def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: T
     preloads = [calc_preload(transit, start, end) for start, end in [(7, 8), (6.5, 8.5), (5, 10)]]
 
     # Check preloads increase in size as time period increases
-    assert preloads[0]['preload'].sum() == 12484
-    assert preloads[1]['preload'].sum() == 21264
-    assert preloads[2]['preload'].sum() == 39696
+    assert preloads[0]["preload"].sum() == 12484
+    assert preloads[1]["preload"].sum() == 21264
+    assert preloads[2]["preload"].sum() == 39696
 
     assignment = _assignment(graph, demand, preload=preloads[0])
     assert len(assignment.preloads) == len(graph.graph)
+
 
 def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
     """Tests a full run through of pt preloading."""

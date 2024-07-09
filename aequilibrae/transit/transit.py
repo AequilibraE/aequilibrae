@@ -117,9 +117,7 @@ class Transit:
     # TODO:
     # Check that this works
     # Rewrite documentation
-    def build_pt_preload(
-        self, start: int, end: int, inclusion_cond: str = "start"
-    ) -> pd.DataFrame:
+    def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period
 
         :Arguments:
@@ -150,9 +148,9 @@ class Transit:
 
     def __build_pt_preload_sql(self, start, end, inclusion_cond):
         probe_point_lookup = {
-        "start": "MIN(departure)",
-        "end": "MAX(arrival)",
-        "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
+            "start": "MIN(departure)",
+            "end": "MAX(arrival)",
+            "midpoint": "(MIN(departure) + MAX(arrival)) / 2",
         }
 
         def select_trip_ids():
