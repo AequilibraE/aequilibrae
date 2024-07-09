@@ -481,7 +481,6 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
-    # TODO: decide whether to include the naming input parameter or not
     def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
         """
         Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
@@ -519,6 +518,13 @@ class TrafficAssignment(AssignmentBase):
         # Merge onto current preload dataframe
         self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
         self.preloads[name] = self.preloads[name].fillna(0)
+
+        # Enable preload to be added before or after specifyig the algorithm
+        if self.assignment is not None:
+            if self.assignment.preload is None:
+                self.assignment.preload = self.preloads[name].to_numpy()
+            else:
+                self.assignment.preload += self.preloads[name]
 
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
@@ -598,7 +604,7 @@ class TrafficAssignment(AssignmentBase):
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
-        preload = self.assignment.preload
+        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
 
         fields = [
             "Preload_AB",
@@ -631,7 +637,7 @@ class TrafficAssignment(AssignmentBase):
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
         agg.data["Preload_AB"][m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
-        agg.data["Preload_BA"][m.network_ab_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.data["Preload_BA"][m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
         agg.data["Preload_tot"][:] = np.nansum([agg.data.Preload_AB, agg.data.Preload_BA], axis=0)
 
         agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
