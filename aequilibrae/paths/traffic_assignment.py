@@ -598,8 +598,12 @@ class TrafficAssignment(AssignmentBase):
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
+        preload = self.assignment.preload
 
         fields = [
+            "Preload_AB",
+            "Preload_BA",
+            "Preload_tot",
             "Congested_Time_AB",
             "Congested_Time_BA",
             "Congested_Time_Max",
@@ -626,6 +630,10 @@ class TrafficAssignment(AssignmentBase):
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
+        agg.data["Preload_AB"][m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        agg.data["Preload_BA"][m.network_ab_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.data["Preload_tot"][:] = np.nansum([agg.data.Preload_AB, agg.data.Preload_BA], axis=0)
+
         agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
         agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)

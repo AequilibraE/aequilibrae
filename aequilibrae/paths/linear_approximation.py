@@ -120,7 +120,6 @@ class LinearApproximation(WorkerThread):
         if assig_spec.preloads is not None:
             cols = assig_spec.preloads.columns.difference(['link_id', 'direction'])
             self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
-            print("Added preload!")
 
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
@@ -498,7 +497,7 @@ class LinearApproximation(WorkerThread):
                 self.equilibration.emit(["rgap", self.rgap])
                 self.equilibration.emit(["iterations", self.iter])
 
-            aon_flows = [] if self.preload is None else [self.preload]
+            aon_flows = []
 
             self.__maybe_create_path_file_directories()
 
@@ -588,6 +587,9 @@ class LinearApproximation(WorkerThread):
                     flows.append(cls_res.total_link_loads)
 
             self.fw_total_flow = np.sum(flows, axis=0)
+            if self.preload is not None:
+                self.fw_total_flow += self.preload
+
             if self.algorithm == "all-or-nothing":
                 break
             # Check convergence
