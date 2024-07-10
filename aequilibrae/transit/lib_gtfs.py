@@ -85,11 +85,11 @@ class GTFSRouteSystemBuilder:
         self.gtfs_data._set_capacities(capacities)
 
     def set_pces(self, pces: dict):
-        """Sets default capacities for modes/vehicles.
+        """Sets default passenger car equivalent (PCE) factor for each GTFS mode.
 
         :Arguments:
-            **pces** (:obj:`dict`): Dictionary with GTFS types as keys, each with float for
-                                    capacities i.e. -> "{0: 2.0,...}"
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
+                                    value i.e. -> "{0: 2.0,...}"
         """
         self.gtfs_data._set_pces(pces)
 

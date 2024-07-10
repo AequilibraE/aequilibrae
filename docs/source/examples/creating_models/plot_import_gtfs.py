@@ -1,3 +1,20 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: venv
+#     language: python
+#     name: python3
+# ---
+
+# %%
 """
 .. _example_gtfs:
 
@@ -22,6 +39,7 @@ from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
 
 # %%
@@ -30,7 +48,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# As the Coquimbo example already has a complete GTFS model, we shall remove its public transport  
+# As the Coquimbo example already has a complete GTFS model, we shall remove its public transport
 # database for the sake of this example.
 
 remove(join(fldr, "public_transport.sqlite"))
@@ -48,7 +66,7 @@ data = Transit(project)
 transit = data.new_gtfs_builder(agency="Lisanco", file_path=dest_path)
 
 # %%
-# To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free 
+# To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free
 # to experiment with any other available dates. Transit class has a function allowing you to check
 # dates for the GTFS feed. It should take approximately 2 minutes to load the data.
 
@@ -86,9 +104,9 @@ for i, row in links.iterrows():
     points = [[x[1], x[0]] for x in eval(points)]
 
     _ = folium.vector_layers.PolyLine(
-        points, 
-        popup=f"<b>pattern_id: {row.pattern_id}</b>", 
-        color=pattern_colors[i], 
+        points,
+        popup=f"<b>pattern_id: {row.pattern_id}</b>",
+        color=pattern_colors[i],
         weight=5,
     ).add_to(gtfs_links)
 
@@ -105,7 +123,7 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
-# %%
+# %% [markdown]
 # Let's create the map!
 
 # %%

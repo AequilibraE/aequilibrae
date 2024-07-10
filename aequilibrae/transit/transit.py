@@ -128,7 +128,7 @@ class Transit:
             **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
 
         :Returns:
-            **preloads** (np.ndarray): A vector of preload from transit vehicles that can be directly used in an assignment
+            **preloads** (pd.DataFrame): A dataframe of preload from transit vehicles that can be directly used in an assignment
 
         Minimal example:
         .. code-block:: python
@@ -137,12 +137,11 @@ class Transit:
             >>> from aequilibrae.utils.create_example import create_example
 
             >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
-            >>> proj.network.build_graphs() # Must be built before assigning preload
 
             >>> start = int(6.5 * 60 * 60) # 6.30am
             >>> end = int(8.5 * 60 * 60)   # 8.30 am
 
-            >>> preload = proj.network.build_pt_preload(graph, start, end)
+            >>> preload = proj.transit.build_pt_preload(start, end)
         """
         return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self.pt_con)
 

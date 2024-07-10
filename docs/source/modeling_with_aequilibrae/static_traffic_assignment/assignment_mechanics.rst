@@ -330,8 +330,8 @@ Setting Preloads
 ^^^^^^^^^^^^^^^^
 
 We can also optionally include a preload vector for constant flows which are not
-being otherwise modelled. For example, this accounts for predetermined public transport 
-vehicles at their regularly scheduled times and adds load to each link accordingly.
+being otherwise modelled. For example, this can be used to account for scheduled 
+public transport vehicles, adding an equivalent load to each link along the route accordingly.
 AequilibraE supports various conditions for which PT trips to include in the preload, 
 and allows the user to specify the PCE for each type of vehicle in the public transport 
 network.
@@ -349,7 +349,7 @@ Next, add the preload to the assignment.
 
 .. code-block:: python
 
-  assig.add_preload(preload)
+  assig.add_preload(preload, 'PT_vehicles')
 
 
 Executing an Assignment

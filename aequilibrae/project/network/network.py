@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -333,9 +333,12 @@ class Network:
         lonlat = self.nodes.lonlat.set_index("node_id")
         data = df[valid_fields]
         for m in modes:
+
+            # For any link in net that doesn't support mode 'm', set a_node = b_node (these will be culled when
+            # the compressed graph representation is created)
             net = pd.DataFrame(data, copy=True)
-            # For all links in net, set a_node == b_node if it doesn't support m (these will be culled in compressed formats)
             net.loc[~net.modes.str.contains(m), "b_node"] = net.loc[~net.modes.str.contains(m), "a_node"]
+
             g = Graph()
             g.mode = m
             g.network = net

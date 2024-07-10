@@ -492,9 +492,7 @@ class TrafficAssignment(AssignmentBase):
         # Create preloads dataframe in correct order if not already initialised
         if self.preloads is None:
             g = self.classes[0].graph.graph
-            self.preloads = g.sort_values(by="__supernet_id__")[
-                ["link_id", "direction"]
-            ].copy()  # .copy() may be unecessary
+            self.preloads = g.sort_values(by="__supernet_id__")[["link_id", "direction"]].copy()
 
         # Check that columns of preload are link_id, direction, preload:
         expected = {"link_id", "direction", "preload"}
