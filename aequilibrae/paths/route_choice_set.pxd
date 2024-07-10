@@ -344,3 +344,31 @@ cdef class GeneralisedCOODemand:
         vector[unique_ptr[vector[float]]] f32
 
     cpdef _hello(GeneralisedCOODemand self)
+
+# I understand this isn't a great way to handle this but I'm rather unsure of a better method.  We need a method to
+# store both float and double loads. Cython doesn't allow us to use fused types (Cython diet templates) in any manner
+# that's useful. We can't store them on an object nor put them into a C++ structure, they can only be returned, used as
+# a local variable, or passed to a function.
+#
+# Cython doesn't allow us to write a templated class, we'd have to write an actual C++ class for that. Even if we did
+# that we'd still have to write a wrapper class.
+cdef class LinkLoadingResults:
+    cdef:
+        # Number of threads * number of demand cols * number of links
+        vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_link_loading_threaded
+        vector[unique_ptr[vector[double]]] f64_link_loading
+
+        vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_link_loading_threaded
+        vector[unique_ptr[vector[float]]] f32_link_loading
+
+        # # Select link
+        # vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_sl_link_loading_threaded
+        # vector[unique_ptr[vector[double]]]  f64_sl_link_loading
+
+        # vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_sl_link_loading_threaded
+        # vector[unique_ptr[vector[float]]] f32_sl_link_loading
+
+        # vector[unique_ptr[vector[COO_struct]]] f64_sl_od_matrix_threaded
+        # vector[COO_struct]] f64_sl_od_matrix
+
+        # f32_sl_od_matrix struct doesn't exist ATM

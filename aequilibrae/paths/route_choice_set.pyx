@@ -1739,6 +1739,89 @@ cdef class GeneralisedCOODemand:
             array = np.asarray(d(self.f32[i]), dtype=np.float32)
             print("f32:", d(self.f32[i]).size(), array.dtype, array)
 
+# See note in route_choice_set.pxd
+cdef class LinkLoadingResults:
+    def __cinit__(
+            self,
+            demand: GeneralisedCOODemand,
+            num_links: int,
+            threads: int,
+    ):
+        if threads <= 0:
+            raise ValueError(f"threads must be positive ({threads})")
+        elif num_links <= 0:
+            raise ValueError(f"num_links must be positive ({num_links})")
+
+        cdef:
+            vector[unique_ptr[vector[double]]] *f64_demand_cols
+            vector[unique_ptr[vector[float]]] *f32_demand_cols
+
+        # FIXME: SOMETHING IS WRONG HERE, the size print out is wrong
+
+        # Allocate the threaded f64 link loading.
+        self.f64_link_loading_threaded.reserve(threads)
+        for i in range(threads):
+            f64_demand_cols = new vector[unique_ptr[vector[double]]]()
+            f64_demand_cols.reserve(demand.f64.size())
+
+            for j in range(demand.f64.size()):
+                f64_demand_cols.emplace_back(new vector[double](<size_t>num_links))
+
+            self.f64_link_loading_threaded.emplace_back(f64_demand_cols)
+
+        # Allocate the f64 link loading. The above will be summed into this.
+        self.f64_link_loading.reserve(demand.f64.size())
+        for j in range(demand.f64.size()):
+            f64_demand_cols.emplace_back(new vector[double](<size_t>num_links))
+
+
+        # Allocate the threaded f32 link loading.
+        self.f32_link_loading_threaded.reserve(threads)
+        for i in range(threads):
+            f32_demand_cols = new vector[unique_ptr[vector[float]]]()
+            f32_demand_cols.reserve(demand.f32.size())
+
+            for j in range(demand.f32.size()):
+                f32_demand_cols.emplace_back(new vector[float](<size_t>num_links))
+
+            self.f32_link_loading_threaded.emplace_back(f32_demand_cols)
+
+        # Allocate the f32 link loading. The above will be summed into this.
+        self.f32_link_loading.reserve(demand.f32.size())
+        for j in range(demand.f32.size()):
+            f32_demand_cols.emplace_back(new vector[float](<size_t>num_links))
+
+
+    def __init__(
+            self,
+            demand: GeneralisedCOODemand,
+            num_links: int,
+            threads: int,
+    ):
+        pass
+
+    def _sizes(self):
+        print("-" * 10, "threaded", "-" * 10)
+        print("f64 threads:", self.f64_link_loading_threaded.size())
+        for i in range(self.f64_link_loading_threaded.size()):
+            print("  f64 cols:", d(self.f64_link_loading_threaded[i]).size())
+            for j in range(d(self.f64_link_loading_threaded[i]).size()):
+                print("    f64 links:", d(d(self.f64_link_loading_threaded[i])[j]).size())
+
+        print("f32 threads:", self.f32_link_loading_threaded.size())
+        for i in range(self.f32_link_loading_threaded.size()):
+            print("  f32 cols:", d(self.f32_link_loading_threaded[i]).size())
+            for j in range(d(self.f32_link_loading_threaded[i]).size()):
+                print("    f32 links:", d(d(self.f32_link_loading_threaded[i])[j]).size())
+
+        print("-" * 10, "results", "-" * 10)
+        print("f64 results:", self.f64_link_loading.size())
+        for j in range(self.f64_link_loading.size()):
+            print("  f64 cols:", d(self.f64_link_loading[i]).size())
+
+        print("f32 results:", self.f32_link_loading.size())
+        for j in range(self.f32_link_loading.size()):
+            print("  f32 cols:", d(self.f32_link_loading[i]).size())
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:
