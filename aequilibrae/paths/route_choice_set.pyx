@@ -178,11 +178,11 @@ cdef class RouteChoiceSet:
             "origin id": [origin],
             "destination id": [destination],
             "demand": [demand]
-        })
-        demand = GeneralisedCOODemand()
-        demand.add_df(df)
+        }).set_index(["origin id", "destination id"])
+        demand_coo = GeneralisedCOODemand("origin id", "destination id")
+        demand_coo.add_df(df)
 
-        self.batched(demand, *args, **kwargs)
+        self.batched(demand_coo, *args, **kwargs)
         where = kwargs.get("where", None)
         if where is not None:
             schema = self.psl_schema if kwargs.get("path_size_logit", False) else self.schema
@@ -210,7 +210,9 @@ cdef class RouteChoiceSet:
             bfsle: bool = True,
             penalty: float = 1.0,
             where: Optional[str] = None,
+            store_results: bool = True,
             path_size_logit: bool = False,
+            eager_link_loading: bool = False,
             beta: float = 1.0,
             cutoff_prob: float = 0.0,
     ):
@@ -252,9 +254,7 @@ cdef class RouteChoiceSet:
         if path_size_logit and not 0.0 <= cutoff_prob <= 1.0:
             raise ValueError("`cutoff_prob` must be 0 <= `cutoff_prob` <= 1 for path sized logit model")
 
-        for i in range(demand.ods.size()):
-            origin = demand.ods[i].first
-            dest = demand.ods[i].second
+        for origin, dest in demand.df.index:
             if self.nodes_to_indices_view[origin] == -1:
                 raise ValueError(f"Origin {origin} is not present within the compact graph")
             if self.nodes_to_indices_view[dest] == -1:
@@ -296,6 +296,7 @@ cdef class RouteChoiceSet:
         else:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
+        demand._initalise_c_data()
         cdef RouteSet_t *route_set
         cdef RouteChoiceSetResults results = RouteChoiceSetResults(
             demand,
@@ -306,14 +307,12 @@ cdef class RouteChoiceSet:
             self.nodes_to_indices_view,
             self.mapping_idx,
             self.mapping_data,
-            True,  # store_results,
-            path_size_logit,  # perform_assignment
-            True,  # eager_link_loading
-            cores
+            store_results=store_results,
+            perform_assignment=path_size_logit,
+            eager_link_loading=eager_link_loading,
+            link_loading_reduction_threads=c_cores
         )
         self.results = results
-
-        print("Starting compute")
 
         with nogil, parallel(num_threads=c_cores):
             route_set = new RouteSet_t()
@@ -321,7 +320,6 @@ cdef class RouteChoiceSet:
                 origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                 dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
-                # fprintf(stderr, "o: %lld, d: %lld\n", origin_index, dest_index)
                 if origin_index == dest_index:
                     continue
 
@@ -980,7 +978,7 @@ cdef class RouteChoiceSet:
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        return libpa.pyarrow_wrap_table(self.results.make_table_from_results()).to_pandas()
+        return libpa.pyarrow_wrap_table(self.results.make_table_from_results())
 
 
 @cython.embedsignature(True)
@@ -1474,8 +1472,8 @@ cdef class RouteChoiceSetResults:
         const size_t thread_id
     ) noexcept nogil:
         cdef:
-            long long origin_index = self.nodes_to_indices_view[self.ods[od_idx].first]
-            long long dest_index = self.nodes_to_indices_view[self.ods[od_idx].second]
+            long long origin_index = self.nodes_to_indices_view[self.demand.ods[od_idx].first]
+            long long dest_index = self.nodes_to_indices_view[self.demand.ods[od_idx].second]
             vector[double].const_iterator route_prob_iter
             double demand = d(self.demand.f64[0])[od_idx]  # TODO FIXME
             double prob, load
@@ -1543,21 +1541,21 @@ cdef class RouteChoiceSetResults:
             path_overlap_col = new CDoubleBuilder(pool)
             prob_col = new CDoubleBuilder(pool)
 
-            for i in range(self.ods.size()):
+            for i in range(self.demand.ods.size()):
                 cost_col.AppendValues(d(self.__cost_set[i]))
                 mask_col.AppendValues(d(self.__mask_set[i]))
                 path_overlap_col.AppendValues(d(self.__path_overlap_set[i]))
                 prob_col.AppendValues(d(self.__prob_set[i]))
 
-        for i in range(self.ods.size()):
+        for i in range(self.demand.ods.size()):
             route_set = self.__route_vecs[i]
 
             # Instead of constructing a "list of lists" style object for storing the route sets we instead will
             # construct one big array of link IDs with a corresponding offsets array that indicates where each new row
             # (path) starts.
             for j in range(d(route_set).size()):
-                o_col.Append(self.ods[i].first)
-                d_col.Append(self.ods[i].second)
+                o_col.Append(self.demand.ods[i].first)
+                d_col.Append(self.demand.ods[i].second)
 
                 offset_builder.Append(offset)
 
@@ -1643,22 +1641,22 @@ cdef class GeneralisedCOODemand:
         If no demand cols are provided, all floating point columns are used.
         """
         if isinstance(dfs, pd.DataFrame):
-            dfs = [dfs]
+            dfs = (dfs,)
 
-        for i in range(len(dfs)):
-            df = dfs[i]
+        new_dfs = [self.df]
+        for df in dfs:
             if df.index.nlevels != 2:
                 raise ValueError("provided pd.DataFrame doesn't have a 2-level multi-index")
 
             if demand_cols is None:
-                dfs[i] = df.select_dtypes(["float64", "float32"])
+                new_dfs.append(df.select_dtypes(["float64", "float32"]))
             else:
                 for col in demand_cols:
                     if not (df.dtypes[col] == "float64" or df.dtypes[col] == "float32"):
                         raise TypeError(f"demand column ({col}) is not a float64 or float32")
-                dfs[i] = df[demand_cols]
+                new_dfs.append(df[demand_cols])
 
-        self.df = pd.concat(dfs, axis=1).fillna(fill)
+        self.df = pd.concat(new_dfs, axis=1).fillna(fill)
 
     def add_matrix(self, matrix: AequilibraeMatrix, fill: float = 0.0):
         """
@@ -1674,17 +1672,15 @@ cdef class GeneralisedCOODemand:
         origins = non_zero[0][non_zero[0] != non_zero[1]]
         destinations = non_zero[1][non_zero[0] != non_zero[1]]
 
-        self.add_df(
-            pd.DataFrame(
-                data={
-                    self.df.index.names[0]: m.index[origins],
-                    self.df.index.names[1]: m.index[destinations],
-                    matrix.view_names[0]: m[origins, destinations],
-                },
-                index=self.df.index,
-            ),
-            fill=fill,
-        )
+        df = pd.DataFrame(
+            data={
+                self.df.index.names[0]: matrix.index[origins],
+                self.df.index.names[1]: matrix.index[destinations],
+                matrix.view_names[0]: m[origins, destinations],
+            },
+        ).set_index([self.df.index.names[0], self.df.index.names[1]])
+
+        self.add_df(df, fill=fill)
         logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
 
     def _initalise_c_data(self):
@@ -1692,6 +1688,8 @@ cdef class GeneralisedCOODemand:
 
         self.f64.clear()
         self.f32.clear()
+        self.f64_names = []
+        self.f32_names = []
 
         cdef:
             double[::1] f64_array
@@ -1702,6 +1700,7 @@ cdef class GeneralisedCOODemand:
         for col in self.df:
             if self.df.dtypes[col] == "float64":
                 f64_array = self.df[col].to_numpy()
+                self.f64_names.append(col)
 
                 # The unique pointer will take ownership of this allocation
                 f64_vec = new vector[double]()
@@ -1710,6 +1709,7 @@ cdef class GeneralisedCOODemand:
 
             elif self.df.dtypes[col] == "float32":
                 f32_array = self.df[col].to_numpy()
+                self.f32_names.append(col)
 
                 # The unique pointer will take ownership of this allocation
                 f32_vec = new vector[float]()
@@ -1718,11 +1718,11 @@ cdef class GeneralisedCOODemand:
             else:
                 raise TypeError(f"non-floating point column ({col}) in self.df. Something has gone wrong")
 
-    cpdef bool no_demand(GeneralisedCOODemand self):
-        if self.ods.size() != 0:
-            return self.f64.size() == 0 and self.f32.size() == 0
-        else:
-            return bool(self.df.columns())
+    def no_demand(GeneralisedCOODemand self) -> bool:
+        return len(self.df.columns) == 0
+
+    def is_empty(self) -> bool:
+        return self.df.index.empty
 
     cpdef _hello(GeneralisedCOODemand self):
         cdef size_t i

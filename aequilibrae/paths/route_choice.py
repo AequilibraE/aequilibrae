@@ -47,7 +47,7 @@ class RouteChoice:
 
         self.cores: int = 0
         self.graph = graph
-        self.demand = None
+        self.demand = self.__init_demand()
 
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
@@ -62,14 +62,16 @@ class RouteChoice:
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
 
-        self.nodes: Optional[Union[List[int], List[Tuple[int, int]]]] = None
-
         self._config = {}
         self._selected_links = {}
 
     @cached_property
     def __rc(self) -> RouteChoiceSet:
         return RouteChoiceSet(self.graph)
+
+    @staticmethod
+    def __init_demand():
+        return GeneralisedCOODemand("origin id", "destination id")
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
@@ -177,9 +179,6 @@ class RouteChoice:
         """
         TODO
         """
-        if self.demand is None:
-            self.demand = GeneralisedCOODemand(origin_col=origin_col, destination_col=destination_col)
-
         if isinstance(demand, pd.DataFrame):
             self.demand.add_df(demand, **kwargs)
         elif isinstance(demand, AequilibraeMatrix):
@@ -198,16 +197,15 @@ class RouteChoice:
                 always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
                 If *None* is provided, all OD pairs with non-zero flows will be used.
         """
-        if nodes is None and self.demand is None:
-            raise ValueError("nothing to prepare, either provide a node list or set a demand matrix")
-        elif nodes is not None and self.demand is not None:
+        if nodes is not None and not self.demand.no_demand():
             raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
-        elif nodes is None and self.demand is not None:
-            self.demand._initalise_c_data()
+        elif nodes is None:
             return
         elif len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 
+        self.demand = self.__init_demand()
+        df = pd.DataFrame()
         if all(
             isinstance(pair, tuple)
             and len(pair) == 2
@@ -215,11 +213,14 @@ class RouteChoice:
             and isinstance(pair[1], (int, np.integer))
             for pair in nodes
         ):
-            self.nodes = nodes
+            df.index = pd.MultiIndex.from_tuples(nodes)
         elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
-            self.nodes = list(itertools.permutations(nodes, r=2))
+            df.index = pd.MultiIndex.from_tuples(itertools.permutations(nodes, r=2))
         else:
             raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
+
+        print(df)
+        self.demand.add_df(df)
 
     def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
         """
@@ -264,7 +265,7 @@ class RouteChoice:
         :Arguments:
             **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
         """
-        if self.nodes is None:
+        if self.demand.df.index.empty:
             raise ValueError(
                 "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
             )
@@ -273,7 +274,7 @@ class RouteChoice:
 
         self.results = None
         self.__rc.batched(
-            self.nodes,
+            self.demand,
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
@@ -294,14 +295,7 @@ class RouteChoice:
             **info** (:obj:`dict`): Dictionary with summary information
         """
 
-        if self.matrix is None:
-            matrix_totals = {}
-        elif len(self.matrix.view_names) == 1:
-            matrix_totals = {self.matrix.view_names[0]: np.sum(self.matrix.matrix_view[:, :])}
-        else:
-            matrix_totals = {
-                nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)
-            }
+        matrix_totals = self.demand.df.sum().to_dict()
 
         info = {
             "Algorithm": self.algorithm,
@@ -356,10 +350,8 @@ class RouteChoice:
                 Columns are the matrix name concatenated direction.
         """
 
-        if self.matrix is None:
-            raise ValueError(
-                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
-            )
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
         tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
         self.link_loads = {k: v[0] for k, v in tmp.items()}
@@ -454,10 +446,8 @@ class RouteChoice:
                 Columns are the matrix name concatenated with the select link set and direction.
         """
 
-        if self.matrix is None:
-            raise ValueError(
-                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
-            )
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
         tmp = self.__rc.select_link_loading(self.matrix, self._selected_links)
 

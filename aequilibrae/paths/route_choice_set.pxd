@@ -253,7 +253,6 @@ cdef class RouteChoiceSetResults:
         unsigned int [:] mapping_idx
         unsigned int [:] mapping_data
 
-        vector[pair[long long, long long]] ods
         vector[shared_ptr[RouteVec_t]] __route_vecs
         vector[vector[long long] *] __link_union_set
         vector[shared_ptr[vector[double]]] __cost_set
@@ -338,6 +337,8 @@ cdef class RouteChoiceSetResults:
 cdef class GeneralisedCOODemand:
     cdef:
         public object df
+        readonly object f64_names
+        readonly object f32_names
         vector[pair[long long, long long]] ods
         vector[unique_ptr[vector[double]]] f64
         vector[unique_ptr[vector[float]]] f32
