@@ -165,7 +165,7 @@ class Transit:
         # Convert trip_id's to link/dir's via pattern_id's
         return f"""
             SELECT pm.link as link_id, pm.dir as direction, SUM(r.pce) as preload
-            FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p 
+            FROM (SELECT pattern_id FROM trips WHERE trip_id IN ({select_trip_ids()})) as p
             INNER JOIN pattern_mapping pm ON p.pattern_id = pm.pattern_id
             INNER JOIN routes r ON p.pattern_id = r.pattern_id
             GROUP BY pm.link, pm.dir

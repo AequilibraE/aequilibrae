@@ -87,7 +87,7 @@ class Pattern(BasicPTElement):
             self.__srid,
         ]
 
-        sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, pce, 
+        sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, pce,
                          seated_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
 

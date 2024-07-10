@@ -497,7 +497,7 @@ class TrafficAssignment(AssignmentBase):
             ].copy()  # .copy() may be unecessary
 
         # Check that columns of preload are link_id, direction, preload:
-        expected = set(["link_id", "direction", "preload"])
+        expected = {"link_id", "direction", "preload"}
         missing = expected - set(preload.columns)
         additional = set(preload.columns) - expected
         if missing:
@@ -511,7 +511,7 @@ class TrafficAssignment(AssignmentBase):
 
         # Reject empty preloads
         if len(preload) == 0:
-            raise ValueError(f"Cannot set empty preload!")
+            raise ValueError("Cannot set empty preload!")
 
         # Check name is not already used (generate new name if needed):
         name = (
