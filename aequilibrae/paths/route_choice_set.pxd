@@ -243,14 +243,9 @@ cdef class RouteChoiceSetResults:
         GeneralisedCOODemand demand
         bool store_results
         bool perform_assignment
-        bool eager_link_loading
         double cutoff_prob
         double beta
-        unsigned link_loading_reduction_threads
-        double[:] link_loads
-        double[:, :] link_loading_matrix
         double[:] cost_view
-        long long[:] nodes_to_indices_view
         unsigned int [:] mapping_idx
         unsigned int [:] mapping_data
 
@@ -260,11 +255,6 @@ cdef class RouteChoiceSetResults:
         vector[shared_ptr[vector[bool]]] __mask_set
         vector[shared_ptr[vector[double]]] __path_overlap_set
         vector[shared_ptr[vector[double]]] __prob_set
-
-        # vector[COO_struct] sl_od_sparse_matrix_matrix
-        # unordered_set[long] select_link_set
-        # double[:] sl_link_loads
-        # double[:, :] sl_link_loading_matrix
 
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil
@@ -320,14 +310,6 @@ cdef class RouteChoiceSetResults:
         const vector[double] &total_cost,
         const vector[double] &path_overlap_vec,
         const vector[bool] &route_mask
-    ) noexcept nogil
-
-    cdef void link_load_single_route_set(
-        RouteChoiceSetResults self,
-        const size_t i,
-        const RouteVec_t &route_set,
-        const vector[double] &prob_vec,
-        const size_t thread_id
     ) noexcept nogil
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self)

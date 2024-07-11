@@ -310,13 +310,10 @@ cdef class RouteChoiceSet:
             beta,
             self.num_links,
             self.cost_view,
-            self.nodes_to_indices_view,
             self.mapping_idx,
             self.mapping_data,
             store_results=store_results,
             perform_assignment=path_size_logit,
-            eager_link_loading=eager_link_loading,
-            link_loading_reduction_threads=c_cores
         )
         self.ll_results = LinkLoadingResults(demand, self.num_links, c_cores)
 
@@ -975,14 +972,10 @@ cdef class RouteChoiceSetResults:
             beta: float,
             num_links: int,
             double[:] cost_view,
-            long long[:] nodes_to_indices_view,
             unsigned int [:] mapping_idx,
             unsigned int [:] mapping_data,
             store_results: bool = True,
             perform_assignment: bool = True,
-            eager_link_loading: bool = True,
-            # select_links: Dict[str, List[long]] = None,
-            link_loading_reduction_threads: int = 1
     ):
         """
 
@@ -999,14 +992,6 @@ cdef class RouteChoiceSetResults:
 
             **perform_assignment** (`obj`: bool): Whether or not to perform a path-sized logit assignment.
 
-            **eager_link_loading** (`obj`: bool): If enabled link loading is immediately performed during the call the
-              `compute_result`. This allows only link loading results to be returned, removing the requirement of
-              `store_results=True` for link loading, significantly reducing total memory usage.
-
-            **link_loading_reduction_threads** (`obj`: int): As link loading is a reduction-style procedure, this parameter
-              controls how many thread buffers are allocated. These buffers should be reduced to a single result via the
-              `get_link_loading` method.
-
         NOTE: This class makes no attempt to be thread safe when improperly accessed. Multithreaded accesses should be
         coordinated to not collide. Each index of `ods` should only ever be accessed by a single thread.
 
@@ -1014,52 +999,17 @@ cdef class RouteChoiceSetResults:
         True the previous internal buffers will be reused. This will highly likely result incorrect results. When False some
         new internal buffers will used, link loading results will still be incorrect. Thus A SINGLE `ods` INDEX SHOULD NOT
         BE ACCESSED MULTIPLE TIMES.
-
-        There are a couple ways this class can be used.
-          1. Plain route set computation.
-             Here we're only interested in the route set outputs. This object should be configured as
-             self.store_results = True
-             self.perform_assignment = False
-             self.eager_link_loading = False
-
-          2. Route set computation with assignment.
-             Here we're interested in the assignment with all outputs. This object should be configured as
-             self.store_results = True
-             self.perform_assignment = True
-             self.eager_link_loading = False
-
-          3. Route set computation with assignment with all outputs and eager link loading.
-             This object should be configured as
-             self.store_results = True
-             self.perform_assignment = True
-             self.eager_link_loading = True
-
-          4. Route set computation with only link loading.
-             This object should be configured as
-             self.store_results = False
-             self.perform_assignment = True
-             self.eager_link_loading = True
-
-        Eager link loading requires assignment. Link loading can be performed later if routes were stored and an assignment
-        was performed.
         """
 
         if not store_results and not perform_assignment:
             raise ValueError("either `store_results` or `perform_assignment` must be True")
-        elif eager_link_loading and not perform_assignment:
-            raise ValueError("eager link loading requires assignment")
-        elif link_loading_reduction_threads <= 0:
-            raise ValueError("thread value must be > 0")
 
         self.demand = demand
         self.cutoff_prob = cutoff_prob
         self.beta = beta
         self.store_results = store_results
         self.perform_assignment = perform_assignment
-        self.eager_link_loading = eager_link_loading
-        self.link_loading_reduction_threads = link_loading_reduction_threads
         self.cost_view = cost_view
-        self.nodes_to_indices_view = nodes_to_indices_view
         self.mapping_idx = mapping_idx
         self.mapping_data = mapping_data
 
@@ -1085,24 +1035,6 @@ cdef class RouteChoiceSetResults:
                 self.__mask_set[i] = make_shared[vector[bool]]()
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
-
-        # if select_links is not None:
-
-
-        # If we're eagerly link loading we must allocate this now while we still have the GIL, otherwise we'll allocate it later.
-        self.link_loads = None
-        # self.sl_link_loads = None
-        if self.eager_link_loading:
-            self.link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
-
-            # if self.select_link:
-            #     self.sl_link_loading_matrix = np.zeros((self.link_loading_reduction_threads, num_links), dtype=np.float64)
-            #     for i in range(self.link_loading_reduction_threads):
-            #         COO.init_struct(self.sl_od_sparse_matrix_matrix[i])
-
-        else:
-            self.link_loading_matrix = None
-            # self.sl_link_loading_matrix = None
 
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
@@ -1392,34 +1324,6 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef void link_load_single_route_set(
-        RouteChoiceSetResults self,
-        const size_t od_idx,
-        const RouteVec_t &route_set,
-        const vector[double] &prob_vec,
-        const size_t thread_id
-    ) noexcept nogil:
-        cdef:
-            long long origin_index = self.nodes_to_indices_view[self.demand.ods[od_idx].first]
-            long long dest_index = self.nodes_to_indices_view[self.demand.ods[od_idx].second]
-            vector[double].const_iterator route_prob_iter
-            double demand = d(self.demand.f64[0])[od_idx]  # TODO FIXME
-            double prob, load
-            size_t i
-
-        route_prob_iter = prob_vec.cbegin()
-        for i in range(route_set.size()):
-            prob = d(route_prob_iter)
-            inc(route_prob_iter)
-
-            load = prob * demand
-            for link in d(route_set[i]):
-                self.link_loading_matrix[thread_id, link] = self.link_loading_matrix[thread_id, link] + load
-
-    @cython.wraparound(False)
-    @cython.embedsignature(True)
-    @cython.boundscheck(False)
-    @cython.initializedcheck(False)
     cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self):
         """
         Construct an Arrow table from C++ stdlib structures.
@@ -1582,11 +1486,6 @@ cdef class GeneralisedCOODemand:
         dfs = []
         for i, name in enumerate(matrix.names):
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-
-        # if len(matrix.view_names) > 1:
-        #     m = matrix.matrix_view.sum(axis=2)  # FIXME: is this index correct?
-        # else:
-        #     m = matrix.matrix_view
 
             non_zero = np.where(m > 0)
             # Remove intrazonals (elements on the diagonal)
