@@ -1756,8 +1756,6 @@ cdef class LinkLoadingResults:
             vector[unique_ptr[vector[double]]] *f64_demand_cols
             vector[unique_ptr[vector[float]]] *f32_demand_cols
 
-        # FIXME: SOMETHING IS WRONG HERE, the size print out is wrong
-
         # Allocate the threaded f64 link loading.
         self.f64_link_loading_threaded.reserve(threads)
         for i in range(threads):
@@ -1772,7 +1770,7 @@ cdef class LinkLoadingResults:
         # Allocate the f64 link loading. The above will be summed into this.
         self.f64_link_loading.reserve(demand.f64.size())
         for j in range(demand.f64.size()):
-            f64_demand_cols.emplace_back(new vector[double](<size_t>num_links))
+            self.f64_link_loading.emplace_back(new vector[double](<size_t>num_links))
 
 
         # Allocate the threaded f32 link loading.
@@ -1785,11 +1783,10 @@ cdef class LinkLoadingResults:
                 f32_demand_cols.emplace_back(new vector[float](<size_t>num_links))
 
             self.f32_link_loading_threaded.emplace_back(f32_demand_cols)
-
         # Allocate the f32 link loading. The above will be summed into this.
         self.f32_link_loading.reserve(demand.f32.size())
         for j in range(demand.f32.size()):
-            f32_demand_cols.emplace_back(new vector[float](<size_t>num_links))
+            self.f32_link_loading.emplace_back(new vector[float](<size_t>num_links))
 
 
     def __init__(
@@ -1817,11 +1814,11 @@ cdef class LinkLoadingResults:
         print("-" * 10, "results", "-" * 10)
         print("f64 results:", self.f64_link_loading.size())
         for j in range(self.f64_link_loading.size()):
-            print("  f64 cols:", d(self.f64_link_loading[i]).size())
+            print("  f64 cols:", d(self.f64_link_loading[j]).size())
 
         print("f32 results:", self.f32_link_loading.size())
         for j in range(self.f32_link_loading.size()):
-            print("  f32 cols:", d(self.f32_link_loading[i]).size())
+            print("  f32 cols:", d(self.f32_link_loading[j]).size())
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:
