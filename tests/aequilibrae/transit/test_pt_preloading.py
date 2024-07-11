@@ -54,10 +54,6 @@ def _assignment(
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
 
-    # # Note: preload has to be added before we set the assignment algorithm
-    # if preload is not None:
-    #     assignment.add_preload(preload)
-
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
     assignment.set_capacity_field("capacity")
