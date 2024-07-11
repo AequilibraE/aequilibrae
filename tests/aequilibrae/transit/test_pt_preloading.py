@@ -4,16 +4,6 @@ from aequilibrae import TrafficAssignment, TrafficClass, Graph, Project, Aequili
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
 
-# TODO:
-# 1) Add PCE to transit database schema for each trip
-#   - Need to update zip file to include pce column in routes table
-#   - Update preload numbers to account for pce in test_building...
-
-# 2) Figure out proper ordering for capacity vector with multiple classes and possible different graphs
-
-# 3) Once 2 is completed, update the build_pt_preload method as appropriate (attempt to remove
-#    graph input if possible, since it should depend on overall network)
-
 
 @pytest.fixture
 def project(tmp_path):
@@ -58,15 +48,15 @@ def demand(graph):
 def _assignment(
     graph: Graph,
     demand: AequilibraeMatrix,
-    preload=None,
 ) -> TrafficAssignment:
+
     # Create assignment and set parameters
     assignment = TrafficAssignment()
     assignment.set_classes([TrafficClass("car", graph, demand)])
 
-    # Note: preload has to be added before we set the assignment algorithm
-    if preload is not None:
-        assignment.add_preload(preload)
+    # # Note: preload has to be added before we set the assignment algorithm
+    # if preload is not None:
+    #     assignment.add_preload(preload)
 
     assignment.set_vdf("BPR")
     assignment.set_vdf_parameters({"alpha": 0.15, "beta": 4.0})
@@ -98,7 +88,13 @@ def test_building_pt_preload(graph: Graph, demand: AequilibraeMatrix, transit: T
     assert preloads[1]["preload"].sum() == 21264
     assert preloads[2]["preload"].sum() == 39696
 
-    assignment = _assignment(graph, demand, preload=preloads[0])
+    # the preload returned should be only for links which have transit routes on them
+    assert len(preloads[0]) < len(graph.graph)
+
+    assignment = _assignment(graph, demand)
+    assignment.add_preload(preloads[0])
+
+    # After adding the preload to the assignment object it should be expanded to cover ALL links
     assert len(assignment.preloads) == len(graph.graph)
 
 
@@ -113,7 +109,8 @@ def test_run(graph: Graph, demand: AequilibraeMatrix, transit: Transit):
     without_res = without_assig.results()
 
     # Run preloaded assignment and get results
-    with_assig = _assignment(graph, demand, preload=preload)
+    with_assig = _assignment(graph, demand)
+    with_assig.add_preload(preload)
     with_assig.execute()
     with_res = with_assig.results()
 
