@@ -154,6 +154,7 @@ cdef class RouteChoiceSet:
         self.mapping_idx, self.mapping_data, _ = graph.create_compressed_link_network_mapping()
 
         self.results = None
+        self.ll_results = None
 
     @cython.embedsignature(True)
     def run(self, origin: int, destination: int, demand: float = 0.0, *args, **kwargs):
@@ -297,8 +298,13 @@ cdef class RouteChoiceSet:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
         demand._initalise_c_data()
-        cdef RouteSet_t *route_set
-        cdef RouteChoiceSetResults results = RouteChoiceSetResults(
+
+        cdef:
+            RouteSet_t *route_set
+            shared_ptr[vector[double]] prob_vec
+            int thread_id
+
+        self.results = RouteChoiceSetResults(
             demand,
             scaled_cutoff_prob,
             beta,
@@ -312,10 +318,12 @@ cdef class RouteChoiceSet:
             eager_link_loading=eager_link_loading,
             link_loading_reduction_threads=c_cores
         )
-        self.results = results
+        self.ll_results = LinkLoadingResults(demand, self.num_links, c_cores)
+
 
         with nogil, parallel(num_threads=c_cores):
             route_set = new RouteSet_t()
+            thread_id = threadid()
             for i in prange(demand.ods.size()):
                 origin_index = self.nodes_to_indices_view[demand.ods[i].first]
                 dest_index = self.nodes_to_indices_view[demand.ods[i].second]
@@ -329,7 +337,7 @@ cdef class RouteChoiceSet:
                         origin_index,
                         self.zones,
                         self.graph_fs_view,
-                        b_nodes_matrix[threadid()],
+                        b_nodes_matrix[thread_id],
                         self.b_nodes_view,
                     )
 
@@ -342,11 +350,11 @@ cdef class RouteChoiceSet:
                         c_max_routes,
                         c_max_depth,
                         c_max_misses,
-                        cost_matrix[threadid()],
-                        predecessors_matrix[threadid()],
-                        conn_matrix[threadid()],
-                        b_nodes_matrix[threadid()],
-                        _reached_first_matrix[threadid()],
+                        cost_matrix[thread_id],
+                        predecessors_matrix[thread_id],
+                        conn_matrix[thread_id],
+                        b_nodes_matrix[thread_id],
+                        _reached_first_matrix[thread_id],
                         penalty,
                         c_seed,
                     )
@@ -359,23 +367,26 @@ cdef class RouteChoiceSet:
                         c_max_routes,
                         c_max_depth,
                         c_max_misses,
-                        cost_matrix[threadid()],
-                        predecessors_matrix[threadid()],
-                        conn_matrix[threadid()],
-                        b_nodes_matrix[threadid()],
-                        _reached_first_matrix[threadid()],
+                        cost_matrix[thread_id],
+                        predecessors_matrix[thread_id],
+                        conn_matrix[thread_id],
+                        b_nodes_matrix[thread_id],
+                        _reached_first_matrix[thread_id],
                         penalty,
                         c_seed,
                     )
 
                 # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
                 # routes. This is done to simplify memory management later on.
-                route_vec = results.get_route_vec(i)
+                route_vec = self.results.get_route_vec(i)
                 RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
                 # We now drop all references to those raw pointers. The unique pointers now own those vectors.
                 route_set.clear()
 
-                results.compute_result(i, d(route_vec), threadid())
+                prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
+
+                if eager_link_loading:
+                    self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
 
                 if self.block_flows_through_centroids:
                     blocking_centroid_flows(
@@ -383,12 +394,14 @@ cdef class RouteChoiceSet:
                         origin_index,
                         self.zones,
                         self.graph_fs_view,
-                        b_nodes_matrix[threadid()],
+                        b_nodes_matrix[thread_id],
                         self.b_nodes_view,
                     )
 
             del route_set
-        self.results.reduce_link_loading()
+
+        if eager_link_loading:
+            self.ll_results.reduce_link_loading()
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -654,71 +667,6 @@ cdef class RouteChoiceSet:
             else:
                 break
 
-    # @cython.embedsignature(True)
-    # def link_loading(RouteChoiceSet self, matrix, generate_path_files: bool = False, cores: int = 0):
-    #     """
-    #     Apply link loading to the network using the demand matrix and the previously computed route sets.
-    #     """
-    #     if self.ods == nullptr \
-    #        or self.link_union_set == nullptr \
-    #        or self.prob_set == nullptr:
-    #         raise ValueError("link loading requires Route Choice path_size_logit results")
-
-    #     if not isinstance(matrix, AequilibraeMatrix):
-    #         raise ValueError("`matrix` is not an AequilibraE matrix")
-
-    #     cores = cores if cores > 0 else omp_get_max_threads()
-
-    #     cdef:
-    #         vector[vector[double] *] *path_files = <vector[vector[double] *] *>nullptr
-    #         vector[double] *vec
-
-    #     if generate_path_files:
-    #         path_files = RouteChoiceSet.compute_path_files(
-    #             d(self.ods),
-    #             d(self.results),
-    #             d(self.link_union_set),
-    #             d(self.prob_set),
-    #             cores,
-    #         )
-
-    #         # # FIXME, write out path files
-    #         # tmp = []
-    #         # for vec in d(path_files):
-    #         #     tmp.append(d(vec))
-    #         # print(tmp)
-
-    #     link_loads = {}
-    #     for i, name in enumerate(matrix.names):
-    #         m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
-
-    #         ll = self.apply_link_loading_from_path_files(m, d(path_files)) \
-    #             if generate_path_files else self.apply_link_loading(m)
-
-    #         link_loads[name] = self.apply_link_loading_func(ll, cores)
-    #         del ll
-
-    #     if generate_path_files:
-    #         for vec in d(path_files):
-    #             del vec
-    #         del path_files
-
-    #     return link_loads
-
-    # cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores):
-    #     """Helper function for link_loading."""
-    #     compressed = np.hstack([d(ll), [0.0]]).reshape(ll.size() + 1, 1)
-    #     actual = np.zeros((self.graph_compressed_id_view.shape[0], 1), dtype=np.float64)
-
-    #     assign_link_loads_cython(
-    #         actual,
-    #         compressed,
-    #         self.graph_compressed_id_view,
-    #         cores
-    #     )
-
-    #     return actual.reshape(-1), compressed[:-1].reshape(-1)
-
     # @cython.boundscheck(False)
     # @cython.wraparound(False)
     # @cython.embedsignature(True)
@@ -834,43 +782,6 @@ cdef class RouteChoiceSet:
 
     #     return link_loads
 
-    # @cython.boundscheck(False)
-    # @cython.wraparound(False)
-    # @cython.embedsignature(True)
-    # @cython.initializedcheck(False)
-    # cdef vector[double] *apply_link_loading(self, double[:, :] matrix_view) noexcept nogil:
-    #     """
-    #     Apply link loading.
-
-    #     Returns a vector of link loads indexed by compressed link ID.
-    #     """
-    #     cdef:
-    #         RouteSet_t *route_set
-    #         vector[double] *route_set_prob
-    #         vector[double].const_iterator route_prob_iter
-    #         long origin_index, dest_index
-    #         double demand, prob, load
-
-    #         vector[double] *link_loads = new vector[double](self.num_links)
-
-    #     for i in range(self.ods.size()):
-    #         route_set = d(self.results)[i]
-    #         route_set_prob = d(self.prob_set)[i]
-
-    #         origin_index = self.nodes_to_indices_view[d(self.ods)[i].first]
-    #         dest_index = self.nodes_to_indices_view[d(self.ods)[i].second]
-    #         demand = matrix_view[origin_index, dest_index]
-
-    #         route_prob_iter = route_set_prob.cbegin()
-    #         for route in d(route_set):
-    #             prob = d(route_prob_iter)
-    #             inc(route_prob_iter)
-
-    #             load = prob * demand
-    #             for link in d(route):
-    #                 d(link_loads)[link] = d(link_loads)[link] + load  # += here results in all zeros? Odd
-
-    #     return link_loads
 
     # @cython.embedsignature(True)
     # def select_link_loading(RouteChoiceSet self, matrix, select_links: Dict[str, List[long]], cores: int = 0):
@@ -979,6 +890,24 @@ cdef class RouteChoiceSet:
             raise RuntimeError("Route Choice results not computed yet")
 
         return libpa.pyarrow_wrap_table(self.results.make_table_from_results())
+
+    def get_link_loading(RouteChoiceSet self, cores: int = 0):
+        """
+        :Returns:
+            **link loading results** (:obj:`Dict[str, np.array]`): Returns a dict of demand column names to
+                uncompressed link loads.
+        """
+        if self.ll_results is None:
+            raise RuntimeError("Link loading results not computed yet")
+
+        return dict(
+            zip(
+                *self.ll_results.apply_link_loading(
+                    self.graph_compressed_id_view,
+                    cores if cores > 0 else omp_get_max_threads()
+                )
+            )
+        )
 
 
 @cython.embedsignature(True)
@@ -1215,13 +1144,15 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef void compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, size_t thread_id) noexcept nogil:
+    cdef shared_ptr[vector[double]] compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, size_t thread_id) noexcept nogil:
         """
         Compute the desired results for the OD pair index with the provided route set. The route set is required as
         an argument here to facilitate not storing them. The route set should correspond to the provided OD pair index,
         however that is not enforced.
 
         Requires that 0 <= i < self.ods.size().
+
+        Returns a shared pointer to the probability vector.
         """
         cdef:
             shared_ptr[vector[double]] cost_vec
@@ -1233,7 +1164,7 @@ cdef class RouteChoiceSetResults:
         if not self.perform_assignment:
             # If we're not performing an assignment then we must be storing the routes and the routes most already be
             # stored when they were acquired, thus we don't need to do anything here.
-            return
+            return shared_ptr[vector[double]]()
 
         cost_vec = self.__get_cost_set(i)
         route_mask = self.__get_mask_set(i)
@@ -1251,10 +1182,7 @@ cdef class RouteChoiceSetResults:
         self.compute_path_overlap(d(path_overlap_vec), route_set, keys, counts, d(cost_vec), d(route_mask), self.cost_view)
         self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
 
-        if not self.eager_link_loading:
-            return
-
-        self.link_load_single_route_set(i, route_set, d(prob_vec), thread_id)
+        return prob_vec
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -1611,19 +1539,6 @@ cdef class RouteChoiceSetResults:
 
         return table
 
-    cdef void reduce_link_loading(RouteChoiceSetResults self):
-        if self.link_loads is None and self.link_loading_matrix is not None:
-            self.link_loads = np.sum(self.link_loading_matrix, axis=0)
-            self.link_loading_matrix = None
-
-        # if self.sl_link_loads is None and self.sl_link_loading_matrix is not None:
-        #     self.sl_link_loads = np.sum(self.sl_link_loading_matrix, axis=0)
-        #     self.sl_link_loading_matrix = None
-
-    cdef double[:] get_link_loading(RouteChoiceSetResults self):
-        self.reduce_link_loading()
-        return self.link_loads
-
 
 cdef class GeneralisedCOODemand:
     def __init__(self, origin_col: str, destination_col: str):
@@ -1647,6 +1562,8 @@ cdef class GeneralisedCOODemand:
         for df in dfs:
             if df.index.nlevels != 2:
                 raise ValueError("provided pd.DataFrame doesn't have a 2-level multi-index")
+            elif df.index.names != self.df.index.names:
+                raise ValueError(f"mismatched index names. Expect {self.df.index.names}, provided {df.index.names}")
 
             if demand_cols is None:
                 new_dfs.append(df.select_dtypes(["float64", "float32"]))
@@ -1662,25 +1579,30 @@ cdef class GeneralisedCOODemand:
         """
         Add an AequilibraE matrix to the existing demand in a sparse manner.
         """
-        if len(matrix.view_names) > 1:
-            m = matrix.matrix_view.sum(axis=2)  # FIXME: is this index correct?
-        else:
-            m = matrix.matrix_view
+        dfs = []
+        for i, name in enumerate(matrix.names):
+            m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
 
-        non_zero = np.where(m > 0)
-        # Remove intrazonals (elements on the diagonal)
-        origins = non_zero[0][non_zero[0] != non_zero[1]]
-        destinations = non_zero[1][non_zero[0] != non_zero[1]]
+        # if len(matrix.view_names) > 1:
+        #     m = matrix.matrix_view.sum(axis=2)  # FIXME: is this index correct?
+        # else:
+        #     m = matrix.matrix_view
 
-        df = pd.DataFrame(
-            data={
-                self.df.index.names[0]: matrix.index[origins],
-                self.df.index.names[1]: matrix.index[destinations],
-                matrix.view_names[0]: m[origins, destinations],
-            },
-        ).set_index([self.df.index.names[0], self.df.index.names[1]])
+            non_zero = np.where(m > 0)
+            # Remove intrazonals (elements on the diagonal)
+            origins = non_zero[0][non_zero[0] != non_zero[1]]
+            destinations = non_zero[1][non_zero[0] != non_zero[1]]
 
-        self.add_df(df, fill=fill)
+            df = pd.DataFrame(
+                data={
+                    self.df.index.names[0]: matrix.index[origins],
+                    self.df.index.names[1]: matrix.index[destinations],
+                    matrix.names[i]: m[origins, destinations],
+                },
+            ).set_index([self.df.index.names[0], self.df.index.names[1]])
+            dfs.append(df)
+
+        self.add_df(dfs, fill=fill)
         logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
 
     def _initalise_c_data(self):
@@ -1741,16 +1663,14 @@ cdef class GeneralisedCOODemand:
 
 # See note in route_choice_set.pxd
 cdef class LinkLoadingResults:
-    def __cinit__(
-            self,
-            demand: GeneralisedCOODemand,
-            num_links: int,
-            threads: int,
-    ):
+    def __cinit__(self, demand: GeneralisedCOODemand, num_links: int, threads: int):
         if threads <= 0:
             raise ValueError(f"threads must be positive ({threads})")
         elif num_links <= 0:
             raise ValueError(f"num_links must be positive ({num_links})")
+
+        self.demand = demand
+        self.num_links = num_links
 
         cdef:
             vector[unique_ptr[vector[double]]] *f64_demand_cols
@@ -1760,42 +1680,26 @@ cdef class LinkLoadingResults:
         self.f64_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f64_demand_cols = new vector[unique_ptr[vector[double]]]()
-            f64_demand_cols.reserve(demand.f64.size())
+            f64_demand_cols.reserve(self.demand.f64.size())
 
-            for j in range(demand.f64.size()):
-                f64_demand_cols.emplace_back(new vector[double](<size_t>num_links))
+            for j in range(self.demand.f64.size()):
+                f64_demand_cols.emplace_back(new vector[double](self.num_links))
 
             self.f64_link_loading_threaded.emplace_back(f64_demand_cols)
-
-        # Allocate the f64 link loading. The above will be summed into this.
-        self.f64_link_loading.reserve(demand.f64.size())
-        for j in range(demand.f64.size()):
-            self.f64_link_loading.emplace_back(new vector[double](<size_t>num_links))
-
 
         # Allocate the threaded f32 link loading.
         self.f32_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f32_demand_cols = new vector[unique_ptr[vector[float]]]()
-            f32_demand_cols.reserve(demand.f32.size())
+            f32_demand_cols.reserve(self.demand.f32.size())
 
-            for j in range(demand.f32.size()):
-                f32_demand_cols.emplace_back(new vector[float](<size_t>num_links))
+            for j in range(self.demand.f32.size()):
+                f32_demand_cols.emplace_back(new vector[float](self.num_links))
 
             self.f32_link_loading_threaded.emplace_back(f32_demand_cols)
-        # Allocate the f32 link loading. The above will be summed into this.
-        self.f32_link_loading.reserve(demand.f32.size())
-        for j in range(demand.f32.size()):
-            self.f32_link_loading.emplace_back(new vector[float](<size_t>num_links))
 
-
-    def __init__(
-            self,
-            demand: GeneralisedCOODemand,
-            num_links: int,
-            threads: int,
-    ):
-        pass
+        # self.f64_link_loading and self.f32_link_loading are not allocated here. The objects are initialised to empty
+        # vectors but elements are created in self.reduce_link_loading
 
     def _sizes(self):
         print("-" * 10, "threaded", "-" * 10)
@@ -1819,6 +1723,173 @@ cdef class LinkLoadingResults:
         print("f32 results:", self.f32_link_loading.size())
         for j in range(self.f32_link_loading.size()):
             print("  f32 cols:", d(self.f32_link_loading[j]).size())
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    # @cython.boundscheck(False)
+    # @cython.initializedcheck(False)
+    cdef void link_load_single_route_set(
+        LinkLoadingResults self,
+        const size_t od_idx,
+        const RouteVec_t &route_set,
+        const vector[double] &prob_vec,
+        const size_t thread_id
+    ) noexcept nogil:
+        cdef:
+            vector[double].const_iterator route_prob_iter
+
+            # Cython doesn't allow declaring references to objects outside of function signatures. So we get the raw
+            # pointer instead. It is still owned by the unique_ptr.
+            vector[unique_ptr[vector[double]]] *f64_ll_cols = self.f64_link_loading_threaded[thread_id].get()
+            vector[unique_ptr[vector[float]]] *f32_ll_cols = self.f32_link_loading_threaded[thread_id].get()
+            vector[double] *f64_ll
+            vector[float] *f32_ll
+
+            double f64_demand, f64_load
+            float f32_demand, f32_load
+            size_t i, j, k
+
+        # For each demand column
+        for i in range(self.demand.f64.size()):
+            # we grab a pointer to the relevant link loading vector and demand value.
+            f64_demand = d(self.demand.f64[i])[od_idx]
+            f64_ll = d(f64_ll_cols)[i].get()
+
+            # For each route in the route set
+            route_prob_iter = prob_vec.cbegin()
+            for j in range(route_set.size()):
+                # we compute out load,
+                f64_load = d(route_prob_iter) * f64_demand
+                inc(route_prob_iter)
+
+                # then apply that to every link in the route
+                for link in d(route_set[j]):
+                    d(f64_ll)[link] = d(f64_ll)[link] + f64_load
+
+        # Then we do it all over again for the floats.
+        for i in range(self.demand.f32.size()):
+            f32_demand = d(self.demand.f32[i])[od_idx]
+            f32_ll = d(f32_ll_cols)[i].get()
+
+            route_prob_iter = prob_vec.cbegin()
+            for j in range(route_set.size()):
+                f32_load = d(route_prob_iter) * f32_demand
+                inc(route_prob_iter)
+
+                for link in d(route_set[j]):
+                    d(f32_ll)[link] = d(f32_ll)[link] + f32_load
+
+    @cython.wraparound(False)
+    @cython.embedsignature(True)
+    # @cython.boundscheck(False)
+    # @cython.initializedcheck(False)
+    cdef void reduce_link_loading(LinkLoadingResults self):
+        """
+        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function requires the GIL.
+        """
+        cdef:
+            vector[unique_ptr[vector[double]]] *f64_ll_cols
+            vector[unique_ptr[vector[float]]] *f32_ll_cols
+            vector[double] *f64_ll_result
+            vector[float] *f32_ll_result
+            vector[double] *f64_ll
+            vector[float] *f32_ll
+
+            size_t thread_id, i, j
+
+        # Allocate the result link loads
+        self.f64_link_loading.reserve(self.demand.f64.size())
+        for j in range(self.demand.f64.size()):
+            self.f64_link_loading.emplace_back(new vector[double](self.num_links))
+
+        self.f32_link_loading.reserve(self.demand.f32.size())
+        for j in range(self.demand.f32.size()):
+            self.f32_link_loading.emplace_back(new vector[float](self.num_links))
+
+        # Here we sum all threads link loads into the results.
+        # For each thread
+        for thread_id in range(self.f64_link_loading_threaded.size()):
+            # we grab the columns
+            f64_ll_cols = self.f64_link_loading_threaded[thread_id].get()
+
+            # for each column
+            for i in range(d(f64_ll_cols).size()):
+                # we get the link loading vector
+                f64_ll_result = self.f64_link_loading[i].get()
+                f64_ll = d(f64_ll_cols)[i].get()
+
+                # for each link
+                for j in range(d(f64_ll).size()):
+                    d(f64_ll_result)[j] = d(f64_ll_result)[j] + d(f64_ll)[j]
+
+        # Then we do it all over again for the floats.
+        for thread_id in range(self.f32_link_loading_threaded.size()):
+            f32_ll_cols = self.f32_link_loading_threaded[thread_id].get()
+
+            for i in range(d(f32_ll_cols).size()):
+                f32_ll_result = self.f32_link_loading[i].get()
+                f32_ll = d(f32_ll_cols)[i].get()
+
+                for j in range(d(f32_ll).size()):
+                    d(f32_ll_result)[j] = d(f32_ll_result)[j] + d(f32_ll)[j]
+
+        # Here we discard all the intermediate results
+        self.f64_link_loading_threaded.clear()
+        self.f32_link_loading_threaded.clear()
+        self.f64_link_loading_threaded.shrink_to_fit()
+        self.f32_link_loading_threaded.shrink_to_fit()
+
+    cdef object apply_link_loading(LinkLoadingResults self, long long[:] compressed_id_view, int cores):
+        cdef:
+            vector[double] *f64_ll
+            vector[float] *f32_ll
+            double[:, :] f64_ll_view
+            double[:, :] f64_actual
+            float[:, :] f32_ll_view
+            float[:, :] f32_actual
+            size_t length
+
+        f64_ll_vectors = []
+        for i in range(self.f64_link_loading.size()):
+            # Push a single element to the back to prevent an issue caused by links that are not present in the
+            # compressed graph causing a OOB access
+            f64_ll = self.f64_link_loading[i].get()
+            f64_ll.push_back(0.0)
+
+            # Cast the vector to a memory view
+            f64_ll_view = <double [:f64_ll.size(), :1]> f64_ll.data()
+            f64_actual = np.zeros((compressed_id_view.shape[0], 1), dtype=np.float64)
+
+            # Assign the compressed link loads to the uncompressed graph
+            assign_link_loads_cython(f64_actual, f64_ll_view, compressed_id_view, cores)
+
+            # Delete the memory view object and pop that element of the end.
+            del f64_ll_view
+            f64_ll.pop_back()
+
+            # Just return the actual link loads. If compressed are required then the memory view will have to be copied
+            # before it is deleted. It does not own the vectors data.
+            f64_ll_vectors.append(np.asarray(f64_actual).reshape(-1))
+
+        # We do the same for the floats, again
+        f32_ll_vectors = []
+        for i in range(self.f32_link_loading.size()):
+            f32_ll = self.f32_link_loading[i].get()
+            f32_ll.push_back(0.0)
+
+            f32_ll_view = <float [:f32_ll.size(), :1]>f32_ll.data()
+            f32_actual = np.zeros((compressed_id_view.shape[0], 1), dtype=np.float32)
+
+            assign_link_loads_cython(f32_actual, f32_ll_view, compressed_id_view, cores)
+
+            del f32_ll_view
+            f32_ll.pop_back()
+
+            f32_ll_vectors.append(np.asarray(f32_actual).reshape(-1))
+
+        return itertools.chain(self.demand.f64_names, self.demand.f32_names), itertools.chain(f64_ll_vectors, f32_ll_vectors)
+
+
 
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:

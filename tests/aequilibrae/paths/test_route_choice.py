@@ -232,12 +232,14 @@ class TestRouteChoiceSet(TestCase):
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
         demand = demand_from_nodes(nodes)
-        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
+        demand.add_matrix(self.mat)
+        demand.df = demand.df.loc[nodes]
+        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, eager_link_loading=True)
 
         n = self.mat.names[0]
 
-        ll = rc.link_loading(self.mat)[n]
-        ll2 = rc.link_loading(self.mat, generate_path_files=True)[n]
+        ll = rc.get_link_loading()[n]
+        ll2 = rc.get_link_loading(generate_path_files=True)[n]
 
         np.testing.assert_array_almost_equal(ll, ll2)
 
@@ -260,39 +262,34 @@ class TestRouteChoiceSet(TestCase):
                 mat.computational_view()
                 mat.matrix_view[:, :, 0] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
                 mat.matrix_view[:, :, 1] = np.zeros((self.graph.num_zones, self.graph.num_zones))
-
-                for od in nodes:
-                    mat.matrix_view[:, :, 0][od[0] - 1, od[1] - 1] = 0.0
-
-                mat.matrix_view[:, :, 1][nodes[0][0] - 1, nodes[0][1] - 1] = 1.0
                 demand = GeneralisedCOODemand("origin id", "destination id")
                 demand.add_matrix(mat)
-                df = demand.df.reset_index()
-                demand.df = df[df["origin id"] != df["destination id"]].set_index(["origin id", "destination id"])
 
-                rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
+                demand.df.loc[nodes] = 0.0
+                demand.df.loc[nodes[0], "single one"] = 1.0
+                demand.df = demand.df.loc[nodes]
 
-                link_loads = rc.link_loading(mat)
+                rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, eager_link_loading=True)
+
+                link_loads = rc.get_link_loading()
                 table = rc.get_results().to_pandas()
 
+                # breakpoint()
                 with self.subTest(matrix="all zeros"):
-                    u, c = link_loads["all zeros"]
+                    u = link_loads["all zeros"]
                     np.testing.assert_allclose(u, 0.0)
-                    np.testing.assert_allclose(c, 0.0)
 
                 with self.subTest(matrix="single one"):
-                    u, c = link_loads["single one"]
+                    u = link_loads["single one"]
                     link = self.graph.graph[
                         (self.graph.graph.a_node == nodes[0][0] - 1) & (self.graph.graph.b_node == nodes[0][1] - 1)
                     ]
 
                     lid = link.link_id.values[0]
-                    c_lid = link.__compressed_id__.values[0]
                     t = table[table["route set"].apply(lambda x, lid=lid: lid in set(x))]
                     v = t.probability.sum()
 
                     self.assertAlmostEqual(u[lid - 1], v, places=6)
-                    self.assertAlmostEqual(c[c_lid], v, places=6)
 
     def test_select_link(self):
         for cost in ["distance", "free_flow_time"]:
@@ -407,6 +404,8 @@ class TestRouteChoice(TestCase):
                 "penalty": 1.1,
                 "cutoff_prob": 0.0,
                 "beta": 1.0,
+                "store_results": True,
+                "eager_link_loading": False,
             },
         )
 
@@ -421,6 +420,8 @@ class TestRouteChoice(TestCase):
                 "penalty": 1.0,
                 "cutoff_prob": 0.0,
                 "beta": 1.0,
+                "store_results": True,
+                "eager_link_loading": False,
             },
         )
 
@@ -428,7 +429,7 @@ class TestRouteChoice(TestCase):
             self.rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
 
     def test_link_results(self):
-        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, eager_link_loading=True)
 
         self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
 
@@ -438,6 +439,7 @@ class TestRouteChoice(TestCase):
         self.rc.execute(perform_assignment=True)
 
         df = self.rc.get_load_results()
+
         u_sl, c_sl = self.rc.get_select_link_results()
 
         pd.testing.assert_frame_equal(u_sl, c_sl)
@@ -516,6 +518,6 @@ def generate_line_strings(project, graph, results):
 def demand_from_nodes(nodes: List[Tuple[int, int]]):
     demand = GeneralisedCOODemand("origin id", "destination id")
     df = pd.DataFrame()
-    df.index = pd.MultiIndex.from_tuples(nodes)
+    df.index = pd.MultiIndex.from_tuples(nodes, names=["origin id", "destination id"])
     demand.add_df(df)
     return demand

@@ -295,8 +295,8 @@ def assign_link_loads(actual_links, compressed_links, crosswalk, cores):
 @cython.wraparound(False)
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-cpdef void assign_link_loads_cython(double[:, :] actual,
-                                    double[:, :] compressed,
+cpdef void assign_link_loads_cython(cython.floating[:, :] actual,
+                                    cython.floating[:, :] compressed,
                                     long long[:] crosswalk,
                                     int cores) noexcept:
     cdef long long i, j, k

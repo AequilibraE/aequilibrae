@@ -163,6 +163,7 @@ cdef class RouteChoiceSet:
         unsigned int [:] mapping_data
 
         readonly RouteChoiceSetResults results
+        readonly LinkLoadingResults ll_results
 
     cdef void path_find(
         RouteChoiceSet self,
@@ -274,7 +275,7 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
     cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil
 
-    cdef void compute_result(
+    cdef shared_ptr[vector[double]] compute_result(
         RouteChoiceSetResults self,
         size_t i,
         RouteVec_t &route_set,
@@ -331,9 +332,6 @@ cdef class RouteChoiceSetResults:
 
     cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self)
 
-    cdef void reduce_link_loading(RouteChoiceSetResults self)
-    cdef double[:] get_link_loading(RouteChoiceSetResults self)
-
 cdef class GeneralisedCOODemand:
     cdef:
         public object df
@@ -354,6 +352,9 @@ cdef class GeneralisedCOODemand:
 # that we'd still have to write a wrapper class.
 cdef class LinkLoadingResults:
     cdef:
+        GeneralisedCOODemand demand
+        size_t num_links
+
         # Number of threads * number of demand cols * number of links
         vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_link_loading_threaded
         vector[unique_ptr[vector[double]]] f64_link_loading
@@ -372,3 +373,14 @@ cdef class LinkLoadingResults:
         # vector[COO_struct]] f64_sl_od_matrix
 
         # f32_sl_od_matrix struct doesn't exist ATM
+
+    cdef void link_load_single_route_set(
+        LinkLoadingResults self,
+        const size_t od_idx,
+        const RouteVec_t &route_set,
+        const vector[double] &prob_vec,
+        const size_t thread_id
+    ) noexcept nogil
+
+    cdef void reduce_link_loading(LinkLoadingResults self)
+    cdef object apply_link_loading(LinkLoadingResults self, long long[:] compressed_id_view, int cores)

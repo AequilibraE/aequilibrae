@@ -30,10 +30,14 @@ class RouteChoice:
             "penalty": 1.01,
             "cutoff_prob": 0.0,
             "beta": 1.0,
+            "store_results": True,
+            "eager_link_loading": False,
         },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
     }
+
+    demand_index_names = ["origin id", "destination id"]
 
     def __init__(self, graph: Graph, project=None):
         self.parameters = self.default_parameters.copy()
@@ -52,9 +56,6 @@ class RouteChoice:
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
 
-        self.compact_link_loads: Optional[Dict[str, np.array]] = None
-        self.link_loads: Optional[Dict[str, np.array]] = None
-
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
@@ -69,9 +70,8 @@ class RouteChoice:
     def __rc(self) -> RouteChoiceSet:
         return RouteChoiceSet(self.graph)
 
-    @staticmethod
-    def __init_demand():
-        return GeneralisedCOODemand("origin id", "destination id")
+    def __init_demand(self):
+        return GeneralisedCOODemand(*self.demand_index_names)
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
@@ -213,13 +213,12 @@ class RouteChoice:
             and isinstance(pair[1], (int, np.integer))
             for pair in nodes
         ):
-            df.index = pd.MultiIndex.from_tuples(nodes)
+            df.index = pd.MultiIndex.from_tuples(nodes, name=self.demand_index_names)
         elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
-            df.index = pd.MultiIndex.from_tuples(itertools.permutations(nodes, r=2))
+            df.index = pd.MultiIndex.from_tuples(itertools.permutations(nodes, r=2), names=self.demand_index_names)
         else:
             raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
 
-        print(df)
         self.demand.add_df(df)
 
     def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
@@ -334,42 +333,27 @@ class RouteChoice:
 
         return self.results
 
-    def get_load_results(
-        self, compressed_graph_results=False
-    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+    def get_load_results(self) -> pd.DataFrame:
         """
         Translates the link loading results from the graph format into the network format.
 
-        :Arguments:
-            **compressed_graph_results** (:obj:`bool`): Whether we should return assignment results for the
-            compressed graph. Only use this option if you are SURE you know what you are doing. Default `False`.
-
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
-                A tuple of uncompressed and compressed link loading results as DataFrames.
+                A tuple of link loading results as DataFrames.
                 Columns are the matrix name concatenated direction.
         """
 
         if self.demand.no_demand():
             raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
-        tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
-        self.link_loads = {k: v[0] for k, v in tmp.items()}
-        self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
+        ll = self.__rc.get_link_loading(cores=self.cores)
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
+        df = self.__link_loads_to_df(m, lids, ll)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
-        if compressed_graph_results:
-            return compressed_df
-        return uncompressed_df
+        return df
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
