@@ -2,7 +2,7 @@ from uuid import uuid4
 from os import remove
 from os.path import join, exists
 from tempfile import gettempdir
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile
 from pathlib import Path
 
 from aequilibrae import __file__ as aeq_init
@@ -36,7 +36,7 @@ def rebuid_coquimbo_example(dest_folder):
     cursor = Transit(project).pt_con.cursor()
     cursor.execute("VACUUM;")
 
-    with ZipFile(f"{dest_folder}/coquimbo.zip", "w") as zip_object:
+    with ZipFile(f"{dest_folder}/coquimbo.zip", "w", compression=ZIP_DEFLATED, compresslevel=9) as zip_object:
         zip_object.write(f"{fldr}/project_database.sqlite", "project_database.sqlite")
         zip_object.write(f"{fldr}/public_transport.sqlite", "public_transport.sqlite")
         zip_object.write(f"{fldr}/gtfs_coquimbo.zip", "gtfs_coquimbo.zip")
