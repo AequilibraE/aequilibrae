@@ -114,9 +114,6 @@ class Transit:
 
         self.graphs[period_ids[0]] = TransitGraphBuilder.from_db(self.pt_con, period_ids[0])
 
-    # TODO:
-    # Check that this works
-    # Rewrite documentation
     def build_pt_preload(self, start: int, end: int, inclusion_cond: str = "start") -> pd.DataFrame:
         """Builds a preload vector for the transit network over the specified time period
 

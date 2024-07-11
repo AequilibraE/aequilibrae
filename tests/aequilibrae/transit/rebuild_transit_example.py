@@ -48,5 +48,4 @@ def rebuid_coquimbo_example(dest_folder):
 
 if __name__ == "__main__":
     aeq_dir = Path(aeq_init).parent
-    print(aeq_dir)
-    #     rebuid_coquimbo_example(aeq_dir / "reference_files")
+    rebuid_coquimbo_example(aeq_dir / "reference_files")
