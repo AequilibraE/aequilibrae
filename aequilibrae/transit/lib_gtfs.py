@@ -22,7 +22,9 @@ class GTFSRouteSystemBuilder:
 
     signal = SIGNAL(object)
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -50,7 +52,8 @@ class GTFSRouteSystemBuilder:
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
-        self.__default_capacities = capacities
+        self.__default_capacities = {} if capacities is None else capacities
+        self.__default_pces = {} if pces is None else pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -60,6 +63,7 @@ class GTFSRouteSystemBuilder:
             self.logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
+            self.gtfs_data._set_pces(self.__default_pces)
 
         self.select_routes = {}
         self.select_trips = []
@@ -79,6 +83,15 @@ class GTFSRouteSystemBuilder:
                                         i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
+
+    def set_pces(self, pces: dict):
+        """Sets default passenger car equivalent (PCE) factor for each GTFS mode.
+
+        :Arguments:
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
+                                    value i.e. -> "{0: 2.0,...}"
+        """
+        self.gtfs_data._set_pces(pces)
 
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
@@ -305,6 +318,7 @@ class GTFSRouteSystemBuilder:
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
+        p.pce = route.pce
         p.seated_capacity = route.seated_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:

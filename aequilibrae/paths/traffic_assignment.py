@@ -236,6 +236,7 @@ class TrafficAssignment(AssignmentBase):
         self.capacity = None  # type: np.ndarray
         self.congested_time = None  # type: np.ndarray
         self.save_path_files = False  # type: bool
+        self.preloads = None  # type: pd.DataFrame
 
         self.steps_below_needed_to_terminate = 1
 
@@ -480,6 +481,55 @@ class TrafficAssignment(AssignmentBase):
         self._config["Number of cores"] = c.results.cores
         self._config["Capacity field"] = capacity_field
 
+    def add_preload(self, preload: pd.DataFrame, name: str = None) -> None:
+        """
+        Given a dataframe of 'link_id', 'direction' and 'preload', merge into current preloads dataframe.
+
+        :Arguments:
+            **preload** (:obj:`pd.DataFrame`): dataframe mapping 'link_id' & 'direction' to 'preload'
+            **name** (:obj:`str`): Name for particular preload (optional - default name will be chosen if not specified)
+        """
+        # Create preloads dataframe in correct order if not already initialised
+        if self.preloads is None:
+            g = self.classes[0].graph.graph
+            self.preloads = g.sort_values(by="__supernet_id__")[["link_id", "direction"]].copy()
+
+        # Check that columns of preload are link_id, direction, preload:
+        expected = {"link_id", "direction", "preload"}
+        missing = expected - set(preload.columns)
+        additional = set(preload.columns) - expected
+        if missing:
+            raise ValueError(
+                f"Input preload dataframe is missing columns: {missing}\n" f"expected columns are {expected}"
+            )
+        elif additional:
+            raise ValueError(
+                f"Input preload dataframe has additional columns: {additional}\n" f"expected columns are {expected}"
+            )
+
+        # Reject empty preloads
+        if len(preload) == 0:
+            raise ValueError("Cannot set empty preload!")
+
+        # Check name is not already used (generate new name if needed):
+        name = (
+            name if name else f"preload_{len(self.preloads.columns) - 1}"
+        )  # -1 -> remove keys to get 1 indexed preload columns
+        if name in self.preloads.columns:
+            raise ValueError(f"New preload has duplicate name - already used names are: {self.preload.columns}")
+        preload.rename(columns={"preload": name}, inplace=True)
+
+        # Merge onto current preload dataframe
+        self.preloads = pd.merge(self.preloads, preload, on=["link_id", "direction"], how="left")
+        self.preloads[name] = self.preloads[name].fillna(0)
+
+        # Enable preload to be added before or after specifyig the algorithm
+        if self.assignment is not None:
+            if self.assignment.preload is None:
+                self.assignment.preload = self.preloads[name].to_numpy()
+            else:
+                self.assignment.preload += self.preloads[name]
+
     # TODO: This function actually needs to return a human-readable dictionary, and not one with
     #       tons of classes. Feeds into the class above
     # def load_assignment_spec(self, specs: dict) -> None:
@@ -558,8 +608,12 @@ class TrafficAssignment(AssignmentBase):
         voc = tot_flow / self.capacity[idx]
         congested_time = self.congested_time[idx]
         free_flow_tt = self.free_flow_tt[idx]
+        preload = np.full(len(tot_flow), np.nan) if self.assignment.preload is None else self.assignment.preload
 
         fields = [
+            "Preload_AB",
+            "Preload_BA",
+            "Preload_tot",
             "Congested_Time_AB",
             "Congested_Time_BA",
             "Congested_Time_Max",
@@ -586,6 +640,10 @@ class TrafficAssignment(AssignmentBase):
         # Use the first class to get a graph -> network link ID mapping
         m = class1.results.get_graph_to_network_mapping()
         graph_ab, graph_ba = m.graph_ab_idx, m.graph_ba_idx
+        agg.data["Preload_AB"][m.network_ab_idx] = nan_to_num(preload[m.graph_ab_idx])
+        agg.data["Preload_BA"][m.network_ba_idx] = nan_to_num(preload[m.graph_ba_idx])
+        agg.data["Preload_tot"][:] = np.nansum([agg.data.Preload_AB, agg.data.Preload_BA], axis=0)
+
         agg.data["Congested_Time_AB"][m.network_ab_idx] = nan_to_num(congested_time[m.graph_ab_idx])
         agg.data["Congested_Time_BA"][m.network_ba_idx] = nan_to_num(congested_time[m.graph_ba_idx])
         agg.data["Congested_Time_Max"][:] = np.nanmax([agg.data.Congested_Time_AB, agg.data.Congested_Time_BA], axis=0)

@@ -93,6 +93,13 @@ class LinearApproximation:
 
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
+
+        # Creates preload vector from preloads
+        self.preload = None
+        if assig_spec.preloads is not None:
+            cols = assig_spec.preloads.columns.difference(["link_id", "direction"])
+            self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
+
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
@@ -562,6 +569,9 @@ class LinearApproximation:
                     flows.append(cls_res.total_link_loads)
 
             self.fw_total_flow = np.sum(flows, axis=0)
+            if self.preload is not None:
+                self.fw_total_flow += self.preload
+
             if self.algorithm == "all-or-nothing":
                 break
             # Check convergence

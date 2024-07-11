@@ -28,6 +28,7 @@ class GTFSReader:
 
     def __init__(self):
         self.__capacities__ = {}
+        self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
         self.agency = Agency()
@@ -67,6 +68,9 @@ class GTFSReader:
 
     def _set_capacities(self, capacities: dict):
         self.__capacities__ = capacities
+
+    def _set_pces(self, pces: dict):
+        self.__pces__ = pces
 
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
@@ -328,6 +332,7 @@ class GTFSReader:
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
                 # trip.shape = self.shapes.get(trip.shape)
+                trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
@@ -458,11 +463,16 @@ class GTFSReader:
         if np.unique(routes["route_id"]).shape[0] < routes.shape[0]:
             self.__fail("There are repeated route IDs in routes.txt")
 
-        cap = self.__capacities__.get("other", [None, None, None])
+        seated_cap, total_cap = self.__capacities__.get("other", [None, None])
         routes = pd.DataFrame(routes)
-        routes = routes.assign(seated_capacity=cap[0], total_capacity=cap[1], srid=self.srid)
+        routes = routes.assign(seated_capacity=seated_cap, total_capacity=total_cap, srid=self.srid)
         for route_type, cap in self.__capacities__.items():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
+
+        default_pce = self.__pces__.get("other", 2.0)
+        routes = routes.assign(pce=default_pce)
+        for route_type, pce in self.__pces__.items():
+            routes.loc[routes.route_type == route_type, ["pce"]] = pce
 
         for i, line in routes.iterrows():
             r = Route(self.agency.agency_id)
