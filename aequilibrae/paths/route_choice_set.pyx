@@ -1726,8 +1726,8 @@ cdef class LinkLoadingResults:
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
-    # @cython.boundscheck(False)
-    # @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef void link_load_single_route_set(
         LinkLoadingResults self,
         const size_t od_idx,
@@ -1781,8 +1781,8 @@ cdef class LinkLoadingResults:
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
-    # @cython.boundscheck(False)
-    # @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef void reduce_link_loading(LinkLoadingResults self):
         """
         NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function requires the GIL.
