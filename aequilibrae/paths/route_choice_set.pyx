@@ -457,7 +457,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
-        double penatly,
+        double penalty,
         unsigned int seed
     ) noexcept nogil:
         """Main method for route set generation. See top of file for commentary."""
@@ -479,7 +479,7 @@ cdef class RouteChoiceSet:
             long long p, connector
 
             # Link penalisation, only used when penalty != 1.0
-            bint lp = penatly != 1.0
+            bint lp = penalty != 1.0
             vector[double] *penalised_cost = <vector[double] *>nullptr
             vector[double] *next_penalised_cost = <vector[double] *>nullptr
 
@@ -547,7 +547,7 @@ cdef class RouteChoiceSet:
                         # then we would introduce a bias for earlier seen paths
                         for connector in d(vec):
                             # *= does not work
-                            d(next_penalised_cost)[connector] = penatly * d(next_penalised_cost)[connector]
+                            d(next_penalised_cost)[connector] = penalty * d(next_penalised_cost)[connector]
 
                     reverse(vec.begin(), vec.end())
 
@@ -611,7 +611,7 @@ cdef class RouteChoiceSet:
         long long [:] thread_conn,
         long long [:] thread_b_nodes,
         long long [:] _thread_reached_first,
-        double penatly,
+        double penalty,
         unsigned int seed
     ) noexcept nogil:
         """Link penalisation algorithm for choice set generation."""
@@ -652,7 +652,7 @@ cdef class RouteChoiceSet:
                     vec.push_back(connector)
 
                 for connector in d(vec):
-                    thread_cost[connector] = penatly * thread_cost[connector]
+                    thread_cost[connector] = penalty * thread_cost[connector]
 
                 reverse(vec.begin(), vec.end())
 
@@ -1484,7 +1484,7 @@ cdef class GeneralisedCOODemand:
         Add an AequilibraE matrix to the existing demand in a sparse manner.
         """
         dfs = []
-        for i, name in enumerate(matrix.names):
+        for i, name in enumerate(matrix.view_names):
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
 
             non_zero = np.where(m > 0)
