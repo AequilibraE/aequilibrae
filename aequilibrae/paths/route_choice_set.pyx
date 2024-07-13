@@ -1495,7 +1495,7 @@ cdef class GeneralisedCOODemand:
                 data={
                     self.df.index.names[0]: matrix.index[coo_.row],
                     self.df.index.names[1]: matrix.index[coo_.col],
-                    matrix.names[i]: coo_.data,
+                    name: coo_.data,
                 },
             ).set_index([self.df.index.names[0], self.df.index.names[1]])
             dfs.append(df.dropna())
