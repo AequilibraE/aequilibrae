@@ -3,6 +3,7 @@
 from aequilibrae.paths.graph import Graph
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.matrix.sparse_matrix cimport COO
+from scipy.sparse import coo_matrix as sp_coo_matrix
 
 from cython.operator cimport dereference as d
 from cython.operator cimport postincrement as inc
@@ -1486,20 +1487,18 @@ cdef class GeneralisedCOODemand:
         dfs = []
         for i, name in enumerate(matrix.view_names):
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
+            if np.nansum(m) == 0:
+                continue
 
-            non_zero = np.where(m > 0)
-            # Remove intrazonals (elements on the diagonal)
-            origins = non_zero[0][non_zero[0] != non_zero[1]]
-            destinations = non_zero[1][non_zero[0] != non_zero[1]]
-
+            coo_ = sp_coo_matrix(m)
             df = pd.DataFrame(
                 data={
-                    self.df.index.names[0]: matrix.index[origins],
-                    self.df.index.names[1]: matrix.index[destinations],
-                    matrix.names[i]: m[origins, destinations],
+                    self.df.index.names[0]: matrix.index[coo_.row],
+                    self.df.index.names[1]: matrix.index[coo_.col],
+                    matrix.names[i]: coo_.data,
                 },
             ).set_index([self.df.index.names[0], self.df.index.names[1]])
-            dfs.append(df)
+            dfs.append(df.dropna())
 
         self.add_df(dfs, fill=fill)
         logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
