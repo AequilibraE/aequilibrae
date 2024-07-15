@@ -359,15 +359,22 @@ class RouteChoice:
         df = pd.DataFrame(
             {"link_id": lids} | {k + dir: np.zeros(lids.shape) for k in link_loads.keys() for dir in ["_ab", "_ba"]}
         )
+        added_dfs = []
         for k, v in link_loads.items():
             # Directional Flows
             df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
             df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            df[k + "_tot"] = df[k + "_ab"] + df[k + "_ba"]
+            added_dfs.append(pd.DataFrame({f"{k}_tot": df[k + "_ab"] + df[k + "_ba"]}))
 
-        return df
+        df = pd.concat([df] + added_dfs, axis=1)
+        cols = df.columns.tolist()
+        cols.remove("link_id")
+        cols.sort()
+        # Insert the certain value at the beginning
+        cols.insert(0, "link_id")
+        return df[cols]
 
     def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
         """
@@ -397,7 +404,7 @@ class RouteChoice:
             for link, dir in link_set:
                 if dir == 0:
                     query = (self.graph.graph["link_id"] == link) & (
-                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
                     )
                 else:
                     query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)

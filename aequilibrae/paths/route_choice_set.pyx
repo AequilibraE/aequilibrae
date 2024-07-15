@@ -1486,6 +1486,7 @@ cdef class GeneralisedCOODemand:
         """
         dfs = []
         for i, name in enumerate(matrix.view_names):
+            assert name not in self.df.columns, f"Matrix name ({name}) already exists in the matrix cube"
             m = matrix.matrix_view if len(matrix.view_names) == 1 else matrix.matrix_view[:, :, i]
             if np.nansum(m) == 0:
                 continue
