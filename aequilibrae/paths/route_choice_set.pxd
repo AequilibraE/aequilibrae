@@ -344,7 +344,10 @@ cdef class LinkLoadingResults:
         vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_link_loading_threaded
         vector[unique_ptr[vector[float]]] f32_link_loading
 
-        # # Select link
+        # Select link
+        vector[unique_ptr[vector[unique_ptr[unordered_set[long long]]]]] select_link_sets
+        vector[unique_ptr[vector[size_t]]] select_link_set_lengths
+
         # vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_sl_link_loading_threaded
         # vector[unique_ptr[vector[double]]]  f64_sl_link_loading
 

@@ -120,7 +120,7 @@ from aequilibrae.paths import RouteChoice
 # supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
 rc = RouteChoice(graph, mat)
 
-#%%
+# %%
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -228,13 +228,15 @@ plot_results(rc.get_load_results())
 # %%
 # Select link analysis
 # ~~~~~~~~~~~~~~~~~~~~
-# We can also enable select link analysis by providing the links and the directions that we are interested in
-rc.set_select_links({"sl1": [(5372, 1), (5374, 1)], "sl2": [(23845, 0)]})
+# We can also enable select link analysis by providing the links and the directions that we are interested in.  Here we
+# set the select link to trigger when (7369, 1) and (20983, 1) is utilised in "sl1" and "sl2" when (7369, 1) is
+# utilised.
+rc.set_select_links({"sl1": [[(7369, 1), (20983, 1)]], "sl2": [(7369, 1)]})
 
 # %%
 # We can get then the results in a Pandas data frame for both the network and compressed graph.
-u_sl, c_sl = rc.get_select_link_results()
-u_sl
+sl = rc.get_select_link_results()
+sl
 
 # %%
 # We can also access the OD matrices for this link loading. These matrices are sparse and can be converted to

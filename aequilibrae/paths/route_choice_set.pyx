@@ -1562,7 +1562,7 @@ cdef class GeneralisedCOODemand:
 
 # See note in route_choice_set.pxd
 cdef class LinkLoadingResults:
-    def __cinit__(self, demand: GeneralisedCOODemand, num_links: int, threads: int):
+    def __cinit__(self, demand: GeneralisedCOODemand, select_links: Dict[str, FrozenSet[FrozenSet[int]]], num_links: int, threads: int):
         if threads <= 0:
             raise ValueError(f"threads must be positive ({threads})")
         elif num_links <= 0:
@@ -1599,6 +1599,30 @@ cdef class LinkLoadingResults:
 
         # self.f64_link_loading and self.f32_link_loading are not allocated here. The objects are initialised to empty
         # vectors but elements are created in self.reduce_link_loading
+
+        cdef:
+            vector[unique_ptr[unordered_set[long long]]] *select_link_set
+            vector[size_t] *select_link_set_length
+
+        # Coerce the select link sets to their cpp structures ahead of time. We'll be using these a lot and they don't
+        # change. We allocate a vector of select link sets. These select link sets a vector representing an OR set,
+        # containing a unordered_set of links representing the AND set.
+        self.select_link_sets.reserve(len(select_links))
+        self.select_link_set_lengths.reserve(len(select_links))
+        for or_set in select_links.values():
+            select_link_set = new vector[unique_ptr[unordered_set[long long]]]()
+            select_link_set_length = new vector[size_t]()
+
+            select_link_set.reserve(len(or_set))
+            select_link_set_length.reserve(len(or_set))
+
+            for and_set in or_set:
+                select_link_set.emplace_back(new unordered_set[long long](and_set))
+                select_link_set_length.push_back(len(and_set))
+
+            self.select_link_sets.emplace_back(select_link_set)
+            self.select_link_set_lengths.emplace_back(select_link_set_length)
+
 
     def _sizes(self):
         print("-" * 10, "threaded", "-" * 10)

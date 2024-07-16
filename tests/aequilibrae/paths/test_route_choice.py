@@ -321,8 +321,8 @@ class TestRouteChoiceSet(TestCase):
                 sl_link_loads = rc.select_link_loading(
                     mat,
                     {
-                        "sl1": self.graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__.to_list(),
-                        "sl2": self.graph.graph.set_index("link_id").loc[[11]].__compressed_id__.to_list(),
+                        "sl1": [(x, 1) for x in self.graph.graph.set_index("link_id").loc[[23, 26]].__compressed_id__],
+                        "sl2": [(x, 1) for x in self.graph.graph.set_index("link_id").loc[[11]].__compressed_id__],
                     },
                 )
 

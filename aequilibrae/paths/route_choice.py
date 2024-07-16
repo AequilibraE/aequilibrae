@@ -376,16 +376,21 @@ class RouteChoice:
         cols.insert(0, "link_id")
         return df[cols]
 
-    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
+    def set_select_links(self, links: Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
         """
-        Set the selected links. Checks if the links and directions are valid. Translates `links=None` and
-        direction into unique link ID used in compact graph.
+        Set the selected links. Checks if the links and directions are valid. Supports OR and AND sets of links.
 
+        Dictionary values should be a list of either (link_id, dir) or a list of (link_id, dir).
+
+        The elements of the first list represent the AND sets, together they are OR'ed. If any of these sets is
+        satisfied the link are loaded as appropriate. The AND sets are comprised of either a single (link_id, dir) tuple
+        or a list of (link_id, dir). The single tuple represents an AND set with a single element. All links and
+        directions in an AND set must appear in any order within a route for it to be considered satisfied.
         Supply `links=None` to disable select link analysis.
 
         :Arguments:
-            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
-             Link IDs and directions to be used in select link analysis.
+            **links** (:obj:`Union[None, Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
+                Name of link set and Link IDs and directions to be used in select link analysis.
         """
         self._selected_links = {}
 
@@ -400,31 +405,53 @@ class RouteChoice:
                 warnings.warn("Input string name has a space in it. Replacing with _")
                 name = str.join("_", name.split(" "))
 
-            link_ids = []
-            for link, dir in link_set:
-                if dir == 0:
-                    query = (self.graph.graph["link_id"] == link) & (
-                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+            normalised_link_set = []
+            for link_ids in link_set:
+                if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
+                    warnings.warn(
+                        f"Adding both directions of a link ({link_ids[0]}) to a single AND set is likely "
+                        f"unintentional. Replacing with {(link_ids[0], -1)} OR {(link_ids[0], 1)}"
                     )
+                    normalised_link_set.append((link_ids[0], -1))
+                    normalised_link_set.append((link_ids[0], 1))
                 else:
-                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-                if not query.any():
-                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                    # Check for duplicate compressed link ids in the current link set
-                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
-                    if comp_id == max_id:
-                        raise ValueError(
-                            f"link ID {link} and direction {dir} is not present in compressed graph. "
-                            "It may have been removed during dead-end removal."
-                        )
-                    elif comp_id in link_ids:
-                        warnings.warn(
-                            "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                    normalised_link_set.append(link_ids)
+
+            or_set = set()
+            for link_ids in normalised_link_set:
+                # For compatibility, a tuple of length 2 is passed, we assume that's a single (link, dir) pair
+                if isinstance(link_ids, tuple) and len(link_ids) == 2:
+                    link_ids = (link_ids,)
+
+                and_set = set()
+                for link, dir in link_ids:
+                    if dir == 0:
+                        query = (self.graph.graph["link_id"] == link) & (
+                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
                         )
                     else:
-                        link_ids.append(comp_id)
-            self._selected_links[name] = link_ids
+                        query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
+
+                    if not query.any():
+                        raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+
+                    for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                        # Check for duplicate compressed link ids in the current link set
+                        if comp_id == max_id:
+                            raise ValueError(
+                                f"link ID {link} and direction {dir} is not present in compressed graph. "
+                                "It may have been removed during dead-end removal."
+                            )
+                        elif comp_id in and_set:
+                            warnings.warn(
+                                "Two input links map to the same compressed link in the network"
+                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                            )
+                        else:
+                            and_set.add(comp_id)
+
+                or_set.add(frozenset(and_set))
+            self._selected_links[name] = frozenset(or_set)
         self._config["select_links"] = str(links)
 
     def get_select_link_results(self) -> pd.DataFrame:
