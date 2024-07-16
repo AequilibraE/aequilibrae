@@ -335,24 +335,45 @@ cdef class GeneralisedCOODemand:
 cdef class LinkLoadingResults:
     cdef:
         GeneralisedCOODemand demand
+        readonly object select_link_set_names
         size_t num_links
 
-        # Number of threads * number of demand cols * number of links
+        # Number of threads
+        #               * number of demand cols
+        #                 |               * number of links
         vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_link_loading_threaded
+
+        # Number of demand cols
+        #               * number of links
         vector[unique_ptr[vector[double]]] f64_link_loading
 
         vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_link_loading_threaded
         vector[unique_ptr[vector[float]]] f32_link_loading
 
         # Select link
+        # A select link set is represented by a vector of unordered AND sets, OR'd together
+        # Number of select link sets
+        #               * number of select link OR sets
+        #                 |               * number of AND sets
         vector[unique_ptr[vector[unique_ptr[unordered_set[long long]]]]] select_link_sets
+
+        # Number of select link sets
+        #               * number of select link OR sets
         vector[unique_ptr[vector[size_t]]] select_link_set_lengths
 
-        # vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_sl_link_loading_threaded
-        # vector[unique_ptr[vector[double]]]  f64_sl_link_loading
+        # Number of threads
+        #               * number of select link sets
+        #                 |               * number of demand cols
+        #                 |                 |               * number of links
+        vector[unique_ptr[vector[unique_ptr[vector[unique_ptr[vector[double]]]]]]] f64_sl_link_loading_threaded
 
-        # vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_sl_link_loading_threaded
-        # vector[unique_ptr[vector[float]]] f32_sl_link_loading
+        # Number of select link sets
+        #               * number of demand cols
+        #                 |               * number of links
+        vector[unique_ptr[vector[unique_ptr[vector[double]]]]]  f64_sl_link_loading
+
+        vector[unique_ptr[vector[unique_ptr[vector[unique_ptr[vector[float]]]]]]] f32_sl_link_loading_threaded
+        vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_sl_link_loading
 
         # vector[unique_ptr[vector[COO_struct]]] f64_sl_od_matrix_threaded
         # vector[COO_struct]] f64_sl_od_matrix
@@ -368,4 +389,25 @@ cdef class LinkLoadingResults:
     ) noexcept nogil
 
     cdef void reduce_link_loading(LinkLoadingResults self)
-    cdef object apply_link_loading(LinkLoadingResults self, long long[:] compressed_id_view, int cores)
+    cdef object apply_generic_link_loading(
+        LinkLoadingResults self,
+        vector[unique_ptr[vector[double]]] &f64_link_loading,
+        vector[unique_ptr[vector[float]]] &f32_link_loading,
+        long long[:] compressed_id_view,
+        int cores
+    )
+
+    @staticmethod
+    cdef bool is_in_select_link_set(
+        vector[long long] &route,
+        vector[unique_ptr[unordered_set[long long]]] &select_link_set,
+        vector[size_t] &select_link_set_lengths
+    ) noexcept nogil
+    cdef void sl_link_load_single_route_set(
+        LinkLoadingResults self,
+        const size_t od_idx,
+        const RouteVec_t &route_set,
+        const vector[double] &prob_vec,
+        const size_t thread_id
+    ) noexcept nogil
+    cdef void reduce_sl_link_loading(LinkLoadingResults self)

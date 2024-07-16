@@ -274,6 +274,7 @@ class RouteChoice:
         self.results = None
         self.__rc.batched(
             self.demand,
+            self._selected_links,
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
@@ -467,30 +468,21 @@ class RouteChoice:
         if self.demand.no_demand():
             raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
-        tmp = self.__rc.select_link_loading(self.matrix, self._selected_links)
+        tmp = self.__rc.get_sl_link_loading()
 
-        self.sl_link_loads = {}
-        self.sl_compact_link_loads = {}
-        self.sl_od_matrix = {}
-        for name, sl_res in tmp.items():
-            for sl_name, res in sl_res.items():
-                mat, (u, c) = res
-                self.sl_od_matrix[name + "_" + sl_name] = mat
-                self.sl_link_loads[name + "_" + sl_name] = u
-                self.sl_compact_link_loads[name + "_" + sl_name] = c
+        # self.sl_od_matrix = {}
+        sl_link_loads = {}
+        for sl_name, sl_res in tmp.items():
+            for demand_name, res in sl_res.items():
+                # self.sl_od_matrix[name + "_" + sl_name] = mat
+                sl_link_loads[sl_name + "_" + demand_name] = res
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
+        df = self.__link_loads_to_df(m, lids, sl_link_loads)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
-
-        return uncompressed_df, compressed_df
+        return df
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
