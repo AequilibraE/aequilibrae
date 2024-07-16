@@ -204,7 +204,7 @@ cdef class RouteChoiceSet:
     def batched(
             self,
             demand: GeneralisedCOODemand,
-            select_links: Dict[str, FrozenSet[FrozenSet[int]]],
+            select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
             max_routes: int = 0,
             max_depth: int = 0,
             max_misses: int = 100,
@@ -245,6 +245,9 @@ cdef class RouteChoiceSet:
         cdef:
             long long origin, dest
             size_t i
+
+        if select_links is None:
+            select_links = {}
 
         if max_routes == 0 and max_depth == 0:
             raise ValueError("Either `max_routes` or `max_depth` must be > 0")
