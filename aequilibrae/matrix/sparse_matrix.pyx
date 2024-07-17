@@ -1,10 +1,12 @@
 from libcpp.vector cimport vector
+from libcpp.utility cimport move
 from libcpp cimport nullptr
 from cython.operator cimport dereference as d
 
 import scipy.sparse
 import numpy as np
 import openmatrix as omx
+import cython
 
 cdef class Sparse:
     """
@@ -57,45 +59,50 @@ cdef class COO(Sparse):
     A class to implement sparse matrix operations such as reading, writing, and indexing
     """
 
-    def __cinit__(self):
+    def __cinit__(self, shape=None, f64: bool = True):
         """C level init. For C memory allocation and initialisation. Called exactly once per object."""
-
-        self.row = new vector[size_t]()
-        self.col = new vector[size_t]()
-        self.data = new vector[double]()
-
-    def __init__(self, shape=None):
-        """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
-
         self.shape = shape
+        self.f64 = f64
 
-    def __dealloc__(self):
-        """
-        C level deallocation. For freeing memory allocated by this object. *Must* have GIL, `self` may be in a
-        partially deallocated state already.
-        """
+        self.row = make_unique[vector[size_t]]()
+        self.col = make_unique[vector[size_t]]()
 
-        del self.row
-        self.row = <vector[size_t] *>nullptr
+        if self.f64:
+            self.f64_data = make_unique[vector[double]]()
+        else:
+            self.f32_data = make_unique[vector[float]]()
 
-        del self.col
-        self.col = <vector[size_t] *>nullptr
-
-        del self.data
-        self.data = <vector[double] *>nullptr
-
-    def to_scipy(self, shape=None, dtype=np.float64):
+    def to_scipy(self, shape=None):
         """
         Create scipy.sparse.coo_matrix from this COO matrix.
         """
-        row = <size_t[:self.row.size()]>&d(self.row)[0]
-        col = <size_t[:self.col.size()]>&d(self.col)[0]
-        data = <double[:self.data.size()]>&d(self.data)[0]
+        cdef:
+            size_t[:] row, col
+            double[:] f64_data
+            float[:] f32_data
+            size_t length
+
+        # We can't construct a 0x0 matrix from 3x 0-sized arrays but we can tell scipy to make one.
+        if not d(self.row).size() or not d(self.col).size():
+            return scipy.sparse.coo_matrix((0, 0))
+
+        length = d(self.row).size()
+        row = <size_t[:length]>d(self.row).data()
+
+        length = d(self.col).size()
+        col = <size_t[:length]>d(self.col).data()
 
         if shape is None:
             shape = self.shape
 
-        return scipy.sparse.coo_matrix((data, (row, col)), dtype=dtype, shape=shape)
+        if self.f64:
+            length = d(self.f64_data).size()
+            f64_data = <double[:length]>d(self.f64_data).data()
+            return scipy.sparse.coo_matrix((f64_data, (row, col)), dtype=np.float64, shape=shape)
+        else:
+            length = d(self.f32_data).size()
+            f32_data = <float[:length]>d(self.f32_data).data()
+            return scipy.sparse.coo_matrix((f32_data, (row, col)), dtype=np.float32, shape=shape)
 
     @classmethod
     def from_matrix(cls, m):
@@ -105,39 +112,74 @@ cdef class COO(Sparse):
         if not isinstance(m, scipy.sparse.coo_matrix):
             m = scipy.sparse.coo_matrix(m)
 
-        self = <COO?>cls()
+        self = <COO?>cls(f64=m.data.dtype is np.float64)
 
-        cdef size_t[:] row = m.row.astype(np.uint64), col = m.row.astype(np.uint64)
-        cdef double[:] data = m.data
+        cdef size_t[:] row = m.row.astype(np.uint64), col = m.col.astype(np.uint64)
+        cdef double[:] f64_data
+        cdef float[:] f32_data
 
-        self.row.insert(self.row.end(), &row[0], &row[-1] + 1)
-        self.col.insert(self.col.end(), &col[0], &col[-1] + 1)
-        self.data.insert(self.data.end(), &data[0], &data[-1] + 1)
+        d(self.row).insert(d(self.row).begin(), &row[0], &row[-1] + 1)
+        d(self.col).insert(d(self.col).begin(), &col[0], &col[-1] + 1)
+
+        if self.f64:
+            f64_data = m.data
+            d(self.f64_data).insert(d(self.f64_data).begin(), &f64_data[0], &f64_data[-1] + 1)
+        else:
+            f32_data = m.data
+            d(self.f32_data).insert(d(self.f32_data).begin(), &f32_data[0], &f32_data[-1] + 1)
 
         return self
 
     @staticmethod
-    cdef void init_struct(COO_struct &struct) noexcept nogil:
-        struct.row = row = new vector[size_t]()
-        struct.col = new vector[size_t]()
-        struct.data = new vector[double]()
+    cdef void init_f64_struct(COO_f64_struct &struct) noexcept nogil:
+        struct.row = make_unique[vector[size_t]]()
+        struct.col = make_unique[vector[size_t]]()
+        struct.f64_data = make_unique[vector[double]]()
 
     @staticmethod
-    cdef object from_struct(COO_struct &struct):
+    cdef void init_f32_struct(COO_f32_struct &struct) noexcept nogil:
+        struct.row = make_unique[vector[size_t]]()
+        struct.col = make_unique[vector[size_t]]()
+        struct.f32_data = make_unique[vector[float]]()
+
+    @staticmethod
+    cdef object from_f64_struct(COO_f64_struct &struct):
         cdef COO self = COO.__new__(COO)
-        self.row = struct.row
-        self.col = struct.col
-        self.data = struct.data
+        self.row = move(struct.row)
+        self.col = move(struct.col)
+        self.f64 = True
+        self.f64_data = move(struct.f64_data)
 
         return self
 
-    cdef void append(COO self, size_t i, size_t j, double v) noexcept nogil:
-        self.row.push_back(i)
-        self.col.push_back(j)
-        self.data.push_back(v)
+    @staticmethod
+    cdef object from_f32_struct(COO_f32_struct &struct):
+        cdef COO self = COO.__new__(COO)
+        self.row = move(struct.row)
+        self.col = move(struct.col)
+        self.f64 = False
+        self.f32_data = move(struct.f32_data)
+
+        return self
+
+    cdef void f64_append(COO self, size_t i, size_t j, double v) noexcept nogil:
+        d(self.row).push_back(i)
+        d(self.col).push_back(j)
+        d(self.f64_data).push_back(v)
+
+    cdef void f32_append(COO self, size_t i, size_t j, float v) noexcept nogil:
+        d(self.row).push_back(i)
+        d(self.col).push_back(j)
+        d(self.f32_data).push_back(v)
 
     @staticmethod
-    cdef void struct_append(COO_struct &struct, size_t i, size_t j, double v) noexcept nogil:
-        struct.row.push_back(i)
-        struct.col.push_back(j)
-        struct.data.push_back(v)
+    cdef void f64_struct_append(COO_f64_struct &struct, size_t i, size_t j, double v) noexcept nogil:
+        d(struct.row).push_back(i)
+        d(struct.col).push_back(j)
+        d(struct.f64_data).push_back(v)
+
+    @staticmethod
+    cdef void f32_struct_append(COO_f32_struct &struct, size_t i, size_t j, float v) noexcept nogil:
+        d(struct.row).push_back(i)
+        d(struct.col).push_back(j)
+        d(struct.f32_data).push_back(v)
