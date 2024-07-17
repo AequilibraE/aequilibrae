@@ -1,6 +1,6 @@
 # cython: language_level=3str
 from aequilibrae.paths.results import PathResults
-from aequilibrae.matrix.sparse_matrix cimport COO, COO_struct
+from aequilibrae.matrix.sparse_matrix cimport COO, COO_f64_struct, COO_f32_struct
 
 from libcpp.vector cimport vector
 from libcpp.unordered_set cimport unordered_set
@@ -375,10 +375,19 @@ cdef class LinkLoadingResults:
         vector[unique_ptr[vector[unique_ptr[vector[unique_ptr[vector[float]]]]]]] f32_sl_link_loading_threaded
         vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_sl_link_loading
 
-        # vector[unique_ptr[vector[COO_struct]]] f64_sl_od_matrix_threaded
-        # vector[COO_struct]] f64_sl_od_matrix
+        # Number of threads
+        #               * number of select link sets
+        #                 |               * number of demand cols
+        vector[unique_ptr[vector[unique_ptr[vector[COO_f64_struct]]]]] f64_sl_od_matrix_threaded
 
-        # f32_sl_od_matrix struct doesn't exist ATM
+        # Number of select link sets
+        #               * number of demand cols
+        vector[unique_ptr[vector[COO_f64_struct]]] f64_sl_od_matrix
+
+        vector[unique_ptr[vector[unique_ptr[vector[COO_f32_struct]]]]] f32_sl_od_matrix_threaded
+        vector[unique_ptr[vector[COO_f32_struct]]] f32_sl_od_matrix
+
+        readonly object od_matrix_objects
 
     cdef void link_load_single_route_set(
         LinkLoadingResults self,
@@ -411,3 +420,5 @@ cdef class LinkLoadingResults:
         const size_t thread_id
     ) noexcept nogil
     cdef void reduce_sl_link_loading(LinkLoadingResults self)
+    cdef void reduce_sl_od_matrix(LinkLoadingResults self)
+    cdef object sl_od_matrices_structs_to_objects(LinkLoadingResults self)

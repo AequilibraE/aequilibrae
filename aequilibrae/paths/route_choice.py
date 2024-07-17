@@ -12,6 +12,7 @@ from functools import cached_property
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
@@ -455,26 +456,21 @@ class RouteChoice:
             self._selected_links[name] = frozenset(or_set)
         self._config["select_links"] = str(links)
 
-    def get_select_link_results(self) -> pd.DataFrame:
+    def get_select_link_loading_results(self) -> pd.DataFrame:
         """
         Get the select link loading results.
 
         :Returns:
-            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`):
-                A tuple of uncompressed and compressed select link loading results as DataFrames.
+            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results as DataFrames.
                 Columns are the matrix name concatenated with the select link set and direction.
         """
 
         if self.demand.no_demand():
             raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
-        tmp = self.__rc.get_sl_link_loading()
-
-        # self.sl_od_matrix = {}
         sl_link_loads = {}
-        for sl_name, sl_res in tmp.items():
+        for sl_name, sl_res in self.__rc.get_sl_link_loading().items():
             for demand_name, res in sl_res.items():
-                # self.sl_od_matrix[name + "_" + sl_name] = mat
                 sl_link_loads[sl_name + "_" + demand_name] = res
 
         # Create a data store with a row for each uncompressed link
@@ -483,6 +479,20 @@ class RouteChoice:
         df = self.__link_loads_to_df(m, lids, sl_link_loads)
 
         return df
+
+    def get_select_link_od_matrix_results(self) -> Dict[str, Dict[str, scipy.sparse.coo_matrix]]:
+        """
+        Get the select link OD matrix results as a sparse matrix.
+
+        :Returns:
+            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`): Returns a dict of
+                select link set names to a dict of demand column names to a sparse OD matrix
+        """
+
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+
+        return self.__rc.get_sl_od_matrices()
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
