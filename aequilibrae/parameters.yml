@@ -42,6 +42,30 @@ network:
           description: name
           osm_source: name
           type: text
+      - cycleway:
+          description: cycleway, both way
+          osm_source: cycleway
+          type: text
+      - cycleway_right:
+          description: cycleway, right
+          osm_source: cycleway:right
+          type: text
+      - cycleway_left:
+          description: cycleway, left
+          osm_source: cycleway:left
+          type: text
+      - busway:
+          description: busway
+          osm_source: busway
+          type: text
+      - busway_right:
+          description: busway, right
+          osm_source: busway:right
+          type: text
+      - busway_left:
+          description: busway, left
+          osm_source: busway:left
+          type: text            
       two-way:
       - lanes:
           description: lanes
