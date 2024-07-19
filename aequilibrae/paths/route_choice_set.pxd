@@ -256,6 +256,8 @@ cdef class RouteChoiceSetResults:
         vector[shared_ptr[vector[double]]] __path_overlap_set
         vector[shared_ptr[vector[double]]] __prob_set
 
+        readonly object table
+
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil
 
@@ -312,7 +314,7 @@ cdef class RouteChoiceSetResults:
         const vector[bool] &route_mask
     ) noexcept nogil
 
-    cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self)
+    cdef object make_table_from_results(RouteChoiceSetResults self)
 
 cdef class GeneralisedCOODemand:
     cdef:
@@ -387,6 +389,8 @@ cdef class LinkLoadingResults:
         vector[unique_ptr[vector[unique_ptr[vector[COO_f32_struct]]]]] f32_sl_od_matrix_threaded
         vector[unique_ptr[vector[COO_f32_struct]]] f32_sl_od_matrix
 
+        readonly object link_loading_objects
+        readonly object sl_link_loading_objects
         readonly object od_matrix_objects
 
     cdef void link_load_single_route_set(
@@ -421,4 +425,6 @@ cdef class LinkLoadingResults:
     ) noexcept nogil
     cdef void reduce_sl_link_loading(LinkLoadingResults self)
     cdef void reduce_sl_od_matrix(LinkLoadingResults self)
+    cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
+    cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
     cdef object sl_od_matrices_structs_to_objects(LinkLoadingResults self)

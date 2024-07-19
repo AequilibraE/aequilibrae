@@ -403,10 +403,16 @@ cdef class RouteChoiceSet:
 
             del route_set
 
+        # Eagerly compute the results, they return objects but are cached
+        self.get_results()
         if eager_link_loading:
             self.ll_results.reduce_link_loading()
-            # self.ll_results.reduce_sl_link_loading()
-            # self.ll_results.reduce_sl_od_matrix()
+            self.ll_results.reduce_sl_link_loading()
+            self.ll_results.reduce_sl_od_matrix()
+
+            self.get_link_loading(cores=c_cores)
+            self.get_sl_link_loading(cores=c_cores)
+            self.get_sl_od_matrices()
 
     @cython.initializedcheck(False)
     cdef void path_find(
@@ -681,7 +687,7 @@ cdef class RouteChoiceSet:
         if self.results is None:
             raise RuntimeError("Route Choice results not computed yet")
 
-        return libpa.pyarrow_wrap_table(self.results.make_table_from_results())
+        return self.results.make_table_from_results()
 
     def get_link_loading(RouteChoiceSet self, cores: int = 0):
         """
@@ -692,7 +698,7 @@ cdef class RouteChoiceSet:
         if self.ll_results is None:
             raise RuntimeError("Link loading results not computed yet")
 
-        return self.ll_results.apply_link_loading(
+        return self.ll_results.link_loading_to_objects(
             self.graph_compressed_id_view,
             cores if cores > 0 else omp_get_max_threads()
         )
@@ -706,7 +712,7 @@ cdef class RouteChoiceSet:
         if self.ll_results is None:
             raise RuntimeError("Link loading results not computed yet")
 
-        return self.ll_results.apply_sl_link_loading(
+        return self.ll_results.sl_link_loading_to_objects(
             self.graph_compressed_id_view,
             cores if cores > 0 else omp_get_max_threads()
         )
@@ -828,6 +834,7 @@ cdef class RouteChoiceSetResults:
         self.cost_view = cost_view
         self.mapping_idx = mapping_idx
         self.mapping_data = mapping_data
+        self.table = None
 
         cdef size_t size = self.demand.ods.size()
 
@@ -1050,6 +1057,7 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
+    @cython.cdivision(True)
     cdef void compute_path_overlap(
         RouteChoiceSetResults self,
         vector[double] &path_overlap_vec,
@@ -1102,6 +1110,7 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
+    @cython.cdivision(True)
     cdef void compute_prob(
         RouteChoiceSetResults self,
         vector[double] &prob_vec,
@@ -1140,7 +1149,7 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef shared_ptr[libpa.CTable] make_table_from_results(RouteChoiceSetResults self):
+    cdef object make_table_from_results(RouteChoiceSetResults self):
         """
         Construct an Arrow table from C++ stdlib structures.
 
@@ -1151,7 +1160,9 @@ cdef class RouteChoiceSetResults:
         Compressed link IDs are expanded to full network link IDs.
         """
 
-        if not self.store_results:
+        if self.table is not None:
+            return self.table
+        elif not self.store_results:
             raise RuntimeError("route set table construction requires `store_results` is True")
 
         cdef:
@@ -1257,7 +1268,8 @@ cdef class RouteChoiceSetResults:
             del path_overlap_col
             del prob_col
 
-        return table
+        self.table = libpa.pyarrow_wrap_table(table)
+        return self.table
 
 
 cdef class GeneralisedCOODemand:
@@ -1457,13 +1469,13 @@ cdef class LinkLoadingResults:
         self.f64_sl_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f64_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[double]]]]]()
-            f64_sl_select_link_sets.reserve(self.demand.f64.size())
+            f64_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-            for j in range(self.demand.f64.size()):
+            for j in range(self.select_link_sets.size()):
                 f64_sl_demand_cols = new vector[unique_ptr[vector[double]]]()
-                f64_sl_demand_cols.reserve(self.select_link_sets.size())
+                f64_sl_demand_cols.reserve(self.demand.f64.size())
 
-                for k in range(self.select_link_sets.size()):
+                for k in range(self.demand.f64.size()):
                     f64_sl_demand_cols.emplace_back(new vector[double](self.num_links))
 
                 f64_sl_select_link_sets.emplace_back(f64_sl_demand_cols)
@@ -1474,13 +1486,13 @@ cdef class LinkLoadingResults:
         self.f32_sl_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f32_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[float]]]]]()
-            f32_sl_select_link_sets.reserve(self.demand.f32.size())
+            f32_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-            for j in range(self.demand.f32.size()):
+            for j in range(self.select_link_sets.size()):
                 f32_sl_demand_cols = new vector[unique_ptr[vector[float]]]()
-                f32_sl_demand_cols.reserve(self.select_link_sets.size())
+                f32_sl_demand_cols.reserve(self.demand.f32.size())
 
-                for k in range(self.select_link_sets.size()):
+                for k in range(self.demand.f32.size()):
                     f32_sl_demand_cols.emplace_back(new vector[float](self.num_links))
 
                 f32_sl_select_link_sets.emplace_back(f32_sl_demand_cols)
@@ -1532,15 +1544,18 @@ cdef class LinkLoadingResults:
         # self.f64_sl_od_matrix and self.f32_sl_od_matrix are not allocated here. The objects are initialised to
         # empty vectors but elements are created in self.reduce_sl_link_loading
 
-    def apply_link_loading(self, long long[:] compressed_id_view, int cores):
-        return dict(zip(*self.apply_generic_link_loading(self.f64_link_loading, self.f32_link_loading, compressed_id_view, cores)))
+    cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
+        if self.link_loading_objects is None:
+            self.link_loading_objects = dict(zip(*self.apply_generic_link_loading(self.f64_link_loading, self.f32_link_loading, compressed_id_view, cores)))
+        return self.link_loading_objects
 
-    def apply_sl_link_loading(self, long long[:] compressed_id_view, int cores):
-        results = []
-        for i in range(self.select_link_sets.size()):
-            results.append(dict(zip(*self.apply_generic_link_loading(d(self.f64_sl_link_loading[i]), d(self.f32_sl_link_loading[i]), compressed_id_view, cores))))
-
-        return dict(zip(self.select_link_set_names, results))
+    cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
+        if self.sl_link_loading_objects is None:
+            results = []
+            for i in range(self.select_link_sets.size()):
+                results.append(dict(zip(*self.apply_generic_link_loading(d(self.f64_sl_link_loading[i]), d(self.f32_sl_link_loading[i]), compressed_id_view, cores))))
+            self.sl_link_loading_objects = dict(zip(self.select_link_set_names, results))
+        return self.sl_link_loading_objects
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -1679,7 +1694,7 @@ cdef class LinkLoadingResults:
             f64_ll.push_back(0.0)
 
             # Cast the vector to a memory view
-            f64_ll_view = <double [:f64_ll.size(), :1]> f64_ll.data()
+            f64_ll_view = <double [:f64_ll.size(), :1]>f64_ll.data()
             f64_actual = np.zeros((compressed_id_view.shape[0], 1), dtype=np.float64)
 
             # Assign the compressed link loads to the uncompressed graph
@@ -2018,6 +2033,11 @@ cdef class LinkLoadingResults:
         return self.od_matrix_objects
 
 
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
     if prob == 1.0:
         return INFINITY
