@@ -156,7 +156,7 @@ print(rc.default_parameters)
 # %%
 # We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
 # as well an an assignment.
-results = rc.execute_single(77011, 74089, perform_assignment=True)
+results = rc.execute_single(77011, 74089, demand=1.0)
 print(results[0])
 
 # %%
