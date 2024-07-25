@@ -249,7 +249,7 @@ rc.get_select_link_od_matrix_results()
 
 # %%
 od_matrix = rc.get_select_link_od_matrix_results()["sl1"]["demand"]
-od_matrix.to_scipy().A
+od_matrix.to_scipy().toarray()
 
 # %%
 project.close()
