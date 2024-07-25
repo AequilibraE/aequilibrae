@@ -113,9 +113,9 @@ cdef class COO(Sparse):
         Create COO matrix from an dense or scipy-like matrix.
         """
         if not isinstance(m, scipy.sparse.coo_matrix):
-            m = scipy.sparse.coo_matrix(m)
+            m = scipy.sparse.coo_matrix(m, dtype=m.dtype)
 
-        self = <COO?>cls(f64=m.data.dtype is np.float64)
+        self = <COO?>cls(f64=m.data.dtype == "float64")
 
         cdef size_t[:] row = m.row.astype(np.uint64), col = m.col.astype(np.uint64)
         cdef double[:] f64_data
