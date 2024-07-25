@@ -12,15 +12,19 @@ from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
+from aequilibrae.utils.signal import SIGNAL
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
-from ..utils.worker_thread import WorkerThread
 
 
-class GTFSRouteSystemBuilder(WorkerThread):
+class GTFSRouteSystemBuilder:
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, agency_identifier, file_path, day="", description="", capacities={}):  # noqa: B006
+    signal = SIGNAL(object)
+
+    def __init__(
+        self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
+    ):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -31,8 +35,6 @@ class GTFSRouteSystemBuilder(WorkerThread):
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
-        WorkerThread.__init__(self, None)
-
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
@@ -50,7 +52,8 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.gtfs_data.agency.agency = agency_identifier
         self.gtfs_data.agency.description = description
-        self.__default_capacities = capacities
+        self.__default_capacities = {} if capacities is None else capacities
+        self.__default_pces = {} if pces is None else pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
@@ -60,6 +63,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.logger.info(f"Creating GTFS feed object for {file_path}")
             self.gtfs_data.set_feed_path(file_path)
             self.gtfs_data._set_capacities(self.__default_capacities)
+            self.gtfs_data._set_pces(self.__default_pces)
 
         self.select_routes = {}
         self.select_trips = []
@@ -79,6 +83,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
                                         i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
+
+    def set_pces(self, pces: dict):
+        """Sets default passenger car equivalent (PCE) factor for each GTFS mode.
+
+        :Arguments:
+            **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
+                                    value i.e. -> "{0: 2.0,...}"
+        """
+        self.gtfs_data._set_pces(pces)
 
     def set_maximum_speeds(self, max_speeds: pd.DataFrame):
         """Sets the maximum speeds to be enforced at segments.
@@ -126,12 +139,15 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
+        self.signal.emit(["start", len(self.select_patterns), "Map-matching patterns"])
         for i, pat in enumerate(self.select_patterns.values()):
+            self.signal.emit(["update", i, f"Map-matching pattern {pat.pattern_id}"])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
                 if msg is not None:
                     self.logger.warning(msg)
+        self.signal.emit(["finished"])
 
     def set_agency_identifier(self, agency_id: str) -> None:
         """Adds agency ID to this GTFS for use on import.
@@ -261,7 +277,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = Constants()
+        self.signal.emit(["start", len(self.select_routes), f"Loading data for {self.day}"])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
+            self.signal.emit(["update", counter])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
@@ -286,6 +304,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
             route.shape = self.__build_route_shape(patterns)
             route.pattern_id = trip.pattern_id
+        self.signal.emit(["finished"])
 
     def __build_new_pattern(self, route, route_id, trip) -> Pattern:
         self.logger.debug(f"New Pattern ID {trip.pattern_id} for route ID {route_id}")
@@ -299,6 +318,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
         p.shortname = route.route_short_name
         p.longname = route.route_long_name
         p.description = route.route_desc
+        p.pce = route.pce
         p.seated_capacity = route.seated_capacity
         p.total_capacity = route.total_capacity
         for stop_id in self.gtfs_data.stop_times[trip.trip].stop_id.values:

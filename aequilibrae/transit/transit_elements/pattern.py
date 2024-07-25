@@ -35,6 +35,7 @@ class Pattern(BasicPTElement):
         self.longname = ""
         self.shortname = ""
         self.description = ""
+        self.pce = 2.0
         self.seated_capacity = None
         self.total_capacity = None
         self.__srid = get_srid()
@@ -79,14 +80,15 @@ class Pattern(BasicPTElement):
             self.longname,
             self.description,
             self.route_type,
+            self.pce,
             self.seated_capacity,
             self.total_capacity,
             geo,
             self.__srid,
         ]
 
-        sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, seated_capacity,
-                         total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
+        sql = """insert into routes (pattern_id, route_id, route, agency_id, shortname, longname, description, route_type, pce,
+                         seated_capacity, total_capacity, geometry) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_Multi(GeomFromWKB(?, ?)));"""
         conn.execute(sql, data)
 
         if self.pattern_mapping.shape[0]:
@@ -131,12 +133,12 @@ class Pattern(BasicPTElement):
         """
         if self.__map_matched:
             return
+        self.__map_matched = True
         self.__logger.debug(f"Map-matching pattern ID {self.pattern_id}")
 
         if not self.__feed.graphs:
             self.__feed.builds_link_graphs_with_broken_stops()
-
-        if mode_correspondence[self.route_type] not in self.__feed.graphs:
+        if self.route_type not in mode_correspondence or mode_correspondence[self.route_type] not in self.__feed.graphs:
             return
 
         self.__map_matching_error.clear()

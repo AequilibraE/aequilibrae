@@ -11,7 +11,6 @@ For the original work, please see https://github.com/gboeing/osmnx
 """
 
 import gc
-import importlib.util as iutil
 import logging
 import re
 import time
@@ -23,25 +22,17 @@ from shapely import Polygon
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
-from aequilibrae.utils import WorkerThread
+from aequilibrae.utils.signal import SIGNAL
 from .osm_params import http_headers, memory
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
 
-
-class OSMDownloader(WorkerThread):
-    if pyqt:
-        downloading = pyqtSignal(object)
+class OSMDownloader:
+    downloading = SIGNAL(object)
 
     def __emit_all(self, *args):
-        if pyqt:
-            self.downloading.emit(*args)
+        self.downloading.emit(*args)
 
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
-        WorkerThread.__init__(self, None)
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)

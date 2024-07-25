@@ -1,6 +1,5 @@
 numpy<1.99
 pyaml
-PyQt5
 pyshp
 cython
 enum34
@@ -15,3 +14,4 @@ sphinx-gallery
 sphinx-copybutton
 sphinx-design
 sphinx-git
+nbconvert

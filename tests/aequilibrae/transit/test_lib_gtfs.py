@@ -21,6 +21,11 @@ def test_set_capacities(system_builder):
     assert system_builder.gtfs_data.__dict__["__capacities__"] == {0: [150, 300], 3: [42, 56]}
 
 
+def test_set_pces(system_builder):
+    system_builder.set_pces({1: 2.5, 3: 6.2})
+    assert system_builder.gtfs_data.__dict__["__pces__"] == {1: 2.5, 3: 6.2}
+
+
 def test_dates_available(system_builder):
     dates = system_builder.dates_available()
     assert isinstance(dates, list)

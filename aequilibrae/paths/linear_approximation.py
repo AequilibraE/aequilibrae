@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import logging
 import os
 from functools import partial
@@ -7,49 +6,29 @@ from tempfile import gettempdir
 from typing import List, Dict
 
 import numpy as np
+from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
+from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
+from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
+from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+from scipy.optimize import root_scalar
 
-from aequilibrae import global_logger
 from aequilibrae.paths.all_or_nothing import allOrNothing
 from aequilibrae.paths.results import AssignmentResults
 from aequilibrae.paths.traffic_class import TrafficClass
-from ..utils import WorkerThread
-
-try:
-    from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-    from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
-    from aequilibrae.paths.AoN import copy_one_dimension, copy_two_dimensions, copy_three_dimensions
-    from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
-import scipy
-
-if int(scipy.__version__.split(".")[1]) >= 3:
-    from scipy.optimize import root_scalar
-
-    recent_scipy = True
-else:
-    from scipy.optimize import root as root_scalar
-
-    recent_scipy = False
-    global_logger.warning("Using older version of Scipy. For better performance, use Scipy >= 1.4")
 
 if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SIGNAL
+from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.python_signal import PythonSignal
 
 
-class LinearApproximation(WorkerThread):
-    if pyqt:
-        equilibration = SIGNAL(object)
-        assignment = SIGNAL(object)
-
+class LinearApproximation:
     def __init__(self, assig_spec, algorithm, project=None) -> None:
-        WorkerThread.__init__(self, None)
+        self.equilibration = SIGNAL(object)
+        self.assignment = SIGNAL(object)
+        if isinstance(self.assignment, PythonSignal):
+            self.assignment.pos = 1
 
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
@@ -114,6 +93,13 @@ class LinearApproximation(WorkerThread):
 
         # Instantiates the arrays that we will use over and over
         self.capacity = assig_spec.capacity
+
+        # Creates preload vector from preloads
+        self.preload = None
+        if assig_spec.preloads is not None:
+            cols = assig_spec.preloads.columns.difference(["link_id", "direction"])
+            self.preload = assig_spec.preloads[cols].sum(axis=1).to_numpy()
+
         self.free_flow_tt = assig_spec.free_flow_tt
         self.fw_total_flow = assig_spec.total_flow
         self.congested_time = assig_spec.congested_time
@@ -470,7 +456,7 @@ class LinearApproximation(WorkerThread):
             # Prepares the fixed cost to be used
             if c.fixed_cost_field:
                 # divide fixed cost by volume-dependent prefactor (vot) such that we don't have to do it for
-                # each occurence in the objective funtion. TODO: Need to think about cost skims here, we do
+                # each occurrence in the objective function. TODO: Need to think about cost skims here, we do
                 # not want this there I think
                 v = c.graph.graph[c.fixed_cost_field].values[:]
                 c.fixed_cost[c.graph.graph.__supernet_id__] = v * c.fc_multiplier / c.vot
@@ -480,28 +466,31 @@ class LinearApproximation(WorkerThread):
             # Just need to create some arrays for cost
             c.graph.set_graph(self.time_field)
 
-            self.aons[c._id] = allOrNothing(c.matrix, c.graph, c._aon_results)
+            self.aons[c._id] = allOrNothing(c._id, c.matrix, c.graph, c._aon_results)
 
+        self.equilibration.emit(["start", self.max_iter, "Equilibrium Assignment"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
-            if pyqt:
-                self.equilibration.emit(["rgap", self.rgap])
-                self.equilibration.emit(["iterations", self.iter])
+            self.equilibration.emit(["key_value", "rgap", self.rgap])
+            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             aon_flows = []
 
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
+                self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
 
                 aon = self.aons[c._id]  # This is a new object every iteration, with new aux_res
-                if pyqt:
-                    aon.assignment.connect(self.signal_handler)
+                self.assignment.emit(["refresh"])
+                self.assignment.emit(["reset"])
+                aon.assignment = self.assignment
+
                 aon.execute()
                 c._aon_results.link_loads *= c.pce
                 c._aon_results.total_flows()
@@ -580,12 +569,15 @@ class LinearApproximation(WorkerThread):
                     flows.append(cls_res.total_link_loads)
 
             self.fw_total_flow = np.sum(flows, axis=0)
+            if self.preload is not None:
+                self.fw_total_flow += self.preload
+
             if self.algorithm == "all-or-nothing":
                 break
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-
+            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -604,6 +596,8 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
+            self.equilibration.emit(["key_value", "rgap", self.rgap])
+            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
@@ -633,10 +627,9 @@ class LinearApproximation(WorkerThread):
         if (self.rgap > self.rgap_target) and (self.algorithm != "all-or-nothing"):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
-        if pyqt:
-            self.equilibration.emit(["rgap", self.rgap])
-            self.equilibration.emit(["iterations", self.iter])
-            self.equilibration.emit(["finished_threaded_procedure"])
+        self.equilibration.emit(["update", self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
+        self.assignment.emit(["finished"])
+        self.equilibration.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
@@ -676,18 +669,10 @@ class LinearApproximation(WorkerThread):
         x_tol = max(min(1e-6, self.rgap * 1e-5), 1e-12)
 
         try:
-            if recent_scipy:
-                min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
-                self.stepsize = min_res.root
-                if not min_res.converged:
-                    self.logger.warning("Descent direction stepsize finder has not converged")
-            else:
-                min_res = root_scalar(derivative_of_objective, 1 / self.iter, xtol=x_tol)
-                if not min_res.success:
-                    self.logger.warning("Descent direction stepsize finder has not converged")
-                self.stepsize = min_res.x[0]
-                if self.stepsize <= 0.0 or self.stepsize >= 1.0:
-                    raise ValueError("wrong root")
+            min_res = root_scalar(derivative_of_objective, bracket=[0, 1], xtol=x_tol)
+            self.stepsize = min_res.root
+            if not min_res.converged:
+                self.logger.warning("Descent direction stepsize finder has not converged")
 
             self.conjugate_failed = False
 
@@ -732,5 +717,4 @@ class LinearApproximation(WorkerThread):
         return False
 
     def signal_handler(self, val):
-        if pyqt:
-            self.assignment.emit(val)
+        self.assignment.emit(val)
