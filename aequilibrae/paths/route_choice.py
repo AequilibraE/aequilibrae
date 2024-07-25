@@ -32,7 +32,6 @@ class RouteChoice:
             "cutoff_prob": 0.0,
             "beta": 1.0,
             "store_results": True,
-            "eager_link_loading": False,
         },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
@@ -72,7 +71,10 @@ class RouteChoice:
         return RouteChoiceSet(self.graph)
 
     def __init_demand(self):
-        return GeneralisedCOODemand(*self.demand_index_names)
+        d = GeneralisedCOODemand(
+            *self.demand_index_names, self.graph.nodes_to_indices, shape=(self.graph.num_zones, self.graph.num_zones)
+        )
+        return d
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
@@ -246,6 +248,7 @@ class RouteChoice:
         return self.__rc.run(
             origin,
             destination,
+            self.demand.shape,
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
@@ -557,7 +560,7 @@ class RouteChoice:
         if not project:
             project = self.project or get_active_project()
 
-        u, c = self.get_select_link_results()
+        u = self.get_select_link_loading_results()
         info = self.info()
         self.__save_dataframe(
             u,
@@ -568,14 +571,9 @@ class RouteChoice:
             project=project,
         )
 
-        self.__save_dataframe(
-            c,
-            "Select link analysis",
-            "Compressed select link analysis results",
-            table_name + "_compressed",
-            info,
-            project=project,
-        )
-
-        for k, v in self.sl_od_matrix.items():
-            v.to_disk((pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"), k)
+        for sl_name, v in self.get_select_link_od_matrix_results().items():
+            for demand_name, mat in v.items():
+                mat.to_disk(
+                    (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"),
+                    sl_name + "_" + demand_name,
+                )

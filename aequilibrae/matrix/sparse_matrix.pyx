@@ -72,6 +72,9 @@ cdef class COO(Sparse):
         else:
             self.f32_data = make_unique[vector[float]]()
 
+    def __init__(self, *args, **kwargs):
+        pass
+
     def to_scipy(self, shape=None):
         """
         Create scipy.sparse.coo_matrix from this COO matrix.
@@ -98,11 +101,11 @@ cdef class COO(Sparse):
         if self.f64:
             length = d(self.f64_data).size()
             f64_data = <double[:length]>d(self.f64_data).data()
-            return scipy.sparse.coo_matrix((f64_data, (row, col)), dtype=np.float64, shape=shape)
+            return scipy.sparse.coo_matrix((f64_data, (row, col)), dtype=np.float64, shape=shape, copy=True)
         else:
             length = d(self.f32_data).size()
             f32_data = <float[:length]>d(self.f32_data).data()
-            return scipy.sparse.coo_matrix((f32_data, (row, col)), dtype=np.float32, shape=shape)
+            return scipy.sparse.coo_matrix((f32_data, (row, col)), dtype=np.float32, shape=shape, copy=True)
 
     @classmethod
     def from_matrix(cls, m):

@@ -22,7 +22,7 @@ cdef class COO(Sparse):
         bool f64
         unique_ptr[vector[double]] f64_data
         unique_ptr[vector[float]] f32_data
-        readonly object shape
+        public object shape
 
     cdef void f64_append(COO self, size_t i, size_t j, double v) noexcept nogil
     cdef void f32_append(COO self, size_t i, size_t j, float v) noexcept nogil

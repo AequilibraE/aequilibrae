@@ -159,7 +159,7 @@ cdef class RouteChoiceSet:
         self.ll_results = None
 
     @cython.embedsignature(True)
-    def run(self, origin: int, destination: int, demand: float = 0.0, *args, **kwargs):
+    def run(self, origin: int, destination: int, shape: Tuple[int, int], demand: float = 0.0, *args, **kwargs):
         """Compute the a route set for a single OD pair.
 
         Often the returned list's length is ``max_routes``, however, it may be limited by ``max_depth`` or if all
@@ -182,7 +182,7 @@ cdef class RouteChoiceSet:
             "destination id": [destination],
             "demand": [demand]
         }).set_index(["origin id", "destination id"])
-        demand_coo = GeneralisedCOODemand("origin id", "destination id")
+        demand_coo = GeneralisedCOODemand("origin id", "destination id", np.asarray(self.nodes_to_indices_view), shape)
         demand_coo.add_df(df)
 
         self.batched(demand_coo, {}, *args, **kwargs)
@@ -216,7 +216,6 @@ cdef class RouteChoiceSet:
             where: Optional[str] = None,
             store_results: bool = True,
             path_size_logit: bool = False,
-            eager_link_loading: bool = False,
             beta: float = 1.0,
             cutoff_prob: float = 0.0,
     ):
@@ -385,11 +384,10 @@ cdef class RouteChoiceSet:
                 # We now drop all references to those raw pointers. The unique pointers now own those vectors.
                 route_set.clear()
 
-                prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
-
-                if eager_link_loading:
+                if path_size_logit:
+                    prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
                     self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
-                    self.ll_results.sl_link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
+                    self.ll_results.sl_link_load_single_route_set(i, d(route_vec), d(prob_vec), origin_index, dest_index, thread_id)
 
                 if self.block_flows_through_centroids:
                     blocking_centroid_flows(
@@ -403,9 +401,8 @@ cdef class RouteChoiceSet:
 
             del route_set
 
-        # Eagerly compute the results, they return objects but are cached
         self.get_results()
-        if eager_link_loading:
+        if path_size_logit:
             self.ll_results.reduce_link_loading()
             self.ll_results.reduce_sl_link_loading()
             self.ll_results.reduce_sl_od_matrix()
@@ -919,7 +916,7 @@ cdef class RouteChoiceSetResults:
         if not self.perform_assignment:
             # If we're not performing an assignment then we must be storing the routes and the routes most already be
             # stored when they were acquired, thus we don't need to do anything here.
-            return shared_ptr[vector[double]]()
+            return make_shared[vector[double]]()
 
         cost_vec = self.__get_cost_set(i)
         route_mask = self.__get_mask_set(i)
@@ -1273,13 +1270,15 @@ cdef class RouteChoiceSetResults:
 
 
 cdef class GeneralisedCOODemand:
-    def __init__(self, origin_col: str, destination_col: str):
+    def __init__(self, origin_col: str, destination_col: str, nodes_to_indices, shape=None):
         """
         A container for access to the float64 and float32 fields of a data frame.
         """
         self.df = pd.DataFrame(columns=[origin_col, destination_col]).set_index([origin_col, destination_col])
+        self.shape = shape
+        self.nodes_to_indices = nodes_to_indices
 
-    def add_df(self, dfs: Union[pd.DataFrame, List[pd.DataFrame]], demand_cols=None, fill: float = 0.0):
+    def add_df(self, dfs: Union[pd.DataFrame, List[pd.DataFrame]], shape=None, demand_cols=None, fill: float = 0.0):
         """
         Add a DataFrame to the existing ones.
 
@@ -1290,12 +1289,23 @@ cdef class GeneralisedCOODemand:
         if isinstance(dfs, pd.DataFrame):
             dfs = (dfs,)
 
+        if shape is None and self.shape is None:
+            raise ValueError("a shape must be provided initially to prevent oddly sized sparse matrices")
+        if shape is not None and self.shape is None:
+            self.shape = shape
+        if shape is not None and self.shape is not None and shape != self.shape:
+            raise ValueError(f"provided shape ({shape}) differs from previous shape ({self.shape})")
+
         new_dfs = [self.df]
         for df in dfs:
             if df.index.nlevels != 2:
                 raise ValueError("provided pd.DataFrame doesn't have a 2-level multi-index")
             elif df.index.names != self.df.index.names:
                 raise ValueError(f"mismatched index names. Expect {self.df.index.names}, provided {df.index.names}")
+
+            shape = self.nodes_to_indices[df.index.to_frame(index=False)].max(axis=0)
+            if shape[0] >= self.shape[0] or shape[1] >= self.shape[1]:
+                raise ValueError(f"inferred max index ({(shape[0], shape[1])}) exceeds provided shape ({self.shape})")
 
             if demand_cols is None:
                 new_dfs.append(df.select_dtypes(["float64", "float32"]))
@@ -1305,9 +1315,9 @@ cdef class GeneralisedCOODemand:
                         raise TypeError(f"demand column ({col}) is not a float64 or float32")
                 new_dfs.append(df[demand_cols])
 
-        self.df = pd.concat(new_dfs, axis=1).fillna(fill)
+        self.df = pd.concat(new_dfs, axis=1).fillna(fill).sort_index()
 
-    def add_matrix(self, matrix: AequilibraeMatrix, fill: float = 0.0):
+    def add_matrix(self, matrix: AequilibraeMatrix, shape=None, fill: float = 0.0):
         """
         Add an AequilibraE matrix to the existing demand in a sparse manner.
         """
@@ -1328,7 +1338,7 @@ cdef class GeneralisedCOODemand:
             ).set_index([self.df.index.names[0], self.df.index.names[1]])
             dfs.append(df.dropna())
 
-        self.add_df(dfs, fill=fill)
+        self.add_df(dfs, shape=shape, fill=fill)
         logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
 
     def _initalise_c_data(self):
@@ -1371,21 +1381,6 @@ cdef class GeneralisedCOODemand:
 
     def is_empty(self) -> bool:
         return self.df.index.empty
-
-    cpdef _hello(GeneralisedCOODemand self):
-        cdef size_t i
-
-        print(self.df)
-
-        print("ods:", self.ods.size(), self.ods)
-
-        for i in range(self.f64.size()):
-            array = np.asarray(d(self.f64[i]))
-            print("f64:", d(self.f64[i]).size(), array.dtype, array)
-
-        for i in range(self.f32.size()):
-            array = np.asarray(d(self.f32[i]), dtype=np.float32)
-            print("f32:", d(self.f32[i]).size(), array.dtype, array)
 
 
 # See note in route_choice_set.pxd
@@ -1732,9 +1727,9 @@ cdef class LinkLoadingResults:
     @cython.initializedcheck(False)
     @staticmethod
     cdef bool is_in_select_link_set(
-        vector[long long] &route,
-        vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        vector[size_t] &select_link_set_lengths
+        vector[long long] &route,  # const but cython doesn't allow iteration over const vectors unless an index is used
+        const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
+        const vector[size_t] &select_link_set_lengths
     ) noexcept nogil:
         """
         Confirms if a given route satisfies the requirements of the select link set.
@@ -1749,10 +1744,10 @@ cdef class LinkLoadingResults:
             long long link
             unordered_set[long long] *and_set
 
-        # We count the number of appearances of links within the AND set. Assuming we only see unique links, then if
-        # that count goes to 0 we have seen all links present within the AND set. A shortest-path will contain only
-        # unique links in paths. This may not be not be true for heuristics, but if the heuristic is that bad that it's
-        # traversing a link twice I don't think we should be using it.
+        # We count the number of links within the AND set. Assuming we only see unique links, then if that count goes to
+        # 0 we have seen all links present within the AND set. A shortest-path will contain only unique links in
+        # paths. This may not be not be true for heuristics, but if the heuristic is that bad that it's traversing a
+        # link twice I don't think we should be using it.
         link_counts.insert(link_counts.begin(), select_link_set_lengths.cbegin(), select_link_set_lengths.cend())
 
         # We iterate over an AND set first in hopes that a whole set is satisfied before checking another. This let's
@@ -1776,6 +1771,8 @@ cdef class LinkLoadingResults:
         const size_t od_idx,
         const RouteVec_t &route_set,
         const vector[double] &prob_vec,
+        const long long origin_idx,
+        const long long dest_idx,
         const size_t thread_id
     ) noexcept nogil:
         cdef:
@@ -1803,13 +1800,13 @@ cdef class LinkLoadingResults:
                 # For each demand column
                 for k in range(self.demand.f64.size()):
                     # we grab a pointer to the relevant link loading vector and compute our load from our demand,
-                    f64_load = prob_vec[i] * d(self.demand.f64[k])[od_idx]
+                    f64_load = prob_vec[j] * d(self.demand.f64[k])[od_idx]
 
                     if f64_load == 0.0:
                         continue
 
                     f64_ll = d(d(f64_ll_sets_cols)[i])[k].get()
-                    COO.f64_struct_append(d(d(f64_od_sets_cols)[i])[k], self.demand.ods[od_idx].first, self.demand.ods[od_idx].second, f64_load)
+                    COO.f64_struct_append(d(d(f64_od_sets_cols)[i])[k], origin_idx, dest_idx, f64_load)
 
                     # then apply that to every link in the route
                     for link in d(route_set[j]):
@@ -1817,13 +1814,13 @@ cdef class LinkLoadingResults:
 
                 # then we do it again for f32
                 for k in range(self.demand.f32.size()):
-                    f32_load = prob_vec[i] * d(self.demand.f32[k])[od_idx]
+                    f32_load = prob_vec[j] * d(self.demand.f32[k])[od_idx]
 
                     if f32_load == 0.0:
                         continue
 
                     f32_ll = d(d(f32_ll_sets_cols)[i])[k].get()
-                    COO.f32_struct_append(d(d(f32_od_sets_cols)[i])[k], self.demand.ods[od_idx].first, self.demand.ods[od_idx].second, f32_load)
+                    COO.f32_struct_append(d(d(f32_od_sets_cols)[i])[k], origin_idx, dest_idx, f32_load)
 
                     for link in d(route_set[j]):
                         d(f32_ll)[link] = d(f32_ll)[link] + f32_load
@@ -2006,21 +2003,22 @@ cdef class LinkLoadingResults:
 
         cdef size_t i, j
 
-        m = max(self.demand.df.index.max())
-        shape = (m, m)
-
         od_matrix_objects = []
         for i in range(self.select_link_sets.size()):
             res = []
             for j in range(self.demand.f64.size()):
-                res.append(COO.from_f64_struct(d(self.f64_sl_od_matrix[i])[j]).to_scipy(shape=shape))
+                coo = COO.from_f64_struct(d(self.f64_sl_od_matrix[i])[j])
+                coo.shape = self.demand.shape
+                res.append(coo)
 
             od_matrix_objects.append(dict(zip(self.demand.f64_names, res)))
 
         for i in range(self.select_link_sets.size()):
             res = []
             for j in range(self.demand.f32.size()):
-                res.append(COO.from_f32_struct(d(self.f32_sl_od_matrix[i])[j]).to_scipy(shape=shape))
+                coo = COO.from_f32_struct(d(self.f32_sl_od_matrix[i])[j])
+                coo.shape = self.demand.shape
+                res.append(coo)
 
             od_matrix_objects.append(dict(zip(self.demand.f32_names, res)))
 

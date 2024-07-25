@@ -31,14 +31,16 @@ class TestRouteChoiceSet(TestCase):
         self.project = Project()
         self.project.open(proj_path)
         self.project.network.build_graphs(fields=["distance", "free_flow_time"], modes=["c"])
-        self.graph = self.project.network.graphs["c"]  # type: Graph
+        self.graph = self.project.network.graphs["c"]
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
 
         self.mat = self.project.matrices.get_matrix("demand_omx")
         self.mat.computational_view()
 
-        self.demand = GeneralisedCOODemand("origin id", "destination id")
+        self.shape = (self.graph.num_zones, self.graph.num_zones)
+
+        self.demand = GeneralisedCOODemand("origin id", "destination id", self.graph.nodes_to_indices, self.shape)
         self.demand.add_matrix(self.mat)
 
     def tearDown(self) -> None:
@@ -51,12 +53,12 @@ class TestRouteChoiceSet(TestCase):
 
         for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}, {"bfsle": True, "penalty": 1.1}]:
             with self.subTest(**kwargs):
-                results = rc.run(a, b, max_routes=10, **kwargs)
+                results = rc.run(a, b, self.shape, max_routes=10, **kwargs)
                 self.assertEqual(len(results), 10, "Returned incorrect number of routes")
                 self.assertEqual(len(results), len(set(results)), "Returned duplicate routes")
 
                 # With a depth 1 only one path will be found
-                results = rc.run(a, b, max_routes=0, max_depth=1)
+                results = rc.run(a, b, self.shape, max_routes=0, max_depth=1)
                 self.assertEqual(len(results), 1, "Depth of 1 didn't yield a lone route")
                 self.assertListEqual(
                     results, [(2, 6, 9, 13, 25, 30, 53, 59)], "Initial route isn't the shortest A* route"
@@ -64,23 +66,23 @@ class TestRouteChoiceSet(TestCase):
 
                 # A depth of 2 should yield the same initial route plus the length of that route more routes minus
                 # duplicates and unreachable paths
-                results2 = rc.run(a, b, max_routes=0, max_depth=2, **kwargs)
+                results2 = rc.run(a, b, self.shape, max_routes=0, max_depth=2, **kwargs)
                 self.assertTrue(results[0] in results2, "Initial route isn't present in a lower depth")
 
         self.assertListEqual(
-            rc.run(a, b, max_routes=0, seed=0, max_depth=2),
-            rc.run(a, b, max_routes=0, seed=10, max_depth=2),
+            rc.run(a, b, self.shape, max_routes=0, seed=0, max_depth=2),
+            rc.run(a, b, self.shape, max_routes=0, seed=10, max_depth=2),
             "Seeded and unseeded results differ with unlimited `max_routes` (queue is incorrectly being shuffled)",
         )
 
         self.assertNotEqual(
-            rc.run(a, b, max_routes=3, seed=0, max_depth=2),
-            rc.run(a, b, max_routes=3, seed=10, max_depth=2),
+            rc.run(a, b, self.shape, max_routes=3, seed=0, max_depth=2),
+            rc.run(a, b, self.shape, max_routes=3, seed=10, max_depth=2),
             "Seeded and unseeded results don't differ with limited `max_routes` (queue is not being shuffled)",
         )
 
     def test_route_choice_empty_path(self):
-        demand = demand_from_nodes([(1, 1)])
+        demand = demand_from_nodes([(1, 1)], self.graph)
 
         for kwargs in [{"bfsle": True}, {"bfsle": False, "penalty": 1.1}]:
             with self.subTest(**kwargs):
@@ -100,13 +102,13 @@ class TestRouteChoiceSet(TestCase):
                 self.graph.set_blocked_centroid_flows(False)
                 rc = RouteChoiceSet(self.graph)
 
-                results = rc.run(a, b, max_routes=2, max_depth=2, **kwargs)
+                results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
                 self.assertNotEqual(results, [], "Unblocked centroid flow found no paths")
 
                 self.graph.set_blocked_centroid_flows(True)
                 rc = RouteChoiceSet(self.graph)
 
-                results = rc.run(a, b, max_routes=2, max_depth=2, **kwargs)
+                results = rc.run(a, b, self.shape, max_routes=2, max_depth=2, **kwargs)
                 self.assertListEqual(results, [], "Blocked centroid flow found a path")
 
     def test_route_choice_batched(self):
@@ -115,7 +117,7 @@ class TestRouteChoiceSet(TestCase):
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
 
         max_routes = 20
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=max_routes, max_depth=10, max_misses=200)
         results = rc.get_results()
 
@@ -132,11 +134,10 @@ class TestRouteChoiceSet(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [(1, 20)] * 5
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
 
         max_routes = 20
-        with self.assertWarns(UserWarning):
-            rc.batched(demand, max_routes=max_routes, max_depth=10)
+        rc.batched(demand, max_routes=max_routes, max_depth=10)
         results = rc.get_results()
 
         gb = results.to_pandas().groupby(by="origin id")
@@ -155,13 +156,13 @@ class TestRouteChoiceSet(TestCase):
         for a, b, max_routes, max_depth in args:
             with self.subTest(a=a, b=b, max_routes=max_routes, max_depth=max_depth):
                 with self.assertRaises(ValueError):
-                    rc.run(a, b, max_routes=max_routes, max_depth=max_depth)
+                    rc.run(a, b, self.shape, max_routes=max_routes, max_depth=max_depth)
 
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
 
         max_routes = 20
 
@@ -186,7 +187,7 @@ class TestRouteChoiceSet(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
         table = rc.get_results().to_pandas()
@@ -204,7 +205,7 @@ class TestRouteChoiceSet(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
         rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
         table = rc.get_results().to_pandas()
 
@@ -216,7 +217,7 @@ class TestRouteChoiceSet(TestCase):
         np.random.seed(0)
         rc = RouteChoiceSet(self.graph)
         nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-        demand = demand_from_nodes(nodes)
+        demand = demand_from_nodes(nodes, self.graph)
 
         for kwargs in [{"cutoff_prob": 0.0}, {"cutoff_prob": 0.5}, {"cutoff_prob": 1.0}]:
             with self.subTest(**kwargs):
@@ -231,10 +232,10 @@ class TestRouteChoiceSet(TestCase):
     #     np.random.seed(0)
     #     rc = RouteChoiceSet(self.graph)
     #     nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-    #     demand = demand_from_nodes(nodes)
+    #     demand = demand_from_nodes(nodes, self.graph)
     #     demand.add_matrix(self.mat)
     #     demand.df = demand.df.loc[nodes]
-    #     rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, eager_link_loading=True)
+    #     rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
     #     n = self.mat.names[0]
 
@@ -260,16 +261,21 @@ class TestRouteChoiceSet(TestCase):
                 )
                 mat.index = self.graph.centroids[:]
                 mat.computational_view()
-                mat.matrix_view[:, :, 0] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
+                mat.matrix_view[:, :, 0] = np.full(self.shape, 1.0)
                 mat.matrix_view[:, :, 1] = np.zeros((self.graph.num_zones, self.graph.num_zones))
-                demand = GeneralisedCOODemand("origin id", "destination id")
+                demand = GeneralisedCOODemand(
+                    "origin id",
+                    "destination id",
+                    self.graph.nodes_to_indices,
+                    shape=(self.graph.num_zones, self.graph.num_zones),
+                )
                 demand.add_matrix(mat)
 
                 demand.df.loc[nodes] = 0.0
                 demand.df.loc[nodes[0], "single one"] = 1.0
-                demand.df = demand.df.loc[nodes]
+                demand.df = demand.df.loc[nodes].fillna(0.0)
 
-                rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True, eager_link_loading=True)
+                rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
                 link_loads = rc.get_link_loading()
                 table = rc.get_results().to_pandas()
@@ -299,7 +305,7 @@ class TestRouteChoiceSet(TestCase):
                 np.random.seed(0)
                 rc = RouteChoiceSet(self.graph)
                 nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-                demand = demand_from_nodes(nodes)
+                demand = demand_from_nodes(nodes, self.graph)
 
                 mat = AequilibraeMatrix()
                 mat.create_empty(
@@ -309,8 +315,9 @@ class TestRouteChoiceSet(TestCase):
                 )
                 mat.index = self.graph.centroids[:]
                 mat.computational_view()
-                mat.matrix_view[:, :] = np.full((self.graph.num_zones, self.graph.num_zones), 1.0)
+                mat.matrix_view[:, :] = np.full(self.shape, 1.0)
                 demand.add_matrix(mat)
+                demand.df = demand.df.loc[nodes]
 
                 rc.batched(
                     demand,
@@ -326,25 +333,23 @@ class TestRouteChoiceSet(TestCase):
                     max_routes=20,
                     max_depth=10,
                     path_size_logit=True,
-                    eager_link_loading=True,
                 )
                 table = rc.get_results().to_pandas()
 
                 # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and 17-9
                 # 20-4 also shares 11 with 5-3
-                # ods = [(20, 4), (21, 2), (10, 8), (17, 9)]
+                ods = [(20, 4), (21, 2), (10, 8), (17, 9)]
                 sl_link_loads = rc.get_sl_link_loading()
+                sl_od_matrices = rc.get_sl_od_matrices()
 
                 # TODO: implement od matrix sl
-                # m, (u, c) = sl_link_loads["all ones"]["sl1"]
-                # m2, (u2, c2) = sl_link_loads["all ones"]["sl2"]
-                # m = m.to_scipy()
-                # m2 = m2.to_scipy()
-                # self.assertSetEqual(set(zip(*(m > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})
-                # self.assertSetEqual(set(zip(*(m2 > 0.0001).nonzero())), {(20 - 1, 4 - 1), (5 - 1, 3 - 1)})
+                m = sl_od_matrices["sl1"]["all ones"].to_scipy()
+                m2 = sl_od_matrices["sl2"]["all ones"].to_scipy()
+                self.assertSetEqual(set(zip(*(m.A > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})
+                self.assertSetEqual(set(zip(*(m2.A > 0.0001).nonzero())), {(20 - 1, 4 - 1), (5 - 1, 3 - 1)})
 
-                u = sl_link_loads["all ones"]["sl1"]
-                u2 = sl_link_loads["all ones"]["sl2"]
+                u = sl_link_loads["sl1"]["all ones"]
+                u2 = sl_link_loads["sl2"]["all ones"]
 
                 t1 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: bool(set(x) & {23, 26}))]
                 t2 = table[(table.probability > 0.0) & table["route set"].apply(lambda x: 11 in set(x))]
@@ -369,7 +374,7 @@ class TestRouteChoice(TestCase):
         self.project = Project()
         self.project.open(proj_path)
         self.project.network.build_graphs(fields=["distance"], modes=["c"])
-        self.graph = self.project.network.graphs["c"]  # type: Graph
+        self.graph = self.project.network.graphs["c"]
         self.graph.set_graph("distance")
         self.graph.set_blocked_centroid_flows(False)
 
@@ -415,7 +420,6 @@ class TestRouteChoice(TestCase):
                 "cutoff_prob": 0.0,
                 "beta": 1.0,
                 "store_results": True,
-                "eager_link_loading": False,
             },
         )
 
@@ -431,7 +435,6 @@ class TestRouteChoice(TestCase):
                 "cutoff_prob": 0.0,
                 "beta": 1.0,
                 "store_results": True,
-                "eager_link_loading": False,
             },
         )
 
@@ -439,9 +442,9 @@ class TestRouteChoice(TestCase):
             self.rc.set_choice_set_generation("not an algorithm", max_routes=20, penalty=1.1)
 
     def test_link_results(self):
-        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1, eager_link_loading=True)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
 
-        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
+        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 1)]})
 
         self.rc.add_demand(self.mat)
         self.rc.prepare()
@@ -449,10 +452,7 @@ class TestRouteChoice(TestCase):
         self.rc.execute(perform_assignment=True)
 
         df = self.rc.get_load_results()
-
-        u_sl, c_sl = self.rc.get_select_link_results()
-
-        pd.testing.assert_frame_equal(u_sl, c_sl)
+        u_sl = self.rc.get_select_link_loading_results()
 
         self.assertListEqual(
             list(df.columns),
@@ -463,22 +463,21 @@ class TestRouteChoice(TestCase):
             list(u_sl.columns),
             ["link_id"]
             + [
-                mat_name + "_" + sl_name + "_" + dir
+                sl_name + "_" + mat_name + "_" + dir
                 for sl_name in ["sl1", "sl2"]
-                for dir in ["ab", "ba"]
                 for mat_name in self.mat.names
-            ]
-            + [mat_name + "_" + sl_name + "_tot" for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names],
+                for dir in ["ab", "ba", "tot"]
+            ],
         )
 
     def test_saving(self):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 0)]})
+        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 1)]})
         self.rc.add_demand(self.mat)
         self.rc.prepare()
         self.rc.execute(perform_assignment=True)
         lloads = self.rc.get_load_results()
-        u_sl, c_sl = self.rc.get_select_link_results()
+        u_sl = self.rc.get_select_link_loading_results()
 
         self.rc.save_link_flows("ll")
         self.rc.save_select_link_flows("sl")
@@ -488,7 +487,6 @@ class TestRouteChoice(TestCase):
             for table, df in [
                 ("ll_uncompressed", lloads),
                 ("sl_uncompressed", u_sl),
-                ("sl_compressed", c_sl),
             ]:
                 with self.subTest(table=table):
                     pd.testing.assert_frame_equal(pd.read_sql(f"select * from {table}", conn), df)
@@ -498,8 +496,12 @@ class TestRouteChoice(TestCase):
             (pathlib.Path(self.project.project_base_path) / "matrices" / "sl").with_suffix(".omx")
         )
 
-        for name, matrix in self.rc.sl_od_matrix.items():
-            np.testing.assert_allclose(matrix.to_scipy().A, matrices[name].A)
+        for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
+            for (
+                demand_name,
+                matrix,
+            ) in v.items():
+                np.testing.assert_allclose(matrix.to_scipy().A, matrices[sl_name + "_" + demand_name].A)
 
 
 def generate_line_strings(project, graph, results):
@@ -525,8 +527,10 @@ def generate_line_strings(project, graph, results):
     return df
 
 
-def demand_from_nodes(nodes: List[Tuple[int, int]]):
-    demand = GeneralisedCOODemand("origin id", "destination id")
+def demand_from_nodes(nodes: List[Tuple[int, int]], graph):
+    demand = GeneralisedCOODemand(
+        "origin id", "destination id", graph.nodes_to_indices, shape=(graph.num_zones, graph.num_zones)
+    )
     df = pd.DataFrame()
     df.index = pd.MultiIndex.from_tuples(nodes, names=["origin id", "destination id"])
     demand.add_df(df)

@@ -321,11 +321,12 @@ cdef class GeneralisedCOODemand:
         public object df
         readonly object f64_names
         readonly object f32_names
+        readonly object shape
+        readonly object nodes_to_indices
         vector[pair[long long, long long]] ods
         vector[unique_ptr[vector[double]]] f64
         vector[unique_ptr[vector[float]]] f32
 
-    cpdef _hello(GeneralisedCOODemand self)
 
 # I understand this isn't a great way to handle this but I'm rather unsure of a better method.  We need a method to
 # store both float and double loads. Cython doesn't allow us to use fused types (Cython diet templates) in any manner
@@ -413,14 +414,16 @@ cdef class LinkLoadingResults:
     @staticmethod
     cdef bool is_in_select_link_set(
         vector[long long] &route,
-        vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        vector[size_t] &select_link_set_lengths
+        const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
+        const vector[size_t] &select_link_set_lengths
     ) noexcept nogil
     cdef void sl_link_load_single_route_set(
         LinkLoadingResults self,
         const size_t od_idx,
         const RouteVec_t &route_set,
         const vector[double] &prob_vec,
+        const long long origin_idx,
+        const long long dest_idx,
         const size_t thread_id
     ) noexcept nogil
     cdef void reduce_sl_link_loading(LinkLoadingResults self)
