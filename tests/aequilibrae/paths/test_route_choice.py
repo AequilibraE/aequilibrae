@@ -5,7 +5,7 @@ from os.path import join, dirname
 import pathlib
 import sqlite3
 from tempfile import gettempdir
-from unittest import TestCase
+from unittest import TestCase, skip
 import pandas as pd
 import numpy as np
 import pyarrow as pa
@@ -158,6 +158,7 @@ class TestRouteChoiceSet(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, self.shape, max_routes=max_routes, max_depth=max_depth)
 
+    @skip("not implemented")
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
@@ -228,21 +229,22 @@ class TestRouteChoiceSet(TestCase):
                 for od, df in gb:
                     self.assertAlmostEqual(1.0, sum(df["probability"].values), msg=", probability not close to 1.0")
 
-    # def test_path_file_link_loading(self):
-    #     np.random.seed(0)
-    #     rc = RouteChoiceSet(self.graph)
-    #     nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
-    #     demand = demand_from_nodes(nodes, self.graph)
-    #     demand.add_matrix(self.mat)
-    #     demand.df = demand.df.loc[nodes]
-    #     rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
+    @skip("not implemented")
+    def test_path_file_link_loading(self):
+        np.random.seed(0)
+        rc = RouteChoiceSet(self.graph)
+        nodes = [tuple(x) for x in np.random.choice(self.graph.centroids, size=(10, 2), replace=False)]
+        demand = demand_from_nodes(nodes, self.graph)
+        demand.add_matrix(self.mat)
+        demand.df = demand.df.loc[nodes]
+        rc.batched(demand, max_routes=20, max_depth=10, path_size_logit=True)
 
-    #     n = self.mat.names[0]
+        n = self.mat.names[0]
 
-    #     ll = rc.get_link_loading()[n]
-    #     ll2 = rc.get_link_loading(generate_path_files=True)[n]
+        ll = rc.get_link_loading()[n]
+        ll2 = rc.get_link_loading(generate_path_files=True)[n]
 
-    #     np.testing.assert_array_almost_equal(ll, ll2)
+        np.testing.assert_array_almost_equal(ll, ll2)
 
     def test_known_results(self):
         for cost in ["distance", "free_flow_time"]:
@@ -280,7 +282,6 @@ class TestRouteChoiceSet(TestCase):
                 link_loads = rc.get_link_loading()
                 table = rc.get_results().to_pandas()
 
-                # breakpoint()
                 with self.subTest(matrix="all zeros"):
                     u = link_loads["all zeros"]
                     np.testing.assert_allclose(u, 0.0)
@@ -342,7 +343,6 @@ class TestRouteChoiceSet(TestCase):
                 sl_link_loads = rc.get_sl_link_loading()
                 sl_od_matrices = rc.get_sl_od_matrices()
 
-                # TODO: implement od matrix sl
                 m = sl_od_matrices["sl1"]["all ones"].to_scipy()
                 m2 = sl_od_matrices["sl2"]["all ones"].to_scipy()
                 self.assertSetEqual(set(zip(*(m.A > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})

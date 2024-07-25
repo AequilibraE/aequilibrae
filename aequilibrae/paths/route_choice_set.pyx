@@ -1278,13 +1278,11 @@ cdef class GeneralisedCOODemand:
         self.shape = shape
         self.nodes_to_indices = nodes_to_indices
 
-    def add_df(self, dfs: Union[pd.DataFrame, List[pd.DataFrame]], shape=None, demand_cols=None, fill: float = 0.0):
+    def add_df(self, dfs: Union[pd.DataFrame, List[pd.DataFrame]], shape=None, fill: float = 0.0):
         """
         Add a DataFrame to the existing ones.
 
         Expects a DataFrame with a multi-index of (o, d).
-
-        If no demand cols are provided, all floating point columns are used.
         """
         if isinstance(dfs, pd.DataFrame):
             dfs = (dfs,)
@@ -1307,13 +1305,7 @@ cdef class GeneralisedCOODemand:
             if shape[0] >= self.shape[0] or shape[1] >= self.shape[1]:
                 raise ValueError(f"inferred max index ({(shape[0], shape[1])}) exceeds provided shape ({self.shape})")
 
-            if demand_cols is None:
-                new_dfs.append(df.select_dtypes(["float64", "float32"]))
-            else:
-                for col in demand_cols:
-                    if not (df.dtypes[col] == "float64" or df.dtypes[col] == "float32"):
-                        raise TypeError(f"demand column ({col}) is not a float64 or float32")
-                new_dfs.append(df[demand_cols])
+            new_dfs.append(df.select_dtypes(["float64", "float32"]))
 
         self.df = pd.concat(new_dfs, axis=1).fillna(fill).sort_index()
 

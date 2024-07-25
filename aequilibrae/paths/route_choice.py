@@ -172,20 +172,29 @@ class RouteChoice:
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
         """
+
         if where is not None:
             where = pathlib.Path(where)
             if not where.exists():
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
 
-    def add_demand(self, demand, origin_col: str = "origin id", destination_col: str = "destination id", **kwargs):
+    def add_demand(self, demand, fill: float = 0.0):
         """
-        TODO
+        Add demand DataFrame or matrix for the assignment.
+
+        :Arguments:
+            **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to assignment. If the supplied
+              demand is a DataFrame, it should have a 2-level MultiIndex of Origin and Destination node IDs. If an
+              AequilibraE matrix is supplied node IDs will be inferred from the index. Demand values should be either
+              float32s or float64s.
+
+            **fill** (:obj:`float`): Value to fill any NaNs with.
         """
         if isinstance(demand, pd.DataFrame):
-            self.demand.add_df(demand, **kwargs)
+            self.demand.add_df(demand, fill=fill)
         elif isinstance(demand, AequilibraeMatrix):
-            self.demand.add_matrix(demand, **kwargs)
+            self.demand.add_matrix(demand, fill=fill)
         else:
             raise TypeError(f"unknown argument type '{(type(demand).__name__)}'")
 
@@ -224,7 +233,7 @@ class RouteChoice:
 
         self.demand.add_df(df)
 
-    def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
+    def execute_single(self, origin: int, destination: int, demand: float = 0.0) -> List[Tuple[int]]:
         """
         Generate route choice sets between `origin` and `destination`, potentially performing an assignment.
 
@@ -236,7 +245,7 @@ class RouteChoice:
         :Arguments:
             **origin** (:obj:`int`): Origin node ID.
             **destination** (:obj:`int`): Destination node ID.
-            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
+            **demand** (:obj:`float`): If provided an assignment will be performed with this demand.
 
         :Returns:
             ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
@@ -249,8 +258,9 @@ class RouteChoice:
             origin,
             destination,
             self.demand.shape,
+            demand=demand,
             bfsle=self.algorithm == "bfsle",
-            path_size_logit=perform_assignment,
+            path_size_logit=bool(demand),
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
             **self.parameters,
@@ -259,9 +269,6 @@ class RouteChoice:
     def execute(self, perform_assignment: bool = True) -> None:
         """
         Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
-
-        Node IDs must be present in the compressed graph. To make a node ID always appear in the compressed
-        graph add it as a centroid.
 
         To access results see `RouteChoice.get_results()`.
 
