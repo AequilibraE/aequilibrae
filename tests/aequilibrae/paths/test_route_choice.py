@@ -345,8 +345,8 @@ class TestRouteChoiceSet(TestCase):
 
                 m = sl_od_matrices["sl1"]["all ones"].to_scipy()
                 m2 = sl_od_matrices["sl2"]["all ones"].to_scipy()
-                self.assertSetEqual(set(zip(*(m.A > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})
-                self.assertSetEqual(set(zip(*(m2.A > 0.0001).nonzero())), {(20 - 1, 4 - 1), (5 - 1, 3 - 1)})
+                self.assertSetEqual(set(zip(*(m.toarray() > 0.0001).nonzero())), {(o - 1, d - 1) for o, d in ods})
+                self.assertSetEqual(set(zip(*(m2.toarray() > 0.0001).nonzero())), {(20 - 1, 4 - 1), (5 - 1, 3 - 1)})
 
                 u = sl_link_loads["sl1"]["all ones"]
                 u2 = sl_link_loads["sl2"]["all ones"]
@@ -497,11 +497,8 @@ class TestRouteChoice(TestCase):
         )
 
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
-            for (
-                demand_name,
-                matrix,
-            ) in v.items():
-                np.testing.assert_allclose(matrix.to_scipy().A, matrices[sl_name + "_" + demand_name].A)
+            for demand_name, matrix in v.items():
+                np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name].toarray())
 
 
 def generate_line_strings(project, graph, results):
