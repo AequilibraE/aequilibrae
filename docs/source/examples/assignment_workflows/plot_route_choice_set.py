@@ -62,14 +62,14 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # Route Choice class
 # ~~~~~~~~~~~~~~~~~~
-# Here we'll construct and use the Route Choice Set class to generate our route sets
-from aequilibrae.paths.route_choice_set import RouteChoiceSet
+# Here we'll construct and use the Route Choice class to generate our route sets
+from aequilibrae.paths import RouteChoice
 
 # %%
 # This object construct might take a minute depending on the size of the graph due to the construction of the compressed
 # link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to
 # supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
-rc = RouteChoiceSet(graph)
+rc = RouteChoice(graph)
 
 #%%
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, and BFSLE
@@ -90,7 +90,9 @@ rc = RouteChoiceSet(graph)
 # %%
 # The 5% penalty (1.05) is likely a little too large, but it create routes that are distinct enough to make this simple
 # example more interesting
-rc.batched(od_pairs_of_interest, max_routes=5, cores=10, bfsle=False, penalty=1.05, path_size_logit=True)
+rc.set_choice_set_generation("bfsle", max_routes=5, penalty=1.05)
+rc.prepare(od_pairs_of_interest)
+rc.execute(perform_assignment=True)
 choice_set = rc.get_results().to_pandas()
 
 # %%

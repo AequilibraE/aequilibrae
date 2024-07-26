@@ -12,23 +12,37 @@ from functools import cached_property
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.dataset
+import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.paths.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
 
 
 class RouteChoice:
     all_algorithms = ["bfsle", "lp", "link-penalisation", "link-penalization"]
 
-    default_paramaters = {
-        "generic": {"seed": 0, "max_routes": 0, "max_depth": 0, "max_misses": 100, "penalty": 1.01, "cutoff_prob": 0.0},
+    default_parameters = {
+        "generic": {
+            "seed": 0,
+            "max_routes": 0,
+            "max_depth": 0,
+            "max_misses": 100,
+            "penalty": 1.01,
+            "cutoff_prob": 0.0,
+            "beta": 1.0,
+            "store_results": True,
+        },
         "link-penalisation": {},
         "bfsle": {"penalty": 1.0},
     }
 
-    def __init__(self, graph: Graph, matrix: Optional[AequilibraeMatrix] = None, project=None):
-        self.parameters = self.default_paramaters.copy()
+    demand_index_names = ["origin id", "destination id"]
+
+    def __init__(self, graph: Graph, project=None):
+        self.parameters = self.default_parameters.copy()
         self.procedure_id = None
         self.procedure_date = None
 
@@ -39,13 +53,10 @@ class RouteChoice:
 
         self.cores: int = 0
         self.graph = graph
-        self.matrix = matrix
+        self.demand = self.__init_demand()
 
         self.schema = RouteChoiceSet.schema
         self.psl_schema = RouteChoiceSet.psl_schema
-
-        self.compact_link_loads: Optional[Dict[str, np.array]] = None
-        self.link_loads: Optional[Dict[str, np.array]] = None
 
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
@@ -54,14 +65,18 @@ class RouteChoice:
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
 
-        self.nodes: Optional[Union[List[int], List[Tuple[int, int]]]] = None
-
         self._config = {}
         self._selected_links = {}
 
     @cached_property
     def __rc(self) -> RouteChoiceSet:
         return RouteChoiceSet(self.graph)
+
+    def __init_demand(self):
+        d = GeneralisedCOODemand(
+            *self.demand_index_names, self.graph.nodes_to_indices, shape=(self.graph.num_zones, self.graph.num_zones)
+        )
+        return d
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
@@ -120,7 +135,7 @@ class RouteChoice:
         if algo is None:
             raise AttributeError(f"Assignment algorithm not available. Choose from: {','.join(self.all_algorithms)}")
 
-        defaults = self.default_paramaters["generic"] | self.default_paramaters[algo]
+        defaults = self.default_parameters["generic"] | self.default_parameters[algo]
         for key in kwargs.keys():
             if key not in defaults:
                 raise ValueError(f"Invalid parameter `{key}` provided for algorithm `{algo}`")
@@ -159,13 +174,33 @@ class RouteChoice:
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
         """
+
         if where is not None:
             where = pathlib.Path(where)
             if not where.exists():
                 raise ValueError(f"Path does not exist `{where}`")
         self.where = where
 
-    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]]]) -> None:
+    def add_demand(self, demand, fill: float = 0.0):
+        """
+        Add demand DataFrame or matrix for the assignment.
+
+        :Arguments:
+            **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to assignment. If the supplied
+              demand is a DataFrame, it should have a 2-level MultiIndex of Origin and Destination node IDs. If an
+              AequilibraE matrix is supplied node IDs will be inferred from the index. Demand values should be either
+              float32s or float64s.
+
+            **fill** (:obj:`float`): Value to fill any NaNs with.
+        """
+        if isinstance(demand, pd.DataFrame):
+            self.demand.add_df(demand, fill=fill)
+        elif isinstance(demand, AequilibraeMatrix):
+            self.demand.add_matrix(demand, fill=fill)
+        else:
+            raise TypeError(f"unknown argument type '{(type(demand).__name__)}'")
+
+    def prepare(self, nodes: Union[List[int], List[Tuple[int, int]], None] = None) -> None:
         """
         Prepare OD pairs for batch computation.
 
@@ -174,10 +209,17 @@ class RouteChoice:
                 provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
                 OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
                 always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+                If *None* is provided, all OD pairs with non-zero flows will be used.
         """
-        if len(nodes) == 0:
+        if nodes is not None and not self.demand.no_demand():
+            raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
+        elif nodes is None:
+            return
+        elif len(nodes) == 0:
             raise ValueError("`nodes` list-like empty.")
 
+        self.demand = self.__init_demand()
+        df = pd.DataFrame()
         if all(
             isinstance(pair, tuple)
             and len(pair) == 2
@@ -185,14 +227,15 @@ class RouteChoice:
             and isinstance(pair[1], (int, np.integer))
             for pair in nodes
         ):
-            self.nodes = nodes
-
+            df.index = pd.MultiIndex.from_tuples(nodes, name=self.demand_index_names)
         elif len(nodes) > 1 and all(isinstance(x, (int, np.unsignedinteger)) for x in nodes):
-            self.nodes = list(itertools.permutations(nodes, r=2))
+            df.index = pd.MultiIndex.from_tuples(itertools.permutations(nodes, r=2), names=self.demand_index_names)
         else:
             raise ValueError(f"{type(nodes)} or {type(nodes[0])} for not valid types for the `prepare` method")
 
-    def execute_single(self, origin: int, destination: int, perform_assignment: bool = False) -> List[Tuple[int]]:
+        self.demand.add_df(df)
+
+    def execute_single(self, origin: int, destination: int, demand: float = 0.0) -> List[Tuple[int]]:
         """
         Generate route choice sets between `origin` and `destination`, potentially performing an assignment.
 
@@ -204,7 +247,7 @@ class RouteChoice:
         :Arguments:
             **origin** (:obj:`int`): Origin node ID.
             **destination** (:obj:`int`): Destination node ID.
-            **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
+            **demand** (:obj:`float`): If provided an assignment will be performed with this demand.
 
         :Returns:
             ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
@@ -216,8 +259,10 @@ class RouteChoice:
         return self.__rc.run(
             origin,
             destination,
+            self.demand.shape,
+            demand=demand,
             bfsle=self.algorithm == "bfsle",
-            path_size_logit=perform_assignment,
+            path_size_logit=bool(demand),
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
             **self.parameters,
@@ -227,15 +272,12 @@ class RouteChoice:
         """
         Generate route choice sets between the previously supplied nodes, potentially performing an assignment.
 
-        Node IDs must be present in the compressed graph. To make a node ID always appear in the compressed
-        graph add it as a centroid.
-
         To access results see `RouteChoice.get_results()`.
 
         :Arguments:
             **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
         """
-        if self.nodes is None:
+        if self.demand.df.index.empty:
             raise ValueError(
                 "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
             )
@@ -244,7 +286,8 @@ class RouteChoice:
 
         self.results = None
         self.__rc.batched(
-            self.nodes,
+            self.demand,
+            self._selected_links,
             bfsle=self.algorithm == "bfsle",
             path_size_logit=perform_assignment,
             cores=self.cores,
@@ -265,14 +308,7 @@ class RouteChoice:
             **info** (:obj:`dict`): Dictionary with summary information
         """
 
-        if self.matrix is None:
-            matrix_totals = {}
-        elif len(self.matrix.view_names) == 1:
-            matrix_totals = {self.matrix.view_names[0]: np.sum(self.matrix.matrix_view[:, :])}
-        else:
-            matrix_totals = {
-                nm: np.sum(self.matrix.matrix_view[:, :, i]) for i, nm in enumerate(self.matrix.view_names)
-            }
+        matrix_totals = self.demand.df.sum().to_dict()
 
         info = {
             "Algorithm": self.algorithm,
@@ -311,69 +347,64 @@ class RouteChoice:
 
         return self.results
 
-    def get_load_results(
-        self, compressed_graph_results=False
-    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+    def get_load_results(self) -> pd.DataFrame:
         """
         Translates the link loading results from the graph format into the network format.
 
-        :Arguments:
-            **compressed_graph_results** (:obj:`bool`): Whether we should return assignment results for the
-            compressed graph. Only use this option if you are SURE you know what you are doing. Default `False`.
-
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
-                A tuple of uncompressed and compressed link loading results as DataFrames.
+                A tuple of link loading results as DataFrames.
                 Columns are the matrix name concatenated direction.
         """
 
-        if self.matrix is None:
-            raise ValueError(
-                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
-            )
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
-        tmp = self.__rc.link_loading(self.matrix, self.save_path_files)
-        self.link_loads = {k: v[0] for k, v in tmp.items()}
-        self.compact_link_loads = {k: v[1] for k, v in tmp.items()}
+        ll = self.__rc.get_link_loading(cores=self.cores)
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.link_loads)
+        df = self.__link_loads_to_df(m, lids, ll)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.compact_link_loads)
-        if compressed_graph_results:
-            return compressed_df
-        return uncompressed_df
+        return df
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
             {"link_id": lids} | {k + dir: np.zeros(lids.shape) for k in link_loads.keys() for dir in ["_ab", "_ba"]}
         )
+        added_dfs = []
         for k, v in link_loads.items():
             # Directional Flows
             df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
             df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            df[k + "_tot"] = df[k + "_ab"] + df[k + "_ba"]
+            added_dfs.append(pd.DataFrame({f"{k}_tot": df[k + "_ab"] + df[k + "_ba"]}))
 
-        return df
+        df = pd.concat([df] + added_dfs, axis=1)
+        cols = df.columns.tolist()
+        cols.remove("link_id")
+        cols.sort()
+        # Insert the certain value at the beginning
+        cols.insert(0, "link_id")
+        return df[cols]
 
-    def set_select_links(self, links: Dict[str, List[Tuple[int, int]]]):
+    def set_select_links(self, links: Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
         """
-        Set the selected links. Checks if the links and directions are valid. Translates `links=None` and
-        direction into unique link ID used in compact graph.
+        Set the selected links. Checks if the links and directions are valid. Supports OR and AND sets of links.
 
+        Dictionary values should be a list of either (link_id, dir) or a list of (link_id, dir).
+
+        The elements of the first list represent the AND sets, together they are OR'ed. If any of these sets is
+        satisfied the link are loaded as appropriate. The AND sets are comprised of either a single (link_id, dir) tuple
+        or a list of (link_id, dir). The single tuple represents an AND set with a single element. All links and
+        directions in an AND set must appear in any order within a route for it to be considered satisfied.
         Supply `links=None` to disable select link analysis.
 
         :Arguments:
-            **links** (:obj:`Union[None, Dict[str, List[Tuple[int, int]]]]`): name of link set and
-             Link IDs and directions to be used in select link analysis.
+            **links** (:obj:`Union[None, Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
+                Name of link set and Link IDs and directions to be used in select link analysis.
         """
         self._selected_links = {}
 
@@ -388,72 +419,92 @@ class RouteChoice:
                 warnings.warn("Input string name has a space in it. Replacing with _")
                 name = str.join("_", name.split(" "))
 
-            link_ids = []
-            for link, dir in link_set:
-                if dir == 0:
-                    query = (self.graph.graph["link_id"] == link) & (
-                        (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
+            normalised_link_set = []
+            for link_ids in link_set:
+                if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
+                    warnings.warn(
+                        f"Adding both directions of a link ({link_ids[0]}) to a single AND set is likely "
+                        f"unintentional. Replacing with {(link_ids[0], -1)} OR {(link_ids[0], 1)}"
                     )
+                    normalised_link_set.append((link_ids[0], -1))
+                    normalised_link_set.append((link_ids[0], 1))
                 else:
-                    query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
-                if not query.any():
-                    raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
-                    # Check for duplicate compressed link ids in the current link set
-                for comp_id in self.graph.graph[query]["__compressed_id__"].values:
-                    if comp_id == max_id:
-                        raise ValueError(
-                            f"link ID {link} and direction {dir} is not present in compressed graph. "
-                            "It may have been removed during dead-end removal."
-                        )
-                    elif comp_id in link_ids:
-                        warnings.warn(
-                            "Two input links map to the same compressed link in the network"
-                            f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                    normalised_link_set.append(link_ids)
+
+            or_set = set()
+            for link_ids in normalised_link_set:
+                # For compatibility, a tuple of length 2 is passed, we assume that's a single (link, dir) pair
+                if isinstance(link_ids, tuple) and len(link_ids) == 2:
+                    link_ids = (link_ids,)
+
+                and_set = set()
+                for link, dir in link_ids:
+                    if dir == 0:
+                        query = (self.graph.graph["link_id"] == link) & (
+                            (self.graph.graph["direction"] == -1) | (self.graph.graph["direction"] == 1)
                         )
                     else:
-                        link_ids.append(comp_id)
-            self._selected_links[name] = link_ids
+                        query = (self.graph.graph["link_id"] == link) & (self.graph.graph["direction"] == dir)
+
+                    if not query.any():
+                        raise ValueError(f"link_id or direction {(link, dir)} is not present within graph.")
+
+                    for comp_id in self.graph.graph[query]["__compressed_id__"].values:
+                        # Check for duplicate compressed link ids in the current link set
+                        if comp_id == max_id:
+                            raise ValueError(
+                                f"link ID {link} and direction {dir} is not present in compressed graph. "
+                                "It may have been removed during dead-end removal."
+                            )
+                        elif comp_id in and_set:
+                            warnings.warn(
+                                "Two input links map to the same compressed link in the network"
+                                f", removing superfluous link {link} and direction {dir} with compressed id {comp_id}"
+                            )
+                        else:
+                            and_set.add(comp_id)
+
+                or_set.add(frozenset(and_set))
+            self._selected_links[name] = frozenset(or_set)
         self._config["select_links"] = str(links)
 
-    def get_select_link_results(self) -> pd.DataFrame:
+    def get_select_link_loading_results(self) -> pd.DataFrame:
         """
         Get the select link loading results.
 
         :Returns:
-            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`):
-                A tuple of uncompressed and compressed select link loading results as DataFrames.
+            **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results as DataFrames.
                 Columns are the matrix name concatenated with the select link set and direction.
         """
 
-        if self.matrix is None:
-            raise ValueError(
-                "AequilibraE matrix was not initially provided. To perform link loading set the `RouteChoice.matrix` attribute."
-            )
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
-        tmp = self.__rc.select_link_loading(self.matrix, self._selected_links)
-
-        self.sl_link_loads = {}
-        self.sl_compact_link_loads = {}
-        self.sl_od_matrix = {}
-        for name, sl_res in tmp.items():
-            for sl_name, res in sl_res.items():
-                mat, (u, c) = res
-                self.sl_od_matrix[name + "_" + sl_name] = mat
-                self.sl_link_loads[name + "_" + sl_name] = u
-                self.sl_compact_link_loads[name + "_" + sl_name] = c
+        sl_link_loads = {}
+        for sl_name, sl_res in self.__rc.get_sl_link_loading().items():
+            for demand_name, res in sl_res.items():
+                sl_link_loads[sl_name + "_" + demand_name] = res
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
         lids = np.unique(self.graph.graph.link_id.values)
-        uncompressed_df = self.__link_loads_to_df(m, lids, self.sl_link_loads)
+        df = self.__link_loads_to_df(m, lids, sl_link_loads)
 
-        m_compact = _get_graph_to_network_mapping(
-            self.graph.compact_graph.link_id.values, self.graph.compact_graph.direction.values
-        )
-        compact_lids = np.unique(self.graph.compact_graph.link_id.values)
-        compressed_df = self.__link_loads_to_df(m_compact, compact_lids, self.sl_compact_link_loads)
+        return df
 
-        return uncompressed_df, compressed_df
+    def get_select_link_od_matrix_results(self) -> Dict[str, Dict[str, scipy.sparse.coo_matrix]]:
+        """
+        Get the select link OD matrix results as a sparse matrix.
+
+        :Returns:
+            **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`): Returns a dict of
+                select link set names to a dict of demand column names to a sparse OD matrix
+        """
+
+        if self.demand.no_demand():
+            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+
+        return self.__rc.get_sl_od_matrices()
 
     def __save_dataframe(self, df, method_name: str, description: str, table_name: str, report: dict, project) -> None:
         self.procedure_id = uuid4().hex
@@ -518,7 +569,7 @@ class RouteChoice:
         if not project:
             project = self.project or get_active_project()
 
-        u, c = self.get_select_link_results()
+        u = self.get_select_link_loading_results()
         info = self.info()
         self.__save_dataframe(
             u,
@@ -529,14 +580,9 @@ class RouteChoice:
             project=project,
         )
 
-        self.__save_dataframe(
-            c,
-            "Select link analysis",
-            "Compressed select link analysis results",
-            table_name + "_compressed",
-            info,
-            project=project,
-        )
-
-        for k, v in self.sl_od_matrix.items():
-            v.to_disk((pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"), k)
+        for sl_name, v in self.get_select_link_od_matrix_results().items():
+            for demand_name, mat in v.items():
+                mat.to_disk(
+                    (pathlib.Path(project.project_base_path) / "matrices" / table_name).with_suffix(".omx"),
+                    sl_name + "_" + demand_name,
+                )
