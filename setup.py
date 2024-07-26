@@ -33,7 +33,7 @@ link_args = [f"{prefix}openmp"]
 
 ext_mod_aon = Extension(
     "aequilibrae.paths.AoN",
-    [join("aequilibrae", "paths", "AoN.pyx")],
+    [join("aequilibrae", "paths", "cython", "AoN.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -53,7 +53,7 @@ ext_mod_ipf = Extension(
 
 ext_mod_put = Extension(
     "aequilibrae.paths.public_transport",
-    [join("aequilibrae", "paths", "public_transport.pyx")],
+    [join("aequilibrae", "paths", "cython", "public_transport.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -63,7 +63,7 @@ ext_mod_put = Extension(
 
 ext_mod_bfs_le = Extension(
     "aequilibrae.paths.route_choice_set",
-    [join("aequilibrae", "paths", "route_choice_set.pyx")],
+    [join("aequilibrae", "paths", "cython", "route_choice_set.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -75,7 +75,7 @@ ext_mod_bfs_le = Extension(
 
 ext_mod_graph_building = Extension(
     "aequilibrae.paths.graph_building",
-    [join("aequilibrae", "paths", "graph_building.pyx")],
+    [join("aequilibrae", "paths", "cython", "graph_building.pyx")],
     extra_compile_args=compile_args,
     extra_link_args=link_args,
     define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
