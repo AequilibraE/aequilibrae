@@ -31,66 +31,64 @@ compile_args = [cpp_std, f"{prefix}openmp{':llvm' if is_win else ''}"]
 compile_args += ["-Wno-unreachable-code"] if is_mac else []
 link_args = [f"{prefix}openmp"]
 
-ext_mod_aon = Extension(
-    "aequilibrae.paths.AoN",
-    [join("aequilibrae", "paths", "cython", "AoN.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    language="c++",
-)
+extension_args = {
+    "extra_compile_args": compile_args,
+    "extra_link_args": link_args,
+    "define_macros": [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+    "include_dirs": include_dirs,
+    "libraries": libraries,
+    "library_dirs": library_dirs,
+    "language": "c++",
+}
+
+ext_mod_aon = Extension("aequilibrae.paths.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args)
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
     [join("aequilibrae", "distribution", "ipf_core.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    language="c++",
+    **extension_args,
 )
 
 ext_mod_put = Extension(
     "aequilibrae.paths.public_transport",
     [join("aequilibrae", "paths", "cython", "public_transport.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    language="c++",
+    **extension_args,
 )
 
-ext_mod_bfs_le = Extension(
-    "aequilibrae.paths.route_choice_set",
+ext_mod_rc = Extension(
+    "aequilibrae.paths.cython.route_choice_set",
     [join("aequilibrae", "paths", "cython", "route_choice_set.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    libraries=libraries,
-    library_dirs=library_dirs,
-    language="c++",
+    **extension_args,
+)
+
+ext_mod_coo_demand = Extension(
+    "aequilibrae.paths.cython.coo_demand",
+    [join("aequilibrae", "paths", "cython", "coo_demand.pyx")],
+    **extension_args,
+)
+
+ext_mod_rc_ll_results = Extension(
+    "aequilibrae.paths.cython.route_choice_link_loading_results",
+    [join("aequilibrae", "paths", "cython", "route_choice_link_loading_results.pyx")],
+    **extension_args,
+)
+
+ext_mod_rc_set_results = Extension(
+    "aequilibrae.paths.cython.route_choice_set_results",
+    [join("aequilibrae", "paths", "cython", "route_choice_set_results.pyx")],
+    **extension_args,
 )
 
 ext_mod_graph_building = Extension(
     "aequilibrae.paths.graph_building",
     [join("aequilibrae", "paths", "cython", "graph_building.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    language="c++",
+    **extension_args,
 )
 
 ext_mod_sparse_matrix = Extension(
     "aequilibrae.matrix.sparse_matrix",
     [join("aequilibrae", "matrix", "sparse_matrix.pyx")],
-    extra_compile_args=compile_args,
-    extra_link_args=link_args,
-    define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    include_dirs=include_dirs,
-    language="c++",
+    **extension_args,
 )
 
 with open("requirements.txt", "r") as fl:
@@ -139,7 +137,17 @@ if __name__ == "__main__":
         ],
         cmdclass={"build_ext": build_ext},
         ext_modules=cythonize(
-            [ext_mod_aon, ext_mod_ipf, ext_mod_put, ext_mod_bfs_le, ext_mod_graph_building, ext_mod_sparse_matrix],
+            [
+                ext_mod_aon,
+                ext_mod_ipf,
+                ext_mod_put,
+                ext_mod_rc,
+                ext_mod_coo_demand,
+                ext_mod_rc_ll_results,
+                ext_mod_rc_set_results,
+                ext_mod_graph_building,
+                ext_mod_sparse_matrix,
+            ],
             compiler_directives={"language_level": "3str"},
         ),
     )
