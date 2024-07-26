@@ -1,3 +1,20 @@
+from libcpp.algorithm cimport min_element, sort, lower_bound
+from libc.math cimport INFINITY, exp, pow, log
+from libcpp cimport bool, nullptr
+from libcpp.memory cimport shared_ptr, make_shared
+
+from cython.operator cimport dereference as d
+from cython.operator cimport postincrement as inc
+
+cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
+cimport pyarrow as pa
+cimport pyarrow.lib as libpa
+
+import pyarrow as pa
+import cython
+import warnings
+
+
 @cython.embedsignature(True)
 cdef class RouteChoiceSetResults:
     """
@@ -506,3 +523,17 @@ cdef class RouteChoiceSetResults:
 
         self.table = libpa.pyarrow_wrap_table(table)
         return self.table
+
+
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False)
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
+    if prob == 1.0:
+        return INFINITY
+    elif prob == 0.0:
+        return -INFINITY
+    else:
+        return (log(prob / (1.0 - prob)) - beta0) / beta1

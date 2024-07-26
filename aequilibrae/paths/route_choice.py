@@ -12,11 +12,13 @@ from functools import cached_property
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.dataset
 import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.paths.route_choice_set import RouteChoiceSet, GeneralisedCOODemand
+from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
 
 
 class RouteChoice:

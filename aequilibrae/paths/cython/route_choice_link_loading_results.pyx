@@ -1,3 +1,14 @@
+from aequilibrae.matrix.sparse_matrix cimport COO
+
+from cython.operator cimport predecrement as pre_dec
+from cython.operator cimport dereference as d
+cimport cython
+
+import numpy as np
+import itertools
+
+include 'parallel_numpy.pyx'
+
 # See note in route_choice_set.pxd
 cdef class LinkLoadingResults:
     def __cinit__(self, demand: GeneralisedCOODemand, select_links: Dict[str, FrozenSet[FrozenSet[int]]], num_links: int, threads: int):
@@ -15,7 +26,7 @@ cdef class LinkLoadingResults:
             vector[unique_ptr[vector[float]]] *f32_demand_cols
 
         # Link loading
-        ## Allocate the threaded f64 link loading.
+        # Allocate the threaded f64 link loading.
         self.f64_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f64_demand_cols = new vector[unique_ptr[vector[double]]]()
@@ -26,7 +37,7 @@ cdef class LinkLoadingResults:
 
             self.f64_link_loading_threaded.emplace_back(f64_demand_cols)
 
-        ## Allocate the threaded f32 link loading.
+        # Allocate the threaded f32 link loading.
         self.f32_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f32_demand_cols = new vector[unique_ptr[vector[float]]]()
@@ -45,7 +56,7 @@ cdef class LinkLoadingResults:
             vector[unique_ptr[unordered_set[long long]]] *select_link_set
             vector[size_t] *select_link_set_length
 
-        ## Select link loading sets
+        # Select link loading sets
         # Coerce the select link sets to their cpp structures ahead of time. We'll be using these a lot and they don't
         # change. We allocate a vector of select link sets. These select link sets a vector representing an OR set,
         # containing a unordered_set of links representing the AND set.
@@ -68,14 +79,14 @@ cdef class LinkLoadingResults:
             self.select_link_sets.emplace_back(select_link_set)
             self.select_link_set_lengths.emplace_back(select_link_set_length)
 
-        ## Select link loading link loads
+        # Select link loading link loads
         cdef:
             vector[unique_ptr[vector[unique_ptr[vector[double]]]]] *f64_sl_select_link_sets
             vector[unique_ptr[vector[unique_ptr[vector[float]]]]] *f32_sl_select_link_sets
             vector[unique_ptr[vector[double]]] *f64_sl_demand_cols
             vector[unique_ptr[vector[float]]] *f32_sl_demand_cols
 
-        ## Allocate f64 thread storage for select link
+        # Allocate f64 thread storage for select link
         self.f64_sl_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f64_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[double]]]]]()
@@ -92,7 +103,7 @@ cdef class LinkLoadingResults:
 
             self.f64_sl_link_loading_threaded.emplace_back(f64_sl_select_link_sets)
 
-        ## Allocate f32 thread storage for select link
+        # Allocate f32 thread storage for select link
         self.f32_sl_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f32_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[float]]]]]()
@@ -112,14 +123,14 @@ cdef class LinkLoadingResults:
         # self.f64_sl_link_loading and self.f32_sl_link_loading are not allocated here. The objects are initialised to
         # empty vectors but elements are created in self.reduce_sl_link_loading
 
-        ## Select link loading od matrix
+        # Select link loading od matrix
         cdef:
             vector[unique_ptr[vector[COO_f64_struct]]] *f64_sl_od_matrix_sets
             vector[unique_ptr[vector[COO_f32_struct]]] *f32_sl_od_matrix_sets
             vector[COO_f64_struct] *f64_sl_od_matrix_demand_cols
             vector[COO_f32_struct] *f32_sl_od_matrix_demand_cols
 
-        ## Allocate f64 thread storage for select link
+        # Allocate f64 thread storage for select link
         self.f64_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f64_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f64_struct]]]()
@@ -135,7 +146,7 @@ cdef class LinkLoadingResults:
 
             self.f64_sl_od_matrix_threaded.emplace_back(f64_sl_od_matrix_sets)
 
-        ## Allocate f32 thread storage for select link
+        # Allocate f32 thread storage for select link
         self.f32_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f32_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f32_struct]]]()
@@ -541,7 +552,7 @@ cdef class LinkLoadingResults:
 
             size_t thread_id, i, j
 
-        ## Allocate f64 thread storage for select link
+        # Allocate f64 thread storage for select link
         self.f64_sl_od_matrix.reserve(self.select_link_sets.size())
         for i in range(self.select_link_sets.size()):
             f64_sl_od_cols = new vector[COO_f64_struct](self.demand.f64.size())
@@ -551,7 +562,7 @@ cdef class LinkLoadingResults:
 
             self.f64_sl_od_matrix.emplace_back(f64_sl_od_cols)
 
-        ## Allocate f32 thread storage for select link
+        # Allocate f32 thread storage for select link
         self.f32_sl_od_matrix.reserve(self.select_link_sets.size())
         for i in range(self.select_link_sets.size()):
             f32_sl_od_cols = new vector[COO_f32_struct](self.demand.f32.size())

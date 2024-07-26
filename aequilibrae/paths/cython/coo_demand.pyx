@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+import logging
+from scipy.sparse import coo_matrix as sp_coo_matrix
 
 cdef class GeneralisedCOODemand:
     def __init__(self, origin_col: str, destination_col: str, nodes_to_indices, shape=None):

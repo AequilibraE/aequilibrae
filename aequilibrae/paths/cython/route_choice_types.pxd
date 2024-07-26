@@ -1,19 +1,13 @@
-# cython: language_level=3str
-from aequilibrae.paths.results import PathResults
-from aequilibrae.matrix.sparse_matrix cimport COO, COO_f64_struct, COO_f32_struct
-
 from libcpp.vector cimport vector
+from libcpp.utility cimport pair
 from libcpp.unordered_set cimport unordered_set
 from libcpp.unordered_map cimport unordered_map
-from libcpp.utility cimport pair
 from libcpp cimport bool
+from libcpp.memory cimport unique_ptr
 
 cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
 cimport pyarrow as pa
 cimport pyarrow.lib as libpa
-cimport pyarrow._dataset_parquet as pq
-from libcpp.memory cimport shared_ptr, unique_ptr, make_shared, make_unique
-from libcpp.utility cimport move
 
 # std::linear_congruential_engine is not available in the Cython libcpp.random shim. We'll import it ourselves
 # from libcpp.random cimport minstd_rand
@@ -107,19 +101,6 @@ cdef extern from * nogil:
         bool operator()(const T& lhs, const T& rhs) const
 
 
-# For typing (haha) convenience, the types names are getting long
-ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerDereferenceEqualTo[vector[long long] *]] RouteSet_t
-ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
-ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
-
-ctypedef vector[unique_ptr[vector[long long]]] RouteVec_t
-
-
-
-# A (known 2016) bug in the Cython compiler means it incorrectly parses the following type when used in a cdef
-# https://github.com/cython/cython/issues/534
-ctypedef vector[bool]* vector_bool_ptr
-
 # Pyarrow's Cython API does not provide all the functions available in the C++ API, some of them are really useful.
 # Here we redeclare the classes with the functions we want, these are available in the current namespace, *not* libarrow
 cdef extern from "arrow/builder.h" namespace "arrow" nogil:
@@ -142,292 +123,13 @@ cdef extern from "arrow/builder.h" namespace "arrow" nogil:
         libpa.CStatus AppendValues(const vector[bool] &values)
 
 
-cdef class RouteChoiceSet:
-    cdef:
-        double [:] cost_view
-        long long [:] graph_fs_view
-        long long [:] b_nodes_view
-        long long [:] nodes_to_indices_view
-        double [:] lat_view
-        double [:] lon_view
-        long long [:] ids_graph_view
-        long long [:] graph_compressed_id_view
-        long long [:] compressed_link_ids
-        long long num_nodes
-        long long num_links
-        long long zones
-        bint block_flows_through_centroids
-        bint a_star
+# For typing convenience, the types names are getting long
+ctypedef unordered_set[vector[long long] *, OrderedVectorPointerHasher, PointerDereferenceEqualTo[vector[long long] *]] RouteSet_t
+ctypedef unordered_set[unordered_set[long long] *, UnorderedSetPointerHasher, PointerDereferenceEqualTo[unordered_set[long long] *]] LinkSet_t
+ctypedef vector[pair[unordered_set[long long] *, vector[long long] *]] RouteMap_t
 
-        unsigned int [:] mapping_idx
-        unsigned int [:] mapping_data
+ctypedef vector[unique_ptr[vector[long long]]] RouteVec_t
 
-        readonly RouteChoiceSetResults results
-        readonly LinkLoadingResults ll_results
-
-    cdef void path_find(
-        RouteChoiceSet self,
-        long origin_index,
-        long dest_index,
-        double [:] scratch_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] thread_reached_first
-    ) noexcept nogil
-
-    cdef void bfsle(
-        RouteChoiceSet self,
-        RouteSet_t &route_set,
-        long origin_index,
-        long dest_index,
-        unsigned int max_routes,
-        unsigned int max_depth,
-        unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        double penatly,
-        unsigned int seed
-    ) noexcept nogil
-
-    cdef void link_penalisation(
-        RouteChoiceSet self,
-        RouteSet_t &route_set,
-        long origin_index,
-        long dest_index,
-        unsigned int max_routes,
-        unsigned int max_depth,
-        unsigned int max_misses,
-        double [:] thread_cost,
-        long long [:] thread_predecessors,
-        long long [:] thread_conn,
-        long long [:] thread_b_nodes,
-        long long [:] _thread_reached_first,
-        double penatly,
-        unsigned int seed
-    ) noexcept nogil
-
-    # @staticmethod
-    # cdef vector[vector[double] *] *compute_path_files(
-    #     vector[pair[long long, long long]] &ods,
-    #     vector[RouteSet_t *] &results,
-    #     vector[vector[long long] *] &link_union_set,
-    #     vector[vector[double] *] &prob_set,
-    #     unsigned int cores
-    # ) noexcept nogil
-
-    # cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
-    # cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
-    # cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
-
-    # cdef vector[double] *apply_select_link_loading(
-    #     RouteChoiceSet self,
-    #     COO sparse_mat,
-    #     double[:, :] matrix_view,
-    #     unordered_set[long] &select_link_set
-    # ) noexcept nogil
-
-
-cdef class Checkpoint:
-    cdef:
-        public object where
-        public object schema
-        public object partition_cols
-
-
-cdef class RouteChoiceSetResults:
-    cdef:
-        GeneralisedCOODemand demand
-        bool store_results
-        bool perform_assignment
-        double cutoff_prob
-        double beta
-        double[:] cost_view
-        unsigned int [:] mapping_idx
-        unsigned int [:] mapping_data
-
-        vector[shared_ptr[RouteVec_t]] __route_vecs
-        vector[vector[long long] *] __link_union_set
-        vector[shared_ptr[vector[double]]] __cost_set
-        vector[shared_ptr[vector[bool]]] __mask_set
-        vector[shared_ptr[vector[double]]] __path_overlap_set
-        vector[shared_ptr[vector[double]]] __prob_set
-
-        readonly object table
-
-    @staticmethod
-    cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil
-
-    cdef shared_ptr[RouteVec_t] get_route_vec(RouteChoiceSetResults self, size_t i) noexcept nogil
-    cdef shared_ptr[vector[double]] __get_cost_set(RouteChoiceSetResults self, size_t i) noexcept nogil
-    cdef shared_ptr[vector[bool]] __get_mask_set(RouteChoiceSetResults self, size_t i) noexcept nogil
-    cdef shared_ptr[vector[double]] __get_path_overlap_set(RouteChoiceSetResults self, size_t i) noexcept nogil
-    cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil
-
-    cdef shared_ptr[vector[double]] compute_result(
-        RouteChoiceSetResults self,
-        size_t i,
-        RouteVec_t &route_set,
-        size_t thread_id
-    ) noexcept nogil
-
-    cdef void compute_cost(
-        RouteChoiceSetResults self,
-        vector[double] &cost_vec,
-        const RouteVec_t &route_set,
-        const double[:] cost_view
-    ) noexcept nogil
-
-    cdef bool compute_mask(
-        RouteChoiceSetResults self,
-        vector[bool] &route_mask,
-        const vector[double] &total_cost
-    ) noexcept nogil
-
-    cdef void compute_frequency(
-        RouteChoiceSetResults self,
-        vector[long long] &keys,
-        vector[long long] &counts,
-        const RouteVec_t &route_set,
-        const vector[bool] &route_mask
-    ) noexcept nogil
-
-    cdef void compute_path_overlap(
-        RouteChoiceSetResults self,
-        vector[double] &path_overlap_vec,
-        const RouteVec_t &route_set,
-        const vector[long long] &keys,
-        const vector[long long] &counts,
-        const vector[double] &total_cost,
-        const vector[bool] &route_mask,
-        const double[:] cost_view
-    ) noexcept nogil
-
-    cdef void compute_prob(
-        RouteChoiceSetResults self,
-        vector[double] &prob_vec,
-        const vector[double] &total_cost,
-        const vector[double] &path_overlap_vec,
-        const vector[bool] &route_mask
-    ) noexcept nogil
-
-    cdef object make_table_from_results(RouteChoiceSetResults self)
-
-cdef class GeneralisedCOODemand:
-    cdef:
-        public object df
-        readonly object f64_names
-        readonly object f32_names
-        readonly object shape
-        readonly object nodes_to_indices
-        vector[pair[long long, long long]] ods
-        vector[unique_ptr[vector[double]]] f64
-        vector[unique_ptr[vector[float]]] f32
-
-
-# I understand this isn't a great way to handle this but I'm rather unsure of a better method.  We need a method to
-# store both float and double loads. Cython doesn't allow us to use fused types (Cython diet templates) in any manner
-# that's useful. We can't store them on an object nor put them into a C++ structure, they can only be returned, used as
-# a local variable, or passed to a function.
-#
-# Cython doesn't allow us to write a templated class, we'd have to write an actual C++ class for that. Even if we did
-# that we'd still have to write a wrapper class.
-cdef class LinkLoadingResults:
-    cdef:
-        GeneralisedCOODemand demand
-        readonly object select_link_set_names
-        size_t num_links
-
-        # Number of threads
-        #               * number of demand cols
-        #                 |               * number of links
-        vector[unique_ptr[vector[unique_ptr[vector[double]]]]] f64_link_loading_threaded
-
-        # Number of demand cols
-        #               * number of links
-        vector[unique_ptr[vector[double]]] f64_link_loading
-
-        vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_link_loading_threaded
-        vector[unique_ptr[vector[float]]] f32_link_loading
-
-        # Select link
-        # A select link set is represented by a vector of unordered AND sets, OR'd together
-        # Number of select link sets
-        #               * number of select link OR sets
-        #                 |               * number of AND sets
-        vector[unique_ptr[vector[unique_ptr[unordered_set[long long]]]]] select_link_sets
-
-        # Number of select link sets
-        #               * number of select link OR sets
-        vector[unique_ptr[vector[size_t]]] select_link_set_lengths
-
-        # Number of threads
-        #               * number of select link sets
-        #                 |               * number of demand cols
-        #                 |                 |               * number of links
-        vector[unique_ptr[vector[unique_ptr[vector[unique_ptr[vector[double]]]]]]] f64_sl_link_loading_threaded
-
-        # Number of select link sets
-        #               * number of demand cols
-        #                 |               * number of links
-        vector[unique_ptr[vector[unique_ptr[vector[double]]]]]  f64_sl_link_loading
-
-        vector[unique_ptr[vector[unique_ptr[vector[unique_ptr[vector[float]]]]]]] f32_sl_link_loading_threaded
-        vector[unique_ptr[vector[unique_ptr[vector[float]]]]] f32_sl_link_loading
-
-        # Number of threads
-        #               * number of select link sets
-        #                 |               * number of demand cols
-        vector[unique_ptr[vector[unique_ptr[vector[COO_f64_struct]]]]] f64_sl_od_matrix_threaded
-
-        # Number of select link sets
-        #               * number of demand cols
-        vector[unique_ptr[vector[COO_f64_struct]]] f64_sl_od_matrix
-
-        vector[unique_ptr[vector[unique_ptr[vector[COO_f32_struct]]]]] f32_sl_od_matrix_threaded
-        vector[unique_ptr[vector[COO_f32_struct]]] f32_sl_od_matrix
-
-        readonly object link_loading_objects
-        readonly object sl_link_loading_objects
-        readonly object od_matrix_objects
-
-    cdef void link_load_single_route_set(
-        LinkLoadingResults self,
-        const size_t od_idx,
-        const RouteVec_t &route_set,
-        const vector[double] &prob_vec,
-        const size_t thread_id
-    ) noexcept nogil
-
-    cdef void reduce_link_loading(LinkLoadingResults self)
-    cdef object apply_generic_link_loading(
-        LinkLoadingResults self,
-        vector[unique_ptr[vector[double]]] &f64_link_loading,
-        vector[unique_ptr[vector[float]]] &f32_link_loading,
-        long long[:] compressed_id_view,
-        int cores
-    )
-
-    @staticmethod
-    cdef bool is_in_select_link_set(
-        vector[long long] &route,
-        const vector[unique_ptr[unordered_set[long long]]] &select_link_set,
-        const vector[size_t] &select_link_set_lengths
-    ) noexcept nogil
-    cdef void sl_link_load_single_route_set(
-        LinkLoadingResults self,
-        const size_t od_idx,
-        const RouteVec_t &route_set,
-        const vector[double] &prob_vec,
-        const long long origin_idx,
-        const long long dest_idx,
-        const size_t thread_id
-    ) noexcept nogil
-    cdef void reduce_sl_link_loading(LinkLoadingResults self)
-    cdef void reduce_sl_od_matrix(LinkLoadingResults self)
-    cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
-    cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores)
-    cdef object sl_od_matrices_structs_to_objects(LinkLoadingResults self)
+# A (known 2016) bug in the Cython compiler means it incorrectly parses the following type when used in a cdef
+# https://github.com/cython/cython/issues/534
+ctypedef vector[bool]* vector_bool_ptr

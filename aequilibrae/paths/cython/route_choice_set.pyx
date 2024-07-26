@@ -1,44 +1,32 @@
 # cython: language_level=3str
-cimport route_choice_types
 from aequilibrae.paths.graph import Graph
-from aequilibrae.matrix import AequilibraeMatrix
-from aequilibrae.matrix.sparse_matrix cimport COO
-from scipy.sparse import coo_matrix as sp_coo_matrix
+from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, vector_bool_ptr, shuffle
+from aequilibrae.paths.cython.coo_demand cimport GeneralisedCOODemand
 
 from cython.operator cimport dereference as d
-from cython.operator cimport postincrement as inc
-from cython.operator cimport predecrement as pre_dec
 from cython.parallel cimport parallel, prange, threadid
 from libc.limits cimport UINT_MAX
-from libc.math cimport INFINITY, exp, pow, log
-from libc.stdlib cimport abort
 from libc.string cimport memcpy
 from libcpp cimport nullptr
-from libcpp.algorithm cimport lower_bound, reverse, sort, copy, min_element
-from libcpp.unordered_map cimport unordered_map
+from libcpp.algorithm cimport reverse, copy
 from libcpp.unordered_set cimport unordered_set
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
+from libcpp cimport bool
 from openmp cimport omp_get_max_threads
 
-from libc.stdio cimport fprintf, stderr
+from libcpp.memory cimport shared_ptr
 
-import random
 import itertools
 import logging
 import pathlib
-import warnings
 from typing import List, Tuple
 
 import numpy as np
 import pyarrow as pa
-import pyarrow.dataset
 import pyarrow.parquet as pq
 import pandas as pd
 
-cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's nothing quite like Cython.
-cimport pyarrow as pa
-cimport pyarrow.lib as libpa
 
 """This module aims to implemented the BFS-LE algorithm as described in Rieser-Schüssler, Balmer, and Axhausen, 'Route
 Choice Sets for Very High-Resolution Data'.  https://doi.org/10.1080/18128602.2012.671383
@@ -93,10 +81,6 @@ routes aren't required small-ish things like the memcpy and banned link set copy
 # It would really be nice if these were modules. The 'include' syntax is long deprecated and adds a lot to compilation
 # times
 include 'basic_path_finding.pyx'
-include 'parallel_numpy.pyx'
-include 'route_choice_link_loading_results.pyx'
-include 'route_choice_set_results.pyx'
-include 'coo_demand.pyx'
 
 
 @cython.embedsignature(True)
@@ -760,18 +744,3 @@ cdef class Checkpoint:
     @staticmethod
     def batches(ods: List[Tuple[int, int]]):
         return (list(g) for k, g in itertools.groupby(sorted(ods), key=lambda x: x[0]))
-
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-@cython.initializedcheck(False)
-@cython.cdivision(True)
-cdef double inverse_binary_logit(double prob, double beta0, double beta1) noexcept nogil:
-    if prob == 1.0:
-        return INFINITY
-    elif prob == 0.0:
-        return -INFINITY
-    else:
-        return (log(prob / (1.0 - prob)) - beta0) / beta1
