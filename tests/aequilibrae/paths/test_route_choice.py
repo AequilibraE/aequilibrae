@@ -159,7 +159,6 @@ class TestRouteChoiceSet(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, self.shape, max_routes=max_routes, max_depth=max_depth)
 
-    @skip("not implemented")
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
@@ -173,7 +172,9 @@ class TestRouteChoiceSet(TestCase):
         table = rc.get_results().to_pandas()
         rc.batched(demand, max_routes=max_routes, max_depth=10, where=path, cores=1)
 
-        dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
+        dataset = pa.dataset.dataset(
+            path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.results.schema)
+        )
         new_table = (
             dataset.to_table()
             .to_pandas()
@@ -500,6 +501,28 @@ class TestRouteChoice(TestCase):
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
             for demand_name, matrix in v.items():
                 np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name].toarray())
+
+    def test_round_trip(self):
+        self.rc.add_demand(self.mat)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 1)]})
+        self.rc.prepare()
+
+        path = join(self.project.project_base_path, "batched results")
+        os.mkdir(path)
+
+        self.rc.set_save_routes(None)
+        self.rc.execute(perform_assignment=True)
+        table = self.rc.get_results().to_pandas()
+
+        self.rc.set_save_routes(path)
+        self.rc.execute(perform_assignment=True)
+        table2 = self.rc.get_results().to_table().to_pandas()
+
+        table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
+        table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(table, table2)
 
 
 def generate_line_strings(project, graph, results):

@@ -10,7 +10,9 @@ cimport numpy as np  # Numpy *must* be cimport'd BEFORE pyarrow.lib, there's not
 cimport pyarrow as pa
 cimport pyarrow.lib as libpa
 
+import logging
 import pyarrow as pa
+import pyarrow.parquet as pq
 import cython
 import warnings
 
@@ -53,7 +55,6 @@ cdef class RouteChoiceSetResults:
             perform_assignment: bool = True,
     ):
         """
-
         :Arguments:
             **demand** (`obj`: GeneralisedCOODemand): A GeneralisedCOODemand object stores the ODs pairs and various
               demand values in a COO form. No verification of these is performed here.
@@ -62,18 +63,19 @@ cdef class RouteChoiceSetResults:
 
             **beta** (`obj`: float): The beta parameter for the path-sized logit.
 
-            **store_results** (`obj`: bool): Whether or not to store the route set computation results. At a minimum stores
-              the route sets per OD. If `perform_assignment` is True then the assignment results are stored as well.
+            **store_results** (`obj`: bool): Whether or not to store the route set computation results. At a minimum
+              stores the route sets per OD. If `perform_assignment` is True then the assignment results are stored as
+              well.
 
             **perform_assignment** (`obj`: bool): Whether or not to perform a path-sized logit assignment.
 
         NOTE: This class makes no attempt to be thread safe when improperly accessed. Multithreaded accesses should be
         coordinated to not collide. Each index of `ods` should only ever be accessed by a single thread.
 
-        NOTE: Depending on `store_results` the behaviour of accessing a single `ods` index multiple times will differ. When
-        True the previous internal buffers will be reused. This will highly likely result incorrect results. When False some
-        new internal buffers will used, link loading results will still be incorrect. Thus A SINGLE `ods` INDEX SHOULD NOT
-        BE ACCESSED MULTIPLE TIMES.
+        NOTE: Depending on `store_results` the behaviour of accessing a single `ods` index multiple times will
+        differ. When True the previous internal buffers will be reused. This will highly likely result incorrect
+        results. When False some new internal buffers will used, link loading results will still be incorrect. Thus A
+        SINGLE `ods` INDEX SHOULD NOT BE ACCESSED MULTIPLE TIMES.
         """
 
         if not store_results and not perform_assignment:
@@ -112,6 +114,23 @@ cdef class RouteChoiceSetResults:
                 self.__path_overlap_set[i] = make_shared[vector[double]]()
                 self.__prob_set[i] = make_shared[vector[double]]()
 
+    def write(self, where):
+        logger = logging.getLogger("aequilibrae")
+        pq.write_to_dataset(
+            self.table,
+            where,
+            partitioning_flavor="hive",
+            partitioning=["origin id"],
+            schema=self.psl_schema if self.perform_assignment else self.schema,
+            use_threads=True,
+            existing_data_behavior="overwrite_or_ignore",
+            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
+        )
+
+    @classmethod
+    def read_dataset(cls, where):
+        return pa.dataset.dataset(where, format="parquet", partitioning=pa.dataset.HivePartitioning(cls.schema))
+
     @staticmethod
     cdef void route_set_to_route_vec(RouteVec_t &route_vec, RouteSet_t &route_set) noexcept nogil:
         """
@@ -128,8 +147,8 @@ cdef class RouteChoiceSetResults:
         """
         Return either a new empty RouteSet_t, or the RouteSet_t (initially empty) corresponding to a OD pair index.
 
-        If `self.store_results` is False no attempt is made to store the route set. The caller is responsible for maintaining
-        a reference to it.
+        If `self.store_results` is False no attempt is made to store the route set. The caller is responsible for
+        maintaining a reference to it.
 
         Requires that 0 <= i < self.ods.size().
         """
@@ -152,7 +171,12 @@ cdef class RouteChoiceSetResults:
     cdef shared_ptr[vector[double]] __get_prob_set(RouteChoiceSetResults self, size_t i) noexcept nogil:
         return self.__prob_set[i] if self.store_results else make_shared[vector[double]]()
 
-    cdef shared_ptr[vector[double]] compute_result(RouteChoiceSetResults self, size_t i, RouteVec_t &route_set, size_t thread_id) noexcept nogil:
+    cdef shared_ptr[vector[double]] compute_result(
+        RouteChoiceSetResults self,
+        size_t i,
+        RouteVec_t &route_set,
+        size_t thread_id
+    ) noexcept nogil:
         """
         Compute the desired results for the OD pair index with the provided route set. The route set is required as
         an argument here to facilitate not storing them. The route set should correspond to the provided OD pair index,
@@ -187,7 +211,15 @@ cdef class RouteChoiceSetResults:
                     "Entire route set masked"
                 )
         self.compute_frequency(keys, counts, route_set, d(route_mask))
-        self.compute_path_overlap(d(path_overlap_vec), route_set, keys, counts, d(cost_vec), d(route_mask), self.cost_view)
+        self.compute_path_overlap(
+            d(path_overlap_vec),
+            route_set,
+            keys,
+            counts,
+            d(cost_vec),
+            d(route_mask),
+            self.cost_view
+        )
         self.compute_prob(d(prob_vec), d(cost_vec), d(path_overlap_vec), d(route_mask))
 
         return prob_vec
@@ -196,7 +228,13 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef void compute_cost(RouteChoiceSetResults self, vector[double] &cost_vec, const RouteVec_t &route_set, const double[:] cost_view) noexcept nogil:
+    cdef void compute_cost(
+        RouteChoiceSetResults self,
+        vector[double] &cost_vec,
+        const RouteVec_t &route_set,
+        const double[:]
+        cost_view
+    ) noexcept nogil:
         """Compute the cost each route."""
         cdef:
             # Scratch objects
@@ -217,11 +255,15 @@ cdef class RouteChoiceSetResults:
     @cython.embedsignature(True)
     @cython.boundscheck(False)
     @cython.initializedcheck(False)
-    cdef bool compute_mask(RouteChoiceSetResults self, vector[bool] &route_mask, const vector[double] &total_cost) noexcept nogil:
+    cdef bool compute_mask(
+        RouteChoiceSetResults self,
+        vector[bool] &route_mask,
+        const vector[double] &total_cost
+    ) noexcept nogil:
         """
         Computes a binary logit between the minimum cost path and each path, if the total cost is greater than the
-        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded from
-        the route set.
+        minimum + the difference in utilities required to produce the cut-off probability then the route is excluded
+        from the route set.
         """
         cdef:
             bool found_zero_cost = False
@@ -239,7 +281,7 @@ cdef class RouteChoiceSetResults:
                 found_zero_cost = True
                 break
             elif total_cost[i] <= cutoff_cost:
-               route_mask[i] = True
+                route_mask[i] = True
 
         if found_zero_cost:
             # If we've found a zero cost path we must abandon the whole route set.

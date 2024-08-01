@@ -55,13 +55,9 @@ class RouteChoice:
         self.graph = graph
         self.demand = self.__init_demand()
 
-        self.schema = RouteChoiceSet.schema
-        self.psl_schema = RouteChoiceSet.psl_schema
-
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
-        self.results: Optional[pa.Table] = None
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
 
@@ -80,7 +76,8 @@ class RouteChoice:
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
-        Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
+        Options for algorithm are, 'bfsle' for breadth first search with link removal, or
+        'link-penalisation'/'link-penalization'.
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
         Michael Balmer & Kay W. Axhausen (2013).
@@ -255,7 +252,6 @@ class RouteChoice:
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        self.results = None
         return self.__rc.run(
             origin,
             destination,
@@ -279,12 +275,12 @@ class RouteChoice:
         """
         if self.demand.df.index.empty:
             raise ValueError(
-                "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
+                "to perform batch route choice generation you must first prepare with the selected nodes. "
+                "See `RouteChoice.prepare()`"
             )
 
         self.procedure_date = str(datetime.today())
 
-        self.results = None
         self.__rc.batched(
             self.demand,
             self._selected_links,
@@ -330,22 +326,18 @@ class RouteChoice:
         Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).
         Represents paths from ``origin`` to ``destination``.
 
-        If `save_routes` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this dataset.
+        If `save_routes` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this
+        dataset.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
         """
-        if self.results is None:
-            try:
-                self.results = self.__rc.get_results()
-            except RuntimeError as err:
-                if self.where is None:
-                    raise ValueError("Route choice results not computed and read/save path not specified") from err
-                self.results = pa.dataset.dataset(
-                    self.where, format="parquet", partitioning=pa.dataset.HivePartitioning(self.schema)
-                )
+        if self.where is None:
+            results = self.__rc.get_results()
+        else:
+            results = self.__rc.results.read_dataset(self.where)
 
-        return self.results
+        return results
 
     def get_load_results(self) -> pd.DataFrame:
         """
