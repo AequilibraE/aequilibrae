@@ -388,7 +388,9 @@ cdef class RouteChoiceSet:
 
             del route_set
 
-        self.get_results()
+        if store_results:
+            self.get_results()
+
         if path_size_logit:
             self.ll_results.reduce_link_loading()
             self.ll_results.reduce_sl_link_loading()
