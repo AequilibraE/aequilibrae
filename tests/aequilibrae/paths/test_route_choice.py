@@ -168,9 +168,9 @@ class TestRouteChoiceSet(TestCase):
         max_routes = 20
 
         path = join(self.project.project_base_path, "batched results")
-        rc.batched(demand, max_routes=max_routes, max_depth=10)
+        rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True)
         table = rc.get_results().to_pandas()
-        rc.batched(demand, max_routes=max_routes, max_depth=10, where=path, cores=1)
+        rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True, where=path, cores=1)
 
         dataset = pa.dataset.dataset(
             path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.results.schema)
@@ -178,11 +178,11 @@ class TestRouteChoiceSet(TestCase):
         new_table = (
             dataset.to_table()
             .to_pandas()
-            .sort_values(by=["origin id", "destination id"])[["origin id", "destination id", "route set"]]
+            .sort_values(by=["origin id", "destination id", "cost"])[table.columns]
             .reset_index(drop=True)
         )
 
-        table = table.sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
+        table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
 
