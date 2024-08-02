@@ -13,9 +13,8 @@ from typing import List, Tuple
 
 from aequilibrae import Project
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.matrix import AequilibraeMatrix, Sparse
+from aequilibrae.matrix import AequilibraeMatrix, Sparse, GeneralisedCOODemand
 
 from ...data import siouxfalls_project
 

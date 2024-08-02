@@ -1,4 +1,4 @@
-from aequilibrae.paths.cython.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 from aequilibrae.paths.cython.route_choice_types cimport RouteVec_t
 from aequilibrae.matrix.sparse_matrix cimport COO_f64_struct, COO_f32_struct
 

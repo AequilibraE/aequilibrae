@@ -61,12 +61,6 @@ ext_mod_rc = Extension(
     **extension_args,
 )
 
-ext_mod_coo_demand = Extension(
-    "aequilibrae.paths.cython.coo_demand",
-    [join("aequilibrae", "paths", "cython", "coo_demand.pyx")],
-    **extension_args,
-)
-
 ext_mod_rc_ll_results = Extension(
     "aequilibrae.paths.cython.route_choice_link_loading_results",
     [join("aequilibrae", "paths", "cython", "route_choice_link_loading_results.pyx")],
@@ -88,6 +82,12 @@ ext_mod_graph_building = Extension(
 ext_mod_sparse_matrix = Extension(
     "aequilibrae.matrix.sparse_matrix",
     [join("aequilibrae", "matrix", "sparse_matrix.pyx")],
+    **extension_args,
+)
+
+ext_mod_coo_demand = Extension(
+    "aequilibrae.matrix.coo_demand",
+    [join("aequilibrae", "matrix", "coo_demand.pyx")],
     **extension_args,
 )
 
