@@ -6,6 +6,7 @@ import socket
 import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
+from collections.abc import Hashable
 from uuid import uuid4
 from functools import cached_property
 
@@ -353,6 +354,7 @@ class RouteChoice:
             raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
         ll = self.__rc.get_link_loading(cores=self.cores)
+        ll = {(k,): v for k, v in ll.items()}
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
@@ -363,26 +365,22 @@ class RouteChoice:
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
-            {"link_id": lids} | {k + dir: np.zeros(lids.shape) for k in link_loads.keys() for dir in ["_ab", "_ba"]}
+            {"link_id": lids} | {(*k, dir): np.zeros(lids.shape) for k in link_loads.keys() for dir in ["ab", "ba"]}
         )
         added_dfs = []
         for k, v in link_loads.items():
             # Directional Flows
-            df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
-            df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
+            df.iloc[mapping.network_ab_idx, df.columns.get_loc((*k, "ab"))] = np.nan_to_num(v[mapping.graph_ab_idx])
+            df.iloc[mapping.network_ba_idx, df.columns.get_loc((*k, "ba"))] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            added_dfs.append(pd.DataFrame({f"{k}_tot": df[k + "_ab"] + df[k + "_ba"]}))
+            added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
 
-        df = pd.concat([df] + added_dfs, axis=1)
-        cols = df.columns.tolist()
-        cols.remove("link_id")
-        cols.sort()
-        # Insert the certain value at the beginning
-        cols.insert(0, "link_id")
-        return df[cols]
+        df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
+        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        return df.sort_index()
 
-    def set_select_links(self, links: Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
+    def set_select_links(self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
         """
         Set the selected links. Checks if the links and directions are valid. Supports OR and AND sets of links.
 
@@ -395,7 +393,7 @@ class RouteChoice:
         Supply `links=None` to disable select link analysis.
 
         :Arguments:
-            **links** (:obj:`Union[None, Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
+            **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
                 Name of link set and Link IDs and directions to be used in select link analysis.
         """
         self._selected_links = {}
@@ -407,10 +405,6 @@ class RouteChoice:
         max_id = self.graph.compact_graph.id.max() + 1
 
         for name, link_set in links.items():
-            if len(name.split(" ")) != 1:
-                warnings.warn("Input string name has a space in it. Replacing with _")
-                name = str.join("_", name.split(" "))
-
             normalised_link_set = []
             for link_ids in link_set:
                 if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
@@ -475,7 +469,7 @@ class RouteChoice:
         sl_link_loads = {}
         for sl_name, sl_res in self.__rc.get_sl_link_loading().items():
             for demand_name, res in sl_res.items():
-                sl_link_loads[sl_name + "_" + demand_name] = res
+                sl_link_loads[demand_name, sl_name] = res
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
@@ -512,7 +506,7 @@ class RouteChoice:
         # sqlite3 context managers only commit, they don't close, oh well
         conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
         with conn:
-            df.to_sql(table_name, conn, index=False)
+            df.to_sql(table_name, conn, index=True)
         conn.close()
 
         conn = project.connect()

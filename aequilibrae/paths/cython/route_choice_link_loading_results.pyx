@@ -7,6 +7,8 @@ cimport cython
 import numpy as np
 import itertools
 
+from collections.abc import Hashable
+
 include 'parallel_numpy.pyx'
 
 # See note in route_choice_set.pxd
@@ -14,7 +16,7 @@ cdef class LinkLoadingResults:
     def __cinit__(
             self,
             demand: GeneralisedCOODemand,
-            select_links: Dict[str, FrozenSet[FrozenSet[int]]],
+            select_links: Dict[Hashable, FrozenSet[FrozenSet[int]]],
             num_links: int,
             threads: int
     ):
