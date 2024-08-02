@@ -270,8 +270,12 @@ cdef class RouteChoiceSetResults:
             size_t i
 
             vector[double].const_iterator min = min_element(total_cost.cbegin(), total_cost.cend())
-            double cutoff_cost = d(min) \
-                + inverse_binary_logit(self.cutoff_prob, 0.0, 1.0)
+            double cutoff_cost
+
+        if min == total_cost.cend():
+            cutoff_cost = INFINITY
+        else:
+            cutoff_cost = d(min) + inverse_binary_logit(self.cutoff_prob, 0.0, 1.0)
 
         route_mask.resize(total_cost.size())
 

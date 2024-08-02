@@ -142,7 +142,7 @@ cdef class LinkLoadingResults:
         self.f64_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f64_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f64_struct]]]()
-            f64_sl_od_matrix_sets.reserve(len(self.demand.f64_names))
+            f64_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
             for j in range(self.select_link_sets.size()):
                 f64_sl_od_matrix_demand_cols = new vector[COO_f64_struct](len(self.demand.f64_names))
@@ -158,7 +158,7 @@ cdef class LinkLoadingResults:
         self.f32_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f32_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f32_struct]]]()
-            f32_sl_od_matrix_sets.reserve(len(self.demand.f32_names))
+            f32_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
             for j in range(self.select_link_sets.size()):
                 f32_sl_od_matrix_demand_cols = new vector[COO_f32_struct](len(self.demand.f32_names))
@@ -531,7 +531,7 @@ cdef class LinkLoadingResults:
                     for k in range(d(f64_sl_ll).size()):
                         d(f64_sl_ll_result)[k] = d(f64_sl_ll_result)[k] + d(f64_sl_ll)[k]
 
-        # # Then we do it all over again for the floats.
+        # Then we do it all over again for the floats.
         for thread_id in range(self.f32_sl_link_loading_threaded.size()):
             f32_sl_ll_sets_cols = self.f32_sl_link_loading_threaded[thread_id].get()
 
