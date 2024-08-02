@@ -419,10 +419,6 @@ class RouteChoice:
 
             or_set = set()
             for link_ids in normalised_link_set:
-                # For compatibility, a tuple of length 2 is passed, we assume that's a single (link, dir) pair
-                if isinstance(link_ids, tuple) and len(link_ids) == 2:
-                    link_ids = (link_ids,)
-
                 and_set = set()
                 for link, dir in link_ids:
                     if dir == 0:
