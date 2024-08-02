@@ -679,18 +679,14 @@ cdef class LinkLoadingResults:
             for j in range(self.demand.f64.size()):
                 coo = COO.from_f64_struct(d(self.f64_sl_od_matrix[i])[j])
                 coo.shape = self.demand.shape
-                res.append(coo)
+                res.append((self.demand.f64_names[j], coo))
 
-            od_matrix_objects.append(dict(zip(self.demand.f64_names, res)))
-
-        for i in range(self.select_link_sets.size()):
-            res = []
             for j in range(self.demand.f32.size()):
                 coo = COO.from_f32_struct(d(self.f32_sl_od_matrix[i])[j])
                 coo.shape = self.demand.shape
-                res.append(coo)
+                res.append((self.demand.f32_names[j], coo))
 
-            od_matrix_objects.append(dict(zip(self.demand.f32_names, res)))
+            od_matrix_objects.append(dict(res))
 
         self.f64_sl_od_matrix.clear()
         self.f32_sl_od_matrix.clear()
