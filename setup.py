@@ -100,7 +100,7 @@ pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
     "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
     "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae": ["./parameters.yml"],
+    "aequilibrae": ["./parameters.yml", "__version__.py"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
