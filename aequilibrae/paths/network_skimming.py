@@ -11,7 +11,7 @@ from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimmi
 from aequilibrae.paths.results.skim_results import SkimResults
 
 try:
-    from aequilibrae.paths.AoN import skimming_single_origin
+    from aequilibrae.paths.cython.AoN import skimming_single_origin
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 

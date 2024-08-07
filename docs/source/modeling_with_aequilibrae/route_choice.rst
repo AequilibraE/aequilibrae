@@ -41,7 +41,7 @@ Imports
 
 .. code:: python
 
-   from aequilibrae.paths.route_choice_set import RouteChoiceSet
+   from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
    from aequilibrae import Project
 
    proj = Project()

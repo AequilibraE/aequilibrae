@@ -3,6 +3,7 @@
 # Make sure to keep this up to date with that file
 
 import platform
+from os.path import join
 import numpy as np
 import pyarrow as pa
 from Cython.Build import cythonize
@@ -20,8 +21,8 @@ cpp_std = "/std:c++17" if is_win else "-std=c++17"
 
 ext_modules = [
     Extension(
-        "AoN",
-        ["AoN.pyx"],
+        "cython.AoN",
+        [join("cython", "AoN.pyx")],
         extra_compile_args=[f"{prefix}openmp", cpp_std],  # do we want -Ofast?
         extra_link_args=[f"{prefix}openmp"],
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],

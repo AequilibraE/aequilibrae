@@ -89,7 +89,7 @@ Code example
    from tempfile import gettempdir
    from os.path import join
    from aequilibrae.utils.create_example import create_example
-   from aequilibrae.paths.route_choice_set import RouteChoiceSet
+   from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
 
    fldr = join(gettempdir(), uuid4().hex)
    project = create_example(fldr, "coquimbo")

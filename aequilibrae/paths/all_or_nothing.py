@@ -8,7 +8,7 @@ from aequilibrae.matrix import AequilibraeMatrix
 from .multi_threaded_aon import MultiThreadedAoN
 
 try:
-    from aequilibrae.paths.AoN import one_to_all, assign_link_loads
+    from aequilibrae.paths.cython.AoN import one_to_all, assign_link_loads
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 

@@ -6,10 +6,10 @@ from tempfile import gettempdir
 from typing import List, Dict
 
 import numpy as np
-from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
-from aequilibrae.paths.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
-from aequilibrae.paths.AoN import sum_a_times_b_minus_c, linear_combination_1d
-from aequilibrae.paths.AoN import triple_linear_combination, triple_linear_combination_skims
+from aequilibrae.paths.cython.AoN import copy_two_dimensions, copy_three_dimensions
+from aequilibrae.paths.cython.AoN import linear_combination, linear_combination_skims, aggregate_link_costs
+from aequilibrae.paths.cython.AoN import sum_a_times_b_minus_c, linear_combination_1d
+from aequilibrae.paths.cython.AoN import triple_linear_combination, triple_linear_combination_skims
 from scipy.optimize import root_scalar
 
 from aequilibrae.paths.all_or_nothing import allOrNothing

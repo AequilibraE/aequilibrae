@@ -109,6 +109,7 @@ pkg_data = {
         "database_specification/network/triggers/*.*",
         "database_specification/transit/tables/*.*",
         "database_specification/transit/triggers/*.*",
+        "network/network.yml",
     ],
 }
 
