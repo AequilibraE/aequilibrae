@@ -41,7 +41,9 @@ extension_args = {
     "language": "c++",
 }
 
-ext_mod_aon = Extension("aequilibrae.paths.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args)
+ext_mod_aon = Extension(
+    "aequilibrae.paths.cython.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args
+)
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
@@ -50,7 +52,7 @@ ext_mod_ipf = Extension(
 )
 
 ext_mod_put = Extension(
-    "aequilibrae.paths.public_transport",
+    "aequilibrae.paths.cython.public_transport",
     [join("aequilibrae", "paths", "cython", "public_transport.pyx")],
     **extension_args,
 )
@@ -80,7 +82,7 @@ ext_mod_rc_set_results = Extension(
 )
 
 ext_mod_graph_building = Extension(
-    "aequilibrae.paths.graph_building",
+    "aequilibrae.paths.cython.graph_building",
     [join("aequilibrae", "paths", "cython", "graph_building.pyx")],
     **extension_args,
 )
@@ -98,8 +100,9 @@ pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
-    "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
+    "aequilibrae.paths.cython": ["parameters.pxi", "*.pyx", "*.pxd"],
     "aequilibrae.distribution": ["*.pyx"],
+    "aequilibrae.matrix": ["*.pyx", "*.pxd"],
     "aequilibrae": ["./parameters.yml", "__version__.py"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
