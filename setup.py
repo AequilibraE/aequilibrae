@@ -1,6 +1,6 @@
 import importlib.util as iutil
 import platform
-from os.path import join
+from os.path import join, dirname
 
 import numpy as np
 from Cython.Distutils import build_ext
@@ -8,6 +8,10 @@ from Cython.Build import cythonize
 from setuptools import Extension
 from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
+
+import sys
+
+sys.path.append(join(dirname(__file__), "aequilibrae", "matrix", "cython"))
 
 with open("__version__.py") as f:
     exec(f.read())
@@ -87,7 +91,7 @@ ext_mod_graph_building = Extension(
 
 ext_mod_sparse_matrix = Extension(
     "aequilibrae.matrix.sparse_matrix",
-    [join("aequilibrae", "matrix", "sparse_matrix.pyx")],
+    [join("aequilibrae", "matrix", "cython", "sparse_matrix.pyx")],
     **extension_args,
 )
 
