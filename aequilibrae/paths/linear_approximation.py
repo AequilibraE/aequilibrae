@@ -20,16 +20,16 @@ if False:
     from aequilibrae.paths.traffic_assignment import TrafficAssignment
 
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
 from aequilibrae.utils.python_signal import PythonSignal
 
 
-class LinearApproximation:
+class LinearApproximation(WorkerThread):
     def __init__(self, assig_spec, algorithm, project=None) -> None:
+        WorkerThread.__init__(self, None)
         self.equilibration = SIGNAL(object)
         self.assignment = SIGNAL(object)
-        if isinstance(self.assignment, PythonSignal):
-            self.assignment.pos = 1
-
+        self.assignment.emit(["set_position", 1])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
         self.project_path = project.project_base_path if project else gettempdir()
@@ -471,6 +471,7 @@ class LinearApproximation:
         self.equilibration.emit(["start", self.max_iter, "Equilibrium Assignment"])
         self.logger.info(f"{self.algorithm} Assignment STATS")
         self.logger.info("Iteration, RelativeGap, stepsize")
+        self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
             self.equilibration.emit(["key_value", "rgap", self.rgap])
@@ -481,7 +482,6 @@ class LinearApproximation:
             self.__maybe_create_path_file_directories()
 
             for c in self.traffic_classes:  # type: TrafficClass
-                self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
                 # cost = c.fixed_cost / c.vot + self.congested_time #  now only once
                 cost = c.fixed_cost + self.congested_time
                 aggregate_link_costs(cost, c.graph.compact_cost, c.results.crosswalk)
@@ -513,7 +513,7 @@ class LinearApproximation:
                             copy_three_dimensions(
                                 c.results.select_link_od.matrix[name],  # matrix being written into
                                 np.sum(self.aons[c._id].aux_res.temp_sl_od_matrix, axis=0)[
-                                    idx, :, :, :
+                                idx, :, :, :
                                 ],  # results after the iteration
                                 self.cores,  # core count
                             )

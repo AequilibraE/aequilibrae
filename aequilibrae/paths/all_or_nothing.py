@@ -46,6 +46,8 @@ class allOrNothing:
         if self.assignment is None:
             self.assignment = SIGNAL(object)
             self.assignment.emit(["start", self.matrix.zones, self.class_name])
+        else:
+            self.assignment.emit(["set_text", f"All-or-Nothing: {self.class_name}"])
 
     def doWork(self):
         self.execute()
