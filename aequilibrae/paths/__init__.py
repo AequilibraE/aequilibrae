@@ -9,14 +9,14 @@ from aequilibrae.paths.traffic_assignment import TrafficAssignment, TransitAssig
 from aequilibrae.paths.vdf import VDF
 from aequilibrae.paths.graph import Graph, TransitGraph
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
-from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+from aequilibrae.paths.public_transport import HyperpathGenerating
 from aequilibrae.paths.route_choice import RouteChoice
 
 from aequilibrae import global_logger
 
 
 try:
-    from aequilibrae.paths.cython.AoN import (
+    from aequilibrae.paths.AoN import (
         one_to_all,
         skimming_single_origin,
         path_computation,

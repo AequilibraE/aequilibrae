@@ -41,9 +41,7 @@ extension_args = {
     "language": "c++",
 }
 
-ext_mod_aon = Extension(
-    "aequilibrae.paths.cython.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args
-)
+ext_mod_aon = Extension("aequilibrae.paths.AoN", [join("aequilibrae", "paths", "cython", "AoN.pyx")], **extension_args)
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
@@ -52,37 +50,37 @@ ext_mod_ipf = Extension(
 )
 
 ext_mod_put = Extension(
-    "aequilibrae.paths.cython.public_transport",
+    "aequilibrae.paths.public_transport",
     [join("aequilibrae", "paths", "cython", "public_transport.pyx")],
     **extension_args,
 )
 
 ext_mod_rc = Extension(
-    "aequilibrae.paths.cython.route_choice_set",
+    "aequilibrae.paths.route_choice_set",
     [join("aequilibrae", "paths", "cython", "route_choice_set.pyx")],
     **extension_args,
 )
 
 ext_mod_coo_demand = Extension(
-    "aequilibrae.paths.cython.coo_demand",
+    "aequilibrae.paths.coo_demand",
     [join("aequilibrae", "paths", "cython", "coo_demand.pyx")],
     **extension_args,
 )
 
 ext_mod_rc_ll_results = Extension(
-    "aequilibrae.paths.cython.route_choice_link_loading_results",
+    "aequilibrae.paths.route_choice_link_loading_results",
     [join("aequilibrae", "paths", "cython", "route_choice_link_loading_results.pyx")],
     **extension_args,
 )
 
 ext_mod_rc_set_results = Extension(
-    "aequilibrae.paths.cython.route_choice_set_results",
+    "aequilibrae.paths.route_choice_set_results",
     [join("aequilibrae", "paths", "cython", "route_choice_set_results.pyx")],
     **extension_args,
 )
 
 ext_mod_graph_building = Extension(
-    "aequilibrae.paths.cython.graph_building",
+    "aequilibrae.paths.graph_building",
     [join("aequilibrae", "paths", "cython", "graph_building.pyx")],
     **extension_args,
 )

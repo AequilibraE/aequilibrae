@@ -46,7 +46,7 @@ Imports
    import networkx as nx
    import numpy as np
    import pandas as pd
-   from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+   from aequilibrae.paths.public_transport import HyperpathGenerating
    from numba import jit
 
    RS = 124  # random seed

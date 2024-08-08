@@ -9,7 +9,7 @@ from aequilibrae import global_logger
 from pathlib import Path
 
 try:
-    from aequilibrae.paths.cython.AoN import sum_axis1, assign_link_loads
+    from aequilibrae.paths.AoN import sum_axis1, assign_link_loads
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 

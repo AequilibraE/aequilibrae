@@ -1,7 +1,7 @@
 from aequilibrae import global_logger
 
 try:
-    from aequilibrae.paths.cython.AoN import (
+    from aequilibrae.paths.AoN import (
         bpr,
         delta_bpr,
         bpr2,

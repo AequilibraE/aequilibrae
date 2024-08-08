@@ -11,7 +11,7 @@ from aequilibrae import transit
 from aequilibrae import project
 
 try:
-    from aequilibrae.paths.cython.AoN import path_computation
+    from aequilibrae.paths.AoN import path_computation
 except Exception as e:
     global_logger.warning(f"Failed to import compiled modules. {e.args}")
     raise

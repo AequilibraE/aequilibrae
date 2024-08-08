@@ -17,8 +17,8 @@ import scipy
 from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
-from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
+from aequilibrae.paths.route_choice_set import RouteChoiceSet
+from aequilibrae.paths.coo_demand import GeneralisedCOODemand
 
 
 class RouteChoice:

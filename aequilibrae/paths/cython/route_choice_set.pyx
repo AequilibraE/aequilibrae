@@ -1,7 +1,7 @@
 # cython: language_level=3str
 from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, vector_bool_ptr, shuffle
-from aequilibrae.paths.cython.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.paths.route_choice_types cimport LinkSet_t, minstd_rand, vector_bool_ptr, shuffle
+from aequilibrae.paths.coo_demand cimport GeneralisedCOODemand
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid

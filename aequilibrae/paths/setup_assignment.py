@@ -21,7 +21,7 @@ cpp_std = "/std:c++17" if is_win else "-std=c++17"
 
 ext_modules = [
     Extension(
-        "cython.AoN",
+        "AoN",
         [join("cython", "AoN.pyx")],
         extra_compile_args=[f"{prefix}openmp", cpp_std],  # do we want -Ofast?
         extra_link_args=[f"{prefix}openmp"],

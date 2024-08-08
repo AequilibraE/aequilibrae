@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
-from aequilibrae.paths.cython.AoN import copy_one_dimension, sum_axis1, linear_combination, linear_combination_skims
-from aequilibrae.paths.cython.AoN import copy_two_dimensions, copy_three_dimensions
+from aequilibrae.paths.AoN import copy_one_dimension, sum_axis1, linear_combination, linear_combination_skims
+from aequilibrae.paths.AoN import copy_two_dimensions, copy_three_dimensions
 
 
 class TestParallel(unittest.TestCase):

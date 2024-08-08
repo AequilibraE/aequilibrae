@@ -10,7 +10,7 @@ https://aetperf.github.io/2023/05/10/Hyperpath-routing-in-the-context-of-transit
 import numpy as np
 import pandas as pd
 from unittest import TestCase
-from aequilibrae.paths.cython.public_transport import HyperpathGenerating
+from aequilibrae.paths.public_transport import HyperpathGenerating
 
 
 def create_vertices(n):

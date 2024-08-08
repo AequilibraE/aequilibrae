@@ -1,5 +1,5 @@
-from aequilibrae.paths.cython.coo_demand cimport GeneralisedCOODemand
-from aequilibrae.paths.cython.route_choice_types cimport (
+from aequilibrae.paths.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.paths.route_choice_types cimport (
     RouteVec_t,
     RouteSet_t,
     CUInt32Builder,
