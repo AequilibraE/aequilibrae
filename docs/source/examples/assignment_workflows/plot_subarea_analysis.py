@@ -117,6 +117,94 @@ zones = zones.loc[zones_of_interest]
 zones.head()
 
 # %%
+# Sub-area analysis
+# ~~~~~~~~~~~~~~~~~~~~
+
+# From here there are two main paths to conduct a sub-area analysis, manual or automated. AequilibraE ships with a small
+# class that handle most of the details regarding the implementation and extract of the relevant data. It also exposes
+# all the tools necessary to conduct this analysis yourself if you need fine grained control.
+
+# %%
+# Automated sub-area analysis
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# We first construct out SubAreaAnalysis object from the graph, zones, and matrix we previously constructed, then
+# configure the route choice assignment and execute it. From there the `post_process` method is able to use the route
+# choice assignment results to construct the desired demand matrix as a DataFrame.
+from aequilibrae.paths import SubAreaAnalysis
+
+subarea = SubAreaAnalysis(graph, zones, mat)
+subarea.rc.set_choice_set_generation("lp", max_routes=5, penalty=1.02, store_results=False)
+subarea.rc.execute(perform_assignment=True)
+demand = subarea.post_process()
+demand
+
+# %%
+# We'll re-prepare our graph but with our new "external" ODs.
+new_centroids = np.unique(demand.reset_index()[["origin id", "destination id"]].to_numpy().reshape(-1))
+graph.prepare_graph(new_centroids)
+graph.set_graph("utility")
+new_centroids
+
+# %%
+# We can then perform an assignment using our new demand matrix on the limited graph
+from aequilibrae.paths import RouteChoice
+
+rc = RouteChoice(graph)
+rc.add_demand(demand)
+rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02, store_results=False, seed=123)
+rc.execute(perform_assignment=True)
+
+# %%
+# And plot the link loads for easy viewing
+subarea_zone = folium.Polygon(
+    locations=[(x[1], x[0]) for x in zones.unary_union.boundary.coords],
+    fill_color="blue",
+    fill_opacity=0.5,
+    fill=True,
+    stroke=False,
+)
+
+
+def plot_results(link_loads):
+    link_loads = link_loads[link_loads.tot > 0]
+    max_load = link_loads["tot"].max()
+    links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
+    loaded_links = links.merge(link_loads, on="link_id", how="inner")
+
+    loads_lyr = folium.FeatureGroup("link_loads")
+
+    # Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
+    factor = 10 / max_load
+
+    # Let's create the layers
+    for _, rec in loaded_links.iterrows():
+        points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
+        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
+        # we need to take from x/y to lat/long
+        points = [[x[1], x[0]] for x in eval(points)]
+        _ = folium.vector_layers.PolyLine(
+            points,
+            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
+            color="red",
+            weight=factor * rec.tot,
+        ).add_to(loads_lyr)
+    long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
+
+    map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
+    loads_lyr.add_to(map_osm)
+    folium.LayerControl().add_to(map_osm)
+    return map_osm
+
+
+map = plot_results(rc.get_load_results()["demand"])
+subarea_zone.add_to(map)
+map
+
+# %%
+# Manual sub-area analysis further preparation
+# ~~~~~~~~~~~~~~~~~~~~~
+# %%
 # We take the union of this GeoDataFrame as our polygon.
 poly = zones.unary_union
 poly
@@ -163,14 +251,6 @@ long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geo
 
 map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
 
-subarea_zone = folium.Polygon(
-    locations=[(x[1], x[0]) for x in poly.boundary.coords],
-    fill_color="blue",
-    fill_opacity=0.5,
-    fill=True,
-    stroke=False,
-)
-
 subarea_zone.add_to(map_osm)
 
 subarea_layer.add_to(map_osm)
@@ -178,7 +258,7 @@ _ = folium.LayerControl().add_to(map_osm)
 map_osm
 
 # %%
-# Sub-area analysis
+# Manual sub-area analysis
 # ~~~~~~~~~~~~~~~~~~~~~
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists our polygon. To do
 # so we perform a select link analysis on all links and pairs of links that cross the boundary.  We create them as
@@ -192,10 +272,19 @@ f"Created: {len(edge_pairs)} edge pairs from {len(single_edges)} edges"
 from aequilibrae.paths import RouteChoice
 
 # %%
-# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
-# link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to supply
-# a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided link loading
-# cannot be preformed.
+# We'll re-prepare out graph quickly
+project.network.build_graphs()
+graph = project.network.graphs["c"]
+graph.network = graph.network.assign(utility=graph.network.distance * theta)
+graph.prepare_graph(graph.centroids)
+graph.set_graph("utility")
+graph.set_blocked_centroid_flows(False)
+
+# %%
+# This object construction might take a minute depending on the size of the graph due to the construction of the
+# compressed link to network link mapping that's required.  This is a one time operation per graph and is cached. We
+# need to supply a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided
+# link loading cannot be preformed.
 rc = RouteChoice(graph)
 rc.add_demand(mat)
 
@@ -204,7 +293,8 @@ rc.add_demand(mat)
 rc.set_select_links(single_edges | edge_pairs)
 
 # %%
-# For the sake of demonstration we limit out demand matrix to a few OD pairs.
+# For the sake of demonstration we limit out demand matrix to a few OD pairs. This filter is also possible with the
+# automated approach, just edit the `subarea.rc.demand.df` DataFrame, however make sure the index remains intact.
 ods_pairs_of_interest = [
     (4, 39),
     (92, 37),
@@ -224,37 +314,6 @@ rc.execute(perform_assignment=True)
 
 # %%
 # We can visualise the current links loads
-def plot_results(link_loads):
-    link_loads = link_loads[link_loads.tot > 0]
-    max_load = link_loads["tot"].max()
-    links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
-    loaded_links = links.merge(link_loads, on="link_id", how="inner")
-
-    loads_lyr = folium.FeatureGroup("link_loads")
-
-    # Maximum thickness we would like is probably a 10, so let's make sure we don't go over that
-    factor = 10 / max_load
-
-    # Let's create the layers
-    for _, rec in loaded_links.iterrows():
-        points = rec.geometry.wkt.replace("LINESTRING ", "").replace("(", "").replace(")", "").split(", ")
-        points = "[[" + "],[".join([p.replace(" ", ", ") for p in points]) + "]]"
-        # we need to take from x/y to lat/long
-        points = [[x[1], x[0]] for x in eval(points)]
-        _ = folium.vector_layers.PolyLine(
-            points,
-            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
-            color="red",
-            weight=factor * rec.tot,
-        ).add_to(loads_lyr)
-    long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
-
-    map_osm = folium.Map(location=[lat, long], tiles="Cartodb Positron", zoom_start=12)
-    loads_lyr.add_to(map_osm)
-    folium.LayerControl().add_to(map_osm)
-    return map_osm
-
-
 map = plot_results(rc.get_load_results()["demand"])
 subarea_zone.add_to(map)
 map

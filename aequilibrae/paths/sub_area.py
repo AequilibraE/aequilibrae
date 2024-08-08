@@ -137,6 +137,11 @@ class SubAreaAnalysis:
                     if not o_inside and not d_inside:
                         through[self.graph.all_nodes[link1.a_node], self.graph.all_nodes[link2.b_node]] += load
 
+            interior = []
+            for o, d in self.rc.demand.df.index:
+                if o in self.interior_nodes.index and d in self.interior_nodes.index:
+                    interior.append((o, d))
+
             sub_area_demand.append(
                 pd.DataFrame(
                     list(entered.values()) + list(exited.values()) + list(through.values()),
@@ -148,5 +153,11 @@ class SubAreaAnalysis:
                 )
             )
 
-        self.sub_area_demand = pd.concat(sub_area_demand, axis=1).fillna(0.0).sort_index()
+        interior = []
+        for o, d in self.rc.demand.df.index:
+            if o in self.interior_nodes.index and d in self.interior_nodes.index:
+                interior.append((o, d))
+
+        self.sub_area_demand = pd.concat(sub_area_demand, axis=1).fillna(0.0)
+        self.sub_area_demand = pd.concat([self.sub_area_demand, self.rc.demand.df.loc[interior]]).sort_index()
         return self.sub_area_demand

@@ -114,10 +114,11 @@ mat.computational_view()
 # Here we'll construct and use the Route Choice class to generate our route sets
 from aequilibrae.paths import RouteChoice
 
-# %% This object construct might take a minute depending on the size of the graph due to the construction of the
-# compressed link to network link mapping that's required.  This is a one time operation per graph and is cached. We
-# need to supply a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided
-# link loading cannot be preformed.
+# %%
+# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
+# link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to supply
+# a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided link loading
+# cannot be preformed.
 rc = RouteChoice(graph)
 rc.add_demand(mat)
 
