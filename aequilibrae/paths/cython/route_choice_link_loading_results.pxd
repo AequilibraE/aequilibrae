@@ -19,6 +19,7 @@ cdef class LinkLoadingResults:
         GeneralisedCOODemand demand
         readonly object select_link_set_names
         size_t num_links
+        bint sl_link_loading
 
         # Number of threads
         #               * number of demand cols

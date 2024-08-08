@@ -64,6 +64,7 @@ class RouteChoice:
 
         self._config = {}
         self._selected_links = {}
+        self.sl_link_loading = True
 
     @cached_property
     def __rc(self) -> RouteChoiceSet:
@@ -262,6 +263,7 @@ class RouteChoice:
             path_size_logit=bool(demand),
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
 
@@ -289,6 +291,7 @@ class RouteChoice:
             path_size_logit=perform_assignment,
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
 
@@ -380,7 +383,9 @@ class RouteChoice:
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         return df.sort_index()
 
-    def set_select_links(self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
+    def set_select_links(
+        self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]], link_loading=True
+    ):
         """
         Set the selected links. Checks if the links and directions are valid. Supports OR and AND sets of links.
 
@@ -395,8 +400,13 @@ class RouteChoice:
         :Arguments:
             **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
                 Name of link set and Link IDs and directions to be used in select link analysis.
+
+            **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix results are
+              available.
+
         """
         self._selected_links = {}
+        self.sl_link_loading = link_loading
 
         if links is None:
             del self._config["select_links"]
@@ -460,7 +470,9 @@ class RouteChoice:
         """
 
         if self.demand.no_demand():
-            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+            raise ValueError("no demand was provided. To perform link loading add a demand matrix or data frame")
+        elif not self.sl_link_loading:
+            raise ValueError("select link loading was disabled via `set_select_links(..., link_loading=False)`")
 
         sl_link_loads = {}
         for sl_name, sl_res in self.__rc.get_sl_link_loading().items():

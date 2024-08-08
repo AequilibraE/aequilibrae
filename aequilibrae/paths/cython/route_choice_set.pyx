@@ -160,6 +160,7 @@ cdef class RouteChoiceSet:
             self,
             demand: GeneralisedCOODemand,
             select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+            sl_link_loading: bool = True,
             max_routes: int = 0,
             max_depth: int = 0,
             max_misses: int = 100,
@@ -261,7 +262,7 @@ cdef class RouteChoiceSet:
             int thread_id
 
         demand._initalise_col_names()
-        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, c_cores)
+        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
 
         for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
             demand._initalise_c_data(grouped_demand_df)
