@@ -174,9 +174,8 @@ def plot_results(link_loads):
     import folium
     import geopandas as gpd
 
-    link_loads = link_loads[["link_id", "demand_tot"]]
-    link_loads = link_loads[link_loads.demand_tot > 0]
-    max_load = link_loads["demand_tot"].max()
+    link_loads = link_loads[link_loads.tot > 0]
+    max_load = link_loads["tot"].max()
     links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
@@ -193,9 +192,9 @@ def plot_results(link_loads):
         points = [[x[1], x[0]] for x in eval(points)]
         _ = folium.vector_layers.PolyLine(
             points,
-            tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
+            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
             color="red",
-            weight=factor * rec.demand_tot,
+            weight=factor * rec.tot,
         ).add_to(loads_lyr)
     long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
@@ -206,7 +205,7 @@ def plot_results(link_loads):
 
 
 # %%
-plot_results(rc.get_load_results())
+plot_results(rc.get_load_results()["demand"])
 
 # %%
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
@@ -225,7 +224,7 @@ res.head()
 rc.get_load_results()
 
 # %% we can plot these as well
-plot_results(rc.get_load_results())
+plot_results(rc.get_load_results()["demand"])
 
 # %%
 # Select link analysis
@@ -233,7 +232,7 @@ plot_results(rc.get_load_results())
 # We can also enable select link analysis by providing the links and the directions that we are interested in.  Here we
 # set the select link to trigger when (7369, 1) and (20983, 1) is utilised in "sl1" and "sl2" when (7369, 1) is
 # utilised.
-rc.set_select_links({"sl1": [[(7369, 1), (20983, 1)]], "sl2": [(7369, 1)]})
+rc.set_select_links({"sl1": [[(7369, 1), (20983, 1)]], "sl2": [[(7369, 1)]]})
 rc.execute(perform_assignment=True)
 
 # %%
