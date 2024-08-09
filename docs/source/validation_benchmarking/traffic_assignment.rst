@@ -227,7 +227,7 @@ Regional), as that instance has a comparable size to real-world models.
 
    .. tab:: Chicago
 
-      .. image:: ../images/assig_validation/convergence_comparison_Chicago.png
+      .. image:: ../images/assig_validation/convergence_comparison_ChicagoRegional.png
           :align: center
           :width: 590
           :alt: Algorithm convergence comparison
