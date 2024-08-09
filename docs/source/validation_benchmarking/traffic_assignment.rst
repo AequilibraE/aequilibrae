@@ -9,183 +9,211 @@ least one very reasonable question: Are the results right?
 
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
-comparing algorithm results, some of which achieve
-converged solutions (~1e-14). Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
+comparing algorithm results.
+Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
-Sioux Falls
+All tests were performed with the AequilibraE version 1.1.0.
+
+Validation
 -----------
-Network has:
 
-* Links: 76
-* Nodes: 24
-* Zones: 24
-
-.. image:: ../images/sioux_falls_msa-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Sioux Falls MSA 500 iterations
-
-|
-
-.. image:: ../images/sioux_falls_frank-wolfe-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Sioux Falls Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/sioux_falls_cfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Sioux Falls Conjugate Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/sioux_falls_bfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Sioux Falls Biconjugate Frank-Wolfe 500 iterations
-
-Anaheim
--------
-Network has:
-
-* Links: 914
-* Nodes: 416
-* Zones: 38
-
-.. image:: ../images/anaheim_msa-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Anaheim MSA 500 iterations
-
-|
-
-.. image:: ../images/anaheim_frank-wolfe-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Anaheim Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/anaheim_cfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Anaheim Conjugate Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/anaheim_bfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Anaheim Biconjugate Frank-Wolfe 500 iterations
-
-Winnipeg
---------
-Network has:
-
-* Links: 914
-* Nodes: 416
-* Zones: 38
-
-.. image:: ../images/winnipeg_msa-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Winnipeg MSA 500 iterations
-
-|
-
-.. image:: ../images/winnipeg_frank-wolfe-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Winnipeg Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/winnipeg_cfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Winnipeg Conjugate Frank-Wolfe 500 iterations
-
-|
-
-.. image:: ../images/winnipeg_bfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Winnipeg Biconjugate Frank-Wolfe 500 iterations
-
-The results for Winnipeg do not seem extremely good when compared to a highly,
-but we believe posting its results would suggest deeper investigation by one
-of our users :-)
+As shown below, the results produced by AequilibraE are within expected, although
+some differences have been found, particularly for Winnipeg.
+We suspect that there are issues with the reference results and welcome further investigations.
 
 
-Barcelona
----------
-Network has:
+.. tabs::
 
-* Links: 2,522
-* Nodes: 1,020
-* Zones: 110
+   .. tab:: Chicago
 
-.. image:: ../images/barcelona_msa-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Barcelona MSA 500 iterations
+      .. tabs::
 
-|
+         .. tab:: Network stats
 
-.. image:: ../images/barcelona_frank-wolfe-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Barcelona Frank-Wolfe 500 iterations
+            * Links: 39,018
+            * Nodes: 12,982
+            * Zones: 1,790
 
-|
+         .. tab:: Bi-conjugate Frank-Wolfe
 
-.. image:: ../images/barcelona_cfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Barcelona Conjugate Frank-Wolfe 500 iterations
+            .. image:: ../images/assig_validation/ChicagoRegional_bfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Chicago Biconjugate Frank-Wolfe 1000 iterations
 
-|
+         .. tab:: Conjugate Frank-Wolfe
 
-.. image:: ../images/barcelona_bfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Barcelona Biconjugate Frank-Wolfe 500 iterations
+            .. image:: ../images/assig_validation/ChicagoRegional_cfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Chicago Conjugate Frank-Wolfe 1000 iterations
 
-Chicago Regional
-----------------
-Network has:
+         .. tab:: Frank-Wolfe
 
-* Links: 39,018
-* Nodes: 12,982
-* Zones: 1,790
+            .. image:: ../images/assig_validation/ChicagoRegional_fw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Chicago Frank-Wolfe 1000 iterations
 
-.. image:: ../images/chicago_regional_msa-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Chicago MSA 500 iterations
+         .. tab:: MSA
 
-|
+            .. image:: ../images/assig_validation/ChicagoRegional_msa-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Chicago MSA 1000 iterations
 
-.. image:: ../images/chicago_regional_frank-wolfe-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Chicago Frank-Wolfe 500 iterations
+   .. tab:: Barcelona
 
-|
+      .. tabs::
 
-.. image:: ../images/chicago_regional_cfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Chicago Conjugate Frank-Wolfe 500 iterations
+         .. tab:: Network stats
 
-|
+            * Links: 2,522
+            * Nodes: 1,020
+            * Zones: 110
 
-.. image:: ../images/chicago_regional_bfw-500_iter.png
-    :align: center
-    :width: 590
-    :alt: Chicago Biconjugate Frank-Wolfe 500 iterations
+         .. tab:: Bi-conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Barcelona_bfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Biconjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Barcelona_cfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Conjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Barcelona_fw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Barcelona Frank-Wolfe 1000 iterations
+
+         .. tab:: MSA
+
+            .. image:: ../images/assig_validation/Barcelona_msa-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Barcelona MSA 1000 iterations
+
+   .. tab:: Winnipeg
+
+      .. tabs::
+
+         .. tab:: Network stats
+
+            * Links: 914
+            * Nodes: 416
+            * Zones: 38
+
+         .. tab:: Bi-conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Winnipeg_bfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Winnipeg Biconjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Winnipeg_cfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Winnipeg Conjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Winnipeg_fw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Winnipeg Frank-Wolfe 1000 iterations
+
+         .. tab:: MSA
+
+            .. image:: ../images/assig_validation/Winnipeg_msa-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Winnipeg MSA 1000 iterations
+
+   .. tab:: Anaheim
+
+      .. tabs::
+
+         .. tab:: Network stats
+
+            * Links: 914
+            * Nodes: 416
+            * Zones: 38
+
+         .. tab:: Bi-conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Anaheim_bfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Anaheim Biconjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Anaheim_cfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Anaheim Conjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Frank-Wolfe
+
+            .. image:: ../images/assig_validation/Anaheim_fw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Anaheim Frank-Wolfe 1000 iterations
+
+         .. tab:: MSA
+
+            .. image:: ../images/assig_validation/Anaheim_msa-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Anaheim MSA 1000 iterations
+
+   .. tab:: Sioux Falls
+
+      .. tabs::
+
+         .. tab:: Network stats
+
+            * Links: 76
+            * Nodes: 24
+            * Zones: 24
+
+         .. tab:: Bi-conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/SiouxFalls_bfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Sioux Falls Biconjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Conjugate Frank-Wolfe
+
+            .. image:: ../images/assig_validation/SiouxFalls_cfw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Sioux Falls Conjugate Frank-Wolfe 1000 iterations
+
+         .. tab:: Frank-Wolfe
+
+            .. image:: ../images/assig_validation/SiouxFalls_fw-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Sioux Falls Frank-Wolfe 1000 iterations
+
+
+         .. tab:: MSA
+
+            .. image:: ../images/assig_validation/SiouxFalls_msa-1000_iter.png
+                :align: center
+                :width: 590
+                :alt: Sioux Falls MSA 1000 iterations
 
 Convergence Study
 -----------------
@@ -196,19 +224,51 @@ Regional), as that instance has a comparable size to real-world models.
 
 .. _algorithm_convergence_comparison:
 
-.. image:: ../images/convergence_comparison.png
-    :align: center
-    :width: 590
-    :alt: Algorithm convergence comparison
+.. tabs::
 
-|
+   .. tab:: Chicago
+
+      .. image:: ../images/assig_validation/convergence_comparison_Chicago.png
+          :align: center
+          :width: 590
+          :alt: Algorithm convergence comparison
+
+   .. tab:: Barcelona
+
+      .. image:: ../images/assig_validation/ChicagoRegional_cfw-1000_iter.png
+          :align: center
+          :width: 590
+          :alt: Chicago Conjugate Frank-Wolfe 1000 iterations
+
+   .. tab:: Winnipeg
+
+      .. image:: ../images/assig_validation/ChicagoRegional_fw-1000_iter.png
+          :align: center
+          :width: 590
+          :alt: Chicago Frank-Wolfe 1000 iterations
+
+   .. tab:: Anaheim
+
+      .. image:: ../images/assig_validation/ChicagoRegional_msa-1000_iter.png
+          :align: center
+          :width: 590
+          :alt: Chicago MSA 1000 iterations
+
+   .. tab:: Sioux-Falls
+
+      .. image:: ../images/assig_validation/convergence_comparison_SiouxFalls.png
+          :align: center
+          :width: 590
+          :alt: Algorithm convergence comparison
+
 
 Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
-Successive Averages for a number of iterations larger than 25, and is capable of
+Successive Averages for a number of iterations larger than 25 in the case of
+Chicago, and is capable of
 reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
-after 1,000 iterations.
+after 1,000 iterations for that same case.
 
-The actual show, however, is left for the Biconjugate Frank-Wolfe
+The actual show, however, is left for the Bi-conjugate Frank-Wolfe
 implementation, which delivers a relative gap of under 1.0e-04 in under 200
 iterations, and a relative gap of under 1.0e-05 in just over 700 iterations.
 
@@ -218,17 +278,16 @@ applications.
 
 Computational performance
 -------------------------
-Running on a IdeaPad laptop equipped with a 6 cores (12 threads) Intel Core i7-10750H
-CPU @ 2.60 GHz, and 32GB of RAM, AequilibraE performed 1,000 iterations of 
-Frank-Wolfe assignment on the Chicago Network in just under 18 minutes, 
-while Bi-conjugate Frank Wolfe takes just under 19 minutes, or a little more than
-1s per All-or-Nothing iteration.
+
+All tests were run on a workstation equipped AMD Threadripper 3970X with 32 cores
+(64 threads) @ 3.7 GHz (memory use is trivial for these instances).
+
+On this machine, AequilibraE performed 1,000 iterations of
+Bi-conjugate Frank-Wolfe assignment on the Chicago Network in a little over 4 minutes,
+or a little less than 0.43s per iteration.
 
 Compared with AequilibraE previous versions, we can notice a reasonable decrease
 in processing time.
-
-Noteworthy items
-----------------
 
 .. note::
    The biggest opportunity for performance in AequilibraE right now it to apply
@@ -352,5 +411,3 @@ understand, and then we'll perform the assignment.
 
         assig.report().to_csv(os.path.join(data_folder, f"{algorithm}_computational_results.csv"))
 
-As we've exported the assignment's results into CSV files, we can use Pandas to read the files,
-and plot a graph just :ref:`like the one above <algorithm_convergence_comparison>`.
