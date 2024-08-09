@@ -3,7 +3,6 @@ import os
 
 cimport numpy as np
 from libcpp cimport bool
-# include 'parameters.pxi'
 include 'basic_path_finding.pyx'
 include 'bpr.pyx'
 include 'bpr2.pyx'
@@ -176,7 +175,7 @@ def path_computation(origin, destination, graph, results):
     :param results: AequilibraE Matrix properly set for computation using matrix.computational_view([matrix list])
     :param skimming: if we will skim for all nodes or not
     """
-    cdef ITYPE_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
+    cdef np.int64_t nodes, orig, dest, p, b, origin_index, dest_index, connector, zones
     cdef long i, j, skims, a, block_flows_through_centroids
     cdef bint early_exit_bint = results.early_exit
 

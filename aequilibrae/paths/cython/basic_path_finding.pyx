@@ -310,7 +310,7 @@ cpdef int path_finding(long origin,
         ElementState vert_state  # vertex state
         size_t origin_vert = <size_t>origin
         size_t destination_vert = <size_t>destination if destination != -1 else 0
-        ITYPE_t found = 0
+        size_t found = 0
 
     for i in range(M):
         pred[i] = -1

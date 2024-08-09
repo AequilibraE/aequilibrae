@@ -36,7 +36,7 @@ SOFTWARE.
 
 from libc.stdlib cimport malloc, free
 from libc.math cimport INFINITY
-include "parameters.pxi"
+ctypedef double DTYPE_t
 
 cdef enum ElementState:
    SCANNED

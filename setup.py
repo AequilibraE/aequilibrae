@@ -11,10 +11,12 @@ from setuptools.discovery import FlatLayoutPackageFinder
 
 import sys
 
-sys.path.append(join(dirname(__file__), "aequilibrae", "matrix", "cython"))
 
-with open("__version__.py") as f:
-    exec(f.read())
+# When updating the version, one must also update the docs/source/_static/switcher.json file
+version = 1.1
+minor_version = "0"
+
+release_version = f"{version}.{minor_version}"
 
 include_dirs = [np.get_include()]
 libraries = []
@@ -102,10 +104,10 @@ pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
-    "aequilibrae.paths.cython": ["parameters.pxi", "*.pyx", "*.pxd"],
+    "aequilibrae.paths": ["*.pxd"],
     "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae.matrix": ["*.pyx", "*.pxd"],
-    "aequilibrae": ["./parameters.yml", "__version__.py"],
+    "aequilibrae.matrix": ["*.pxd"],
+    "aequilibrae": ["./parameters.yml"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
@@ -121,7 +123,7 @@ with open("README.md", "r") as fh:
 if __name__ == "__main__":
     setup(
         name="aequilibrae",
-        version=release_version,  # noqa: F821
+        version=release_version,
         install_requires=install_requirements,
         packages=pkgs,
         package_dir={"": "."},

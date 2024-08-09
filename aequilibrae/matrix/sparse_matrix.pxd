@@ -1,19 +1,22 @@
 from libcpp.vector cimport vector
-from libcpp.memory cimport unique_ptr, make_unique
+from libcpp.memory cimport unique_ptr
 from libcpp cimport bool
 
 cdef class Sparse:
     pass
+
 
 cdef struct COO_f64_struct:
     unique_ptr[vector[size_t]] row
     unique_ptr[vector[size_t]] col
     unique_ptr[vector[double]] f64_data
 
+
 cdef struct COO_f32_struct:
     unique_ptr[vector[size_t]] row
     unique_ptr[vector[size_t]] col
     unique_ptr[vector[float]] f32_data
+
 
 cdef class COO(Sparse):
     cdef:
