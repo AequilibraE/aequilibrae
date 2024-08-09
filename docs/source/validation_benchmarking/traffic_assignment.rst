@@ -207,7 +207,6 @@ We suspect that there are issues with the reference results and welcome further 
                 :width: 590
                 :alt: Sioux Falls Frank-Wolfe 1000 iterations
 
-
          .. tab:: MSA
 
             .. image:: ../images/assig_validation/SiouxFalls_msa-1000_iter.png
@@ -252,7 +251,7 @@ Regional), as that instance has a comparable size to real-world models.
       .. image:: ../images/assig_validation/convergence_comparison_Anaheim.png
           :align: center
           :width: 590
-          :alt:Algorithm convergence comparison
+          :alt: Algorithm convergence comparison
 
    .. tab:: Sioux-Falls
 
