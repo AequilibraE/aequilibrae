@@ -513,7 +513,7 @@ class LinearApproximation(WorkerThread):
                             copy_three_dimensions(
                                 c.results.select_link_od.matrix[name],  # matrix being written into
                                 np.sum(self.aons[c._id].aux_res.temp_sl_od_matrix, axis=0)[
-                                idx, :, :, :
+                                    idx, :, :, :
                                 ],  # results after the iteration
                                 self.cores,  # core count
                             )
