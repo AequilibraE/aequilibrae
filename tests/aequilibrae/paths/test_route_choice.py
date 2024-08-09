@@ -13,9 +13,8 @@ from typing import List, Tuple
 
 from aequilibrae import Project
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
 from aequilibrae.paths.route_choice import RouteChoice
-from aequilibrae.matrix import AequilibraeMatrix, Sparse
+from aequilibrae.matrix import AequilibraeMatrix, Sparse, GeneralisedCOODemand
 
 from ...data import siouxfalls_project
 
@@ -159,7 +158,6 @@ class TestRouteChoiceSet(TestCase):
                 with self.assertRaises(ValueError):
                     rc.run(a, b, self.shape, max_routes=max_routes, max_depth=max_depth)
 
-    @skip("not implemented")
     def test_round_trip(self):
         np.random.seed(1000)
         rc = RouteChoiceSet(self.graph)
@@ -169,19 +167,21 @@ class TestRouteChoiceSet(TestCase):
         max_routes = 20
 
         path = join(self.project.project_base_path, "batched results")
-        rc.batched(demand, max_routes=max_routes, max_depth=10)
+        rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True)
         table = rc.get_results().to_pandas()
-        rc.batched(demand, max_routes=max_routes, max_depth=10, where=path, cores=1)
+        rc.batched(demand, max_routes=max_routes, max_depth=10, path_size_logit=True, where=path, cores=1)
 
-        dataset = pa.dataset.dataset(path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.schema))
+        dataset = pa.dataset.dataset(
+            path, format="parquet", partitioning=pa.dataset.HivePartitioning(rc.results.schema)
+        )
         new_table = (
             dataset.to_table()
             .to_pandas()
-            .sort_values(by=["origin id", "destination id"])[["origin id", "destination id", "route set"]]
+            .sort_values(by=["origin id", "destination id", "cost"])[table.columns]
             .reset_index(drop=True)
         )
 
-        table = table.sort_values(by=["origin id", "destination id"]).reset_index(drop=True)
+        table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
 
         pd.testing.assert_frame_equal(table, new_table)
 
@@ -338,8 +338,8 @@ class TestRouteChoiceSet(TestCase):
                 )
                 table = rc.get_results().to_pandas()
 
-                # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and 17-9
-                # 20-4 also shares 11 with 5-3
+                # Shortest routes between 20-4, and 21-2 share links 23 and 26. Link 26 also appears in between 10-8 and
+                # 17-9 20-4 also shares 11 with 5-3
                 ods = [(20, 4), (21, 2), (10, 8), (17, 9)]
                 sl_link_loads = rc.get_sl_link_loading()
                 sl_od_matrices = rc.get_sl_od_matrices()
@@ -445,7 +445,7 @@ class TestRouteChoice(TestCase):
     def test_link_results(self):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
 
-        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 1)]})
+        self.rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
 
         self.rc.add_demand(self.mat)
         self.rc.prepare()
@@ -455,25 +455,27 @@ class TestRouteChoice(TestCase):
         df = self.rc.get_load_results()
         u_sl = self.rc.get_select_link_loading_results()
 
-        self.assertListEqual(
-            list(df.columns),
-            ["link_id"] + [mat_name + "_" + dir for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names],
+        pd.testing.assert_index_equal(
+            df.columns,
+            pd.MultiIndex.from_tuples([(mat_name, dir) for dir in ["ab", "ba", "tot"] for mat_name in self.mat.names]),
         )
 
-        self.assertListEqual(
-            list(u_sl.columns),
-            ["link_id"]
-            + [
-                sl_name + "_" + mat_name + "_" + dir
-                for sl_name in ["sl1", "sl2"]
-                for mat_name in self.mat.names
-                for dir in ["ab", "ba", "tot"]
-            ],
+        pd.testing.assert_index_equal(
+            u_sl.columns,
+            pd.MultiIndex.from_tuples(
+                [
+                    (mat_name, sl_name, dir)
+                    for sl_name in ["sl1", "sl2"]
+                    for dir in ["ab", "ba"]
+                    for mat_name in self.mat.names
+                ]
+                + [(mat_name, sl_name, "tot") for sl_name in ["sl1", "sl2"] for mat_name in self.mat.names]
+            ),
         )
 
     def test_saving(self):
         self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
-        self.rc.set_select_links({"sl1": [(23, 1), (26, 1)], "sl2": [(11, 1)]})
+        self.rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
         self.rc.add_demand(self.mat)
         self.rc.prepare()
         self.rc.execute(perform_assignment=True)
@@ -490,7 +492,11 @@ class TestRouteChoice(TestCase):
                 ("sl_uncompressed", u_sl),
             ]:
                 with self.subTest(table=table):
-                    pd.testing.assert_frame_equal(pd.read_sql(f"select * from {table}", conn), df)
+                    df2 = pd.read_sql(f"select * from {table}", conn).set_index("link_id")
+                    # NOTE: Pandas to_sql serialises the columns of a multiindex as a str, to avoid annoying parsing we
+                    # use eval here.
+                    df2.columns = pd.MultiIndex.from_tuples([eval(x) for x in df2.columns])
+                    pd.testing.assert_frame_equal(df2, df)
         conn.close()
 
         matrices = Sparse.from_disk(
@@ -500,6 +506,28 @@ class TestRouteChoice(TestCase):
         for sl_name, v in self.rc.get_select_link_od_matrix_results().items():
             for demand_name, matrix in v.items():
                 np.testing.assert_allclose(matrix.to_scipy().toarray(), matrices[sl_name + "_" + demand_name].toarray())
+
+    def test_round_trip(self):
+        self.rc.add_demand(self.mat)
+        self.rc.set_choice_set_generation("link-penalization", max_routes=20, penalty=1.1)
+        self.rc.set_select_links({"sl1": [((23, 1),), ((26, 1),)], "sl2": [((11, 1),)]})
+        self.rc.prepare()
+
+        path = join(self.project.project_base_path, "batched results")
+        os.mkdir(path)
+
+        self.rc.set_save_routes(None)
+        self.rc.execute(perform_assignment=True)
+        table = self.rc.get_results().to_pandas()
+
+        self.rc.set_save_routes(path)
+        self.rc.execute(perform_assignment=True)
+        table2 = self.rc.get_results().to_table().to_pandas()
+
+        table = table.sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
+        table2 = table2[table.columns].sort_values(by=["origin id", "destination id", "cost"]).reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(table, table2)
 
 
 def generate_line_strings(project, graph, results):

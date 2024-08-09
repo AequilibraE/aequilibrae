@@ -3,6 +3,7 @@ import pandas as pd
 import logging
 from scipy.sparse import coo_matrix as sp_coo_matrix
 
+
 cdef class GeneralisedCOODemand:
     def __init__(self, origin_col: str, destination_col: str, nodes_to_indices, shape=None):
         """
@@ -41,7 +42,7 @@ cdef class GeneralisedCOODemand:
 
             new_dfs.append(df.select_dtypes(["float64", "float32"]))
 
-        self.df = pd.concat(new_dfs, axis=1).fillna(fill).sort_index()
+        self.df = pd.concat(new_dfs, axis=1).fillna(fill).sort_index(level=0)
 
     def add_matrix(self, matrix: AequilibraeMatrix, shape=None, fill: float = 0.0):
         """
@@ -67,13 +68,31 @@ cdef class GeneralisedCOODemand:
         self.add_df(dfs, shape=shape, fill=fill)
         logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
 
-    def _initalise_c_data(self):
-        self.ods = self.df.index  # MultiIndex[int, int] -> vector[pair[long long, long long]]
+    def _initalise_col_names(self):
+        """
+        This function is a bit of a hack to allow keeping the same LinkLoadingResults between batched result
+        writes. We just need to know how many columns of each type there are
+        """
+        self.f64_names = []
+        self.f32_names = []
+        for col in self.df:
+            if self.df.dtypes[col] == "float64":
+                self.f64_names.append(col)
+            elif self.df.dtypes[col] == "float32":
+                self.f32_names.append(col)
+            else:
+                raise TypeError(f"non-floating point column ({col}) in df. Something has gone wrong")
+
+    def _initalise_c_data(self, df = None):
+        if df is None:
+            df = self.df
+        else:
+            assert all(self.df.columns == df.columns)
+
+        self.ods = df.index  # MultiIndex[int, int] -> vector[pair[long long, long long]]
 
         self.f64.clear()
         self.f32.clear()
-        self.f64_names = []
-        self.f32_names = []
 
         cdef:
             double[::1] f64_array
@@ -81,29 +100,33 @@ cdef class GeneralisedCOODemand:
             vector[double] *f64_vec
             vector[float] *f32_vec
 
-        for col in self.df:
-            if self.df.dtypes[col] == "float64":
-                f64_array = self.df[col].to_numpy()
-                self.f64_names.append(col)
+        for col in df:
+            if df.dtypes[col] == "float64":
+                f64_array = df[col].to_numpy()
 
                 # The unique pointer will take ownership of this allocation
                 f64_vec = new vector[double]()
                 f64_vec.insert(f64_vec.begin(), &f64_array[0], &f64_array[0] + len(f64_array))
-                self.f64.emplace_back(f64_vec)  # From here f63_vec should not be accessed. It is owned by the unique pointer
+                # From here f63_vec should not be accessed. It is owned by the unique pointer
+                self.f64.emplace_back(f64_vec)
 
-            elif self.df.dtypes[col] == "float32":
-                f32_array = self.df[col].to_numpy()
-                self.f32_names.append(col)
+            elif df.dtypes[col] == "float32":
+                f32_array = df[col].to_numpy()
 
                 # The unique pointer will take ownership of this allocation
                 f32_vec = new vector[float]()
                 f32_vec.insert(f32_vec.begin(), &f32_array[0], &f32_array[0] + len(f32_array))
-                self.f32.emplace_back(f32_vec)  # From here f32_vec should not be accessed. It is owned by the unique pointer
+                # From here f32_vec should not be accessed. It is owned by the unique pointer
+                self.f32.emplace_back(f32_vec)
             else:
-                raise TypeError(f"non-floating point column ({col}) in self.df. Something has gone wrong")
+                raise TypeError(f"non-floating point column ({col}) in df. Something has gone wrong")
 
     def no_demand(GeneralisedCOODemand self) -> bool:
         return len(self.df.columns) == 0
 
     def is_empty(self) -> bool:
         return self.df.index.empty
+
+    def batches(self):
+        self.df = self.df.sort_index(level=0)
+        return self.df.groupby(level=0)  # Group by the origin in the multi-index

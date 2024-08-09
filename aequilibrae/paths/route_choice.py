@@ -6,6 +6,7 @@ import socket
 import sqlite3
 from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict
+from collections.abc import Hashable
 from uuid import uuid4
 from functools import cached_property
 
@@ -18,7 +19,7 @@ from aequilibrae.context import get_active_project
 from aequilibrae.matrix import AequilibraeMatrix
 from aequilibrae.paths.graph import Graph, _get_graph_to_network_mapping
 from aequilibrae.paths.cython.route_choice_set import RouteChoiceSet
-from aequilibrae.paths.cython.coo_demand import GeneralisedCOODemand
+from aequilibrae.matrix.coo_demand import GeneralisedCOODemand
 
 
 class RouteChoice:
@@ -55,18 +56,15 @@ class RouteChoice:
         self.graph = graph
         self.demand = self.__init_demand()
 
-        self.schema = RouteChoiceSet.schema
-        self.psl_schema = RouteChoiceSet.psl_schema
-
         self.sl_compact_link_loads: Optional[Dict[str, np.array]] = None
         self.sl_link_loads: Optional[Dict[str, np.array]] = None
 
-        self.results: Optional[pa.Table] = None
         self.where: Optional[pathlib.Path] = None
         self.save_path_files: bool = False
 
         self._config = {}
         self._selected_links = {}
+        self.sl_link_loading = True
 
     @cached_property
     def __rc(self) -> RouteChoiceSet:
@@ -80,7 +78,8 @@ class RouteChoice:
 
     def set_choice_set_generation(self, /, algorithm: str, **kwargs) -> None:
         """Chooses the assignment algorithm and set parameters.
-        Options for algorithm are, 'bfsle' for breadth first search with link removal, or 'link-penalisation'/'link-penalization'.
+        Options for algorithm are, 'bfsle' for breadth first search with link removal, or
+        'link-penalisation'/'link-penalization'.
 
         BFSLE implementation based on "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler,
         Michael Balmer & Kay W. Axhausen (2013).
@@ -255,7 +254,6 @@ class RouteChoice:
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        self.results = None
         return self.__rc.run(
             origin,
             destination,
@@ -265,6 +263,7 @@ class RouteChoice:
             path_size_logit=bool(demand),
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
 
@@ -279,12 +278,12 @@ class RouteChoice:
         """
         if self.demand.df.index.empty:
             raise ValueError(
-                "to perform batch route choice generation you must first prepare with the selected nodes. See `RouteChoice.prepare()`"
+                "to perform batch route choice generation you must first prepare with the selected nodes. "
+                "See `RouteChoice.prepare()`"
             )
 
         self.procedure_date = str(datetime.today())
 
-        self.results = None
         self.__rc.batched(
             self.demand,
             self._selected_links,
@@ -292,6 +291,7 @@ class RouteChoice:
             path_size_logit=perform_assignment,
             cores=self.cores,
             where=str(self.where) if self.where is not None else None,
+            sl_link_loading=self.sl_link_loading,
             **self.parameters,
         )
 
@@ -330,22 +330,18 @@ class RouteChoice:
         Returns a table of OD pairs to lists of link IDs for each OD pair provided (as columns).
         Represents paths from ``origin`` to ``destination``.
 
-        If `save_routes` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this dataset.
+        If `save_routes` was specified then a Pyarrow dataset is returned. The caller is responsible for reading this
+        dataset.
 
         :Returns:
             **results** (:obj:`pa.Table`): Table with the results of the route choice procedure
         """
-        if self.results is None:
-            try:
-                self.results = self.__rc.get_results()
-            except RuntimeError as err:
-                if self.where is None:
-                    raise ValueError("Route choice results not computed and read/save path not specified") from err
-                self.results = pa.dataset.dataset(
-                    self.where, format="parquet", partitioning=pa.dataset.HivePartitioning(self.schema)
-                )
+        if self.where is None:
+            results = self.__rc.get_results()
+        else:
+            results = self.__rc.results.read_dataset(self.where)
 
-        return self.results
+        return results
 
     def get_load_results(self) -> pd.DataFrame:
         """
@@ -361,6 +357,7 @@ class RouteChoice:
             raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
 
         ll = self.__rc.get_link_loading(cores=self.cores)
+        ll = {(k,): v for k, v in ll.items()}
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
@@ -371,26 +368,24 @@ class RouteChoice:
 
     def __link_loads_to_df(self, mapping, lids, link_loads):
         df = pd.DataFrame(
-            {"link_id": lids} | {k + dir: np.zeros(lids.shape) for k in link_loads.keys() for dir in ["_ab", "_ba"]}
+            {"link_id": lids} | {(*k, dir): np.zeros(lids.shape) for k in link_loads.keys() for dir in ["ab", "ba"]}
         )
         added_dfs = []
         for k, v in link_loads.items():
             # Directional Flows
-            df.iloc[mapping.network_ab_idx, df.columns.get_loc(k + "_ab")] = np.nan_to_num(v[mapping.graph_ab_idx])
-            df.iloc[mapping.network_ba_idx, df.columns.get_loc(k + "_ba")] = np.nan_to_num(v[mapping.graph_ba_idx])
+            df.iloc[mapping.network_ab_idx, df.columns.get_loc((*k, "ab"))] = np.nan_to_num(v[mapping.graph_ab_idx])
+            df.iloc[mapping.network_ba_idx, df.columns.get_loc((*k, "ba"))] = np.nan_to_num(v[mapping.graph_ba_idx])
 
             # Tot Flow
-            added_dfs.append(pd.DataFrame({f"{k}_tot": df[k + "_ab"] + df[k + "_ba"]}))
+            added_dfs.append(pd.DataFrame({(*k, "tot"): df[(*k, "ab")] + df[(*k, "ba")]}))
 
-        df = pd.concat([df] + added_dfs, axis=1)
-        cols = df.columns.tolist()
-        cols.remove("link_id")
-        cols.sort()
-        # Insert the certain value at the beginning
-        cols.insert(0, "link_id")
-        return df[cols]
+        df = pd.concat([df] + added_dfs, axis=1).set_index("link_id")
+        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        return df.sort_index()
 
-    def set_select_links(self, links: Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]):
+    def set_select_links(
+        self, links: Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]], link_loading=True
+    ):
         """
         Set the selected links. Checks if the links and directions are valid. Supports OR and AND sets of links.
 
@@ -403,10 +398,15 @@ class RouteChoice:
         Supply `links=None` to disable select link analysis.
 
         :Arguments:
-            **links** (:obj:`Union[None, Dict[str, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
+            **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
                 Name of link set and Link IDs and directions to be used in select link analysis.
+
+            **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix results are
+              available.
+
         """
         self._selected_links = {}
+        self.sl_link_loading = link_loading
 
         if links is None:
             del self._config["select_links"]
@@ -415,10 +415,6 @@ class RouteChoice:
         max_id = self.graph.compact_graph.id.max() + 1
 
         for name, link_set in links.items():
-            if len(name.split(" ")) != 1:
-                warnings.warn("Input string name has a space in it. Replacing with _")
-                name = str.join("_", name.split(" "))
-
             normalised_link_set = []
             for link_ids in link_set:
                 if isinstance(link_ids, tuple) and len(link_ids) == 2 and link_ids[1] == 0:
@@ -433,10 +429,6 @@ class RouteChoice:
 
             or_set = set()
             for link_ids in normalised_link_set:
-                # For compatibility, a tuple of length 2 is passed, we assume that's a single (link, dir) pair
-                if isinstance(link_ids, tuple) and len(link_ids) == 2:
-                    link_ids = (link_ids,)
-
                 and_set = set()
                 for link, dir in link_ids:
                     if dir == 0:
@@ -478,12 +470,14 @@ class RouteChoice:
         """
 
         if self.demand.no_demand():
-            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+            raise ValueError("no demand was provided. To perform link loading add a demand matrix or data frame")
+        elif not self.sl_link_loading:
+            raise ValueError("select link loading was disabled via `set_select_links(..., link_loading=False)`")
 
         sl_link_loads = {}
         for sl_name, sl_res in self.__rc.get_sl_link_loading().items():
             for demand_name, res in sl_res.items():
-                sl_link_loads[sl_name + "_" + demand_name] = res
+                sl_link_loads[demand_name, sl_name] = res
 
         # Create a data store with a row for each uncompressed link
         m = _get_graph_to_network_mapping(self.graph.graph.link_id.values, self.graph.graph.direction.values)
@@ -520,7 +514,7 @@ class RouteChoice:
         # sqlite3 context managers only commit, they don't close, oh well
         conn = sqlite3.connect(pathlib.Path(project.project_base_path) / "results_database.sqlite")
         with conn:
-            df.to_sql(table_name, conn, index=False)
+            df.to_sql(table_name, conn, index=True)
         conn.close()
 
         conn = project.connect()

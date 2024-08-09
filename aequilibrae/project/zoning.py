@@ -2,12 +2,15 @@ from copy import deepcopy
 from os.path import join, realpath
 from typing import Union, Dict
 
+import pandas as pd
+
 import shapely.wkb
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
 from shapely.ops import unary_union
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.project_creation import run_queries_from_sql_file
+from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
 from aequilibrae.utils.db_utils import commit_and_close
@@ -161,3 +164,13 @@ class Zoning(BasicTable):
         zone = Zone(data, self)
         self.__items[zone.zone_id] = zone
         return zone
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """Returns all zones data as a Pandas DataFrame
+
+        :Returns:
+            **table** (:obj:`DataFrame`): Pandas DataFrame with all the zones, complete with Geometry
+        """
+        dl = DataLoader(self.project.path_to_file, "zones")
+        return dl.load_table()

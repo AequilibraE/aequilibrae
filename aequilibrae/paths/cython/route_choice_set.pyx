@@ -1,7 +1,7 @@
 # cython: language_level=3str
 from aequilibrae.paths.graph import Graph
-from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, vector_bool_ptr, shuffle
-from aequilibrae.paths.cython.coo_demand cimport GeneralisedCOODemand
+from aequilibrae.paths.cython.route_choice_types cimport LinkSet_t, minstd_rand, shuffle
+from aequilibrae.matrix.coo_demand cimport GeneralisedCOODemand
 
 from cython.operator cimport dereference as d
 from cython.parallel cimport parallel, prange, threadid
@@ -17,14 +17,10 @@ from openmp cimport omp_get_max_threads
 
 from libcpp.memory cimport shared_ptr
 
-import itertools
-import logging
-import pathlib
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
 import pyarrow as pa
-import pyarrow.parquet as pq
 import pandas as pd
 
 
@@ -89,34 +85,6 @@ cdef class RouteChoiceSet:
     Route choice implemented via breadth first search with link removal (BFS-LE) as described in Rieser-Schüssler,
     Balmer, and Axhausen, 'Route Choice Sets for Very High-Resolution Data'
     """
-
-    route_set_dtype = pa.list_(pa.uint32())
-
-    schema = pa.schema([
-        pa.field("origin id", pa.uint32(), nullable=False),
-        pa.field("destination id", pa.uint32(), nullable=False),
-        pa.field("route set", route_set_dtype, nullable=False),
-    ])
-
-    psl_schema = pa.schema([
-        pa.field("origin id", pa.uint32(), nullable=False),
-        pa.field("destination id", pa.uint32(), nullable=False),
-        pa.field("route set", route_set_dtype, nullable=False),
-        pa.field("cost", pa.float64(), nullable=False),
-        pa.field("mask", pa.bool_(), nullable=False),
-        pa.field("path overlap", pa.float64(), nullable=False),
-        pa.field("probability", pa.float64(), nullable=False),
-    ])
-
-    def __cinit__(self):
-        """C level init. For C memory allocation and initialisation. Called exactly once per object."""
-        results = <vector[RouteSet_t *] *>nullptr
-        link_union_set = <vector[vector[long long] *] *>nullptr
-        cost_set = <vector[vector[double] *] *>nullptr
-        mask_set = <vector[vector_bool_ptr] *>nullptr
-        path_overlap_set = <vector[vector[double] *] *>nullptr
-        prob_set = <vector[vector[double] *] *>nullptr
-        ods = <vector[pair[long long, long long]] *>nullptr
 
     def __init__(self, graph: Graph):
         """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
@@ -192,6 +160,7 @@ cdef class RouteChoiceSet:
             self,
             demand: GeneralisedCOODemand,
             select_links: Dict[str, FrozenSet[FrozenSet[int]]] = None,
+            sl_link_loading: bool = True,
             max_routes: int = 0,
             max_depth: int = 0,
             max_misses: int = 100,
@@ -278,8 +247,6 @@ cdef class RouteChoiceSet:
             # interface.
             long long [:, :] _reached_first_matrix
 
-            size_t max_results_len, j
-
         # self.a_star = a_star
 
         pa.set_io_thread_count(c_cores)
@@ -289,106 +256,119 @@ cdef class RouteChoiceSet:
         else:
             _reached_first_matrix = np.zeros((c_cores, self.num_nodes + 1), dtype=np.int64)
 
-        demand._initalise_c_data()
-
         cdef:
             RouteSet_t *route_set
             shared_ptr[vector[double]] prob_vec
             int thread_id
 
-        self.results = RouteChoiceSetResults(
-            demand,
-            scaled_cutoff_prob,
-            beta,
-            self.num_links,
-            self.cost_view,
-            self.mapping_idx,
-            self.mapping_data,
-            store_results=store_results,
-            perform_assignment=path_size_logit,
-        )
-        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, c_cores)
+        demand._initalise_col_names()
+        self.ll_results = LinkLoadingResults(demand, select_links, self.num_links, sl_link_loading, c_cores)
 
-        with nogil, parallel(num_threads=c_cores):
-            route_set = new RouteSet_t()
-            thread_id = threadid()
-            for i in prange(demand.ods.size()):
-                origin_index = self.nodes_to_indices_view[demand.ods[i].first]
-                dest_index = self.nodes_to_indices_view[demand.ods[i].second]
+        for _, grouped_demand_df in (demand.batches() if where is not None else ((None, None),)):
+            demand._initalise_c_data(grouped_demand_df)
 
-                if origin_index == dest_index:
-                    continue
+            self.results = RouteChoiceSetResults(
+                demand,
+                scaled_cutoff_prob,
+                beta,
+                self.num_links,
+                self.cost_view,
+                self.mapping_idx,
+                self.mapping_data,
+                store_results=store_results,
+                perform_assignment=path_size_logit,
+            )
 
-                if self.block_flows_through_centroids:
-                    blocking_centroid_flows(
-                        0,  # Always blocking
-                        origin_index,
-                        self.zones,
-                        self.graph_fs_view,
-                        b_nodes_matrix[thread_id],
-                        self.b_nodes_view,
-                    )
+            with nogil, parallel(num_threads=c_cores):
+                route_set = new RouteSet_t()
+                thread_id = threadid()
+                for i in prange(demand.ods.size()):
+                    origin_index = self.nodes_to_indices_view[demand.ods[i].first]
+                    dest_index = self.nodes_to_indices_view[demand.ods[i].second]
 
-                if bfsle:
-                    RouteChoiceSet.bfsle(
-                        self,
-                        d(route_set),
-                        origin_index,
-                        dest_index,
-                        c_max_routes,
-                        c_max_depth,
-                        c_max_misses,
-                        cost_matrix[thread_id],
-                        predecessors_matrix[thread_id],
-                        conn_matrix[thread_id],
-                        b_nodes_matrix[thread_id],
-                        _reached_first_matrix[thread_id],
-                        penalty,
-                        c_seed,
-                    )
-                else:
-                    RouteChoiceSet.link_penalisation(
-                        self,
-                        d(route_set),
-                        origin_index,
-                        dest_index,
-                        c_max_routes,
-                        c_max_depth,
-                        c_max_misses,
-                        cost_matrix[thread_id],
-                        predecessors_matrix[thread_id],
-                        conn_matrix[thread_id],
-                        b_nodes_matrix[thread_id],
-                        _reached_first_matrix[thread_id],
-                        penalty,
-                        c_seed,
-                    )
+                    if origin_index == dest_index:
+                        continue
 
-                # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
-                # routes. This is done to simplify memory management later on.
-                route_vec = self.results.get_route_vec(i)
-                RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
-                # We now drop all references to those raw pointers. The unique pointers now own those vectors.
-                route_set.clear()
+                    if self.block_flows_through_centroids:
+                        blocking_centroid_flows(
+                            0,  # Always blocking
+                            origin_index,
+                            self.zones,
+                            self.graph_fs_view,
+                            b_nodes_matrix[thread_id],
+                            self.b_nodes_view,
+                        )
 
-                if path_size_logit:
-                    prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
-                    self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
-                    self.ll_results.sl_link_load_single_route_set(i, d(route_vec), d(prob_vec), origin_index, dest_index, thread_id)
+                    if bfsle:
+                        RouteChoiceSet.bfsle(
+                            self,
+                            d(route_set),
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            c_max_misses,
+                            cost_matrix[thread_id],
+                            predecessors_matrix[thread_id],
+                            conn_matrix[thread_id],
+                            b_nodes_matrix[thread_id],
+                            _reached_first_matrix[thread_id],
+                            penalty,
+                            c_seed,
+                        )
+                    else:
+                        RouteChoiceSet.link_penalisation(
+                            self,
+                            d(route_set),
+                            origin_index,
+                            dest_index,
+                            c_max_routes,
+                            c_max_depth,
+                            c_max_misses,
+                            cost_matrix[thread_id],
+                            predecessors_matrix[thread_id],
+                            conn_matrix[thread_id],
+                            b_nodes_matrix[thread_id],
+                            _reached_first_matrix[thread_id],
+                            penalty,
+                            c_seed,
+                        )
 
-                if self.block_flows_through_centroids:
-                    blocking_centroid_flows(
-                        1,  # Always unblocking
-                        origin_index,
-                        self.zones,
-                        self.graph_fs_view,
-                        b_nodes_matrix[thread_id],
-                        self.b_nodes_view,
-                    )
+                    # Here we transform the set of raw pointers to routes (vectors) into a vector of unique points to
+                    # routes. This is done to simplify memory management later on.
+                    route_vec = self.results.get_route_vec(i)
+                    RouteChoiceSetResults.route_set_to_route_vec(d(route_vec), d(route_set))
+                    # We now drop all references to those raw pointers. The unique pointers now own those vectors.
+                    route_set.clear()
 
-            del route_set
+                    if path_size_logit:
+                        prob_vec = self.results.compute_result(i, d(route_vec), thread_id)
+                        self.ll_results.link_load_single_route_set(i, d(route_vec), d(prob_vec), thread_id)
+                        self.ll_results.sl_link_load_single_route_set(
+                            i, d(route_vec),
+                            d(prob_vec),
+                            origin_index,
+                            dest_index,
+                            thread_id
+                        )
 
-        self.get_results()
+                    if self.block_flows_through_centroids:
+                        blocking_centroid_flows(
+                            1,  # Always unblocking
+                            origin_index,
+                            self.zones,
+                            self.graph_fs_view,
+                            b_nodes_matrix[thread_id],
+                            self.b_nodes_view,
+                        )
+
+                del route_set
+
+            if store_results:
+                self.get_results()
+                if where is not None:
+                    self.results.write(where)
+
         if path_size_logit:
             self.ll_results.reduce_link_loading()
             self.ll_results.reduce_sl_link_loading()
@@ -506,7 +486,8 @@ cdef class RouteChoiceSet:
 
             for banned in queue:
                 if lp:
-                    # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link penalisation,
+                    # We copy the penalised cost buffer into the thread cost buffer to allow us to apply link
+                    # penalisation,
                     copy(penalised_cost.cbegin(), penalised_cost.cend(), &thread_cost[0])
                 else:
                     # ...otherwise we just copy directly from the cost view.
@@ -711,36 +692,3 @@ cdef class RouteChoiceSet:
             raise RuntimeError("Link loading results not computed yet")
 
         return self.ll_results.sl_od_matrices_structs_to_objects()
-
-
-@cython.embedsignature(True)
-cdef class Checkpoint:
-    """
-    A small wrapper class to write a dataset partition by partition
-    """
-
-    def __init__(self, where, schema, partition_cols=None):
-        """Python level init, may be called multiple times, for things that can't be done in __cinit__."""
-        self.where = pathlib.Path(where)
-        self.schema = schema
-        self.partition_cols = partition_cols
-
-    def write(self, table):
-        logger = logging.getLogger("aequilibrae")
-        pq.write_to_dataset(
-            table,
-            self.where,
-            partitioning=self.partition_cols,
-            partitioning_flavor="hive",
-            schema=self.schema,
-            use_threads=True,
-            existing_data_behavior="overwrite_or_ignore",
-            file_visitor=lambda written_file: logger.info(f"Wrote partition dataset at {written_file.path}")
-        )
-
-    def read_dataset(self):
-        return pa.dataset.dataset(self.where, format="parquet", partitioning=pa.dataset.HivePartitioning(self.schema))
-
-    @staticmethod
-    def batches(ods: List[Tuple[int, int]]):
-        return (list(g) for k, g in itertools.groupby(sorted(ods), key=lambda x: x[0]))
