@@ -4,6 +4,7 @@ if inside_qgis:
     from PyQt5.QtCore import QThread
     from PyQt5.QtCore import pyqtSignal
 else:
+
     class QThread:  # type: ignore
         def __init__(self, *arg):
             pass
