@@ -235,24 +235,24 @@ Regional), as that instance has a comparable size to real-world models.
 
    .. tab:: Barcelona
 
-      .. image:: ../images/assig_validation/ChicagoRegional_cfw-1000_iter.png
+      .. image:: ../images/assig_validation/convergence_comparison_Barcelona.png
           :align: center
           :width: 590
-          :alt: Chicago Conjugate Frank-Wolfe 1000 iterations
+          :alt: Algorithm convergence comparison
 
    .. tab:: Winnipeg
 
-      .. image:: ../images/assig_validation/ChicagoRegional_fw-1000_iter.png
+      .. image:: ../images/assig_validation/convergence_comparison_Winnipeg.png
           :align: center
           :width: 590
-          :alt: Chicago Frank-Wolfe 1000 iterations
+          :alt: Algorithm convergence comparison
 
    .. tab:: Anaheim
 
-      .. image:: ../images/assig_validation/ChicagoRegional_msa-1000_iter.png
+      .. image:: ../images/assig_validation/convergence_comparison_Anaheim.png
           :align: center
           :width: 590
-          :alt: Chicago MSA 1000 iterations
+          :alt:Algorithm convergence comparison
 
    .. tab:: Sioux-Falls
 
