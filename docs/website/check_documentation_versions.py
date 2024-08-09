@@ -7,8 +7,7 @@ if npth not in sys.path:
     sys.path.append(npth)
     print(npth)
 
-with open(npth / "__version__.py") as f:
-    exec(f.read())
+from setup import release_version
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
