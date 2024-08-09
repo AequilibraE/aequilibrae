@@ -14,7 +14,7 @@ if not missing_tqdm:
 
 qgis = iutil.find_spec("qgis") is not None
 
-show_status = os.environ.get("SHOW PROGRESS", "FALSE") == "TRUE"
+show_status = os.environ.get("AEQ_SHOW_PROGRESS", "FALSE") == "TRUE"
 
 
 class PythonSignal:  # type: ignore
