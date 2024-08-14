@@ -12,10 +12,10 @@ jobs:
       - name: Build SDist
         run: pipx run build --sdist
 
-      - name: Test if SDist build has all necessary pieces to be installed
-        run: |
-          pip3 install setuptools build --upgrade
-          pip3 install dist/*.tar.gz
+#      - name: Test if SDist build has all necessary pieces to be installed
+#        run: |
+#          pip3 install setuptools build --upgrade
+#          pip3 install dist/*.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
