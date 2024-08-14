@@ -104,7 +104,7 @@ pkg_data = {
     "aequilibrae.paths": ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"],
     "aequilibrae.distribution": ["cython/*.pyx"],
     "aequilibrae.matrix": ["*.pyx", "*.pxd"],
-    "aequilibrae": ["./parameters.yml"],
+    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",
