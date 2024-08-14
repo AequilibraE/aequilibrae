@@ -1,13 +1,13 @@
 import os
 import sys
 import shutil
+import pkg_resources
 
 npth = os.path.abspath(".")
 if npth not in sys.path:
     sys.path.append(npth)
 
-from __version__ import release_version
-
+release_version = pkg_resources.get_distribution("aequilibrae").version
 
 version = f"V.{release_version}"
 
