@@ -1,7 +1,3 @@
-numpy<1.99
-pyaml
-pyshp
-cython
 enum34
 Sphinx
 pydata-sphinx-theme==0.13.3

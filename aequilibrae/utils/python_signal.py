@@ -1,4 +1,5 @@
 import importlib.util as iutil
+import os
 import warnings
 from random import choice
 
@@ -13,8 +14,7 @@ if not missing_tqdm:
 
 qgis = iutil.find_spec("qgis") is not None
 
-if missing_tqdm and not qgis:
-    warnings.warn("No progress bars will be shown. Please install tqdm to see them")
+show_status = os.environ.get("AEQ_SHOW_PROGRESS", "FALSE") == "TRUE"
 
 
 class PythonSignal:  # type: ignore
@@ -28,23 +28,26 @@ class PythonSignal:  # type: ignore
     ['action', 'bar hierarchy', 'value', 'text', 'master']
 
     'action': 'start', 'update', or 'finished_*_processing' (the last one applies in QGIS)
-    'bar hierarchy': 'master' or 'secondary'
+    'position': Position (0 for top, 1 for bottom)
     'value': Numerical value for the action (total or current)
     'text': Whatever label to be updated
     'master': The corresponding master bar for this task
     """
 
-    deactivate = missing_tqdm  # by default don't use progress bars in tests
+    deactivate = not show_status  # by default don't use progress bars in tests
 
     def __init__(self, object):
         self.color = choice(["green", "magenta", "cyan", "blue", "red", "yellow"])
         self.pbar = None  # type: tqdm
         self.keydata = {}
-        self.pos = 0
+        self.position = 0
 
     def emit(self, val):
         if self.deactivate:
             return
+        if val[0] == "set_position":
+            self.position = val[1]
+
         if val[0] == "finished":
             if self.pbar is not None:
                 self.pbar.close()
@@ -61,10 +64,13 @@ class PythonSignal:  # type: ignore
             self.keydata[val[1]] = val[2]
 
         elif val[0] == "start":
+            if missing_tqdm and not qgis:
+                self.deactivate = True
+                warnings.warn("No progress bars will be shown. Please install tqdm to see them")
             if self.pbar is not None:
                 self.pbar.close()
             desc = str(val[2]).rjust(50)
-            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=desc, position=self.pos)
+            self.pbar = tqdm(total=val[1], colour=self.color, leave=False, desc=desc, position=self.position)
 
         elif val[0] == "update":
             self.pbar.update(val[1] - self.pbar.n)
@@ -72,3 +78,8 @@ class PythonSignal:  # type: ignore
                 desc = str(val[2]).rjust(50)
                 if self.pbar.desc != desc:
                     self.pbar.set_description(desc, refresh=True)
+
+        elif val[0] == "set_text":
+            desc = str(val[1]).rjust(50)
+            if self.pbar.desc != desc:
+                self.pbar.set_description(desc, refresh=True)

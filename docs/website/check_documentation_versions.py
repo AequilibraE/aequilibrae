@@ -1,14 +1,14 @@
 import os
 import sys
 from pathlib import Path
+import pkg_resources
 
 npth = Path(__file__).parent.parent.parent
 if npth not in sys.path:
     sys.path.append(npth)
     print(npth)
 
-with open(npth / "__version__.py") as f:
-    exec(f.read())
+release_version = pkg_resources.get_distribution("aequilibrae").version
 
 # We check if the reference to all existing versions were added by checking
 # that the current version is referenced
