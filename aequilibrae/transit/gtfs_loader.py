@@ -1,10 +1,9 @@
-from datetime import datetime
 import hashlib
 import zipfile
 from copy import deepcopy
+from datetime import datetime
 from os.path import splitext, basename
 from typing import Dict
-import importlib.util as iutil
 
 import numpy as np
 import pandas as pd
@@ -13,36 +12,23 @@ from pyproj import Transformer
 from shapely.geometry import LineString
 
 from aequilibrae.context import get_logger
-from aequilibrae.transit.constants import AGENCY_MULTIPLIER
-from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.column_order import column_order
+from aequilibrae.transit.constants import AGENCY_MULTIPLIER
 from aequilibrae.transit.date_tools import to_seconds, create_days_between, format_date
+from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
-from aequilibrae.utils.worker_thread import WorkerThread
-
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal as SignalImpl
-else:
-
-    class SignalImpl:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def emit(*args, **kwargs):
-            pass
+from aequilibrae.utils.signal import SIGNAL
 
 
-class GTFSReader(WorkerThread):
+class GTFSReader:
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
-    signal = SignalImpl(object)
+    signal = SIGNAL(object)
 
     def __init__(self):
-        WorkerThread.__init__(self, None)
         self.__capacities__ = {}
+        self.__pces__ = {}
         self.__max_speeds__ = {}
         self.feed_date = ""
         self.agency: Dict[int, Agency] = {}
@@ -86,6 +72,9 @@ class GTFSReader(WorkerThread):
     def _set_capacities(self, capacities: dict):
         self.__capacities__ = capacities
 
+    def _set_pces(self, pces: dict):
+        self.__pces__ = pces
+
     def _set_maximum_speeds(self, max_speeds: dict):
         self.__max_speeds__ = max_speeds
 
@@ -98,40 +87,51 @@ class GTFSReader(WorkerThread):
         self.service_date = service_date
         self.description = description
         self.logger.info(f"Loading data for {self.service_date} from the GTFS feed. This may take some time")
-
+        
         self.__mt = "Reading GTFS"
         self.signal.emit(["start", "master", 6, self.__mt, self.__mt])
-
+    
         self.__load_date()
-
-        self.finished()
-
-    def finished(self):
-        self.signal.emit(["finished_static_gtfs_procedure"])
 
     def __load_date(self):
         self.logger.debug("Starting __load_date")
         self.zip_archive = zipfile.ZipFile(self.archive_dir)
 
         self.__load_agencies()
+        
+        self.signal.emit(["start", 7, "Loading routes"])
         self.__load_routes_table()
+
+        self.signal.emit(["update", 1, "Loading stops"])
         self.__load_stops_table()
+
+        self.signal.emit(["update", 2, "Loading stop times"])
         self.__load_stop_times()
+
+        self.signal.emit(["update", 3, "Loading shapes"])
         self.__load_shapes_table()
+
+        self.signal.emit(["update", 4, "Loading trips"])
         self.__load_trips_table()
+
+        self.signal.emit(["update", 5, "De-conflicting stop times"])
         self.__deconflict_stop_times()
+
+        self.signal.emit(["update", 6, "Loading fares"])
         self.__load_fare_data()
 
         self.zip_archive.close()
+        self.signal.emit(["finished"])
+        self.signal = SIGNAL(object)
 
     def __deconflict_stop_times(self) -> None:
         self.logger.info("Starting deconflict_stop_times")
 
         msg_txt = "Interpolating stop times for feed agencies"
         self.signal.emit(["start", "secondary", len(self.trips), msg_txt, self.__mt])
+
         total_fast = 0
         for prog_counter, route in enumerate(self.trips):
-            self.signal.emit(["update", "secondary", prog_counter + 1, msg_txt, self.__mt])
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
@@ -269,6 +269,7 @@ class GTFSReader(WorkerThread):
             shapes = parse_csv(file, column_order[shapestxt])
 
         all_shape_ids = np.unique(shapes["shape_id"]).tolist()
+
         msg_txt = "Load shapes"
         self.signal.emit(["start", "secondary", len(all_shape_ids), msg_txt, self.__mt])
 
@@ -277,7 +278,6 @@ class GTFSReader(WorkerThread):
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
         for i, shape_id in enumerate(all_shape_ids):
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
@@ -296,6 +296,7 @@ class GTFSReader(WorkerThread):
 
         msg_txt = "Load trips"
         self.signal.emit(["start", "secondary", trips_array.shape[0], msg_txt, self.__mt])
+
         if np.unique(trips_array["trip_id"]).shape[0] < trips_array.shape[0]:
             self.__fail("There are repeated trip IDs in trips.txt")
 
@@ -316,7 +317,6 @@ class GTFSReader(WorkerThread):
         self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
         for i, line in enumerate(trips_array):
-            self.signal.emit(["update", "secondary", i + 1, msg_txt, self.__mt])
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -348,6 +348,9 @@ class GTFSReader(WorkerThread):
                 trip.source_time = list(stop_times.source_time.values)
                 self.logger.debug(f"{trip.trip} has {len(trip.stops)} stops")
                 trip._stop_based_shape = LineString([self.stops[x].geo for x in trip.stops])
+                
+                # trip.shape = self.shapes.get(trip.shape)
+                trip.pce = self.routes[trip.route].pce
                 trip.seated_capacity = self.routes[trip.route].seated_capacity
                 trip.total_capacity = self.routes[trip.route].total_capacity
                 self.trips[trip.route] = self.trips.get(trip.route, {})
@@ -400,6 +403,7 @@ class GTFSReader(WorkerThread):
         with self.zip_archive.open(stoptimestxt, "r") as file:
             stoptimes = parse_csv(file, column_order[stoptimestxt])
         self.data_arrays[stoptimestxt] = stoptimes
+        
         msg_txt = "Load stop times"
 
         df = pd.DataFrame(stoptimes)
@@ -437,12 +441,10 @@ class GTFSReader(WorkerThread):
         df = df.merge(stop_list, on="stop")
         df.sort_values(["trip_id", "stop_sequence"], inplace=True)
         df = df.assign(source_time=0)
-        self.signal.emit(["start", "secondary", df.trip_id.unique().shape[0], msg_txt, self.__mt])
         for trip_id, data in [[trip_id, x] for trip_id, x in df.groupby(df["trip_id"])]:
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
             counter += data.shape[0]
-            self.signal.emit(["update", "secondary", counter, msg_txt, self.__mt])
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -487,8 +489,9 @@ class GTFSReader(WorkerThread):
         self.signal.emit(["start", "secondary", len(routes), msg_txt, self.__mt])
 
         cap = self.__capacities__.get("other", [None, None, None])
+
         routes = pd.DataFrame(routes)
-        routes = routes.assign(seated_capacity=cap[0], total_capacity=cap[1], srid=self.srid)
+        routes = routes.assign(seated_capacity=seated_cap, total_capacity=total_cap, srid=self.srid)
         for route_type, cap in self.__capacities__.items():
             routes.loc[routes.route_type == route_type, ["seated_capacity", "total_capacity"]] = cap
 
@@ -543,63 +546,56 @@ class GTFSReader(WorkerThread):
         if not has_cal and not has_caldate:
             raise FileNotFoundError('Missing "calendar" and "calendar_dates" in this feed')
 
-        if has_caldate:
-            self.logger.debug('    Loading "calendar dates" table')
+        if not has_caldate:
+            return
 
-            with self.zip_archive.open(caldatetxt, "r") as file:
-                caldates = parse_csv(file, column_order[caldatetxt])
+        self.logger.debug('    Loading "calendar dates" table')
+        with self.zip_archive.open(caldatetxt, "r") as file:
+            caldates = parse_csv(file, column_order[caldatetxt])
 
-            if caldates.shape[0] > 0 and not has_cal:
-                min_date = datetime.fromisoformat(format_date(min(caldates["date"].tolist())))
-                max_date = datetime.fromisoformat(format_date(max(caldates["date"].tolist())))
-                self.feed_dates = create_days_between(min_date, max_date)
-            else:
-                self.logger.warning('"calendar_dates.txt" file is empty')
-                return
+        if caldates.shape[0] == 0:
+            self.logger.warning('"calendar_dates.txt" file is empty')
+            return
 
-            exception_inconsistencies = 0
-            for line in caldates:
-                sd = format_date(line["date"])
+        if caldates.shape[0] > 0 and not has_cal:
+            min_date = datetime.fromisoformat(format_date(min(caldates["date"].tolist())))
+            max_date = datetime.fromisoformat(format_date(max(caldates["date"].tolist())))
+            self.feed_dates = create_days_between(min_date, max_date)
 
-                if has_cal:
-                    if line["service_id"] not in self.services:
-                        s = Service()
-                        s.service_id = line["service_id"]
-                        self.services[line["service_id"]] = s
-                        msg = "           Service ({}) exists on calendar_dates.txt but not on calendar.txt"
-                        self.logger.debug(msg.format(line["service_id"].service_id))
-                        exception_inconsistencies += 1
+        exception_inconsistencies = 0
+        svc_id_col = caldates.dtype.names.index("service_id")
+        xcpt_tp_col = caldates.dtype.names.index("exception_type")
+        for line in caldates:
+            sd = format_date(line["date"])
+            service_id = line[svc_id_col]
+            exception_type = line[xcpt_tp_col]
 
-                    service = self.services[line["service_id"]]
+            if service_id not in self.services:
+                s = Service()
+                s.service_id = service_id
+                self.services[service_id] = s
 
-                    if line["exception_type"] == 1:
-                        if sd not in service.dates:
-                            service.dates.append(sd)
-                        else:
-                            exception_inconsistencies += 1
-                            msg = "ignoring service ({}) addition on a day when the service is already active"
-                            self.logger.debug(msg.format(service.service_id))
-                    elif line["exception_type"] == 2:
-                        if sd in service.dates:
-                            _ = service.dates.remove(sd)
-                        else:
-                            exception_inconsistencies += 1
-                            msg = "ignoring service ({}) removal on a day from which the service was absent"
-                            self.logger.debug(msg.format(service.service_id))
-                    else:
-                        self.__fail(f"illegal service exception type. {service.service_id}")
+            service = self.services[service_id]
+
+            if exception_type == 1:
+                if sd not in service.dates:
+                    service.dates.append(sd)
                 else:
-                    # Insert only services available
-                    if line["exception_type"] == 1:
-                        if line["service_id"] not in self.services:
-                            s = Service()
-                            s._populate(line, caldates.dtype.names, False)
-                            self.services[s.service_id] = s
-                        else:
-                            self.services[line["service_id"]].dates.append(sd)
+                    exception_inconsistencies += 1
+                    msg = "ignoring service ({}) addition on a day when the service is already active"
+                    self.logger.debug(msg.format(service.service_id))
+            elif exception_type == 2:
+                if sd in service.dates:
+                    _ = service.dates.remove(sd)
+                else:
+                    exception_inconsistencies += 1
+                    msg = "ignoring service ({}) removal on a day from which the service was absent"
+                    self.logger.debug(msg.format(service.service_id))
+            else:
+                self.__fail(f"illegal service exception type. {service.service_id}")
 
-            if exception_inconsistencies:
-                self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
+        if exception_inconsistencies:
+            self.logger.info("    Minor inconsistencies found between calendar.txt and calendar_dates.txt")
 
     def __load_agencies(self):
         self.logger.debug("Starting __load_agencies")

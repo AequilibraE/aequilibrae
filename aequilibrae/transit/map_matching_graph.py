@@ -1,5 +1,4 @@
 import hashlib
-import importlib.util as iutil
 import math
 from contextlib import closing
 from copy import deepcopy
@@ -19,17 +18,18 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
-from ..utils import WorkerThread
+from aequilibrae.utils.signal import SIGNAL
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
 
 
-class MMGraph(WorkerThread):
+class MMGraph:
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
+    signal = SIGNAL(object)
+
     def __init__(self, lib_gtfs):
-        WorkerThread.__init__(self, None)
         self.project = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs

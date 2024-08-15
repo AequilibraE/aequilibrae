@@ -8,6 +8,7 @@ In this example, we import a GTFS feed to our model and perform map matching.
 
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
+
 # %%
 
 # Imports
@@ -22,6 +23,7 @@ from aequilibrae.project.database_connection import database_connection
 
 from aequilibrae.transit import Transit
 from aequilibrae.utils.create_example import create_example
+
 # sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
 
 # %%
@@ -30,7 +32,6 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-
 # Since the Coquimbo example already includes a complete GTFS model, we will remove its public transport 
 # database for the purposes of this example.    
 remove(join(fldr, "public_transport.sqlite"))
@@ -59,7 +60,6 @@ transit = data.new_gtfs_builder(file_path=dest_path, description="Wednesday feed
 # our database using the day 2016-04-13 but feel free to experiment with any other available dates.
 # 
 # It shouldn't take long to load the data.
-
 transit.load_date("2016-04-13")
 
 # %%
@@ -94,9 +94,9 @@ for i, row in links.iterrows():
     points = [[x[1], x[0]] for x in eval(points)]
 
     _ = folium.vector_layers.PolyLine(
-        points, 
-        popup=f"<b>pattern_id: {row.pattern_id}</b>", 
-        color=pattern_colors[i], 
+        points,
+        popup=f"<b>pattern_id: {row.pattern_id}</b>",
+        color=pattern_colors[i],
         weight=5,
     ).add_to(gtfs_links)
 
@@ -113,7 +113,7 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
-#%%
+# %% [markdown]
 # Let's create the map!
 
 # %%
