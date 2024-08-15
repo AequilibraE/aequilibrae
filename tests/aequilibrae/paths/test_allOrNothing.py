@@ -38,7 +38,7 @@ class TestAllOrNothing(TestCase):
 
         self.g.set_skimming([])
         self.g.set_blocked_centroid_flows(True)
-        assig = allOrNothing(self.matrix, self.g, res)
+        assig = allOrNothing("name", self.matrix, self.g, res)
         assig.execute()
 
         if res.skims.distance.sum() > 0:
@@ -46,19 +46,19 @@ class TestAllOrNothing(TestCase):
 
         res.prepare(self.g, self.matrix)
 
-        assig = allOrNothing(self.matrix, self.g, res)
+        assig = allOrNothing("name", self.matrix, self.g, res)
         assig.execute()
 
     def test_execute(self):
         # Loads and prepares the graph
         res1 = AssignmentResults()
         res1.prepare(self.g, self.matrix)
-        assig1 = allOrNothing(self.matrix, self.g, res1)
+        assig1 = allOrNothing("name", self.matrix, self.g, res1)
         assig1.execute()
 
         res2 = AssignmentResults()
         res2.prepare(self.g, self.matrix2)
-        assig2 = allOrNothing(self.matrix2, self.g, res2)
+        assig2 = allOrNothing("name", self.matrix2, self.g, res2)
         assig2.execute()
 
         load1 = res1.get_load_results()

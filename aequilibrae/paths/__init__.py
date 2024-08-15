@@ -11,6 +11,7 @@ from aequilibrae.paths.graph import Graph, TransitGraph
 from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.public_transport import HyperpathGenerating
 from aequilibrae.paths.route_choice import RouteChoice
+from aequilibrae.paths.sub_area import SubAreaAnalysis
 
 from aequilibrae import global_logger
 

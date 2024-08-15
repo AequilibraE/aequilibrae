@@ -31,6 +31,7 @@ def create_project(project: Project):
                 "longname",
                 "description",
                 "route_type",
+                "pce",
                 "seated_capacity",
                 "total_capacity",
                 "geometry",

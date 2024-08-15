@@ -1,4 +1,3 @@
-import importlib.util as iutil
 import multiprocessing as mp
 import sys
 import threading
@@ -10,22 +9,18 @@ from aequilibrae import global_logger
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
-from aequilibrae.utils import WorkerThread
 
 try:
     from aequilibrae.paths.AoN import skimming_single_origin
 except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
-spec = iutil.find_spec("PyQt5")
-pyqt = spec is not None
-if pyqt:
-    from PyQt5.QtCore import pyqtSignal
+from aequilibrae.utils.signal import SIGNAL
 
 sys.dont_write_bytecode = True
 
 
-class NetworkSkimming(WorkerThread):
+class NetworkSkimming:
     """
 
     .. code-block:: python
@@ -61,11 +56,9 @@ class NetworkSkimming(WorkerThread):
         >>> project.close()
     """
 
-    if pyqt:
-        skimming = pyqtSignal(object)
+    skimming = SIGNAL(object)
 
     def __init__(self, graph, origins=None, project=None):
-        WorkerThread.__init__(self, None)
         self.project = project
         self.origins = origins
         self.graph = graph
@@ -82,8 +75,7 @@ class NetworkSkimming(WorkerThread):
 
     def execute(self):
         """Runs the skimming process as specified in the graph"""
-        if pyqt:
-            self.skimming.emit(["zones finalized", 0])
+        self.skimming.emit(["zones finalized", 0])
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
@@ -105,9 +97,8 @@ class NetworkSkimming(WorkerThread):
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
 
-        if pyqt:
-            self.skimming.emit(["text skimming", "Saving Outputs"])
-            self.skimming.emit(["finished_threaded_procedure", None])
+        self.skimming.emit(["text skimming", "Saving Outputs"])
+        self.skimming.emit(["finished_threaded_procedure", None])
 
     def set_cores(self, cores: int) -> None:
         """
@@ -168,7 +159,7 @@ class NetworkSkimming(WorkerThread):
         self.cumulative += 1
         if x != origin:
             self.report.append(x)
-        if pyqt:
-            self.skimming.emit(["zones finalized", self.cumulative])
-            txt = str(self.cumulative) + " / " + str(self.matrix.zones)
-            self.skimming.emit(["text skimming", txt])
+
+        self.skimming.emit(["zones finalized", self.cumulative])
+        txt = str(self.cumulative) + " / " + str(self.matrix.zones)
+        self.skimming.emit(["text skimming", txt])

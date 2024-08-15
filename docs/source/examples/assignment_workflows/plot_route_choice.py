@@ -116,11 +116,13 @@ from aequilibrae.paths import RouteChoice
 
 # %%
 # This object construct might take a minute depending on the size of the graph due to the construction of the compressed
-# link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to
-# supply a Graph and optionally a AequilibraeMatrix, if the matrix is not provided link loading cannot be preformed.
-rc = RouteChoice(graph, mat)
+# link to network link mapping that's required.  This is a one time operation per graph and is cached. We need to supply
+# a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided link loading
+# cannot be preformed.
+rc = RouteChoice(graph)
+rc.add_demand(mat)
 
-#%%
+# %%
 # Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, or BFSLE
 # based on the paper
 # "Route choice sets for very high-resolution data" by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
@@ -150,12 +152,12 @@ rc.set_choice_set_generation("bfsle", max_routes=5)
 
 # %%
 # All parameters are optional, the defaults are:
-print(rc.default_paramaters)
+print(rc.default_parameters)
 
 # %%
 # We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
 # as well an an assignment.
-results = rc.execute_single(77011, 74089, perform_assignment=True)
+results = rc.execute_single(77011, 74089, demand=1.0)
 print(results[0])
 
 # %%
@@ -173,9 +175,8 @@ def plot_results(link_loads):
     import folium
     import geopandas as gpd
 
-    link_loads = link_loads[["link_id", "demand_tot"]]
-    link_loads = link_loads[link_loads.demand_tot > 0]
-    max_load = link_loads["demand_tot"].max()
+    link_loads = link_loads[link_loads.tot > 0]
+    max_load = link_loads["tot"].max()
     links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
@@ -192,9 +193,9 @@ def plot_results(link_loads):
         points = [[x[1], x[0]] for x in eval(points)]
         _ = folium.vector_layers.PolyLine(
             points,
-            tooltip=f"link_id: {rec.link_id}, Flow: {rec.demand_tot:.3f}",
+            tooltip=f"link_id: {rec.link_id}, Flow: {rec.tot:.3f}",
             color="red",
-            weight=factor * rec.demand_tot,
+            weight=factor * rec.tot,
         ).add_to(loads_lyr)
     long, lat = project.conn.execute("select avg(xmin), avg(ymin) from idx_links_geometry").fetchone()
 
@@ -205,12 +206,13 @@ def plot_results(link_loads):
 
 
 # %%
-plot_results(rc.get_load_results())
+plot_results(rc.get_load_results()["demand"])
 
 # %%
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
 # pairs we'd like to use, or we can provided a 1D list and the generation will be run on all permutations.
-rc.prepare(graph.centroids[:5])  # You can inspect the result with rc.nodes
+# rc.prepare(graph.centroids[:5])
+rc.prepare()
 
 # %%
 # Now we can perform a batch computation with an assignment
@@ -223,28 +225,31 @@ res.head()
 rc.get_load_results()
 
 # %% we can plot these as well
-plot_results(rc.get_load_results())
+plot_results(rc.get_load_results()["demand"])
 
 # %%
 # Select link analysis
 # ~~~~~~~~~~~~~~~~~~~~
-# We can also enable select link analysis by providing the links and the directions that we are interested in
-rc.set_select_links({"sl1": [(5372, 1), (5374, 1)], "sl2": [(23845, 0)]})
+# We can also enable select link analysis by providing the links and the directions that we are interested in.  Here we
+# set the select link to trigger when (7369, 1) and (20983, 1) is utilised in "sl1" and "sl2" when (7369, 1) is
+# utilised.
+rc.set_select_links({"sl1": [[(7369, 1), (20983, 1)]], "sl2": [[(7369, 1)]]})
+rc.execute(perform_assignment=True)
 
 # %%
-# We can get then the results in a Pandas data frame for both the network and compressed graph.
-u_sl, c_sl = rc.get_select_link_results()
-u_sl
+# We can get then the results in a Pandas data frame for both the network.
+sl = rc.get_select_link_loading_results()
+sl
 
 # %%
 # We can also access the OD matrices for this link loading. These matrices are sparse and can be converted to
 # scipy.sparse matrices for ease of use. They're stored in a dictionary where the key is the matrix name concatenated
-# wit the select link set name via an underscore. These matrices are constructed during `get_select_link_results`.
-list(rc.sl_od_matrix.keys())
+# wit the select link set name via an underscore. These matrices are constructed during `get_select_link_loading_results`.
+rc.get_select_link_od_matrix_results()
 
 # %%
-od_matrix = rc.sl_od_matrix["demand_sl1"]
-od_matrix.to_scipy()
+od_matrix = rc.get_select_link_od_matrix_results()["sl1"]["demand"]
+od_matrix.to_scipy().toarray()
 
 # %%
 project.close()
