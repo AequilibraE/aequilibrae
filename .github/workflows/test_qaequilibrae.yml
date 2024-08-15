@@ -1,4 +1,4 @@
-name: Dispatch Event
+name: Test QAequilibraE
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send repository_dispatch
+      - name: Triggers test run on QAequilibraE
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
