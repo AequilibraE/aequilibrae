@@ -28,15 +28,12 @@ class GTFSRouteSystemBuilder:
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
-
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
-
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
-        self.day = None
         self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
@@ -49,7 +46,7 @@ class GTFSRouteSystemBuilder:
         self.description = description
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
-        self.__default_capacities = capacities
+        self.__default_capacities = {} if capacities is None else capacities
         self.__default_pces = {} if pces is None else pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
