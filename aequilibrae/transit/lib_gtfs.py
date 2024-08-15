@@ -20,7 +20,9 @@ from .map_matching_graph import MMGraph
 class GTFSRouteSystemBuilder:
     """Container for GTFS feeds providing data retrieval for the importer"""
 
-    def __init__(self, network, file_path, description="", capacities={}):  # noqa: B006
+    signal = SIGNAL(object)
+
+    def __init__(self, network, file_path, description="", capacities=None, pces=None):  # noqa: B006
         """Instantiates a transit class for the network
 
         :Arguments:
@@ -48,6 +50,7 @@ class GTFSRouteSystemBuilder:
         self.transformer = Transformer.from_crs("epsg:4326", f"epsg:{self.srid}", always_xy=False)
         self.sridproj = pyproj.Proj(f"epsg:{self.srid}")
         self.__default_capacities = capacities
+        self.__default_pces = {} if pces is None else pces
         self.__do_execute_map_matching = False
         self.__target_date__ = None
         self.__outside_zones = 0
