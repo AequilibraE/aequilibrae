@@ -34,6 +34,7 @@ class GTFSRouteSystemBuilder:
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
+        self.day = None
         self.logger = get_logger()
         self.gtfs_data = GTFSReader()
 
