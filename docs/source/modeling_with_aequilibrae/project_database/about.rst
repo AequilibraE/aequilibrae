@@ -27,4 +27,4 @@ An API for editing the contents of this database is available from the API docum
 
 .. seealso::
 
-    :doc:`Refer to the documentation <../../generated/aequilibrae.project.About>`
+    :doc:`Editing About table <../../generated/aequilibrae.project.About>`
