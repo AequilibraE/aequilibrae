@@ -168,9 +168,6 @@ latex_appendices = [
     "installation",
     "validation_benchmarking/ipf_performance",
     "validation_benchmarking/traffic_assignment",
-    "modeling_with_aequilibrae/project_database/importing_from_osm",
-    "modeling_with_aequilibrae/project_database/importing_from_gmns",
-    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
 ]
 
 # -- Options for manual page output ------------------------------------------

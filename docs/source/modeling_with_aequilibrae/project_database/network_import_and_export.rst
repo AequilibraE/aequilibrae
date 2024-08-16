@@ -9,7 +9,7 @@ sections.
 Importing from Open Street Maps
 -------------------------------
 
-Please review the information :ref:`parameters_osm`
+You can check more specifications on OSM download on the :ref:`parameters_file`.
 
 .. note::
 
@@ -82,8 +82,9 @@ platform that does not support both R-Tree and Spatialite.
 Importing from link layer
 -------------------------
 
-
-:ref:`project_from_link_layer`
+It is possible to create an AequilibraE project from a link layer, such as a \*.csv file that
+contains geometry in WKT, for instance. You can check an example with all functions used in
+:ref:`the following example <project_from_link_layer>`.
 
 Importing from files in GMNS format
 -----------------------------------
@@ -137,7 +138,7 @@ After loading an existing AequilibraE project, you can export it to GMNS format.
 .. image:: ../../images/plot_export_to_gmns.png
     :align: center
     :alt: example
-    :target: ../../_auto_examples/plot_export_to_gmns.html
+    :target: export_to_gmns
 
 As of July 2022, it is possible to export an AequilibraE network to the following
 tables in GMNS format:

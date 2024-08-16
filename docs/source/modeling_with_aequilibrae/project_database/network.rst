@@ -29,4 +29,4 @@ other changes to the layers or preventing the changes.
 
 .. include:: network_import_and_export.rst
 
-.. .. include:: network_geometry.rst
+.. include:: network_geometry.rst
