@@ -5,12 +5,6 @@ Parameters YAML File
 
 The parameter file holds the parameters information for a certain portion of the software.
 
-* :ref:`parameters_assignment`
-* :ref:`parameters_distribution`
-* :ref:`parameters_network`
-* :ref:`parameters_system`
-* :ref:`parameters_osm`
-
 .. _parameters_assignment:
 
 Assignment
@@ -27,7 +21,6 @@ of iterations and target Relative Gap.
 
 Although these parameters are required to exist in the parameters file, one can
 override them during the assignment, as detailed in :ref:`convergence_criteria`.
-
 
 .. _parameters_distribution:
 
@@ -107,7 +100,6 @@ The example below also shows that it is possible to mix fields that will be impo
 `OSM <https://www.openstreetmap.org/>`_ posted speed and number of lanes, and fields that need
 to be in the network but should not be imported from OSM, such as link capacities.
 
-
 Node fields
 ~~~~~~~~~~~
 
@@ -115,7 +107,6 @@ The specification for node fields is similar to the one for link fields, with th
 that it does not make sense to have fields for one or two directions and that it is not possible
 yet to import any tagged values from OSM at the moment, and therefore the parameter *osm_source*
 would have no effect here.
-
 
 Open Street Maps
 ~~~~~~~~~~~~~~~~
@@ -199,3 +190,7 @@ requests *sleeptime*.
 
 It is also possible to set a custom address for the Nominatim server, but its
 use by AequilibraE is so small that it is likely not necessary to do so.
+
+.. seealso::
+
+    :doc:`Parameters documentation <../../generated/aequilibrae.Parameters>`

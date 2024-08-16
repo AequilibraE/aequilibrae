@@ -107,7 +107,7 @@ mat.computational_view()
 
 # %%
 # Sub-area preparation
-# ~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~
 # We need to define some polygon for out sub-area analysis, here we'll use a section of zones and create out polygon as
 # # the union of their geometry. It's best to choose a polygon that avoids any unnecessary intersections with links as
 # the # resource requirements of this approach grow quadratically with the number of links cut.
@@ -118,7 +118,7 @@ zones.head()
 
 # %%
 # Sub-area analysis
-# ~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~
 
 # From here there are two main paths to conduct a sub-area analysis, manual or automated. AequilibraE ships with a small
 # class that handle most of the details regarding the implementation and extract of the relevant data. It also exposes
@@ -203,7 +203,7 @@ map
 
 # %%
 # Manual sub-area analysis further preparation
-# ~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # %%
 # We take the union of this GeoDataFrame as our polygon.
 poly = zones.unary_union
@@ -234,7 +234,7 @@ g.head()
 
 # %%
 # Sub-area visualisation
-# ~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~
 # Here we'll quickly visualise what out sub-area is looking like. We'll plot the polygon from our zoning system and the
 # links that it cuts.
 points = [(link_id, list(x.coords)) for link_id, x in zip(inner_links.link_id, inner_links.geometry)]
@@ -259,7 +259,7 @@ map_osm
 
 # %%
 # Manual sub-area analysis
-# ~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists our polygon. To do
 # so we perform a select link analysis on all links and pairs of links that cross the boundary.  We create them as
 # tuples of tuples to make represent the select link AND sets.

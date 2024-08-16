@@ -2,7 +2,7 @@
 .. _example_usage_forecasting:
 
 Forecasting
-============
+===========
 
 In this example, we present a full forecasting workflow for the Sioux Falls
 example model.

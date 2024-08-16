@@ -13,14 +13,18 @@ the new field is added, the underlying database is altered and the field will
 be present when the project is open during future use.
 
 This table, which can look something like the example from image below, is required
-to exist in AequilibraE but it is not currently actively used by any process but
-we strongly recommend not to edit the information on **projection** and
+to exist in AequilibraE but it is not currently actively used by any process.
+We strongly recommend not to edit the information on **projection** and
 **aequilibrae_version**, as these are fields that might or might not be used by
 the software to produce valuable information to the user with regards to
 opportunities for version upgrades.
 
 .. image:: ../../images/about_table_example.png
-    :width: 800
     :alt: About table structure
+    :align: center
 
 An API for editing the contents of this database is available from the API documentation.
+
+.. seealso::
+
+    :doc:`Refer to the documentation <../../generated/aequilibrae.project.About>`
