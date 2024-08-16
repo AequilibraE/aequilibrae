@@ -1,7 +1,7 @@
 .. _project:
 
 The AequilibraE project
------------------------
+=======================
 
 Similarly to commercial packages, any AequilibraE project must have a certain
 structure and follow a certain set of guidelines in order for software to
@@ -28,7 +28,7 @@ for Windows users this dependency is automatically handled under the hood, but
 the details are also discussed in the aforementioned dependencies section.
 
 Project structure
-~~~~~~~~~~~~~~~~~
+-----------------
 
 Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
@@ -73,7 +73,7 @@ model, but there is still no support for manually or programmatically adding rou
 to a route system as of yet.
 
 Package components: A conceptual view
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------------
 
 As all the components of an AequilibraE model based on open-source software and
 open-data standards, modeling with AequilibraE is a little different from

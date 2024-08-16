@@ -1,5 +1,6 @@
 Dealing with Geometries
-=======================
+-----------------------
+
 Geometry is a key feature when dealing with transportation infrastructure and
 actual travel. For this reason, all datasets in AequilibraE that correspond to
 elements with physical GIS representation, links and nodes in particular, are
@@ -15,7 +16,7 @@ to use its powerful tools to manipulate your model's geometries, although that
 is not recommended, as the "training wheels are off".
 
 Data consistency
-----------------
+~~~~~~~~~~~~~~~~
 
 Data consistency is not achieved as a monolithic piece, but rather through the
 *treatment* of specific changes to each aspect of all the objects being
@@ -41,7 +42,7 @@ use of the tool.
   `Andrew <https://au.linkedin.com/in/andrew-o-brien-5a8bb486>`_.
 
 Network consistency behaviour
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order for the implementation of this standard to be successful, it is
 necessary to map all the possible user-driven changes to the underlying data and
@@ -95,7 +96,7 @@ change are also discussed, and all the points where alternative behavior is
 conceivable are also explored.
 
 Creating a node
-~~~~~~~~~~~~~~~
++++++++++++++++
 
 There are only three situations when a node is to be created:
 
@@ -119,7 +120,7 @@ Behavior regarding the fields regarding modes and link types is discussed in
 their respective table descriptions
 
 Deleting a node
-~~~~~~~~~~~~~~~
++++++++++++++++
 
 Deleting a node is only allowed in two situations:
 
@@ -143,7 +144,7 @@ Behavior regarding the fields regarding modes and link types is discussed in
 their respective table descriptions
 
 Moving a node
-~~~~~~~~~~~~~
++++++++++++++
 
 There are two possibilities for moving a node: Moving to an empty space, and
 moving on top of another node.
@@ -170,20 +171,20 @@ their respective table descriptions.
     :ref:`Example - Editing network nodes <editing_network_nodes>`
 
 Adding a data field
-~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++
 
 No consistency check is needed other than ensuring that no repeated data field
 names exist.
 
 Deleting a data field
-~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++
 
 If the data field whose attempted deletion is mandatory, the network should
 return an error and not perform such operation. Otherwise the operation can be
 performed.
 
 Modifying a data entry
-~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++
 
 If the field being edited is the node_id field, then all the related tables need
 to be edited as well (e.g. a_b and b_node in the link layer, the node_id tagged
@@ -195,7 +196,7 @@ Link layer changes and expected behavior
 Network links layer also has some possible changes of geographic and data-only nature.
 
 Deleting a link
-~~~~~~~~~~~~~~~
++++++++++++++++
 
 In case a link is deleted, it is necessary to check for orphan nodes, and deal
 with them as prescribed in *Deleting a node*. In case one of the link
@@ -206,7 +207,7 @@ Behavior regarding the fields regarding modes and link types is discussed in
 their respective table descriptions.
 
 Moving a link extremity
-~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
 This change can happen in two different forms:
 
@@ -230,7 +231,7 @@ This change can happen in two different forms:
     :ref:`Example - Editing network links <editing_network_links>`
 
 Re-shaping a link
-~~~~~~~~~~~~~~~~~
++++++++++++++++++
 
 When reshaping a link, the only thing other than we expect to be updated in the
 link database is their length (or distance, in AequilibraE's field structure).
@@ -241,7 +242,7 @@ As of now, distance in AequilibraE is **ALWAYS** measured in meters.
     :ref:`Example - Splitting network links <editing_network_splitting_link>`
 
 Deleting a required field
-~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++
 
 Unfortunately, SQLite does not have the resources to prevent a user to remove a
 data field from the table. For this reason, if the user removes a required
@@ -253,32 +254,32 @@ Field-specific data consistency
 Some data fields are specially sensitive to user changes.
 
 Link distance
-~~~~~~~~~~~~~
++++++++++++++
 
 Link distance cannot be changed by the user, as it is automatically recalculated
 using the Spatialite function *GeodesicLength*, which always returns distances
 in meters.
 
 Link direction
-~~~~~~~~~~~~~~
+++++++++++++++
 
 Triggers enforce link direction to be -1, 0 or 1, and any other value results in
 an SQL exception.
 
 *modes* field (Links and Nodes layers)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++++++
 
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_modes`.
 
 *link_type* field (Links layer) & *link_types* field (Nodes layer)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 A serious of triggers are associated with the modes field, and they are all
 described in the :ref:`tables_link_types`.
 
 a_node and b_node
-~~~~~~~~~~~~~~~~~
++++++++++++++++++
 
 The user should not change the a_node and b_node fields, as they are controlled
 by the triggers that govern the consistency between links and nodes. It is not

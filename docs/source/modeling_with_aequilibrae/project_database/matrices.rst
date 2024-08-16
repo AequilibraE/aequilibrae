@@ -1,7 +1,7 @@
 .. _matrix_table:
 
-Matrices
-~~~~~~~~
+Matrices table
+==============
 
 The **matrices** table in the project_database is nothing more than an index of
 all matrix files contained in the matrices folder inside the AequilibraE project.
@@ -20,6 +20,6 @@ types (AEM and OMX) without prejudice to functionality.
 
 .. seealso::
 
-    :doc:`Editing Matrices table <../../generated/aequilibrae.project.Matrices>`
+    :func:`aequilibrae.project.Matrices`
     
-    :doc:`AequilibraE Matrix <../../generated/aequilibrae.matrix.AequilibraeMatrix>`
+    :func:`aequilibrae.matrix.AequilibraeMatrix`

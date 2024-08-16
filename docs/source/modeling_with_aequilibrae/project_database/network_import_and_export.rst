@@ -1,5 +1,5 @@
 Importing and exporting the network
-===================================
+-----------------------------------
 
 Currently AequilibraE can import links and nodes from a network from OpenStreetMaps, 
 GMNS, and from link layers. AequilibraE can also export the existing network
@@ -7,7 +7,7 @@ into GMNS format. There is some valuable information on these topics in the foll
 sections.
 
 Importing from Open Street Maps
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can check more specifications on OSM download on the :ref:`parameters_file`.
 
@@ -80,14 +80,14 @@ platform that does not support both R-Tree and Spatialite.
     :func:`aequilibrae.project.Network.create_from_osm`
 
 Importing from link layer
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It is possible to create an AequilibraE project from a link layer, such as a \*.csv file that
 contains geometry in WKT, for instance. You can check an example with all functions used in
 :ref:`the following example <project_from_link_layer>`.
 
 Importing from files in GMNS format
------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Before importing a network from a source in GMNS format, it is imperative to know 
 in which spatial reference its geometries (links and nodes) were created. If the SRID
@@ -131,7 +131,7 @@ specification.
     :func:`aequilibrae.project.Network.create_from_gmns`
 
 Exporting AequilibraE model to GMNS format
-------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After loading an existing AequilibraE project, you can export it to GMNS format. 
 

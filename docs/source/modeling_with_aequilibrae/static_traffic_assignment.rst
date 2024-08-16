@@ -3,9 +3,9 @@
 Static Traffic Assignment
 =========================
 
-Performing static traffic assignment with AequilibraE is not dissimilar than doing so with traditional commercial packages,
-as we strive to make it as easy as possible for seasoned modelers to migrate their models and
-workflows to AequilibraE.
+Performing static traffic assignment with AequilibraE is not dissimilar than doing so with traditional 
+commercial packages, as we strive to make it as easy as possible for seasoned modelers to migrate their 
+models and workflows to AequilibraE.
 
 Although modeling with AequilibraE should feel somewhat familiar to seasoned modelers, especially
 those used to programming, the mechanics of traffic assignment in AequilibraE might be foreign to
@@ -19,7 +19,7 @@ we detail how these concepts are translated into the AequilibraE tools and recom
 
 .. toctree::
     :maxdepth: 1
+    :caption: Static Traffic Assignment
 
     static_traffic_assignment/multi_class_equilibrium
     static_traffic_assignment/assignment_mechanics
-

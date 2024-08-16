@@ -1,7 +1,7 @@
 .. _multiclass_equilibrium:
 
 Multi-class Equilibrium assignment
-----------------------------------
+==================================
 
 While single-class equilibrium traffic assignment [1]_ is mathematically simple,
 multi-class traffic assignment [7]_, especially when including monetary costs
@@ -12,20 +12,10 @@ As it is to be expected, strict convergence of multi-class equilibrium assignmen
 comes at the cost of specific technical requirements and more advanced equilibration
 algorithms have slightly different requirements.
 
-Cost function
-~~~~~~~~~~~~~
-
-AequilibraE supports class-=specific cost functions, where each class can include
-the following:
-
-* PCE
-* Link-based fixed financial cost components
-* Value-of-Time (VoT)
-
 .. _technical_requirements_multi_class:
 
 Technical requirements
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 This documentation is not intended to discuss in detail the mathematical
 requirements of multi-class traffic assignment, which can be found discussed in
@@ -33,21 +23,29 @@ detail on [4]_.
 
 A few requirements, however, need to be made clear.
 
-* All traffic classes shall have identical free-flow travel times throughout the
-  network
+* All traffic classes shall have identical free-flow travel times throughout the network
 
 * Each class shall have an unique Passenger Car Equivalency (PCE) factor for all links
 
-* Volume delay functions shall be monotonically increasing. *Well behaved*
-  functions are always something we are after
+* Volume delay functions shall be monotonically increasing. *Well behaved* functions are 
+  always something we are after
 
-For the conjugate and Biconjugate Frank-Wolfe algorithms it is also necessary
-that the VDFs are differentiable.
+For the conjugate and biconjugate Frank-Wolfe algorithms it is also necessary that the VDFs 
+are differentiable.
+
+Cost function
+-------------
+
+AequilibraE supports class-specific cost functions, where each class can include the following:
+
+* PCE
+* Link-based fixed financial cost components
+* Value-of-Time (VoT)
 
 .. _convergence_criteria:
 
 Convergence criteria
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 Convergence in AequilibraE is measured solely in terms of relative gap, which is
 a somewhat old recommendation [5]_, but it is still the most used measure in
@@ -61,7 +59,7 @@ are described in detail in the :ref:`parameters_assignment` section, in the
 :ref:`parameters_file`.
 
 Algorithms available
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 All algorithms have been implemented as a single software class, as the
 differences between them are simply the step direction and step size after each
@@ -86,12 +84,12 @@ iteration of all-or-nothing assignment, as shown in the table below
 +-------------------------------+-----------------------+----------------------------------+
 
 .. note::
-   Our implementations of the conjudate and Biconjugate-Frank-Wolfe methods
+   Our implementations of the conjugate and biconjugate-Frank-Wolfe methods
    should be inherently proportional [6]_, but we have not yet carried the
    appropriate testing that would be required for an empirical proof.
 
 Method of Successive Averages (MSA)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This algorithm has been included largely for historical reasons, and we see very
 little reason to use it. Yet, it has been implemented with the appropriate
@@ -99,7 +97,7 @@ computation of relative gap computation and supports all the analysis features
 available.
 
 Frank-Wolfe (FW)
-^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~
 
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
@@ -108,15 +106,15 @@ introduced by LeBlanc in 1975 [2]_.
 
 
 Conjugate Frank-Wolfe
-^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~
 
 The conjugate direction algorithm was introduced in 2013 [3]_, which is quite
 recent if you consider that the Frank-Wolfe algorithm was first applied in the
 early 1970's, and it was introduced at the same as its Biconjugate evolution,
 so it was born outdated.
 
-Biconjugate Frank-Wolfe
-^^^^^^^^^^^^^^^^^^^^^^^
+Biconjugate Frank-Wolfe (BFW)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Biconjugate Frank-Wolfe algorithm is currently the fastest converging link-
 based traffic assignment algorithm used in practice, and it is the recommended
@@ -125,7 +123,8 @@ it **requires more memory** during runtime, but very large networks should still
 fit nicely in systems with 16Gb of RAM.
 
 Implementation details & tricks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
+
 A few implementation details and tricks are worth mentioning not because they are
 needed to use the software, but because they were things we grappled with during
 implementation, and it would be a shame not register it for those looking to
@@ -145,12 +144,13 @@ their own purposes.
   was generalized to the conjugate and biconjugate Frank-Wolfe algorithms.
 
 Multi-threaded implementation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------
 
 AequilibraE's All-or-Nothing assignment (the basis of all the other algorithms)
 has been parallelized in Python using the threading library, which is possible
 due to the work we have done with memory management to release Python's Global
 Interpreter Lock.
+
 Other opportunities for parallelization, such as the computation of costs and
 its derivatives (required during the line-search optimization step), as well as
 all linear combination operations for vectors and matrices have been achieved
@@ -161,11 +161,9 @@ Much of the gains of going back to Cython to parallelize these functions came
 from making in-place computation using previously existing arrays, as the
 instantiation of large NumPy arrays can be computationally expensive.
 
-.. _traffic-assignment-references:
-
-
 Handling the network
-~~~~~~~~~~~~~~~~~~~~
+--------------------
+
 The other important topic when dealing with multi-class assignment is to have
 a single consistent handling of networks, as in the end there is only physical
 network across all modes, regardless of access differences to each mode (e.g. truck
@@ -173,10 +171,12 @@ lanes, High-Occupancy Lanes, etc.). This handling is often done with something
 called a **super-network**.
 
 Super-network
-^^^^^^^^^^^^^
+~~~~~~~~~~~~~
+
 We deal with a super-network by having all classes with the same links in their
 sub-graphs, but assigning *b_node* identical to *a_node* for all links whenever a
 link is not available for a certain user class.
+
 This approach is slightly less efficient when we are computing shortest paths, but
 it gets eliminated when topologically compressing the network for centroid-to-centroid
 path computation and it is a LOT more efficient when we are aggregating flows.
@@ -186,10 +186,7 @@ ensure that all graphs will be built in a consistent manner and multi-class
 assignment is possible.
 
 References
-~~~~~~~~~~
-
-Traffic assignment and equilibrium
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------
 
 .. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
        Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. 

@@ -15,7 +15,6 @@ contains only the convergence criteria for assignment in terms of the maximum nu
 of iterations and target Relative Gap.
 
 .. image:: ../images/parameters_assignment_example.png
-    :width: 487
     :align: center
     :alt: Assignment example
 
@@ -33,7 +32,6 @@ and maximum trip length to be applied in Iterative Proportional Fitting and
 synthetic gravity models, as shown below.
 
 .. image:: ../images/parameters_distribution_example.png
-    :width: 546
     :align: center
     :alt: Distribution example
 
@@ -71,12 +69,12 @@ to the use of **integer**, **numeric** and **varchar**.
     :align: center
     :alt: Link example
 
-For the case of all non-mandatory fields, two more parameters are possible: *osm_source* and
-*osm_behaviour*. Those two fields provide the necessary information for importing data from
+For the case of all non-mandatory fields, two more parameters are possible: 'osm_source' and
+'osm_behaviour'. Those two fields provide the necessary information for importing data from
 `Open Street Maps <https://www.openstreetmap.org/>`_ in case such resource is required, and
 they work in the following way:
 
-*osm_source*: The name of the tag for which data needs to be retrieved. Common tags are
+'osm_source': The name of the tag for which data needs to be retrieved. Common tags are
 **highway**, **maxspeed** and **name**. The import result will contain a null value for all
 links that do not contain a value for such tag.
 
@@ -87,12 +85,11 @@ values for both directions, and it might have only a tag value for **maxspeed**.
 Although for **maxspeed** (which is the value for posted speed) we might want to copy the same
 value for both directions, that would not be true for parameters such as **lanes**, which we
 might want to split in half for both directions (cases with an odd number of lanes usually have
-forward/backward values tagged). For this reason, one can use the parameter *osm_behaviour*
+forward/backward values tagged). For this reason, one can use the parameter 'osm_behaviour'
 to define what to do with numeric tag values that have not been tagged for both directions.
 the allowed values for this parameter are **copy** and **divide**, as shown below.
 
 .. image:: ../images/parameters_links_osm_behaviour.png
-    :width: 437
     :align: center
     :alt: OSM behaviour examples
 
@@ -110,6 +107,7 @@ would have no effect here.
 
 Open Street Maps
 ~~~~~~~~~~~~~~~~
+
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
@@ -154,7 +152,6 @@ and whether we should be saving information to a log file at all, as exemplified
 below.
 
 .. image:: ../images/parameters_system_example.png
-    :width: 812
     :align: center
     :alt: System example
 
@@ -180,7 +177,6 @@ download a substantial amount of data from an Overpass API, in which case it is
 recommended to deploy a local Overpass server.
 
 .. image:: ../images/parameters_osm_example.png
-    :width: 840
     :align: center
     :alt: OSM example
 
@@ -193,4 +189,4 @@ use by AequilibraE is so small that it is likely not necessary to do so.
 
 .. seealso::
 
-    :doc:`Parameters documentation <../../generated/aequilibrae.Parameters>`
+    :func:`aequilibrae.Parameters`
