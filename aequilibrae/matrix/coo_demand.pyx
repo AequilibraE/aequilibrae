@@ -66,7 +66,7 @@ cdef class GeneralisedCOODemand:
             dfs.append(df.dropna())
 
         self.add_df(dfs, shape=shape, fill=fill)
-        logging.info(f"There {len(self.df):,} are OD pairs with non-zero flows")
+        logging.info(f"There are {len(self.df):,} OD pairs with non-zero flows")
 
     def _initalise_col_names(self):
         """
