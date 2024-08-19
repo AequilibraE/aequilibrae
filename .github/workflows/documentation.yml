@@ -6,6 +6,8 @@ on:
      - develop
  pull_request:
  release:
+     types: [published]
+
 
 jobs:
   build:
