@@ -282,10 +282,8 @@ class RouteChoice:
             **perform_assignment** (:obj:`bool`): Whether or not to perform an assignment. Default `False`.
         """
         if self.demand.df.index.empty:
-            raise ValueError(
-                "to perform batch route choice generation you must first prepare with the selected nodes. "
-                "See `RouteChoice.prepare()`"
-            )
+            logging.warning("There is no demand or pairs of OD pairs to compute Route choice for.")
+            return
 
         self.procedure_date = str(datetime.today())
 
@@ -358,7 +356,8 @@ class RouteChoice:
         """
 
         if self.demand.no_demand():
-            raise ValueError("No demand was provided. To perform link loading add a demand matrix or data frame")
+            warnings.warn("No demand was provided. To perform link loading add a demand matrix or data frame")
+            return pd.DataFrame([])
 
         ll = self.__rc.get_link_loading(cores=self.cores)
         ll = {(k,): v for k, v in ll.items()}

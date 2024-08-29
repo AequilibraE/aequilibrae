@@ -1,6 +1,13 @@
 name: Build
 
-on: [pull_request]
+on:
+ push:
+    branches:
+      - 'develop'
+ pull_request:
+ release:
+     types: [published]
+
 
 jobs:
   make_sdist:

@@ -84,7 +84,7 @@ iteration of all-or-nothing assignment, as shown in the table below
 +-------------------------------+-----------------------+----------------------------------+
 
 .. note::
-   Our implementations of the conjugate and biconjugate-Frank-Wolfe methods
+   Our implementations of the conjugate and Biconjugate-Frank-Wolfe methods
    should be inherently proportional [6]_, but we have not yet carried the
    appropriate testing that would be required for an empirical proof.
 
