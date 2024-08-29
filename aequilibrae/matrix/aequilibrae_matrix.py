@@ -405,7 +405,7 @@ class AequilibraeMatrix(object):
 
             **from_column** (:obj:`str`): trip list file column containing the origin zones numbers
 
-            **from_column** (:obj:`str`): trip list file column containing the destination zones numbers
+            **to_column** (:obj:`str`): trip list file column containing the destination zones numbers
 
             **list_cores** (:obj:`list`): list of core columns in the trip list file
 

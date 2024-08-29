@@ -114,6 +114,7 @@ Paths
     TransitAssignment
     HyperpathGenerating
     OptimalStrategies
+    SubAreaAnalysis
 
 Transit
 -------

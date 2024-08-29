@@ -1,8 +1,8 @@
 """
 .. _example_usage_route_choice:
 
-Route Choice
-============
+Route Choice with sub-area analysis
+===================================
 
 In this example, we show how to perform sub-area analysis using route choice assignment, for a city in La Serena
 Metropolitan Area in Chile.
@@ -42,15 +42,11 @@ stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 
 # %%
-# Route Choice
-# ------------
-
-# %%
 # Model parameters
-# ~~~~~~~~~~~~~~~~
+# ----------------
 # We'll set the parameters for our route choice model. These are the parameters that will be used to calculate the
-# utility of each path. In our example, the utility is equal to *theta* * distance
-# And the path overlap factor (PSL) is equal to *beta*.
+# utility of each path. In our example, the utility is equal to :math:`theta * distance`,
+# and the path overlap factor (PSL) is equal to :math:`beta`.
 
 # Distance factor
 theta = 0.011
@@ -86,15 +82,15 @@ graph.set_graph("utility")
 
 # %%
 # We allow flows through "centroid connectors" because our centroids are not really centroids
-# If we have actual centroid connectors in the network (and more than one per centroid) , then we
+# If we have actual centroid connectors in the network (and more than one per centroid), then we
 # should remove them from the graph
 graph.set_blocked_centroid_flows(False)
 graph.graph.head()
 
 # %%
 # Mock demand matrix
-# ~~~~~~~~~~~~~~~~~~
-# We'll create a mock demand matrix with demand `10` for every zone.
+# ------------------
+# We'll create a mock demand matrix with demand ``10`` for every zone.
 from aequilibrae.matrix import AequilibraeMatrix
 
 names_list = ["demand"]
@@ -107,10 +103,10 @@ mat.computational_view()
 
 # %%
 # Sub-area preparation
-# ~~~~~~~~~~~~~~~~~~~~
+# --------------------
 # We need to define some polygon for out sub-area analysis, here we'll use a section of zones and create out polygon as
 # # the union of their geometry. It's best to choose a polygon that avoids any unnecessary intersections with links as
-# the # resource requirements of this approach grow quadratically with the number of links cut.
+# the resource requirements of this approach grow quadratically with the number of links cut.
 zones_of_interest = [29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 49, 50, 51, 52, 57, 58, 59, 60]
 zones = gpd.GeoDataFrame(project.zoning.data).set_index("zone_id")
 zones = zones.loc[zones_of_interest]
@@ -118,8 +114,7 @@ zones.head()
 
 # %%
 # Sub-area analysis
-# ~~~~~~~~~~~~~~~~~
-
+# -----------------
 # From here there are two main paths to conduct a sub-area analysis, manual or automated. AequilibraE ships with a small
 # class that handle most of the details regarding the implementation and extract of the relevant data. It also exposes
 # all the tools necessary to conduct this analysis yourself if you need fine grained control.
@@ -127,9 +122,8 @@ zones.head()
 # %%
 # Automated sub-area analysis
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 # We first construct out SubAreaAnalysis object from the graph, zones, and matrix we previously constructed, then
-# configure the route choice assignment and execute it. From there the `post_process` method is able to use the route
+# configure the route choice assignment and execute it. From there the ``post_process`` method is able to use the route
 # choice assignment results to construct the desired demand matrix as a DataFrame.
 from aequilibrae.paths import SubAreaAnalysis
 
@@ -164,7 +158,6 @@ subarea_zone = folium.Polygon(
     fill=True,
     stroke=False,
 )
-
 
 def plot_results(link_loads):
     link_loads = link_loads[link_loads.tot > 0]
@@ -202,8 +195,9 @@ subarea_zone.add_to(map)
 map
 
 # %%
-# Manual sub-area analysis further preparation
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Sub-area further preparation
+# ````````````````````````````
+
 # %%
 # We take the union of this GeoDataFrame as our polygon.
 poly = zones.unary_union
@@ -234,7 +228,9 @@ g.head()
 
 # %%
 # Sub-area visualisation
-# ~~~~~~~~~~~~~~~~~~~~~~
+# ``````````````````````
+
+# %%
 # Here we'll quickly visualise what out sub-area is looking like. We'll plot the polygon from our zoning system and the
 # links that it cuts.
 points = [(link_id, list(x.coords)) for link_id, x in zip(inner_links.link_id, inner_links.geometry)]
@@ -260,8 +256,10 @@ map_osm
 # %%
 # Manual sub-area analysis
 # ~~~~~~~~~~~~~~~~~~~~~~~~
+
+# %%
 # In order to perform out analysis we need to know what OD pairs have flow that enters and/or exists our polygon. To do
-# so we perform a select link analysis on all links and pairs of links that cross the boundary.  We create them as
+# so we perform a select link analysis on all links and pairs of links that cross the boundary. We create them as
 # tuples of tuples to make represent the select link AND sets.
 edge_pairs = {x: (x,) for x in itertools.permutations(g.index, r=2)}
 single_edges = {x: ((x,),) for x in g.index}
@@ -282,8 +280,8 @@ graph.set_blocked_centroid_flows(False)
 
 # %%
 # This object construction might take a minute depending on the size of the graph due to the construction of the
-# compressed link to network link mapping that's required.  This is a one time operation per graph and is cached. We
-# need to supply a Graph and an AequilibraeMatrix or DataFrame via the `add_demand` method , if demand is not provided
+# compressed link to network link mapping that's required. This is a one time operation per graph and is cached. We
+# need to supply a Graph and an AequilibraeMatrix or DataFrame via the ``add_demand`` method, if demand is not provided
 # link loading cannot be preformed.
 rc = RouteChoice(graph)
 rc.add_demand(mat)
@@ -294,7 +292,7 @@ rc.set_select_links(single_edges | edge_pairs)
 
 # %%
 # For the sake of demonstration we limit out demand matrix to a few OD pairs. This filter is also possible with the
-# automated approach, just edit the `subarea.rc.demand.df` DataFrame, however make sure the index remains intact.
+# automated approach, just edit the ``subarea.rc.demand.df`` DataFrame, however make sure the index remains intact.
 ods_pairs_of_interest = [
     (4, 39),
     (92, 37),
