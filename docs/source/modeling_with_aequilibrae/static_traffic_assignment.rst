@@ -21,5 +21,5 @@ we detail how these concepts are translated into the AequilibraE tools and recom
     :maxdepth: 1
     :caption: Static Traffic Assignment
 
-    static_traffic_assignment/multi_class_equilibrium
     static_traffic_assignment/assignment_mechanics
+    static_traffic_assignment/multi_class_equilibrium

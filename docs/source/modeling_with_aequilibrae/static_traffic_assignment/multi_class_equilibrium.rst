@@ -4,7 +4,7 @@ Multi-class Equilibrium assignment
 ==================================
 
 While single-class equilibrium traffic assignment [1]_ is mathematically simple,
-multi-class traffic assignment [7]_, especially when including monetary costs
+multi-class traffic assignment [2]_, especially when including monetary costs
 (e.g. tolls) and multiple classes with different Passenger Car Equivalent (PCE)
 factors, requires more sophisticated mathematics.
 
@@ -19,7 +19,7 @@ Technical requirements
 
 This documentation is not intended to discuss in detail the mathematical
 requirements of multi-class traffic assignment, which can be found discussed in
-detail on [4]_.
+detail on [3]_.
 
 A few requirements, however, need to be made clear.
 
@@ -48,7 +48,7 @@ Convergence criteria
 --------------------
 
 Convergence in AequilibraE is measured solely in terms of relative gap, which is
-a somewhat old recommendation [5]_, but it is still the most used measure in
+a somewhat old recommendation [4]_, but it is still the most used measure in
 practice, and is detailed below.
 
 .. math:: RelGap = \frac{\sum_{a}V_{a}^{*}*C_{a} - \sum_{a}V_{a}^{AoN}*C_{a}}{\sum_{a}V_{a}^{*}*C_{a}}
@@ -85,7 +85,7 @@ iteration of all-or-nothing assignment, as shown in the table below
 
 .. note::
    Our implementations of the conjugate and Biconjugate-Frank-Wolfe methods
-   should be inherently proportional [6]_, but we have not yet carried the
+   should be inherently proportional [5]_, but we have not yet carried the
    appropriate testing that would be required for an empirical proof.
 
 Method of Successive Averages (MSA)
@@ -102,13 +102,12 @@ Frank-Wolfe (FW)
 The implementation of Frank-Wolfe in AequilibraE is extremely simple from an
 implementation point of view, as we use a generic optimizer from SciPy as an
 engine for the line search, and it is a standard implementation of the algorithm
-introduced by LeBlanc in 1975 [2]_.
-
+introduced by LeBlanc in 1975 [6]_.
 
 Conjugate Frank-Wolfe
 ~~~~~~~~~~~~~~~~~~~~~
 
-The conjugate direction algorithm was introduced in 2013 [3]_, which is quite
+The conjugate direction algorithm was introduced in 2013 [7]_, which is quite
 recent if you consider that the Frank-Wolfe algorithm was first applied in the
 early 1970's, and it was introduced at the same as its Biconjugate evolution,
 so it was born outdated.
@@ -155,7 +154,7 @@ Other opportunities for parallelization, such as the computation of costs and
 its derivatives (required during the line-search optimization step), as well as
 all linear combination operations for vectors and matrices have been achieved
 through the use of OpenMP in pure Cython code. These implementations can be
-cound on a file called *parallel_numpy.pyx* if you are curious to look at.
+cound on a file called ``parallel_numpy.pyx`` if you are curious to look at.
 
 Much of the gains of going back to Cython to parallelize these functions came
 from making in-place computation using previously existing arrays, as the
@@ -192,30 +191,30 @@ References
        Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. 
        Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259
 
-.. [2] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) 
-       "An efficient approach to solving the road network equilibrium traffic assignment problem". 
-       Transportation Research, 9(5):309-318. 
-       Available in: https://doi.org/10.1016/0041-1647(75)90030-1
+.. [2] Marcotte, P., Patriksson, M. (2007) 
+       "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", 
+       Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4
 
-.. [3] Mitradjieva, M. and Lindberg, P.O. (2013) 
-       "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment".
-       Transportation Science, 47(2):280-293. 
-       Available in: https://doi.org/10.1287/trsc.1120.0409
-
-.. [4] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) 
+.. [3] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) 
        "Toll Choice and Stochastic User Equilibrium: Ticking All the Boxes",
        Transportation Research Record, 2673(4):930-940. 
        Available in: https://doi.org/10.1177%2F0361198119837496
 
-.. [5] Rose, G., Daskin, M., Koppelman, F. (1988) 
+.. [4] Rose, G., Daskin, M., Koppelman, F. (1988) 
        "An examination of convergence error in equilibrium traffic assignment models", 
        Transportation Research Part B, 22(4):261-274. 
        Available in: https://doi.org/10.1016/0191-2615(88)90003-3
 
-.. [6] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment",
+.. [5] Florian, M., Morosan, C.D. (2014) "On uniqueness and proportionality in multi-class equilibrium assignment",
        Transportation Research Part B, 70:261-274. 
        Available in: https://doi.org/10.1016/j.trb.2014.06.011
 
-.. [7] Marcotte, P., Patriksson, M. (2007) 
-       "Chapter 10 Traffic Equilibrium - Handbooks in Operations Research and Management Science, Vol 14", 
-       Elsevier. Editors Barnhart, C., Laporte, G. https://doi.org/10.1016/S0927-0507(06)14010-4
+.. [6] LeBlanc L. J., Morlok E. K. and Pierskalla W. P. (1975) 
+       "An efficient approach to solving the road network equilibrium traffic assignment problem". 
+       Transportation Research, 9(5):309-318. 
+       Available in: https://doi.org/10.1016/0041-1647(75)90030-1
+
+.. [7] Mitradjieva, M. and Lindberg, P.O. (2013) 
+       "The Stiff Is Moving—Conjugate Direction Frank-Wolfe Methods with Applications to Traffic Assignment".
+       Transportation Science, 47(2):280-293. 
+       Available in: https://doi.org/10.1287/trsc.1120.0409

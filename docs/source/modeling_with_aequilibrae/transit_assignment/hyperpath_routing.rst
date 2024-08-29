@@ -116,8 +116,6 @@ Vertices
    vertices = create_vertices(n)
    vertices.head(3)
 
-
-
 +------+----------+-------+
 |      |        x |     y |
 +======+==========+=======+
@@ -127,7 +125,6 @@ Vertices
 +------+----------+-------+
 |    2 | 0.222222 |   0.0 |
 +------+----------+-------+
-
 
 .. code:: python
 
@@ -164,9 +161,6 @@ Vertices
    edges = create_edges(n, seed=RS)
    edges.head(3)
 
-
-
-
 +------+----------+-------+------------+------------+
 |      |     tail |  head |  trav_time | delay_base |
 +======+==========+=======+============+============+
@@ -177,13 +171,12 @@ Vertices
 |    2 |       10 |    11 |   0.969136 |   0.854512 |
 +------+----------+-------+------------+------------+
 
-
 Plot the network
 ~~~~~~~~~~~~~~~~
 
-We use the `NetworkX <https://networkx.org/>`__ package to plot the
-network. The bottom left vertex is the origin (‘o’) and the top right
-vertex is the destination (‘d’) for the hyperpath computation.
+We use the `NetworkX <https://networkx.org/>`_ package to plot the
+network. The bottom left vertex is the origin (*o*) and the top right
+vertex is the destination (*d*) for the hyperpath computation.
 
 .. code:: python
 
@@ -222,13 +215,10 @@ vertex is the destination (‘d’) for the hyperpath computation.
    ax = plt.gca()
    _ = ax.set_title(f"Bell's network with $n$={n}", color="k")
 
-
-
 .. image:: ../../images/transit/hyperpath_bell_s_network.png
    :width: 600
    :align: center
    :alt: Bell's network
-
 
 We can also visualize the edge travel time:
 
@@ -261,14 +251,10 @@ We can also visualize the edge travel time:
        "Bell's network - edge travel time :  $\\textit{trav_time}$", color="k"
    )
 
-
-
 .. image:: ../../images/transit/hyperpath_bell_edge_travel_time.png
    :width: 600
    :align: center
    :alt: Bell's network - edge travel time
-
-
 
 And the base delay:
 
@@ -299,13 +285,10 @@ And the base delay:
    ax = plt.gca()
    _ = ax.set_title("Bell's network - edge base delay : $\\textit{delay_base}$", color="k")
 
-
-
 .. image:: ../../images/transit/hyperpath_bell_edge_base_delay.png
    :width: 600
    :align: center
    :alt: Bell's network - edge base delay
-
 
 Hyperpath computation
 ---------------------
@@ -313,13 +296,9 @@ Hyperpath computation
 We now introduce a function ``plot_shortest_hyperpath`` that: 
 
 - creates the network, 
-
 - computes the edge frequency given an input value for :math:`\alpha`, 
-
 - compute the shortest hyperpath, 
-
 - plot the network and hyperpath with NetworkX.
-
 
 .. code:: python
 
@@ -389,19 +368,14 @@ all the network.
 
    plot_shortest_hyperpath(n=10, alpha=0.0)
 
-
-
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d0.png
    :width: 600
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.0
 
-
-
 The hyperpath that we obtain is the same as the shortest path that
 Dijkstra’s algorithm would have computed. We call NetworkX’s
 ``dijkstra_path`` method in order to compute the shortest path:
-
 
 .. code:: python
 
@@ -446,12 +420,10 @@ Dijkstra’s algorithm would have computed. We call NetworkX’s
        f"Shortest path - Bell's network", color="k"
    )
 
-
 .. image:: ../../images/transit/hyperpath_bell_n_10_shartest_path.png
    :width: 600
    :align: center
    :alt: Shortest path - Bell's network
-
 
 Let’s introduce some delay by increasing the value of :math:`\alpha`:
 
@@ -459,12 +431,10 @@ Let’s introduce some delay by increasing the value of :math:`\alpha`:
 
    plot_shortest_hyperpath(n=10, alpha=0.5)
 
-
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d5.png
    :width: 600
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.5
-
 
 The shortest path is no longer unique and multiple routes are suggested.
 The link usage probability is reflected by the line width. The majority
@@ -472,17 +442,14 @@ of the flow still follows the shortest path, but some of it is
 distributed among different alternative paths. This becomes more
 apparent as we further increase :math:`\alpha`:
 
-
 .. code:: python
 
    plot_shortest_hyperpath(n=10, alpha=1.0)
-
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_1d0.png
    :width: 600
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=1.0
-
 
 .. code:: python
 
@@ -494,6 +461,9 @@ apparent as we further increase :math:`\alpha`:
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=100.0
 
+.. seealso::
+   
+   :func:`aequilibrae.paths.HyperpathGenerating`
 
 References
 ----------

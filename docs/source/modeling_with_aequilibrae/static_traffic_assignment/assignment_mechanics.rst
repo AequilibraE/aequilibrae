@@ -1,5 +1,5 @@
-Path-finding and assignment mechanics
--------------------------------------
+Assignment mechanics
+--------------------
 
 Performing traffic assignment, or even just computing paths through a network is
 always a little different in each platform, and in AequilibraE is not different.
@@ -73,7 +73,7 @@ Manipulating graphs in memory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As mentioned before, the AequilibraE Graph can be manipulated in memory, with all its
-components available for editing.  One of the simple tools available directly in the
+components available for editing. One of the simple tools available directly in the
 API is a method call for excluding one or more links from the Graph, **which is done**
 **in place**.
 
@@ -124,6 +124,12 @@ not blocking flows through "centroids".
     graph.prepare_graph(np.array([13, 169, 2197, 28561, 371293], np.int))
     graph.set_blocked_centroid_flows(False)
 
+.. seealso::
+
+    :func:`aequilibrae.paths.Graph`
+    
+    :func:`aequilibrae.paths.TransitGraph`
+
 Traffic Assignment Procedure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -140,7 +146,7 @@ application in :ref:`this example <example_usage_forecasting>`.
 Traffic Assignment Class
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Traffic assignment is organized within a object introduces on version 0.6.1 of the
+Traffic assignment is organized within a object introduced on version 0.6.1 of
 AequilibraE, and includes a small list of member variables which should be populated
 by the user, providing a complete specification of the assignment procedure:
 
@@ -184,12 +190,72 @@ To begin building the assignment it is easy:
 
     assig = TrafficAssignment()
 
+.. seealso::
+
+    :func:`aequilibrae.paths.TrafficAssignment`
+
+.. _assignment_class_object:
+
+Traffic class
+^^^^^^^^^^^^^
+
+The Traffic class object holds all the information pertaining to a specific
+traffic class to be assigned. There are three pieces of information that are
+required in the instantiation of this class:
+
+* **name** - Name of the class. Unique among all classes used in a multi-class
+  traffic assignment
+
+* **graph** - It is the Graph object corresponding to that particular traffic class/
+  mode
+
+* **matrix** - It is the AequilibraE matrix with the demand for that traffic class,
+  but which can have an arbitrary number of user-classes, setup as different
+  layers of the matrix object
+
+* **pce** - The passenger-car equivalent is the standard way of modeling
+  multi-class traffic assignment equilibrium in a consistent manner (see [3]_ for
+  the technical detail), and it is set to 1 by default. If the **pce** for a
+  certain class should be different than one, one can make a quick method call.
+
+* **fixed_cost** - In case there are fixed costs associated with the traversal of
+  links in the network, the user can provide the name of the field in the graph
+  that contains that network.
+
+* **vot** - Value-of-Time (VoT) is the mechanism to bring time and monetary
+  costs into a consistent basis within a generalized cost function. In the event
+  that fixed cost is measured in the same unit as free-flow travel time, then
+  **vot** must be set to 1.0, and can be set to the appropriate value (1.0,
+  value-of-timeIf the **vot** or whatever conversion factor is appropriate) with
+  a method call.
+
+.. code-block:: python
+
+    from aequilibrae.paths import TrafficClass
+
+    tc_car = TrafficClass("car", graph_car, matrix_car)
+    tc_truck = TrafficClass("truck", graph_truck, matrix_truck)
+
+    tc_truck.set_pce(2.5)
+    tc_truck.set_fixed_cost("truck_toll")
+    tc_truck.set_vot(0.35)
+
+    # Add traffic classes to the assignment instance
+    assig.set_classes([tc_car, tc_truck])
+
+    # To add only one class to the assignment instance
+    # assig.add_class(tc_truck)
+
+.. seealso::
+
+    :func:`aequilibrae.paths.TrafficClass`
+
 Volume Delay Function
 ^^^^^^^^^^^^^^^^^^^^^
 
-For now, the only VDF functions available in AequilibraE are the
+For now, the only VDF functions available in AequilibraE are
 
-* BPR [3]_
+* BPR [1]_
 
 .. math:: CongestedTime_{i} = FreeFlowTime_{i} * (1 + \alpha * (\frac{Volume_{i}}{Capacity_{i}})^\beta)
 
@@ -212,74 +278,13 @@ More functions will be added as needed/requested/possible.
 Setting the volume delay function is one of the first things you should do after
 instantiating an assignment problem in AequilibraE, and it is as simple as:
 
-.. code-block:: python
-
-    assig.set_vdf('BPR')
-
 The implementation of the VDF functions in AequilibraE is written in Cython and
 fully multi-threaded, and therefore descent methods that may evaluate such
 function multiple times per iteration should not become unecessarily slow,
 especially in modern multi-core systems.
 
-.. _assignment_class_object:
-
-Traffic class
-^^^^^^^^^^^^^
-
-The Traffic class object holds all the information pertaining to a specific
-traffic class to be assigned. There are three pieces of information that are
-required in the instantiation of this class:
-
-* **name** - Name of the class. Unique among all classes used in a multi-class
-  traffic assignment
-
-* **graph** - It is the Graph object corresponding to that particular traffic class/
-  mode
-
-* **matrix** - It is the AequilibraE matrix with the demand for that traffic class,
-  but which can have an arbitrary number of user-classes, setup as different
-  layers of the matrix object
-
-Example:
-
-.. code-block:: python
-
-  tc = TrafficClass("car", graph_car, matrix_car)
-
-  tc2 = TrafficClass("truck", graph_truck, matrix_truck)
-
-* **pce** - The passenger-car equivalent is the standard way of modeling
-  multi-class traffic assignment equilibrium in a consistent manner (see [1]_ for
-  the technical detail), and it is set to 1 by default. If the **pce** for a
-  certain class should be different than one, one can make a quick method call.
-
-* **fixed_cost** - In case there are fixed costs associated with the traversal of
-  links in the network, the user can provide the name of the field in the graph
-  that contains that network.
-
-* **vot** - Value-of-Time (VoT) is the mechanism to bring time and monetary
-  costs into a consistent basis within a generalized cost function.in the event
-  that fixed cost is measured in the same unit as free-flow travel time, then
-  **vot** must be set to 1.0, and can be set to the appropriate value (1.0,
-  value-of-timeIf the **vot** or whatever conversion factor is appropriate) with
-  a method call.
-
-
-.. code-block:: python
-
-  tc2.set_pce(2.5)
-  tc2.set_fixed_cost("truck_toll")
-  tc2.set_vot(0.35)
-
-To add traffic classes to the assignment instance it is just a matter of making
-a method call:
-
-.. code-block:: python
-
-  assig.set_classes([tc, tc2])
-
 Setting VDF Parameters
-^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""
 
 Parameters for VDF functions can be passed as a fixed value to use for all
 links, or as graph fields. As it is the case for the travel time and capacity
@@ -293,20 +298,20 @@ values for each link **OR** a single value for the entire network.
 Setting the VDF parameters should be done **AFTER** setting the VDF function of
 choice and adding traffic classes to the assignment, or it will **fail**.
 
-To choose a field that exists in the graph, we just pass the parameters as
-follows:
-
 .. code-block:: python
 
-  assig.set_vdf_parameters({"alpha": "alphas", "beta": "betas"})
+    assig.set_vdf('BPR')
 
+    # To set the parameters using a field that exists in the graph, just pass
+    # them as parameters
+    assig.set_vdf_parameters({"alpha": "alphas", "beta": "betas"})
 
-To pass global values, it is simply a matter of doing the following:
+    # Or to pass global values, it is simply a matter of doing the following:
+    assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
 
-.. code-block:: python
+.. seealso::
 
-  assig.set_vdf_parameters({"alpha": 0.15, "beta": 4})
-
+    :func:`aequilibrae.paths.VDF`
 
 Setting final parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -314,9 +319,7 @@ Setting final parameters
 There are still three parameters missing for the assignment.
 
 * Capacity field
-
 * Travel time field
-
 * Equilibrium algorithm to use
 
 .. code-block:: python
@@ -324,7 +327,6 @@ There are still three parameters missing for the assignment.
   assig.set_capacity_field("capacity")
   assig.set_time_field("free_flow_time")
   assig.set_algorithm(algorithm)
-
 
 Setting Preloads
 ^^^^^^^^^^^^^^^^
@@ -351,7 +353,6 @@ Next, add the preload to the assignment.
 
   assig.add_preload(preload, 'PT_vehicles')
 
-
 Executing an Assignment
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -365,12 +366,12 @@ Finally, one can execute assignment:
 
 References
 ~~~~~~~~~~
-.. [1] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: 
-       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
-       Available in: https://doi.org/10.1177%2F0361198119837496
+.. [1] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
+       Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
 
 .. [2] Spiess H. (1990) "Technical Note—Conical Volume-Delay Functions."Transportation Science, 24(2): 153-158.
        Available in: https://doi.org/10.1287/trsc.24.2.153
 
-.. [3] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
-       Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
+.. [3] Zill, J., Camargo, P., Veitch, T., Daisy,N. (2019) "Toll Choice and Stochastic User Equilibrium: 
+       Ticking All the Boxes", Transportation Research Record, 2673(4):930-940. 
+       Available in: https://doi.org/10.1177%2F0361198119837496

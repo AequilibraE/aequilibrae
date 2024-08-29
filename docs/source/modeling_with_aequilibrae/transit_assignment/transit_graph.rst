@@ -85,9 +85,7 @@ CBA.
 Various configurations are possible, such as: 
 
 - a partial route at a given moment of the day: AB, 
-
 - a route with an additional stop : ABDC 
-
 - a route that does not stop at a given stop: AC
 
 .. image:: ../../images/transit/transit_graph_routes_2.png
@@ -230,7 +228,6 @@ Connectors that connect *od* to *stop* nodes allow passengers to access the netw
 Link attributes
 ~~~~~~~~~~~~~~~
 
-
 The table below summarizes link characteristics and attributes based on
 link types:
 
@@ -370,33 +367,30 @@ Transit graph specificities in AequilibraE
 
 The graph creation process in AequilibraE incorporates several edge types to capture the nuances of transit networks. Notable distinctions include:
 
-**Connectors :**  
+**Connectors:**  
 
 - *access connectors* directed from od nodes to the network   
-
 - *egress connectors* directed from the network to the od nodes  
 
-**Transfer edges :**
+**Transfer edges:**
 
 - *inner transfer*: Connect lines within the same stop  
-
 - *outer transfer*: Connect lines between distinct stops within the same station  
 
-**Origin and Destination Nodes :**  
+**Origin and Destination Nodes:**  
 
 - *origin* nodes: represent the starting point of passenger trips
-
 - *destination* nodes: represent the end point of passenger trips
 
 Users can customize these features using boolean parameters:
 
-- `with_walking_edges`: create walking edges between the stops of a station
+- ``with_walking_edges``: create walking edges between the stops of a station
 
-- `with_inner_stop_transfers`: create transfer edges between lines of a stop
+- ``with_inner_stop_transfers``: create transfer edges between lines of a stop
 
-- `with_outer_stop_transfers`: create transfer edges between lines of different stops of a station
+- ``with_outer_stop_transfers``: create transfer edges between lines of different stops of a station
 
-- `blocking_centroid_flow`: duplicate OD nodes into unconnected origin and destination nodes in order to block centroid flows. Flows starts from an origin node and ends at a destination node. It is not possible to use an egress connector followed by an access connector in the middle of a trip.
+- ``blocking_centroid_flow``: duplicate OD nodes into unconnected origin and destination nodes in order to block centroid flows. Flows starts from an origin node and ends at a destination node. It is not possible to use an egress connector followed by an access connector in the middle of a trip.
 
 Note that during the assignment, if passengers have the choice between a transfer edge or a walking edge for a line change, they will always be assigned to the transfer edge.
 
@@ -443,36 +437,42 @@ Here is a simple example of a station with two stops, with two lines each:
    :align: center
    :alt: both inner and outer transfer edges
 
-
 As an illustrative example, if we build the graph for the city of Lyon France (GTFS files from 2022) on a given day, we get 20196 vertices and 91107 edges, with
 ``with_walking_edges=True``, ``with_inner_stop_transfers=True``,
 ``with_outer_stop_transfers=True`` and ``blocking_centroid_flow=False``.
+
 Here is the distribution of edge types:
 
-================ =====
-Edge type        Count
-================ =====
-outer_transfer   27287
-inner_transfer   10721
-walking          9140
-on-board         7590
-boarding         7590
-alighting        7590
-dwell            7231
-access_connector 6979
-egress_connector 6979
-================ =====
+.. table:: 
+   :widths: 30 15
+
+   ================ ======
+   Edge type        Count
+   ================ ======
+   outer_transfer   27,287
+   inner_transfer   10,721
+   walking           9,140
+   on-board          7,590
+   boarding          7,590
+   alighting         7,590
+   dwell             7,231
+   access_connector  6,979
+   egress_connector  6,979
+   ================ ======
 
 and vertex types:
 
-=========== =====
-Vertex type Count
-=========== =====
-alighting   7590
-boarding    7590
-stop        4499
-od          517
-=========== =====
+.. table:: 
+   :widths: 30 15
+
+   =========== =====
+   Vertex type Count
+   =========== =====
+   alighting   7,590
+   boarding    7,590
+   stop        4,499
+   od          517
+   =========== =====
 
 References
 ----------
