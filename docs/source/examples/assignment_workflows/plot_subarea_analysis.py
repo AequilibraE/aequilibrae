@@ -1,5 +1,5 @@
 """
-.. _example_usage_route_choice:
+.. _example_usage_sub_area_analysis:
 
 Route Choice with sub-area analysis
 ===================================

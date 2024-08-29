@@ -96,15 +96,15 @@ class RouteChoice:
         if returned with fewer than `max_routes`. It has a default value of `100`.
 
         - When using BFSLE `max_depth` corresponds to the maximum height of the graph of graphs. It's value is
-            largely dependent on the size of the paths within the network. For very small networks a value of 10
-            is a recommended starting point. For large networks a good starting value is 5. Increase the value
-            until the number of desired routes is being consistently returned. If it is exceeded then the route set
-            if returned with fewer than `max_routes`.
+          largely dependent on the size of the paths within the network. For very small networks a value of 10
+          is a recommended starting point. For large networks a good starting value is 5. Increase the value
+          until the number of desired routes is being consistently returned. If it is exceeded then the route set
+          if returned with fewer than `max_routes`.
 
         - When using LP, `max_depth` corresponds to the maximum number of iterations performed. While not enforced,
-            it should be higher than `max_routes`. It's value is dependent on the magnitude of the cost field,
-            specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
-            If it is exceeded then the route set if returned with fewer than `max_routes`.
+          it should be higher than `max_routes`. It's value is dependent on the magnitude of the cost field,
+          specifically it's related to the log base `penalty` of the ratio of costs between two alternative routes.
+          If it is exceeded then the route set if returned with fewer than `max_routes`.
 
         Additionally BFSLE has the option to incorporate link penalisation. Every link in all routes found at a depth
         are penalised with the `penalty` factor for the next depth. So at a depth of 0 no links are penalised nor
@@ -124,6 +124,7 @@ class RouteChoice:
 
         :Arguments:
             **algorithm** (:obj:`str`): Algorithm to be used
+
             **kwargs** (:obj:`dict`): Dictionary with all parameters for the algorithm
         """
         algo_dict = {i: i for i in self.all_algorithms}
@@ -186,9 +187,9 @@ class RouteChoice:
 
         :Arguments:
             **demand** (:obj:`Union[pd.DataFrame, AequilibraeMatrix]`): Demand to add to assignment. If the supplied
-              demand is a DataFrame, it should have a 2-level MultiIndex of Origin and Destination node IDs. If an
-              AequilibraE matrix is supplied node IDs will be inferred from the index. Demand values should be either
-              float32s or float64s.
+            demand is a DataFrame, it should have a 2-level MultiIndex of Origin and Destination node IDs. If an
+            AequilibraE matrix is supplied node IDs will be inferred from the index. Demand values should be either
+            float32s or float64s.
 
             **fill** (:obj:`float`): Value to fill any NaNs with.
         """
@@ -205,10 +206,10 @@ class RouteChoice:
 
         :Arguments:
             **nodes** (:obj:`Union[list[int], list[tuple[int, int]]]`): List of node IDs to operate on. If a 1D list is
-                provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
-                OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
-                always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
-                If *None* is provided, all OD pairs with non-zero flows will be used.
+            provided, OD pairs are taken to be all pair permutations of the list. If a list of pairs is provided
+            OD pairs are taken as is. All node IDs must be present in the compressed graph. To make a node ID
+            always appear in the compressed graph add it as a centroid. Duplicates will be dropped on execution.
+            If *None* is provided, all OD pairs with non-zero flows will be used.
         """
         if nodes is not None and not self.demand.no_demand():
             raise ValueError("provide either `nodes` or set a `demand` matrix, not both")
@@ -245,11 +246,13 @@ class RouteChoice:
 
         :Arguments:
             **origin** (:obj:`int`): Origin node ID.
+
             **destination** (:obj:`int`): Destination node ID.
+
             **demand** (:obj:`float`): If provided an assignment will be performed with this demand.
 
         :Returns:
-            ***route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
+            **route set** (:obj:`List[Tuple[int]]`): A list of routes as tuples of link IDs.
         """
         self.procedure_id = uuid4().hex
         self.procedure_date = str(datetime.today())
@@ -349,8 +352,7 @@ class RouteChoice:
 
         :Returns:
             **dataset** (:obj:`Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]`):
-                A tuple of link loading results as DataFrames.
-                Columns are the matrix name concatenated direction.
+            A tuple of link loading results as DataFrames. Columns are the matrix name concatenated direction.
         """
 
         if self.demand.no_demand():
@@ -399,10 +401,10 @@ class RouteChoice:
 
         :Arguments:
             **links** (:obj:`Union[None, Dict[Hashable, List[Union[Tuple[int, int], List[Tuple[int, int]]]]]]`):
-                Name of link set and Link IDs and directions to be used in select link analysis.
+            Name of link set and Link IDs and directions to be used in select link analysis.
 
             **link_loading** (:obj:`bool`): Enable select link loading. If disabled only OD matrix results are
-              available.
+            available.
 
         """
         self._selected_links = {}
@@ -466,7 +468,7 @@ class RouteChoice:
 
         :Returns:
             **dataset** (:obj:`Tuple[pd.DataFrame, pd.DataFrame]`): Select link loading results as DataFrames.
-                Columns are the matrix name concatenated with the select link set and direction.
+            Columns are the matrix name concatenated with the select link set and direction.
         """
 
         if self.demand.no_demand():
@@ -492,7 +494,7 @@ class RouteChoice:
 
         :Returns:
             **select link OD matrix results** (:obj:`Dict[str, Dict[str, scipy.sparse.coo_matrix]]`): Returns a dict of
-                select link set names to a dict of demand column names to a sparse OD matrix
+            select link set names to a dict of demand column names to a sparse OD matrix
         """
 
         if self.demand.no_demand():
@@ -532,6 +534,7 @@ class RouteChoice:
 
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to.
+
             **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
             Defaults to the active project
         """
@@ -557,6 +560,7 @@ class RouteChoice:
         :Arguments:
             **table_name** (:obj:`str`): Name of the table being inserted to and the name of the
             OpenMatrix file used for OD matrices.
+
             **project** (:obj:`Project`, `Optional`): Project we want to save the results to.
             Defaults to the active project
         """

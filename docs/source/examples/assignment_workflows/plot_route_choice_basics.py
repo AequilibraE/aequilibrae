@@ -6,11 +6,9 @@ Route Choice
 
 In this example, we show how to perform route choice set generation using BFSLE and Link penalisation, for a city in La
 Serena Metropolitan Area in Chile.
-
 """
 
 # %%
-
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -20,7 +18,6 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
 
 # %%
-
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
