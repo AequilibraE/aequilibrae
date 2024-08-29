@@ -12,7 +12,7 @@ to be implemented in AequilibraE
 Path-Size Logit (PSL)
 ~~~~~~~~~~~~~~~~~~~~~
 
- The PSL model’s utility function is defined by
+The PSL model’s utility function is defined by
 
 .. math:: U_{i} = V_{i} + \beta_{PSL} \times \log{\gamma_i} + \varepsilon_{i}
 

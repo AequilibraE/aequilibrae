@@ -116,15 +116,19 @@ Vertices
    vertices = create_vertices(n)
    vertices.head(3)
 
-+------+----------+-------+
-|      |        x |     y |
-+======+==========+=======+
-|    0 | 0.000000 |   0.0 |
-+------+----------+-------+
-|    1 | 0.111111 |   0.0 |
-+------+----------+-------+
-|    2 | 0.222222 |   0.0 |
-+------+----------+-------+
+.. table:: 
+   :align: left
+   :width: 25%
+
+   +------+----------+-------+
+   |      |        x |     y |
+   +======+==========+=======+
+   |    0 | 0.000000 |   0.0 |
+   +------+----------+-------+
+   |    1 | 0.111111 |   0.0 |
+   +------+----------+-------+
+   |    2 | 0.222222 |   0.0 |
+   +------+----------+-------+
 
 .. code:: python
 
@@ -144,7 +148,6 @@ Vertices
                k += 1
        return tail, head
 
-
    def create_edges(n, seed=124):
        tail, head = create_edges_numba(n)
        edges = pd.DataFrame()
@@ -161,15 +164,19 @@ Vertices
    edges = create_edges(n, seed=RS)
    edges.head(3)
 
-+------+----------+-------+------------+------------+
-|      |     tail |  head |  trav_time | delay_base |
-+======+==========+=======+============+============+
-|    0 |        0 |     1 |   0.785253 |   0.287917 |
-+------+----------+-------+------------+------------+
-|    1 |        0 |    10 |   0.785859 |   0.970429 |
-+------+----------+-------+------------+------------+
-|    2 |       10 |    11 |   0.969136 |   0.854512 |
-+------+----------+-------+------------+------------+
+.. table:: 
+   :align: left
+   :width: 25%
+
+   +------+----------+-------+------------+------------+
+   |      |     tail |  head |  trav_time | delay_base |
+   +======+==========+=======+============+============+
+   |    0 |        0 |     1 |   0.785253 |   0.287917 |
+   +------+----------+-------+------------+------------+
+   |    1 |        0 |    10 |   0.785859 |   0.970429 |
+   +------+----------+-------+------------+------------+
+   |    2 |       10 |    11 |   0.969136 |   0.854512 |
+   +------+----------+-------+------------+------------+
 
 Plot the network
 ~~~~~~~~~~~~~~~~
@@ -216,7 +223,7 @@ vertex is the destination (*d*) for the hyperpath computation.
    _ = ax.set_title(f"Bell's network with $n$={n}", color="k")
 
 .. image:: ../../images/transit/hyperpath_bell_s_network.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Bell's network
 
@@ -252,7 +259,7 @@ We can also visualize the edge travel time:
    )
 
 .. image:: ../../images/transit/hyperpath_bell_edge_travel_time.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Bell's network - edge travel time
 
@@ -286,7 +293,7 @@ And the base delay:
    _ = ax.set_title("Bell's network - edge base delay : $\\textit{delay_base}$", color="k")
 
 .. image:: ../../images/transit/hyperpath_bell_edge_base_delay.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Bell's network - edge base delay
 
@@ -369,7 +376,7 @@ all the network.
    plot_shortest_hyperpath(n=10, alpha=0.0)
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d0.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.0
 
@@ -421,7 +428,7 @@ Dijkstra’s algorithm would have computed. We call NetworkX’s
    )
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_shartest_path.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Shortest path - Bell's network
 
@@ -432,7 +439,7 @@ Let’s introduce some delay by increasing the value of :math:`\alpha`:
    plot_shortest_hyperpath(n=10, alpha=0.5)
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_0d5.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=0.5
 
@@ -447,7 +454,7 @@ apparent as we further increase :math:`\alpha`:
    plot_shortest_hyperpath(n=10, alpha=1.0)
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_1d0.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=1.0
 
@@ -457,7 +464,7 @@ apparent as we further increase :math:`\alpha`:
 
 
 .. image:: ../../images/transit/hyperpath_bell_n_10_alpha_100d0.png
-   :width: 600
+   :scale: 80%
    :align: center
    :alt: Shortest hyperpath - Bell's network alpha=100.0
 

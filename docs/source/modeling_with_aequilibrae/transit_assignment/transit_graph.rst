@@ -9,7 +9,7 @@ focus is the classic algorithm “Optimal strategies” by Spiess & Florian
 Let’s start by giving a few definitions:
 
 -  *transit* definition from
-   `Wikipedia <https://en.wikipedia.org/wiki/Public_transport>`__:
+   `Wikipedia <https://en.wikipedia.org/wiki/Public_transport>`_:
 
 ..
 
@@ -97,15 +97,19 @@ Lines can be decomposed into multiple sub-lines, each representing
 distinct routes. For the given example, we may have several sub-lines
 under the same commercial line (L1):
 
-======= =============== ============= ===========
-line id commercial name stop sequence headway (s)
-======= =============== ============= ===========
-L1_a1   L1              ABC           600
-L1_a2   L1              ABDC          3600
-L1_a3   L1              AB            3600
-L1_a4   L1              AC            3600
-L1_b1   L1              CBA           600
-======= =============== ============= ===========
+.. table::
+   :align: center
+   :width: 40%
+
+   ======= =============== ============= ===========
+   line id commercial name stop sequence headway (s)
+   ======= =============== ============= ===========
+   L1_a1   L1              ABC           600
+   L1_a2   L1              ABDC          3600
+   L1_a3   L1              AB            3600
+   L1_a4   L1              AC            3600
+   L1_b1   L1              CBA           600
+   ======= =============== ============= ===========
 
 Headway, associated with each sub-line, corresponds to the mean time
 range between consecutive vehicles—the inverse of the line frequency
@@ -118,14 +122,18 @@ A line segment represents a portion of a transit line between two
 consecutive stops. Using the example line ``L1_a1``, we derive two
 distinct line segments:
 
-+----------+---------+-------------+-------------------+--------------+
-| line id  | segment | origin stop | destination stop  | travel_time  |
-|          | index   |             |                   | (s)          |
-+==========+=========+=============+===================+==============+
-| L1_a1    | 1       | A           | B                 | 300          |
-+----------+---------+-------------+-------------------+--------------+
-| L1_a1    | 2       | B           | C                 | 600          |
-+----------+---------+-------------+-------------------+--------------+
+.. table::
+   :align: center
+   :width: 40%
+
+   +----------+---------+-------------+-------------------+--------------+
+   | line id  | segment | origin stop | destination stop  | travel_time  |
+   |          | index   |             |                   | (s)          |
+   +==========+=========+=============+===================+==============+
+   | L1_a1    | 1       | A           | B                 | 300          |
+   +----------+---------+-------------+-------------------+--------------+
+   | L1_a1    | 2       | B           | C                 | 600          |
+   +----------+---------+-------------+-------------------+--------------+
 
 Note that a travel time is included for each line segment, serving as
 another link attribute used by the assignment algorithm.
@@ -170,29 +178,19 @@ categories play crucial roles in this representation.
 | **Link types:**
 
 - *on-board* 
-
 - *boarding* 
-
 - *alighting* 
-
 - *dwell* 
-
 - *transfer* 
-
 - *connector* 
-
 - *walking*
 
 | **Nodes types:**
 
 - *stop* 
-
 - *boarding* 
-
 - *alighting* 
-
 - *od* 
-
 - *walking*
 
 To illustrate, consider the anatomy of a simple stop:
@@ -231,25 +229,29 @@ Link attributes
 The table below summarizes link characteristics and attributes based on
 link types:
 
-+-------------+------------------+----------------+------------+------------------+
-| link type   | from node type   | to node type   | cost       | frequency        |
-+=============+==================+================+============+==================+
-| *on-board*  | *boarding*       | *alighting*    | trav. time | :math:`\infty`   |
-+-------------+------------------+----------------+------------+------------------+
-| *boarding*  | *stop*           | *boarding*     | const.     | line freq.       |
-+-------------+------------------+----------------+------------+------------------+
-| *alighting* | *alighting*      | *stop*         | const.     | :math:`\infty`   |
-+-------------+------------------+----------------+------------+------------------+
-| *dwell*     | *alighting*      | *boarding*     | const.     | :math:`\infty`   |
-+-------------+------------------+----------------+------------+------------------+
-| *transfer*  | *alighting*      | *boarding*     | const. +   | dest. line freq. |
-|             |                  |                | trav. time |                  |
-+-------------+------------------+----------------+------------+------------------+
-| *connector* | *od* or *stop*   | *od* or *stop* | trav. time | :math:`\infty`   |
-+-------------+------------------+----------------+------------+------------------+
-| *walking*   | *stop* or        | *stop* or      | trav. time | :math:`\infty`   |
-|             | *walking*        | *walking*      |            |                  |
-+-------------+------------------+----------------+------------+------------------+
+.. table::
+   :align: center
+   :width: 60%
+      
+   +-------------+------------------+----------------+------------+------------------+
+   | link type   | from node type   | to node type   | cost       | frequency        |
+   +=============+==================+================+============+==================+
+   | *on-board*  | *boarding*       | *alighting*    | trav. time | :math:`\infty`   |
+   +-------------+------------------+----------------+------------+------------------+
+   | *boarding*  | *stop*           | *boarding*     | const.     | line freq.       |
+   +-------------+------------------+----------------+------------+------------------+
+   | *alighting* | *alighting*      | *stop*         | const.     | :math:`\infty`   |
+   +-------------+------------------+----------------+------------+------------------+
+   | *dwell*     | *alighting*      | *boarding*     | const.     | :math:`\infty`   |
+   +-------------+------------------+----------------+------------+------------------+
+   | *transfer*  | *alighting*      | *boarding*     | const. +   | dest. line freq. |
+   |             |                  |                | trav. time |                  |
+   +-------------+------------------+----------------+------------+------------------+
+   | *connector* | *od* or *stop*   | *od* or *stop* | trav. time | :math:`\infty`   |
+   +-------------+------------------+----------------+------------+------------------+
+   | *walking*   | *stop* or        | *stop* or      | trav. time | :math:`\infty`   |
+   |             | *walking*        | *walking*      |            |                  |
+   +-------------+------------------+----------------+------------+------------------+
 
 The travel time is specific to each line segment or walking time. For
 example, there can be 10 minutes connection between stops in a large
@@ -285,17 +287,21 @@ This illustrative example is taken from *Spiess and Florian* [1]_:
 
 Travel time are indicated on the figure. We have the following four distinct line characteristics:
 
-+-------+------+-------------+-----------------+
-|line id| route|headway (min)| frequency (1/s) |
-+=======+======+=============+=================+
-| L1    |  AB  |          12 |     0.001388889 |
-+-------+------+-------------+-----------------+
-| L2    | AXY  |          12 |     0.001388889 |
-+-------+------+-------------+-----------------+
-| L3    | XYB  |          30 |     0.000555556 |
-+-------+------+-------------+-----------------+
-| L4    |  YB  |           6 |     0.002777778 |
-+-------+------+-------------+-----------------+
+.. table::
+   :align: center
+   :width: 40%
+
+   +-------+------+-------------+-----------------+
+   |line id| route|headway (min)| frequency (1/s) |
+   +=======+======+=============+=================+
+   | L1    |  AB  |          12 |     0.001388889 |
+   +-------+------+-------------+-----------------+
+   | L2    | AXY  |          12 |     0.001388889 |
+   +-------+------+-------------+-----------------+
+   | L3    | XYB  |          30 |     0.000555556 |
+   +-------+------+-------------+-----------------+
+   | L4    |  YB  |           6 |     0.002777778 |
+   +-------+------+-------------+-----------------+
 
 Passengers aim to travel from A to B, prompting the division of the network area into two distinct zones: TAZ 1 and TAZ 2. The assignment graph associated with this network encompasses 26 links:
 
@@ -306,61 +312,65 @@ Passengers aim to travel from A to B, prompting the division of the network area
 
 Here is a table listing all links :
 
-+---------+-----------+---------+------+--------------+
-| link id | link type | line id | cost |    frequency |
-+=========+===========+=========+======+==============+
-|       1 |*connector*|         |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|       2 | *boarding*|      L1 |    0 |  0.001388889 |
-+---------+-----------+---------+------+--------------+
-|       3 | *boarding*|      L2 |    0 |  0.001388889 |
-+---------+-----------+---------+------+--------------+
-|       4 | *on-board*|      L1 | 1500 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|       5 | *on-board*|      L2 |  420 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|       6 |*alighting*|      L2 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|       7 |    *dwell*|      L2 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|       8 | *transfer*|         |    0 |  0.000555556 |
-+---------+-----------+---------+------+--------------+
-|       9 | *boarding*|      L2 |    0 |  0.001388889 |
-+---------+-----------+---------+------+--------------+
-|      10 | *boarding*|      L3 |    0 |  0.000555556 |
-+---------+-----------+---------+------+--------------+
-|      11 | *on-board*|      L2 |  360 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      12 | *on-board*|      L3 |  240 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      13 |*alighting*|      L3 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      14 |*alighting*|      L2 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      15 | *transfer*|      L3 |    0 |  0.000555556 |
-+---------+-----------+---------+------+--------------+
-|      16 | *transfer*|         |    0 |  0.002777778 |
-+---------+-----------+---------+------+--------------+
-|      17 |    *dwell*|      L3 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      18 | *transfer*|         |    0 |  0.002777778 |
-+---------+-----------+---------+------+--------------+
-|      19 | *boarding*|      L3 |    0 |  0.000555556 |
-+---------+-----------+---------+------+--------------+
-|      20 | *boarding*|      L4 |    0 |  0.002777778 |
-+---------+-----------+---------+------+--------------+
-|      21 | *on-board*|      L3 |  240 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      22 | *on-board*|      L4 |  600 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      23 |*alighting*|      L4 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      24 |*alighting*|      L3 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      25 |*alighting*|      L1 |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
-|      26 |*connector*|         |    0 |:math:`\infty`|
-+---------+-----------+---------+------+--------------+
+.. table::
+   :align: center
+   :width: 50%
+
+   +---------+-----------+---------+------+--------------+
+   | link id | link type | line id | cost |    frequency |
+   +=========+===========+=========+======+==============+
+   |       1 |*connector*|         |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |       2 | *boarding*|      L1 |    0 |  0.001388889 |
+   +---------+-----------+---------+------+--------------+
+   |       3 | *boarding*|      L2 |    0 |  0.001388889 |
+   +---------+-----------+---------+------+--------------+
+   |       4 | *on-board*|      L1 | 1500 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |       5 | *on-board*|      L2 |  420 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |       6 |*alighting*|      L2 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |       7 |    *dwell*|      L2 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |       8 | *transfer*|         |    0 |  0.000555556 |
+   +---------+-----------+---------+------+--------------+
+   |       9 | *boarding*|      L2 |    0 |  0.001388889 |
+   +---------+-----------+---------+------+--------------+
+   |      10 | *boarding*|      L3 |    0 |  0.000555556 |
+   +---------+-----------+---------+------+--------------+
+   |      11 | *on-board*|      L2 |  360 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      12 | *on-board*|      L3 |  240 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      13 |*alighting*|      L3 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      14 |*alighting*|      L2 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      15 | *transfer*|      L3 |    0 |  0.000555556 |
+   +---------+-----------+---------+------+--------------+
+   |      16 | *transfer*|         |    0 |  0.002777778 |
+   +---------+-----------+---------+------+--------------+
+   |      17 |    *dwell*|      L3 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      18 | *transfer*|         |    0 |  0.002777778 |
+   +---------+-----------+---------+------+--------------+
+   |      19 | *boarding*|      L3 |    0 |  0.000555556 |
+   +---------+-----------+---------+------+--------------+
+   |      20 | *boarding*|      L4 |    0 |  0.002777778 |
+   +---------+-----------+---------+------+--------------+
+   |      21 | *on-board*|      L3 |  240 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      22 | *on-board*|      L4 |  600 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      23 |*alighting*|      L4 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      24 |*alighting*|      L3 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      25 |*alighting*|      L1 |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
+   |      26 |*connector*|         |    0 |:math:`\infty`|
+   +---------+-----------+---------+------+--------------+
 
 Transit graph specificities in AequilibraE
 ------------------------------------------
@@ -397,21 +407,13 @@ Note that during the assignment, if passengers have the choice between a transfe
 This leads to these possible edge types:
 
 - on-board
-
 - boarding
-
 - alighting
-
 - dwell
-
 - access_connector
-
 - egress_connector
-
 - inner_transfer
-
 - outer_transfer
-
 - walking
 
 Here is a simple example of a station with two stops, with two lines each:
@@ -443,8 +445,9 @@ As an illustrative example, if we build the graph for the city of Lyon France (G
 
 Here is the distribution of edge types:
 
-.. table:: 
-   :widths: 30 15
+.. table::
+   :align: center
+   :width: 30%
 
    ================ ======
    Edge type        Count
@@ -463,7 +466,8 @@ Here is the distribution of edge types:
 and vertex types:
 
 .. table:: 
-   :widths: 30 15
+   :align: center
+   :width: 30%
 
    =========== =====
    Vertex type Count
