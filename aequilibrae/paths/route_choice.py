@@ -168,8 +168,10 @@ class RouteChoice:
         """
         Set save path for route choice results. Provide ``None`` to disable.
 
-        **warning** enabling route saving will disable in memory results. Viewing the results will read the results
-        from disk first.
+        .. warning:
+
+            Enabling route saving will disable in memory results. Viewing the results will read the results
+            from disk first.
 
         :Arguments:
             **save_it** (:obj:`bool`): Boolean to indicate whether routes should be saved
