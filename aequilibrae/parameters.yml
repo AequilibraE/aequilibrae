@@ -170,7 +170,6 @@ network:
         - living_street
         - pedestrian
         - elevator
-        - trunk
         - tertiary
         - service
         - proposed
@@ -252,7 +251,6 @@ network:
         - pedestrian
         - bridleway
         - elevator
-        - trunk
         - tertiary
         - service
         - steps
