@@ -5,23 +5,20 @@
 Installation
 ============
 
-In this section we describe how to install AequilibraE.
+In this section we describe how to install AequilibraE. The recommendations on this page are current 
+as of September 2024.
 
 .. note::
    Although AequilibraE is under intense development, we try to avoid making
    breaking changes to the API. In any case, you should check for new features
    and possible API changes often.
 
-.. note::
-   The recommendations on this page are current as of December 2023.
-
 .. index:: installation
 
 Installation
 ------------
 
-1. Install `Python 3.8, 3.9, 3.10, 3.11 or 3.12 <www.python.org>`__. We recommend Python 3.10 or 3.11
-
+1. Install `Python 3.9, 3.10, 3.11 or 3.12 <www.python.org>`_. We recommend Python 3.10 or 3.11
 2. Install AequilibraE
 
 ::
@@ -31,11 +28,10 @@ Installation
 .. _dependencies:
 
 Dependencies
-~~~~~~~~~~~~
+------------
 
-All of AequilibraE's dependencies are readily available from `PyPI
-<https://www.pypi.org/>`_ for all currently supported Python versions and major
-platforms.
+All of AequilibraE's dependencies are readily available from `PyPI <https://www.pypi.org/>`_ 
+for all currently supported Python versions and major platforms.
 
 .. _installing_spatialite_on_windows:
 
@@ -53,7 +49,7 @@ Windows
 ^^^^^^^
 
 .. note::
-   On Windows ONLY, AequilibraE automatically verifies if you have SpatiaLite
+   On Windows ONLY, AequilibraE automatically verifies if you have Spatialite
    installed in your system and downloads it to your temporary folder if you do
    not.
 
@@ -61,13 +57,13 @@ Spatialite does not have great support on Python for Windows. For this reason,
 it is necessary to download Spatialite for Windows and inform and load it
 to the Python SQLite driver every time you connect to the database.
 
-One can download the appropriate version of the latest SpatiaLite release
+One can download the appropriate version of the latest Spatialite release
 directly from its `project page <https://www.gaia-gis.it/gaia-sins/>`_ , or the
 cached versions on AequilibraE's website for
 `64-Bit Python <https://github.com/AequilibraE/aequilibrae/releases/tag/V.0.7.5>`_
 
-After unpacking the zip file into its own folder (say *D:/spatialite*), one can
-**temporarily** add the spatialite folder to system path environment variable,
+After unpacking the zip file into its own folder (say ``D:/spatialite``), one can
+*temporarily* add the spatialite folder to system path environment variable,
 as follows:
 
 ::
@@ -89,12 +85,11 @@ On Ubuntu it is possible to install Spatialite by simply using apt-get
   sudo apt install -y libsqlite3-mod-spatialite
   sudo apt install -y libspatialite-dev
 
-
 MacOS
 ^^^^^
 
 On MacOS one can use brew as per
-`this answer on StackOverflow <https://stackoverflow.com/a/48370444/1480643>`_.
+`this answer on Stack Overflow <https://stackoverflow.com/a/48370444/1480643>`_.
 
 ::
 
@@ -104,13 +99,10 @@ Hardware requirements
 ---------------------
 
 AequilibraE's requirements depend heavily on the size of the model you are using
-for computation. The most important
-things to keep an eye on are:
+for computation. The most important things to keep an eye on are:
 
 * Number of zones on your model (size of the matrices you are dealing with)
-
 * Number of matrices (vehicles classes (and user classes) you are dealing with)
-
 * Number of links and nodes on your network (far less likely to create trouble)
 
 Substantial testing has been done with large real-world models (up to 8,000

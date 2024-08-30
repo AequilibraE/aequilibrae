@@ -43,7 +43,6 @@ development/estimation stage.
 The overhead of the LP method is negligible due to AequilibraE's internal data structures that allow for easy
 data manipulation of the graph in memory.
 
-
 BFS-LE
 ~~~~~~
 
@@ -99,7 +98,6 @@ Code example
    graph.set_graph("free_flow_time")
 
    graph.prepare_graph(np.array([1, 2, 3, 50, 100, 150]))
-
 
    nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
    max_routes = 10  # Maximum number of routes to be computed for each OD pair

@@ -10,17 +10,17 @@ we can take full advantage of multi-core CPUs. We have also implemented the abil
 of using both 32-bit and 64-bit floating-point seed matrices, which has direct impact
 on cache use and consequently computational performance.
 
-In this section, we compare the
-runtime of AequilibraE's current implementation of IPF, 
-with a general IPF algorithm written in pure Python, available `here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
+In this section, we compare the runtime of AequilibraE's current implementation of IPF, 
+with a general IPF algorithm written in pure Python, available 
+`here <https://github.com/joshchea/python-tdm/blob/master/scripts/CalcDistribution.py>`_.
 
 The figure below compares AequilibraE's IPF runtime with one core with the benchmark Python
 code. From the figure below, we can notice that the runtimes were practically the same for the
 instances with 1,000 zones or less. As the number of zones increases, AequilibraE demonstrated to be slightly faster
-than the benchmark python code, while applying IPF to a 32-bit NumPy array (np.float32) was significantly faster.
-It's worth mentioning that
-the user can set up a threshold for AequilibraE's IPF function, as well as use more than one
-core to speed up the fitting process.
+than the benchmark python code, while applying IPF to a 32-bit NumPy array (``np.float32``) was significantly faster.
+
+It's worth mentioning that the user can set up a threshold for AequilibraE's IPF function, 
+as well as use more than one core to speed up the fitting process.
 
 .. image:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
     :align: center

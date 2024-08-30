@@ -10,17 +10,17 @@ least one very reasonable question: Are the results right?
 For this reason, we have used all equilibrium traffic assignment algorithms
 available in AequilibraE to solve standard instances used in academia for
 comparing algorithm results.
+
 Instances can be downloaded `here <https://github.com/bstabler/TransportationNetworks/>`_.
 
 All tests were performed with the AequilibraE version 1.1.0.
 
 Validation
------------
+----------
 
 As shown below, the results produced by AequilibraE are within expected, although
-some differences have been found, particularly for Winnipeg.
-We suspect that there are issues with the reference results and welcome further investigations.
-
+some differences have been found, particularly for Winnipeg. We suspect that there are 
+issues with the reference results and welcome further investigations.
 
 .. tabs::
 
@@ -34,7 +34,7 @@ We suspect that there are issues with the reference results and welcome further 
             * Nodes: 12,982
             * Zones: 1,790
 
-         .. tab:: Bi-conjugate Frank-Wolfe
+         .. tab:: biconjugate Frank-Wolfe
 
             .. image:: ../images/assig_validation/ChicagoRegional_bfw-1000_iter.png
                 :align: center
@@ -72,7 +72,7 @@ We suspect that there are issues with the reference results and welcome further 
             * Nodes: 1,020
             * Zones: 110
 
-         .. tab:: Bi-conjugate Frank-Wolfe
+         .. tab:: biconjugate Frank-Wolfe
 
             .. image:: ../images/assig_validation/Barcelona_bfw-1000_iter.png
                 :align: center
@@ -110,7 +110,7 @@ We suspect that there are issues with the reference results and welcome further 
             * Nodes: 416
             * Zones: 38
 
-         .. tab:: Bi-conjugate Frank-Wolfe
+         .. tab:: biconjugate Frank-Wolfe
 
             .. image:: ../images/assig_validation/Winnipeg_bfw-1000_iter.png
                 :align: center
@@ -148,7 +148,7 @@ We suspect that there are issues with the reference results and welcome further 
             * Nodes: 416
             * Zones: 38
 
-         .. tab:: Bi-conjugate Frank-Wolfe
+         .. tab:: biconjugate Frank-Wolfe
 
             .. image:: ../images/assig_validation/Anaheim_bfw-1000_iter.png
                 :align: center
@@ -186,7 +186,7 @@ We suspect that there are issues with the reference results and welcome further 
             * Nodes: 24
             * Zones: 24
 
-         .. tab:: Bi-conjugate Frank-Wolfe
+         .. tab:: biconjugate Frank-Wolfe
 
             .. image:: ../images/assig_validation/SiouxFalls_bfw-1000_iter.png
                 :align: center
@@ -218,8 +218,8 @@ Convergence Study
 -----------------
 
 Besides validating the final results from the algorithms, we have also compared
-how well they converge for the largest instance we have tested (Chicago
-Regional), as that instance has a comparable size to real-world models.
+how well they converge for the largest instance we have tested (Chicago Regional), 
+as that instance has a comparable size to real-world models.
 
 .. _algorithm_convergence_comparison:
 
@@ -260,14 +260,12 @@ Regional), as that instance has a comparable size to real-world models.
           :width: 590
           :alt: Algorithm convergence comparison
 
-
 Not surprisingly, one can see that Frank-Wolfe far outperforms the Method of
 Successive Averages for a number of iterations larger than 25 in the case of
-Chicago, and is capable of
-reaching 1.0e-04 just after 800 iterations, while MSA is still at 3.5e-4 even
-after 1,000 iterations for that same case.
+Chicago, and is capable of reaching 1.0e-04 just after 800 iterations, while 
+MSA is still at 3.5e-4 even after 1,000 iterations for that same case.
 
-The actual show, however, is left for the Bi-conjugate Frank-Wolfe
+The actual show, however, is left for the biconjugate Frank-Wolfe
 implementation, which delivers a relative gap of under 1.0e-04 in under 200
 iterations, and a relative gap of under 1.0e-05 in just over 700 iterations.
 
@@ -282,7 +280,7 @@ All tests were run on a workstation equipped AMD Threadripper 3970X with 32 core
 (64 threads) @ 3.7 GHz (memory use is trivial for these instances).
 
 On this machine, AequilibraE performed 1,000 iterations of
-Bi-conjugate Frank-Wolfe assignment on the Chicago Network in a little over 4 minutes,
+biconjugate Frank-Wolfe assignment on the Chicago Network in a little over 4 minutes,
 or a little less than 0.43s per iteration.
 
 Compared with AequilibraE previous versions, we can notice a reasonable decrease

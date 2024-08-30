@@ -14,10 +14,13 @@ It all started when `Pedro <https://www.xl-optim.com/>`_ was a student at `UCI-I
 needed low level access to outputs of standard algorithms used in transportation modeling (e.g. path files from traffic
 assignment) and had that denied by the maker of the commercial software he normally used. There, the
 `first scratch of a traffic assignment procedure <https://www.xl-optim.com/python-traffic-assignment>`_ was born.
+
 After that, there were a couple of scripts developed to implement synthetic gravity models (calibration and application)
 that were developed for a government think-tank in Brazil `IPEA <https://www.ipea.gov.br/>`_.
+
 Around the same time, another student needed a piece of code that transformed a GIS link layer into a proper graph,
 where each link would become the connection between two nodes.
+
 So there were three fundamental pieces that would come to be part of AequilibraE.
 
 The first take on a release software
@@ -27,7 +30,7 @@ Having all those algorithms at hand, it made sense combining them into something
 seemed that QGIS was the way to go, so Pedro developed the
 `very first version of AequilibraE <http://www.xl-optim.com/introducing_aequilibrae>`_.
 
-It was buggy as hell and there was very little, if any, software engineering built into it, but it put Aequilibrae on
+It was buggy as hell and there was very little, if any, software engineering built into it, but it put AequilibraE on
 the map. That was 16/December/2014.
 
 The first reasonable version
@@ -37,7 +40,7 @@ The first important thing Pedro noticed after releasing AequilibraE was that the
 even though it would make a lot more sense doing it in an Object-Oriented fashion, which let him down the path of
 creating the objects (graph, assignment results, matrix) that the software still relies on and were the foundation
 blocks of the proper API that is in the making. That
-`version was released in 2016 <http://www.xl-optim.com/new-version-of-aequilibrae>`_
+`version was released in 2016 <http://www.xl-optim.com/new-version-of-aequilibrae>`_.
 
 Evolving into proper software
 -----------------------------

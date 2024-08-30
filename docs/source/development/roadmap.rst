@@ -24,7 +24,6 @@ identified and that we intend to dedicate some time to in the future.
 * Public Transport
 
     * Export of GTFS (enables editing of GTFS in QGIS)
-    * Public transit assignment (Scheduled for 3rd Quarter 2023)
 
 * Project
 

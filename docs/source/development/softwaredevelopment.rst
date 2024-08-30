@@ -23,10 +23,11 @@ Development Install
 
 As it goes with most Python packages, we recommend using a dedicated virtual environment to develop AequilibraE.
 
-AequilibraE is currently tested for Python 3.7, 3.8, 3.9 & 3.11, but we recommend using Python 3.9 or 2.10 for development.
+AequilibraE is currently tested for Python 3.9, 3.10, 3.11 & 3.12, but we recommend using Python 3.9 or 2.10 for 
+development.
 
-We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or `VSCode <https://code.visualstudio.com/>`_
-which are awesome IDEs for Python.
+We also assume you are using `PyCharm <https://www.jetbrains.com/pycharm>`_ or 
+`VSCode <https://code.visualstudio.com/>`_ which are awesome IDEs for Python.
 
 If you are using a different IDE, we would welcome if you could contribute with instructions to set that up.
 
@@ -39,8 +40,7 @@ Non-Windows
 Windows
 ~~~~~~~
 
-Make sure to clone the AequilibraE repository and run the following from within
-that cloned repo using an elevated command prompt.
+Make sure to clone the AequilibraE repository and run the following from withinthat cloned repo using an elevated command prompt.
 
 Python 3.9 (or whatever version you chose) needs to be installed, and the
 following instructions assume you are using `Chocolatey
@@ -74,15 +74,16 @@ Style
 
 * Python code should follow (mostly) the `pycodestyle style guide <https://pypi.python.org/pypi/pycodestyle>`_
 * Python docstrings should follow the `reStructuredText Docstring Format <https://www.python.org/dev/peps/pep-0287/>`_
-* We are big fans of auto-code formatting. For that, we use `Black <https://black.readthedocs.io/en/stable/index.html/>`_
+* We are big fans of auto-code formatting. 
+  For that, we use `Black <https://black.readthedocs.io/en/stable/index.html/>`_
 * Negating some of what we have said so far, we use maximum line length of 120 characters
 
 Imports
 ~~~~~~~
 
 * Imports should be one per line.
-* Imports should be grouped into standard library, third-party, and intra-library imports (`ctrl+shit+o`
-  does it automatically on PyCharm).
+* Imports should be grouped into standard library, third-party, and intra-library imports 
+  (``ctrl+shit+o`` does it automatically on PyCharm).
 * Imports of NumPy and Pandas should follow the following convention:
 
 .. code-block:: python
@@ -161,8 +162,8 @@ manually review the code before merging it into master (or returning for correct
 In some cases, test targets need to be updated to match the new results produced by the code since these 
 are now the correct results.  In order to update the test targets, first determine which tests are 
 failing and then review the failing lines in the source files.  These are easy to identify since each 
-test ultimately comes down to one of Python's various types of `assert` statements.  Once you identify 
-which `assert` is failing, you can work your way back through the code that creates the test targets in 
+test ultimately comes down to one of Python's various types of ``assert`` statements.  Once you identify 
+which ``assert`` is failing, you can work your way back through the code that creates the test targets in 
 order to update it.  After updating the test targets, re-run the tests to confirm the new code passes all 
 the tests.
 
@@ -194,8 +195,7 @@ Releases
 ~~~~~~~~~
 
 AequilibraE releases are automatically  uploaded to the `Python Package Index
-<https://pypi.python.org/pypi/aequilibrae>`__  (pypi) at each new GitHub release (2 to 6 times per year).
-
+<https://pypi.python.org/pypi/aequilibrae>`_ (pypi) at each new GitHub release (2 to 6 times per year).
 
 Acknowledgement
 ~~~~~~~~~~~~~~~

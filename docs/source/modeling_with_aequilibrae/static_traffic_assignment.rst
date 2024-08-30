@@ -16,7 +16,6 @@ Further, many AequilibraE users are new to the *craft*, so we have elected to st
 creating documentation on the most important topics in the transportation modeling practice, where
 we detail how these concepts are translated into the AequilibraE tools and recommended workflows.
 
-
 .. toctree::
     :maxdepth: 1
     :caption: Static Traffic Assignment
