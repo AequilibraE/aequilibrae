@@ -15,7 +15,7 @@ In this section you can find a deep dive into modeling with AequilibraE, from
 a start guide to a complete view into AequilibraE's data structure.
 
 .. toctree::
-    :numbered: 2
+    :numbered: 3
     :maxdepth: 1
     :caption: A guide to AequilibraE
 

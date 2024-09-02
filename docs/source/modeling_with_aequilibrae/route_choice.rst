@@ -10,6 +10,13 @@ is consists of two steps: Choice set generation and the choice selection process
 AequilibraE is the first modeling package with full support for route choice, from the creation of choice sets through
 multiple algorithms to the assignment of trips to the network using the traditional Path-Size logit.
 
+.. toctree::
+    :maxdepth: 1
+    :caption: Dive deep into route choice
+
+    route_choice/route_choice_model.rst
+    route_choice/choice_set_generation.rst
+
 Costs, utilities and signs
 --------------------------
 
@@ -82,10 +89,3 @@ be presented at the ATRF 2024 [1]_ [3]_ [4]_.
 .. seealso::
        
        LOREM IPSUM
-
-.. toctree::
-    :maxdepth: 1
-    :caption: Route Choice
-
-    route_choice/route_choice_model.rst
-    route_choice/choice_set_generation.rst

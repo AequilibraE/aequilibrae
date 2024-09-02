@@ -18,3 +18,5 @@ You can check :ref:`this example <create_zones>` to learn how to add zones to yo
 .. seealso::
 
     :func:`aequilibrae.project.Zone`
+
+.. include:: data_model/zones.rst

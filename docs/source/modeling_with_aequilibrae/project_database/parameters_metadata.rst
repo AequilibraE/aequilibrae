@@ -19,3 +19,5 @@ As a simple table, it looks as follows:
 .. seealso::
 
     :func:`aequilibrae.project.FieldEditor`
+
+.. include:: data_model/attributes_documentation.rst

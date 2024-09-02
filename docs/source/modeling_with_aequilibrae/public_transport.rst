@@ -10,10 +10,5 @@ we recommend understanding the role of each table before setting an AequilibraE 
 you intend to use. If you don't know much about GTFS, we strongly encourage you to take
 a look at the documentation provided by `Google <https://developers.google.com/transit/gtfs>`_.
 
-A more technical view of the database structure, including the SQL queries used to create
-each table and their indices are also available.
-
-.. toctree::
-    :maxdepth: 1
-
-    transit_database/data_model/datamodel.rst
+The public transport database is created on the run when the ``Transit`` class is executed
+for the first time.

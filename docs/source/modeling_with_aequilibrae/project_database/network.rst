@@ -22,11 +22,18 @@ other changes to the layers or preventing the changes.
 **transportation network can be edited without specialized software that**
 **requires the editing to be done inside such software.**
 
-.. note::
+.. important::
    AequilibraE does not currently support turn penalties and/or bans. Their
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific development efforts.
 
-.. include:: network_import_and_export.rst
+.. toctree::
+   :maxdepth: 1
+   :caption: Dive deep into network!
 
-.. include:: network_geometry.rst
+   network_import_and_export.rst
+   network_geometry.rst
+
+.. include:: data_model/links.rst
+
+.. include:: data_model/nodes.rst

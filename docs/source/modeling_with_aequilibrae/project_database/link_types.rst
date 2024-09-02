@@ -27,7 +27,7 @@ removed from the model without breaking it.
 
 .. _adding_new_link_types:
 
-Adding new link_types to a project
+Adding new link types to a project
 ----------------------------------
 
 Adding link types to a project can be done through the Python API or directly into
@@ -61,8 +61,8 @@ physical link type and one virtual link type present in the model.
 
 .. _change_link_type_for_link:
 
-Changing the *link_type* for a certain link
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Changing the link type for a certain link
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Whenever we change the 'link_type' associated to a link, we need to check whether
 that link type exists in the links_table.
@@ -83,8 +83,8 @@ case, but it requires an specific trigger on the **creation** of the link.
 
 .. _editing_lt_on_lt_table:
 
-Editing a *link_type* in the *link_types* table
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Editing a link type in the *link_types* table
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Whenever we want to edit a 'link_type' in the 'link_types' table, we need to check
 for two conditions:
@@ -101,8 +101,8 @@ construction of the 'link_types' table by using the keys **UNIQUE** and
 
 .. _adding_new_ltype:
 
-Adding a new *link_type* to the *link_types* table
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Adding a new link type to the *link_types* table
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this case, only the first behaviour mentioned above on
 :ref:`editing_lt_on_lt_table` applies, the verification that the 'link_type_id' is
@@ -110,8 +110,8 @@ exactly one character long. Therefore only one new trigger is required.
 
 .. _deleting_ltype:
 
-Removing a *link_type* from the *link_types* table
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Removing a link type from the *link_types* table
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In counterpoint, only the second behaviour mentioned above on
 :ref:`editing_lt_on_lt_table` applies in this case, the verification that the old
@@ -121,3 +121,5 @@ required.
 .. seealso::
 
     :func:`aequilibrae.project.network.LinkTypes`
+
+.. include:: data_model/link_types.rst

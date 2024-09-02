@@ -17,3 +17,5 @@ an AequilibraE model you intend to use in anger.
    project_database/zones
    project_database/parameters_metadata
    project_database/results
+   project_database/periods
+   project_database/transit_graph

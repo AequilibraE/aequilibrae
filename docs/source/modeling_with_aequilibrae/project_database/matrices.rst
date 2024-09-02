@@ -23,3 +23,5 @@ types (AEM and OMX) without prejudice to functionality.
     :func:`aequilibrae.project.Matrices`
     
     :func:`aequilibrae.matrix.AequilibraeMatrix`
+
+.. include:: data_model/matrices.rst

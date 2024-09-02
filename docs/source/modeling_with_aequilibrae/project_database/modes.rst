@@ -7,7 +7,7 @@ The **modes** table exists to list all the modes available in the model's networ
 and its main role is to support the creation of graphs directly from the SQLite
 project.
 
-.. note::
+.. important::
 
     Modes must have a unique mode_id composed of a single letter, which is
     case-sensitive to a total of 52 possible modes in the model.
@@ -98,3 +98,5 @@ required.
 .. seealso::
 
     :func:`aequilibrae.project.network.Modes`
+
+.. include:: data_model/modes.rst
