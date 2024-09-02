@@ -86,21 +86,38 @@ Matrix
 
 Paths
 -----
+
+Graph
+~~~~~
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
    :toctree: generated/
 
    Graph
    TransitGraph
+   
+Traffic assignment
+~~~~~~~~~~~~~~~~~~
+.. currentmodule:: aequilibrae.paths
+.. autosummary::
+   :toctree: generated/
+   
+   TrafficClass
+   TransitClass
+   VDF
+   TrafficAssignment
+   TransitAssignment
    AssignmentResults
    TransitAssignmentResults
    SkimResults
    PathResults
-   VDF
-   TrafficClass
-   TransitClass
-   TrafficAssignment
-   TransitAssignment
+
+Route choice
+~~~~~~~~~~~~
+.. currentmodule:: aequilibrae.paths
+.. autosummary::
+   :toctree: generated/
+
    HyperpathGenerating
    OptimalStrategies
    RouteChoice

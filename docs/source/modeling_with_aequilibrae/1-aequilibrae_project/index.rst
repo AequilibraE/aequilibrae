@@ -98,6 +98,9 @@ also created *on-the-fly* when the user imports a GTFS source into an Aequilibra
 model, but there is still no support for manually or programmatically adding routes
 to a route system as of yet.
 
+The following sections presents the structure and contents for all databases in the project.
+
+
 .. toctree::
     :maxdepth: 1
     :caption: Dive deep into project structure! 
@@ -105,4 +108,4 @@ to a route system as of yet.
     project_database/index
     parameter_file
     results_database
-    public_transport_database/index
+    transit_database/index

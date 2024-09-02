@@ -27,9 +27,16 @@ class CreateTablesSRC:
         self.stub = "data_model"
         # Get the appropriate data for the database we are documenting
         self.conn = database_connection(db_type=folder, project_path=self.proj_path)
-        self.path = join(*Path(realpath(__file__)).parts[:-1],
-                        f"../aequilibrae/project/database_specification/{folder}/tables")
-        self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
+        self.path = join(
+            *Path(realpath(__file__)).parts[:-1], f"../aequilibrae/project/database_specification/{folder}/tables"
+        )
+        self.doc_path = str(
+            Path(realpath(__file__)).parent
+            / "source"
+            / "modeling_with_aequilibrae"
+            / "1-aequilibrae_project"
+            / tgt_fldr
+        )
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -44,7 +51,7 @@ class CreateTablesSRC:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()
 
             # Title of the page
-            title = f'*{table_name}* table structure'
+            title = f"*{table_name}* table structure"
             txt = [title, "-" * len(title), ""]
 
             # intro = """A more technical view of the database structure, including the SQL queries used to create each table and the indices used are displayed below.\n"""
@@ -126,8 +133,11 @@ class CreateTablesSRC:
         with open(filename, "r") as f:
             return [x.strip() for x in f.readlines()]
 
-tables = [("project_database", "modeling_with_aequilibrae/project_database"),
-          ("transit_database", "modeling_with_aequilibrae/transit_database")]
+
+tables = [
+    ("project_database", "modeling_with_aequilibrae/project_database"),
+    ("transit_database", "modeling_with_aequilibrae/transit_database"),
+]
 
 for table, pth in tables:
     s = CreateTablesSRC(table, pth)
