@@ -14,8 +14,8 @@ multiple algorithms to the assignment of trips to the network using the traditio
     :maxdepth: 1
     :caption: Dive deep into route choice
 
-    route_choice/route_choice_model.rst
-    route_choice/choice_set_generation.rst
+    route_choice_model.rst
+    choice_set_generation.rst
 
 Costs, utilities and signs
 --------------------------

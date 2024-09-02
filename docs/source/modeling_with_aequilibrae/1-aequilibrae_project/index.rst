@@ -60,7 +60,7 @@ Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
 is as follows:
 
-.. image:: ../images/project_structure.png
+.. image:: ../../images/project_structure.png
     :width: 700
     :alt: AequilibraE project structure
 
@@ -100,8 +100,9 @@ to a route system as of yet.
 
 .. toctree::
     :maxdepth: 1
-    :caption: Project structure 
+    :caption: Dive deep into project structure! 
 
-    project_database
+    project_database/index
     parameter_file
-    public_transport
+    results_database
+    public_transport_database/index

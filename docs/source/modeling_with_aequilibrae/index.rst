@@ -19,7 +19,7 @@ a start guide to a complete view into AequilibraE's data structure.
     :maxdepth: 1
     :caption: A guide to AequilibraE
 
-    project
-    static_traffic_assignment
-    transit_assignment
-    route_choice
+    1-aequilibrae_project/index
+    2-static_traffic_assignment/index
+    3-transit_assignment/index
+    4-route_choice/index

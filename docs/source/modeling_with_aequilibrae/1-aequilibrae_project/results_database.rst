@@ -1,7 +1,7 @@
 .. _tables_results:
 
-Results
-=======
+Results database
+================
 
 The **results** table exists to hold the metadata for the results stored in the
 **results_database.sqlite** in the same folder as the model database. In that,
@@ -14,8 +14,8 @@ essentially clutter the **project_database.sqlite**.
 
 As a simple table, it looks as follows:
 
-.. image:: ../../images/results_table.png
+.. image:: ../images/results_table.png
     :align: center
     :alt: results table structure
 
-.. include:: data_model/results.rst
+.. include:: project_database/data_model/results.rst

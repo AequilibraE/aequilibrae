@@ -122,11 +122,11 @@ class Transit:
 
             **end** (:obj:`int`): The end of the period for which to check pt schedules, (seconds from midnight)
 
-            **inclusion_cond** (:obj:`str`): Specifies condition with which to include/exclude pt trips from the 
+            **inclusion_cond** (:obj:`str`): Specifies condition with which to include/exclude pt trips from the
             preload.
 
         :Returns:
-            **preloads** (:obj:`pd.DataFrame`): A DataFrame of preload from transit vehicles that can be directly used 
+            **preloads** (:obj:`pd.DataFrame`): A DataFrame of preload from transit vehicles that can be directly used
             in an assignment
 
         .. code-block:: python

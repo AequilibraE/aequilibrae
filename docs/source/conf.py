@@ -93,10 +93,7 @@ sphinx_gallery_conf = {
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_static"]
 
-# The suffix(es) of source filenames.¶
-# You can specify multiple suffix as a list of string:
-#
-# source_suffix = ['.rst', '.md']
+# The suffix(es) of source filenames.
 source_suffix = ".rst"
 
 # The master toctree document.
@@ -163,7 +160,7 @@ latex_elements = {}
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
+latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", author, "manual")]
 
 latex_appendices = [
     "useful_information/installation",
@@ -181,18 +178,12 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 
 autodoc_default_options = {
     "members": True,
-    # "inherited-members": True,
-    # "member-order": "bysource",
-    # "special-members": False,
-    # "private-members": False,
-    # "undoc-members": True,
-    # "exclude-members": "__weakref__",
+    "inherited-members": True,
+    "undoc-members": True,
     'autosummary': True
 }
 
-# autodoc_member_order = "groupwise"
-
-autoclass_content = "init"  # classes should include both the class' and the __init__ method's docstring
+autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
 
@@ -206,7 +197,7 @@ texinfo_documents = [
         "AequilibraE Documentation",
         author,
         "AequilibraE",
-        "One line description of project.",
+        "Comprehensive Python package for transportation modeling",
         "Miscellaneous",
     )
 ]

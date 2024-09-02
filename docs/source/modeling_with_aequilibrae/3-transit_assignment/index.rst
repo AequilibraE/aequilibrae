@@ -9,5 +9,5 @@ Transit assignment
     :maxdepth: 1
     :caption: Transit Assignment
 
-    transit_assignment/hyperpath_routing.rst
-    transit_assignment/transit_graph.rst
+    hyperpath_routing.rst
+    transit_graph.rst
