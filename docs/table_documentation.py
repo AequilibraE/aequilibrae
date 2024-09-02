@@ -135,8 +135,8 @@ class CreateTablesSRC:
 
 
 tables = [
-    ("project_database", "modeling_with_aequilibrae/project_database"),
-    ("transit_database", "modeling_with_aequilibrae/transit_database"),
+    ("project_database", "project_database"),
+    ("transit_database", "transit_database"),
 ]
 
 for table, pth in tables:

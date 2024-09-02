@@ -87,7 +87,7 @@ sphinx_gallery_conf = {
             "examples/other_applications",
         ]
     ),
-    "plot_gallery": "False",
+    # "plot_gallery": "False",
 }
 
 # Add any paths that contain templates here, relative to this directory.
