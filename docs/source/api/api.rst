@@ -11,7 +11,7 @@ Project
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
    Project
 
@@ -20,7 +20,7 @@ Project Components
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     About
     FieldEditor
@@ -34,7 +34,7 @@ Project Objects
 .. currentmodule:: aequilibrae.project
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Zone
 
@@ -43,7 +43,7 @@ Network Data
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Modes
     LinkTypes
@@ -56,7 +56,7 @@ Network Items
 .. currentmodule:: aequilibrae.project.network
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Mode
     LinkType
@@ -69,7 +69,7 @@ Parameters
 .. currentmodule:: aequilibrae
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Parameters
 
@@ -77,7 +77,7 @@ Distribution
 ------------
 .. currentmodule:: aequilibrae.distribution
 .. autosummary::
-   :toctree: generated/
+   :toctree: api/generated/
 
     Ipf
     GravityApplication
@@ -89,7 +89,7 @@ Matrix
 .. currentmodule:: aequilibrae.matrix
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
    AequilibraeData
    AequilibraeMatrix
@@ -99,7 +99,7 @@ Paths
 .. currentmodule:: aequilibrae.paths
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Graph
     TransitGraph
@@ -122,7 +122,7 @@ Transit
 .. currentmodule:: aequilibrae.transit
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: api/generated/
 
     Transit
     TransitGraphBuilder

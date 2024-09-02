@@ -86,7 +86,7 @@ sphinx_gallery_conf = {
             "examples/other_applications",
         ]
     ),
-    # "plot_gallery": "False",
+    "plot_gallery": "False",
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -165,9 +165,9 @@ latex_elements = {}
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
 
 latex_appendices = [
-    "installation",
-    "validation_benchmarking/ipf_performance",
-    "validation_benchmarking/traffic_assignment",
+    "useful_information/installation",
+    "useful_information/validation_benchmarking/ipf_performance",
+    "useful_information/validation_benchmarking/traffic_assignment",
 ]
 
 # -- Options for manual page output ------------------------------------------

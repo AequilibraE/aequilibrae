@@ -29,7 +29,7 @@ resources not easily available from other open-source packages in the Python (Nu
         results.
 
     .. grid-item-card:: :material-outlined:`menu_book;1.5em` Modeling with AequilibraE
-        :link: modeling_with_aequilibrae
+        :link: modeling_with_aequilibrae/modeling_with_aequilibrae
         :link-type: any
         :text-align: center
         
@@ -56,5 +56,5 @@ resources not easily available from other open-source packages in the Python (Nu
    :maxdepth: 1
 
    _auto_examples/index
-   modeling_with_aequilibrae
-   api
+   modeling_with_aequilibrae/modeling_with_aequilibrae
+   api/api

@@ -22,7 +22,7 @@ than the benchmark python code, while applying IPF to a 32-bit NumPy array (``np
 It's worth mentioning that the user can set up a threshold for AequilibraE's IPF function, 
 as well as use more than one core to speed up the fitting process.
 
-.. image:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
+.. image:: ../../images/ipf_runtime_aequilibrae_vs_benchmark.png
     :align: center
     :alt: AequilibraE's IPF runtime
 
@@ -30,7 +30,7 @@ As IPF is an embarrassingly-parallel workload, it is more relevant to look at th
 AequilibraE implementations, starting by comparing the implementation performance for inputs in 32 vs 64
 bits using 32 threads.
 
-.. image:: ../images/ipf_runtime_32vs64bits.png
+.. image:: ../../images/ipf_runtime_32vs64bits.png
     :align: center
     :alt: AequilibraE's IPF runtime 32 vs 64 bits
 
@@ -43,11 +43,11 @@ that the 32-bit version scales significantly better than its 64-bit counterpart,
 gains up to 16 threads, while the latter stops showing much improvement beyond 8 threads, likely due to limitations
 on cache size.
 
-.. image:: ../images/ipf_runtime_vs_num_cores.png
+.. image:: ../../images/ipf_runtime_vs_num_cores.png
     :align: left
     :alt: number of cores used in IPF for 64 bit matrices
 
-.. image:: ../images/ipf_runtime_vs_num_cores32bits.png
+.. image:: ../../images/ipf_runtime_vs_num_cores32bits.png
     :align: right
     :alt: number of cores used in IPF for 32 bit matrices
 
