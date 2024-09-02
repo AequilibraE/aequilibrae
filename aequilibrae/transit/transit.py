@@ -129,8 +129,6 @@ class Transit:
             **preloads** (:obj:`pd.DataFrame`): A DataFrame of preload from transit vehicles that can be directly used 
             in an assignment
 
-        Minimal example:
-
         .. code-block:: python
 
             >>> from aequilibrae import Project
@@ -142,7 +140,6 @@ class Transit:
             >>> end = int(8.5 * 60 * 60)   # 8.30 am
 
             >>> preload = proj.transit.build_pt_preload(start, end)
-
         """
         return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self.pt_con)
 

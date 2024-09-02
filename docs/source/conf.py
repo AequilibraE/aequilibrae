@@ -57,6 +57,7 @@ else:
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
+    "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
     "sphinx_gallery.gen_gallery",
@@ -180,17 +181,18 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 
 autodoc_default_options = {
     "members": True,
-    "inherited-members": True,
-    "member-order": "bysource",
-    "special-members": False,
-    "private-members": False,
-    "undoc-members": True,
+    # "inherited-members": True,
+    # "member-order": "bysource",
+    # "special-members": False,
+    # "private-members": False,
+    # "undoc-members": True,
     # "exclude-members": "__weakref__",
+    'autosummary': True
 }
 
 # autodoc_member_order = "groupwise"
 
-autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
+autoclass_content = "init"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
 

@@ -27,7 +27,7 @@ mentioning that the user can set up a threshold for AequilibraE’s IPF
 function, as well as use more than one core to speed up the fitting
 process.
 
-.. figure:: ../../images/ipf_runtime_aequilibrae_vs_benchmark.png
+.. figure:: ../images/ipf_runtime_aequilibrae_vs_benchmark.png
    :alt: AequilibraE’s IPF runtime
 
    AequilibraE’s IPF runtime
@@ -37,7 +37,7 @@ look at the performance of the AequilibraE implementations, starting by
 comparing the implementation performance for inputs in 32 vs 64 bits
 using 32 threads.
 
-.. figure:: ../../images/ipf_runtime_32vs64bits.png
+.. figure:: ../images/ipf_runtime_32vs64bits.png
    :alt: AequilibraE’s IPF runtime 32 vs 64 bits
 
    AequilibraE’s IPF runtime 32 vs 64 bits
@@ -54,12 +54,12 @@ better than its 64-bit counterpart, showing significant performance
 gains up to 16 threads, while the latter stops showing much improvement
 beyond 8 threads, likely due to limitations on cache size.
 
-.. figure:: ../../images/ipf_runtime_vs_num_cores.png
+.. figure:: ../images/ipf_runtime_vs_num_cores.png
    :alt: number of cores used in IPF for 64 bit matrices
 
    number of cores used in IPF for 64 bit matrices
 
-.. figure:: ../../images/ipf_runtime_vs_num_cores32bits.png
+.. figure:: ../images/ipf_runtime_vs_num_cores32bits.png
    :alt: number of cores used in IPF for 32 bit matrices
 
    number of cores used in IPF for 32 bit matrices
