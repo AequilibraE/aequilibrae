@@ -11,7 +11,7 @@ This index, which looks like below, has two main columns. The first one is the
 AequilibraE to find the file, and **name**, which is the name by which the user
 should refer to the matrix in order to access it through the API.
 
-.. image:: ../../images/matrices_table.png
+.. image:: ../../../images/matrices_table.png
     :align: center
     :alt: Matrices table structure
 

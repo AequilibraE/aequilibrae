@@ -8,7 +8,7 @@ Installation
 In this section we describe how to install AequilibraE. The recommendations on this page are current 
 as of September 2024.
 
-.. note::
+.. important::
    Although AequilibraE is under intense development, we try to avoid making
    breaking changes to the API. In any case, you should check for new features
    and possible API changes often.

@@ -16,7 +16,7 @@ As described in the SQL data model, all AequilibraE models are created with 4
 standard modes, which can be added to or removed by the user, and would look like
 the following.
 
-.. image:: ../../images/modes_table.png
+.. image:: ../../../images/modes_table.png
     :align: center
     :alt: Modes table structure
 

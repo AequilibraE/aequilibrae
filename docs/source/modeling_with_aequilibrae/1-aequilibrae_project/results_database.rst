@@ -14,7 +14,7 @@ essentially clutter the **project_database.sqlite**.
 
 As a simple table, it looks as follows:
 
-.. image:: ../images/results_table.png
+.. image:: ../../images/results_table.png
     :align: center
     :alt: results table structure
 

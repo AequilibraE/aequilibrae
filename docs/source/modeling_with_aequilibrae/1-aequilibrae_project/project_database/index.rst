@@ -16,6 +16,5 @@ an AequilibraE model you intend to use in anger.
    matrices
    zones
    attributes_documentation
-   results
    periods
    transit_graph

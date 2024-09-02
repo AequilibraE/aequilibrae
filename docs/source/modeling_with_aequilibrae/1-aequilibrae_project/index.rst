@@ -3,6 +3,10 @@
 The AequilibraE project
 =======================
 
+.. contents:: **Contents**
+    :local:
+    :depth: 1
+
 Similarly to commercial packages, any AequilibraE project must have a certain
 structure and follow a certain set of guidelines in order for software to
 work correctly.
@@ -99,7 +103,6 @@ model, but there is still no support for manually or programmatically adding rou
 to a route system as of yet.
 
 The following sections presents the structure and contents for all databases in the project.
-
 
 .. toctree::
     :maxdepth: 1

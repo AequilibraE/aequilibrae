@@ -47,7 +47,7 @@ layers to the canvas, and selecting properties and clicking on *create spatial*
 *index* for each layer at a time. This action automatically saves the spatial
 indices to the sqlite database.
 
-.. image:: ../../images/qgis_creating_spatial_indices.png
+.. image:: ../../../images/qgis_creating_spatial_indices.png
     :align: center
     :alt: Adding Spatial indices with QGIS
 
@@ -93,10 +93,10 @@ Before importing a network from a source in GMNS format, it is imperative to kno
 in which spatial reference its geometries (links and nodes) were created. If the SRID
 is different than 4326, it must be passed as an input using the argument 'srid'.
 
-.. image:: ../../images/plot_import_from_gmns.png
+.. image:: ../../../images/plot_import_from_gmns.png
     :align: center
     :alt: example
-    :target: ../../_auto_examples/plot_import_from_gmns.html
+    :target: ../../../_auto_examples/plot_import_from_gmns.html
 
 As of July 2022, it is possible to import the following files from a GMNS source:
 
@@ -135,7 +135,7 @@ Exporting AequilibraE model to GMNS format
 
 After loading an existing AequilibraE project, you can export it to GMNS format. 
 
-.. image:: ../../images/plot_export_to_gmns.png
+.. image:: ../../../images/plot_export_to_gmns.png
     :align: center
     :alt: example
     :target: export_to_gmns

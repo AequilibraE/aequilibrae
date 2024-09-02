@@ -12,7 +12,7 @@ itself.
 
 As a simple table, it looks as follows:
 
-.. image:: ../../images/attributes_documentation.png
+.. image:: ../../../images/attributes_documentation.png
     :align: center
     :alt: attributes documentation table 
 
