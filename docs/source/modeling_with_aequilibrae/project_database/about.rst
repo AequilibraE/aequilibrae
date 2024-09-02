@@ -27,4 +27,6 @@ An API for editing the contents of this database is available from the API docum
 
 .. seealso::
 
-    :doc:`Editing About table <../../generated/aequilibrae.project.About>`
+    :func:`aequilibrae.project.About`
+
+.. include:: data_model/about.rst

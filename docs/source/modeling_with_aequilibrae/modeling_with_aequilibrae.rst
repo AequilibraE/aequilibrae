@@ -15,14 +15,11 @@ In this section you can find a deep dive into modeling with AequilibraE, from
 a start guide to a complete view into AequilibraE's data structure.
 
 .. toctree::
-    :numbered: 1
+    :numbered: 2
     :maxdepth: 1
     :caption: A guide to AequilibraE
 
     project
-    project_database
-    parameter_file
-    public_transport
     static_traffic_assignment
     transit_assignment
     route_choice

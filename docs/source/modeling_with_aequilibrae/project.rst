@@ -72,6 +72,14 @@ also created *on-the-fly* when the user imports a GTFS source into an Aequilibra
 model, but there is still no support for manually or programmatically adding routes
 to a route system as of yet.
 
+.. toctree::
+    :maxdepth: 1
+    :caption: Project structure 
+
+    project_database
+    parameter_file
+    public_transport
+
 Package components: A conceptual view
 -------------------------------------
 

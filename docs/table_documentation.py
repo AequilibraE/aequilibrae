@@ -44,8 +44,11 @@ class CreateTablesSRC:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()
 
             # Title of the page
-            title = f'**{table_name.replace("_", " ")}** table structure'
+            title = "Table structure"
             txt = [title, "=" * len(title), ""]
+
+            intro = """A more technical view of the database structure, including the SQL queries used to create each table and the indices used are displayed below.\n"""
+            txt.append(intro)
 
             docstrings = self.__get_docstrings(table_name)
             sql_code = self.__get_sql_code(table_name)
