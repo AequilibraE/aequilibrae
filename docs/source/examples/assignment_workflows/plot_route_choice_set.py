@@ -162,3 +162,15 @@ map_osm
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   :ref:`route_choice`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.Graph` | :func:`aequilibrae.paths.RouteChoice`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

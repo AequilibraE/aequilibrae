@@ -60,7 +60,7 @@ transit.load_date("2016-04-13")
 # Let's save this model for later use.
 transit.save_to_disk()
 
-#%%
+# %%
 # Graph building
 # --------------
 # Let's build the transit network. We'll disable ``outer_stop_transfers`` and ``walking_edges`` 
@@ -132,6 +132,11 @@ graph_db.edges
 transit_graph = graph.to_transit_graph()
 
 # %%
+# .. admonition:: References
+# 
+#   :ref:`transit_assignment_graph`
+
+# %%
 # Spiess & Florian assignment
 # ---------------------------
 
@@ -155,7 +160,7 @@ mat.index = transit_graph.centroids[:]
 mat.matrices[:, :, 0] = np.full((zones_in_the_model, zones_in_the_model), 1.0)
 mat.computational_view()
 
-#%%
+# %%
 # Hyperpath generation/assignment
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # We'll create a `TransitAssignment` object as well as a `TransitClass`
@@ -200,3 +205,16 @@ assig.save_results(table_name='hyperpath example')
 # %%
 # Wrapping up
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   :ref:`transit_hyperpath_routing`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.TransitGraphBuilder`
+#     * :func:`aequilibrae.paths.TransitClass` | :func:`aequilibrae.paths.TransitAssignment`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

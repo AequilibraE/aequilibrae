@@ -1,3 +1,5 @@
+.. _transit_hyperpath_routing:
+
 Hyperpath routing in the context of transit assignment
 ======================================================
 

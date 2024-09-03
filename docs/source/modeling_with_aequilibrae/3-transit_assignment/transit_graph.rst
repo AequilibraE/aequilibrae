@@ -1,3 +1,5 @@
+.. _transit_assignment_graph:
+
 The Transit assignment graph
 ============================
 

@@ -9,6 +9,7 @@ Serena Metropolitan Area in Chile.
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -18,6 +19,7 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_route_choice_assignment.png'
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -251,3 +253,15 @@ od_matrix.to_scipy().toarray()
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   :ref:`route_choice`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.Graph` | :func:`aequilibrae.paths.RouteChoice`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

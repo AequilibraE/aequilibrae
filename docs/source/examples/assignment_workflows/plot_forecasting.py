@@ -18,14 +18,14 @@ import logging
 import sys
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 logger = project.logger
 
-
-#%%
+# %%
 # Traffic assignment with skimming
 # --------------------------------
 
@@ -110,7 +110,7 @@ assig.save_results("base_year_assignment")
 # And save the skims
 assig.save_skims("base_year_assignment_skims", which_ones="all", format="omx")
 
-#%%
+# %%
 # Trip distribution
 # -----------------
 # Calibration
@@ -137,7 +137,7 @@ imped = proj_matrices.get_matrix("base_year_assignment_skims_car")
 # We can check which matrix cores were created for our skims to decide which one to use
 imped.names
 
-#%%
+# %%
 # Where ``free_flow_time_final`` is actually the congested time for the last iteration
 
 # %%
@@ -185,7 +185,7 @@ for function in ["power", "expo"]:
         for r in gc.report:
             otp.write(r + "\n")
 
-#%%
+# %%
 # Forecast
 # --------
 # We create a set of 'future' vectors using some random growth factors.
@@ -219,7 +219,7 @@ vectors.origins[:] = origins * (1 + np.random.rand(vectors.entries) / 10)
 vectors.destinations[:] = destinations * (1 + np.random.rand(vectors.entries) / 10)
 vectors.destinations *= vectors.origins.sum() / vectors.destinations.sum()
 
-#%%
+# %%
 # Impedance
 # ~~~~~~~~~
 
@@ -259,7 +259,7 @@ for function in ["power", "expo"]:
 proj_matrices.update_database()
 print(proj_matrices.list())
 
-#%%
+# %%
 # IPF for the future vectors
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -282,7 +282,7 @@ ipf.save_to_project(name="demand_ipfd_omx", file_name="demand_ipfd.omx")
 # %%
 df = proj_matrices.list()
 
-#%%
+# %%
 # Future traffic assignment
 # -------------------------
 
@@ -326,7 +326,7 @@ assig.set_algorithm("bfw")
 assig.max_iter = 500
 assig.rgap_target = 0.00001
 
-#%%
+# %%
 # Optional: Select link analysis
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -393,3 +393,11 @@ plt.show()
 # %%
 # Close the project
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.TrafficClass` | :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
