@@ -81,8 +81,11 @@ Matrix
 .. autosummary::
    :toctree: generated/
 
-   AequilibraeData
    AequilibraeMatrix
+   AequilibraeData
+   Sparse
+   COO
+   GeneralisedCOODemand
 
 Paths
 -----
@@ -131,4 +134,13 @@ Transit
 
    Transit
    TransitGraphBuilder
-   .. GTFSRouteSystemBuilder
+   lib_gtfs.GTFSRouteSystemBuilder
+
+Utils
+-----
+.. currentmodule:: aequilibrae.utils
+.. autosummary::
+   :toctree: generated/
+
+   create_delaunay_network.DelaunayAnalysis
+   create_example

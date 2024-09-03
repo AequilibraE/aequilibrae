@@ -166,3 +166,11 @@ map_osm
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.network.Link` | :func:`aequilibrae.project.network.Links` 
+#     * :func:`aequilibrae.project.network.Node` | :func:`aequilibrae.project.network.Nodes` 
+#     * :func:`aequilibrae.project.network.Mode` | :func:`aequilibrae.project.network.LinkType` 

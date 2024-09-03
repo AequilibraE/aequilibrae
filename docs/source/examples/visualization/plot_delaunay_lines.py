@@ -6,7 +6,7 @@ Creating Delaunay Lines
 
 In this example, we show how to create AequilibraE's famous Delaunay Lines, but in Python.
 
-For more on this topic, the first publication is `here <https://xl-optim.com/delaunay/>`_.
+For more on this topic, see its `first publication <https://xl-optim.com/delaunay/>`_.
 
 We use the Sioux Falls example once again.
 """
@@ -70,3 +70,9 @@ plt.show()
 # %%
 # Close the project
 project.close()
+
+# %% 
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.utils.create_delaunay_network.DelaunayAnalysis`

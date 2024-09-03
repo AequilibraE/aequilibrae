@@ -7,7 +7,6 @@ Traffic Assignment without an AequilibraE Model
 In this example, we show how to perform Traffic Assignment in AequilibraE without a model.
 
 We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetworks/tree/master/SiouxFalls>`_, from TNTP.
-
 """
 # %%
 
@@ -87,7 +86,7 @@ geom.drop(columns=["newline", "terminator"], index=[24], inplace=True)
 geom["node_id"] = geom.index + 1
 geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set_index("node_id")
 
-#%%
+# %%
 # Let's build our Graph! In case you're in doubt about AequilibraE Graph, 
 # :ref:`click here <aequilibrae-graphs>` to read more about it.
 
@@ -105,6 +104,11 @@ g.set_skimming(["free_flow_time"])
 g.set_blocked_centroid_flows(False)
 g.network["id"] = g.network.link_id
 g.lonlat_index = geom.loc[g.all_nodes]
+
+# %%
+# .. admonition:: References
+# 
+#   :ref:`aequilibrae-graphs`
 
 # %%
 # Let's perform our assignment. Feel free to try different algorithms,
@@ -136,4 +140,14 @@ print(assig.results())
 print(assig.report())
 
 # %%
+# .. admonition:: References
 # 
+#   :ref:`traffic_assignment_procedure` | :ref:`multiclass_equilibrium`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.TrafficClass` | :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

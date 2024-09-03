@@ -130,6 +130,8 @@ not blocking flows through "centroids".
     
     :func:`aequilibrae.paths.TransitGraph`
 
+.. _traffic_assignment_procedure:
+
 Traffic Assignment Procedure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -364,8 +366,6 @@ Finally, one can execute assignment:
 
 :ref:`convergence_criteria` is discussed in a different section.
 
-References
-~~~~~~~~~~
 .. [1] Hampton Roads Transportation Planning Organization, Regional Travel Demand Model V2 (2020). 
        Available in: https://www.hrtpo.org/uploads/docs/2020_HamptonRoads_Modelv2_MethodologyReport.pdf
 

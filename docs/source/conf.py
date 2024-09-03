@@ -183,6 +183,8 @@ autodoc_default_options = {
     'autosummary': True
 }
 
+autodoc_member_order = "groupwise"
+
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
