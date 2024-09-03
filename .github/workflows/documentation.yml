@@ -16,6 +16,7 @@ jobs:
       max-parallel: 1
     env:
       HAS_SECRETS: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+      MERGE_REQUEST_ID: echo 'python/${{ github.event.number }}/'
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.10
@@ -68,7 +69,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
         SOURCE_DIR: 'docs/build/html/'      # optional: defaults to entire repository
-        DEST_DIR: 'python/dev/'      # optional: defaults to entire repository
+        DEST_DIR: $MERGE_REQUEST_ID      # optional: defaults to entire repository
 
     - name: Upload to develop branch to S3
       if: ${{ (github.ref == 'refs/heads/develop') && (github.event_name == 'push') && (env.HAS_SECRETS == 'true') }}
