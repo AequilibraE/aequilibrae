@@ -65,7 +65,6 @@ series of files and sub folders exist, and the current project organization
 is as follows:
 
 .. image:: ../../images/project_structure.png
-    :width: 700
     :alt: AequilibraE project structure
 
 |
