@@ -23,3 +23,4 @@ a start guide to a complete view into AequilibraE's data structure.
     2-static_traffic_assignment/index
     3-transit_assignment/index
     4-route_choice/index
+    5-aequilibrae_matrix

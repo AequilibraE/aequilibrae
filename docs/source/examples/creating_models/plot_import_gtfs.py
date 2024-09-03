@@ -34,7 +34,6 @@ project = create_example(fldr, "coquimbo")
 # %%
 # As the Coquimbo example already has a complete GTFS model, we shall remove its public transport
 # database for the sake of this example.
-
 remove(join(fldr, "public_transport.sqlite"))
 
 # %%

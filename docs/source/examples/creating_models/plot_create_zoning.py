@@ -1,8 +1,8 @@
 """
 .. _create_zones:
 
-Creating a zone system based on Hex Bins
-========================================
+Create a zone system based on Hex Bins
+======================================
 
 In this example, we show how to create hex bin zones covering an arbitrary area.
 
@@ -14,7 +14,6 @@ you have the geometries for them. In that case, you can just skip the hex bin co
 part of this notebook.
 
 We also add centroid connectors to our network to make it a pretty complete example
-
 """
 
 # %%
@@ -30,6 +29,7 @@ from aequilibrae.utils.create_example import create_example, list_examples
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -43,7 +43,7 @@ project = create_example(fldr, "nauru")
 # We said we wanted 100 zones
 zones = 100
 
-#%%
+# %%
 # Hex Bins using Spatialite
 # -------------------------
 
@@ -62,8 +62,8 @@ geo = network.convex_hull()
 zone_area = geo.area / zones
 
 # %%
-# Since the area of the hexagon is **3 * sqrt(3) * side^2 / 2**
-# is side is equal to  **sqrt(2 * sqrt(3) * A/9)**
+# Since the area of the hexagon is :math:`\frac{3\sqrt{3}}{2} * side^{2}`
+# the side is equal to :math:`\sqrt{\frac{2\sqrt{3} * area}{9}}`
 zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 
 # %%
@@ -90,15 +90,14 @@ grid = [p for p in grid.geoms if p.intersects(geo)]
 
 # %%
 # Let's re-number all nodes with IDs smaller than 300 to something bigger as to free space to our centroids to go from 1
-# to N
+# to N.
 nodes = network.nodes
 for i in range(1, 301):
     nd = nodes.get(i)
     nd.renumber(i + 1300)
 
 # %%
-# Now we can add them to the model
-# And add centroids to them while we are at it
+# Now we can add them to the model and add centroids to them while we are at it.
 zoning = project.zoning
 for i, zone_geo in enumerate(grid):
     zone = zoning.new(i + 1)
@@ -108,8 +107,7 @@ for i, zone_geo in enumerate(grid):
     # But we could provide a Shapely point as an alternative
     zone.add_centroid(None)
 
-
-#%%
+# %%
 # Centroid connectors
 # -------------------
 
@@ -127,7 +125,12 @@ for zone_id, zone in zoning.all_zones().items():
         break
 
 # %%
-# Let's add special generator zones
+# Special generator zones
+# ~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# Let's add special generator zones!
+
+# %%
 # We also add a centroid at the airport terminal
 nodes = project.network.nodes
 
@@ -145,3 +148,11 @@ airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytr
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.Zone`
+#     * :func:`aequilibrae.project.network.Node` | :func:`aequilibrae.project.network.Nodes` 
+#     * :ref:`tables_zones`

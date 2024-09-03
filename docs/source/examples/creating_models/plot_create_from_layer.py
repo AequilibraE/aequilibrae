@@ -1,8 +1,8 @@
 """
 .. _project_from_link_layer:
 
-Project from a link layer
-=========================
+Create project from a link layer
+================================
 
 In this example, we show how to create an empty project and populate it with a
 network coming from a link layer we load from a text file. It can easily be

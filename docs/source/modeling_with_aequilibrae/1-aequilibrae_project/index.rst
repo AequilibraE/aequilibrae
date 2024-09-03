@@ -3,10 +3,6 @@
 The AequilibraE project
 =======================
 
-.. contents:: **Contents**
-    :local:
-    :depth: 1
-
 Similarly to commercial packages, any AequilibraE project must have a certain
 structure and follow a certain set of guidelines in order for software to
 work correctly.
@@ -65,6 +61,7 @@ series of files and sub folders exist, and the current project organization
 is as follows:
 
 .. image:: ../../images/project_structure.png
+    :width: 600
     :alt: AequilibraE project structure
 
 |

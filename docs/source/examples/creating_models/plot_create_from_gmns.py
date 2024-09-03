@@ -1,12 +1,12 @@
 """
 .. _import_from_gmns:
 
-Importing network from GMNS
-===========================
+Create project from GMNS
+========================
 
 In this example, we import a simple network in GMNS format.
-The source files of this network are publicly available in the GMNS GitHub repository itself.
-Here's the repository: https://github.com/zephyr-data-specs/GMNS
+The source files of this network are publicly available in the 
+`GMNS GitHub repository <https://github.com/zephyr-data-specs/GMNS>`_ itself.
 """
 
 # %%
@@ -21,12 +21,14 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/plot_import_from_gmns.png'
 
 # %%
+
 # We load the example file from the GMNS GitHub repository
 link_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/link.csv"
 node_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/node.csv"
 use_group_file = "https://raw.githubusercontent.com/zephyr-data-specs/GMNS/main/examples/Arlington_Signals/use_group.csv"
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -109,6 +111,7 @@ curr.execute("select avg(xmin), avg(ymin) from idx_links_geometry")
 long, lat = curr.fetchone()
 
 # %%
+
 # We create the map
 map_gmns = folium.Map(location=[lat, long], zoom_start=17)
 
@@ -122,3 +125,10 @@ map_gmns
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.Network.create_from_gmns`
+#     * :ref:`importing_from_gmns_file`
