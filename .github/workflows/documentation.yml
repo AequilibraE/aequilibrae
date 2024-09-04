@@ -115,7 +115,7 @@ jobs:
 
     - name: Rename documentation folder to push to S3 DEV
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
-      run: mv docs/build/html/ docs/build/${github.event.number}/
+      run: mv docs/build/html/ docs/build/${{ github.event.number }}/
 
     - name: Upload to DEV on S3
       if: ${{ (github.event_name == 'pull_request') && (env.HAS_SECRETS == 'true') }}
