@@ -56,14 +56,6 @@ Network Items
    Node
    Period
 
-Parameters
-----------
-.. currentmodule:: aequilibrae
-.. autosummary::
-   :toctree: generated/
-
-   Parameters
-
 Distribution
 ------------
 .. currentmodule:: aequilibrae.distribution
@@ -83,9 +75,6 @@ Matrix
 
    AequilibraeMatrix
    AequilibraeData
-   Sparse
-   COO
-   GeneralisedCOODemand
 
 Paths
 -----
@@ -144,3 +133,11 @@ Utils
 
    create_delaunay_network.DelaunayAnalysis
    create_example
+
+Parameters
+----------
+.. currentmodule:: aequilibrae
+.. autosummary::
+   :toctree: generated/
+
+   Parameters

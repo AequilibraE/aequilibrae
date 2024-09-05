@@ -59,7 +59,7 @@ class Zoning(BasicTable):
         """Creates a new zone
 
         :Returns:
-            **zone** (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
+            **zone** (:obj:`Zone`): A new zone object populated only with ``zone_id`` (but not saved in the model yet)
         """
 
         if zone_id in self.__items:
@@ -94,13 +94,13 @@ class Zoning(BasicTable):
         return unary_union(polygons)
 
     def get(self, zone_id: str) -> Zone:
-        """Get a zone from the model by its **zone_id**"""
+        """Get a zone from the model by its ``zone_id``"""
         if zone_id not in self.__items:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
         return self.__items[zone_id]
 
     def all_zones(self) -> dict:
-        """Returns a dictionary with all Zone objects available in the model. *zone_id* as key"""
+        """Returns a dictionary with all Zone objects available in the model, using ``zone_id`` as key"""
         return self.__items
 
     def save(self):

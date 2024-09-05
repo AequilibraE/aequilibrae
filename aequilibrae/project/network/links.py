@@ -46,12 +46,12 @@ class Links(BasicTable):
             self.refresh_fields()
 
     def get(self, link_id: int) -> Link:
-        """Get a link from the network by its *link_id*
+        """Get a link from the network by its ``link_id``
 
-        It raises an error if link_id does not exist
+        It raises an error if ``link_id`` does not exist
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of a link to retrieve
+            **link_id** (:obj:`int`): ID of a link to retrieve
 
         :Returns:
             **link** (:obj:`Link`): Link object for requested link_id
@@ -71,7 +71,7 @@ class Links(BasicTable):
         """Creates a new link
 
         :Returns:
-            **link** (:obj:`Link`): A new link object populated only with link_id (not saved in the model yet)
+            **link** (:obj:`Link`): A new link object populated only with ``link_id`` (not saved in the model yet)
         """
 
         data = {key: None for key in self.__fields}
@@ -86,13 +86,13 @@ class Links(BasicTable):
     def copy_link(self, link_id: int) -> Link:
         """Creates a copy of a link with a new id
 
-        It raises an error if link_id does not exist
+        It raises an error if ``link_id`` does not exist
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of the link to copy
+            **link_id** (:obj:`int`): ID of the link to copy
 
         :Returns:
-            **link** (:obj:`Link`): Link object for requested link_id
+            **link** (:obj:`Link`): Link object for requested ``link_id``
         """
 
         data = self.__link_data(int(link_id))
@@ -108,10 +108,10 @@ class Links(BasicTable):
         return link
 
     def delete(self, link_id: int) -> None:
-        """Removes the link with **link_id** from the project
+        """Removes the link with ``link_id`` from the project
 
         :Arguments:
-            **link_id** (:obj:`int`): Id of a link to delete
+            **link_id** (:obj:`int`): ID of a link to delete
         """
         d = 1
         link_id = int(link_id)
@@ -140,7 +140,7 @@ class Links(BasicTable):
         """Returns all links data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`DataFrame`): Pandas dataframe with all the links, complete with Geometry
+            **table** (:obj:`DataFrame`): Pandas DataFrame with all the links, complete with Geometry
         """
         dl = DataLoader(self.project.path_to_file, "links")
         return dl.load_table()

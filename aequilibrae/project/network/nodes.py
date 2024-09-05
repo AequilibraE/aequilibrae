@@ -12,7 +12,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 class Nodes(BasicTable):
     """
-    Access to the API resources to manipulate the links table in the network
+    Access to the API resources to manipulate the nodes table in the network
 
     .. code-block:: python
 
@@ -42,15 +42,15 @@ class Nodes(BasicTable):
             self.refresh_fields()
 
     def get(self, node_id: int) -> Node:
-        """Get a node from the network by its **node_id**
+        """Get a node from the network by its ``node_id``
 
-        It raises an error if node_id does not exist
+        It raises an error if ``node_id`` does not exist
 
         :Arguments:
-            **node_id** (:obj:`int`): Id of a node to retrieve
+            **node_id** (:obj:`int`): ID of a node to retrieve
 
         :Returns:
-            **node** (:obj:`Node`): Node object for requested node_id
+            **node** (:obj:`Node`): Node object for requested ``node_id``
         """
 
         if node_id in self.__items:
@@ -91,7 +91,7 @@ class Nodes(BasicTable):
         """Creates a new centroid with a given ID
 
         :Arguments:
-            **node_id** (:obj:`int`): Id of the centroid to be created
+            **node_id** (:obj:`int`): ID of the centroid to be created
         """
 
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
@@ -122,7 +122,7 @@ class Nodes(BasicTable):
 
     @property
     def lonlat(self) -> pd.DataFrame:
-        """Returns all nodes lon/lat coords as a Pandas DataFrame
+        """Returns all nodes lon/lat coordinates as a Pandas DataFrame
 
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat

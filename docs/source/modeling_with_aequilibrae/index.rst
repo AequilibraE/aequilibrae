@@ -24,3 +24,5 @@ a start guide to a complete view into AequilibraE's data structure.
     3-transit_assignment/index
     4-route_choice/index
     5-aequilibrae_matrix
+    6-accessing-project-data
+    7-project_components
