@@ -47,10 +47,12 @@ def test_map_match_int_exception(system_builder):
         system_builder.map_match(route_types=[3.5])
 
 
-def test_map_match(transit_conn, system_builder):
+def test_map_match(transit_conn, system_builder, caplog):
     system_builder.load_date("2016-04-13")
     system_builder.set_allow_map_match(True)
-    system_builder.map_match()
+    system_builder.map_match([3, 1, 2])
+    assert "Skipping the following route_types as they have no corresponding road mode: [1, 2]" in caplog.text
+
     system_builder.save_to_disk()
 
     assert transit_conn.execute("SELECT * FROM pattern_mapping;").fetchone()[0] > 1
