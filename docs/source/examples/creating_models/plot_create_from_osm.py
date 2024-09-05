@@ -20,8 +20,10 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/nauru.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
+
 project = Project()
 project.new(fldr)
 
@@ -77,8 +79,12 @@ map_osm
 project.close()
 
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`importing_from_osm` 
+
+# %%
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
 #     * :func:`aequilibrae.project.Network.create_from_osm`
-#     * :ref:`importing_from_osm`

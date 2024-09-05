@@ -11,16 +11,17 @@ Let's consider that you have an OD-matrix, the future production and future attr
 *How would your trip distribution matrix using IPF look like?*
 The data used in this example comes from Table 5.6 in Ortúzar & Willumsen (2011).
 
+*ORTÚZAR, J.D., WILLUMSEN, L.G. (2011) Modelling Transport (4th ed.). Wiley-Blackwell.*
 """
 
 # %%
 
 # Imports
 import numpy as np
-
-from aequilibrae.distribution import Ipf
 from os.path import join
 from tempfile import gettempdir
+
+from aequilibrae.distribution import Ipf
 from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
 # sphinx_gallery_thumbnail_path = 'images/ipf.png'
 
@@ -76,9 +77,16 @@ fratar.output.matrix_view
 # %%
 for line in fratar.report:
     print(line)
-
-#%%
-# Reference
-# ~~~~~~~~~
+    
+# %%
+# .. admonition:: References
 # 
-# ORTÚZAR, J.D., WILLUMSEN, L.G. (2011) *Modelling Transport* (4th ed.). Wiley-Blackwell.
+#   * :ref:`all_about_aeq_matrices` 
+#   * :ref:`validation`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix` | :func:`aequilibrae.matrix.AequilibraeData`
+#     * :func:`aequilibrae.distribution.Ipf`

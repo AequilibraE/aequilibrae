@@ -85,3 +85,14 @@ plt.show()
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_links_layer` 
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.network.Links`

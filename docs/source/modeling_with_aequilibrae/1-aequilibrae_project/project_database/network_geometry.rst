@@ -87,6 +87,8 @@ each of the changes to see how they are treated through triggers.
    | Modifying a data entry               |                                   |
    +--------------------------------------+-----------------------------------+
 
+.. _modifications_on_nodes_layer:
+
 Node layer changes and expected behavior
 ````````````````````````````````````````
 
@@ -189,6 +191,8 @@ Modifying a data entry
 If the field being edited is the node_id field, then all the related tables need
 to be edited as well (e.g. a_b and b_node in the link layer, the node_id tagged
 to turn restrictions and to transit stops).
+
+.. _modifications_on_links_layer:
 
 Link layer changes and expected behavior
 ````````````````````````````````````````

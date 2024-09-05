@@ -79,6 +79,14 @@ Matrix
 Paths
 -----
 
+Skimming
+~~~~~~~~
+.. currentmodule:: aequilibrae.paths
+.. autosummary::
+   :toctree: generated/
+
+   NetworkSkimming
+
 Graph
 ~~~~~
 .. currentmodule:: aequilibrae.paths

@@ -17,6 +17,7 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/skims.png'
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -27,15 +28,14 @@ import logging
 import sys
 
 # %%
-
-# We the project opens, we can tell the logger to direct all messages to the terminal as well
+# When the project opens, we can tell the logger to direct all messages to the terminal as well
 logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 
-#%%
+# %%
 # Network Skimming
 # ----------------
 
@@ -46,7 +46,7 @@ import numpy as np
 # %%
 # Let's build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs.
+# We get warnings that several fields in the project are filled with ``NaN``s.
 # This is true, but we won't use those fields.
 
 # %%
@@ -59,7 +59,7 @@ project.network.graphs.keys()
 # let's say we want to minimize the distance
 graph.set_graph("distance")
 
-# And will skim distance while we are at it, other fields like `free_flow_time` or `travel_time` 
+# And will skim distance while we are at it, other fields like ``free_flow_time`` or ``travel_time`` 
 # can be added here as well
 graph.set_skimming(["distance"])
 
@@ -96,3 +96,9 @@ mat_record.save()
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.NetworkSkimming`

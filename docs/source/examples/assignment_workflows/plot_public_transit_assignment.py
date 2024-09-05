@@ -29,6 +29,7 @@ from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
 # sphinx_gallery_thumbnail_path = 'images/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
+
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
 

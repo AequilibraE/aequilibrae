@@ -20,6 +20,7 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/plot_network_image.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 

@@ -79,11 +79,12 @@ sphinx_gallery_conf = {
     "subsection_order": ExplicitOrder(
         [
             "examples/creating_models",
-            "examples/editing_networks",
+            "examples/skimming",
             "examples/trip_distribution",
-            "examples/visualization",
-            "examples/aequilibrae_without_a_model",
             "examples/assignment_workflows",
+            "examples/editing_networks",
+            "examples/aequilibrae_without_a_model",
+            "examples/visualization",
             "examples/other_applications",
         ]
     ),
@@ -184,7 +185,6 @@ autodoc_default_options = {
 }
 
 autodoc_member_order = "groupwise"
-
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True

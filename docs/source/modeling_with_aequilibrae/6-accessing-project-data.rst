@@ -1,3 +1,5 @@
+.. _accessing_project_data:
+
 Accessing Project Data
 ======================
 
@@ -37,6 +39,8 @@ The actions
 .. seealso::
 
     * :func:`aequilibrae.network.Nodes`
+
+.. _project_zoning:
 
 ``Zoning``
 ----------

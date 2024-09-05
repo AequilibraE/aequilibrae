@@ -25,6 +25,7 @@ from aequilibrae.paths import TrafficAssignment, TrafficClass
 # sphinx_gallery_thumbnail_path = 'images/logs_image.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)
@@ -102,4 +103,4 @@ with open(join(fldr, "aequilibrae.log")) as file:
 # if we had created our project from OSM, the lines on top of the log would have been
 # different to display information on the queries done to the server to obtain the data.
 #
-# Log image by https://oldschool.runescape.wiki/index.php?curid=66905#
+# Log image by `OSRS Wiki <https://oldschool.runescape.wiki/index.php?curid=66905#>`_

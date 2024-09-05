@@ -1,3 +1,5 @@
+.. _all_about_aeq_matrices:
+
 AequilibraE Matrix
 ==================
 

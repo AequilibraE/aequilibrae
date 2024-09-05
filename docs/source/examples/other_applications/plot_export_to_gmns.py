@@ -22,13 +22,14 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/plot_export_to_gmns.png'
 
 # %%
+
 # We load the example project inside a temp folder
 fldr = os.path.join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 
 # %%
-# We export the network to csv files in GMNS format, that will be saved inside the project folder
+# We export the network to CSV files in GMNS format, that will be saved inside the project folder
 output_fldr = os.path.join(gettempdir(), uuid4().hex)
 if not os.path.exists(output_fldr):
     os.mkdir(output_fldr)
@@ -96,3 +97,14 @@ map_gmns
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`aequilibrae_to_gmns` 
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.Network.export_to_gmns`

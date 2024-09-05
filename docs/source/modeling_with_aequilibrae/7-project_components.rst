@@ -1,3 +1,5 @@
+.. _project_components:
+
 Project Components
 ==================
 
@@ -18,7 +20,7 @@ Network and Zoning are the components that contain the geo-spatial information o
 as links, nodes, and zones, which can also be manipulated. In the Network component, there are also
 non-geometric classes related to the project network, such as Modes, LinkTypes, and Periods.
 
-One important thing to observe is that related to each component in Network and Zoning, there is an
+One important thing to observe is that related to each component in Matrices, Network, andd Zoning, there is an
 object with similar name that corresponds to one object in the class. Thus the ``project.network.Links``
 enables the access to manipulate the links table, and each item in the items table is a 
 ``project.network.Link``.
@@ -56,7 +58,7 @@ in the table.
 
 .. code-block:: python
 
-    project.about.list_fields()  # returns a list with all charactetistics in the 'about' table
+    project.about.list_fields()  # returns a list with all characteristics in the 'about' table
 
 The 'about' table is created automatically when a project is created, but if you're loading a project
 created with an older AequilibraE version that didn't contain it, it is possible to create one too.
@@ -68,7 +70,8 @@ created with an older AequilibraE version that didn't contain it, it is possible
 
 .. seealso::
 
-    :ref:`tables_about`
+    * :ref:`tables_about`
+        Table documentation
 
 ``project.FieldEditor``
 -----------------------
@@ -82,11 +85,9 @@ This class is directly accessed from within the corresponding module one wants t
 
 .. code-block:: python
 
-    from aequilibrae.utils.create_example import create_example
-
-    project = create_example("/path_to_my_folder", "coquimbo")
-
+    # We'll edit the fields in the 'links' table
     link_fields = project.network.links.fields
+
     # To add a new field to the 'links' table
     link_fields.add("my_new_field", "this is an example of AequilibraE's funcionalities", "TEXT")
 
@@ -109,19 +110,63 @@ All field descriptions are kept in the table 'attributes_documentation'.
 
 .. seealso::
 
-    :ref:`parameters_metadata`
+    * :ref:`parameters_metadata`
+        Table documentation
 
 ``project.Log``
 ---------------
 
+Every AequilibraE project contains a log file that holds information on all the project procedures.
+It is possible to access the log file contents, as presented in the next code block.
+
+.. code-block:: python
+
+    project_log = project.log()
+
+    project_log.contents()  # returns a list with all entires in the log file
+
+If your project's log is getting cluttered, it is possible to clear it. This option must be used wiesly
+once the deletion of data in the log file can't be undone.
+
+.. code-block:: python
+
+    project_log.clear()
+
+.. seealso::
+    
+    * :func:`aequilibrae.project.Log`
+        Class documentation
+
+    * :ref:`useful-log-tips`
+        Usage example
+    
 ``project.Matrices``
 --------------------
+
+This method ia a gateway to all the matrices available in the model, which allows us to update the
+records in the 'matrices' table.
+
+.. seealso::
+
+    * :func:`aequilibrae.project.Matrices`
+        Class documentation
+
+    * :ref:`matrix_table`
+        Table documentation
+
+Each item in ``project.Matrices`` is a ``MatrixRecord``.
 
 ``project.network.LinkTypes``
 -----------------------------
 
+Each item in ``project.network.LinkTypes`` is a ``LinkType``.
+
 ``project.network.Modes``
 -------------------------
 
+Each item in ``project.network.Modes`` is a ``Mode``.
+
 ``project.network.Periods``
 ---------------------------
+
+Each item in ``project.network.Periods`` is a ``Period``.

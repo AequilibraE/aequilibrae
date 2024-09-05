@@ -150,9 +150,14 @@ airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytr
 project.close()
 
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`tables_zones` 
+#   * :ref:`project_zoning`
+
+# %%
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.project.Zone`
-#     * :func:`aequilibrae.project.network.Node` | :func:`aequilibrae.project.network.Nodes` 
-#     * :ref:`tables_zones`
+#     * :func:`aequilibrae.project.Zoning`
+#     * :func:`aequilibrae.project.network.Nodes` 

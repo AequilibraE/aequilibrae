@@ -27,8 +27,10 @@ from aequilibrae import Project
 # sphinx_gallery_thumbnail_path = 'images/plot_from_layer.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
+
 project = Project()
 project.new(fldr)
 
@@ -52,16 +54,16 @@ lt = project.network.link_types
 lt_dict = lt.all_types()
 existing_types = [ltype.link_type for ltype in lt_dict.values()]
 
-#%%
+# %%
 # We could also get it directly from the project database
-
+# 
 # existing_types = [x[0] for x in project.conn.execute('Select link_type from link_types')]
 
-#%%
-# We add the link types that do not exist yet
-# The trickier part is to choose a unique link type ID for each link type
+# %%
+# We add the link types that do not exist yet.
+# The trickier part is to choose a unique link type ID for each link type.
 # You might want to tailor the link type for your use, but here we get letters
-# in alphabetical order
+# in alphabetical order.
 
 # %%
 types_to_add = [ltype for ltype in link_types if ltype not in existing_types]
@@ -171,6 +173,5 @@ project.close()
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.project.network.Link` | :func:`aequilibrae.project.network.Links` 
-#     * :func:`aequilibrae.project.network.Node` | :func:`aequilibrae.project.network.Nodes` 
-#     * :func:`aequilibrae.project.network.Mode` | :func:`aequilibrae.project.network.LinkType` 
+#     * :func:`aequilibrae.project.network.Links` | :func:`aequilibrae.project.network.Nodes` 
+#     * :func:`aequilibrae.project.network.Modes` | :func:`aequilibrae.project.network.LinkTypes` 

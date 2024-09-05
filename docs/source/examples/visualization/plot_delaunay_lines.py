@@ -26,6 +26,7 @@ from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.create_delaunay_network import DelaunayAnalysis
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 

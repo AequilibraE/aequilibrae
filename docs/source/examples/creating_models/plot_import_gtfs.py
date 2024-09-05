@@ -27,6 +27,7 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
 
 # %%
+
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
@@ -106,10 +107,8 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
-# %% [markdown]
-# Let's create the map!
-
 # %%
+# Let's create the map!
 map_osm = folium.Map(location=[-29.93, -71.29], zoom_start=13)
 
 # add all layers

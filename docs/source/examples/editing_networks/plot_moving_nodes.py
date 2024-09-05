@@ -19,15 +19,15 @@ from shapely.geometry import Point
 import matplotlib.pyplot as plt
 
 # %%
+
 # We create the example project inside our temp folder.
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 
-#%%
+# %%
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom.
 
-# %%
 # We also add the node we want to move.
 all_nodes = project.network.nodes
 links = project.network.links
@@ -56,9 +56,20 @@ plt.plot(*node.geometry.xy, "o", color="black")
 
 plt.show()
 
-#%%
+# %%
 # Did you notice the links are matching the node?
 # Look at the original network and see how it used to look like.
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_nodes_layer` 
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.network.Nodes`

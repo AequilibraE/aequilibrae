@@ -28,7 +28,7 @@ project = create_example(fldr)
 all_nodes = project.network.nodes
 links = project.network.links
 
-#%%
+# %%
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom
 
 # %%
@@ -47,7 +47,7 @@ link.geometry = LineString([new_extremity, node2.geometry])
 links.save()
 links.refresh()
 
-#%%
+# %%
 # Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously.
 
 # %%
@@ -75,3 +75,14 @@ plt.show()
 
 # %%
 project.close()
+
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_links_layer` 
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.project.network.Links`

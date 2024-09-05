@@ -33,12 +33,14 @@ logger = project.logger
 from aequilibrae.paths import TrafficAssignment, TrafficClass
 
 # %%
+
 # We build all graphs
 project.network.build_graphs()
 # We get warnings that several fields in the project are filled with NaNs. 
 # This is true, but we won't use those fields
 
 # %%
+
 # We grab the graph for cars
 graph = project.network.graphs["c"]
 
@@ -91,10 +93,8 @@ assig.rgap_target = 0.001
 assig.execute()  # we then execute the assignment
 
 # %%
-# Convergence report is easy to see
-import pandas as pd
 
-# %%
+# Convergence report is easy to see
 convergence_report = assig.report()
 print(convergence_report.head())
 
@@ -370,9 +370,10 @@ assig.save_results("future_year_assignment")
 # And save the skims
 assig.save_skims("future_year_assignment_skims", which_ones="all", format="omx")
 
-#%%
+# %%
 # We can also plot convergence
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 import matplotlib.pyplot as plt
 
 # %%

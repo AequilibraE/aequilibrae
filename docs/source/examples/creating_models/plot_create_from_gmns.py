@@ -127,8 +127,12 @@ map_gmns
 project.close()
 
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`importing_from_gmns_file` 
+
+# %%
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
 #     * :func:`aequilibrae.project.Network.create_from_gmns`
-#     * :ref:`importing_from_gmns_file`

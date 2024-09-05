@@ -15,6 +15,7 @@ from os.path import join
 from aequilibrae.utils.create_example import create_example
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -32,17 +33,15 @@ formatter = logging.Formatter("%(asctime)s;%(levelname)s ; %(message)s")
 stdout_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 
-#%%
+# %%
 # Path Computation
 # ----------------
-
-# %%
 from aequilibrae.paths import PathResults
 
 # %%
 # We build all graphs
 project.network.build_graphs()
-# We get warnings that several fields in the project are filled with NaNs. 
+# We get warnings that several fields in the project are filled with ``NaN``s. 
 # This is true, but we won't use those fields.
 
 # %%
@@ -145,3 +144,9 @@ plt.show()
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.PathResults`

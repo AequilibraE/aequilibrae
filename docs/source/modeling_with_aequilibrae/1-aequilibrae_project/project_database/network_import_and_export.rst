@@ -134,6 +134,8 @@ specification.
 
     :func:`aequilibrae.project.Network.create_from_gmns`
 
+.. _aequilibrae_to_gmns:
+
 Exporting AequilibraE model to GMNS format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

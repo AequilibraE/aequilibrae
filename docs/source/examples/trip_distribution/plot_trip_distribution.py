@@ -18,13 +18,14 @@ import pandas as pd
 import numpy as np
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 
 # %%
-# We get the demand matrix directly from the project record
+# We get the demand matrix directly from the project record,
 # so let's inspect what we have in the project
 proj_matrices = project.matrices
 print(proj_matrices.list())
@@ -89,14 +90,13 @@ for function in ["power", "expo"]:
 plt = plot_tlfd(demand.matrix_view, impedance.matrix_view, join(fldr, "demand_tfld.png"))
 plt.show()
 
-#%%
+# %%
 # Forecast
 # --------
 # We create a set of *'future'* vectors by applying some models
 # and apply the model for both deterrence functions
 
 # %%
-
 from aequilibrae.distribution import Ipf, GravityApplication, SyntheticGravityModel
 from aequilibrae.matrix import AequilibraeData
 import numpy as np
@@ -176,3 +176,11 @@ print(proj_matrices.list())
 
 # %%
 project.close()
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.distribution.Ipf` | :func:`aequilibrae.distribution.GravityCalibration`
+#     * :func:`aequilibrae.distribution.GravityApplication` | :func:`aequilibrae.distribution.SyntheticGravityModel`
+#     * :func:`aequilibrae.matrix.AequilibraeData`
