@@ -20,7 +20,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 class Zoning(BasicTable):
     """
-    Access to the API resources to manipulate the zones table in the project
+    Access to the API resources to manipulate the 'zones' table in the project
 
     .. code-block:: python
 

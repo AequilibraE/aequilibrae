@@ -52,6 +52,7 @@ network editing done in SQLite, Python or QGIS will go through the SpatiaLite tr
 while any procedure such as traffic assignment done in QGIS is nothing more than an
 API call to the corresponding Python method.
 
+.. _aeq_project_structure:
 
 Project structure
 -----------------

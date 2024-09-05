@@ -1,3 +1,4 @@
+.. _aeq_project_database_tables:
 
 Project database
 ----------------

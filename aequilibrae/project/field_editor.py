@@ -63,7 +63,7 @@ class FieldEditor:
 
             **description** (:obj:`str`): Description of the field to be inserted in the metadata
 
-            **data_type** (:obj:`str`, *Optional*): Valid SQLite Data type. Default: "NUMERIC"
+            **data_type** (:obj:`str`, *Optional*): Valid SQLite Data type. Default: ``'NUMERIC'``
         """
         if field_name.lower() in self._original_values.keys():
             raise ValueError("attribute_name already exists")
