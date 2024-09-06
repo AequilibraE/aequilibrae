@@ -21,9 +21,9 @@ as links, nodes, and zones, which can also be manipulated. In the Network compon
 non-geometric classes related to the project network, such as Modes, LinkTypes, and Periods.
 
 One important thing to observe is that related to each component in Matrices, Network, andd Zoning, there is an
-object with similar name that corresponds to one object in the class. Thus the ``project.network.Links``
-enables the access to manipulate the links table, and each item in the items table is a 
-``project.network.Link``.
+object with similar name that corresponds to one object in the class. Thus ``project.network.links``
+enables the access to manipulate the 'links' table, and each item in the items table is a 
+``Link`` object.
 
 .. image:: ../images/project_components_and_items.png
    :align: center
@@ -31,7 +31,7 @@ enables the access to manipulate the links table, and each item in the items tab
 
 In this section, we'll briefly discuss about the project components without geo-spatial information.
 
-``project.About``
+``project.about``
 -----------------
 
 This class provides an interface for editing the 'about' table of a project. We can add new fields or
@@ -53,20 +53,14 @@ this information, otherwise it will be lost.
     # And save our modifications
     project.about.write_back()
 
-To check if ``my_new_field`` was added to the 'about' table, we can check all the characteristics stored
-in the table.
-
-.. code-block:: python
-
+    # To check if ``my_new_field`` was added to the 'about' table, we can check the characteristics 
+    # stored in the table.
     project.about.list_fields()  # returns a list with all characteristics in the 'about' table
 
-The 'about' table is created automatically when a project is created, but if you're loading a project
-created with an older AequilibraE version that didn't contain it, it is possible to create one too.
-
-.. code-block:: python
-
+    # The 'about' table is created automatically when a project is created, but if you're 
+    # loading a project created with an older AequilibraE version that didn't contain it, 
+    # it is possible to create one too.
     project.about.create()
-    # All AequilibraE's example already have an 'about' table, so you don't have to create it
 
 .. seealso::
 
@@ -100,10 +94,7 @@ This class is directly accessed from within the corresponding module one wants t
     # Or just to access the description of a field
     link_fields.a_node
 
-One can also check all the fields in the links table.
-
-.. code-block:: python
-
+    # One can also check all the fields in the links table.
     link_fields.all_fields()
 
 All field descriptions are kept in the table 'attributes_documentation'.
@@ -113,7 +104,7 @@ All field descriptions are kept in the table 'attributes_documentation'.
     * :ref:`parameters_metadata`
         Table documentation
 
-``project.Log``
+``project.log``
 ---------------
 
 Every AequilibraE project contains a log file that holds information on all the project procedures.
@@ -125,11 +116,8 @@ It is possible to access the log file contents, as presented in the next code bl
 
     project_log.contents()  # returns a list with all entires in the log file
 
-If your project's log is getting cluttered, it is possible to clear it. This option must be used wiesly
-once the deletion of data in the log file can't be undone.
-
-.. code-block:: python
-
+    # If your project's log is getting cluttered, it is possible to clear it. 
+    # This option must be used wiesly once the deletion of data in the log file can't be undone.
     project_log.clear()
 
 .. seealso::
@@ -144,9 +132,9 @@ once the deletion of data in the log file can't be undone.
 --------------------
 
 This method ia a gateway to all the matrices available in the model, which allows us to update the
-records in the 'matrices' table.
+records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord``.
 
-.. code-block::
+.. code-block:: python
 
     from aequilibrae.utils.create_example import create_example
 
@@ -155,17 +143,8 @@ records in the 'matrices' table.
 
     matrices = project.matrices
 
-One can also check all the project matrices.
-
-.. code-block:: python
-
-    matrices.list()  # returns a DataFrame of all available matrices
-
-Each item in ``project.Matrices`` is a ``MatrixRecord`` for which we can carry out some procedures.
-
-.. code-block:: python
-
-    pass
+    # One can also check all the project matrices as a Pandas' DataFrame
+    matrices.list()
 
 .. seealso::
 
@@ -175,12 +154,11 @@ Each item in ``project.Matrices`` is a ``MatrixRecord`` for which we can carry o
     * :ref:`matrix_table`
         Table documentation
 
-``project.network.LinkTypes``
------------------------------
+``project.network.link_types``
+------------------------------
 
 This method allows you to access the API resources to manipulate the 'link_types' table.
-
-Each item in ``project.network.LinkTypes`` is a ``LinkType``.
+Each item in the 'link_types' table is a ``LinkType`` object.
 
 .. code-block:: python
 
@@ -197,7 +175,7 @@ Each item in ``project.network.LinkTypes`` is a ``LinkType``.
     new_link_type.speed = 35
     new_link_type.link_type = "Arterial"
 
-    # To save the modifications for ```new_link_type```
+    # To save the modifications for ``new_link_type``
     new_link_type.save()
 
     # To create a new field in the 'link_types' table, you can call the function ``fields``
@@ -214,30 +192,90 @@ Each item in ``project.network.LinkTypes`` is a ``LinkType``.
     link_types.all_types()  # returns a dictionary with all LinkType objects in the model.
                             # The dictionary's keys are the ``link_type_id``'s
 
-    # There are two ways to get a LinkType from the network:
-    link_types.get("p")  # using the ``link_type_id``
-    # or
-    link_types.get_by_name("primary")  # using the ``link_type``
+    # There are two ways to get a LinkType from the 'link_types' table
+    # using the ``link_type_id``
+    link_types.get("p")
+    # or using the ``link_type``
+    link_types.get_by_name("primary")
 
 
 ``project.network.modes``
 -------------------------
 
 This method allows you to access the API resources to manipulate the 'modes' table.
-
-Each item in ``project.network.modes`` is a ``Mode``.
+Each item in 'modes' table is a ``Mode`` object.
 
 .. code-block:: python
 
-    pass
+    from aequilibrae.utils.create_example import create_example
 
-``project.network.Periods``
+    project = create_example("/path_to_my_folder", "coquimbo")
+
+    modes = project.network.modes
+
+    # We create a new mode
+    new_mode = modes.new("k")
+    new_mode.mode_name = "flying_car"
+
+    # And add it to the modes table
+    modes.add(new_mode)
+
+    # When we add a new mode to the 'modes' table, it is automatically saved in the table
+    # But we can continue editing the modes, and save them as we modify them
+    new_mode.description = "Like the one in the Jetsons"
+    new_mode.save()
+
+    # You can also remove a Mode from a project using its ``mode_id``
+    modes.delete("w")
+
+    # To check all ``LinkTypes`` in the project
+    modes.all_modes()  # returns a dictionary with all Mode objects in the model.
+                       # The dictionary's keys are the ``mode_id``'s
+
+    # There are two ways to get a Mode from the 'modes' table
+    # using the ``mode_id``
+    modes.get("c")
+    # or using the ``mode_name``
+    modes.get_by_name("car")
+
+``project.network.periods``
 ---------------------------
 
 This method allows you to access the API resources to manipulate the 'periods' table.
-
-Each item in ``project.network.Periods`` is a ``Period``.
+Each item in the 'periods' table is a ``Period`` object.
 
 .. code-block:: python
 
-    pass
+    from aequilibrae.utils.create_example import create_example
+
+    project = create_example("/path_to_my_folder", "coquimbo")
+
+    periods = project.network.periods
+
+    # Let's add a new field to our 'periods' table
+    periods.fields.add("my_field", "This is an example", "TEXT")
+
+    # To save this modification, we must refresh the table
+    periods.refresh_fields()
+
+    # To add a new period
+    new_period = periods.new_period(2, 21600, 43200, "6AM to noon")
+
+    # It is also possible to renumber a period
+    new_period.renumber(9)
+    # And check the existing data fields for each period
+    new_period.data_fields()
+
+    # Saving can be done after finishing all modifications in the table but for the sake
+    # of this example, we'll save the addition of a new period to our table right away
+    periods.save()
+
+    # To see all periods data as a Pandas' DataFrame
+    periods.data
+
+    # Let's get our default period and change its description
+    select_period = periods.get(1)
+    select_period.period_description = "We changed the period description"
+
+    # And we save this period modification
+    select_period.save()
