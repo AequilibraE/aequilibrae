@@ -146,6 +146,27 @@ once the deletion of data in the log file can't be undone.
 This method ia a gateway to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table.
 
+.. code-block::
+
+    from aequilibrae.utils.create_example import create_example
+
+    # Sioux Falls is a better example for this component
+    project = create_example("/path_to_my_folder")
+
+    matrices = project.matrices
+
+One can also check all the project matrices.
+
+.. code-block:: python
+
+    matrices.list()  # returns a DataFrame of all available matrices
+
+Each item in ``project.Matrices`` is a ``MatrixRecord`` for which we can carry out some procedures.
+
+.. code-block:: python
+
+    pass
+
 .. seealso::
 
     * :func:`aequilibrae.project.Matrices`
@@ -154,19 +175,69 @@ records in the 'matrices' table.
     * :ref:`matrix_table`
         Table documentation
 
-Each item in ``project.Matrices`` is a ``MatrixRecord``.
-
 ``project.network.LinkTypes``
 -----------------------------
 
+This method allows you to access the API resources to manipulate the 'link_types' table.
+
 Each item in ``project.network.LinkTypes`` is a ``LinkType``.
 
-``project.network.Modes``
+.. code-block:: python
+
+    from aequilibrae.utils.create_example import create_example
+
+    project = create_example("/path_to_my_folder", "coquimbo")
+
+    link_types = project.network.link_types
+
+    new_link_type = link_types.new("A")  # Create a new LinkType with ID 'A'
+
+    # We can add information to the LinkType we just created
+    new_link_type.description = "This is a description"
+    new_link_type.speed = 35
+    new_link_type.link_type = "Arterial"
+
+    # To save the modifications for ```new_link_type```
+    new_link_type.save()
+
+    # To create a new field in the 'link_types' table, you can call the function ``fields``
+    # to return a FieldEditor instance, which can be edited
+    link_types.fields()
+
+    # You can also remove a LinkType from a project using its ``link_type_id``
+    link_types.delete("A")
+
+    # And don't forget to save the modifications you did in the 'link_types' table
+    link_types.save()
+
+    # To check all ``LinkTypes`` in the project
+    link_types.all_types()  # returns a dictionary with all LinkType objects in the model.
+                            # The dictionary's keys are the ``link_type_id``'s
+
+    # There are two ways to get a LinkType from the network:
+    link_types.get("p")  # using the ``link_type_id``
+    # or
+    link_types.get_by_name("primary")  # using the ``link_type``
+
+
+``project.network.modes``
 -------------------------
 
-Each item in ``project.network.Modes`` is a ``Mode``.
+This method allows you to access the API resources to manipulate the 'modes' table.
+
+Each item in ``project.network.modes`` is a ``Mode``.
+
+.. code-block:: python
+
+    pass
 
 ``project.network.Periods``
 ---------------------------
 
+This method allows you to access the API resources to manipulate the 'periods' table.
+
 Each item in ``project.network.Periods`` is a ``Period``.
+
+.. code-block:: python
+
+    pass
