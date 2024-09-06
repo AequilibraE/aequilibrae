@@ -5,7 +5,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Mode:
-    """A mode object represents a single record in the *modes* table"""
+    """A mode object represents a single record in the 'modes' table"""
 
     __alowed_characters = string.ascii_letters + "_"
 

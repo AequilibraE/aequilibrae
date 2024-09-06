@@ -2,6 +2,8 @@
 _build
 _static
 _templates
+docs/source/_auto_examples
+docs/source/api/generated
 
 # User-specific stuff:
 .idea/**/workspace.xml

@@ -7,23 +7,19 @@ An AequilibraE project helds geometric information that can be accessed by the u
 three different classes: ``Links``, ``Nodes``, and ``Zoning``. In this section, we'll
 cover the main points regarding them.
 
-``Links``
----------
+``project.network.links``
+-------------------------
 
-The ``Links`` class allows the access to the links table in the project network, if one
-wants to manipulate it.
+This method allows you to access the API resources to manipulate the 'links' table.
+Each item in the 'links' table is a ``Link`` object.
 
 .. code-block:: python
 
-    from tempfile import gettempdir
     from aequilibrae.utils.create_example import create_example
 
-    # Let's use Coquimbo as example
-    project = create_example(gettempdir(), "coquimbo")
+    project = create_example("/path_to_my_folder", "coquimbo")
 
-    links = project.network.links  # access the links table
-
-The actions 
+    links = project.network.links
 
 .. seealso::
     
@@ -33,8 +29,21 @@ The actions
     * :ref:`project_from_link_layer`
         Usage example
 
-``Nodes``
----------
+``project.network.nodes``
+-------------------------
+
+This method allows you to access the API resources to manipulate the 'nodes' table.
+Each item in the 'nodes' table is a ``Node`` object.
+
+.. code-block:: python
+
+    from aequilibrae.utils.create_example import create_example
+
+    project = create_example("/path_to_my_folder", "coquimbo")
+
+    project_nodes = project.network.nodes
+
+    # To add special generators, we can add a `new_centroid`
 
 .. seealso::
 
@@ -42,8 +51,19 @@ The actions
 
 .. _project_zoning:
 
-``Zoning``
-----------
+``project.zoning``
+------------------
+
+This method allows you to access the API resources to manipulate the 'zones' table.
+Each item in the 'zones' table is a ``Zone`` object.
+
+.. code-block:: python
+
+    from aequilibrae.utils.create_example import create_example
+
+    project = create_example("/path_to_my_folder", "coquimbo")
+
+    zones = project.zoning
 
 .. seealso::
 
