@@ -19,7 +19,7 @@ class DataLoader:
             fields = [f'"{x}"' for x in fields]
             keys = ",".join(fields)
             if geo_field is not None:
-                keys += 'Hex(ST_AsBinary("geometry")) as geometry'
+                keys += ', Hex(ST_AsBinary("geometry")) as geometry'
 
             sql = f"select {keys} from '{self.table_name}'"
             if geo_field is None:
