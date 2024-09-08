@@ -17,7 +17,7 @@ class DataLoader:
         with commit_and_close(connect_spatialite(self.__pth_file)) as conn:
             fields, _, geo_field = self.__find_table_fields()
             fields = [f'"{x}"' for x in fields]
-            keys = ','.join(fields)
+            keys = ",".join(fields)
             if geo_field is not None:
                 keys += 'Hex(ST_AsBinary("geometry")) as geometry'
 
