@@ -136,20 +136,6 @@ class Project:
         finally:
             self.deactivate()
 
-    def load(self, project_path: str) -> None:
-        """
-        Loads project from disk
-
-        .. deprecated:: 0.7.0
-            Use :func:`open` instead.
-
-        :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
-            not exist, it will fail.
-        """
-        warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
-        self.open(project_path)
-
     def connect(self):
         return database_connection("network", self.project_base_path)
 
