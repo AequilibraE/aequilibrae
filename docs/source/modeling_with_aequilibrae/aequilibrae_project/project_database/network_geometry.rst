@@ -261,7 +261,7 @@ Link distance
 +++++++++++++
 
 Link distance cannot be changed by the user, as it is automatically recalculated
-using the Spatialite function *GeodesicLength*, which always returns distances
+using the SpatiaLite function ``GeodesicLength``, which always returns distances
 in meters.
 
 Link direction

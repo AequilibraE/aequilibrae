@@ -15,14 +15,10 @@ In this section you can find a deep dive into modeling with AequilibraE, from
 a start guide to a complete view into AequilibraE's data structure.
 
 .. toctree::
-    :numbered: 3
     :maxdepth: 1
     :caption: A guide to AequilibraE
 
-    1-aequilibrae_project/index
-    2-static_traffic_assignment/index
-    3-transit_assignment/index
-    4-route_choice/index
-    5-aequilibrae_matrix
-    6-project_components
-    6-accessing-project-data
+    aequilibrae_project/index
+    static_traffic_assignment/index
+    transit_assignment/index
+    route_choice/index

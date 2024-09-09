@@ -111,14 +111,14 @@ AequilibraE matrices saved in disk can be reused and loaded once again.
     :ref:`plot_assignment_without_model`
         Usage example 
 
-Open Matrix (OMX)
------------------
+OpenMatrix (OMX)
+----------------
 
 AequilibraE can handle OMX files, but if you're wondering what is OMX and what does
 it stand for, this section is for you. The text in this section is borrowed from 
-`Open Matrix Wiki page <https://github.com/osPlanning/omx/wiki>`_.
+`OpenMatrix Wiki page <https://github.com/osPlanning/omx/wiki>`_.
 
-The Open Matrix file format (or simply OMX) is a standard matrix format for storing and
+The OpenMatrix file format (or simply OMX) is a standard matrix format for storing and
 transferring matrix data across different models and software packages, intended to make
 the model development easier. It is a file capable of storing more than one matrices
 at a time, including multiple indexes/lookups, and attributes (key/value pairs) for matrices and

@@ -16,13 +16,13 @@ AequilibraE is built on the shoulder of much older and more established
 projects, such as `SQLite <https://sqlite.org/index.html>`_,
 `SpatiaLite <http://www.gaia-gis.it/gaia-sins/>`_ and `NumPy
 <https://numpy.org/>`_, as well as reasonably new industry standards such as the
-`Open-Matrix format <https://github.com/osPlanning/omx>`_.
+`OpenMatrix format <https://github.com/osPlanning/omx>`_.
 
 Impressive performance, portability, self containment and open-source character
 of these pieces of software, along with their large user base and wide
 industry support make them solid options to be AequilibraE's data backend.
 
-Since working with Spatialite is not just a matter of a ``pip install``,
+Since working with SpatiaLite is not just a matter of a ``pip install``,
 please refer to :ref:`dependencies`. For QGIS users this is not a concern, while
 for Windows users this dependency is automatically handled under the hood, but
 the details are also discussed in the aforementioned dependencies section.
@@ -30,7 +30,7 @@ the details are also discussed in the aforementioned dependencies section.
 Package components: A conceptual view
 -------------------------------------
 
-As all the components of an AequilibraE model based on open-source software and
+As all the components of an AequilibraE model are based on open-source software and
 open-data standards, modeling with AequilibraE is a little different from
 modeling with commercial packages, as the user can read and manipulate model
 components outside the software modeling environments (Python and QGIS).
@@ -62,7 +62,8 @@ series of files and sub folders exist, and the current project organization
 is as follows:
 
 .. image:: ../../images/project_structure.png
-    :width: 600
+    :scale: 25 %
+    :align: center
     :alt: AequilibraE project structure
 
 |
@@ -75,10 +76,10 @@ folders and databases.
 The second key component of any model is the **parameters.yaml** file, which
 holds the default values for a number of procedures (e.g. assignment
 convergence), as well as the specification for networks imported from
-Open-Street Maps and other general *import-export* parameters.
+OpenStreetMap and other general *import-export* parameters.
 
-The third and last required component of an AequilibraE model is the Matrices
-folder, where all the matrices in binary format (in AequilibraE's native AEM or
+The third and last required component of an AequilibraE model is the **Matrices
+folder**, where all the matrices in binary format (in AequilibraE's native AEM or
 OMX formats) should be placed. This folder can be empty, however, as no
 particular matrix is required to exist in an AequilibraE model.
 
@@ -103,7 +104,7 @@ The following sections presents the structure and contents for all databases in 
 
 .. toctree::
     :maxdepth: 1
-    :caption: Dive deep into project structure! 
+    :caption: Or dive deep into project structure! 
 
     project_database/index
     parameter_file

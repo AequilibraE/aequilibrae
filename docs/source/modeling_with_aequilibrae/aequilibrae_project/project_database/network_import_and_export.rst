@@ -25,7 +25,7 @@ Python limitations
 ``````````````````
 
 As it happens in other cases, Python's usual implementation of SQLite is
-incomplete, and does not include R-Tree, a key extension used by Spatialite for
+incomplete, and does not include R-Tree, a key extension used by SpatiaLite for
 GIS operations.
 
 For this reason, AequilibraE's default option when importing a network from OSM
@@ -69,13 +69,13 @@ with the option for creating such indices.
 If you want to learn a little more about this topic, you can access this
 `blog post <https://pythongisandstuff.wordpress.com/2015/11/11/python-and-spatialite-32-bit-on-64-bit-windows/>`_
 or check out the SQLite page on `R-Tree <https://www.sqlite.org/rtree.html>`_.
-If you want to take a stab at solving your SQLite/Spatialite problem
+If you want to take a stab at solving your SQLite/SpatiaLite problem
 permanently, take a look at this
 `other blog post <https://www.xl-optim.com/spatialite-and-python-in-2020/>`_.
 
 Please also note that the network consistency triggers will NOT work before
 spatial indices have been created and/or if the editing is being done on a
-platform that does not support both R-Tree and Spatialite.
+platform that does not support both R-Tree and SpatiaLite.
 
 .. seealso::
 

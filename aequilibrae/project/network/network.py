@@ -121,7 +121,7 @@ class Network:
         clean=True,
     ) -> None:
         """
-        Downloads the network from Open-Street Maps
+        Downloads the network from OpenStreetMap (OSM)
 
         :Arguments:
             **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,

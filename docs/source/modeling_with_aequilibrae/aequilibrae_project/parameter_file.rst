@@ -73,7 +73,7 @@ to the use of **integer**, **numeric** and **varchar**.
 
 For the case of all non-mandatory fields, two more parameters are possible: 'osm_source' and
 'osm_behaviour'. Those two fields provide the necessary information for importing data from
-`Open Street Maps <https://www.openstreetmap.org/>`_ in case such resource is required, and
+`OpenStreetMap <https://www.openstreetmap.org/>`_ in case such resource is required, and
 they work in the following way:
 
 'osm_source': The name of the tag for which data needs to be retrieved. Common tags are
@@ -108,13 +108,13 @@ that it does not make sense to have fields for one or two directions and that it
 yet to import any tagged values from OSM at the moment, and therefore the parameter *osm_source*
 would have no effect here.
 
-Open Street Maps
-~~~~~~~~~~~~~~~~
+OpenStreetMap
+~~~~~~~~~~~~~
 
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
-`Open-Street Maps <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
+`OpenStreetMap Wiki <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
 not changing the standard parameters unless you are exactly sure of what you are doing.
 
 For each mode to be imported there is also a mode filter to control for non-default
