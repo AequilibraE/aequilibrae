@@ -126,4 +126,5 @@ project.close()
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.transit.Transit` | :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`
+#     * :func:`aequilibrae.transit.Transit`
+#     * :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`

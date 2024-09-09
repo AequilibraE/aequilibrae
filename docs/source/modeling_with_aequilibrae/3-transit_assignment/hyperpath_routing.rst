@@ -466,9 +466,6 @@ apparent as we further increase :math:`\alpha`:
    
    :func:`aequilibrae.paths.HyperpathGenerating`
 
-References
-----------
-
 .. [1] Spiess, H., Florian, M. (1989) "Optimal strategies: A new assignment model for transit networks". 
        Transportation Research Part B: Methodological, 23(2), 83-102. 
        Available in: https://doi.org/10.1016/0191-2615(89)90034-9

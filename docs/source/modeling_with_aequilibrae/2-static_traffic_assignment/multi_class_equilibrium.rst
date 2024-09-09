@@ -184,9 +184,6 @@ The use of the AequilibraE project and its built-in methods to build graphs
 ensure that all graphs will be built in a consistent manner and multi-class
 assignment is possible.
 
-References
-----------
-
 .. [1] Wardrop J. G. (1952) "Some theoretical aspects of road traffic research."
        Proceedings of the Institution of Civil Engineers 1952, 1(3):325-362. 
        Available in: https://www.icevirtuallibrary.com/doi/abs/10.1680/ipeds.1952.11259

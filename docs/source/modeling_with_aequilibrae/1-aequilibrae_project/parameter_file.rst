@@ -16,6 +16,7 @@ of iterations and target Relative Gap.
 
 .. image:: ../../images/parameters_assignment_example.png
     :align: center
+    :scale: 80 %
     :alt: Assignment example
 
 Although these parameters are required to exist in the parameters file, one can
@@ -33,6 +34,7 @@ synthetic gravity models, as shown below.
 
 .. image:: ../../images/parameters_distribution_example.png
     :align: center
+    :scale: 80 %
     :alt: Distribution example
 
 .. _parameters_network:
@@ -65,8 +67,8 @@ The data types available are those that exist within the
 to the use of **integer**, **numeric** and **varchar**.
 
 .. image:: ../../images/parameters_links_example.png
-    :width: 704
     :align: center
+    :scale: 80 %
     :alt: Link example
 
 For the case of all non-mandatory fields, two more parameters are possible: 'osm_source' and
@@ -91,6 +93,7 @@ the allowed values for this parameter are **copy** and **divide**, as shown belo
 
 .. image:: ../../images/parameters_links_osm_behaviour.png
     :align: center
+    :scale: 80 %
     :alt: OSM behaviour examples
 
 The example below also shows that it is possible to mix fields that will be imported from
@@ -153,6 +156,7 @@ below.
 
 .. image:: ../../images/parameters_system_example.png
     :align: center
+    :scale: 80 %
     :alt: System example
 
 The number of CPUs have a special behaviour defined, as follows:
@@ -178,6 +182,7 @@ recommended to deploy a local Overpass server.
 
 .. image:: ../../images/parameters_osm_example.png
     :align: center
+    :scale: 80 %
     :alt: OSM example
 
 The user is also welcome to change the maximum area for a single query to the

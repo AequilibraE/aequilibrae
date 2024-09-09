@@ -88,5 +88,6 @@ for line in fratar.report:
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix` | :func:`aequilibrae.matrix.AequilibraeData`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.matrix.AequilibraeData`
 #     * :func:`aequilibrae.distribution.Ipf`

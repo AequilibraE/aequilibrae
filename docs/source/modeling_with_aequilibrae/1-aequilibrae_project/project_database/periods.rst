@@ -1,11 +1,9 @@
 Periods table
 =============
 
-Lorem ipsum
-
 .. seealso::
 
-    Lorem ipsum
+    * :func:`aequilibrae.project.network.Periods`
 
 .. include:: data_model/periods.rst
 

@@ -181,6 +181,8 @@ project.close()
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.distribution.Ipf` | :func:`aequilibrae.distribution.GravityCalibration`
-#     * :func:`aequilibrae.distribution.GravityApplication` | :func:`aequilibrae.distribution.SyntheticGravityModel`
+#     * :func:`aequilibrae.distribution.Ipf`
+#     * :func:`aequilibrae.distribution.GravityCalibration`
+#     * :func:`aequilibrae.distribution.GravityApplication`
+#     * :func:`aequilibrae.distribution.SyntheticGravityModel`
 #     * :func:`aequilibrae.matrix.AequilibraeData`

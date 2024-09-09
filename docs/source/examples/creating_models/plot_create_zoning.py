@@ -153,7 +153,7 @@ project.close()
 # .. admonition:: References
 # 
 #   * :ref:`tables_zones` 
-#   * :ref:`project_zoning`
+#   * :ref:`Accessing project zones <project_zoning>`
 
 # %%
 # .. seealso::
