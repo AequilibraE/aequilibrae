@@ -1,3 +1,5 @@
+.. _tables_period:
+
 Periods table
 =============
 

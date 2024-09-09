@@ -3,7 +3,7 @@
 Project Components
 ==================
 
-In the :ref:`aeq_project_structure` section, we presented the main file components and folders that
+In the :ref:`aeq_project_structure` section, we present the main file components and folders that
 consists an AequilibraE project. We also present in :ref:`aeq_project_database_tables` all tables
 that are part of the project database, how do they look like, and what fields do they have.
 
@@ -62,10 +62,15 @@ this information, otherwise it will be lost.
     # it is possible to create one too.
     project.about.create()
 
-.. seealso::
+.. admonition:: References
 
     * :ref:`tables_about`
         Table documentation
+
+.. seealso::
+
+    * :func:`aequilibrae.procedure.About`
+        Class documentation
 
 ``project.FieldEditor``
 -----------------------
@@ -99,10 +104,15 @@ This class is directly accessed from within the corresponding module one wants t
 
 All field descriptions are kept in the table 'attributes_documentation'.
 
-.. seealso::
+.. admonition:: References
 
     * :ref:`parameters_metadata`
         Table documentation
+
+.. seealso::
+
+    *  :func:`aequilibrae.project.FieldEditor`
+        Class documentation
 
 ``project.log``
 ---------------
@@ -120,13 +130,15 @@ It is possible to access the log file contents, as presented in the next code bl
     # This option must be used wiesly once the deletion of data in the log file can't be undone.
     project_log.clear()
 
+.. admonition:: References
+
+    * :ref:`useful-log-tips`
+        Usage example
+
 .. seealso::
     
     * :func:`aequilibrae.project.Log`
         Class documentation
-
-    * :ref:`useful-log-tips`
-        Usage example
     
 ``project.matrices``
 --------------------
@@ -171,13 +183,15 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # get an AequilibraE matrix.
     matrices.get_matrix("demand_aem")
 
+.. admonition:: References
+
+    * :ref:`matrix_table`
+        Table documentation
+
 .. seealso::
 
     * :func:`aequilibrae.project.Matrices`
         Class documentation
-
-    * :ref:`matrix_table`
-        Table documentation
 
 ``project.network.link_types``
 ------------------------------
@@ -200,29 +214,38 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     new_link_type.speed = 35
     new_link_type.link_type = "Arterial"
 
-    # To save the modifications for ``new_link_type``
+    # To save the modifications for `new_link_type`
     new_link_type.save()
 
-    # To create a new field in the 'link_types' table, you can call the function ``fields``
+    # To create a new field in the 'link_types' table, you can call the function `fields`
     # to return a FieldEditor instance, which can be edited
     link_types.fields()
 
-    # You can also remove a LinkType from a project using its ``link_type_id``
+    # You can also remove a LinkType from a project using its `link_type_id`
     link_types.delete("A")
 
     # And don't forget to save the modifications you did in the 'link_types' table
     link_types.save()
 
-    # To check all ``LinkTypes`` in the project
+    # To check all `LinkTypes` in the project
     link_types.all_types()  # returns a dictionary with all LinkType objects in the model.
-                            # The dictionary's keys are the ``link_type_id``'s
+                            # The dictionary's keys are the `link_type_id`'s
 
     # There are two ways to get a LinkType from the 'link_types' table
-    # using the ``link_type_id``
+    # using the `link_type_id`
     link_types.get("p")
-    # or using the ``link_type``
+    # or using the `link_type`
     link_types.get_by_name("primary")
 
+.. admonition:: References
+
+    * :ref:`tables_link_types`
+        Table documentation
+
+.. seealso::
+
+    * :func:`aequilibrae.project.LinkTypes`
+        Class documentation
 
 ``project.network.modes``
 -------------------------
@@ -262,6 +285,16 @@ Each item in 'modes' table is a ``Mode`` object.
     modes.get("c")
     # or using the ``mode_name``
     modes.get_by_name("car")
+
+.. admonition:: References
+
+    * :ref:`tables_modes`
+        Table documentation
+
+.. seealso::
+
+    * :func:`aequilibrae.project.Modes`
+        Class documentation
 
 ``project.network.periods``
 ---------------------------
@@ -304,3 +337,13 @@ Each item in the 'periods' table is a ``Period`` object.
 
     # And we save this period modification
     select_period.save()
+
+.. admonition:: References
+
+    * :ref:`tables_period`
+        Table documentation
+
+.. seealso::
+
+    * :func:`aequilibrae.project.Periods`
+        Class documentation

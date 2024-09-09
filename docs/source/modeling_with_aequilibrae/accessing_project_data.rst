@@ -55,13 +55,17 @@ Each item in the 'links' table is a ``Link`` object.
     # And refresh the links in memory for usage
     project_links.refresh()
 
-.. seealso::
-    
-    * :func:`aequilibrae.project.network.Links`
-        Class documentation
+.. admonition:: References
+
+    * :ref:`modifications_on_links_layer`
 
     * :ref:`project_from_link_layer` | :ref:`editing_network_splitting_link`
         Usage examples
+
+.. seealso::
+    
+    * :func:`aequilibrae.project.network.Links`
+        Class documentation 
 
 ``project.network.nodes``
 -------------------------
@@ -113,6 +117,13 @@ Each item in the 'nodes' table is a ``Node`` object.
     # or if you want to check the coordinate of each node in the shape of
     # a Pandas DataFrame
     project_nodes.lonlat
+
+.. admonition:: References
+
+    * :ref:`modifications_on_nodes_layer`
+
+    * :ref:`editing_network_nodes`
+        Usage example
 
 .. seealso::
 
@@ -187,10 +198,12 @@ Each item in the 'zones' table is a ``Zone`` object.
     # And to get the nearest zone to giver geometry
     project_zones.get_closest_zone(Point(-71.3336, -29.9490))
 
+.. admonition:: References
+
+    * :ref:`create_zones`
+        Usage example
+
 .. seealso::
 
     * :func:`aequilibrae.project.Zoning`
         Class documentation
-
-    * :ref:`create_zones`
-        Usage example

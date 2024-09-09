@@ -104,6 +104,14 @@ The following sections presents the structure and contents for all databases in 
 
 .. toctree::
     :maxdepth: 1
+    :caption: Get to know the project components 
+
+    ../project_components
+    ../accessing_project_data
+    ../aequilibrae_matrix
+
+.. toctree::
+    :maxdepth: 1
     :caption: Or dive deep into project structure! 
 
     project_database/index
