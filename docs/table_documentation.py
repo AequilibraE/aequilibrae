@@ -34,7 +34,7 @@ class CreateTablesSRC:
             Path(realpath(__file__)).parent
             / "source"
             / "modeling_with_aequilibrae"
-            / "1-aequilibrae_project"
+            / "aequilibrae_project"
             / tgt_fldr
         )
 
