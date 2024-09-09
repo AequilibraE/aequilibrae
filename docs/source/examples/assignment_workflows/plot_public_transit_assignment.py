@@ -26,7 +26,7 @@ from aequilibrae.transit import Transit
 # Imports for SF transit graph construction
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.transit_graph_builder import TransitGraphBuilder
-# sphinx_gallery_thumbnail_path = 'images/hyperpath_bell_n_10_alpha_100d0.png'
+# sphinx_gallery_thumbnail_path = 'images/transit/hyperpath_bell_n_10_alpha_100d0.png'
 
 # %%
 
@@ -66,6 +66,7 @@ transit.save_to_disk()
 # --------------
 # Let's build the transit network. We'll disable ``outer_stop_transfers`` and ``walking_edges`` 
 # because Coquimbo doesn't have any parent stations.
+# 
 # For the OD connections we'll use the ``overlapping_regions`` method and create some accurate line geometry later.
 # Creating the graph should only take a moment. By default zoning information is pulled from the project network. 
 # If you have your own zoning information add it using ``graph.add_zones(zones)`` then ``graph.create_graph()``. 
@@ -102,23 +103,23 @@ graph.create_line_geometry(method="connector project match", graph="c")
 # %%
 # Saving and reloading
 # ~~~~~~~~~~~~~~~~~~~~
-# Lets save all graphs to the ``public_transport.sqlite`` database.
+# Lets save all graphs to the 'public_transport.sqlite' database.
 data.save_graphs()
 
 # %%
 # We can reload the saved graphs with ``data.load``. 
-# This will create new `TransitGraphBuilder`\'s based on the `period_id` of the saved graphs.
-# The graph configuration is stored in the `transit_graph_config` table in ``project_database.sqlite`` 
+# This will create new ``TransitGraphBuilder``\'s based on the 'period_id' of the saved graphs.
+# The graph configuration is stored in the 'transit_graph_config' table in 'project_database.sqlite' 
 # as serialised JSON.
 data.load()
 
 # %%
-# Links and nodes are stored in a similar manner to the ``project_database.sqlite`` database.
+# Links and nodes are stored in a similar manner to the 'project_database.sqlite' database.
 
 # %%
 # Reading back into AequilibraE
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# You can create back in a particular graph via it's `period_id`.
+# You can create back in a particular graph via it's 'period_id'.
 pt_con = database_connection("transit")
 graph_db = TransitGraphBuilder.from_db(pt_con, periods.default_period.period_id)
 graph_db.vertices.drop(columns="geometry")
@@ -133,19 +134,14 @@ graph_db.edges
 transit_graph = graph.to_transit_graph()
 
 # %%
-# .. admonition:: References
-# 
-#   :ref:`transit_assignment_graph`
-
-# %%
 # Spiess & Florian assignment
 # ---------------------------
 
 # %%
 # Mock demand matrix
 # ~~~~~~~~~~~~~~~~~~
-# We'll create a mock demand matrix with demand `1` for every zone.
-# We'll also need to convert from `zone_id`\'s to `node_id`\'s.
+# We'll create a mock demand matrix with demand ``1`` for every zone.
+# We'll also need to convert from ``zone_id``\'s to ``node_id``\'s.
 from aequilibrae.matrix import AequilibraeMatrix
 
 # %%
@@ -164,7 +160,7 @@ mat.computational_view()
 # %%
 # Hyperpath generation/assignment
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# We'll create a `TransitAssignment` object as well as a `TransitClass`
+# We'll create a ``TransitAssignment`` object as well as a ``TransitClass``
 
 # %%
 assig = TransitAssignment()
@@ -184,7 +180,7 @@ assig.set_algorithm("os")
 assigclass.set_demand_matrix_core("pt")
 
 # %%
-# Let's perform the assignment with the mock demand matrx for all `TransitClass`\'s added.
+# Let's perform the assignment with the mock demand matrx for all ``TransitClass``\'s added.
 assig.execute()
 
 # %%
@@ -192,15 +188,15 @@ assig.execute()
 assig.results()
 
 # %%
-# We can also access the `TransitAssignmentResults` object from the `TransitClass`
+# We can also access the ``TransitAssignmentResults`` object from the ``TransitClass``
 assigclass.results
 
 # %%
 # Saving results
 # ~~~~~~~~~~~~~~
-# We'll be saving the results to another sqlite db called ``results_database.sqlite``. 
-# The `results` table with ``project_database.sqlite`` contains some metadata about each table in 
-# ``results_database.sqlite``.
+# We'll be saving the results to another sqlite db called 'results_database.sqlite'. 
+# The 'results' table with 'project_database.sqlite' contains some metadata about each table in 
+# 'results_database.sqlite'.
 assig.save_results(table_name='hyperpath example')
 
 # %%
@@ -210,12 +206,15 @@ project.close()
 # %%
 # .. admonition:: References
 # 
-#   :ref:`transit_hyperpath_routing`
+#   * :ref:`transit_assignment_graph`
+#   * :ref:`transit_hyperpath_routing`
 
 # %%
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.paths.TransitGraphBuilder`
-#     * :func:`aequilibrae.paths.TransitClass` | :func:`aequilibrae.paths.TransitAssignment`
+#     * :func:`aequilibrae.transit.Transit`
+#     * :func:`aequilibrae.transit.TransitGraphBuilder`
+#     * :func:`aequilibrae.paths.TransitClass`
+#     * :func:`aequilibrae.paths.TransitAssignment`
 #     * :func:`aequilibrae.matrix.AequilibraeMatrix`

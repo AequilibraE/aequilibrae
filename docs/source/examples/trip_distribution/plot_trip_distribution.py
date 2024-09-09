@@ -93,7 +93,7 @@ plt.show()
 # %%
 # Forecast
 # --------
-# We create a set of *'future'* vectors by applying some models
+# We create a set of 'future' vectors by applying some models
 # and apply the model for both deterrence functions
 
 # %%

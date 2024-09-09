@@ -1,10 +1,11 @@
 Transit graph configuration
 ===========================
 
-Lorem ipsum
+The 'transit_graph_configs' table holds information on the configuration parameters for a 
+``TransitGraph`` of a particular 'period_id'.
 
 .. seealso::
 
-    Lorem ipsum
+    * :func:`aequilibtae.transit.TransitGraphBuilder`
 
 .. include:: data_model/transit_graph_configs.rst

@@ -287,9 +287,6 @@ df = proj_matrices.list()
 # -------------------------
 
 # %%
-from aequilibrae.paths import TrafficAssignment, TrafficClass
-
-# %%
 logger.info("\n\n\n TRAFFIC ASSIGNMENT FOR FUTURE YEAR")
 
 # %%
@@ -334,7 +331,7 @@ assig.rgap_target = 0.00001
 # The format of the input select links is a ``dictionary (str: list[tuple])``.
 # Each entry represents a separate set of selected links to compute. The str name will name the set of links.
 # The list[tuple] is the list of links being selected, of the form (link_id, direction), as it occurs in the Graph.
-# Direction can be 0, 1, -1. 0 denotes bi-directionality
+# Direction can be 0, 1, -1. 0 denotes bi-directionality.
 # For example, let's use Select Link on two sets of links:
 
 # %% 
@@ -350,7 +347,7 @@ assigclass.set_select_links(select_links)
 assig.execute()  # we then execute the assignment
 
 # %%
-# Now let us save our select link results, all we need to do is provide it with a name
+# Now let us save our select link results, all we need to do is provide it with a name.
 # In addition to exporting the select link flows, it also exports the Select Link matrices in OMX format.
 assig.save_select_link_results("select_link_analysis")
 
@@ -363,7 +360,7 @@ assig.save_select_link_matrices("just_matrices")
 # Internally, the save_select_link_results calls both of these methods at once.
 
 # %%
-# We could export it to CSV or AequilibraE data, but let's put it directly into the results database
+# We could export it to CSV or AequilibraE Data, but let's put it directly into the results database
 assig.save_results("future_year_assignment")
 
 # %%
@@ -400,5 +397,10 @@ project.close()
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
 #     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass` | :func:`aequilibrae.paths.TrafficAssignment` 
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.paths.TrafficClass`
+#     * :func:`aequilibrae.paths.TrafficAssignment`
+#     * :func:`aequilibrae.distribution.Ipf`
+#     * :func:`aequilibrae.distribution.GravityCalibration`
+#     * :func:`aequilibrae.distribution.GravityApplication`
+#     * :func:`aequilibrae.distribution.SyntheticGravityModel`
+#     * :func:`aequilibrae.matrix.AequilibraeData`

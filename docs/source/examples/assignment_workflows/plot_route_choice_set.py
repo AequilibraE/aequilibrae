@@ -9,6 +9,7 @@ a city in La Serena Metropolitan Area in Chile.
 """
 
 # %%
+
 # Imports
 from uuid import uuid4
 from tempfile import gettempdir
@@ -51,7 +52,7 @@ graph.set_graph("distance")
 # We set the nodes of interest as centroids to make sure they are not simplified away when we create the network
 graph.prepare_graph(np.array(nodes_of_interest))
 
-# We allow flows through "centroid connectors" because our centroids are not really centroids
+# We allow flows through "centroid connectors" because our centroids are not really centroids.
 # If we have actual centroid connectors in the network (and more than one per centroid), then we
 # should remove them from the graph
 graph.set_blocked_centroid_flows(False)
@@ -65,18 +66,18 @@ from aequilibrae.paths import RouteChoice
 # %% 
 # This object construct might take a minute depending on the size of the graph due to the construction of the
 # compressed link to network link mapping that's required. This is a one time operation per graph and is cached. We
-# need to supply a Graph and an AequilibraeMatrix or DataFrame via the ``add_demand`` method, if demand is not provided
-# link loading cannot be preformed.
+# need to supply a ``Graph`` and an ``AequilibraeMatrix`` or Panda's DataFrame via the ``add_demand`` method, 
+# if demand is not provided link loading cannot be preformed.
 rc = RouteChoice(graph)
 
 # %%
-# Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation, and BFSLE
+# Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation and BFSLE, 
 # based on the paper
 # `"Route choice sets for very high-resolution data" <https://doi.org/10.1080/18128602.2012.671383>`_ 
 # by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
 #
 # Our BFSLE implementation has been extended to allow applying link penalisation as well. Every
-# link in all routes found at a depth are penalised with the `penalty` factor for the next depth. 
+# link in all routes found at a depth are penalised with the 'penalty' factor for the next depth. 
 # So at a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0 are penalised, 
 # then the links marked for removal are removed. All links in the routes found at depth 1 are then penalised 
 # for the next depth. The penalisation compounds. Pass set ``penalty=1.0`` to disable.
@@ -173,5 +174,4 @@ project.close()
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
-#     * :func:`aequilibrae.paths.Graph` | :func:`aequilibrae.paths.RouteChoice`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.paths.RouteChoice`

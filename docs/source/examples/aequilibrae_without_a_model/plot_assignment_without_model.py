@@ -106,11 +106,6 @@ g.network["id"] = g.network.link_id
 g.lonlat_index = geom.loc[g.all_nodes]
 
 # %%
-# .. admonition:: References
-# 
-#   :ref:`aequilibrae-graphs`
-
-# %%
 # Let's perform our assignment. Feel free to try different algorithms,
 # as well as change the maximum number of iterations and the gap.
 aem = AequilibraeMatrix()
@@ -142,12 +137,15 @@ print(assig.report())
 # %%
 # .. admonition:: References
 # 
-#   :ref:`traffic_assignment_procedure` | :ref:`multiclass_equilibrium`
+#   :ref:`aequilibrae-graphs`
+#   :ref:`traffic_assignment_procedure`
+#   :ref:`multiclass_equilibrium`
 
 # %%
 # .. seealso::
 #     The use of the following functions, methods, classes and modules is shown in this example:
 #
 #     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass` | :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.paths.TrafficClass`
+#     * :func:`aequilibrae.paths.TrafficAssignment` 
 #     * :func:`aequilibrae.matrix.AequilibraeMatrix`
