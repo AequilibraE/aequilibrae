@@ -140,7 +140,7 @@ class Links(BasicTable):
         """Returns all links data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
+            **table** (:obj:`gpd.GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
         """
         dl = DataLoader(self.project.path_to_file, "links")
         return dl.load_table()

@@ -27,17 +27,12 @@ class Zoning(BasicTable):
 
         >>> project = Project.from_path("/tmp/test_project")
 
-
         >>> zoning = project.zoning
 
         >>> zone_downtown = zoning.get(1)
         >>> zone_downtown.population = 637
         >>> zone_downtown.employment = 10039
         >>> zone_downtown.save()
-
-        # changing the value for an existing value/field
-        >>> project.about.scenario_name = 'Just a better scenario name'
-        >>> project.about.write_back()
 
         # We can also add one more field to the table
         >>> fields = zoning.fields
