@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import geopandas as gpd
 import pandas as pd
 
 from aequilibrae.project.basic_table import BasicTable
@@ -111,11 +112,11 @@ class Nodes(BasicTable):
             item.save()
 
     @property
-    def data(self) -> pd.DataFrame:
+    def data(self) -> gpd.GeoDataFrame:
         """Returns all nodes data as a Pandas DataFrame
 
         :Returns:
-            **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, complete with Geometry
+            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
         """
         dl = DataLoader(self.project.path_to_file, "nodes")
         return dl.load_table()
