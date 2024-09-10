@@ -292,7 +292,7 @@ class AequilibraeMatrix(object):
         memory_only: bool = True,
     ) -> None:
         """
-        Creates an AequilibraeMatrix from an original Open Matrix
+        Creates an AequilibraeMatrix from an original OpenMatrix
 
         :Arguments:
             **file_path** (:obj:`str`): Path for the output AequilibraeMatrix

@@ -123,7 +123,7 @@ class Nodes(BasicTable):
 
     @property
     def lonlat(self) -> pd.DataFrame:
-        """Returns all nodes lon/lat coordinates as a Pandas DataFrame
+        """Returns all nodes lon/lat coords as a Pandas DataFrame
 
         :Returns:
             **table** (:obj:`DataFrame`): Pandas DataFrame with all the nodes, with geometry as lon/lat

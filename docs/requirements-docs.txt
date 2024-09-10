@@ -2,10 +2,9 @@ enum34
 Sphinx
 pydata-sphinx-theme==0.13.3
 sphinx_autodoc_annotation
-pillow
 matplotlib
 folium
-keplergl
+mapclassify
 sphinx-gallery
 sphinx-copybutton
 sphinx-design

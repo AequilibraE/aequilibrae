@@ -44,7 +44,7 @@ readily available to other modeling activities.
 AequilibraE includes multi-class user-equilibrium assignment with full support
 for class-specific networks, value-of-time and generalized cost functions, and 
 includes a range of equilibration algorithms, including MSA, the traditional 
-Frank-Wolfe as well as the state-of-the-art biconjugate Frank-Wolfe.
+Frank-Wolfe as well as the state-of-the-art Bi-conjugate Frank-Wolfe.
 
 AequilibraE's support for public transport includes a GTFS importer that can 
 map-match routes into the model network and an optimized version of the

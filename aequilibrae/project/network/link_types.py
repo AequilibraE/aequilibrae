@@ -88,7 +88,7 @@ class LinkTypes:
         return lt
 
     def delete(self, link_type_id: str) -> None:
-        """Removes the ``LinkType`` with ``link_type_id`` from the project"""
+        """Removes the link_type with *link_type_id* from the project"""
         try:
             lt = self.__items[link_type_id]  # type: LinkType
             lt.delete()
@@ -99,21 +99,20 @@ class LinkTypes:
         self.logger.warning(f"Link type {link_type_id} was successfully removed from the project database")
 
     def get(self, link_type_id: str) -> LinkType:
-        """Get a ``LinkType`` from the network by its ``link_type_id``"""
+        """Get a link_type from the network by its *link_type_id*"""
         if link_type_id not in self.__items:
             raise ValueError(f"Link type {link_type_id} does not exist in the model")
         return self.__items[link_type_id]
 
     def get_by_name(self, link_type: str) -> LinkType:
-        """Get a ``LinkType`` from the network by its ``link_type`` (i.e. name)"""
+        """Get a link_type from the network by its *link_type* (i.e. name)"""
         for lt in self.__items.values():
             if lt.link_type.lower() == link_type.lower():
                 return lt
 
-    # TODO: fix the FieldEditor import to self.project
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor(self.project, "link_types")
+        return FieldEditor(self.project.project_base_path, "link_types")
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""

@@ -13,10 +13,6 @@ a look at the documentation provided by `Google <https://developers.google.com/t
 The public transport database is created on the run when the ``Transit`` module is executed
 for the first time.
 
-.. Só é possível popular essas tabelas através da execução dos módulos ``Transit`` e 
-.. ``TransitGraphBuilder`` (mais algum módulo pertinente). A tabela a seguir mostra
-.. quais tabelas são povoadas através dos módulos 
-
 .. seealso::
 
     :func:`aequilibrae.transit.Transit`

@@ -8,7 +8,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class About:
-    """Provides an interface for querying and editing the 'about' table of an AequilibraE project
+    """Provides an interface for querying and editing the **about** table of an AequilibraE project
 
     .. code-block:: python
 

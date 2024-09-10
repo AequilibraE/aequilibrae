@@ -693,7 +693,7 @@ class LinearApproximation:
                     self.stepsize = tiny_step
                 else:
                     self.stepsize = 0.0
-                    # need to reset conjugate / biconjugate direction search
+                    # need to reset conjugate / bi-conjugate direction search
                     self.do_fw_step = True
                     self.conjugate_failed = True
                     self.iteration_issue.append("Found bad conjugate direction step. Performing FW search. {e.args}")
