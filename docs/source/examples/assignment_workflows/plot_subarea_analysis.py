@@ -17,7 +17,6 @@ from os.path import join
 import itertools
 
 import pandas as pd
-import geopandas as gpd
 import numpy as np
 import folium
 
@@ -110,7 +109,7 @@ mat.computational_view()
 # # the union of their geometry. It's best to choose a polygon that avoids any unnecessary intersections with links as
 # the resource requirements of this approach grow quadratically with the number of links cut.
 zones_of_interest = [29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 49, 50, 51, 52, 57, 58, 59, 60]
-zones = gpd.GeoDataFrame(project.zoning.data).set_index("zone_id")
+zones = project.zoning.data.set_index("zone_id")
 zones = zones.loc[zones_of_interest]
 zones.head()
 
@@ -164,7 +163,7 @@ subarea_zone = folium.Polygon(
 def plot_results(link_loads):
     link_loads = link_loads[link_loads.tot > 0]
     max_load = link_loads["tot"].max()
-    links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
+    links = project.network.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
     loads_lyr = folium.FeatureGroup("link_loads")
@@ -202,18 +201,18 @@ map
 
 # %%
 # We take the union of this GeoDataFrame as our polygon.
-poly = zones.unary_union
+poly = zones.union_all()
 poly
 
 # %%
 # It's useful later on to know which links from the network cross our polygon.
-links = gpd.GeoDataFrame(project.network.links.data)
+links = project.network.links.data
 inner_links = links[links.crosses(poly.boundary)].sort_index()
 inner_links.head()
 
 # %%
 # As well as which nodes are interior.
-nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
+nodes = project.network.nodes.data.set_index("node_id")
 inside_nodes = nodes.sjoin(zones, how="inner").sort_index()
 inside_nodes.head()
 

@@ -101,7 +101,6 @@ choice_set = rc.get_results().to_pandas()
 # %%
 # Now we will plot the paths we just created for the second OD pair
 import folium
-import geopandas as gpd
 
 # %%
 # Let's create a separate for each route so we can visualize one at a time
@@ -115,8 +114,8 @@ layers = [rlyr1, rlyr2, rlyr3, rlyr4, rlyr5]
 
 # %%
 # We get the data we will use for the plot: Links, Nodes and the route choice set
-links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
-nodes = gpd.GeoDataFrame(project.network.nodes.data, crs=4326)
+links = project.network.links.data
+nodes = project.network.nodes.data
 
 plot_routes = choice_set[(choice_set["origin id"] == 77011)]["route set"].values
 

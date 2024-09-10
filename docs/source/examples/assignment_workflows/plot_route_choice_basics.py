@@ -169,11 +169,10 @@ res.head()
 # let's define a function to plot assignment results
 def plot_results(link_loads):
     import folium
-    import geopandas as gpd
 
     link_loads = link_loads[link_loads.tot > 0]
     max_load = link_loads["tot"].max()
-    links = gpd.GeoDataFrame(project.network.links.data, crs=4326)
+    links = project.network.links.data
     loaded_links = links.merge(link_loads, on="link_id", how="inner")
 
     loads_lyr = folium.FeatureGroup("link_loads")

@@ -29,7 +29,7 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "nauru")
 
 # %%
-# We grab all the links data as a Pandas dataframe so we can process it easier
+# We grab all the links data as a geopandas GeoDataFrame so we can process it easier
 links = project.network.links.data
 nodes = project.network.nodes.data
 
