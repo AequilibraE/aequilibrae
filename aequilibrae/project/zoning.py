@@ -5,7 +5,7 @@ from typing import Union, Dict
 import geopandas as gpd
 import shapely.wkb
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
-from shapely.ops import unary_union
+from shapely import union_all
 
 from aequilibrae.project.basic_table import BasicTable
 from aequilibrae.project.data_loader import DataLoader
@@ -90,7 +90,7 @@ class Zoning(BasicTable):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
-        return unary_union(polygons)
+        return union_all(polygons)
 
     def get(self, zone_id: str) -> Zone:
         """Get a zone from the model by its **zone_id**"""
