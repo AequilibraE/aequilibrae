@@ -23,12 +23,12 @@ class SubAreaAnalysis:
         Construct a sub-area matrix from a provided sub-area GeoDataFrame using route choice.
 
         This class aims to provide a semi-automated method for constructing the sub-area matrix. The user should provide
-        the Graph object, demand matrix, and a GeoDataFrame whose `unary_union` represents the desired sub-area. Perform
-        a route choice assignment, then call the `post_process` method to obtain a sub-area matrix.
+        the Graph object, demand matrix, and a GeoDataFrame whose geometry union represents the desired sub-area.
+        Perform a route choice assignment, then call the ``post_process`` method to obtain a sub-area matrix.
 
         :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph object to use
-            **subarea** (:obj:`geopandas.GeoDataFrame`): A GeoPandas GeoDataFrame whose `unary_union` represents the
+            **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union represents the
               sub-area.
             **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to provide to the route
               choice assignment.
@@ -63,7 +63,7 @@ class SubAreaAnalysis:
         self.sub_area_demand = None
 
         links = gpd.GeoDataFrame(project.network.links.data)
-        self.interior_links = links[links.crosses(subarea.unary_union.boundary)].sort_index()
+        self.interior_links = links[links.crosses(subarea.union_all().boundary)].sort_index()
 
         nodes = gpd.GeoDataFrame(project.network.nodes.data).set_index("node_id")
         self.interior_nodes = nodes.sjoin(subarea, how="inner").sort_index()
