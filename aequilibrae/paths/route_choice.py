@@ -81,8 +81,8 @@ class RouteChoice:
         Options for algorithm are, 'bfsle' for breadth first search with link removal, or
         'link-penalisation'/'link-penalization'.
 
-        BFSLE implementation based on "Route choice sets for very high-resolution data" by 
-        Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013). 
+        BFSLE implementation based on "Route choice sets for very high-resolution data" by
+        Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
         `DOI: 10.1080/18128602.2012.671383 <https://doi.org/10.1080/18128602.2012.671383>`_.
 
         'lp' is also accepted as an alternative to 'link-penalisation'
@@ -91,7 +91,7 @@ class RouteChoice:
 
         ``seed`` is a BFSLE specific parameters.
 
-        Setting ``max_depth`` or ``max_misses``, while not required, is strongly recommended to prevent runaway 
+        Setting ``max_depth`` or ``max_misses``, while not required, is strongly recommended to prevent runaway
         algorithms.
 
         ``max_misses`` is the maximum amount of duplicate routes found per OD pair. If it is exceeded then the route set
@@ -103,7 +103,7 @@ class RouteChoice:
           until the number of desired routes is being consistently returned. If it is exceeded then the route set
           if returned with fewer than ``max_routes``.
 
-        - When using **LP**, ``max_depth`` corresponds to the maximum number of iterations performed. While not 
+        - When using **LP**, ``max_depth`` corresponds to the maximum number of iterations performed. While not
           enforced,
           it should be higher than ``max_routes``. It's value is dependent on the magnitude of the cost field,
           specifically it's related to the log base ``penalty`` of the ratio of costs between two alternative routes.
@@ -395,15 +395,15 @@ class RouteChoice:
         """
         Set the selected links. Checks if the links and directions are valid. Supports **OR** and **AND** sets of links.
 
-        Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a list of 
+        Dictionary values should be a list of either a single ``(link_id, direction)`` tuple or a list of
         ``(link_id, dirirection)``.
 
         The elements of the first list represent the **AND** sets, together they are OR'ed. If any of these sets is
-        satisfied the link are loaded as appropriate. 
-        
-        The **AND** sets are comprised of either a single ``(link_id, direction)`` tuple or a list of 
-        ``(link_id, direction)``. The single tuple represents an **AND** set with a single element. 
-        
+        satisfied the link are loaded as appropriate.
+
+        The **AND** sets are comprised of either a single ``(link_id, direction)`` tuple or a list of
+        ``(link_id, direction)``. The single tuple represents an **AND** set with a single element.
+
         All links and directions in an **AND** set must appear in any order within a route for it to be considered
         satisfied.
 
