@@ -28,10 +28,10 @@ class SubAreaAnalysis:
 
         :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph object to use
-            
+
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union represents the
             sub-area.
-            
+
             **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to provide to the route
             choice assignment.
 

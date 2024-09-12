@@ -371,6 +371,7 @@ select_links = {
 #
 #    The string name will name the set of links, and the list of tuples is the list of selected links
 #    in the form ``(link_id, direction)``, as it occurs in the :ref:`Graph <aequilibrae-graphs>`.
+#
 #    Direction can be one of ``0``, ``1``, ``-1``, where ``0`` denotes bi-directionality.
 
 # %%

@@ -53,11 +53,11 @@ breadth-first search (BFS) order.
 
 To efficiently store and determine the uniqueness of a new route or removed link sets, we used modified hash functions
 with properties that allowed us to store and nest them within standard C++ data structures. We used a commutative hash
-function for the removed link sets to allow for amortised O(1) order-independent uniqueness testing. While the removed
-link sets are always constructed incrementally, we did not opt for an incremental hash function as we did not deem this
-a worthwhile optimisation. The removed link sets rarely grew larger than double digits, even on a network with over
-600,000 directed links. This may be an area worth exploring for networks with a significantly larger number of desired
-routes than links between ODs.
+function for the removed link sets to allow for amortised :math:`O(1)` order-independent uniqueness testing. While the 
+removed link sets are always constructed incrementally, we did not opt for an incremental hash function as we did not 
+deem this a worthwhile optimisation. The removed link sets rarely grew larger than double digits, even on a network 
+with over 600,000 directed links. This may be an area worth exploring for networks with a significantly larger number 
+of desired routes than links between ODs.
 
 For uniqueness testing of discovered routes, AequilibraE implements a traditional, non-commutative hash function.
 Since cryptographic security was not a requirement for our purposes, we use a fast general-purpose integer hash function.

@@ -35,6 +35,7 @@ project = create_example(fldr, "coquimbo")
 import logging
 import sys
 
+# %%
 # We the project opens, we can tell the logger to direct all messages to the terminal as well
 logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -69,7 +70,7 @@ graph = project.network.graphs["c"]
 # We also see what graphs are available
 project.network.graphs.keys()
 # %%
-# let's say that utility is just a function of distance
+# Let's say that utility is just a function of distance.
 # So we build our *utility* field as the distance times theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
 
@@ -82,9 +83,9 @@ graph.prepare_graph(graph.centroids)
 graph.set_graph("utility")
 
 # %%
-# We allow flows through "centroid connectors" because our centroids are not really centroids
+# We allow flows through "centroid connectors" because our centroids are not really centroids.
 # If we have actual centroid connectors in the network (and more than one per centroid), then we
-# should remove them from the graph
+# should remove them from the graph.
 graph.set_blocked_centroid_flows(False)
 graph.graph.head()
 

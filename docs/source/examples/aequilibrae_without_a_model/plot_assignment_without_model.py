@@ -14,6 +14,7 @@ We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetwor
 import os
 import pandas as pd
 import numpy as np
+from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
@@ -32,7 +33,7 @@ geometry_file = "https://raw.githubusercontent.com/bstabler/TransportationNetwor
 
 # %%
 # Let's use a temporary folder to store our data
-folder = gettempdir()
+folder = os.path.join(gettempdir(), uuid4().hex)
 
 # %% 
 # First we load our demand file. This file has three columns: O, D, and Ton. 
@@ -55,8 +56,7 @@ aemfile = os.path.join(folder, "demand.aem")
 aem = AequilibraeMatrix()
 kwargs = {'file_name': aemfile,
           'zones': zones,
-          'matrix_names': ['matrix'],
-          "memory_only": False}  # We'll save it to disk so we can use it later
+          'matrix_names': ['matrix']}
 
 aem.create_empty(**kwargs)
 aem.matrix['matrix'][:,:] = mtx[:,:]
@@ -106,12 +106,12 @@ g.network["id"] = g.network.link_id
 g.lonlat_index = geom.loc[g.all_nodes]
 
 # %%
-# Let's perform our assignment. Feel free to try different algorithms,
-# as well as change the maximum number of iterations and the gap.
-aem = AequilibraeMatrix()
-aem.load(aemfile)
+# Let's prepare our matrix for computation
 aem.computational_view(["matrix"])
 
+# %%
+# Let's perform our assignment. Feel free to try different algorithms,
+# as well as change the maximum number of iterations and the gap
 assigclass = TrafficClass("car", g, aem)
 
 assig = TrafficAssignment()
@@ -128,11 +128,11 @@ assig.execute()
 
 # %%
 # Now let's take a look at the Assignment results
-print(assig.results())
+assig.results()
 
 # %%
 # And at the Assignment report
-print(assig.report())
+assig.report()
 
 # %%
 # .. admonition:: References

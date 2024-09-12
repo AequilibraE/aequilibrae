@@ -5,7 +5,7 @@ Running IPF without an AequilibraE model
 ========================================
 
 In this example, we show you how to use AequilibraE's IPF function without a model.
-This is a compliment to the application in :ref:`Trip Distribution <example_usage_distribution>`.
+This is a complement to the application in :ref:`example_usage_forecasting`.
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
 *How would your trip distribution matrix using IPF look like?*

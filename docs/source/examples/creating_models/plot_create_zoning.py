@@ -6,14 +6,15 @@ Create a zone system based on Hex Bins
 
 In this example, we show how to create hex bin zones covering an arbitrary area.
 
+We also add centroid connectors and a special generator zone to our network to make 
+it a pretty complete example.
+
 We use the Nauru example to create roughly 100 zones covering the whole modeling
-area as delimited by the entire network
+area as delimited by the entire network.
 
 You are obviously welcome to create whatever zone system you would like, as long as
 you have the geometries for them. In that case, you can just skip the hex bin computation
 part of this notebook.
-
-We also add centroid connectors to our network to make it a pretty complete example
 """
 
 # %%
@@ -29,12 +30,13 @@ from aequilibrae.utils.create_example import create_example, list_examples
 # sphinx_gallery_thumbnail_path = "images/plot_create_zoning.png"
 
 # %%
+# Let's print the list of examples that ship with AequilibraE
+print(list_examples())
+
+# %%
 
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
-
-# We can print the list of examples that ship with AequilibraE
-print(list_examples())
 
 # Let's use the Nauru example project for display
 project = create_example(fldr, "nauru")
@@ -69,8 +71,8 @@ zone_side = sqrt(2 * sqrt(3) * zone_area / 9)
 # %%
 # Now we can run an SQL query to compute the hexagonal grid.
 # There are many ways to create hex bins (including with a GUI on QGIS), but we find that
-# using SpatiaLite is a pretty neat solution.
-# For which we will use the entire network bounding box to make sure we cover everything
+# using SpatiaLite is a pretty neat solution, 
+# for which we will use the entire network bounding box to make sure we cover everything.
 extent = network.extent()
 
 # %%
@@ -84,13 +86,13 @@ grid = curr.fetchone()[0]
 grid = shapely.wkb.loads(grid)
 
 # %%
-# Since we used the bounding box, we have WAY more zones than we wanted, so we clean them
+# Since we used the bounding box, we have way more zones than we wanted, so we clean them
 # by only keeping those that intersect the network convex hull.
 grid = [p for p in grid.geoms if p.intersects(geo)]
 
 # %%
-# Let's re-number all nodes with IDs smaller than 300 to something bigger as to free space to our centroids to go from 1
-# to N.
+# Let's re-number all nodes with IDs smaller than 300 to something bigger as to free space to our
+# centroids to go from 1 to N.
 nodes = network.nodes
 for i in range(1, 301):
     nd = nodes.get(i)
@@ -110,6 +112,7 @@ for i, zone_geo in enumerate(grid):
 # %%
 # Centroid connectors
 # -------------------
+# Let's connect our zone centroids to the network.
 
 # %%
 for zone_id, zone in zoning.all_zones().items():
@@ -126,13 +129,9 @@ for zone_id, zone in zoning.all_zones().items():
 
 # %%
 # Special generator zones
-# ~~~~~~~~~~~~~~~~~~~~~~~
+# -----------------------
 # 
-# Let's add special generator zones!
-
-# %%
-# We also add a centroid at the airport terminal
-nodes = project.network.nodes
+# Let's add a special generator zone by adding a centroid at the airport terminal.
 
 # %%
 # Let's use some silly number for its ID, like 10,000, just so we can easily differentiate it

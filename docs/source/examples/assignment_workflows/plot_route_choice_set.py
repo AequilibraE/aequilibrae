@@ -29,8 +29,7 @@ project = create_example(fldr, "coquimbo")
 # %%
 # Model parameters
 # ----------------
-
-# %%
+# Let's select a set of nodes of interest
 od_pairs_of_interest = [(71645, 79385), (77011, 74089)]
 nodes_of_interest = (71645, 74089, 77011, 79385)
 
@@ -54,7 +53,7 @@ graph.prepare_graph(np.array(nodes_of_interest))
 
 # We allow flows through "centroid connectors" because our centroids are not really centroids.
 # If we have actual centroid connectors in the network (and more than one per centroid), then we
-# should remove them from the graph
+# should remove them from the graph.
 graph.set_blocked_centroid_flows(False)
 
 # %%
@@ -65,33 +64,18 @@ from aequilibrae.paths import RouteChoice
 
 # %% 
 # This object construct might take a minute depending on the size of the graph due to the construction of the
-# compressed link to network link mapping that's required. This is a one time operation per graph and is cached. We
-# need to supply a ``Graph`` and an ``AequilibraeMatrix`` or Panda's DataFrame via the ``add_demand`` method, 
-# if demand is not provided link loading cannot be preformed.
+# compressed link to network link mapping that's required. This is a one time operation per graph and is cached.
 rc = RouteChoice(graph)
 
 # %%
-# Here we'll set the parameters of our set generation. There are two algorithms available: Link penalisation and BFSLE, 
-# based on the paper
-# `"Route choice sets for very high-resolution data" <https://doi.org/10.1080/18128602.2012.671383>`_ 
-# by Nadine Rieser-Schüssler, Michael Balmer & Kay W. Axhausen (2013).
-#
-# Our BFSLE implementation has been extended to allow applying link penalisation as well. Every
-# link in all routes found at a depth are penalised with the 'penalty' factor for the next depth. 
-# So at a depth of 0 no links are penalised nor removed. At depth 1, all links found at depth 0 are penalised, 
-# then the links marked for removal are removed. All links in the routes found at depth 1 are then penalised 
-# for the next depth. The penalisation compounds. Pass set ``penalty=1.0`` to disable.
-#
 # It is highly recommended to set either ``max_routes`` or ``max_depth`` to prevent runaway results.
-
-# rc.set_choice_set_generation("link-penalisation", max_routes=5, penalty=1.02)
-
-# %%
-# The 5% penalty (1.05) is likely a little too large, but it create routes that are distinct enough to make this simple
-# example more interesting
+# 
+# We'll also set a 5% penalty (``penalty=1.05``), which is likely a little too large, but it creates routes that are 
+# distinct enough to make this simple example more interesting.
 rc.set_choice_set_generation("bfsle", max_routes=5, penalty=1.05)
 rc.prepare(od_pairs_of_interest)
 rc.execute(perform_assignment=True)
+
 choice_set = rc.get_results().to_pandas()
 
 # %%
@@ -113,7 +97,7 @@ od_lyr = folium.FeatureGroup("Origin and Destination")
 layers = [rlyr1, rlyr2, rlyr3, rlyr4, rlyr5]
 
 # %%
-# We get the data we will use for the plot: Links, Nodes and the route choice set
+# We get the data we will use for the plot: links, nodes and the route choice set
 links = project.network.links.data
 nodes = project.network.nodes.data
 
