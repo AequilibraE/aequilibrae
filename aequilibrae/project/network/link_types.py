@@ -110,9 +110,10 @@ class LinkTypes:
             if lt.link_type.lower() == link_type.lower():
                 return lt
 
+    @property
     def fields(self) -> FieldEditor:
         """Returns a FieldEditor class instance to edit the Link_Types table fields and their metadata"""
-        return FieldEditor(self.project.project_base_path, "link_types")
+        return FieldEditor(self.project, "link_types")
 
     def all_types(self) -> dict:
         """Returns a dictionary with all LinkType objects available in the model. link_type_id as key"""
