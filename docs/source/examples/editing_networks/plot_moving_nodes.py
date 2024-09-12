@@ -42,12 +42,14 @@ node.save()
 # If you want to show the path in Python.
 # 
 # We do NOT recommend this, though.... It is very slow for real networks.
-# 
-# We plot the entire network.
+
+# Let's refresh the links in memory for usage
 links.refresh()
+
 curr = project.conn.cursor()
 curr.execute("Select link_id from links;")
 
+# We plot the entire network.
 for lid in curr.fetchall():
     geo = links.get(lid[0]).geometry
     plt.plot(*geo.xy, color="blue")

@@ -19,6 +19,7 @@ import sys
 # sphinx_gallery_thumbnail_path = 'images/plot_logging_to_terminal_image.png'
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr)

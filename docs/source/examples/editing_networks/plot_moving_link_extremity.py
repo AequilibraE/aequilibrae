@@ -19,6 +19,7 @@ from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 
 # %%
+
 # We create the example project inside our temp folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -31,8 +32,6 @@ links = project.network.links
 # %%
 # Let's move node one from the upper left corner of the image above, a bit to the left and to the bottom
 
-# %%
-
 # We edit the link that goes from node 1 to node 2
 link = links.get(1)
 node = all_nodes.get(1)
@@ -44,15 +43,15 @@ link = links.get(3)
 node2 = all_nodes.get(2)
 link.geometry = LineString([new_extremity, node2.geometry])
 
+# We save the changes and refresh the links in memory for usage
 links.save()
 links.refresh()
 
 # %%
 # Because each link is unidirectional, you can no longer go from node 1 to node 2, obviously.
-
-# %%
+#
 # We do NOT recommend this, though.... It is very slow for real networks.
-# 
+
 # We plot the entire network.
 curr = project.conn.cursor()
 curr.execute("Select link_id from links;")
@@ -71,6 +70,7 @@ for nid in curr.fetchall():
 
 plt.show()
 
+# %%
 # Now look at the network and how it used to be.
 
 # %%

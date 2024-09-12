@@ -79,10 +79,9 @@ sphinx_gallery_conf = {
     "subsection_order": ExplicitOrder(
         [
             "examples/creating_models",
-            "examples/skimming",
-            "examples/trip_distribution",
-            "examples/assignment_workflows",
             "examples/editing_networks",
+            "examples/skimming",
+            "examples/assignment_workflows",
             "examples/aequilibrae_without_a_model",
             "examples/visualization",
             "examples/other_applications",

@@ -46,7 +46,7 @@ import numpy as np
 
 # %%
 # We'll set the parameters for our route choice model. These are the parameters that will be used to calculate the
-# utility of each path. In our example, the utility is equal to :math:`theta * distance`,
+# utility of each path. In our example, the utility is equal to :math:`distance * theta`,
 # and the path overlap factor (PSL) is equal to :math:`beta`.
 
 # Distance factor
@@ -56,28 +56,25 @@ theta = 0.00011
 beta = 1.1
 
 # %%
+# Let's select a set of nodes of interest
+nodes_of_interest = (71645, 74089, 77011, 79385)
+
+# %%
 # Let's build all graphs
 project.network.build_graphs()
 # We get warnings that several fields in the project are filled with NaNs.
 # This is true, but we won't use those fields.
 
 # %%
-# We grab the graph for cars
-graph = project.network.graphs["c"]
-
-# %%
 # We also see what graphs are available
 project.network.graphs.keys()
 
-od_pairs_of_interest = [(71645, 79385), (77011, 74089)]
-nodes_of_interest = (71645, 74089, 77011, 79385)
-
 # %%
-# Let's say that utility is just a function of distance, so we build our *utility* field as
-# :math:`distance * theta`
+# We grab the graph for cars
+graph = project.network.graphs["c"]
+
+# Let's say that utility is just a function of distance, so we build our 'utility' field as distance * theta
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
-
-# %%
 
 # Prepare the graph with all nodes of interest as centroids
 graph.prepare_graph(np.array(nodes_of_interest))
@@ -93,7 +90,7 @@ graph.set_blocked_centroid_flows(False)
 # %%
 # Mock demand matrix
 # ------------------
-# We'll create a mock demand matrix with demand ``1`` for every zone.
+# We'll create a mock demand matrix with demand 1 for every zone and prepare it for computation.
 from aequilibrae.matrix import AequilibraeMatrix
 
 names_list = ["demand", "5x demand"]
@@ -106,41 +103,13 @@ mat.matrices[:, :, 1] = np.full((graph.num_zones, graph.num_zones), 50.0)
 mat.computational_view()
 
 # %%
-# Route Choice class
-# ------------------
-# Here we'll construct and use the Route Choice class to generate our route sets
-from aequilibrae.paths import RouteChoice
+# Create plot function
+# --------------------
+# Before dive into the Route Choice class, let's define a function to plot assignment results.
+import folium
 
 # %%
-# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
-# link to network link mapping that's required. This is a one time operation per graph and is cached.
-rc = RouteChoice(graph)
-rc.add_demand(mat)
-
-# %%
-# It is highly recommended to set either ``max_routes`` or ``max_depth`` to prevent runaway results.
-rc.set_choice_set_generation("bfsle", max_routes=5)
-
-# %%
-# All parameters are optional, the defaults are:
-print(rc.default_parameters)
-
-# %%
-# We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
-# as well an an assignment.
-results = rc.execute_single(77011, 74089, demand=1.0)
-print(results[0])
-
-# %%
-# Because we asked it to also perform an assignment we can access the various results from that.
-# The default return is a Pyarrow Table but Pandas is nicer for viewing.
-res = rc.get_results().to_pandas()
-res.head()
-
-# %%
-# Let's define a function to plot assignment results
 def plot_results(link_loads):
-    import folium
 
     link_loads = link_loads[link_loads.tot > 0]
     max_load = link_loads["tot"].max()
@@ -172,15 +141,47 @@ def plot_results(link_loads):
     return map_osm
 
 # %%
+# Route Choice class
+# ------------------
+# Here we'll construct and use the Route Choice class to generate our route sets
+from aequilibrae.paths import RouteChoice
+
+# %%
+# This object construct might take a minute depending on the size of the graph due to the construction of the compressed
+# link to network link mapping that's required. This is a one time operation per graph and is cached.
+rc = RouteChoice(graph)
+
+# Let's check the default parameters for the Route Choice class
+print(rc.default_parameters)
+
+# %%
+# Let's add the demand. If it's not provided, link loading cannot be preformed.
+rc.add_demand(mat)
+
+# %%
+# It is highly recommended to set either ``max_routes`` or ``max_depth`` to prevent runaway results.
+rc.set_choice_set_generation("bfsle", max_routes=5)
+
+# %%
+# We can now perform a computation for single OD pair if we'd like. Here we do one between the first and last centroid
+# as well as an assignment.
+results = rc.execute_single(77011, 74089, demand=1.0)
+print(results[0])
+
+# %%
+# Because we asked it to also perform an assignment we can access the various results from that.
+# The default return is a Pyarrow Table but Pandas is nicer for viewing.
+res = rc.get_results().to_pandas()
+res.head()
+
+# %%
 plot_results(rc.get_load_results()["demand"])
 
 # %%
+# Batch operations
+# ----------------
 # To perform a batch operation we need to prepare the object first. We can either provide a list of tuple of the OD
 # pairs we'd like to use, or we can provided a 1D list and the generation will be run on all permutations.
-
-# rc.prepare(graph.centroids[:5])
-
-# %%
 rc.prepare()
 
 # %%
@@ -207,16 +208,14 @@ rc.set_select_links({"sl1": [[(7369, 1), (20983, 1)]], "sl2": [[(7369, 1)]]})
 rc.execute(perform_assignment=True)
 
 # %%
-# We can get then the results in a Pandas data frame for both the network.
+# We can get then the results in a Pandas DataFrame for both the network.
 sl = rc.get_select_link_loading_results()
 sl
 
 # %%
 # We can also access the OD matrices for this link loading. These matrices are sparse and can be converted to
-# scipy.sparse matrices for ease of use. They're stored in a dictionary where the key is the matrix name concatenated
+# SciPy sparse matrices for ease of use. They're stored in a dictionary where the key is the matrix name concatenated
 # with the select link set name via an underscore.
-# 
-# These matrices are constructed during ``get_select_link_loading_results``.
 rc.get_select_link_od_matrix_results()
 
 # %%

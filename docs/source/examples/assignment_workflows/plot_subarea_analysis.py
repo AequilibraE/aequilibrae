@@ -36,6 +36,7 @@ import logging
 import sys
 
 # %%
+
 # We the project opens, we can tell the logger to direct all messages to the terminal as well
 logger = project.logger
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -47,7 +48,7 @@ logger.addHandler(stdout_handler)
 # Model parameters
 # ----------------
 # We'll set the parameters for our route choice model. These are the parameters that will be used to calculate the
-# utility of each path. In our example, the utility is equal to :math:`theta * distance`,
+# utility of each path. In our example, the utility is equal to :math:`distance * theta`,
 # and the path overlap factor (PSL) is equal to :math:`beta`.
 
 # Distance factor
@@ -71,7 +72,7 @@ graph = project.network.graphs["c"]
 project.network.graphs.keys()
 # %%
 # Let's say that utility is just a function of distance.
-# So we build our *utility* field as the distance times theta
+# So we build our *utility* field as the :math:`distance * theta`.
 graph.network = graph.network.assign(utility=graph.network.distance * theta)
 
 # %%
@@ -92,7 +93,7 @@ graph.graph.head()
 # %%
 # Mock demand matrix
 # ------------------
-# We'll create a mock demand matrix with demand ``10`` for every zone.
+# We'll create a mock demand matrix with demand ``10`` for every zone and prepare it for computation.
 from aequilibrae.matrix import AequilibraeMatrix
 
 names_list = ["demand"]
@@ -107,7 +108,7 @@ mat.computational_view()
 # Sub-area preparation
 # --------------------
 # We need to define some polygon for out sub-area analysis, here we'll use a section of zones and create out polygon as
-# # the union of their geometry. It's best to choose a polygon that avoids any unnecessary intersections with links as
+# the union of their geometry. It's best to choose a polygon that avoids any unnecessary intersections with links as
 # the resource requirements of this approach grow quadratically with the number of links cut.
 zones_of_interest = [29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 49, 50, 51, 52, 57, 58, 59, 60]
 zones = project.zoning.data.set_index("zone_id")

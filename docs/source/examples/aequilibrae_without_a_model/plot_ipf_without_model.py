@@ -8,10 +8,12 @@ In this example, we show you how to use AequilibraE's IPF function without a mod
 This is a complement to the application in :ref:`example_usage_forecasting`.
 
 Let's consider that you have an OD-matrix, the future production and future attraction values.
-*How would your trip distribution matrix using IPF look like?*
-The data used in this example comes from Table 5.6 in Ortúzar & Willumsen (2011).
 
-*ORTÚZAR, J.D., WILLUMSEN, L.G. (2011) Modelling Transport (4th ed.). Wiley-Blackwell.*
+*How would your trip distribution matrix using IPF look like?*
+
+The data used in this example comes from Table 5.6 in 
+`Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
+
 """
 
 # %%
