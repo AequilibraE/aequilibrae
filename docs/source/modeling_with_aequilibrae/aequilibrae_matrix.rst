@@ -21,37 +21,49 @@ There are three ways of creating an ``AequilibraeMatrix``:
 
 .. code-block:: python
 
-    from aequilibrae.matrix import AequilibraeMatrix
+    >>> import numpy as np
+    >>> from uuid import uuid4
+    >>> from os.path import join
+    >>> from aequilibrae.matrix import AequilibraeMatrix
 
-    file = "folder/path_to_my_matrix.aem"
-    num_zones = 10
+    >>> folder = f"/tmp/{uuid4().hex}"
+    
+    >>> file = join(folder, "path_to_my_matrix.aem")
+    >>> num_zones = 5
+    >>> index = np.arange(1, 6, dtype=np.int32)
+    >>> mtx = np.ones((5, 5), dtype=np.float32)
+    >>> names = ["only_ones"]
 
-    mat = AequilibraeMatrix()
-    mat.create_empty(file_name=file, zones=num_zones, memory_only=False)
+    >>> mat = AequilibraeMatrix()
+    >>> mat.create_empty(file_name=file, zones=num_zones, matrix_names=names)
 
     # `memory_only` parameter can be changed to `True` case you want to save the matrix in disk.
 
     # Adds the matrix indexes, which are going to be used for computation
-    mat.index[:] = index[:]
-    # Adds the matricial data stored in `mtx` to a matrix named "my_matrix"
-    mat.matrix["my_matrix"][:,:] = mtx[:,:]
+    >>> mat.index[:] = index[:]
 
-Creating a matrix from an OMX file is also straightforward.
-
-.. code-block:: python
-
-    mat = AequilibraeMatrix()
-    mat.create_from_omx(file_path, omx_path)
+    # Adds the matricial data stored in `mtx` to a matrix named "only_ones"
+    >>> mat.matrix["only_ones"][:,:] = mtx[:,:]
 
 The following methods allow you to check the data in you AequilibraE matrix.
 
 .. code-block:: python
 
-    mat.cores # displays the number of cores in the matrix
-    mat.names # displays the names of the matrices
-    mat.index # displays the IDs of the indexes
+    >>> mat.cores # displays the number of cores in the matrix
+    1
+
+    >>> mat.names # displays the names of the matrices
+    ['only_ones']
     
-    mat.get_matrix_name("name_of_a_matrix") # returns an array with the selected matrix data
+    >>> mat.index # displays the IDs of the indexes
+    array([1, 2, 3, 4, 5])
+    
+    >>> mat.get_matrix("only_ones") # returns an array with the selected matrix data
+    array([[1., 1., 1., 1., 1.],
+           [1., 1., 1., 1., 1.],
+           [1., 1., 1., 1., 1.],
+           [1., 1., 1., 1., 1.],
+           [1., 1., 1., 1., 1.]])
 
 More than storing project data, AequilibraE matrices are objects necessary to run procedures,
 such as traffic assignment. To do so, one must create a computational view of the matrix, which
@@ -63,7 +75,7 @@ otherwise the matrix is useless in other procedures.
 
 .. code-block:: python
 
-    mat.computational_view(["my_matrix"])
+    >>> mat.computational_view(["only_ones"])
 
 You can also export AequilibraE matrices to another file formats, such as CSV and OMX. When exporting
 to a OMX file, you can choose the cores os the matrix you want to save, although this is not the case
@@ -91,6 +103,13 @@ or to close the OMX file, if that's the case.
 .. code-block:: python
 
     mat.close()
+
+Creating a matrix from an OMX file is also straightforward.
+
+.. code-block:: python
+
+    mat = AequilibraeMatrix()
+    mat.create_from_omx(file_path, omx_path)
 
 AequilibraE matrices saved in disk can be reused and loaded once again.
 
