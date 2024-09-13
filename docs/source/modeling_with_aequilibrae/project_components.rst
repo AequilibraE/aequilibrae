@@ -31,6 +31,15 @@ enables the access to manipulate the 'links' table, and each item in the items t
 
 In this section, we'll briefly discuss about the project components without geo-spatial information.
 
+.. testsetup:: *
+    
+    >>> from uuid import uuid4
+    >>> from aequilibrae.utils.create_example import create_example
+
+.. testcleanup:: *
+
+    >> project.close()
+
 ``project.about``
 -----------------
 
@@ -38,10 +47,7 @@ This class provides an interface for editing the 'about' table of a project. We 
 edit the existing ones as necessary, but everytime you add or modify a field, you have to write back
 this information, otherwise it will be lost.
 
-.. code-block::  python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}")
 
@@ -64,8 +70,6 @@ this information, otherwise it will be lost.
     # it is possible to create one too.
     >>> project.about.create()
 
-    >>> project.close()
-
 .. admonition:: References
 
     * :ref:`tables_about`
@@ -86,10 +90,7 @@ The ``FieldEditor`` allows the user to edit the project data tables, and it has 
 
 This class is directly accessed from within the corresponding module one wants to edit.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}", "nauru")
 
@@ -113,8 +114,6 @@ This class is directly accessed from within the corresponding module one wants t
     >>> node_fields.all_fields() # doctest: +ELLIPSIS
     ['is_centroid', ..., 'my_new_field']
 
-    >>> project.close()
-
 All field descriptions are kept in the table 'attributes_documentation'.
 
 .. admonition:: References
@@ -133,10 +132,7 @@ All field descriptions are kept in the table 'attributes_documentation'.
 Every AequilibraE project contains a log file that holds information on all the project procedures.
 It is possible to access the log file contents, as presented in the next code block.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}", "nauru")
 
@@ -151,8 +147,6 @@ It is possible to access the log file contents, as presented in the next code bl
     # If your project's log is getting cluttered, it is possible to clear it. 
     # Use this option wiesly once the deletion of data in the log file can't be undone.
     >>> project_log.clear()
-
-    >>> project.close()
 
 .. admonition:: References
 
@@ -170,10 +164,7 @@ It is possible to access the log file contents, as presented in the next code bl
 This method ia a gateway to all the matrices available in the model, which allows us to update the
 records in the 'matrices' table. Each item in the 'matrices' table  is a ``MatrixRecord`` object.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}")
 
@@ -210,8 +201,6 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # get an AequilibraE matrix.
     >>> matrices.get_matrix("demand_aem") # doctest: +SKIP
 
-    >>> project.close()
-
 .. admonition:: References
 
     * :ref:`matrix_table`
@@ -228,10 +217,7 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 This method allows you to access the API resources to manipulate the 'link_types' table.
 Each item in the 'link_types' table is a ``LinkType`` object.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
 
@@ -268,8 +254,6 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     # or using the `link_type`
     >>> get_link = link_types.get_by_name("primary")
 
-    >>> project.close()
-
 .. admonition:: References
 
     * :ref:`tables_link_types`
@@ -286,10 +270,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 This method allows you to access the API resources to manipulate the 'modes' table.
 Each item in 'modes' table is a ``Mode`` object.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
 
@@ -321,8 +302,6 @@ Each item in 'modes' table is a ``Mode`` object.
     # or using the ``mode_name``
     >>> get_mode = modes.get_by_name("car")
 
-    >>> project.close()
-
 .. admonition:: References
 
     * :ref:`tables_modes`
@@ -339,10 +318,7 @@ Each item in 'modes' table is a ``Mode`` object.
 This method allows you to access the API resources to manipulate the 'periods' table.
 Each item in the 'periods' table is a ``Period`` object.
 
-.. code-block:: python
-
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
+.. doctest::
 
     >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
 
@@ -377,8 +353,6 @@ Each item in the 'periods' table is a ``Period`` object.
     # Saving can be done after finishing all modifications in the table but for the sake
     # of this example, we'll save the addition of a new period to our table right away
     >>> periods.save()
-
-    >>> project.close()
 
 .. admonition:: References
 

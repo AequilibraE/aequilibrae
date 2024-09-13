@@ -60,6 +60,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx_gallery.gen_gallery",
     "sphinx_design",
     "sphinx_copybutton",

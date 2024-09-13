@@ -16,10 +16,10 @@ Each item in the 'links' table is a ``Link`` object.
 .. code-block:: python
 
     >>> from shapely.geometry import LineString
-    >>> from uuid import uuid4
     >>> from aequilibrae.utils.create_example import create_example
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
+    >>> folder = getfixture("create_path")
+    >>> project = create_example(folder, "coquimbo")
 
     >>> project_links = project.network.links
 
@@ -120,7 +120,7 @@ Each item in the 'nodes' table is a ``Node`` object.
     >>> # or if you want to check the coordinate of each node in the shape of
     >>> # a Pandas DataFrame
     >>> coords = project_nodes.lonlat
-    >>> coords.head(3)
+    >>> coords.head(3) # doctest: +NORMALIZE_WHITESPACE
       node_id        lon        lat
     0   10037 -71.315117 -29.996804
     1   10064 -71.336604 -29.949050
