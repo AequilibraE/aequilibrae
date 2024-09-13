@@ -58,7 +58,7 @@ The following methods allow you to check the data in you AequilibraE matrix.
     array([1, 2, 3, 4, 5])
     
     # To return an array with the selected matrix data
-    >>> mat.get_matrix("only_ones") # doctest: +NORMALIZE_WHITESPACE
+    >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     array([[1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.],
            [1., 1., 1., 1., 1.],
@@ -111,7 +111,7 @@ AequilibraE matrices in disk can be reused and loaded once again.
     >>> mat = AequilibraeMatrix()
     >>> mat.load(join(folder, 'my_new_aem_file.aem'))
 
-    >>> mat.get_matrix("only_ones") # doctest: +NORMALIZE_WHITESPACE
+    >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     memmap([[1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1.],
@@ -158,7 +158,7 @@ Creating an AequilibraE matrix from an OMX file is pretty straightforward.
     >>> omx_mat = AequilibraeMatrix()
     >>> omx_mat.create_from_omx(file_path, omx_path)
 
-    >>> mat.get_matrix("only_ones") # doctest: +NORMALIZE_WHITESPACE
+    >>> mat.get_matrix("only_ones") # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     memmap([[1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1.],
             [1., 1., 1., 1., 1.],
