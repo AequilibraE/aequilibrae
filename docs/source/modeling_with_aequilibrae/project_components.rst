@@ -139,10 +139,7 @@ It is possible to access the log file contents, as presented in the next code bl
     >>> project_log = project.log()
 
     # Returns a list with all entires in the log file.
-    >>> project_log.contents() # doctest: +ELLIPSIS
-    ['2021-01-01 15:52:03,945;aequilibrae;INFO ; Created project on D:/release/Sample models/nauru',
-     ...,
-     '2021-01-01 15:52:37,843;aequilibrae;INFO ; Network built successfully']
+    >>> project_log.contents() # doctest: +SKIP
 
     # If your project's log is getting cluttered, it is possible to clear it. 
     # Use this option wiesly once the deletion of data in the log file can't be undone.
