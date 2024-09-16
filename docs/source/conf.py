@@ -177,12 +177,7 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 
 # -- Options for Texinfo output ----------------------------------------------
 
-autodoc_default_options = {
-    "members": True,
-    "inherited-members": True,
-    "undoc-members": True,
-    'autosummary': True
-}
+autodoc_default_options = {"members": True, "inherited-members": True, "undoc-members": True, "autosummary": True}
 
 autodoc_member_order = "groupwise"
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring

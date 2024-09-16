@@ -13,12 +13,15 @@ cover the main points regarding them.
 This method allows you to access the API resources to manipulate the 'links' table.
 Each item in the 'links' table is a ``Link`` object.
 
+.. testsetup:: *
+
+    >>> folder = getfixture("create_path")
+
 .. code-block:: python
 
     >>> from shapely.geometry import LineString
     >>> from aequilibrae.utils.create_example import create_example
 
-    >>> folder = getfixture("create_path")
     >>> project = create_example(folder, "coquimbo")
 
     >>> project_links = project.network.links

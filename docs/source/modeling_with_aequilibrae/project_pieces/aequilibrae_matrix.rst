@@ -18,7 +18,7 @@ There are three ways of creating an ``AequilibraeMatrix``:
 * from a trip list, which is nothing more than a CSV file containing the origins, destinations, and trip cores; 
 * from an empty matrix. In this case, the data type must be one of the following NumPy data types: 
   ``np.int32``, ``np.int64``, ``np.float32``, ``np.float64``.
-
+    
 .. code-block:: python
 
     >>> import numpy as np

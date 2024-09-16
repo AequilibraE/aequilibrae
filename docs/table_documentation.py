@@ -30,13 +30,7 @@ class CreateTablesSRC:
         self.path = join(
             *Path(realpath(__file__)).parts[:-1], f"../aequilibrae/project/database_specification/{folder}/tables"
         )
-        self.doc_path = str(
-            Path(realpath(__file__)).parent
-            / "source"
-            / "modeling_with_aequilibrae"
-            / "aequilibrae_project"
-            / tgt_fldr
-        )
+        self.doc_path = str(Path(realpath(__file__)).parent / "source" / "modeling_with_aequilibrae" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -51,11 +45,8 @@ class CreateTablesSRC:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()
 
             # Title of the page
-            title = f"*{table_name}* table structure"
-            txt = [title, "-" * len(title), ""]
-
-            # intro = """A more technical view of the database structure, including the SQL queries used to create each table and the indices used are displayed below.\n"""
-            # txt.append(intro)
+            title = f'**{table_name.replace("_", " ")}** table structure'
+            txt = [title, "=" * len(title), ""]
 
             docstrings = self.__get_docstrings(table_name)
             sql_code = self.__get_sql_code(table_name)
@@ -134,10 +125,7 @@ class CreateTablesSRC:
             return [x.strip() for x in f.readlines()]
 
 
-tables = [
-    ("project_database", "project_database"),
-    ("transit_database", "transit_database"),
-]
+tables = [("project_database", "project_database"), ("transit_database", "transit_database")]
 
 for table, pth in tables:
     s = CreateTablesSRC(table, pth)

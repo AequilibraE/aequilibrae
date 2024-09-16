@@ -27,31 +27,6 @@ please refer to :ref:`dependencies`. For QGIS users this is not a concern, while
 for Windows users this dependency is automatically handled under the hood, but
 the details are also discussed in the aforementioned dependencies section.
 
-Package components: A conceptual view
--------------------------------------
-
-As all the components of an AequilibraE model are based on open-source software and
-open-data standards, modeling with AequilibraE is a little different from
-modeling with commercial packages, as the user can read and manipulate model
-components outside the software modeling environments (Python and QGIS).
-
-Thus, using/manipulating each one of an AequilibraE model components can be done
-in different ways depending on the tool you use for such.
-
-It is then important to highlight that AequilibraE, as a software, is divided in
-three very distinctive layers.  The first, which is responsible for tables
-consistent with each other (including links and nodes, modes and link_types),
-are embedded in the data layer in the form of geo-spatial database triggers. The
-second is the Python API, which provides all of AequilibraE's core algorithms
-and data manipulation facilities. The third is the GUI implemented in QGIS,
-which provides a user-friendly interface to access the model, visualize results
-and run procedures.
-
-These software layers are *stacked* and depend on each other, which means that any
-network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
-while any procedure such as traffic assignment done in QGIS is nothing more than an
-API call to the corresponding Python method.
-
 .. _aeq_project_structure:
 
 Project structure
@@ -61,7 +36,7 @@ Since version 0.7, the AequilibraE project consists of a main folder, where a
 series of files and sub folders exist, and the current project organization
 is as follows:
 
-.. image:: ../../images/project_structure.png
+.. image:: ../images/project_structure.png
     :scale: 25 %
     :align: center
     :alt: AequilibraE project structure
@@ -100,21 +75,27 @@ also created *on-the-fly* when the user imports a GTFS source into an Aequilibra
 model, but there is still no support for manually or programmatically adding routes
 to a route system as of yet.
 
-The following sections presents the structure and contents for all databases in the project.
+Package components: A conceptual view
+-------------------------------------
 
-.. toctree::
-    :maxdepth: 1
-    :caption: Get to know the project components 
+As all the components of an AequilibraE model are based on open-source software and
+open-data standards, modeling with AequilibraE is a little different from
+modeling with commercial packages, as the user can read and manipulate model
+components outside the software modeling environments (Python and QGIS).
 
-    ../project_components
-    ../accessing_project_data
-    ../aequilibrae_matrix
+Thus, using/manipulating each one of an AequilibraE model components can be done
+in different ways depending on the tool you use for such.
 
-.. toctree::
-    :maxdepth: 1
-    :caption: Or dive deep into project structure! 
+It is then important to highlight that AequilibraE, as a software, is divided in
+three very distinctive layers.  The first, which is responsible for tables
+consistent with each other (including links and nodes, modes and link_types),
+are embedded in the data layer in the form of geo-spatial database triggers. The
+second is the Python API, which provides all of AequilibraE's core algorithms
+and data manipulation facilities. The third is the GUI implemented in QGIS,
+which provides a user-friendly interface to access the model, visualize results
+and run procedures.
 
-    project_database/index
-    parameter_file
-    results_database
-    transit_database/index
+These software layers are *stacked* and depend on each other, which means that any
+network editing done in SQLite, Python or QGIS will go through the SpatiaLite triggers,
+while any procedure such as traffic assignment done in QGIS is nothing more than an
+API call to the corresponding Python method.

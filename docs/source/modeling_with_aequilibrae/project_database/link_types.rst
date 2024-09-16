@@ -33,7 +33,7 @@ Adding new link types to a project
 Adding link types to a project can be done through the Python API or directly into
 the 'link_types' table, which could look like the following.
 
-.. image:: ../../../images/link_types_table.png
+.. image:: ../../images/link_types_table.png
     :align: center
     :alt: Link_types table structure
 
@@ -121,5 +121,3 @@ required.
 .. seealso::
 
     :func:`aequilibrae.project.network.LinkTypes`
-
-.. include:: data_model/link_types.rst

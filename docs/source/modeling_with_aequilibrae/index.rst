@@ -18,7 +18,11 @@ a start guide to a complete view into AequilibraE's data structure.
     :maxdepth: 1
     :caption: A guide to AequilibraE
 
-    aequilibrae_project/index
+    project
+    project_database/index
+    parameter_file
+    transit_database/index
+    project_pieces/index
     static_traffic_assignment/index
     transit_assignment/index
     route_choice/index

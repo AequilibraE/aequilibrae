@@ -23,40 +23,8 @@ In the following sections, we'll dive deep into the tables existing in the publi
 Please notice that some tables are homonyms to the ones existing in the **project_database.sqlite**,
 but its contents are related to the public transport graph building and assignment processes. 
 
-.. include:: data_model/agencies.rst
+.. toctree::
+    :caption: Get to know the data structures in public transport database!
+    :maxdepth: 1
 
-.. include:: data_model/attributes_documentation.rst
-
-.. include:: data_model/fare_attributes.rst
-
-.. include:: data_model/fare_rules.rst
-
-.. include:: data_model/fare_zones.rst
-
-.. include:: data_model/link_types.rst
-
-.. include:: data_model/links.rst
-
-.. include:: data_model/modes.rst
-
-.. include:: data_model/node_types.rst
-
-.. include:: data_model/nodes.rst
-
-.. include:: data_model/pattern_mapping.rst
-
-.. include:: data_model/results.rst
-
-.. include:: data_model/route_links.rst
-
-.. include:: data_model/routes.rst
-
-.. include:: data_model/stop_connectors.rst
-
-.. include:: data_model/stops.rst
-
-.. include:: data_model/trigger_settings.rst
-
-.. include:: data_model/trips_schedule.rst
-
-.. include:: data_model/trips.rst
+    data_model/datamodel.rst

@@ -1,12 +1,10 @@
-:orphan:
-
-.. _transit_supply_data_model:
+.. _supply_data_model:
 
 SQL Data model
 ^^^^^^^^^^^^^^
 
 The data model presented in this section pertains only to the structure of
-AequilibraE's public_transport database and general information about the usefulness
+AequilibraE's project_database and general information about the usefulness
 of specific fields, especially on the interdependency between tables.
 
 Conventions

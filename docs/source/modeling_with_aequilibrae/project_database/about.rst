@@ -19,7 +19,7 @@ We strongly recommend not to edit the information on **projection** and
 the software to produce valuable information to the user with regards to
 opportunities for version upgrades.
 
-.. image:: ../../../images/about_table_example.png
+.. image:: ../../images/about_table_example.png
     :alt: About table structure
     :align: center
 
@@ -28,5 +28,3 @@ An API for editing the contents of this database is available from the API docum
 .. seealso::
 
     :func:`aequilibrae.project.About`
-
-.. include:: data_model/about.rst

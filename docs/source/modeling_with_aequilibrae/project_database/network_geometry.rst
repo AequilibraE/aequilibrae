@@ -69,6 +69,7 @@ can do to links and nodes, and you can use the table below to navigate between
 each of the changes to see how they are treated through triggers.
 
 .. table::
+   :width: 60%
    :align: center
 
    +--------------------------------------+-----------------------------------+
@@ -151,26 +152,25 @@ Moving a node
 There are two possibilities for moving a node: Moving to an empty space, and
 moving on top of another node.
 
-- If a node is moved to an empty space
+- If a node is moved to an empty space - 
+  all links originated/ending at that node will 
+  have its shape altered to conform
+  to that new node position and keep the network connected. The alteration of the
+  link happens only by changing the Latitude and Longitude of the link extremity
+  associated with that node.
 
-    All links originated/ending at that node will have its shape altered to conform
-    to that new node position and keep the network connected. The alteration of the
-    link happens only by changing the Latitude and Longitude of the link extremity
-    associated with that node.
-
-- If a node is moved on top of another node
-
-    All the links that connected to the node on the bottom have their extremities
-    switched to the node on top
-    The node on the bottom gets eliminated as a consequence of the behavior listed
-    on *Deleting a node*
+- If a node is moved on top of another node - 
+  All the links that connected to the node on the bottom have their extremities
+  switched to the node on top.
+  The node on the bottom gets eliminated as a consequence of the behavior listed
+  on *Deleting a node*
 
 Behavior regarding the fields related to modes and link types is discussed in
 their respective table descriptions.
 
 .. seealso::
 
-    :ref:`Example - Editing network nodes <editing_network_nodes>`
+      :ref:`Example - Editing network nodes <editing_network_nodes>`
 
 Adding a data field
 +++++++++++++++++++
@@ -215,20 +215,17 @@ Moving a link extremity
 
 This change can happen in two different forms:
 
-- The link extremity is moved to an empty space
+- The link extremity is moved to an empty space - 
+  In this case, a new node needs to be created, according to the behavior
+  described in *Creating a node*. The information of node ID (A or B
+  node, depending on the extremity) needs to be updated according to the ID for
+  the new node created.
 
-    In this case, a new node needs to be created, according to the behavior
-    described in *Creating a node* . The information of node ID (A or B
-    node, depending on the extremity) needs to be updated according to the ID for
-    the new node created.
-
-- The link extremity is moved from one node to another
-
-    The information of node ID (A or B node, depending on the extremity) needs to be
-    updated according to the ID for the node the link now terminates in.
-
-    Behavior regarding the fields regarding modes and link types is discussed in
-    their respective table descriptions.
+- The link extremity is moved from one node to another - 
+  The information of node ID (A or B node, depending on the extremity) needs to be
+  updated according to the ID for the node the link now terminates in.
+  Behavior regarding the fields regarding modes and link types is discussed in
+  their respective table descriptions.
 
 .. seealso::
     

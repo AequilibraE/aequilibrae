@@ -14,7 +14,7 @@ The assignment section of the parameter file is the smallest one, and it
 contains only the convergence criteria for assignment in terms of the maximum number
 of iterations and target Relative Gap.
 
-.. image:: ../../images/parameters_assignment_example.png
+.. image:: ../images/parameters_assignment_example.png
     :align: center
     :scale: 80 %
     :alt: Assignment example
@@ -32,7 +32,7 @@ contains only the parameters for number of maximum iterations, convergence level
 and maximum trip length to be applied in Iterative Proportional Fitting and
 synthetic gravity models, as shown below.
 
-.. image:: ../../images/parameters_distribution_example.png
+.. image:: ../images/parameters_distribution_example.png
     :align: center
     :scale: 80 %
     :alt: Distribution example
@@ -66,7 +66,7 @@ The data types available are those that exist within the
 `SQLite specification <https://www.sqlite.org/datatype3.html>`_ . We recommend limiting yourself
 to the use of **integer**, **numeric** and **varchar**.
 
-.. image:: ../../images/parameters_links_example.png
+.. image:: ../images/parameters_links_example.png
     :align: center
     :scale: 80 %
     :alt: Link example
@@ -91,7 +91,7 @@ forward/backward values tagged). For this reason, one can use the parameter 'osm
 to define what to do with numeric tag values that have not been tagged for both directions.
 the allowed values for this parameter are **copy** and **divide**, as shown below.
 
-.. image:: ../../images/parameters_links_osm_behaviour.png
+.. image:: ../images/parameters_links_osm_behaviour.png
     :align: center
     :scale: 80 %
     :alt: OSM behaviour examples
@@ -132,7 +132,7 @@ GMNS
 The **GMNS** group of parameters has four specifications: **critical_dist**, **link**,
 **node**, and **use_definition**.
 
-.. image:: ../../images/parameter_yaml_files_gmns.png
+.. image:: ../images/parameter_yaml_files_gmns.png
     :align: center
     :alt: GMNS parameter group
 
@@ -154,7 +154,7 @@ number of threads used in multi-threaded processes, logging and temp folders
 and whether we should be saving information to a log file at all, as exemplified
 below.
 
-.. image:: ../../images/parameters_system_example.png
+.. image:: ../images/parameters_system_example.png
     :align: center
     :scale: 80 %
     :alt: System example
@@ -180,7 +180,7 @@ The OSM section of the parameter file is relevant only when one plans to
 download a substantial amount of data from an Overpass API, in which case it is
 recommended to deploy a local Overpass server.
 
-.. image:: ../../images/parameters_osm_example.png
+.. image:: ../images/parameters_osm_example.png
     :align: center
     :scale: 80 %
     :alt: OSM example

@@ -7,5 +7,3 @@ The 'transit_graph_configs' table holds information on the configuration paramet
 .. seealso::
 
     * :func:`aequilibtae.transit.TransitGraphBuilder`
-
-.. include:: data_model/transit_graph_configs.rst

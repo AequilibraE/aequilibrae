@@ -33,7 +33,3 @@ other changes to the layers or preventing the changes.
 
    network_import_and_export.rst
    network_geometry.rst
-
-.. include:: data_model/links.rst
-
-.. include:: data_model/nodes.rst

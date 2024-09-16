@@ -46,9 +46,7 @@ jobs:
     - name: Test docstrings
       run: |
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
-        python -m pytest docs/source/modeling_with_aequilibrae/project_components.rst --doctest-glob=*.rst
-        python -m pytest docs/source/modeling_with_aequilibrae/accessing_project_data.rst --doctest-glob=*.rst
-        python -m pytest docs/source/modeling_with_aequilibrae/aequilibrae_matrix.rst --doctest-glob=*.rst
+        python -m pytest docs/source/modeling_with_aequilibrae/project_pieces --doctest-glob=*.rst
 
     - name: Build documentation
       run: |
