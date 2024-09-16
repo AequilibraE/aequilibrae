@@ -136,8 +136,8 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
     "switcher": {
-        "json_url": "_static/switcher.json",
-        "version_match": switcher_version,
+        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
+        "version_match": version,
     },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
