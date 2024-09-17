@@ -27,9 +27,14 @@ other changes to the layers or preventing the changes.
    implementation requires a complete overahaul of the path-building code, so
    that is still a long-term goal, barred specific development efforts.
 
+.. seealso::
+
+   * :ref:`links_network_data_model`
+   * :ref:`nodes_network_data_model`
+
 .. toctree::
    :maxdepth: 1
    :caption: Dive deep into network!
 
-   network_import_and_export.rst
    network_geometry.rst
+   network_import_and_export.rst

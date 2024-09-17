@@ -31,15 +31,6 @@ enables the access to manipulate the 'links' table, and each item in the items t
 
 In this section, we'll briefly discuss about the project components without geo-spatial information.
 
-.. testsetup:: *
-    
-    >>> from uuid import uuid4
-    >>> from aequilibrae.utils.create_example import create_example
-
-.. testcleanup:: *
-
-    >> project.close()
-
 ``project.about``
 -----------------
 
@@ -48,8 +39,10 @@ edit the existing ones as necessary, but everytime you add or modify a field, yo
 this information, otherwise it will be lost.
 
 .. doctest::
+    >>> from aequilibrae import Project
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_sfalls_data")
 
     >>> project.about.add_info_field("my_new_field")
     >>> project.about.my_new_field = "add some useful information about the field"
@@ -69,6 +62,8 @@ this information, otherwise it will be lost.
     # loading a project created with an older AequilibraE version that didn't contain it, 
     # it is possible to create one too.
     >>> project.about.create()
+
+    >>> project.close()
 
 .. admonition:: References
 
@@ -92,7 +87,8 @@ This class is directly accessed from within the corresponding module one wants t
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "nauru")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_nauru_data")
 
     # We'll edit the fields in the 'nodes' table
     >>> node_fields = project.network.nodes.fields
@@ -114,6 +110,8 @@ This class is directly accessed from within the corresponding module one wants t
     >>> node_fields.all_fields() # doctest: +ELLIPSIS
     ['is_centroid', ..., 'my_new_field']
 
+    >>> project.close()
+
 All field descriptions are kept in the table 'attributes_documentation'.
 
 .. admonition:: References
@@ -134,7 +132,8 @@ It is possible to access the log file contents, as presented in the next code bl
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "nauru")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_nauru_data")
 
     >>> project_log = project.log()
 
@@ -145,6 +144,8 @@ It is possible to access the log file contents, as presented in the next code bl
     # If your project's log is getting cluttered, it is possible to clear it. 
     # Use this option wiesly once the deletion of data in the log file can't be undone.
     >>> project_log.clear()
+
+    >>> project.close()
 
 .. admonition:: References
 
@@ -164,7 +165,8 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_sfalls_data")
 
     >>> matrices = project.matrices
 
@@ -199,6 +201,8 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
     # get an AequilibraE matrix.
     >>> matrices.get_matrix("demand_aem") # doctest: +SKIP
 
+    >>> project.close()
+
 .. admonition:: References
 
     * :ref:`matrix_table`
@@ -217,7 +221,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_coquimbo_data")
 
     >>> link_types = project.network.link_types
 
@@ -242,8 +247,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     >>> link_types.save()
 
     # To check all `LinkTypes` in the project as a dictionary whose keys are the `link_type_id`'s
-    >>> link_types.all_types() # doctest: +SKIP
-    {'z': ...} 
+    >>> link_types.all_types() # doctest: +ELLIPSIS
+    {'z': <aequilibrae.project.network.link_type.LinkType object at 0x...>} 
 
     # There are two ways to get a LinkType from the 'link_types' table
     # using the `link_type_id`
@@ -251,6 +256,8 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
     # or using the `link_type`
     >>> get_link = link_types.get_by_name("primary")
+
+    >>> project.close()
 
 .. admonition:: References
 
@@ -270,7 +277,8 @@ Each item in 'modes' table is a ``Mode`` object.
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_coquimbo_data")
 
     >>> modes = project.network.modes
 
@@ -290,7 +298,8 @@ Each item in 'modes' table is a ``Mode`` object.
     >>> modes.delete("k")
 
     # To check all `Modes` in the project as a dictionary whose keys are the `mode_id`'s
-    >>> modes.all_modes() # doctest: +SKIP
+    >>> modes.all_modes() # doctest: +ELLIPSIS
+    {'b': <aequilibrae.project.network.mode.Mode object at 0x...>}
 
     # There are two ways to get a Mode from the 'modes' table
     # using the ``mode_id``
@@ -298,6 +307,8 @@ Each item in 'modes' table is a ``Mode`` object.
     
     # or using the ``mode_name``
     >>> get_mode = modes.get_by_name("car")
+
+    >>> project.close()
 
 .. admonition:: References
 
@@ -317,7 +328,8 @@ Each item in the 'periods' table is a ``Period`` object.
 
 .. doctest::
 
-    >>> project = create_example(f"/tmp/{uuid4().hex}", "coquimbo")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_coquimbo_data")
 
     >>> periods = project.network.periods
 
@@ -335,7 +347,7 @@ Each item in the 'periods' table is a ``Period`` object.
     >>> select_period.save()
 
     # To see all periods data as a Pandas' DataFrame
-    >>> periods.data # doctest: +SKIP
+    >>> all_periods = periods.data
 
     # To add a new period
     >>> new_period = periods.new_period(2, 21600, 43200, "6AM to noon")
@@ -350,6 +362,8 @@ Each item in the 'periods' table is a ``Period`` object.
     # Saving can be done after finishing all modifications in the table but for the sake
     # of this example, we'll save the addition of a new period to our table right away
     >>> periods.save()
+
+    >>> project.close()
 
 .. admonition:: References
 

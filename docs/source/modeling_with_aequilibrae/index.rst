@@ -16,7 +16,6 @@ a start guide to a complete view into AequilibraE's data structure.
 
 .. toctree::
     :maxdepth: 1
-    :caption: A guide to AequilibraE
 
     project
     project_database/index

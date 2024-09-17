@@ -10,6 +10,22 @@ to check out the article.
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`transit_assignment_graph`
+#   * :ref:`transit_hyperpath_routing`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.transit.Transit`
+#     * :func:`aequilibrae.transit.TransitGraphBuilder`
+#     * :func:`aequilibrae.paths.TransitClass`
+#     * :func:`aequilibrae.paths.TransitAssignment`
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+
+# %%
 
 # Imports for example construction
 from uuid import uuid4
@@ -170,19 +186,3 @@ assig.save_results(table_name='hyperpath example')
 # %%
 # Wrapping up
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`transit_assignment_graph`
-#   * :ref:`transit_hyperpath_routing`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.transit.Transit`
-#     * :func:`aequilibrae.transit.TransitGraphBuilder`
-#     * :func:`aequilibrae.paths.TransitClass`
-#     * :func:`aequilibrae.paths.TransitAssignment`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

@@ -13,16 +13,13 @@ cover the main points regarding them.
 This method allows you to access the API resources to manipulate the 'links' table.
 Each item in the 'links' table is a ``Link`` object.
 
-.. testsetup:: *
-
-    >>> folder = getfixture("create_path")
-
 .. code-block:: python
 
+    >>> from aequilibrae import Project
     >>> from shapely.geometry import LineString
-    >>> from aequilibrae.utils.create_example import create_example
 
-    >>> project = create_example(folder, "coquimbo")
+    >>> project = Project()
+    >>> project.open("/tmp/accessing_coquimbo_data")
 
     >>> project_links = project.network.links
 
@@ -208,9 +205,9 @@ Each item in the 'zones' table is a ``Zone`` object.
     >>> zones = project_zones.data
 
     # To get a Shapely Polygon or Multipolygon with the entire zoning coverage
-    >>> project_zones.coverage() # doctest: +SKIP
+    >>> boundaries = project_zones.coverage()
 
-    # And to get the nearest zone to giver geometry
+    # And to get the nearest zone to a given geometry
     >>> project_zones.get_closest_zone(Point(-71.3336, -29.9490))
     57
 

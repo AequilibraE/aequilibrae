@@ -80,8 +80,8 @@ be presented at the ATRF 2024 [1]_ [3]_ [4]_.
 .. [2] Rieser-Schüssler, N., Balmer, M., & Axhausen, K. W. (2012). Route choice sets for very high-resolution data.
        Transportmetrica A: Transport Science, 9(9), 825–845. DOI: https://doi.org/10.1080/18128602.2012.671383
 
-.. [3] Camargo, P. V. de, and R. Imai. Map-Matching Large Streams of Vehicle GPS Data into Bespoke Networks (Submitted).
+.. [3] Camargo, P. V. de, and R. Imai. Map-Matching Large Streams of Vehicle GPS Data into Bespoke Networks.
        Presented at the ATRF, Melbourne, 2024.
 
 .. [4] Moss, J., P. V. de Camargo, C. de Freitas, and R. Imai. High-Performance Route Choice Set Generation on
-       Large Networks (Submitted). Presented at the ATRF, Melbourne, 2024.
+       Large Networks. Presented at the ATRF, Melbourne, 2024.

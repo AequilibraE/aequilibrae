@@ -97,4 +97,5 @@ required.
 
 .. seealso::
 
-    :func:`aequilibrae.project.network.Modes`
+    * :func:`aequilibrae.project.network.Modes`
+    * :ref:`modes_network_data_model`

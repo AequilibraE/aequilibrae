@@ -34,6 +34,11 @@ links = project.network.links.data
 nodes = project.network.nodes.data
 
 # %%
+# And if you want to take a quick look in your GeoDataFrames, you can plot it!
+
+# links.plot()
+ 
+# %%
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")
 network_nodes = folium.FeatureGroup("nodes")

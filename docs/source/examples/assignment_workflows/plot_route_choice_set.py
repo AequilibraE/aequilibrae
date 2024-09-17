@@ -7,6 +7,16 @@ Route Choice set generation
 In this example, we show how to generate route choice sets for estimation of route choice models, using a
 a city in La Serena Metropolitan Area in Chile.
 """
+# %%
+# .. admonition:: References
+# 
+#   :ref:`route_choice`
+
+# %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.RouteChoice`
 
 # %%
 
@@ -147,14 +157,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   :ref:`route_choice`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.RouteChoice`

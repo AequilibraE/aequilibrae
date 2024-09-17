@@ -11,6 +11,19 @@ distributing these trips into the network. Later, we estimate a set of future de
 which are going to be the input of a future year assignnment with select link analysis.
 """
 # %%
+# .. seealso::
+#     The use of the following functions, methods, classes and modules is shown in this example:
+#
+#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.TrafficClass`
+#     * :func:`aequilibrae.paths.TrafficAssignment`
+#     * :func:`aequilibrae.distribution.Ipf`
+#     * :func:`aequilibrae.distribution.GravityCalibration`
+#     * :func:`aequilibrae.distribution.GravityApplication`
+#     * :func:`aequilibrae.distribution.SyntheticGravityModel`
+#     * :func:`aequilibrae.matrix.AequilibraeData`
+
+# %%
 
 # Imports
 from uuid import uuid4
@@ -425,16 +438,3 @@ plt.show()
 # %%
 # Close the project
 project.close()
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass`
-#     * :func:`aequilibrae.paths.TrafficAssignment`
-#     * :func:`aequilibrae.distribution.Ipf`
-#     * :func:`aequilibrae.distribution.GravityCalibration`
-#     * :func:`aequilibrae.distribution.GravityApplication`
-#     * :func:`aequilibrae.distribution.SyntheticGravityModel`
-#     * :func:`aequilibrae.matrix.AequilibraeData`

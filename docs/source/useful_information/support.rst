@@ -10,6 +10,17 @@ Support
 
 AequilibraE is developed by a small but dedicated team of professionals with limited funding.
 
+Paid support
+~~~~~~~~~~~~
+
+Paid support for AequilibraE is offered by Outer Loop Consulting, an Australia-based consulting company,
+with support available in English, Portuguese, German & Spanish.
+
+All support is offered in prepaid packages of a minimum of 10h of consulting by phone, e-mail or Microsoft Teams
+at a fixed rate of USD 150/h.
+
+To acquire a paid support package for AequilibraE, please e-mail aequilibrae@outerloop.io
+
 Free support
 ~~~~~~~~~~~~
 
@@ -21,17 +32,6 @@ already asked in the past, with the first option being the most often used as of
 2. Posting your question to `GIS StackOverflow <https://gis.stackexchange.com/>`_ using the ``#aequilibrae`` tag;
 
 Please note that all questions and answers in both forums are public.
-
-Paid support
-~~~~~~~~~~~~
-
-Paid support for AequilibraE is offered by Outer Loop Consulting, an Australia-based consulting company,
-with support available in English, Portuguese, German & Spanish.
-
-All support is offered in prepaid packages of a minimum of 10h of consulting by phone, e-mail or Microsoft Teams
-at a fixed rate of USD 150/h.
-
-To acquire a paid support package for AequilibraE, please e-mail aequilibrae@outerloop.io
 
 .. _sponsors:
 
