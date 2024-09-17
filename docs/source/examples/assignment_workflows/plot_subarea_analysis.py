@@ -6,8 +6,19 @@ Route Choice with sub-area analysis
 
 In this example, we show how to perform sub-area analysis using route choice assignment, for a city in La Serena
 Metropolitan Area in Chile.
-"""
 
+.. admonition:: References
+ 
+   :ref:`route_choice`
+
+.. seealso::
+    The use of the following functions, methods, classes and modules is shown in this example:
+
+    * :func:`aequilibrae.paths.Graph`
+    * :func:`aequilibrae.paths.RouteChoice`
+    * :func:`aequilibrae.paths.SubAreaAnalysis`
+    * :func:`aequilibrae.matrix.AequilibraeMatrix`
+"""
 # %%
 
 # Imports
@@ -407,17 +418,3 @@ rc.execute(perform_assignment=True)
 map = plot_results(rc.get_load_results()["demand"])
 subarea_zone.add_to(map)
 map
-
-# %%
-# .. admonition:: References
-# 
-#   :ref:`route_choice`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.RouteChoice`
-#     * :func:`aequilibrae.paths.SubAreaAnalysis`
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
