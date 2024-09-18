@@ -15,9 +15,10 @@ for the first time.
 
 .. seealso::
 
-    :func:`aequilibrae.transit.Transit`
-
-    :func:`aequilibrae.transit.TransitGraphBuilder`
+    * :func:`aequilibrae.transit.Transit`
+        Class documentation
+    * :func:`aequilibrae.transit.TransitGraphBuilder`
+        Class documentation
 
 In the following sections, we'll dive deep into the tables existing in the public transport database.
 Please notice that some tables are homonyms to the ones existing in the **project_database.sqlite**,

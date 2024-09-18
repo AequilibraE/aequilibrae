@@ -17,4 +17,7 @@ You can check :ref:`this example <create_zones>` to learn how to add zones to yo
 
 .. seealso::
 
-    :func:`aequilibrae.project.Zone`
+    * :func:`aequilibrae.project.Zone`
+        Class documentation
+    * :ref:`zones_network_data_model`
+        Data model

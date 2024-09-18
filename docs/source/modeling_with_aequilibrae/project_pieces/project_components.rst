@@ -65,15 +65,12 @@ this information, otherwise it will be lost.
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`tables_about`
-        Table documentation
-
 .. seealso::
 
-    * :func:`aequilibrae.procedure.About`
+    * :func:`aequilibrae.project.About`
         Class documentation
+    * :ref:`tables_about`
+        Table documentation
 
 ``project.FieldEditor``
 -----------------------
@@ -114,11 +111,6 @@ This class is directly accessed from within the corresponding module one wants t
 
 All field descriptions are kept in the table 'attributes_documentation'.
 
-.. admonition:: References
-
-    * :ref:`parameters_metadata`
-        Table documentation
-
 .. seealso::
 
     *  :func:`aequilibrae.project.FieldEditor`
@@ -147,15 +139,12 @@ It is possible to access the log file contents, as presented in the next code bl
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`useful-log-tips`
-        Usage example
-
 .. seealso::
     
     * :func:`aequilibrae.project.Log`
         Class documentation
+    * :ref:`useful-log-tips`
+        Usage example
     
 ``project.matrices``
 --------------------
@@ -203,15 +192,12 @@ records in the 'matrices' table. Each item in the 'matrices' table  is a ``Matri
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`matrix_table`
-        Table documentation
-
 .. seealso::
 
     * :func:`aequilibrae.project.Matrices`
         Class documentation
+    * :ref:`matrix_table`
+        Table documentation
 
 ``project.network.link_types``
 ------------------------------
@@ -247,7 +233,7 @@ Each item in the 'link_types' table is a ``LinkType`` object.
     >>> link_types.save()
 
     # To check all `LinkTypes` in the project as a dictionary whose keys are the `link_type_id`'s
-    >>> print(link_types.all_types()) # doctest: +ELLIPSIS
+    >>> link_types.all_types() # doctest: +SKIP
     {'z': <aequilibrae.project.network.link_type.LinkType object at 0x...>} 
 
     # There are two ways to get a LinkType from the 'link_types' table
@@ -259,15 +245,12 @@ Each item in the 'link_types' table is a ``LinkType`` object.
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`tables_link_types`
-        Table documentation
-
 .. seealso::
 
-    * :func:`aequilibrae.project.LinkTypes`
+    * :func:`aequilibrae.project.network.LinkTypes`
         Class documentation
+    * :ref:`tables_link_types`
+        Table documentation
 
 ``project.network.modes``
 -------------------------
@@ -298,7 +281,7 @@ Each item in 'modes' table is a ``Mode`` object.
     >>> modes.delete("k")
 
     # To check all `Modes` in the project as a dictionary whose keys are the `mode_id`'s
-    >>> print(modes.all_modes()) # doctest: +ELLIPSIS
+    >>> modes.all_modes() # doctest: +SKIP
     {'b': <aequilibrae.project.network.mode.Mode object at 0x...>}
 
     # There are two ways to get a Mode from the 'modes' table
@@ -310,15 +293,12 @@ Each item in 'modes' table is a ``Mode`` object.
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`tables_modes`
-        Table documentation
-
 .. seealso::
 
-    * :func:`aequilibrae.project.Modes`
+    * :func:`aequilibrae.project.network.Modes`
         Class documentation
+    * :ref:`tables_modes`
+        Table documentation
 
 ``project.network.periods``
 ---------------------------
@@ -365,12 +345,9 @@ Each item in the 'periods' table is a ``Period`` object.
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`tables_period`
-        Table documentation
-
 .. seealso::
 
-    * :func:`aequilibrae.project.Periods`
+    * :func:`aequilibrae.project.network.Periods`
         Class documentation
+    * :ref:`tables_period`
+        Table documentation

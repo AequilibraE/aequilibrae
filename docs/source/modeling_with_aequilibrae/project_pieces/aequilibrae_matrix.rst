@@ -123,8 +123,7 @@ AequilibraE matrices in disk can be reused and loaded once again.
 .. seealso::
 
     :func:`aequilibrae.matrix.AequilibraeMatrix`
-        Documentation for ``AequilibraeMatrix`` class
-
+        Class documentatiom
     :ref:`plot_assignment_without_model`
         Usage example 
 

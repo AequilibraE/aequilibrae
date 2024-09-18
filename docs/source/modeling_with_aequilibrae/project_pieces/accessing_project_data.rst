@@ -64,13 +64,14 @@ Each item in the 'links' table is a ``Link`` object.
 
     * :ref:`modifications_on_links_layer`
 
-    * :ref:`project_from_link_layer` | :ref:`editing_network_splitting_link`
-        Usage examples
-
 .. seealso::
     
     * :func:`aequilibrae.project.network.Links`
         Class documentation 
+    * :ref:`project_from_link_layer`
+        Usage example
+    * :ref:`editing_network_splitting_link`
+        Usage example
 
 ``project.network.nodes``
 -------------------------
@@ -130,13 +131,13 @@ Each item in the 'nodes' table is a ``Node`` object.
 
     * :ref:`modifications_on_nodes_layer`
 
-    * :ref:`editing_network_nodes`
-        Usage example
-
 .. seealso::
 
     * :func:`aequilibrae.project.network.Nodes`
         Class documentation
+    * :ref:`editing_network_nodes`
+        Usage example
+
 
 .. _project_zoning:
 
@@ -213,12 +214,9 @@ Each item in the 'zones' table is a ``Zone`` object.
 
     >>> project.close()
 
-.. admonition:: References
-
-    * :ref:`create_zones`
-        Usage example
-
 .. seealso::
 
     * :func:`aequilibrae.project.Zoning`
         Class documentation
+    * :ref:`create_zones`
+        Usage example

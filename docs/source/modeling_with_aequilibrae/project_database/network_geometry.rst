@@ -170,7 +170,8 @@ their respective table descriptions.
 
 .. seealso::
 
-      :ref:`Example - Editing network nodes <editing_network_nodes>`
+      * :ref:`Editing network nodes <editing_network_nodes>`
+         Usage example
 
 Adding a data field
 +++++++++++++++++++
@@ -229,7 +230,8 @@ This change can happen in two different forms:
 
 .. seealso::
     
-    :ref:`Example - Editing network links <editing_network_links>`
+    * :ref:`Editing network links <editing_network_links>`
+       Usage example
 
 Re-shaping a link
 +++++++++++++++++
@@ -240,7 +242,8 @@ As of now, distance in AequilibraE is **ALWAYS** measured in meters.
 
 .. seealso::
 
-    :ref:`Example - Splitting network links <editing_network_splitting_link>`
+    * :ref:`Splitting network links <editing_network_splitting_link>`
+       Usage example
 
 Deleting a required field
 +++++++++++++++++++++++++

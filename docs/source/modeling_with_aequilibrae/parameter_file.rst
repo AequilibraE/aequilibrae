@@ -194,4 +194,5 @@ use by AequilibraE is so small that it is likely not necessary to do so.
 
 .. seealso::
 
-    :func:`aequilibrae.Parameters`
+    * :func:`aequilibrae.Parameters`
+        Class documentation

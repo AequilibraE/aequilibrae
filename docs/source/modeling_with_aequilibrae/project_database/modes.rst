@@ -98,4 +98,6 @@ required.
 .. seealso::
 
     * :func:`aequilibrae.project.network.Modes`
+        Class documentation
     * :ref:`modes_network_data_model`
+        Data model

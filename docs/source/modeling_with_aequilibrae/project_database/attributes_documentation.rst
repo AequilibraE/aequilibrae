@@ -18,4 +18,5 @@ As a simple table, it looks as follows:
 
 .. seealso::
 
-    :func:`aequilibrae.project.FieldEditor`
+    * :ref:`attributes_documentation_network_data_model`
+        Data model

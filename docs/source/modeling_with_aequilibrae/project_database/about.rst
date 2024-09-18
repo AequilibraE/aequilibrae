@@ -27,4 +27,7 @@ An API for editing the contents of this database is available from the API docum
 
 .. seealso::
 
-    :func:`aequilibrae.project.About`
+    * :func:`aequilibrae.project.About`
+        Class documentation
+    * :ref:`about_network_data_model`
+        Data model

@@ -30,7 +30,9 @@ other changes to the layers or preventing the changes.
 .. seealso::
 
    * :ref:`links_network_data_model`
+      Data model
    * :ref:`nodes_network_data_model`
+      Data model
 
 .. toctree::
    :maxdepth: 1

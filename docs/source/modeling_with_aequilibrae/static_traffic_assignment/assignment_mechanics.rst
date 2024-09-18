@@ -27,7 +27,7 @@ etc.).
 
 The **Graph** object is rather complex, but the difference between the physical links and
 those that are available two class member variables consisting of Pandas DataFrames, the
-***network** and the **graph**.
+**network** and the **graph**.
 
 .. code-block:: python
 
@@ -126,9 +126,10 @@ not blocking flows through "centroids".
 
 .. seealso::
 
-    :func:`aequilibrae.paths.Graph`
-    
-    :func:`aequilibrae.paths.TransitGraph`
+    * :func:`aequilibrae.paths.Graph`
+        Class documentation
+    * :func:`aequilibrae.paths.TransitGraph`
+        Class documentation
 
 .. _traffic_assignment_procedure:
 
@@ -194,7 +195,8 @@ To begin building the assignment it is easy:
 
 .. seealso::
 
-    :func:`aequilibrae.paths.TrafficAssignment`
+    * :func:`aequilibrae.paths.TrafficAssignment`
+        Class documentation
 
 .. _assignment_class_object:
 
@@ -250,7 +252,8 @@ required in the instantiation of this class:
 
 .. seealso::
 
-    :func:`aequilibrae.paths.TrafficClass`
+    * :func:`aequilibrae.paths.TrafficClass`
+        Class documentation
 
 Volume Delay Function
 ^^^^^^^^^^^^^^^^^^^^^
@@ -313,7 +316,8 @@ choice and adding traffic classes to the assignment, or it will **fail**.
 
 .. seealso::
 
-    :func:`aequilibrae.paths.VDF`
+    * :func:`aequilibrae.paths.VDF`
+        Class documentation
 
 Setting final parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^

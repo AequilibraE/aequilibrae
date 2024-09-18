@@ -20,6 +20,7 @@ types (AEM and OMX) without prejudice to functionality.
 
 .. seealso::
 
-    :func:`aequilibrae.project.Matrices`
-    
-    :func:`aequilibrae.matrix.AequilibraeMatrix`
+    * :func:`aequilibrae.project.Matrices`
+        Class documentation
+    * :ref:`matrices_network_data_model`
+        Data model

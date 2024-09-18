@@ -120,4 +120,8 @@ required.
 
 .. seealso::
 
-    :func:`aequilibrae.project.network.LinkTypes`
+    * :func:`aequilibrae.project.network.LinkTypes`
+       Class documentation
+    * :ref:`link_types_network_data_model`
+        Data model
+  

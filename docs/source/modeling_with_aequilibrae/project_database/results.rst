@@ -1,6 +1,6 @@
 .. _tables_results:
 
-Results database
+Results table
 ================
 
 The **results** table exists to hold the metadata for the results stored in the
@@ -17,3 +17,7 @@ As a simple table, it looks as follows:
 .. image:: ../../images/results_table.png
     :align: center
     :alt: results table structure
+
+.. seealso::
+    * :ref:`results_network_data_model`
+        Data model
