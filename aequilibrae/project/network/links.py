@@ -108,7 +108,7 @@ class Links(BasicTable):
         return link
 
     def delete(self, link_id: int) -> None:
-        """Removes the link with **link_id** from the project
+        """Removes the link with link_id from the project
 
         :Arguments:
             **link_id** (:obj:`int`): Id of a link to delete

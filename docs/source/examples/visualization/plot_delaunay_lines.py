@@ -6,10 +6,15 @@ Creating Delaunay Lines
 
 In this example, we show how to create AequilibraE's famous Delaunay Lines, but in Python.
 
-For more on this topic, the first publication is `here <https://xl-optim.com/delaunay/>`_.
+For more on this topic, see its `first publication <https://xl-optim.com/delaunay/>`_.
 
 We use the Sioux Falls example once again.
 """
+# %% 
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.utils.create_delaunay_network.DelaunayAnalysis`
 
 # %%
 
@@ -26,6 +31,7 @@ from aequilibrae.utils.create_example import create_example
 from aequilibrae.utils.create_delaunay_network import DelaunayAnalysis
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 

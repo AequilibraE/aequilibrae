@@ -1,7 +1,7 @@
 --@ The *stops* table holds information on the stops where vehicles
 --@ pick up or drop off riders. This table information comes from
 --@ the GTFS file *stops.txt*. You can find more information about
---@ it `here <https://developers.google.com/transit/gtfs/reference#stopstxt>`_.
+--@ `the stops table here <https://gtfs.org/documentation/schedule/reference/#stopstxt>`_.
 --@ 
 --@ **stop_id** is an unique identifier for a stop
 --@ 

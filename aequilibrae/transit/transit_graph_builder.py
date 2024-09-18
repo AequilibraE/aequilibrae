@@ -1189,7 +1189,8 @@ class TransitGraphBuilder:
         Project graphs must be built for the "connector project match" method.
 
         :Arguments:
-           **method** (:obj:`str`): Must be either "direct" or "connector project match". If method is "direct", ``graph`` argument is ignored.
+           **method** (:obj:`str`): Must be either ``"direct"`` or ``"connector project match"``.
+           If method is ``"direct"``, ``graph`` argument is ignored.
 
            **graph** (:obj:`str`): Must be a key within ``project.network.graphs``.
         """
@@ -1381,7 +1382,7 @@ class TransitGraphBuilder:
         """
         Save the contents of self.edges to the public transport database.
 
-        If no geometry for the edges is present or `recreate_line_geometry` is True, direct lines will be created.
+        If no geometry for the edges is present or ``recreate_line_geometry`` is ``True``, direct lines will be created.
 
         :Arguments:
            **recreate_line_geometry** (:obj:`bool`): Whether to recreate the line strings for the edges as direct lines. Defaults to ``False``.
@@ -1424,7 +1425,7 @@ class TransitGraphBuilder:
         self.save_config()
 
     def to_transit_graph(self) -> TransitGraph:
-        """Create an AequilibraE (:obj:`TransitGraph`) object from an SF graph builder."""
+        """Create an AequilibraE ``TransitGraph`` object from an SF graph builder."""
 
         # TODO: Better required link type detections
         # link_type_diff = set(self.edges.link_type.unique()) ^ {'access_connector', 'alighting', 'boarding', 'dwell', 'egress_connector', 'inner_transfer', 'on-board'}
@@ -1463,7 +1464,7 @@ class TransitGraphBuilder:
         All arguments are forwarded to the constructor.
 
         :Arguments:
-           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the ``public_transport.sqlite`` database.
+           **public_transport_conn** (:obj:`sqlite3.Connection`): Connection to the 'public_transport.sqlite' database.
         """
         project_conn = database_connection("project_database")
         config = json.loads(

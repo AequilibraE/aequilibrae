@@ -11,7 +11,7 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
 class Periods(BasicTable):
-    """Access to the API resources to manipulate the links table in the network
+    """Access to the API resources to manipulate the periods table in the network
 
     .. code-block:: python
 

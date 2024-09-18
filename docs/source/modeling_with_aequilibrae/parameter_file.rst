@@ -5,12 +5,6 @@ Parameters YAML File
 
 The parameter file holds the parameters information for a certain portion of the software.
 
-* :ref:`parameters_assignment`
-* :ref:`parameters_distribution`
-* :ref:`parameters_network`
-* :ref:`parameters_system`
-* :ref:`parameters_osm`
-
 .. _parameters_assignment:
 
 Assignment
@@ -21,13 +15,12 @@ contains only the convergence criteria for assignment in terms of the maximum nu
 of iterations and target Relative Gap.
 
 .. image:: ../images/parameters_assignment_example.png
-    :width: 487
     :align: center
+    :scale: 80 %
     :alt: Assignment example
 
 Although these parameters are required to exist in the parameters file, one can
 override them during the assignment, as detailed in :ref:`convergence_criteria`.
-
 
 .. _parameters_distribution:
 
@@ -40,8 +33,8 @@ and maximum trip length to be applied in Iterative Proportional Fitting and
 synthetic gravity models, as shown below.
 
 .. image:: ../images/parameters_distribution_example.png
-    :width: 546
     :align: center
+    :scale: 80 %
     :alt: Distribution example
 
 .. _parameters_network:
@@ -74,16 +67,16 @@ The data types available are those that exist within the
 to the use of **integer**, **numeric** and **varchar**.
 
 .. image:: ../images/parameters_links_example.png
-    :width: 704
     :align: center
+    :scale: 80 %
     :alt: Link example
 
-For the case of all non-mandatory fields, two more parameters are possible: *osm_source* and
-*osm_behaviour*. Those two fields provide the necessary information for importing data from
-`Open Street Maps <https://www.openstreetmap.org/>`_ in case such resource is required, and
+For the case of all non-mandatory fields, two more parameters are possible: 'osm_source' and
+'osm_behaviour'. Those two fields provide the necessary information for importing data from
+`OpenStreetMap <https://www.openstreetmap.org/>`_ in case such resource is required, and
 they work in the following way:
 
-*osm_source*: The name of the tag for which data needs to be retrieved. Common tags are
+'osm_source': The name of the tag for which data needs to be retrieved. Common tags are
 **highway**, **maxspeed** and **name**. The import result will contain a null value for all
 links that do not contain a value for such tag.
 
@@ -94,19 +87,18 @@ values for both directions, and it might have only a tag value for **maxspeed**.
 Although for **maxspeed** (which is the value for posted speed) we might want to copy the same
 value for both directions, that would not be true for parameters such as **lanes**, which we
 might want to split in half for both directions (cases with an odd number of lanes usually have
-forward/backward values tagged). For this reason, one can use the parameter *osm_behaviour*
+forward/backward values tagged). For this reason, one can use the parameter 'osm_behaviour'
 to define what to do with numeric tag values that have not been tagged for both directions.
 the allowed values for this parameter are **copy** and **divide**, as shown below.
 
 .. image:: ../images/parameters_links_osm_behaviour.png
-    :width: 437
     :align: center
+    :scale: 80 %
     :alt: OSM behaviour examples
 
 The example below also shows that it is possible to mix fields that will be imported from
 `OSM <https://www.openstreetmap.org/>`_ posted speed and number of lanes, and fields that need
 to be in the network but should not be imported from OSM, such as link capacities.
-
 
 Node fields
 ~~~~~~~~~~~
@@ -116,13 +108,13 @@ that it does not make sense to have fields for one or two directions and that it
 yet to import any tagged values from OSM at the moment, and therefore the parameter *osm_source*
 would have no effect here.
 
+OpenStreetMap
+~~~~~~~~~~~~~
 
-Open Street Maps
-~~~~~~~~~~~~~~~~
 The **OSM** group of parameters has two specifications: **modes** and **all_link_types**.
 
 **modes** contains the list of key tags we will import for each mode. Description of tags can be found on
-`Open-Street Maps <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
+`OpenStreetMap Wiki <https://wiki:openstreetmap:org/wiki/Key:highway:>`_, and we recommend
 not changing the standard parameters unless you are exactly sure of what you are doing.
 
 For each mode to be imported there is also a mode filter to control for non-default
@@ -163,8 +155,8 @@ and whether we should be saving information to a log file at all, as exemplified
 below.
 
 .. image:: ../images/parameters_system_example.png
-    :width: 812
     :align: center
+    :scale: 80 %
     :alt: System example
 
 The number of CPUs have a special behaviour defined, as follows:
@@ -189,8 +181,8 @@ download a substantial amount of data from an Overpass API, in which case it is
 recommended to deploy a local Overpass server.
 
 .. image:: ../images/parameters_osm_example.png
-    :width: 840
     :align: center
+    :scale: 80 %
     :alt: OSM example
 
 The user is also welcome to change the maximum area for a single query to the
@@ -199,3 +191,8 @@ requests *sleeptime*.
 
 It is also possible to set a custom address for the Nominatim server, but its
 use by AequilibraE is so small that it is likely not necessary to do so.
+
+.. seealso::
+
+    * :func:`aequilibrae.Parameters`
+        Class documentation

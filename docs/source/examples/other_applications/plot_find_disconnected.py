@@ -4,10 +4,16 @@
 Finding disconnected links
 ==========================
 
-In this example, we show how to find disconnected links in an AequilibraE network..
+In this example, we show how to find disconnected links in an AequilibraE network.
 
 We use the Nauru example to find disconnected links.
 """
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.paths.PathResults`
+
 # %%
 
 # Imports
@@ -22,6 +28,7 @@ from aequilibrae.paths.results import PathResults
 # sphinx_gallery_thumbnail_path = 'images/disconnected_network.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -100,9 +107,9 @@ islands = pd.concat(islands)
 # And save to disk alongside our model
 islands.to_csv(join(fldr, "island_outputs_complete.csv"), index=False)
 
-#%%
-# If you join the node_id field in the csv file generated above with the a_node or b_node fields
-# in the links table, you will have the corresponding links in each disjoint island found.
+# %%
+# If you join the ``node_id`` field in the CSV file generated above with the ``a_node`` or ``b_node`` 
+# fields in the links table, you will have the corresponding links in each disjoint island found.
 
 # %%
 project.close()

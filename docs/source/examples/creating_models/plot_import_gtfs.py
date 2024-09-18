@@ -8,6 +8,12 @@ In this example, we import a GTFS feed to our model and perform map matching.
 
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.transit.Transit`
+#     * :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`
 
 # %%
 
@@ -27,6 +33,7 @@ from aequilibrae.utils.create_example import create_example
 # sphinx_gallery_thumbnail_path = 'images/plot_import_gtfs.png'
 
 # %%
+
 # Let's create an empty project on an arbitrary folder.
 fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
@@ -34,7 +41,6 @@ project = create_example(fldr, "coquimbo")
 # %%
 # As the Coquimbo example already has a complete GTFS model, we shall remove its public transport
 # database for the sake of this example.
-
 remove(join(fldr, "public_transport.sqlite"))
 
 # %%
@@ -107,10 +113,8 @@ for i, row in stops.iterrows():
         fillOpacity=1.0,
     ).add_to(gtfs_stops)
 
-# %% [markdown]
-# Let's create the map!
-
 # %%
+# Let's create the map!
 map_osm = folium.Map(location=[-29.93, -71.29], zoom_start=13)
 
 # add all layers

@@ -28,12 +28,15 @@ class SubAreaAnalysis:
 
         :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph object to use
+
             **subarea** (:obj:`gpd.GeoDataFrame`): A GeoPandas GeoDataFrame whose geometry union represents the
-              sub-area.
+            sub-area.
+
             **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to provide to the route
-              choice assignment.
+            choice assignment.
 
         Minimal example:
+
         .. code-block:: python
 
             >>> import tempfile
@@ -89,8 +92,8 @@ class SubAreaAnalysis:
         Apply the necessary post processing to the route choice assignment select link results.
 
         :Arguments:
-            **demand_cols** (:obj:Optional[list[str]]): If provided, only construct the sub-area matrix for these demand
-              matrices.
+            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the sub-area matrix for these demand
+            matrices.
 
         :Returns:
             **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area demand matrix.

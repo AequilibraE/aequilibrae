@@ -118,16 +118,17 @@ class Transit:
         """Builds a preload vector for the transit network over the specified time period
 
         :Arguments:
-            **start** (int): The start of the period for which to check pt schedules (seconds from midnight)
+            **start** (:obj:`int`): The start of the period for which to check pt schedules (seconds from midnight)
 
-            **end** (int): The end of the period for which to check pt schedules, (seconds from midnight)
+            **end** (:obj:`int`): The end of the period for which to check pt schedules, (seconds from midnight)
 
-            **inclusion_cond** (str): Specifies condition with which to include/exclude pt trips from the preload.
+            **inclusion_cond** (:obj:`str`): Specifies condition with which to include/exclude pt trips from the
+            preload.
 
         :Returns:
-            **preloads** (pd.DataFrame): A dataframe of preload from transit vehicles that can be directly used in an assignment
+            **preloads** (:obj:`pd.DataFrame`): A DataFrame of preload from transit vehicles that can be directly used
+            in an assignment
 
-        Minimal example:
         .. code-block:: python
 
             >>> from aequilibrae import Project

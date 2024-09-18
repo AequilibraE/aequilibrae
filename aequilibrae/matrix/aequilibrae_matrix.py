@@ -93,6 +93,8 @@ class AequilibraeMatrix(object):
 
         :Arguments:
             **names** (:obj:`tuple(str)`, *Optional*): New names for the matrices. Required if working with OMX files
+
+            **file_name** (:obj:`str`, *Optional*): Local path to the matrix file
         """
         if file_name is not None:
             cores = names if len(names) else self.names
@@ -293,21 +295,22 @@ class AequilibraeMatrix(object):
         Creates an AequilibraeMatrix from an original OpenMatrix
 
         :Arguments:
-            **file_path** (:obj:`str`): Path for the output AequilibraEMatrix
+            **file_path** (:obj:`str`): Path for the output AequilibraeMatrix
 
             **omx_path** (:obj:`str`): Path to the OMX file one wants to import
 
-            **cores** (:obj:`list`): List of matrix cores to be imported
+            **cores** (:obj:`list`, *Optional*): List of matrix cores to be imported
 
-            **mappings** (:obj:`list`): List of the matrix mappings (i.e. indices, centroid numbers) to be imported
+            **mappings** (:obj:`list`, *Optional*): List of the matrix mappings (i.e. indices, centroid numbers)
+            to be imported
 
-            **robust** (:obj:`bool`, *Optional*): Boolean for whether AequilibraE should try to adjust the names for cores
-            and indices in case they are too long. Defaults to True
+            **robust** (:obj:`bool`, *Optional*): Boolean for whether AequilibraE should try to adjust the names
+            for cores and indices in case they are too long. Defaults to ``True``
 
             **compressed** (:obj:`bool`, *Optional*): Boolean for whether we should compress the output matrix.
             Not yet implemented
 
-            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to True
+            **memory_only** (:obj:`bool`, *Optional*): Whether you want to keep the matrix copy in memory only. Defaults to ``True``
 
         """
 
@@ -405,7 +408,7 @@ class AequilibraeMatrix(object):
 
             **from_column** (:obj:`str`): trip list file column containing the origin zones numbers
 
-            **from_column** (:obj:`str`): trip list file column containing the destination zones numbers
+            **to_column** (:obj:`str`): trip list file column containing the destination zones numbers
 
             **list_cores** (:obj:`list`): list of core columns in the trip list file
 
@@ -840,7 +843,7 @@ class AequilibraeMatrix(object):
             self.__load_aem__()
 
     def is_omx(self):
-        """Returns ``True`` if matrix data source is OMX, False otherwise"""
+        """Returns ``True`` if matrix data source is OMX, ``False`` otherwise"""
         return self.__omx
 
     def computational_view(self, core_list: List[str] = None):
@@ -920,7 +923,7 @@ class AequilibraeMatrix(object):
             **output_name** (:obj:`str`): Name of the new matrix file.
             If none is provided, returns a copy in memory only
 
-            **cores** (:obj:`list`):List of the matrix cores to be copied
+            **cores** (:obj:`list`): List of the matrix cores to be copied
 
             **names** (:obj:`list`, *Optional*): List with the new names for the cores. Defaults to current names
 
@@ -1044,7 +1047,7 @@ class AequilibraeMatrix(object):
 
     def nan_to_num(self):
         """
-        Converts all NaN values in all cores in the computational view to zeros
+        Converts all ``NaN`` values in all cores in the computational view to zeros
 
         .. code-block:: python
 
