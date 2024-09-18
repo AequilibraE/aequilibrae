@@ -12,6 +12,20 @@ We use Folium to visualize the resulting network.
 """
 
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`accessing_project_data`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.network.Links`
+#     * :func:`aequilibrae.project.network.Nodes` 
+#     * :func:`aequilibrae.project.network.Modes`
+#     * :func:`aequilibrae.project.network.LinkTypes` 
+
+# %%
 
 # Imports
 from uuid import uuid4
@@ -143,17 +157,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`accessing_project_data`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.network.Links`
-#     * :func:`aequilibrae.project.network.Nodes` 
-#     * :func:`aequilibrae.project.network.Modes`
-#     * :func:`aequilibrae.project.network.LinkTypes` 

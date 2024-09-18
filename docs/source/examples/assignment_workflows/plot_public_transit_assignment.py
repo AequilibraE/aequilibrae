@@ -12,12 +12,11 @@ We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 # %%
 # .. admonition:: References
 # 
-#   * :ref:`transit_assignment_graph`
-#   * :ref:`transit_hyperpath_routing`
+#   * :ref:`transit_assignment`
 
 # %%
 # .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
+#     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.transit.Transit`
 #     * :func:`aequilibrae.transit.TransitGraphBuilder`

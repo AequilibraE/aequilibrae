@@ -16,6 +16,17 @@ You are obviously welcome to create whatever zone system you would like, as long
 you have the geometries for them. In that case, you can just skip the hex bin computation
 part of this notebook.
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`Accessing project zones <project_zoning>`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.Zoning`
+#     * :func:`aequilibrae.project.network.Nodes` 
 
 # %%
 
@@ -147,16 +158,3 @@ airport.connect_mode(airport.geometry.buffer(0.01), mode_id="c", link_types="ytr
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`tables_zones` 
-#   * :ref:`Accessing project zones <project_zoning>`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.Zoning`
-#     * :func:`aequilibrae.project.network.Nodes` 

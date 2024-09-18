@@ -7,6 +7,16 @@ Editing network geometry: Links
 In this example, we move a link extremity from one point to another
 and see what happens to the network.
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_links_layer` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.network.Links`
 
 # %%
 
@@ -75,14 +85,3 @@ plt.show()
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`modifications_on_links_layer` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.network.Links`

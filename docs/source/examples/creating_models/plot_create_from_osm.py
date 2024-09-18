@@ -6,8 +6,18 @@ Create project from OpenStreetMap
 
 In this example, we show how to create an empty project and populate it with a network from OpenStreetMap.
 
-This time we will use Folium to visualize the network.
+This time we will use GeoPandas to visualize the network.
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`importing_from_osm` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.Network.create_from_osm`
 
 # %%
 
@@ -54,14 +64,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`importing_from_osm` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.Network.create_from_osm`

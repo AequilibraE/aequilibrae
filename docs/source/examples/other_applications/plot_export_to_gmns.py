@@ -9,6 +9,16 @@ The source AequilibraE model used as input for this is the result of the import 
 (``create_from_gmns()``) using the GMNS example of Arlington Signals, which can be found
 in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`aequilibrae_to_gmns` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.Network.export_to_gmns`
 
 # %%
 
@@ -97,14 +107,3 @@ map_gmns
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`aequilibrae_to_gmns` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.Network.export_to_gmns`

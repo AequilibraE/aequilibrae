@@ -9,6 +9,20 @@ In this example, we show how to perform Traffic Assignment in AequilibraE withou
 We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetworks/tree/master/SiouxFalls>`_, from TNTP.
 """
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`static_traffic_assignment`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.TrafficClass`
+#     * :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+
+# %%
 
 # Imports
 import os
@@ -133,19 +147,3 @@ assig.results()
 # %%
 # And at the Assignment report
 assig.report()
-
-# %%
-# .. admonition:: References
-# 
-#   :ref:`aequilibrae-graphs`
-#   :ref:`traffic_assignment_procedure`
-#   :ref:`multiclass_equilibrium`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.Graph`
-#     * :func:`aequilibrae.paths.TrafficClass`
-#     * :func:`aequilibrae.paths.TrafficAssignment` 
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`

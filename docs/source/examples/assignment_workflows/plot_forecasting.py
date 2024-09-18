@@ -12,7 +12,7 @@ which are going to be the input of a future year assignnment with select link an
 """
 # %%
 # .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
+#     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.TrafficClass`

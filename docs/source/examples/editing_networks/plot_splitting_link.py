@@ -8,6 +8,18 @@ In this example, we split a link right in the middle, while keeping all fields
 in the database equal. Distance is proportionally computed automatically in the database.
 """
 # %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_links_layer` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.network.Links`
+
+
+# %%
 
 # Imports
 from uuid import uuid4
@@ -89,14 +101,3 @@ plt.show()
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`modifications_on_links_layer` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.network.Links`

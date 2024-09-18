@@ -10,11 +10,11 @@ Serena Metropolitan Area in Chile.
 # %%
 # .. admonition:: References
 # 
-#   :ref:`route_choice`
+#   * :ref:`route_choice`
 
 # %%
 # .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
+#     Several functions, methods, classes and modules are used in this example:
 #
 #     * :func:`aequilibrae.paths.Graph`
 #     * :func:`aequilibrae.paths.RouteChoice`

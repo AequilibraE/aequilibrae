@@ -9,6 +9,12 @@ In this example, we show how to find disconnected links in an AequilibraE networ
 We use the Nauru example to find disconnected links.
 """
 # %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.paths.PathResults`
+
+# %%
 
 # Imports
 from uuid import uuid4
@@ -107,9 +113,3 @@ islands.to_csv(join(fldr, "island_outputs_complete.csv"), index=False)
 
 # %%
 project.close()
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.PathResults`

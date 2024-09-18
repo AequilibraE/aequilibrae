@@ -15,6 +15,19 @@ The data used in this example comes from Table 5.6 in
 `Ortúzar & Willumsen (2011) <https://www.wiley.com/en-us/Modelling+Transport%2C+4th+Edition-p-9780470760390>`_.
 
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`all_about_aeq_matrices` 
+#   * :ref:`validation`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+#     * :func:`aequilibrae.matrix.AequilibraeData`
+#     * :func:`aequilibrae.distribution.Ipf`
 
 # %%
 
@@ -80,16 +93,3 @@ fratar.output.matrix_view
 for line in fratar.report:
     print(line)
     
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`all_about_aeq_matrices` 
-#   * :ref:`validation`
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
-#     * :func:`aequilibrae.matrix.AequilibraeData`
-#     * :func:`aequilibrae.distribution.Ipf`

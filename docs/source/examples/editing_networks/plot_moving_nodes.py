@@ -7,6 +7,16 @@ Editing network geometry: Nodes
 In this example, we show how to mode a node in the network and look into
 what happens to the links.
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`modifications_on_nodes_layer` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.network.Nodes`
 
 # %%
 
@@ -64,14 +74,3 @@ plt.show()
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`modifications_on_nodes_layer` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.network.Nodes`

@@ -8,6 +8,12 @@ In this example, we import a GTFS feed to our model and perform map matching.
 
 We use data from Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.transit.Transit`
+#     * :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`
 
 # %%
 
@@ -121,10 +127,3 @@ map_osm
 
 # %%
 project.close()
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.transit.Transit`
-#     * :func:`aequilibrae.transit.lib_gtfs.GTFSRouteSystemBuilder`

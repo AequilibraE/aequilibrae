@@ -6,6 +6,11 @@ Network skimming
 
 In this example, we show how to perform network skimming for Coquimbo, a city in La Serena Metropolitan Area in Chile.
 """
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.paths.NetworkSkimming`
 
 # %%
 
@@ -96,9 +101,3 @@ mat_record.save()
 
 # %%
 project.close()
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.paths.NetworkSkimming`

@@ -8,6 +8,16 @@ In this example, we import a simple network in GMNS format.
 The source files of this network are publicly available in the 
 `GMNS GitHub repository <https://github.com/zephyr-data-specs/GMNS>`_ itself.
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`importing_from_gmns_file` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.Network.create_from_gmns`
 
 # %%
 
@@ -125,14 +135,3 @@ map_gmns
 
 # %%
 project.close()
-
-# %%
-# .. admonition:: References
-# 
-#   * :ref:`importing_from_gmns_file` 
-
-# %%
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.project.Network.create_from_gmns`

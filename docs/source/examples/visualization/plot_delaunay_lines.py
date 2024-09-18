@@ -10,6 +10,11 @@ For more on this topic, see its `first publication <https://xl-optim.com/delauna
 
 We use the Sioux Falls example once again.
 """
+# %% 
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.utils.create_delaunay_network.DelaunayAnalysis`
 
 # %%
 
@@ -71,9 +76,3 @@ plt.show()
 # %%
 # Close the project
 project.close()
-
-# %% 
-# .. seealso::
-#     The use of the following functions, methods, classes and modules is shown in this example:
-#
-#     * :func:`aequilibrae.utils.create_delaunay_network.DelaunayAnalysis`
