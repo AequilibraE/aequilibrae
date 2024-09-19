@@ -17,6 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from sphinx_gallery.sorting import ExplicitOrder
+import pkg_resources
 
 project_dir = Path(__file__).parent.parent.parent
 if str(project_dir) not in sys.path:
@@ -27,7 +28,7 @@ project_dir = os.path.abspath("../../")
 if str(project_dir) not in sys.path:
     sys.path.insert(0, project_dir)
 
-from __version__ import release_version
+release_version = pkg_resources.get_distribution("aequilibrae").version
 
 # -- Project information -----------------------------------------------------
 
@@ -56,8 +57,10 @@ else:
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
+    "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx_gallery.gen_gallery",
     "sphinx_design",
     "sphinx_copybutton",
@@ -78,10 +81,10 @@ sphinx_gallery_conf = {
         [
             "examples/creating_models",
             "examples/editing_networks",
-            "examples/trip_distribution",
-            "examples/visualization",
-            "examples/aequilibrae_without_a_model",
+            "examples/skimming",
             "examples/assignment_workflows",
+            "examples/aequilibrae_without_a_model",
+            "examples/visualization",
             "examples/other_applications",
         ]
     ),
@@ -91,10 +94,7 @@ sphinx_gallery_conf = {
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_static"]
 
-# The suffix(es) of source filenames.¶
-# You can specify multiple suffix as a list of string:
-#
-# source_suffix = ['.rst', '.md']
+# The suffix(es) of source filenames.
 source_suffix = ".rst"
 
 # The master toctree document.
@@ -136,8 +136,8 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_align": "left",
     "switcher": {
-        "json_url": "_static/switcher.json",
-        "version_match": switcher_version,
+        "json_url": "https://www.aequilibrae.com/python/latest/_static/switcher.json",
+        "version_match": version,
     },
     # "check_switcher": False,
     "github_url": "https://github.com/AequilibraE/aequilibrae",
@@ -161,15 +161,12 @@ latex_elements = {}
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", "Pedro Camargo", "manual")]
+latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", author, "manual")]
 
 latex_appendices = [
-    "installation",
-    "validation_benchmarking/ipf_performance",
-    "validation_benchmarking/traffic_assignment",
-    "modeling_with_aequilibrae/project_database/importing_from_osm",
-    "modeling_with_aequilibrae/project_database/importing_from_gmns",
-    "modeling_with_aequilibrae/project_database/exporting_to_gmns",
+    "useful_information/installation",
+    "useful_information/validation_benchmarking/ipf_performance",
+    "useful_information/validation_benchmarking/traffic_assignment",
 ]
 
 # -- Options for manual page output ------------------------------------------
@@ -180,18 +177,9 @@ man_pages = [(master_doc, "aequilibrae", "AequilibraE Documentation", [author], 
 
 # -- Options for Texinfo output ----------------------------------------------
 
-autodoc_default_options = {
-    "members": True,
-    "inherited-members": True,
-    "member-order": "bysource",
-    "special-members": False,
-    "private-members": False,
-    "undoc-members": True,
-    # "exclude-members": "__weakref__",
-}
+autodoc_default_options = {"members": True, "inherited-members": True, "undoc-members": True, "autosummary": True}
 
-# autodoc_member_order = "groupwise"
-
+autodoc_member_order = "groupwise"
 autoclass_content = "class"  # classes should include both the class' and the __init__ method's docstring
 
 autosummary_generate = True
@@ -206,7 +194,7 @@ texinfo_documents = [
         "AequilibraE Documentation",
         author,
         "AequilibraE",
-        "One line description of project.",
+        "Comprehensive Python package for transportation modeling",
         "Miscellaneous",
     )
 ]

@@ -20,6 +20,7 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/plot_network_image.png'
 
 # %%
+
 # We create an empty project on an arbitrary folder
 fldr = join(gettempdir(), uuid4().hex)
 
@@ -28,10 +29,15 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "nauru")
 
 # %%
-# We grab all the links data as a Pandas dataframe so we can process it easier
+# We grab all the links data as a geopandas GeoDataFrame so we can process it easier
 links = project.network.links.data
 nodes = project.network.nodes.data
 
+# %%
+# And if you want to take a quick look in your GeoDataFrames, you can plot it!
+
+# links.plot()
+ 
 # %%
 # We create our Folium layers
 network_links = folium.FeatureGroup("links")

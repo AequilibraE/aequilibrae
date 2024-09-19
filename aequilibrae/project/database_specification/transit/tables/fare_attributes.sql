@@ -1,7 +1,8 @@
 --@ The *fare_attributes* table holds information about the fare values.
 --@ This table information comes from the GTFS file *fare_attributes.txt*.
 --@ Given that this file is optional in GTFS, it can be empty.
---@ You can check out more information `here <https://gtfs.org/schedule/reference/#fare_attributestxt>`_.
+--@ You can check out more information 
+--@ `on fare attributes here <https://gtfs.org/documentation/schedule/reference/#fare_attributestxt>`_.
 --@ 
 --@ **fare_id** identifies a fare class
 --@ 

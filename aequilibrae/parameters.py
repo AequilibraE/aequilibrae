@@ -6,16 +6,24 @@ from aequilibrae.context import get_active_project
 
 
 class Parameters:
-    """Global parameters module
+    """Global parameters module.
 
-    Parameters are used in many procedures, and are often defined only in the parameters.yml file ONLY
+    Parameters are used in many procedures, and are often defined in the ``parameters.yml`` file ONLY.
+
     Parameters are organized in the following groups:
 
     * assignment
     * distribution
+    * network
+      * links
+      * modes
+      * nodes
+      * osm
+      * gmns
+    * osm
     * system
-    * report zeros
-    * temp directory
+
+    Please observe that OSM information handled on network is not the same on the OSM group.
 
     .. code-block:: python
 

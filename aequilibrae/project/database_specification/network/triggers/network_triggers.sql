@@ -112,10 +112,10 @@ create trigger new_link after insert on links
     set b_node = (
       select node_id
       from nodes
-      where nodes.geometry = EndPoint(links.geometry) and
+      where nodes.geometry = EndPoint(new.geometry) and
       (nodes.rowid in (
           select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = EndPoint(links.geometry)) or
+          search_frame = EndPoint(new.geometry)) or
         nodes.node_id = new.b_node))
     where links.rowid = new.rowid;
     update links
@@ -160,10 +160,10 @@ create trigger updated_link_geometry after update of geometry on links
     set b_node = (
       select node_id
       from nodes
-      where nodes.geometry = EndPoint(links.geometry) and
+      where nodes.geometry = EndPoint(new.geometry) and
       (nodes.rowid in (
           select rowid from SpatialIndex where f_table_name = 'nodes' and
-          search_frame = EndPoint(links.geometry)) or
+          search_frame = EndPoint(new.geometry)) or
         nodes.node_id = new.b_node))
     where links.rowid = new.rowid;
     update links

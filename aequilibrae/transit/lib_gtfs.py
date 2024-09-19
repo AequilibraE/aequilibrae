@@ -28,7 +28,9 @@ class GTFSRouteSystemBuilder:
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+            
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         self.__network = network
@@ -83,7 +85,7 @@ class GTFSRouteSystemBuilder:
 
         :Arguments:
             **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
-                                    value i.e. -> "{0: 2.0,...}"
+            value i.e. -> "{0: 2.0,...}"
         """
         self.gtfs_data._set_pces(pces)
 

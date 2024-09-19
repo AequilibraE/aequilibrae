@@ -1,6 +1,7 @@
 --@ The *trips* table holds information on trips for each route.
 --@ This table comes from the GTFS file *trips.txt*.
---@ You can find more information about it `here <https://gtfs.org/schedule/reference/#tripstxt>`_.
+--@ You can find more information about the 
+--@ `trips table here <https://gtfs.org/documentation/schedule/reference/#tripstxt>`_.
 --@ 
 --@ **trip_id** identifies a trip
 --@ 

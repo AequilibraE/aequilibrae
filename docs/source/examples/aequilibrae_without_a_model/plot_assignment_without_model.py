@@ -7,14 +7,28 @@ Traffic Assignment without an AequilibraE Model
 In this example, we show how to perform Traffic Assignment in AequilibraE without a model.
 
 We are using `Sioux Falls data <https://github.com/bstabler/TransportationNetworks/tree/master/SiouxFalls>`_, from TNTP.
-
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`static_traffic_assignment`
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.paths.Graph`
+#     * :func:`aequilibrae.paths.TrafficClass`
+#     * :func:`aequilibrae.paths.TrafficAssignment` 
+#     * :func:`aequilibrae.matrix.AequilibraeMatrix`
+
 # %%
 
 # Imports
 import os
 import pandas as pd
 import numpy as np
+from uuid import uuid4
 from tempfile import gettempdir
 
 from aequilibrae.matrix import AequilibraeMatrix
@@ -33,7 +47,7 @@ geometry_file = "https://raw.githubusercontent.com/bstabler/TransportationNetwor
 
 # %%
 # Let's use a temporary folder to store our data
-folder = gettempdir()
+folder = os.path.join(gettempdir(), uuid4().hex)
 
 # %% 
 # First we load our demand file. This file has three columns: O, D, and Ton. 
@@ -56,8 +70,7 @@ aemfile = os.path.join(folder, "demand.aem")
 aem = AequilibraeMatrix()
 kwargs = {'file_name': aemfile,
           'zones': zones,
-          'matrix_names': ['matrix'],
-          "memory_only": False}  # We'll save it to disk so we can use it later
+          'matrix_names': ['matrix']}
 
 aem.create_empty(**kwargs)
 aem.matrix['matrix'][:,:] = mtx[:,:]
@@ -87,7 +100,7 @@ geom.drop(columns=["newline", "terminator"], index=[24], inplace=True)
 geom["node_id"] = geom.index + 1
 geom = geom.astype({"node_id": "int64", "lon": "float64", "lat": "float64"}).set_index("node_id")
 
-#%%
+# %%
 # Let's build our Graph! In case you're in doubt about AequilibraE Graph, 
 # :ref:`click here <aequilibrae-graphs>` to read more about it.
 
@@ -107,12 +120,12 @@ g.network["id"] = g.network.link_id
 g.lonlat_index = geom.loc[g.all_nodes]
 
 # %%
-# Let's perform our assignment. Feel free to try different algorithms,
-# as well as change the maximum number of iterations and the gap.
-aem = AequilibraeMatrix()
-aem.load(aemfile)
+# Let's prepare our matrix for computation
 aem.computational_view(["matrix"])
 
+# %%
+# Let's perform our assignment. Feel free to try different algorithms,
+# as well as change the maximum number of iterations and the gap
 assigclass = TrafficClass("car", g, aem)
 
 assig = TrafficAssignment()
@@ -129,8 +142,8 @@ assig.execute()
 
 # %%
 # Now let's take a look at the Assignment results
-print(assig.results())
+assig.results()
 
 # %%
 # And at the Assignment report
-print(assig.report())
+assig.report()

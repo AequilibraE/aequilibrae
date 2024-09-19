@@ -1,7 +1,8 @@
 --@ The *agencies* table holds information about the Public Transport
 --@ agencies within the GTFS data. This table information comes from
 --@ GTFS file *agency.txt*.
---@ You can check out more information `here <https://gtfs.org/schedule/reference/#agencytxt>`_.
+--@ You can check out more information 
+--@ `on agencies here <https://gtfs.org/documentation/schedule/reference/#agencytxt>`_.
 --@ 
 --@ **agency_id** identifies the agency for the specified route
 --@
