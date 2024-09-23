@@ -17,7 +17,6 @@ class Ipf:
 
     .. code-block:: python
 
-        >>> from aequilibrae.utils.create_example import create_example
         >>> from aequilibrae.distribution import Ipf
         >>> from aequilibrae.matrix import AequilibraeData
 
@@ -26,9 +25,9 @@ class Ipf:
         >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
 
-        >>> dataset_args = {"entries": matrix.zones, 
+        >>> dataset_args = {"entries": matrix.zones,
         ...                 "field_names": ["productions", "attractions"],
-        ...                 "data_types": [np.float64, np.float64], 
+        ...                 "data_types": [np.float64, np.float64],
         ...                 "memory_mode": True}
 
         >>> vectors = AequilibraeData()
@@ -40,11 +39,11 @@ class Ipf:
         # We assume that the indices would be sorted and that they would match the matrix indices
         >>> vectors.index[:] = matrix.index[:]
 
-        >>> ipf_args = {"matrix": matrix, 
-        ...             "rows": vectors, 
-        ...             "row_field": "productions", 
+        >>> ipf_args = {"matrix": matrix,
+        ...             "rows": vectors,
+        ...             "row_field": "productions",
         ...             "columns": vectors,
-        ...             "column_field": "attractions", 
+        ...             "column_field": "attractions",
         ...             "nan_as_zero": False}
 
         >>> fratar = Ipf(**ipf_args)

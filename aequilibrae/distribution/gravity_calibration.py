@@ -17,29 +17,25 @@ from aequilibrae.parameters import Parameters
 class GravityCalibration:
     """Calibrate a traditional gravity model
 
-    Available deterrence function forms are: 'EXPO' or 'POWER'. 'GAMMA'
+    Available deterrence function forms are: 'EXPO', 'POWER' or 'GAMMA'.
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
+        >>> from aequilibrae.utils.create_example import create_example
         >>> from aequilibrae.distribution import GravityCalibration
 
-        >>> project = Project.from_path("/tmp/test_project_gc")
+        >>> project = create_example(project_path)
 
-        # We load the impedance matrix
-        >>> matrix = AequilibraeMatrix()
-        >>> matrix.load('/tmp/test_project_gc/matrices/demand.omx')
-        >>> matrix.computational_view(['matrix'])
+        # We load the demand matrix
+        >>> demand = project.matrices.get_matrix("demand_omx")
+        >>> demand.computational_view()
 
-        # We load the impedance matrix
-        >>> impedmatrix = AequilibraeMatrix()
-        >>> impedmatrix.load('/tmp/test_project_gc/matrices/skims.omx')
-        >>> impedmatrix.computational_view(['time_final'])
+        # We load the skim matrix
+        >>> skim = project.matrices.get_matrix("skims")
+        >>> skim.computational_view(["time_final"])
 
-        # Creates the problem
-        >>> args = {"matrix": matrix,
-        ...         "impedance": impedmatrix,
+        >>> args = {"matrix": demand,
+        ...         "impedance": skim,
         ...         "row_field": "productions",
         ...         "function": 'expo',
         ...         "nan_as_zero": True}
@@ -47,12 +43,7 @@ class GravityCalibration:
 
         # Solve and save outputs
         >>> gravity.calibrate()
-        >>> gravity.model.save('/tmp/test_project_gc/dist_expo_model.mod')
-
-        # To save the model report in a file
-        # with open('/tmp/test_project_gc/report.txt', 'w') as f:
-        #     for line in gravity.report:
-        #         f.write(f'{line}\\n')
+        >>> gravity.model.save(os.path.join(project_path, 'dist_expo_model.mod'))
     """
 
     def __init__(self, project=None, **kwargs):

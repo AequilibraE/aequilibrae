@@ -10,10 +10,6 @@ from aequilibrae.utils.create_example import create_example
 
 project = create_example("/tmp/test_project")
 project.close()
-project = create_example("/tmp/test_project_gc")
-project.close()
-project = create_example("/tmp/test_project_ga")
-project.close()
 project = create_example("/tmp/accessing_sfalls_data")
 project.close()
 project = create_example("/tmp/accessing_nauru_data", "nauru")

@@ -8,6 +8,8 @@ from shutil import copytree
 
 import pytest
 
+import pandas as pd
+
 from aequilibrae import Project
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit import Transit
@@ -104,3 +106,6 @@ def transit_conn(create_gtfs_project):
 def doctest_fixtures(doctest_namespace, create_path, tmp_path_factory):
     doctest_namespace["project_path"] = str(create_path)
     doctest_namespace["my_folder_path"] = tmp_path_factory.mktemp(uuid.uuid4().hex)
+    doctest_namespace["os"] = os
+    doctest_namespace["pd"] = pd
+    doctest_namespace["create_example"] = create_example

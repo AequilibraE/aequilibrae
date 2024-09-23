@@ -823,7 +823,6 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.utils.create_example import create_example
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> project = create_example(project_path)
@@ -943,9 +942,10 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'), 
-            ...                  zones=zones_in_the_model, 
+            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
+            ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
+
             >>> mat.copy(os.path.join(my_folder_path, 'copy_of_my_matrix.aem'),
             ...          cores=['bike trips', 'walk trips'],
             ...          names=['bicycle', 'walking'],
@@ -1007,7 +1007,6 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.utils.create_example import create_example
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> project = create_example(project_path)
@@ -1037,7 +1036,6 @@ class AequilibraeMatrix(object):
 
         .. code-block:: python
 
-            >>> from aequilibrae.utils.create_example import create_example
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> project = create_example(project_path)
@@ -1069,8 +1067,8 @@ class AequilibraeMatrix(object):
             >>> index = np.arange(1, 4, dtype=np.int32)
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name=os.path.join(my_folder_path, "matrices/nan_matrix.aem"), 
-            ...                  zones=3, 
+            >>> mat.create_empty(file_name=os.path.join(my_folder_path, "matrices/nan_matrix.aem"),
+            ...                  zones=3,
             ...                  matrix_names=["only_nan"])
             >>> mat.index[:] = index[:]
             >>> mat.matrix["only_nan"][:, :] = nan_matrix[:, :]
@@ -1125,7 +1123,7 @@ class AequilibraeMatrix(object):
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
             >>> zones_in_the_model = 3317
-            
+
             >>> mat = AequilibraeMatrix()
             >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'my_matrix.aem'),
             ...                  zones=zones_in_the_model,

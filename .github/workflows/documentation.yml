@@ -45,6 +45,11 @@ jobs:
 
     - name: Test docstrings
       run: |
+        python -m pytest --doctest-modules aequilibrae/distribution/gravity_application.py
+        python -m pytest --doctest-modules aequilibrae/distribution/gravity_calibration.py
+        python -m pytest --doctest-modules aequilibrae/distribution/ipf.py
+        python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_data.py 
+        python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_matrix.py
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
         python -m pytest docs/source/modeling_with_aequilibrae/project_pieces --doctest-glob=*.rst
 
