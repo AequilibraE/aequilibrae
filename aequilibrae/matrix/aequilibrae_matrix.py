@@ -197,10 +197,10 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
+            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'path_to_my_matrix.aem'),
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
-            ...                  memory_only=False,)
+            ...                  memory_only=False)
             >>> mat.num_indices
             1
             >>> mat.zones
@@ -675,7 +675,7 @@ class AequilibraeMatrix(object):
             >>> index_list = ['tazs', 'census']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name="/tmp/path_to_new_matrix.aem",
+            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'path_to_my_matrix.aem'),
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list,
             ...                  index_names=index_list )
@@ -767,15 +767,15 @@ class AequilibraeMatrix(object):
             >>> names_list = ['Car trips', 'pt trips', 'DRT trips', 'bike trips', 'walk trips']
 
             >>> mat = AequilibraeMatrix()
-            >>> mat.create_empty(file_name='/tmp/path_to_matrix.aem',
+            >>> mat.create_empty(file_name=os.path.join(my_folder_path, 'path_to_my_matrix.aem'),
             ...                  zones=zones_in_the_model,
             ...                  matrix_names=names_list)
             >>> mat.cores
             5
-            >>> mat.export('/tmp/my_new_path.aem', ['Car trips', 'bike trips'])
+            >>> mat.export(os.path.join(my_folder_path, 'my_new_path.aem'), ['Car trips', 'bike trips'])
 
             >>> mat2 = AequilibraeMatrix()
-            >>> mat2.load('/tmp/my_new_path.aem')
+            >>> mat2.load(os.path.join(my_folder_path, 'my_new_path.aem'))
             >>> mat2.cores
             2
         """
@@ -1168,9 +1168,8 @@ class AequilibraeMatrix(object):
 
             >>> from aequilibrae.matrix import AequilibraeMatrix
 
-            >>> name = AequilibraeMatrix().random_name() # doctest: +ELLIPSIS
-
-            # This is an example of output
-            # '/tmp/Aequilibrae_matrix_54625f36-bf41-4c85-80fb-7fc2e3f3d76e.aem'
+            >>> mat = AequilibraeMatrix()
+            >>> mat.random_name() # doctest: +ELLIPSIS
+            '/tmp/Aequilibrae_matrix_...'
         """
         return os.path.join(tempfile.gettempdir(), f"Aequilibrae_matrix_{uuid.uuid4()}.aem")

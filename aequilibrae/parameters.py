@@ -30,11 +30,11 @@ class Parameters:
         >>> from aequilibrae import Project, Parameters
 
         >>> project = Project()
-        >>> project.new(tmp_path_empty)
+        >>> project.new(project_path)
 
         >>> p = Parameters(project)
 
-        >>> p.parameters['system']['logging_directory'] =  "/tmp/other_folder"
+        >>> p.parameters['system']['logging_directory'] =  "/path_to/other_logging_directory"
         >>> p.parameters['osm']['overpass_endpoint'] = "http://192.168.0.110:32780/api"
         >>> p.parameters['osm']['max_query_area_size'] = 10000000000
         >>> p.parameters['osm']['sleeptime'] = 0

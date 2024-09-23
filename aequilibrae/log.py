@@ -13,7 +13,7 @@ class Log:
         >>> from aequilibrae import Project
 
         >>> project = Project()
-        >>> project.new(tmp_path_empty)
+        >>> project.new(project_path)
 
         >>> log = project.log()
 
