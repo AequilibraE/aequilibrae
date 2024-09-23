@@ -42,11 +42,12 @@ class GraphBase(ABC):  # noqa: B024
         - dead end removal.
 
     Link contraction creates a topological equivalent graph by contracting sequences of links between nodes
-    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into single links.
+    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into
+    single links.
 
-    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the observation
-    that in a graph with non-negative weights a dead end will only ever appear in the results of a short(est) path if the
-    origin or destination is present within that dead end.
+    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the
+    observation that in a graph with non-negative weights a dead end will only ever appear in the results of a
+    short(est) path if the origin or destination is present within that dead end.
 
     Dead end removal is applied before link contraction and does not create a strictly topological equivalent graph,
     however, all centroids are preserved.
@@ -416,7 +417,7 @@ class GraphBase(ABC):  # noqa: B024
         Saves graph to disk
 
         :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is *aeg*
+            **filename** (:obj:`str`): Path to file. Usual file extension is 'aeg'
         """
         mygraph = {}
         mygraph["description"] = self.description

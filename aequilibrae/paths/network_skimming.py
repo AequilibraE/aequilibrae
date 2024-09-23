@@ -25,10 +25,9 @@ class NetworkSkimming:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
         >>> from aequilibrae.paths.network_skimming import NetworkSkimming
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
 
         >>> network = project.network
         >>> network.build_graphs()
@@ -48,10 +47,10 @@ class NetworkSkimming:
         >>> matrix = skm.results.skims
 
         # Or you can save the results to disk
-        >>> skm.save_to_project('/tmp/skimming result.omx')
+        >>> skm.save_to_project(os.path.join(project_path, 'matrices/skimming_result.omx'))
 
         # Or specify the AequilibraE's matrix file format
-        >>> skm.save_to_project('skimming result', 'aem')
+        >>> skm.save_to_project(os.path.join(project_path, 'matrices/skimming_result.aem'), 'aem')
 
         >>> project.close()
     """
@@ -132,7 +131,7 @@ class NetworkSkimming:
         :Arguments:
             **name** (:obj:`str`): Name of the matrix. Same value for matrix record name and file (plus extension)
 
-            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is ``'omx'``
+            **format** (:obj:`str`, *Optional*): File format ('aem' or 'omx'). Default is 'omx'
 
             **project** (:obj:`Project`, *Optional*): Project we want to save the results to.
             Defaults to the active project

@@ -13,7 +13,7 @@ data_export_types = ["aed", "csv", "sqlite"]
 
 class AequilibraeData(object):
     """AequilibraE dataset
-    
+
     .. code-block:: python
 
         >>> from aequilibrae.matrix import AequilibraeData
