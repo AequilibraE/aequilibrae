@@ -17,23 +17,22 @@ class Ipf:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> from aequilibrae.utils.create_example import create_example
         >>> from aequilibrae.distribution import Ipf
-        >>> from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+        >>> from aequilibrae.matrix import AequilibraeData
 
-        >>> project = Project.from_path("/tmp/test_project_ipf")
+        >>> project = create_example(project_path)
 
-        >>> matrix = AequilibraeMatrix()
-
-        # Here we can create from OMX or load from an AequilibraE matrix.
-        >>> matrix.load('/tmp/test_project/matrices/demand.omx')
+        >>> matrix = project.matrices.get_matrix("demand_omx")
         >>> matrix.computational_view()
 
-        >>> args = {"entries": matrix.zones, "field_names": ["productions", "attractions"],
-        ...         "data_types": [np.float64, np.float64], "memory_mode": True}
+        >>> dataset_args = {"entries": matrix.zones, 
+        ...                 "field_names": ["productions", "attractions"],
+        ...                 "data_types": [np.float64, np.float64], 
+        ...                 "memory_mode": True}
 
         >>> vectors = AequilibraeData()
-        >>> vectors.create_empty(**args)
+        >>> vectors.create_empty(**dataset_args)
 
         >>> vectors.productions[:] = matrix.rows()[:]
         >>> vectors.attractions[:] = matrix.columns()[:]
@@ -41,17 +40,19 @@ class Ipf:
         # We assume that the indices would be sorted and that they would match the matrix indices
         >>> vectors.index[:] = matrix.index[:]
 
-        >>> args = {
-        ...         "matrix": matrix, "rows": vectors, "row_field": "productions", "columns": vectors,
-        ...         "column_field": "attractions", "nan_as_zero": False}
+        >>> ipf_args = {"matrix": matrix, 
+        ...             "rows": vectors, 
+        ...             "row_field": "productions", 
+        ...             "columns": vectors,
+        ...             "column_field": "attractions", 
+        ...             "nan_as_zero": False}
 
-        >>> fratar = Ipf(**args)
-
+        >>> fratar = Ipf(**ipf_args)
         >>> fratar.fit()
 
         # We can get back to our OMX matrix in the end
-        >>> fratar.output.export("/tmp/to_omx_output.omx")
-        >>> fratar.output.export("/tmp/to_aem_output.aem")
+        >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.omx"))
+        >>> fratar.output.export(os.path.join(my_folder_path, "to_omx_output.aem"))
     """
 
     def __init__(self, project=None, **kwargs):
