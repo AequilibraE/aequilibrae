@@ -68,11 +68,9 @@ class TrafficClass(TransportClassBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
         >>> from aequilibrae.paths import TrafficClass
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
@@ -82,7 +80,6 @@ class TrafficClass(TransportClassBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
         >>> demand.computational_view(['matrix'])
 

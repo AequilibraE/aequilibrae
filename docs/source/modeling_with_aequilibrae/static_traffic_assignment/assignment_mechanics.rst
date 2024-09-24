@@ -62,12 +62,10 @@ or when using AequilibraE in anger, as much of the setup is done by default.
 
 .. code-block:: python
 
-    from aequilibrae import Project
+    >>> project = create_example(project_path)
+    >>> project.network.build_graphs(modes=["c"]) # We build the graph for cars only
 
-    project = Project.from_path("/tmp/test_project")
-    project.network.build_graphs(modes=["c"]) # We build the graph for cars only
-
-    graph = project.network.graphs['c'] # we grab the graph for cars
+    >>> graph = project.network.graphs['c'] # we grab the graph for cars
 
 Manipulating graphs in memory
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

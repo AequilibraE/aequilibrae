@@ -131,7 +131,8 @@ class GTFSRouteSystemBuilder:
 
         Defaults to map-matching Bus routes (type 3) only.
 
-        For a reference of route types, see https://developers.google.com/transit/gtfs/reference#routestxt
+        For a reference of route types, see the inputs for
+        `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
 
         :Arguments:
             **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only

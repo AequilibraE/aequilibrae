@@ -150,11 +150,9 @@ class TrafficAssignment(AssignmentBase):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix
         >>> from aequilibrae.paths import TrafficAssignment, TrafficClass
 
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
         >>> project.network.build_graphs()
 
         >>> graph = project.network.graphs['c'] # we grab the graph for cars
@@ -164,7 +162,6 @@ class TrafficAssignment(AssignmentBase):
 
         >>> proj_matrices = project.matrices
 
-        >>> demand = AequilibraeMatrix()
         >>> demand = proj_matrices.get_matrix("demand_omx")
 
         # We will only assign one user class stored as 'matrix' inside the OMX file
@@ -191,14 +188,12 @@ class TrafficAssignment(AssignmentBase):
         # And the algorithm we want to use to assign
         >>> assig.set_algorithm('bfw')
 
-        # Since we haven't checked the parameters file, let's make sure convergence criteria is good
-        >>> assig.max_iter = 1000
+        >>> assig.max_iter = 10
         >>> assig.rgap_target = 0.00001
 
         >>> assig.execute() # we then execute the assignment
 
         # If you want, it is possible to access the convergence report
-        >>> import pandas as pd
         >>> convergence_report = pd.DataFrame(assig.assignment.convergence_report)
 
         # Assignment results can be viewed as a Pandas DataFrame

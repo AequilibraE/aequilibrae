@@ -537,21 +537,30 @@ class GraphBase(ABC):  # noqa: B024
 
     def create_compressed_link_network_mapping(self):
         """
-        Create two arrays providing a mapping of compressed id to link id.
+        Create three arrays providing a mapping of compressed ID to link ID.
 
-        Uses sparse compression. Index ``idx`` by the by compressed id and compressed id + 1, the
+        Uses sparse compression. Index 'idx' by the by compressed ID and compressed ID + 1, the
         network IDs are then in the range ``idx[id]:idx[id + 1]``.
+
+        Links not in the compressed graph are not contained within the 'data' array.
 
         .. code-block:: python
 
-            >>> idx, data = graph.compressed_link_network_mapping
-            >>> data[idx[id]:idx[id + 1]]  # ==> Slice of network ID's corresponding to the compressed ID
+            >>> project = create_example(project_path)
 
-        Links not in the compressed graph are not contained within the ``data`` array.
+            >>> project.network.build_graphs()
+
+            >>> graph = project.network.graphs['c']
+            >>> graph.prepare_graph(np.arange(1,25))
+
+            >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
 
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``
+
             **data** (:obj:`np.array`): array of link ids
+
+            **node_mapping**: (:obj:`np.array`): array of node_mapping ids
         """
 
         return create_compressed_link_network_mapping(self)

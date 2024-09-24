@@ -15,14 +15,13 @@ class PathResults:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
         >>> from aequilibrae.paths.results import PathResults
 
-        >>> proj = Project.from_path("/tmp/test_project")
-        >>> proj.network.build_graphs()
+        >>> project = create_example(project_path)
+        >>> project.network.build_graphs()
 
         # Mode c is car in this project
-        >>> car_graph = proj.network.graphs['c']
+        >>> car_graph = project.network.graphs['c']
 
         # minimize distance
         >>> car_graph.set_graph('distance')
@@ -34,12 +33,6 @@ class PathResults:
         >>> res = PathResults()
         >>> res.prepare(car_graph)
         >>> res.compute_path(1, 17)
-
-        # res.milepost contains the milepost corresponding to each node along the path
-        # res.path_nodes contains the sequence of nodes that form the path
-        # res.path  contains the sequence of links that form the path
-        # res.path_link_directions contains the link directions corresponding to the above links
-        # res.skims contain all skims requested when preparing the graph
 
         # Update all the outputs mentioned above for destination 9. Same origin: 1
         >>> res.update_trace(9)
