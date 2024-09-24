@@ -50,6 +50,7 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/distribution/ipf.py
         python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_data.py 
         python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_matrix.py
+        python -m pytest --doctest-modules aequilibrae/paths/vdf.py
         python -m pytest --doctest-modules aequilibrae/project/network/link_types.py
         python -m pytest --doctest-modules aequilibrae/project/network/link.py
         python -m pytest --doctest-modules aequilibrae/project/network/links.py
@@ -61,7 +62,11 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/project/network/periods.py
         python -m pytest --doctest-modules aequilibrae/project/about.py
         python -m pytest --doctest-modules aequilibrae/project/field_editor.py
-        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
+        python -m pytest --doctest-modules aequilibrae/project/project.py
+        python -m pytest --doctest-modules aequilibrae/project/zoning.py
+        python -m pytest --doctest-modules aequilibrae/log.py 
+        python -m pytest --doctest-modules aequilibrae/parameters.py 
+        python -m pytest --doctest-modules aequilibrae/transit/transit.py
         python -m pytest docs/source/modeling_with_aequilibrae/project_pieces --doctest-glob=*.rst
 
     - name: Build documentation
