@@ -50,6 +50,17 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/distribution/ipf.py
         python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_data.py 
         python -m pytest --doctest-modules aequilibrae/matrix/aequilibrae_matrix.py
+        python -m pytest --doctest-modules aequilibrae/project/network/link_types.py
+        python -m pytest --doctest-modules aequilibrae/project/network/link.py
+        python -m pytest --doctest-modules aequilibrae/project/network/links.py
+        python -m pytest --doctest-modules aequilibrae/project/network/modes.py
+        python -m pytest --doctest-modules aequilibrae/project/network/network.py
+        python -m pytest --doctest-modules aequilibrae/project/network/node.py
+        python -m pytest --doctest-modules aequilibrae/project/network/nodes.py
+        python -m pytest --doctest-modules aequilibrae/project/network/period.py
+        python -m pytest --doctest-modules aequilibrae/project/network/periods.py
+        python -m pytest --doctest-modules aequilibrae/project/about.py
+        python -m pytest --doctest-modules aequilibrae/project/field_editor.py
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
         python -m pytest docs/source/modeling_with_aequilibrae/project_pieces --doctest-glob=*.rst
 
