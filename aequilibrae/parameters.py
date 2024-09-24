@@ -27,7 +27,7 @@ class Parameters:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project, Parameters
+        >>> from aequilibrae import Parameters
 
         >>> project = Project()
         >>> project.new(project_path)

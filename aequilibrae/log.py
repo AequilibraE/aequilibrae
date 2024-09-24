@@ -10,8 +10,6 @@ class Log:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
         >>> project = Project()
         >>> project.new(project_path)
 
