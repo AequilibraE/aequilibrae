@@ -21,7 +21,6 @@ class GravityCalibration:
 
     .. code-block:: python
 
-        >>> from aequilibrae.utils.create_example import create_example
         >>> from aequilibrae.distribution import GravityCalibration
 
         >>> project = create_example(project_path)
