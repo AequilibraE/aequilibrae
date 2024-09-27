@@ -410,7 +410,6 @@ def create_compressed_link_network_mapping(graph):
         np.int64_t[:, :] dups
 
     start_tiem = time.time()
-    print("starting compressed link network mapping", start_tiem)
 
     # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
     # bother redoing sorting it.
@@ -479,7 +478,6 @@ def create_compressed_link_network_mapping(graph):
     graph.compressed_link_network_mapping_data = np.array(data)
     graph.network_compressed_node_mapping = np.array(node_mapping)
 
-    print("end compressed link network mapping", time.time() - start_tiem)
     return (
         graph.compressed_link_network_mapping_idx,
         graph.compressed_link_network_mapping_data,
