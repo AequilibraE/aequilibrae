@@ -52,6 +52,7 @@ jobs:
         python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py 
         python -m pytest --doctest-modules aequilibrae/transit
         python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/project_pieces
+        python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/static_traffic_assignment
 
     - name: Build documentation
       run: |
