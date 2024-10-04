@@ -8,23 +8,15 @@ class Period(SafeClass):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path, "coquimbo")
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_periods = proj.network.periods
+        >>> all_periods = project.network.periods
 
         # We can just get one link in specific
         >>> period1 = all_periods.get(1)
 
         # We can find out which fields exist for the period
         >>> which_fields_do_we_have = period1.data_fields()
-
-        # It succeeds if the period_id already does not exist
-        >>> period1.renumber(998877)
-
-        # We can just save the period
-        >>> period1.save()
     """
 
     def __init__(self, dataset, project):

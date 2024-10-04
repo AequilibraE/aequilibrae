@@ -26,6 +26,8 @@ class SubAreaAnalysis:
         the Graph object, demand matrix, and a GeoDataFrame whose geometry union represents the desired sub-area.
         Perform a route choice assignment, then call the ``post_process`` method to obtain a sub-area matrix.
 
+        Check how to run sub-area analysis :ref:`here <example_usage_sub_area_analysis>`.
+
         :Arguments:
             **graph** (:obj:`Graph`): AequilibraE graph object to use
 
@@ -34,31 +36,6 @@ class SubAreaAnalysis:
 
             **demand** (:obj:`Union[pandas.DataFrame, AequilibraeMatrix]`): The demand matrix to provide to the route
             choice assignment.
-
-        Minimal example:
-
-        .. code-block:: python
-
-            >>> import tempfile
-            >>> from aequilibrae import Project
-            >>> from aequilibrae.utils.create_example import create_example
-            >>> from aequilibrae.paths import SubAreaAnalysis
-
-            >>> fldr = tempfile.TemporaryDirectory(suffix="-subarea")
-            >>> proj = create_example(fldr.name, from_model="coquimbo")
-
-            >>> project.network.build_graphs()
-            >>> graph = project.network.graphs["c"]
-            >>> graph.network = graph.network.assign(utility=graph.network.distance * theta)
-            >>> graph.prepare_graph(graph.centroids)
-            >>> graph.set_graph("utility")
-            >>> graph.set_blocked_centroid_flows(False)
-
-            >>> subarea = SubAreaAnalysis(graph, zones, mat)
-            >>> subarea.rc.set_choice_set_generation("lp", max_routes=5, penalty=1.02, store_results=False)
-            >>> subarea.rc.execute(perform_assignment=True)
-            >>> demand = subarea.post_process()
-
         """
         project = project if project is not None else get_active_project()
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
@@ -92,8 +69,8 @@ class SubAreaAnalysis:
         Apply the necessary post processing to the route choice assignment select link results.
 
         :Arguments:
-            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the sub-area matrix for these demand
-            matrices.
+            **demand_cols** (*Optional*: :obj:`[list[str]]`): If provided, only construct the sub-area matrix
+            for these demand matrices.
 
         :Returns:
             **sub_area_demand** (:obj:`pd.DataFrame`): A DataFrame representing the sub-area demand matrix.
