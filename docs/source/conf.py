@@ -146,10 +146,10 @@ html_theme_options = {
     },
     "logo": {
         "text": "AequilibraE",
-        "image_light": "../../large_icon.png",
-        "image_dark": "../../large_icon.png",
+        "image_light": "_static/large_icon.png",
+        "image_dark": "_static/large_icon.png",
     },
-    "external_links": [{"name": "link-one-name", "url": "https://<link-one>"}],
+    "external_links": [{"name": "QGIS", "url": "https://www.aequilibrae.com/qgis/latest/"}],
 }
 
 # The name for this set of Sphinx documents. If None, it defaults to
@@ -165,8 +165,7 @@ htmlhelp_basename = "AequilibraEdoc"
 latex_elements = {}
 
 # Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
+# (source start file, target name, title, author, documentclass [howto, manual, or own class]).
 latex_documents = [(master_doc, "AequilibraE.tex", "AequilibraE Documentation", author, "manual")]
 
 latex_appendices = [

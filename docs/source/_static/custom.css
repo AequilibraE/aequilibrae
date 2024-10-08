@@ -1,7 +1,23 @@
-.bd-main .bd-content .bd-article-container {
-    max-width: 90%;
+.bd-page-width {
+    max-width: 80%;
 }
 
-.bd-page-width {
-    max-width: 90%;
+.bd-main .bd-content .bd-article-container {
+    max-width: 80%;
+}
+
+.bd-links__title[role="heading"][aria-level="1"] {
+    display: none;
+}
+
+a[href="_auto_examples/index.html"] {
+    font-weight: bold;
+}
+
+a[href="modeling_with_aequilibrae/index.html"] {
+    font-weight: bold;
+}
+
+a[href="api/api.html"] {
+    font-weight: bold;
 }
