@@ -144,9 +144,15 @@ html_theme_options = {
     "analytics": {
         "google_analytics_id": "G-0HRKZDXRZ7",
     },
+    "logo": {
+        "text": "AequilibraE",
+        "image_light": "../../large_icon.png",
+        "image_dark": "../../large_icon.png",
+    },
+    "external_links": [{"name": "link-one-name", "url": "https://<link-one>"}],
 }
 
-# The name for this set of Sphinx documents.  If None, it defaults to
+# The name for this set of Sphinx documents. If None, it defaults to
 html_title = f"AequilibraE {version}"
 
 # -- Options for HTMLHelp output ---------------------------------------------
