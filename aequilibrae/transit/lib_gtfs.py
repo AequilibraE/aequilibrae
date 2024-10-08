@@ -7,7 +7,8 @@ import pyproj
 from pyproj import Transformer
 from shapely.geometry import Point, MultiLineString
 
-from aequilibrae.context import get_active_project, get_logger
+from aequilibrae.log import logger
+from aequilibrae.context import get_active_project
 from aequilibrae.project.database_connection import database_connection
 from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
@@ -43,7 +44,7 @@ class GTFSRouteSystemBuilder:
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str
         self.day = day
-        self.logger = get_logger()
+        self.logger = logger
         self.gtfs_data = GTFSReader()
 
         self.srid = get_srid()
@@ -126,7 +127,7 @@ class GTFSRouteSystemBuilder:
 
         self.__do_execute_map_matching = allow
 
-    def map_match(self, route_types=[3]) -> None:  # noqa: B006
+    def map_match(self, route_types=(3)) -> None:  # noqa: B006
         """Performs map-matching for all routes of one or more types.
 
         Defaults to map-matching Bus routes (type 3) only.
@@ -142,6 +143,13 @@ class GTFSRouteSystemBuilder:
 
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
+
+        if any(e not in mode_correspondence for e in route_types):
+            missing_route_types = [e for e in route_types if e not in mode_correspondence]
+            logger.warning(
+                f"Skipping the following route_types as they have no corresponding road mode: {missing_route_types}"
+            )
+            route_types = [e for e in route_types if e in mode_correspondence]
 
         self.signal.emit(["start", len(self.select_patterns), "Map-matching patterns"])
         for i, pat in enumerate(self.select_patterns.values()):
