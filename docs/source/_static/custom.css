@@ -10,14 +10,17 @@
     display: none;
 }
 
-a[href="_auto_examples/index.html"] {
-    font-weight: bold;
+.navbar-header-items .active {
+    text-decoration: none;
+    border: none;
+
+    background-color: goldenrod;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 15px;
 }
 
-a[href="modeling_with_aequilibrae/index.html"] {
-    font-weight: bold;
-}
-
-a[href="api/api.html"] {
-    font-weight: bold;
-}
+/* .nav-item .current .active {
+    text-decoration: none;
+    border-bottom: none;
+} */

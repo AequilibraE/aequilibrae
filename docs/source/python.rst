@@ -12,7 +12,7 @@ Python
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
+   :maxdepth: 1
 
    _auto_examples/index
    modeling_with_aequilibrae/index
