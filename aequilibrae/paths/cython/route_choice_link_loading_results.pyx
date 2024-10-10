@@ -7,11 +7,20 @@ cimport cython
 import numpy as np
 import itertools
 
+from collections.abc import Hashable
+
 include 'parallel_numpy.pyx'
 
 # See note in route_choice_set.pxd
 cdef class LinkLoadingResults:
-    def __cinit__(self, demand: GeneralisedCOODemand, select_links: Dict[str, FrozenSet[FrozenSet[int]]], num_links: int, threads: int):
+    def __cinit__(
+            self,
+            demand: GeneralisedCOODemand,
+            select_links: Dict[Hashable, FrozenSet[FrozenSet[int]]],
+            num_links: int,
+            sl_link_loading: bool,
+            threads: int
+    ):
         if threads <= 0:
             raise ValueError(f"threads must be positive ({threads})")
         elif num_links <= 0:
@@ -20,6 +29,7 @@ cdef class LinkLoadingResults:
         self.demand = demand
         self.num_links = num_links
         self.od_matrix_objects = None
+        self.sl_link_loading = sl_link_loading
 
         cdef:
             vector[unique_ptr[vector[double]]] *f64_demand_cols
@@ -30,9 +40,9 @@ cdef class LinkLoadingResults:
         self.f64_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f64_demand_cols = new vector[unique_ptr[vector[double]]]()
-            f64_demand_cols.reserve(self.demand.f64.size())
+            f64_demand_cols.reserve(len(self.demand.f64_names))
 
-            for j in range(self.demand.f64.size()):
+            for j in range(len(self.demand.f64_names)):
                 f64_demand_cols.emplace_back(new vector[double](self.num_links))
 
             self.f64_link_loading_threaded.emplace_back(f64_demand_cols)
@@ -41,9 +51,9 @@ cdef class LinkLoadingResults:
         self.f32_link_loading_threaded.reserve(threads)
         for i in range(threads):
             f32_demand_cols = new vector[unique_ptr[vector[float]]]()
-            f32_demand_cols.reserve(self.demand.f32.size())
+            f32_demand_cols.reserve(len(self.demand.f32_names))
 
-            for j in range(self.demand.f32.size()):
+            for j in range(len(self.demand.f32_names)):
                 f32_demand_cols.emplace_back(new vector[float](self.num_links))
 
             self.f32_link_loading_threaded.emplace_back(f32_demand_cols)
@@ -86,39 +96,40 @@ cdef class LinkLoadingResults:
             vector[unique_ptr[vector[double]]] *f64_sl_demand_cols
             vector[unique_ptr[vector[float]]] *f32_sl_demand_cols
 
-        # Allocate f64 thread storage for select link
-        self.f64_sl_link_loading_threaded.reserve(threads)
-        for i in range(threads):
-            f64_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[double]]]]]()
-            f64_sl_select_link_sets.reserve(self.select_link_sets.size())
+        if self.sl_link_loading:
+            # Allocate f64 thread storage for select link
+            self.f64_sl_link_loading_threaded.reserve(threads)
+            for i in range(threads):
+                f64_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[double]]]]]()
+                f64_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-            for j in range(self.select_link_sets.size()):
-                f64_sl_demand_cols = new vector[unique_ptr[vector[double]]]()
-                f64_sl_demand_cols.reserve(self.demand.f64.size())
+                for j in range(self.select_link_sets.size()):
+                    f64_sl_demand_cols = new vector[unique_ptr[vector[double]]]()
+                    f64_sl_demand_cols.reserve(len(self.demand.f64_names))
 
-                for k in range(self.demand.f64.size()):
-                    f64_sl_demand_cols.emplace_back(new vector[double](self.num_links))
+                    for k in range(len(self.demand.f64_names)):
+                        f64_sl_demand_cols.emplace_back(new vector[double](self.num_links))
 
-                f64_sl_select_link_sets.emplace_back(f64_sl_demand_cols)
+                    f64_sl_select_link_sets.emplace_back(f64_sl_demand_cols)
 
-            self.f64_sl_link_loading_threaded.emplace_back(f64_sl_select_link_sets)
+                self.f64_sl_link_loading_threaded.emplace_back(f64_sl_select_link_sets)
 
-        # Allocate f32 thread storage for select link
-        self.f32_sl_link_loading_threaded.reserve(threads)
-        for i in range(threads):
-            f32_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[float]]]]]()
-            f32_sl_select_link_sets.reserve(self.select_link_sets.size())
+            # Allocate f32 thread storage for select link
+            self.f32_sl_link_loading_threaded.reserve(threads)
+            for i in range(threads):
+                f32_sl_select_link_sets = new vector[unique_ptr[vector[unique_ptr[vector[float]]]]]()
+                f32_sl_select_link_sets.reserve(self.select_link_sets.size())
 
-            for j in range(self.select_link_sets.size()):
-                f32_sl_demand_cols = new vector[unique_ptr[vector[float]]]()
-                f32_sl_demand_cols.reserve(self.demand.f32.size())
+                for j in range(self.select_link_sets.size()):
+                    f32_sl_demand_cols = new vector[unique_ptr[vector[float]]]()
+                    f32_sl_demand_cols.reserve(len(self.demand.f32_names))
 
-                for k in range(self.demand.f32.size()):
-                    f32_sl_demand_cols.emplace_back(new vector[float](self.num_links))
+                    for k in range(len(self.demand.f32_names)):
+                        f32_sl_demand_cols.emplace_back(new vector[float](self.num_links))
 
-                f32_sl_select_link_sets.emplace_back(f32_sl_demand_cols)
+                    f32_sl_select_link_sets.emplace_back(f32_sl_demand_cols)
 
-            self.f32_sl_link_loading_threaded.emplace_back(f32_sl_select_link_sets)
+                self.f32_sl_link_loading_threaded.emplace_back(f32_sl_select_link_sets)
 
         # self.f64_sl_link_loading and self.f32_sl_link_loading are not allocated here. The objects are initialised to
         # empty vectors but elements are created in self.reduce_sl_link_loading
@@ -134,12 +145,12 @@ cdef class LinkLoadingResults:
         self.f64_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f64_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f64_struct]]]()
-            f64_sl_od_matrix_sets.reserve(self.demand.f64.size())
+            f64_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
             for j in range(self.select_link_sets.size()):
-                f64_sl_od_matrix_demand_cols = new vector[COO_f64_struct](self.demand.f64.size())
+                f64_sl_od_matrix_demand_cols = new vector[COO_f64_struct](len(self.demand.f64_names))
 
-                for k in range(self.demand.f64.size()):
+                for k in range(len(self.demand.f64_names)):
                     COO.init_f64_struct(d(f64_sl_od_matrix_demand_cols)[k])
 
                 f64_sl_od_matrix_sets.emplace_back(f64_sl_od_matrix_demand_cols)
@@ -150,12 +161,12 @@ cdef class LinkLoadingResults:
         self.f32_sl_od_matrix_threaded.reserve(threads)
         for i in range(threads):
             f32_sl_od_matrix_sets = new vector[unique_ptr[vector[COO_f32_struct]]]()
-            f32_sl_od_matrix_sets.reserve(self.demand.f32.size())
+            f32_sl_od_matrix_sets.reserve(self.select_link_sets.size())
 
             for j in range(self.select_link_sets.size()):
-                f32_sl_od_matrix_demand_cols = new vector[COO_f32_struct](self.demand.f32.size())
+                f32_sl_od_matrix_demand_cols = new vector[COO_f32_struct](len(self.demand.f32_names))
 
-                for k in range(self.demand.f32.size()):
+                for k in range(len(self.demand.f32_names)):
                     COO.init_f32_struct(d(f32_sl_od_matrix_demand_cols)[k])
 
                 f32_sl_od_matrix_sets.emplace_back(f32_sl_od_matrix_demand_cols)
@@ -167,14 +178,21 @@ cdef class LinkLoadingResults:
 
     cdef object link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
         if self.link_loading_objects is None:
-            self.link_loading_objects = dict(zip(*self.apply_generic_link_loading(self.f64_link_loading, self.f32_link_loading, compressed_id_view, cores)))
+            self.link_loading_objects = dict(zip(*self.apply_generic_link_loading(
+                self.f64_link_loading, self.f32_link_loading, compressed_id_view, cores
+            )))
         return self.link_loading_objects
 
     cdef object sl_link_loading_to_objects(self, long long[:] compressed_id_view, int cores):
+        if not self.sl_link_loading:
+            return {}
+
         if self.sl_link_loading_objects is None:
             results = []
             for i in range(self.select_link_sets.size()):
-                results.append(dict(zip(*self.apply_generic_link_loading(d(self.f64_sl_link_loading[i]), d(self.f32_sl_link_loading[i]), compressed_id_view, cores))))
+                results.append(dict(zip(*self.apply_generic_link_loading(
+                    d(self.f64_sl_link_loading[i]), d(self.f32_sl_link_loading[i]), compressed_id_view, cores
+                ))))
             self.sl_link_loading_objects = dict(zip(self.select_link_set_names, results))
         return self.sl_link_loading_objects
 
@@ -199,7 +217,7 @@ cdef class LinkLoadingResults:
 
             double f64_demand, f64_load
             float f32_demand, f32_load
-            size_t i, j, k
+            size_t i, j
 
         # For each demand column
         for i in range(self.demand.f64.size()):
@@ -237,7 +255,8 @@ cdef class LinkLoadingResults:
     @cython.initializedcheck(False)
     cdef void reduce_link_loading(LinkLoadingResults self):
         """
-        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function requires the GIL.
+        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function
+        requires the GIL.
         """
         cdef:
             vector[unique_ptr[vector[double]]] *f64_ll_cols
@@ -305,7 +324,6 @@ cdef class LinkLoadingResults:
             double[:, :] f64_actual
             float[:, :] f32_ll_view
             float[:, :] f32_actual
-            size_t length
 
         f64_ll_vectors = []
         for i in range(f64_link_loading.size()):
@@ -345,7 +363,8 @@ cdef class LinkLoadingResults:
 
             f32_ll_vectors.append(np.asarray(f32_actual).reshape(-1))
 
-        return itertools.chain(self.demand.f64_names, self.demand.f32_names), itertools.chain(f64_ll_vectors, f32_ll_vectors)
+        return itertools.chain(self.demand.f64_names, self.demand.f32_names), \
+            itertools.chain(f64_ll_vectors, f32_ll_vectors)
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -364,11 +383,8 @@ cdef class LinkLoadingResults:
         """
 
         cdef:
-            bool set_present
             vector[size_t] link_counts
-            size_t select_link_set_idx
             long long link
-            unordered_set[long long] *and_set
 
         # We count the number of links within the AND set. Assuming we only see unique links, then if that count goes to
         # 0 we have seen all links present within the AND set. A shortest-path will contain only unique links in
@@ -404,23 +420,37 @@ cdef class LinkLoadingResults:
         cdef:
             # Cython doesn't allow declaring references to objects outside of function signatures. So we get the raw
             # pointer instead. It is still owned by the unique_ptr.
-            vector[unique_ptr[vector[unique_ptr[vector[double]]]]] *f64_ll_sets_cols = self.f64_sl_link_loading_threaded[thread_id].get()
-            vector[unique_ptr[vector[unique_ptr[vector[float]]]]] *f32_ll_sets_cols = self.f32_sl_link_loading_threaded[thread_id].get()
-            vector[unique_ptr[vector[COO_f64_struct]]] *f64_od_sets_cols = self.f64_sl_od_matrix_threaded[thread_id].get()
-            vector[unique_ptr[vector[COO_f32_struct]]] *f32_od_sets_cols = self.f32_sl_od_matrix_threaded[thread_id].get()
+            vector[unique_ptr[vector[unique_ptr[vector[double]]]]] *f64_ll_sets_cols
+            vector[unique_ptr[vector[unique_ptr[vector[float]]]]] *f32_ll_sets_cols
+            vector[unique_ptr[vector[COO_f64_struct]]] *f64_od_sets_cols
+            vector[unique_ptr[vector[COO_f32_struct]]] *f32_od_sets_cols
             vector[double] *f64_ll
             vector[float] *f32_ll
 
-            double f64_demand, f64_load
-            float f32_demand, f32_load
+            double f64_load
+            float f32_load
             size_t i, j, k
+
+        if self.sl_link_loading:
+            f64_ll_sets_cols = self.f64_sl_link_loading_threaded[thread_id].get()
+            f32_ll_sets_cols = self.f32_sl_link_loading_threaded[thread_id].get()
+        else:
+            f64_ll_sets_cols = NULL
+            f32_ll_sets_cols = NULL
+
+        f64_od_sets_cols = self.f64_sl_od_matrix_threaded[thread_id].get()
+        f32_od_sets_cols = self.f32_sl_od_matrix_threaded[thread_id].get()
 
         # For each select link set
         for i in range(self.select_link_sets.size()):
             # for each route in the route set
             for j in range(route_set.size()):
                 # if this route satisfies this link set, then we link load
-                if not LinkLoadingResults.is_in_select_link_set(d(route_set[j]), d(self.select_link_sets[i]), d(self.select_link_set_lengths[i])):
+                if not LinkLoadingResults.is_in_select_link_set(
+                        d(route_set[j]),
+                        d(self.select_link_sets[i]),
+                        d(self.select_link_set_lengths[i])
+                ):
                     continue
 
                 # For each demand column
@@ -431,12 +461,13 @@ cdef class LinkLoadingResults:
                     if f64_load == 0.0:
                         continue
 
-                    f64_ll = d(d(f64_ll_sets_cols)[i])[k].get()
                     COO.f64_struct_append(d(d(f64_od_sets_cols)[i])[k], origin_idx, dest_idx, f64_load)
 
-                    # then apply that to every link in the route
-                    for link in d(route_set[j]):
-                        d(f64_ll)[link] = d(f64_ll)[link] + f64_load
+                    if self.sl_link_loading:
+                        f64_ll = d(d(f64_ll_sets_cols)[i])[k].get()
+                        # then apply that to every link in the route
+                        for link in d(route_set[j]):
+                            d(f64_ll)[link] = d(f64_ll)[link] + f64_load
 
                 # then we do it again for f32
                 for k in range(self.demand.f32.size()):
@@ -445,11 +476,12 @@ cdef class LinkLoadingResults:
                     if f32_load == 0.0:
                         continue
 
-                    f32_ll = d(d(f32_ll_sets_cols)[i])[k].get()
                     COO.f32_struct_append(d(d(f32_od_sets_cols)[i])[k], origin_idx, dest_idx, f32_load)
 
-                    for link in d(route_set[j]):
-                        d(f32_ll)[link] = d(f32_ll)[link] + f32_load
+                    if self.sl_link_loading:
+                        f32_ll = d(d(f32_ll_sets_cols)[i])[k].get()
+                        for link in d(route_set[j]):
+                            d(f32_ll)[link] = d(f32_ll)[link] + f32_load
 
     @cython.wraparound(False)
     @cython.embedsignature(True)
@@ -457,7 +489,8 @@ cdef class LinkLoadingResults:
     @cython.initializedcheck(False)
     cdef void reduce_sl_link_loading(LinkLoadingResults self):
         """
-        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function requires the GIL.
+        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function
+        requires the GIL.
         """
         cdef:
             vector[unique_ptr[vector[unique_ptr[vector[double]]]]] *f64_sl_ll_sets_cols
@@ -470,6 +503,9 @@ cdef class LinkLoadingResults:
             vector[float] *f32_sl_ll
 
             size_t thread_id, i, j
+
+        if not self.sl_link_loading:
+            return
 
         # Allocate the result link loads
         self.f64_sl_link_loading.reserve(self.select_link_sets.size())
@@ -512,7 +548,7 @@ cdef class LinkLoadingResults:
                     for k in range(d(f64_sl_ll).size()):
                         d(f64_sl_ll_result)[k] = d(f64_sl_ll_result)[k] + d(f64_sl_ll)[k]
 
-        # # Then we do it all over again for the floats.
+        # Then we do it all over again for the floats.
         for thread_id in range(self.f32_sl_link_loading_threaded.size()):
             f32_sl_ll_sets_cols = self.f32_sl_link_loading_threaded[thread_id].get()
 
@@ -538,7 +574,8 @@ cdef class LinkLoadingResults:
     @cython.initializedcheck(False)
     cdef void reduce_sl_od_matrix(LinkLoadingResults self):
         """
-        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function requires the GIL.
+        NOTE: doesn't require the GIL but should NOT be called in a multithreaded environment. Thus the function
+        requires the GIL.
         """
         cdef:
             vector[unique_ptr[vector[COO_f64_struct]]] *f64_sl_od_sets_cols
@@ -587,9 +624,21 @@ cdef class LinkLoadingResults:
                     f64_sl_od_result = &d(self.f64_sl_od_matrix[i])[j]
                     f64_sl_od = &d(f64_sl_od_cols)[j]
 
-                    d(f64_sl_od_result.row).insert(d(f64_sl_od_result.row).end(), d(f64_sl_od.row).cbegin(), d(f64_sl_od.row).cend())
-                    d(f64_sl_od_result.col).insert(d(f64_sl_od_result.col).end(), d(f64_sl_od.col).cbegin(), d(f64_sl_od.col).cend())
-                    d(f64_sl_od_result.f64_data).insert(d(f64_sl_od_result.f64_data).end(), d(f64_sl_od.f64_data).begin(), d(f64_sl_od.f64_data).end())
+                    d(f64_sl_od_result.row).insert(
+                        d(f64_sl_od_result.row).end(),
+                        d(f64_sl_od.row).cbegin(),
+                        d(f64_sl_od.row).cend()
+                    )
+                    d(f64_sl_od_result.col).insert(
+                        d(f64_sl_od_result.col).end(),
+                        d(f64_sl_od.col).cbegin(),
+                        d(f64_sl_od.col).cend()
+                    )
+                    d(f64_sl_od_result.f64_data).insert(
+                        d(f64_sl_od_result.f64_data).end(),
+                        d(f64_sl_od.f64_data).begin(),
+                        d(f64_sl_od.f64_data).end()
+                    )
 
         # Then we do it all over again for the floats.
         for thread_id in range(self.f32_sl_od_matrix_threaded.size()):
@@ -605,9 +654,21 @@ cdef class LinkLoadingResults:
                     f32_sl_od_result = &d(self.f32_sl_od_matrix[i])[j]
                     f32_sl_od = &d(f32_sl_od_cols)[j]
 
-                    d(f32_sl_od_result.row).insert(d(f32_sl_od_result.row).end(), d(f32_sl_od.row).cbegin(), d(f32_sl_od.row).cend())
-                    d(f32_sl_od_result.col).insert(d(f32_sl_od_result.col).end(), d(f32_sl_od.col).cbegin(), d(f32_sl_od.col).cend())
-                    d(f32_sl_od_result.f32_data).insert(d(f32_sl_od_result.f32_data).end(), d(f32_sl_od.f32_data).begin(), d(f32_sl_od.f32_data).end())
+                    d(f32_sl_od_result.row).insert(
+                        d(f32_sl_od_result.row).end(),
+                        d(f32_sl_od.row).cbegin(),
+                        d(f32_sl_od.row).cend()
+                    )
+                    d(f32_sl_od_result.col).insert(
+                        d(f32_sl_od_result.col).end(),
+                        d(f32_sl_od.col).cbegin(),
+                        d(f32_sl_od.col).cend()
+                    )
+                    d(f32_sl_od_result.f32_data).insert(
+                        d(f32_sl_od_result.f32_data).end(),
+                        d(f32_sl_od.f32_data).begin(),
+                        d(f32_sl_od.f32_data).end()
+                    )
 
         # Here we discard all the intermediate results
         self.f64_sl_od_matrix_threaded.clear()
@@ -635,18 +696,14 @@ cdef class LinkLoadingResults:
             for j in range(self.demand.f64.size()):
                 coo = COO.from_f64_struct(d(self.f64_sl_od_matrix[i])[j])
                 coo.shape = self.demand.shape
-                res.append(coo)
+                res.append((self.demand.f64_names[j], coo))
 
-            od_matrix_objects.append(dict(zip(self.demand.f64_names, res)))
-
-        for i in range(self.select_link_sets.size()):
-            res = []
             for j in range(self.demand.f32.size()):
                 coo = COO.from_f32_struct(d(self.f32_sl_od_matrix[i])[j])
                 coo.shape = self.demand.shape
-                res.append(coo)
+                res.append((self.demand.f32_names[j], coo))
 
-            od_matrix_objects.append(dict(zip(self.demand.f32_names, res)))
+            od_matrix_objects.append(dict(res))
 
         self.f64_sl_od_matrix.clear()
         self.f32_sl_od_matrix.clear()

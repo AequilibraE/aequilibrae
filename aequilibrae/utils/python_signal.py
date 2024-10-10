@@ -3,6 +3,8 @@ import os
 import warnings
 from random import choice
 
+from aequilibrae.utils.qgis_utils import inside_qgis
+
 missing_tqdm = iutil.find_spec("tqdm") is None
 
 if not missing_tqdm:
@@ -11,8 +13,6 @@ if not missing_tqdm:
         from tqdm.notebook import tqdm  # type: ignore
     else:
         from tqdm import tqdm  # type: ignore
-
-qgis = iutil.find_spec("qgis") is not None
 
 show_status = os.environ.get("AEQ_SHOW_PROGRESS", "FALSE") == "TRUE"
 
@@ -64,7 +64,8 @@ class PythonSignal:  # type: ignore
             self.keydata[val[1]] = val[2]
 
         elif val[0] == "start":
-            if missing_tqdm and not qgis:
+            if missing_tqdm and not inside_qgis:
+                self.deactivate = True
                 warnings.warn("No progress bars will be shown. Please install tqdm to see them")
             if self.pbar is not None:
                 self.pbar.close()

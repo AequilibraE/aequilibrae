@@ -85,17 +85,6 @@ cdef class RouteChoiceSet:
     #     unsigned int cores
     # ) noexcept nogil
 
-    # cdef vector[double] *apply_link_loading(RouteChoiceSet self, double[:, :] matrix_view) noexcept nogil
-    # cdef vector[double] *apply_link_loading_from_path_files(RouteChoiceSet self, double[:, :] matrix_view, vector[vector[double] *] &path_files) noexcept nogil
-    # cdef apply_link_loading_func(RouteChoiceSet self, vector[double] *ll, int cores)
-
-    # cdef vector[double] *apply_select_link_loading(
-    #     RouteChoiceSet self,
-    #     COO sparse_mat,
-    #     double[:, :] matrix_view,
-    #     unordered_set[long] &select_link_set
-    # ) noexcept nogil
-
 
 cdef class Checkpoint:
     cdef:

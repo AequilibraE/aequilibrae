@@ -2,11 +2,13 @@ from copy import deepcopy
 from os.path import join, realpath
 from typing import Union, Dict
 
+import geopandas as gpd
 import shapely.wkb
 from shapely.geometry import Point, Polygon, LineString, MultiLineString
-from shapely.ops import unary_union
+from shapely import union_all
 
 from aequilibrae.project.basic_table import BasicTable
+from aequilibrae.project.data_loader import DataLoader
 from aequilibrae.project.project_creation import run_queries_from_sql_file
 from aequilibrae.project.table_loader import TableLoader
 from aequilibrae.project.zone import Zone
@@ -17,14 +19,11 @@ from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 class Zoning(BasicTable):
     """
-    Access to the API resources to manipulate the zones table in the project
+    Access to the API resources to manipulate the 'zones' table in the project
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> project = Project.from_path("/tmp/test_project")
-
+        >>> project = create_example(project_path, "coquimbo")
 
         >>> zoning = project.zoning
 
@@ -32,10 +31,6 @@ class Zoning(BasicTable):
         >>> zone_downtown.population = 637
         >>> zone_downtown.employment = 10039
         >>> zone_downtown.save()
-
-        # changing the value for an existing value/field
-        >>> project.about.scenario_name = 'Just a better scenario name'
-        >>> project.about.write_back()
 
         # We can also add one more field to the table
         >>> fields = zoning.fields
@@ -56,7 +51,7 @@ class Zoning(BasicTable):
         """Creates a new zone
 
         :Returns:
-            **zone** (:obj:`Zone`): A new zone object populated only with zone_id (but not saved in the model yet)
+            **zone** (:obj:`Zone`): A new zone object populated only with ``zone_id`` (but not saved in the model yet)
         """
 
         if zone_id in self.__items:
@@ -88,16 +83,16 @@ class Zoning(BasicTable):
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             dt = conn.execute('Select ST_asBinary("geometry") from zones;').fetchall()
         polygons = [shapely.wkb.loads(x[0]) for x in dt]
-        return unary_union(polygons)
+        return union_all(polygons)
 
     def get(self, zone_id: str) -> Zone:
-        """Get a zone from the model by its **zone_id**"""
+        """Get a zone from the model by its ``zone_id``"""
         if zone_id not in self.__items:
             raise ValueError(f"Zone {zone_id} does not exist in the model")
         return self.__items[zone_id]
 
     def all_zones(self) -> dict:
-        """Returns a dictionary with all Zone objects available in the model. *zone_id* as key"""
+        """Returns a dictionary with all Zone objects available in the model, using ``zone_id`` as key"""
         return self.__items
 
     def save(self):
@@ -161,3 +156,13 @@ class Zoning(BasicTable):
         zone = Zone(data, self)
         self.__items[zone.zone_id] = zone
         return zone
+
+    @property
+    def data(self) -> gpd.GeoDataFrame:
+        """Returns all zones data as a Pandas DataFrame
+
+        :Returns:
+            **table** (:obj:`GeoDataFrame`): GeoPandas GeoDataFrame with all the nodes
+        """
+        dl = DataLoader(self.project.path_to_file, "zones")
+        return dl.load_table()

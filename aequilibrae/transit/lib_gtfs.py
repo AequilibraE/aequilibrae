@@ -30,9 +30,13 @@ class GTFSRouteSystemBuilder:
         :Arguments:
 
             **local network** (:obj:`Network`): Supply model to which this GTFS will be imported
+
             **agency_identifier** (:obj:`str`): ID for the agency this feed refers to (e.g. 'CTA')
+
             **file_path** (:obj:`str`): Full path to the GTFS feed (e.g. 'D:/project/my_gtfs_feed.zip')
+
             **day** (:obj:`str`, *Optional*): Service data contained in this field to be imported (e.g. '2019-10-04')
+
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
         self.__network = network
@@ -79,8 +83,7 @@ class GTFSRouteSystemBuilder:
 
         :Arguments:
             **capacities** (:obj:`dict`): Dictionary with GTFS types as keys, each with a list
-                                        of 3 items for values for capacities: seated and total
-                                        i.e. -> "{0: [150, 300],...}"
+            of 3 items for values for capacities: seated and total i.e. -> "{0: [150, 300],...}"
         """
         self.gtfs_data._set_capacities(capacities)
 
@@ -89,7 +92,7 @@ class GTFSRouteSystemBuilder:
 
         :Arguments:
             **pces** (:obj:`dict`): Dictionary with GTFS types as keys and the corresponding PCE
-                                    value i.e. -> "{0: 2.0,...}"
+            value i.e. -> "{0: 2.0,...}"
         """
         self.gtfs_data._set_pces(pces)
 
@@ -128,7 +131,8 @@ class GTFSRouteSystemBuilder:
 
         Defaults to map-matching Bus routes (type 3) only.
 
-        For a reference of route types, see https://developers.google.com/transit/gtfs/reference#routestxt
+        For a reference of route types, see the inputs for
+        `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
 
         :Arguments:
             **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
@@ -240,7 +244,7 @@ class GTFSRouteSystemBuilder:
 
             zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
             if zones:
-                sql = "Insert into fare_zones (fare_zone_id, transit_zone, agency_id) values(?, ?, ?);"
+                sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
                 conn.executemany(sql, zones)
             conn.commit()
 

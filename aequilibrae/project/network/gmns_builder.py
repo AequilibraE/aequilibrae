@@ -225,6 +225,7 @@ class GMNSBuilder:
 
         # For node table
         lons, lats = transformer.transform(self.node_df.loc[:, "x_coord"], self.node_df.loc[:, "y_coord"])
+        self.node_df = self.node_df.astype({"x_coord": np.float64, "y_coord": np.float64})
         self.node_df.loc[:, "x_coord"] = np.around(lons, decimals=10)
         self.node_df.loc[:, "y_coord"] = np.around(lats, decimals=10)
 

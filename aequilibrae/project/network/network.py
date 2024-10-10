@@ -6,7 +6,7 @@ import pandas as pd
 import shapely.wkb
 import shapely.wkt
 from shapely.geometry import Polygon, box
-from shapely.ops import unary_union
+from shapely import union_all
 
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
@@ -121,7 +121,7 @@ class Network:
         clean=True,
     ) -> None:
         """
-        Downloads the network from Open-Street Maps
+        Downloads the network from OpenStreetMap (OSM)
 
         :Arguments:
             **area** (:obj:`Polygon`, *Optional*): Polygon for which the network will be downloaded. If not provided,
@@ -138,28 +138,13 @@ class Network:
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
-
-            >>> p = Project()
-            >>> p.new("/tmp/new_project")
-
-            # We now choose a different overpass endpoint (say a deployment in your local network)
-            >>> par = Parameters()
-            >>> par.parameters['osm']['overpass_endpoint'] = "http://192.168.1.234:5678/api"
-
-            # Because we have our own server, we can set a bigger area for download (in M2)
-            >>> par.parameters['osm']['max_query_area_size'] = 10000000000
-
-            # And have no pause between successive queries
-            >>> par.parameters['osm']['sleeptime'] = 0
-
-            # Save the parameters to disk
-            >>> par.write_back()
+            >>> project = Project()
+            >>> project.new(project_path)
 
             # Now we can import the network for any place we want
-            # p.network.create_from_osm(place_name="my_beautiful_hometown")
+            >>> project.network.create_from_osm(place_name="my_beautiful_hometown") # doctest: +SKIP
 
-            >>> p.close()
+            >>> project.close()
         """
 
         if self.count_links() > 0:
@@ -293,15 +278,14 @@ class Network:
             **modes** (:obj:`list`, *Optional*): When working with very large graphs with large number of fields in the
             database, it may be useful to generate only those we need
 
-        To use the *fields* parameter, a minimalistic option is the following
+        To use the 'fields' parameter, a minimalistic option is the following
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
+            >>> project = create_example(project_path)
 
-            >>> p = Project.from_path("/tmp/test_project")
             >>> fields = ['distance']
-            >>> p.network.build_graphs(fields, modes = ['c', 'w'])
+            >>> project.network.build_graphs(fields, modes = ['c', 'w'])
 
         """
         from aequilibrae.paths import Graph
@@ -324,7 +308,8 @@ class Network:
 
             sql = f"select {','.join(all_fields)} from links"
 
-            df = pd.read_sql(sql, conn).fillna(value=np.nan)
+            with pd.option_context("future.no_silent_downcasting", True):
+                df = pd.read_sql(sql, conn).fillna(value=np.nan).infer_objects(False)
             valid_fields = list(df.select_dtypes(np.number).columns) + ["modes"]
             sql = "select node_id from nodes where is_centroid=1 order by node_id;"
             centroids = np.array([i[0] for i in conn.execute(sql).fetchall()], np.uint32)
@@ -409,7 +394,7 @@ class Network:
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:
             sql = 'Select ST_asBinary("geometry") from Links where ST_Length("geometry") > 0;'
             links = [shapely.wkb.loads(x[0]) for x in conn.execute(sql).fetchall()]
-        return unary_union(links).convex_hull
+        return union_all(links).convex_hull
 
     def __count_items(self, field: str, table: str, condition: str) -> int:
         with commit_and_close(connect_spatialite(self.project.path_to_file)) as conn:

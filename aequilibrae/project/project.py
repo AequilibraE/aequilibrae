@@ -26,25 +26,14 @@ class Project:
     .. code-block:: python
         :caption: Create Project
 
-        >>> newfile = Project()
-        >>> newfile.new('/tmp/new_project')
+        >>> new_project = Project()
+        >>> new_project.new(project_path)
 
     .. code-block:: python
         :caption: Open Project
 
-        >>> from aequilibrae.project import Project
-
-        >>> existing = Project()
-        >>> existing.open('/tmp/test_project')
-
-        >>> #Let's check some of the project's properties
-        >>> existing.network.list_modes()
-        ['M', 'T', 'b', 'c', 't', 'w']
-        >>> existing.network.count_links()
-        76
-        >>> existing.network.count_nodes()
-        24
-
+        >>> existing_project = Project()
+        >>> existing_project.open(project_path)
     """
 
     def __init__(self):
@@ -135,20 +124,6 @@ class Project:
 
         finally:
             self.deactivate()
-
-    def load(self, project_path: str) -> None:
-        """
-        Loads project from disk
-
-        .. deprecated:: 0.7.0
-            Use :func:`open` instead.
-
-        :Arguments:
-            **project_path** (:obj:`str`): Full path to the project data folder. If the project inside does
-            not exist, it will fail.
-        """
-        warnings.warn(f"Function has been deprecated. Use my_project.open({project_path}) instead", DeprecationWarning)
-        self.open(project_path)
 
     def connect(self):
         return database_connection("network", self.project_base_path)

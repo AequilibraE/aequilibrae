@@ -42,11 +42,12 @@ class GraphBase(ABC):  # noqa: B024
         - dead end removal.
 
     Link contraction creates a topological equivalent graph by contracting sequences of links between nodes
-    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into single links.
+    with degrees of two. This compresses long streams of links, such as along highways or curved roads, into
+    single links.
 
-    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the observation
-    that in a graph with non-negative weights a dead end will only ever appear in the results of a short(est) path if the
-    origin or destination is present within that dead end.
+    Dead end removal attempts to remove dead ends and fish spines from the network. It does this based on the
+    observation that in a graph with non-negative weights a dead end will only ever appear in the results of a
+    short(est) path if the origin or destination is present within that dead end.
 
     Dead end removal is applied before link contraction and does not create a strictly topological equivalent graph,
     however, all centroids are preserved.
@@ -416,7 +417,7 @@ class GraphBase(ABC):  # noqa: B024
         Saves graph to disk
 
         :Arguments:
-            **filename** (:obj:`str`): Path to file. Usual file extension is *aeg*
+            **filename** (:obj:`str`): Path to file. Usual file extension is 'aeg'
         """
         mygraph = {}
         mygraph["description"] = self.description
@@ -536,21 +537,30 @@ class GraphBase(ABC):  # noqa: B024
 
     def create_compressed_link_network_mapping(self):
         """
-        Create two arrays providing a mapping of compressed id to link id.
+        Create three arrays providing a mapping of compressed ID to link ID.
 
-        Uses sparse compression. Index ``idx`` by the by compressed id and compressed id + 1, the
+        Uses sparse compression. Index 'idx' by the by compressed ID and compressed ID + 1, the
         network IDs are then in the range ``idx[id]:idx[id + 1]``.
+
+        Links not in the compressed graph are not contained within the 'data' array.
 
         .. code-block:: python
 
-            >>> idx, data = graph.compressed_link_network_mapping
-            >>> data[idx[id]:idx[id + 1]]  # ==> Slice of network ID's corresponding to the compressed ID
+            >>> project = create_example(project_path)
 
-        Links not in the compressed graph are not contained within the ``data`` array.
+            >>> project.network.build_graphs()
+
+            >>> graph = project.network.graphs['c']
+            >>> graph.prepare_graph(np.arange(1,25))
+
+            >>> idx, data, node_mapping = graph.create_compressed_link_network_mapping()
 
         :Returns:
             **idx** (:obj:`np.array`): index array for ``data``
+
             **data** (:obj:`np.array`): array of link ids
+
+            **node_mapping**: (:obj:`np.array`): array of node_mapping ids
         """
 
         return create_compressed_link_network_mapping(self)

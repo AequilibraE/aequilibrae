@@ -23,13 +23,15 @@ class CreateTablesSRC:
         self.proj.new(self.proj_path)
         Transit(self.proj)
 
-        folder = "network" if component == "project_database" else "transit"
+        self.__folder = "network" if component == "project_database" else "transit"
         self.stub = "data_model"
         # Get the appropriate data for the database we are documenting
-        self.conn = database_connection(db_type=folder, project_path=self.proj_path)
-        self.path = join(*Path(realpath(__file__)).parts[:-1],
-                        f"../aequilibrae/project/database_specification/{folder}/tables")
-        self.doc_path = str(Path(realpath(__file__)).parent / "source" / tgt_fldr)
+        self.conn = database_connection(db_type=self.__folder, project_path=self.proj_path)
+        self.path = join(
+            *Path(realpath(__file__)).parts[:-1],
+            f"../aequilibrae/project/database_specification/{self.__folder}/tables",
+        )
+        self.doc_path = str(Path(realpath(__file__)).parent / "source" / "modeling_with_aequilibrae" / tgt_fldr)
 
         Path(join(self.doc_path, self.stub)).mkdir(exist_ok=True, parents=True)
 
@@ -43,9 +45,12 @@ class CreateTablesSRC:
         for table_name in all_tables:
             descr = self.conn.execute(f"pragma table_info({table_name})").fetchall()
 
+            # Data model reference
+            reference = f".. _{table_name}_{self.__folder}_data_model:\n"
+
             # Title of the page
             title = f'**{table_name.replace("_", " ")}** table structure'
-            txt = [title, "=" * len(title), ""]
+            txt = [reference, title, "=" * len(title), ""]
 
             docstrings = self.__get_docstrings(table_name)
             sql_code = self.__get_sql_code(table_name)
@@ -123,8 +128,8 @@ class CreateTablesSRC:
         with open(filename, "r") as f:
             return [x.strip() for x in f.readlines()]
 
-tables = [("project_database", "modeling_with_aequilibrae/project_database"),
-          ("transit_database", "modeling_with_aequilibrae/transit_database")]
+
+tables = [("project_database", "project_database"), ("transit_database", "transit_database")]
 
 for table, pth in tables:
     s = CreateTablesSRC(table, pth)

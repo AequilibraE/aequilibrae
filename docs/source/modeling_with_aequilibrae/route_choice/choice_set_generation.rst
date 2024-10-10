@@ -43,7 +43,6 @@ development/estimation stage.
 The overhead of the LP method is negligible due to AequilibraE's internal data structures that allow for easy
 data manipulation of the graph in memory.
 
-
 BFS-LE
 ~~~~~~
 
@@ -54,11 +53,11 @@ breadth-first search (BFS) order.
 
 To efficiently store and determine the uniqueness of a new route or removed link sets, we used modified hash functions
 with properties that allowed us to store and nest them within standard C++ data structures. We used a commutative hash
-function for the removed link sets to allow for amortised O(1) order-independent uniqueness testing. While the removed
-link sets are always constructed incrementally, we did not opt for an incremental hash function as we did not deem this
-a worthwhile optimisation. The removed link sets rarely grew larger than double digits, even on a network with over
-600,000 directed links. This may be an area worth exploring for networks with a significantly larger number of desired
-routes than links between ODs.
+function for the removed link sets to allow for amortised :math:`O(1)` order-independent uniqueness testing. While the 
+removed link sets are always constructed incrementally, we did not opt for an incremental hash function as we did not 
+deem this a worthwhile optimisation. The removed link sets rarely grew larger than double digits, even on a network 
+with over 600,000 directed links. This may be an area worth exploring for networks with a significantly larger number 
+of desired routes than links between ODs.
 
 For uniqueness testing of discovered routes, AequilibraE implements a traditional, non-commutative hash function.
 Since cryptographic security was not a requirement for our purposes, we use a fast general-purpose integer hash function.
@@ -99,7 +98,6 @@ Code example
    graph.set_graph("free_flow_time")
 
    graph.prepare_graph(np.array([1, 2, 3, 50, 100, 150]))
-
 
    nodes = [(1, 50), (2, 100), (3, 150)]  # List of tuples with (origin, destination) nodes
    max_routes = 10  # Maximum number of routes to be computed for each OD pair

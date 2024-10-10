@@ -9,8 +9,11 @@ from setuptools import Extension
 from setuptools import setup, find_packages
 from setuptools.discovery import FlatLayoutPackageFinder
 
-with open("__version__.py") as f:
-    exec(f.read())
+# When updating the version, one must also update the docs/source/_static/switcher.json file
+version = 1.1
+minor_version = 1
+
+release_version = f"{version}.{minor_version}"
 
 include_dirs = [np.get_include()]
 libraries = []
@@ -45,7 +48,7 @@ ext_mod_aon = Extension("aequilibrae.paths.AoN", [join("aequilibrae", "paths", "
 
 ext_mod_ipf = Extension(
     "aequilibrae.distribution.ipf_core",
-    [join("aequilibrae", "distribution", "ipf_core.pyx")],
+    [join("aequilibrae", "distribution", "cython", "ipf_core.pyx")],
     **extension_args,
 )
 
@@ -58,12 +61,6 @@ ext_mod_put = Extension(
 ext_mod_rc = Extension(
     "aequilibrae.paths.cython.route_choice_set",
     [join("aequilibrae", "paths", "cython", "route_choice_set.pyx")],
-    **extension_args,
-)
-
-ext_mod_coo_demand = Extension(
-    "aequilibrae.paths.cython.coo_demand",
-    [join("aequilibrae", "paths", "cython", "coo_demand.pyx")],
     **extension_args,
 )
 
@@ -91,6 +88,12 @@ ext_mod_sparse_matrix = Extension(
     **extension_args,
 )
 
+ext_mod_coo_demand = Extension(
+    "aequilibrae.matrix.coo_demand",
+    [join("aequilibrae", "matrix", "coo_demand.pyx")],
+    **extension_args,
+)
+
 with open("requirements.txt", "r") as fl:
     install_requirements = [x.strip() for x in fl.readlines()]
 
@@ -98,9 +101,10 @@ pkgs = find_packages(exclude=FlatLayoutPackageFinder.DEFAULT_EXCLUDE)
 
 pkg_data = {
     "aequilibrae.reference_files": ["spatialite.sqlite", "nauru.zip", "sioux_falls.zip", "coquimbo.zip"],
-    "aequilibrae.paths": ["parameters.pxi", "*.pyx"],
-    "aequilibrae.distribution": ["*.pyx"],
-    "aequilibrae": ["./parameters.yml"],
+    "aequilibrae.paths": ["cython/*.pxi", "cython/*.pyx", "cython/*.pxd"],
+    "aequilibrae.distribution": ["cython/*.pyx"],
+    "aequilibrae.matrix": ["*.pyx", "*.pxd"],
+    "aequilibrae": ["./parameters.yml", "../requirements.txt"],
     "aequilibrae.project": [
         "database_specification/network/tables/*.*",
         "database_specification/network/triggers/*.*",

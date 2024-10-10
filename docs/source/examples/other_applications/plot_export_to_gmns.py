@@ -9,6 +9,16 @@ The source AequilibraE model used as input for this is the result of the import 
 (``create_from_gmns()``) using the GMNS example of Arlington Signals, which can be found
 in the GMNS repository on GitHub: https://github.com/zephyr-data-specs/GMNS
 """
+# %%
+# .. admonition:: References
+# 
+#   * :ref:`aequilibrae_to_gmns` 
+
+# %%
+# .. seealso::
+#     Several functions, methods, classes and modules are used in this example:
+#
+#     * :func:`aequilibrae.project.Network.export_to_gmns`
 
 # %%
 
@@ -22,13 +32,14 @@ import folium
 # sphinx_gallery_thumbnail_path = 'images/plot_export_to_gmns.png'
 
 # %%
+
 # We load the example project inside a temp folder
 fldr = os.path.join(gettempdir(), uuid4().hex)
 
 project = create_example(fldr)
 
 # %%
-# We export the network to csv files in GMNS format, that will be saved inside the project folder
+# We export the network to CSV files in GMNS format, that will be saved inside the project folder
 output_fldr = os.path.join(gettempdir(), uuid4().hex)
 if not os.path.exists(output_fldr):
     os.mkdir(output_fldr)

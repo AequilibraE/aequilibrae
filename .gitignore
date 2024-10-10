@@ -2,6 +2,11 @@
 _build
 _static
 _templates
+docs/source/sg_execution_times.rst
+docs/source/_auto_examples
+docs/source/api/generated
+docs/source/modeling_with_aequilibrae/project_database/data_model
+docs/source/modeling_with_aequilibrae/transit_database/data_model
 
 # User-specific stuff:
 .idea/**/workspace.xml
@@ -97,3 +102,4 @@ coverage.xml
 
 #### End snippet
 .DS_Store
+.vscode

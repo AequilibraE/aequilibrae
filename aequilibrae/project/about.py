@@ -12,9 +12,7 @@ class About:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
 
         # Adding a new field and saving it
         >>> project.about.add_info_field('my_super_relevant_field')
@@ -67,12 +65,11 @@ class About:
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
+            >>> project = create_example(project_path)
 
-            >>> p = Project.from_path("/tmp/test_project")
-            >>> p.about.add_info_field('a_cool_field')
-            >>> p.about.a_cool_field = 'super relevant information'
-            >>> p.about.write_back()
+            >>> project.about.add_info_field('a_cool_field')
+            >>> project.about.a_cool_field = 'super relevant information'
+            >>> project.about.write_back()
         """
         allowed = string.ascii_lowercase + "_"
         has_forbidden = [x for x in info_field if x not in allowed]
@@ -90,11 +87,10 @@ class About:
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
+            >>> project = create_example(project_path)
 
-            >>> p = Project.from_path("/tmp/test_project")
-            >>> p.about.description = 'This is the example project. Do not use for forecast'
-            >>> p.about.write_back()
+            >>> project.about.description = 'This is the example project. Do not use for forecast'
+            >>> project.about.write_back()
         """
         with commit_and_close(connect_spatialite(self.__path_to_file)) as conn:
             for k in self.__characteristics:

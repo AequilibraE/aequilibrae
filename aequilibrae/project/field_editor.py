@@ -21,15 +21,13 @@ class FieldEditor:
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> proj = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
 
         # To edit the fields of the link_types table
-        >>> lt_fields = proj.network.link_types.fields
+        >>> lt_fields = project.network.link_types.fields
 
         # To edit the fields of the modes table
-        >>> m_fields = proj.network.modes.fields
+        >>> m_fields = project.network.modes.fields
 
     Field descriptions are kept in the table *attributes_documentation*
     """

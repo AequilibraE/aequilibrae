@@ -4,6 +4,7 @@ cimport numpy as np
 cimport cython
 
 from libcpp.queue cimport queue
+import time
 
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -387,50 +388,75 @@ def build_compressed_graph(graph):
 @cython.boundscheck(False)
 @cython.initializedcheck(False)
 def create_compressed_link_network_mapping(graph):
-        # Cache the result, this isn't a huge computation but isn't worth doing twice
-        if (
-            graph.compressed_link_network_mapping_idx is not None
-            and graph.compressed_link_network_mapping_data is not None
-            and graph.network_compressed_node_mapping is not None
-        ):
-            return (
-                graph.compressed_link_network_mapping_idx,
-                graph.compressed_link_network_mapping_data,
-                graph.network_compressed_node_mapping,
-            )
+    # Cache the result, this isn't a huge computation but isn't worth doing twice
+    if (
+        graph.compressed_link_network_mapping_idx is not None
+        and graph.compressed_link_network_mapping_data is not None
+        and graph.network_compressed_node_mapping is not None
+    ):
+        return (
+            graph.compressed_link_network_mapping_idx,
+            graph.compressed_link_network_mapping_data,
+            graph.network_compressed_node_mapping,
+        )
 
-        cdef:
-            long long i, j, a_node, x, b_node, tmp, compressed_id
-            long long[:] b
-            long long[:] values
-            np.uint32_t[:] idx
-            np.uint32_t[:] data
-            np.int32_t[:] node_mapping
+    cdef:
+        long long i, j, a_node, x, b_node, tmp, compressed_id, dup_idx
+        long long[:] b
+        long long[:] values
+        np.uint32_t[:] idx
+        np.uint32_t[:] data
+        np.int32_t[:] node_mapping
+        np.int64_t[:, :] dups
 
-        # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
-        # bother redoing sorting it.
+    start_tiem = time.time()
 
-        # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
-        # we skip them.
-        filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
-        gb = filtered.groupby(by="__compressed_id__", sort=True)
-        idx = np.zeros(graph.compact_num_links + 1, dtype=np.uint32)
-        data = np.zeros(len(filtered), dtype=np.uint32)
+    # This method requires that graph.graph is sorted on the a_node IDs, since that's done already we don't
+    # bother redoing sorting it.
 
-        node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
+    # Some links are completely removed from the network, they are assigned ID `graph.compact_graph.id.max() + 1`,
+    # we skip them.
+    filtered = graph.graph[graph.graph.__compressed_id__ != graph.compact_graph.id.max() + 1]
+    filtered = filtered[["__compressed_id__", "a_node", "b_node", "link_id"]]
+    duplicated = filtered.__compressed_id__.duplicated(keep=False)
+    gb = filtered[duplicated].groupby(by="__compressed_id__", sort=True)
 
-        i = 0
-        for compressed_id, df in gb:
+    idx = np.zeros(graph.compact_num_links + 1, dtype=np.uint32)
+    data = np.zeros(len(filtered), dtype=np.uint32)
+    node_mapping = np.full(graph.num_nodes, -1, dtype=np.int32)
+
+    compact_a_nodes = graph.compact_graph["a_node"].to_numpy()
+    compact_b_nodes = graph.compact_graph["b_node"].to_numpy()
+
+    dup_idx = 0
+    dups = filtered[~duplicated].sort_values(by="__compressed_id__").to_numpy()
+
+    i = 0
+    # This should be possible to parallelise, each thread gets a segment of the bincount below, they compute their
+    # respective idx and data, then the end i value from the first segment is added to the idx of the segment after and
+    # so on. Then the idx and data values are concatenated
+    for compressed_id, count in enumerate(np.bincount(filtered["__compressed_id__"].to_numpy())):
+        # We separate the easy un-compressible link path from the compressible link path
+        # gb.get_group and those sorted searches are rather slow
+        if count == 1:
+            compressed_id, a_node, b_node, link_id = dups[dup_idx]
+            dup_idx += 1
             idx[compressed_id] = i
-            values = df.link_id.values
-            a = df.a_node.values
-            b = df.b_node.values
+            data[i] = link_id
+            node_mapping[a_node] = compact_a_nodes[compressed_id]
+            node_mapping[b_node] = compact_b_nodes[compressed_id]
+        else:
+            df = gb.get_group(compressed_id)
+            idx[compressed_id] = i
+            values = df.link_id.to_numpy()
+            a = df.a_node.to_numpy()
+            b = df.b_node.to_numpy()
 
             # In order to ensure that the link IDs come out in the correct order we must walk the links
             # we do this assuming the `a` array is sorted.
             j = 0
-            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
 
+            # Find the missing a_node, this is the starting of the chain. We cannot rely on the node ordering to do a simple lookup
             a_node = x = a[np.isin(a, b, invert=True, assume_unique=True)][0]
             while True:
                 tmp = a.searchsorted(x)
@@ -442,15 +468,18 @@ def create_compressed_link_network_mapping(graph):
                 j += 1
 
             b_node = x
-            node_mapping[a_node] = graph.compact_graph["a_node"].iat[compressed_id]
-            node_mapping[b_node] = graph.compact_graph["b_node"].iat[compressed_id]
+            node_mapping[a_node] = compact_a_nodes[compressed_id]
+            node_mapping[b_node] = compact_b_nodes[compressed_id]
+        i += count
 
-            i += len(values)
+    idx[-1] = i
 
-        idx[-1] = i
+    graph.compressed_link_network_mapping_idx = np.array(idx)
+    graph.compressed_link_network_mapping_data = np.array(data)
+    graph.network_compressed_node_mapping = np.array(node_mapping)
 
-        graph.compressed_link_network_mapping_idx = np.array(idx)
-        graph.compressed_link_network_mapping_data = np.array(data)
-        graph.network_compressed_node_mapping = np.array(node_mapping)
-
-        return idx, data, node_mapping
+    return (
+        graph.compressed_link_network_mapping_idx,
+        graph.compressed_link_network_mapping_data,
+        graph.network_compressed_node_mapping
+    )
