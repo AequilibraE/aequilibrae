@@ -39,6 +39,11 @@ class TestGraph(TestCase):
         graph = self.project.network.graphs["c"]
         graph.prepare_graph(np.arange(5) + 1)
 
+    def test_prepare_graph_no_centroids(self):
+        graph = self.project.network.graphs["c"]
+        graph.prepare_graph()
+        graph.set_graph("distance")
+
     def test_set_graph(self):
         self.graph.set_graph(cost_field="distance")
         self.graph.set_blocked_centroid_flows(block_centroid_flows=True)
