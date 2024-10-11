@@ -33,7 +33,7 @@ Dependencies
 All of AequilibraE's dependencies are readily available from `PyPI <https://www.pypi.org/>`_ 
 for all currently supported Python versions and major platforms.
 
-.. _installing_spatialite_on_windows:
+.. _installing_spatialite:
 
 SpatiaLite
 ++++++++++

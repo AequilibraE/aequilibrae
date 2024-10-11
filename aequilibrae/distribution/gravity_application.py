@@ -19,35 +19,32 @@ class GravityApplication:
     """Applies a synthetic gravity model.
 
     Model is an instance of SyntheticGravityModel class.
+
     Impedance is an instance of AequilibraEMatrix.
+
     Row and Column vectors are instances of AequilibraeData.
 
     .. code-block:: python
 
-        >>> import pandas as pd
-        >>> from aequilibrae import Project
-        >>> from aequilibrae.matrix import AequilibraeMatrix, AequilibraeData
+        >>> from aequilibrae.matrix import AequilibraeData
         >>> from aequilibrae.distribution import SyntheticGravityModel, GravityApplication
 
-        >>> project = Project.from_path("/tmp/test_project_ga")
+        >>> project = create_example(project_path)
 
         # We define the model we will use
         >>> model = SyntheticGravityModel()
 
         # Before adding a parameter to the model, you need to define the model functional form
-        >>> model.function = "GAMMA" # "EXPO" or "POWER"
+        # You can select one of GAMMA, EXPO or POWER.
+        >>> model.function = "GAMMA"
 
         # Only the parameter(s) applicable to the chosen functional form will have any effect
         >>> model.alpha = 0.1
         >>> model.beta = 0.0001
 
-        # Or you can load the model from a file
-        # model.load('path/to/model/file')
-
         # We load the impedance matrix
-        >>> matrix = AequilibraeMatrix()
-        >>> matrix.load('/tmp/test_project_ga/matrices/skims.omx')
-        >>> matrix.computational_view(['distance_blended'])
+        >>> matrix = project.matrices.get_matrix("skims")
+        >>> matrix.computational_view(["distance_blended"])
 
         # We create the vectors we will use
         >>> query = "SELECT zone_id, population, employment FROM zones;"
@@ -61,8 +58,11 @@ class GravityApplication:
         >>> zones = df.index.shape[0]
 
         # We create the vector database
-        >>> args = {"entries": zones, "field_names": ["productions", "attractions"],
-        ...     "data_types": [np.float64, np.float64], "memory_mode": True}
+        >>> args = {"entries": zones,
+        ...         "field_names": ["productions", "attractions"],
+        ...         "data_types": [np.float64, np.float64],
+        ...         "memory_mode": True}
+
         >>> vectors = AequilibraeData()
         >>> vectors.create_empty(**args)
 
@@ -81,20 +81,14 @@ class GravityApplication:
         ...         "model": model,
         ...         "columns": vectors,
         ...         "column_field": "attractions",
-        ...         "output": '/tmp/test_project_ga/matrices/matrix.aem',
+        ...         "output": os.path.join(project_path, 'matrices/gravity_matrix.aem'),
         ...         "nan_as_zero":True
         ...         }
         >>> gravity = GravityApplication(**args)
 
         # Solve and save the outputs
         >>> gravity.apply()
-        >>> gravity.output.export('/tmp/test_project_ga/matrices/omx_file.omx')
-
-        # To save your report into a file, you can do the following:
-        # with open('/tmp/test_project_ga/report.txt', 'w') as file:
-        #     for line in gravity.report:
-        #         file.write(f"{line}\\n")
-
+        >>> gravity.output.export(os.path.join(project_path, 'matrices/gravity_omx.omx'))
     """
 
     def __init__(self, project=None, **kwargs):

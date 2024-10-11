@@ -45,8 +45,14 @@ jobs:
 
     - name: Test docstrings
       run: |
-        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py aequilibrae/paths/vdf.py
-        python -m pytest docs/source/modeling_with_aequilibrae/project_pieces --doctest-glob=*.rst
+        python -m pytest --doctest-modules aequilibrae/distribution --ignore=aequilibrae/distribution/setup_ipf.py
+        python -m pytest --doctest-modules aequilibrae/matrix
+        python -m pytest --doctest-modules aequilibrae/paths --ignore=aequilibrae/paths/setup_assignment.py
+        python -m pytest --doctest-modules aequilibrae/project
+        python -m pytest --doctest-modules aequilibrae/log.py aequilibrae/parameters.py 
+        python -m pytest --doctest-modules aequilibrae/transit
+        python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/project_pieces
+        python -m pytest --doctest-glob=*.rst docs/source/modeling_with_aequilibrae/static_traffic_assignment
 
     - name: Build documentation
       run: |

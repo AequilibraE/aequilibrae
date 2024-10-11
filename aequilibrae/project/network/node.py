@@ -11,12 +11,11 @@ class Node(SafeClass):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
         >>> from shapely.geometry import Point
 
-        >>> proj = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path)
 
-        >>> all_nodes = proj.network.nodes
+        >>> all_nodes = project.network.nodes
 
         # We can just get one link in specific
         >>> node1 = all_nodes.get(7)

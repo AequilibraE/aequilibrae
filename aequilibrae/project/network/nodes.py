@@ -17,11 +17,9 @@ class Nodes(BasicTable):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_nodes = proj.network.nodes
+        >>> all_nodes = project.network.nodes
 
         # We can just get one link in specific
         >>> node = all_nodes.get(21)

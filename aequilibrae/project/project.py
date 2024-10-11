@@ -26,25 +26,14 @@ class Project:
     .. code-block:: python
         :caption: Create Project
 
-        >>> newfile = Project()
-        >>> newfile.new('/tmp/new_project')
+        >>> new_project = Project()
+        >>> new_project.new(project_path)
 
     .. code-block:: python
         :caption: Open Project
 
-        >>> from aequilibrae.project import Project
-
-        >>> existing = Project()
-        >>> existing.open('/tmp/test_project')
-
-        >>> #Let's check some of the project's properties
-        >>> existing.network.list_modes()
-        ['M', 'T', 'b', 'c', 't', 'w']
-        >>> existing.network.count_links()
-        76
-        >>> existing.network.count_nodes()
-        24
-
+        >>> existing_project = Project()
+        >>> existing_project.open(project_path)
     """
 
     def __init__(self):

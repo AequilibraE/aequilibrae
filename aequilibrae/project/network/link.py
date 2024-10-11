@@ -10,14 +10,12 @@ class Link(SafeClass):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
+        >>> project = create_example(project_path)
 
-        >>> proj = Project.from_path("/tmp/test_project")
-
-        >>> all_links = proj.network.links
+        >>> all_links = project.network.links
 
         # Let's get a mode to work with
-        >>> modes = proj.network.modes
+        >>> modes = project.network.modes
         >>> car_mode = modes.get('c')
 
         # We can just get one link in specific

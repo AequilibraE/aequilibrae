@@ -23,9 +23,7 @@ class Zoning(BasicTable):
 
     .. code-block:: python
 
-        >>> from aequilibrae import Project
-
-        >>> project = Project.from_path("/tmp/test_project")
+        >>> project = create_example(project_path, "coquimbo")
 
         >>> zoning = project.zoning
 

@@ -124,7 +124,8 @@ class GTFSRouteSystemBuilder:
 
         Defaults to map-matching Bus routes (type 3) only.
 
-        For a reference of route types, see https://developers.google.com/transit/gtfs/reference#routestxt
+        For a reference of route types, see the inputs for
+        `route_type here <https://gtfs.org/documentation/schedule/reference/#routestxt>`_.
 
         :Arguments:
             **route_types** (:obj:`List[int]` or :obj:`Tuple[int]`): Default is [3], for bus only
@@ -218,6 +219,17 @@ class GTFSRouteSystemBuilder:
 
             for counter, (_, link) in enumerate(self.select_links.items()):
                 link.save_to_database(conn, commit=False)
+            conn.commit()
+
+            self.__outside_zones = 0
+            zone_ids1 = {x.origin: x.origin_id for x in self.gtfs_data.fare_rules if x.origin_id >= 0}
+            zone_ids2 = {x.destination: x.destination_id for x in self.gtfs_data.fare_rules if x.destination_id >= 0}
+            zone_ids = {**zone_ids1, **zone_ids2}
+
+            zones = [[y, x, self.gtfs_data.agency.agency_id] for x, y in list(zone_ids.items())]
+            if zones:
+                sql = "Insert into fare_zones (transit_fare_zone, agency_id) values(?, ?);"
+                conn.executemany(sql, zones)
             conn.commit()
 
             for fare in self.gtfs_data.fare_attributes.values():

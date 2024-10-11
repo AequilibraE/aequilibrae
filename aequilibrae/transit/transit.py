@@ -125,15 +125,15 @@ class Transit:
 
         .. code-block:: python
 
-            >>> from aequilibrae import Project
-            >>> from aequilibrae.utils.create_example import create_example
+            >>> project = create_example(project_path, "coquimbo")
 
-            >>> proj = create_example(str(tmp_path / "test_traffic_assignment"), from_model="coquimbo")
+            >>> project.network.build_graphs()
 
-            >>> start = int(6.5 * 60 * 60) # 6.30am
-            >>> end = int(8.5 * 60 * 60)   # 8.30 am
+            >>> start = int(6.5 * 60 * 60) # 6:30 am
+            >>> end = int(8.5 * 60 * 60)   # 8:30 am
 
-            >>> preload = proj.transit.build_pt_preload(start, end)
+            >>> transit = Transit(project)
+            >>> preload = transit.build_pt_preload(start, end)
         """
         return pd.read_sql(self.__build_pt_preload_sql(start, end, inclusion_cond), self.pt_con)
 

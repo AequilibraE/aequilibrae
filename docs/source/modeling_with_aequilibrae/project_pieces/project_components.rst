@@ -39,7 +39,6 @@ edit the existing ones as necessary, but everytime you add or modify a field, yo
 this information, otherwise it will be lost.
 
 .. doctest::
-    >>> from aequilibrae import Project
 
     >>> project = Project()
     >>> project.open("/tmp/accessing_sfalls_data")

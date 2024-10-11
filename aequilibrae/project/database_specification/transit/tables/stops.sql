@@ -23,14 +23,14 @@
 --@ 
 --@ **fare_zone_id** identifies the fare zone for a stop
 --@ 
---@ **transit_zone** identifies the TAZ for a fare zone
+--@ **transit_fare_zone** identifies the transit fare zone for a stop
 --@ 
 --@ **route_type** indicates the type of transporation used on a route
 
 CREATE TABLE IF NOT EXISTS stops (
-	stop_id           TEXT     PRIMARY KEY,
-	stop              TEXT     NOT NULL ,
-	agency_id         INTEGER  NOT NULL,
+	stop_id           TEXT    PRIMARY KEY,
+	stop              TEXT    NOT NULL ,
+	agency_id         INTEGER NOT NULL,
 	link              INTEGER,
 	dir               INTEGER,
 	name              TEXT,

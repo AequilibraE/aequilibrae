@@ -15,11 +15,9 @@ Each item in the 'links' table is a ``Link`` object.
 
 .. code-block:: python
 
-    >>> from aequilibrae import Project
     >>> from shapely.geometry import LineString
 
-    >>> project = Project()
-    >>> project.open("/tmp/accessing_coquimbo_data")
+    >>> project = create_example(project_path, "coquimbo")
 
     >>> project_links = project.network.links
 

@@ -1,11 +1,9 @@
---@ The *zones* tables holds information on the fare transit zones and
---@ the TAZs they are in.
+--@ The *fare_zones* table hold information on the transit fare zones and
+--@ the transit agencies that operate in it.
+--@
+--@ **transit_fare_zone** identifies the transit fare zones
 --@ 
---@ **fare_zone_id** identifies the fare zone for a stop
---@ 
---@ **transit_zone** identifies the TAZ for a fare zone
---@ 
---@ **agency_id** identifies the agency fot the specified route
+--@ **agency_id** identifies the agency/agencies for the specified fare zone
 
 CREATE TABLE IF NOT EXISTS fare_zones (
 	fare_zone_id    INTEGER  PRIMARY KEY,
