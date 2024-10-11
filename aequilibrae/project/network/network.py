@@ -24,15 +24,15 @@ from aequilibrae.project.network.periods import Periods
 from aequilibrae.project.project_creation import req_link_flds, req_node_flds, protected_fields
 from aequilibrae.utils.db_utils import commit_and_close
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 from aequilibrae.utils.spatialite_utils import connect_spatialite
 
 
-class Network:
+class Network(WorkerThread):
     """
     Network class. Member of an AequilibraE Project
     """
-
-    netsignal = SIGNAL(object)
 
     req_link_flds = req_link_flds
     req_node_flds = req_node_flds
@@ -40,8 +40,10 @@ class Network:
     link_types: LinkTypes = None
 
     def __init__(self, project) -> None:
+        WorkerThread.__init__(self, None)
         from aequilibrae.paths import Graph
 
+        self.netsignal = self.jobFinished if inside_qgis else SIGNAL(object)
         self.graphs = {}  # type: Dict[Graph]
         self.project = project
         self.logger = project.logger

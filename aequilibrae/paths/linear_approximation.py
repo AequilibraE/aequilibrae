@@ -628,8 +628,8 @@ class LinearApproximation(WorkerThread):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         self.equilibration.emit(["update", self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
-        self.assignment.emit(["finished"])
-        self.equilibration.emit(["finished"])
+        self.assignment.emit(["finished_threaded_procedure"])
+        self.equilibration.emit(["finished_threaded_procedure"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,
