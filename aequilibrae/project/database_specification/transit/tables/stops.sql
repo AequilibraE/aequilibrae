@@ -23,7 +23,7 @@
 --@ 
 --@ **fare_zone_id** identifies the fare zone for a stop
 --@ 
---@ **transit_fare_zone** identifies the transit fare zone for a stop
+--@ **transit_zone** identifies the transit fare zone for a stop
 --@ 
 --@ **route_type** indicates the type of transporation used on a route
 
