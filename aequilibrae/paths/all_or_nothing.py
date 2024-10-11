@@ -25,13 +25,14 @@ class allOrNothing(WorkerThread):
     def __init__(self, class_name, matrix, graph, results):
         # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
         WorkerThread.__init__(self, None)
-        self.assignment = self.jobFinished if inside_qgis else None
+        self.assignment = self.jobFinished if inside_qgis else SIGNAL(object)
 
         self.class_name = class_name
         self.matrix = matrix
         self.graph = graph
         self.results = results
         self.aux_res = MultiThreadedAoN()
+        self.assignment.emit(["start", self.matrix.zones, self.class_name])
 
         if results._graph_id != graph._id:
             raise ValueError("Results object not prepared. Use --> results.prepare(graph)")
@@ -46,11 +47,7 @@ class allOrNothing(WorkerThread):
             raise ValueError("Matrix and graph do not have compatible sets of centroids.")
 
     def _build_signal(self):
-        if self.assignment is None:
-            self.assignment = SIGNAL(object)
-            self.assignment.emit(["start", self.matrix.zones, self.class_name])
-        else:
-            self.assignment.emit(["set_text", f"All-or-Nothing: {self.class_name}"])
+        self.assignment.emit(["set_text", f"All-or-Nothing: {self.class_name}"])
 
     def doWork(self):
         self.execute()
