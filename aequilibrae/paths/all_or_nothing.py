@@ -13,16 +13,19 @@ except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 if False:
     from .results import AssignmentResults
     from .graph import Graph
 
 
-class allOrNothing:
+class allOrNothing(WorkerThread):
     def __init__(self, class_name, matrix, graph, results):
-        # type: (AequilibraeMatrix, Graph, AssignmentResults)->None
-        self.assignment: SIGNAL = None
+        # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
+        WorkerThread.__init__(self, None)
+        self.assignment = self.jobFinished if inside_qgis else None
 
         self.class_name = class_name
         self.matrix = matrix

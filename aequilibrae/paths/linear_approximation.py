@@ -21,14 +21,14 @@ if False:
 
 from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.python_signal import PythonSignal
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 
 class LinearApproximation(WorkerThread):
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        self.equilibration = SIGNAL(object)
-        self.assignment = SIGNAL(object)
+        self.equilibration = self.jobFinished if inside_qgis else SIGNAL(object)
+        self.assignment = self.jobFinished if inside_qgis else SIGNAL(object)
         self.assignment.emit(["set_position", 1])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 

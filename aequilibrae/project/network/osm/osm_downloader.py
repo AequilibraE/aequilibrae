@@ -23,16 +23,20 @@ from shapely import Polygon
 from aequilibrae.context import get_logger
 from aequilibrae.parameters import Parameters
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 from .osm_params import http_headers, memory
 
 
-class OSMDownloader:
-    downloading = SIGNAL(object)
+class OSMDownloader(WorkerThread):
 
     def __emit_all(self, *args):
         self.downloading.emit(*args)
 
     def __init__(self, polygons: List[Polygon], modes, logger: logging.Logger = None):
+        WorkerThread.__init__(self, None)
+        self.downloading = self.jobFinished if inside_qgis else SIGNAL(object)
+
         self.logger = logger or get_logger()
         self.polygons = polygons
         self.filter = self.get_osm_filter(modes)

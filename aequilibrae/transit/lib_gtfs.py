@@ -13,14 +13,14 @@ from aequilibrae.transit.constants import Constants, PATTERN_ID_MULTIPLIER
 from aequilibrae.transit.functions.get_srid import get_srid
 from aequilibrae.transit.transit_elements import Link, Pattern, mode_correspondence
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 from .gtfs_loader import GTFSReader
 from .map_matching_graph import MMGraph
 
 
-class GTFSRouteSystemBuilder:
+class GTFSRouteSystemBuilder(WorkerThread):
     """Container for GTFS feeds providing data retrieval for the importer"""
-
-    signal = SIGNAL(object)
 
     def __init__(
         self, network, agency_identifier, file_path, day="", description="", capacities=None, pces=None
@@ -39,6 +39,8 @@ class GTFSRouteSystemBuilder:
 
             **description** (:obj:`str`, *Optional*): Description for this feed (e.g. 'CTA19 fixed by John after coffee')
         """
+        WorkerThread.__init__(self, None)
+        self.signal = self.jobFinished if inside_qgis else SIGNAL(object)
         self.__network = network
         self.project = get_active_project(False)
         self.archive_dir = None  # type: str

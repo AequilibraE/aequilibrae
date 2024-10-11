@@ -16,11 +16,13 @@ except ImportError as ie:
     global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
 
 from aequilibrae.utils.signal import SIGNAL
+from aequilibrae.utils.interface.worker_thread import WorkerThread
+from aequilibrae.utils.qgis_utils import inside_qgis
 
 sys.dont_write_bytecode = True
 
 
-class NetworkSkimming:
+class NetworkSkimming(WorkerThread):
     """
 
     .. code-block:: python
@@ -55,9 +57,9 @@ class NetworkSkimming:
         >>> project.close()
     """
 
-    skimming = SIGNAL(object)
-
     def __init__(self, graph, origins=None, project=None):
+        WorkerThread.__init__(self, None)
+        self.skimming = self.jobFinished if inside_qgis else SIGNAL(object)
         self.project = project
         self.origins = origins
         self.graph = graph
