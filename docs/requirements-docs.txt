@@ -1,6 +1,6 @@
 enum34
 Sphinx
-pydata-sphinx-theme==0.13.3
+pydata-sphinx-theme
 sphinx_autodoc_annotation
 matplotlib
 folium
