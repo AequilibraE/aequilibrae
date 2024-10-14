@@ -38,4 +38,4 @@ def test_load_data(gtfs_loader, gtfs_fldr):
 
     gtfs._set_maximum_speeds(dict_speeds)
     gtfs.set_feed_path(gtfs_fldr)
-    gtfs.load_data("2016-04-13")
+    gtfs.load_data("2016-04-13", "this is a description")

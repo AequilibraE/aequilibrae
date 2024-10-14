@@ -41,7 +41,7 @@ class MMGraph:
         self.mode_id = -1
         self.__mode = ""
         self.__df_file = ""
-        self.__agency = lib_gtfs.gtfs_data.agency.agency
+        self.__agency = "-".join(list(lib_gtfs.gtfs_data.agency_correspondence.keys()))
         self.__centroids_file = ""
         self.__mm_graph_file = ""
         self.node_corresp = []

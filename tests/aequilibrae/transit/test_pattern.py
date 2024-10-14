@@ -6,7 +6,7 @@ import os
 def pat(create_path, create_gtfs_project):
     gtfs_fldr = os.path.join(create_path, "gtfs_coquimbo.zip")
 
-    transit = create_gtfs_project.new_gtfs_builder(agency="Lisanco", file_path=gtfs_fldr, description="")
+    transit = create_gtfs_project.new_gtfs_builder(file_path=gtfs_fldr, description="")
     transit.load_date("2016-04-13")
 
     patterns = transit.select_patterns

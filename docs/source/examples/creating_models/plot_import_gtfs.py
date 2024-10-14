@@ -39,8 +39,8 @@ fldr = join(gettempdir(), uuid4().hex)
 project = create_example(fldr, "coquimbo")
 
 # %%
-# As the Coquimbo example already has a complete GTFS model, we shall remove its public transport
-# database for the sake of this example.
+# Since Coquimbo already includes a complete GTFS model, we will remove its public transport 
+# database for the purposes of this example.    
 remove(join(fldr, "public_transport.sqlite"))
 
 # %%
@@ -48,35 +48,42 @@ remove(join(fldr, "public_transport.sqlite"))
 dest_path = join(fldr, "gtfs_coquimbo.zip")
 
 # %%
-# Now we create our Transit object and import the GTFS feed into our model.
-# This will automatically create a new public transport database.
-
+# Now we create our Transit object. This will automatically create a new public transport database.
 data = Transit(project)
 
-transit = data.new_gtfs_builder(agency="Lisanco", file_path=dest_path)
+# %%
+# To initialize the GTFS builder, specify the path to the GTFS file. You no longer need to provide the 
+# name of the transit agency, but you can add a general description of the GTFS feed. If your GTFS file
+# includes multiple transit agencies, all data will be loaded simultaneously. However, any description 
+# you add will apply to all agencies in the file.
+transit = data.new_gtfs_builder(file_path=dest_path, description="Wednesday feed by John Doe")
+
+#%%
+# Case you want information on the available dates before loading the GTFS data to the database,
+# it is possible to use the function ``transit.dates_available()`` to check the available feed dates.
 
 # %%
-# To load the data, we must choose one date. We're going to continue with 2016-04-13 but feel free
-# to experiment with any other available dates. Transit class has a function allowing you to check
-# dates for the GTFS feed. It should take approximately 2 minutes to load the data.
-
+# To load the data, we must choose one date using the format ``YYYY-MM-DD``. We're going to build
+# our database using the day 2016-04-13 but feel free to experiment with any other available dates.
+# 
+# It shouldn't take long to load the data.
 transit.load_date("2016-04-13")
 
-# Now we execute the map matching to find the real paths.
-# Depending on the GTFS size, this process can be really time-consuming.
-transit.set_allow_map_match(True)
+# %%
+# Now we execute the map matching to find the real paths. Depending on the number or different route  
+# patterns and/or the project area size, this process can be really time-consuming.
 transit.map_match()
 
-# Finally, we save our GTFS into our model.
+# %%
+# Finally, we save our GTFS feed into our model.
 transit.save_to_disk()
 
 # %%
-# Now we will plot one of the route's patterns we just imported
+# Now we will plot the route's patterns we just imported
 conn = database_connection("transit")
 
 links = pd.read_sql("SELECT pattern_id, ST_AsText(geometry) geom FROM routes;", con=conn)
-
-stops = pd.read_sql("""SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops""", con=conn)
+stops = pd.read_sql("SELECT stop_id, ST_X(geometry) X, ST_Y(geometry) Y FROM stops;", con=conn)
 
 # %%
 gtfs_links = folium.FeatureGroup("links")
