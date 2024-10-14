@@ -20,15 +20,15 @@ from aequilibrae.transit.parse_csv import parse_csv
 from aequilibrae.transit.transit_elements import Fare, Agency, FareRule, Service, Trip, Stop, Route
 from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 
 class GTFSReader(WorkerThread):
+    signal = SIGNAL(object)
+
     """Loader for GTFS data. Not meant to be used directly by the user"""
 
     def __init__(self):
         WorkerThread.__init__(self, None)
-        self.signal = self.jobFinished if inside_qgis else SIGNAL(object)
 
         self.__capacities__ = {}
         self.__pces__ = {}

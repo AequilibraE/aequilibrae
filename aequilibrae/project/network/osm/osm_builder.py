@@ -22,10 +22,10 @@ from .model_area_gridding import geometry_grid
 
 
 class OSMBuilder(WorkerThread):
+    building = SIGNAL(object)
 
     def __init__(self, data, project, model_area: Polygon, clean: bool) -> None:
         WorkerThread.__init__(self, None)
-        self.building = self.jobFinished if inside_qgis else SIGNAL(object)
 
         project.logger.info("Preparing OSM builder")
         self.__emit_all(["text", "Preparing OSM builder"])

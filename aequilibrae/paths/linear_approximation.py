@@ -21,14 +21,14 @@ if False:
 
 from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 
 class LinearApproximation(WorkerThread):
+    equilibration = SIGNAL(object)
+    assignment = SIGNAL(object)
+    
     def __init__(self, assig_spec, algorithm, project=None) -> None:
         WorkerThread.__init__(self, None)
-        self.equilibration = self.jobFinished if inside_qgis else SIGNAL(object)
-        self.assignment = self.jobFinished if inside_qgis else SIGNAL(object)
         self.assignment.emit(["set_position", 1])
         self.logger = project.logger if project else logging.getLogger("aequilibrae")
 
@@ -474,8 +474,6 @@ class LinearApproximation(WorkerThread):
         self.assignment.emit(["start", c.matrix.zones, "All-or-Nothing"])
         for self.iter in range(1, self.max_iter + 1):  # noqa: B020
             self.iteration_issue = []
-            self.equilibration.emit(["key_value", "rgap", self.rgap])
-            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             aon_flows = []
 
@@ -577,7 +575,6 @@ class LinearApproximation(WorkerThread):
             # Check convergence
             # This needs to be done with the current costs, and not the future ones
             converged = self.check_convergence() if self.iter > 1 else False
-            self.equilibration.emit(["update", self.iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
             self.vdf.apply_vdf(
                 self.congested_time,
                 self.fw_total_flow,
@@ -596,8 +593,6 @@ class LinearApproximation(WorkerThread):
             self.convergence_report["rgap"].append(self.rgap)
             self.convergence_report["warnings"].append("; ".join(self.iteration_issue))
             self.convergence_report["alpha"].append(self.stepsize)
-            self.equilibration.emit(["key_value", "rgap", self.rgap])
-            self.equilibration.emit(["key_value", "iterations", self.iter])
 
             if self.algorithm in ["cfw", "bfw"]:
                 self.convergence_report["beta0"].append(self.betas[0])
@@ -620,6 +615,9 @@ class LinearApproximation(WorkerThread):
                     idx = c.graph.skim_fields.index(self.time_field)
                     c.graph.skims[:, idx] = self.congested_time[:]
 
+            self.equilibration.emit(["key_value", "rgap", self.rgap])
+            self.equilibration.emit(["key_value", "iterations", self.iter])
+
         for c in self.traffic_classes:
             c.results.link_loads /= c.pce
             c.results.total_flows()
@@ -628,8 +626,8 @@ class LinearApproximation(WorkerThread):
             self.logger.error(f"Desired RGap of {self.rgap_target} was NOT reached")
         self.logger.info(f"{self.algorithm} Assignment finished. {self.iter} iterations and {self.rgap} final gap")
         self.equilibration.emit(["update", self.max_iter, f"Equilibrium Assignment: RGap - {self.rgap:.3E}"])
-        self.assignment.emit(["finished_threaded_procedure"])
-        self.equilibration.emit(["finished_threaded_procedure"])
+        self.assignment.emit(["finished"])
+        self.equilibration.emit(["finished"])
 
     def __derivative_of_objective_stepsize_dependent(self, stepsize, const_term):
         """The stepsize-dependent part of the derivative of the objective function. If fixed costs are defined,

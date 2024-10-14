@@ -17,12 +17,13 @@ except ImportError as ie:
 
 from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 sys.dont_write_bytecode = True
 
 
 class NetworkSkimming(WorkerThread):
+    skimming = SIGNAL(object)
+
     """
 
     .. code-block:: python
@@ -59,7 +60,6 @@ class NetworkSkimming(WorkerThread):
 
     def __init__(self, graph, origins=None, project=None):
         WorkerThread.__init__(self, None)
-        self.skimming = self.jobFinished if inside_qgis else SIGNAL(object)
         self.project = project
         self.origins = origins
         self.graph = graph
@@ -99,7 +99,7 @@ class NetworkSkimming(WorkerThread):
         self.procedure_date = str(datetime.today())
 
         self.skimming.emit(["text skimming", "Saving Outputs"])
-        self.skimming.emit(["finished_threaded_procedure", None])
+        self.skimming.emit(["finished", None])
 
     def set_cores(self, cores: int) -> None:
         """

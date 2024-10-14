@@ -14,7 +14,6 @@ except ImportError as ie:
 
 from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 if False:
     from .results import AssignmentResults
@@ -22,10 +21,11 @@ if False:
 
 
 class allOrNothing(WorkerThread):
+    assignment = SIGNAL(object)
+
     def __init__(self, class_name, matrix, graph, results):
         # type: (str, AequilibraeMatrix, Graph, AssignmentResults)->None
         WorkerThread.__init__(self, None)
-        self.assignment = self.jobFinished if inside_qgis else SIGNAL(object)
 
         self.class_name = class_name
         self.matrix = matrix
@@ -78,6 +78,7 @@ class allOrNothing(WorkerThread):
         assign_link_loads(
             self.results.link_loads, self.results.compact_link_loads, self.results.crosswalk, self.results.cores
         )
+        self.assignment.emit(["finished", None])
 
     def func_assig_thread(self, origin, all_threads):
         thread_id = threading.get_ident()
