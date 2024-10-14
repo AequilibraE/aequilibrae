@@ -13,12 +13,12 @@ class MultiThreadedPaths:
         self.temp_b_nodes = np.array([], np.int64)
 
     # In case we want to do by hand, we can prepare each method individually
-    def prepare_(self, graph, results):
+    def prepare_(self, graph, cores, nodes):
         itype = graph.default_types("int")
-        self.predecessors = np.zeros((results.cores, results.nodes), dtype=itype)
-        self.reached_first = np.zeros((results.cores, results.nodes), dtype=itype)
-        self.connectors = np.zeros((results.cores, results.nodes), dtype=itype)
-        self.temp_b_nodes = np.zeros((results.cores, graph.compact_graph.b_node.values.shape[0]), dtype=itype)
+        self.predecessors = np.zeros((cores, nodes), dtype=itype)
+        self.reached_first = np.zeros((cores, nodes), dtype=itype)
+        self.connectors = np.zeros((cores, nodes), dtype=itype)
+        self.temp_b_nodes = np.zeros((cores, graph.compact_graph.b_node.values.shape[0]), dtype=itype)
 
-        for i in range(results.cores):
+        for i in range(cores):
             self.temp_b_nodes[i, :] = graph.compact_graph.b_node.values[:]

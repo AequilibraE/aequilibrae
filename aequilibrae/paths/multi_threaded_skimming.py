@@ -11,8 +11,8 @@ class MultiThreadedNetworkSkimming(MultiThreadedPaths):
         self.temporary_skims = np.array([], np.int64)
 
     # In case we want to do by hand, we can prepare each method individually
-    def prepare(self, graph, results):
-        self.prepare_(graph, results)
+    def prepare(self, graph, cores, nodes, num_skims):
+        self.prepare_(graph, cores, nodes)
 
         ftype = graph.default_types("float")
-        self.temporary_skims = np.zeros((results.cores, results.nodes, results.num_skims), dtype=ftype)
+        self.temporary_skims = np.zeros((cores, nodes, num_skims), dtype=ftype)

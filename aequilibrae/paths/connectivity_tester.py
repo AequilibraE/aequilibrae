@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from aequilibrae import global_logger
 from aequilibrae.context import get_active_project
+from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
 
@@ -51,7 +52,7 @@ class ConnectivityTester:
         self.origins = origins
         self.graph = graph
         self.cores = mp.cpu_count()
-        self.aux_res = MultiThreadedNetworkSkimming()
+        self.aux_res = MultiThreadedPaths()
         self.report = []
         self.procedure_id = ""
         self.procedure_date = ""
@@ -63,8 +64,8 @@ class ConnectivityTester:
     def execute(self):
         """Runs the skimming process as specified in the graph"""
         self.connectivity.emit(["zones finalized", 0])
-        self.aux_res = MultiThreadedNetworkSkimming()
-        self.aux_res.prepare(self.graph, self.results)
+        self.aux_res = MultiThreadedPaths()
+        self.aux_res.prepare_(self.graph, self.results)
 
         pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}

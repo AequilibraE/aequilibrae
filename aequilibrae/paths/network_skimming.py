@@ -78,8 +78,7 @@ class NetworkSkimming:
         self.results.cores = self.cores
         self.results.prepare(self.graph)
         self.aux_res = MultiThreadedNetworkSkimming()
-        self.aux_res.prepare(self.graph, self.results)
-
+        self.aux_res.prepare(self.graph, self.results.cores, self.results.nodes, self.results.num_skims)
         pool = ThreadPool(self.results.cores)
         all_threads = {"count": 0}
         for orig in list(self.graph.centroids):
