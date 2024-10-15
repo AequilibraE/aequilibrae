@@ -64,10 +64,9 @@ class ConnectivityTester:
     def execute(self):
         """Runs the skimming process as specified in the graph"""
         self.connectivity.emit(["zones finalized", 0])
-        self.aux_res = MultiThreadedPaths()
-        self.aux_res.prepare_(self.graph, self.results)
+        self.aux_res.prepare_(self.graph, self.cores, self.graph.compact_num_nodes + 1)
 
-        pool = ThreadPool(self.results.cores)
+        pool = ThreadPool(self.cores)
         all_threads = {"count": 0}
         for orig in list(self.graph.centroids):
             i = int(self.graph.nodes_to_indices[orig])
