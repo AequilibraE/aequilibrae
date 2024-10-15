@@ -146,9 +146,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
         if any(not isinstance(item, int) for item in route_types):
             raise TypeError("All route types must be integers")
 
-        self.signal.emit(["start", len(self.select_patterns), "Map-matching patterns"])
+        self.signal.emit(["start", "secondary", len(self.select_patterns), "Map-matching patterns"])
         for i, pat in enumerate(self.select_patterns.values()):
-            self.signal.emit(["update", i, f"Map-matching pattern {pat.pattern_id}"])
+            self.signal.emit(["update", "secondary", i, f"Map-matching pattern {pat.pattern_id}"])
             if pat.route_type in route_types:
                 pat.map_match()
                 msg = pat.get_error("stop_from_pattern")
@@ -202,7 +202,12 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.gtfs_data.load_data(service_date)
 
         self.logger.info("  Building data structures")
+        self.signal.emit(["start", "master", 1, "Building data structures"])
+
         self.__build_data()
+
+        self.signal.emit(["update", "master", 1])
+
         self.gtfs_data.agency.service_date = self.day
 
     def doWork(self):
@@ -220,21 +225,33 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.logger.info(f"  Importing feed for agency {self.gtfs_data.agency.agency} on {self.day}")
 
+        self.signal.emit(["start", "master", 3, "Saving to database"])
         self.save_to_disk()
+
+        self.signal.emit(["finished"])
 
     def save_to_disk(self):
         """Saves all transit elements built in memory to disk"""
 
         with closing(database_connection("transit")) as conn:
+
+            self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Saving patterns"])
             for counter, (_, pattern) in enumerate(self.select_patterns.items()):
                 pattern.save_to_database(conn, commit=False)
+                self.signal.emit(["update", "secondary", counter + 1])
             conn.commit()
+
+            self.signal.emit(["update", "master", 1])
 
             self.gtfs_data.agency.save_to_database(conn)
 
+            self.signal.emit(["start", "secondary", len(self.select_trips), "Saving trips"])
             for counter, trip in enumerate(self.select_trips):
                 trip.save_to_database(conn, commit=False)
+                self.signal.emit(["update", "secondary", counter + 1])
             conn.commit()
+
+            self.signal.emit(["update", "master", 2])
 
             for counter, (_, link) in enumerate(self.select_links.items()):
                 link.save_to_database(conn, commit=False)
@@ -257,6 +274,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             for fare_rule in self.gtfs_data.fare_rules:
                 fare_rule.save_to_database(conn)
 
+            self.signal.emit(["start", "secondary", len(self.select_stops.keys()), "Saving stops"])
             for counter, (_, stop) in enumerate(self.select_stops.items()):
                 if stop.zone in zone_ids:
                     stop.zone_id = zone_ids[stop.zone]
@@ -265,7 +283,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
+                self.signal.emit(["update", "secondary", counter + 1])
             conn.commit()
+
+            self.signal.emit(["update", "master", 3])
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
@@ -284,7 +305,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = Constants()
-        self.signal.emit(["start", "master", len(self.select_routes), f"Loading data for {self.day}"])
+        self.signal.emit(["start", "secondary", len(self.select_routes), f"Loading data for {self.day}"])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
             self.signal.emit(["update", "secondary", counter + 1, f"{counter + 1} / {len(self.select_routes)}"])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
