@@ -18,21 +18,15 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
-from aequilibrae.utils.signal import SIGNAL
-from aequilibrae.utils.interface.worker_thread import WorkerThread
-from aequilibrae.utils.qgis_utils import inside_qgis
 
 GRAPH_VERSION = 1
 CONNECTOR_SPEED = 1
 
 
-class MMGraph(WorkerThread):
+class MMGraph:
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
 
     def __init__(self, lib_gtfs):
-        WorkerThread.__init__(self, None)
-        self.signal = self.jobFinished if inside_qgis else SIGNAL(object)
-
         self.project = lib_gtfs.project
         self.stops = lib_gtfs.gtfs_data.stops
         self.lib_gtfs = lib_gtfs

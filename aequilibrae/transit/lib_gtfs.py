@@ -284,9 +284,9 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.builds_link_graphs_with_broken_stops()
 
         c = Constants()
-        self.signal.emit(["start", len(self.select_routes), f"Loading data for {self.day}"])
+        self.signal.emit(["start", "master", len(self.select_routes), f"Loading data for {self.day}"])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", counter])
+            self.signal.emit(["update", "secondary", counter + 1, f"{counter + 1} / {len(self.select_routes)}"])
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
