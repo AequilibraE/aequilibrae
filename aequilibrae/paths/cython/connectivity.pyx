@@ -4,7 +4,10 @@ from multiprocessing.dummy import Pool as ThreadPool
 import cython
 from libcpp.vector cimport vector
 
+from aequilibrae.paths.cython.parameters import ITYPE
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
+
+ctypedef vector[ITYPE_t]* disconn_vec
 
 def connectivity_multi_threaded(tester):
     graph = tester.graph
@@ -16,14 +19,12 @@ def connectivity_multi_threaded(tester):
     
     cdef:
         long zones = graph.num_zones
-        vector[ITYPE_t] all_disconnected = vector[ITYPE_t](zones)
+        vector[disconn_vec] all_disconnected = vector[disconn_vec](zones)
 
-
-    connectivity_single_threaded(graph, aux_result, 1, 0, all_disconnected[1])
     pool = ThreadPool(cores)
     all_threads = {"count": 0, "run": 0}
     for i, orig in enumerate(list(graph.centroids)):
-        args = (orig, graph, aux_result, all_disconnected[i], all_threads, signal)
+        args = (orig, graph, aux_result, all_threads, signal)
         pool.apply_async(connectivity_single_threaded, args=args)
     pool.close()
     pool.join()
@@ -32,11 +33,7 @@ def connectivity_multi_threaded(tester):
     signal.emit(["finished_threaded_procedure", None])
 
 
-    
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False) # turn of bounds-checking for entire function
-cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_threads, signal):
+cdef disconn_vec connectivity_single_threaded(origin, graph, aux_result, all_threads, signal):
     if threading.get_ident() in all_threads:
         core_id = all_threads[threading.get_ident()]
     else:
@@ -46,10 +43,12 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_t
 
     cdef:
         ITYPE_t i, b, thread_num
+        int orig = origin
         int core = core_id
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long [:] origin_index = graph.compact_nodes_to_indices
         int zones = graph.num_zones
+        vector[ITYPE_t] *disconnected = new vector[ITYPE_t]()
 
         long long [:] graph_fs_view = graph.compact_fs
         double [:] g_view = graph.compact_cost
@@ -66,13 +65,13 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_t
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
             b = 0
             blocking_centroid_flows(b,
-                                    origin_index[origin],
+                                    origin_index[orig],
                                     zones,
                                     graph_fs_view,
                                     b_nodes_view,
                                     original_b_nodes_view)
 
-        w = path_finding(origin_index[origin],
+        w = path_finding(origin_index[orig],
                          -1,  # destination index to disable early exit
                          g_view,
                          b_nodes_view,
@@ -84,7 +83,7 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_t
         if block_flows_through_centroids: # Unblocks the centroid if that is the case
             b = 1
             blocking_centroid_flows(b,
-                                    origin_index[origin],
+                                    origin_index[orig],
                                     zones,
                                     graph_fs_view,
                                     b_nodes_view,
@@ -95,3 +94,5 @@ cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_t
 
     signal.emit(["zones finalized", all_threads["count"]])
     signal.emit(["text connectivity", f"{all_threads['count']} / {zones}"])
+
+    return disconnected
