@@ -5,16 +5,12 @@ from datetime import datetime
 from multiprocessing.dummy import Pool as ThreadPool
 from uuid import uuid4
 
-from aequilibrae import global_logger
+from aequilibrae.paths.AoN import skimming_single_origin
+
 from aequilibrae.context import get_active_project
 from aequilibrae.paths.multi_threaded_skimming import MultiThreadedNetworkSkimming
 from aequilibrae.paths.results.skim_results import SkimResults
-
-try:
-    from aequilibrae.paths.AoN import skimming_single_origin
-except ImportError as ie:
-    global_logger.warning(f"Could not import procedures from the binary. {ie.args}")
-
+from aequilibrae.utils.core_setter import set_cores
 from aequilibrae.utils.signal import SIGNAL
 
 sys.dont_write_bytecode = True
@@ -111,18 +107,7 @@ class NetworkSkimming:
         :Arguments:
             **cores** (:obj:`int`): Number of cores to be used in computation
         """
-
-        if isinstance(cores, int):
-            if cores < 0:
-                self.cores = max(1, mp.cpu_count() + cores)
-            if cores == 0:
-                self.cores = mp.cpu_count()
-            elif cores > 0:
-                cores = min(mp.cpu_count(), cores)
-                if self.cores != cores:
-                    self.cores = cores
-        else:
-            raise ValueError("Number of cores needs to be an integer")
+        self.cores = set_cores(cores)
 
     def save_to_project(self, name: str, format="omx", project=None) -> None:
         """Saves skim results to the project folder and creates record in the database
