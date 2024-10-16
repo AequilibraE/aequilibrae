@@ -185,23 +185,22 @@ cpdef void put_path_file_on_disk(unsigned int orig,
 @cython.embedsignature(True)
 @cython.boundscheck(False)
 cdef void blocking_centroid_flows(int action,
-                                  int thread_num,
                                   long long orig,
                                   long long centroids,
                                   long long [:] fs,
-                                  long long [:,:] temp_b_nodes,
+                                  long long [:] temp_b_nodes,
                                   long long [:] real_b_nodes) noexcept nogil:
     cdef long long i
 
     if action == 1: # We are unblocking
         for i in range(fs[centroids]):
-            temp_b_nodes[thread_num, i] = real_b_nodes[i]
+            temp_b_nodes[i] = real_b_nodes[i]
     else: # We are blocking:
         for i in range(fs[centroids]):
-            temp_b_nodes[thread_num, i] = orig
+            temp_b_nodes[i] = orig
 
         for i in range(fs[orig], fs[orig + 1]):
-            temp_b_nodes[thread_num, i] = real_b_nodes[i]
+            temp_b_nodes[i] = real_b_nodes[i]
 
 
 @cython.wraparound(False)

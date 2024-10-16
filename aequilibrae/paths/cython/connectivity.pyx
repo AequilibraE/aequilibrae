@@ -1,105 +1,97 @@
-from cython.operator cimport dereference as d
-from cython.parallel import parallel, prange
-cimport numpy as np
-from libcpp.vector cimport vector
-from openmp cimport omp_get_thread_num
-from libc.stdlib cimport malloc, free
-from aequilibrae.paths.cython.parameters import ITYPE
+import threading
+from multiprocessing.dummy import Pool as ThreadPool
+
 import cython
+from libcpp.vector cimport vector
 
-ctypedef vector[pair_t]* disconn_pair
+from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
-cdef struct pair_t:
-    long long origin
-    long long destination
-
-
-def connectivity_multi_threaded(graph, aux_result, cores):
+def connectivity_multi_threaded(tester):
+    graph = tester.graph
+    cores = tester.cores
+    signal = tester.connectivity
+    
+    aux_result = MultiThreadedPaths()
+    aux_result.prepare_(graph, cores, graph.compact_num_nodes + 1)
+    
     cdef:
-        long long i, b, thread_num
-        int c_cores = cores
+        long zones = graph.num_zones
+        vector[ITYPE_t] all_disconnected = vector[ITYPE_t](zones)
+
+
+    connectivity_single_threaded(graph, aux_result, 1, 0, all_disconnected[1])
+    pool = ThreadPool(cores)
+    all_threads = {"count": 0, "run": 0}
+    for i, orig in enumerate(list(graph.centroids)):
+        args = (orig, graph, aux_result, all_disconnected[i], all_threads, signal)
+        pool.apply_async(connectivity_single_threaded, args=args)
+    pool.close()
+    pool.join()
+
+    signal.emit(["text connectivity", "Saving Outputs"])
+    signal.emit(["finished_threaded_procedure", None])
+
+
+    
+@cython.wraparound(False)
+@cython.embedsignature(True)
+@cython.boundscheck(False) # turn of bounds-checking for entire function
+cdef connectivity_single_threaded(origin, graph, aux_result, disconnected, all_threads, signal):
+    if threading.get_ident() in all_threads:
+        core_id = all_threads[threading.get_ident()]
+    else:
+        all_threads[threading.get_ident()] = all_threads["count"]
+        core_id = all_threads["count"]
+        all_threads["count"] += 1
+
+    cdef:
+        ITYPE_t i, b, thread_num
+        int core = core_id
         long long block_flows_through_centroids = graph.block_centroid_flows
         long long [:] origin_index = graph.compact_nodes_to_indices
         int zones = graph.num_zones
-        int nodes = graph.compact_num_nodes + 1
-        long long [:] centroids = graph.centroids
-
 
         long long [:] graph_fs_view = graph.compact_fs
         double [:] g_view = graph.compact_cost
         long long [:] ids_graph_view = graph.compact_graph.id.values
         long long [:] original_b_nodes_view = graph.compact_graph.b_node.values
-        long long b_size = graph.compact_graph.b_node.shape[0]
 
         # views from the aux-result object
-        long long [:, :] predecessors_view = aux_result.predecessors
-        long long [:, :] reached_first_view = aux_result.reached_first
-        long long [:, :] conn_view = aux_result.connectors
-        long long [:, :] b_nodes_view = aux_result.temp_b_nodes
+        long long [:] predecessors_view = aux_result.predecessors[core_id, :]
+        long long [:] reached_first_view = aux_result.reached_first[core_id, :]
+        long long [:] conn_view = aux_result.connectors[core_id, :]
+        long long [:] b_nodes_view = aux_result.temp_b_nodes[core_id, :]
 
-        vector[disconn_pair] all_disconnected = vector[disconn_pair](zones)
+    with nogil:
+        if block_flows_through_centroids: # Unblocks the centroid if that is the case
+            b = 0
+            blocking_centroid_flows(b,
+                                    origin_index[origin],
+                                    zones,
+                                    graph_fs_view,
+                                    b_nodes_view,
+                                    original_b_nodes_view)
 
-    #Now we do all procedures with NO GIL
-    with nogil, parallel(num_threads=c_cores):
-        thread_num = omp_get_thread_num()
-        for i in prange(zones, schedule="dynamic"):
-            # if block_flows_through_centroids: # Unblocks the centroid if that is the case
-            #     b = 0
-                # blocking_centroid_flows(b,
-                #                         origin_index[centroids[i]],
-                #                         zones,
-                #                         graph_fs_view,
-                #                         b_nodes_view[thread_num, :],
-                #                         original_b_nodes_view)
-            # w = path_finding(origin_index[centroids[i]],
-            #                  -1,  # destination index to disable early exit
-            #                  g_view,
-            #                  b_nodes_view[thread_num, :],
-            #                  graph_fs_view,
-            #                  predecessors_view[thread_num, :],
-            #                  ids_graph_view,
-            #                  conn_view[thread_num, :],
-            #                  reached_first_view[thread_num, :])
-            #
-            # if block_flows_through_centroids: # Unblocks the centroid if that is the case
-            #     b = 1
-            #     blocking_centroid_flows(b,
-            #                             origin_index,
-            #                             zones,
-            #                             graph_fs_view,
-            #                             b_nodes_view[thread_num, :],
-            #                             original_b_nodes_view)
-            #
-            all_disconnected[i] = disconnected(omp_get_thread_num(),
-                                               centroids[i],
-                                               zones,
-                                               conn_view
-                                                  )
+        w = path_finding(origin_index[origin],
+                         -1,  # destination index to disable early exit
+                         g_view,
+                         b_nodes_view,
+                         graph_fs_view,
+                         predecessors_view,
+                         ids_graph_view,
+                         conn_view,
+                         reached_first_view)
+        if block_flows_through_centroids: # Unblocks the centroid if that is the case
+            b = 1
+            blocking_centroid_flows(b,
+                                    origin_index[origin],
+                                    zones,
+                                    graph_fs_view,
+                                    b_nodes_view,
+                                    original_b_nodes_view)
+        for i in range(zones):
+            if predecessors_view[i] == -1:
+                disconnected.push_back(i)
 
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cdef disconn_pair disconnected(int thread_num,
-                               long long origin,
-                               long long zones,
-                               long long [:, :] connectors) noexcept nogil:
-
-    cdef:
-        long long i
-        vector[pair_t] *pairs = new vector[pair_t]()
-
-    for i in range(zones):
-        if connectors[thread_num, i] == NULL_IDX:
-            create_pair(origin, i, d(pairs))
-    return pairs
-
-
-@cython.wraparound(False)
-@cython.embedsignature(True)
-@cython.boundscheck(False)
-cdef void create_pair(long long origin, long long destination, vector[pair_t] &pairs) noexcept nogil:
-    cdef pair_t pair
-    
-    pair.origin = origin
-    pair.destination = destination
-    pairs.push_back(pair)
+    signal.emit(["zones finalized", all_threads["count"]])
+    signal.emit(["text connectivity", f"{all_threads['count']} / {zones}"])
