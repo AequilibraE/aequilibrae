@@ -18,7 +18,6 @@ from aequilibrae.project.zoning import GeoIndex
 from aequilibrae.transit.constants import DRIVING_SIDE
 from aequilibrae.transit.functions.compute_line_bearing import compute_line_bearing
 from aequilibrae.transit.transit_elements import mode_correspondence
-from aequilibrae.utils.signal import SIGNAL
 from aequilibrae.utils.interface.worker_thread import WorkerThread
 
 GRAPH_VERSION = 1
@@ -27,8 +26,6 @@ CONNECTOR_SPEED = 1
 
 class MMGraph(WorkerThread):
     """Build specialized map-matching graphs. Not designed to be used by the final user"""
-
-    signal = SIGNAL(object)
 
     def __init__(self, lib_gtfs):
         WorkerThread.__init__(self, None)
@@ -52,6 +49,7 @@ class MMGraph(WorkerThread):
         self.distance_to_project = -1
         self.df = pd.DataFrame([])
         self.logger = logger
+        self.signal = lib_gtfs.signal
 
     def build_graph_with_broken_stops(self, mode_id: int, distance_to_project=200):
         """Build the graph for links for a certain mode while splitting the closest links at stops' projection
@@ -63,6 +61,8 @@ class MMGraph(WorkerThread):
             Defaults to 50m
         """
         self.logger.debug(f"Called build_graph_with_broken_stops for mode_id={mode_id}")
+        self.signal.emit(["update", "master", 1, f"Called build_graph_with_broken_stops for mode_id={mode_id}"])
+
         self.mode_id = mode_id
         self.distance_to_project = distance_to_project
         self.__mode = mode_correspondence[self.mode_id]
@@ -104,7 +104,7 @@ class MMGraph(WorkerThread):
 
     def __build_graph_from_cache(self):
         self.logger.info(f"Loading map-matching graph from disk for mode_id={self.mode_id}")
-        self.signal.emit(["start", "secondary", 1, "Building graph from cache ..."])
+        self.signal.emit(["update", "master", 2, "Building graph from cache ..."])
 
         net = pd.read_csv(self.__df_file)
         centroid_corresp = pd.read_csv(self.__centroids_file)
@@ -112,13 +112,13 @@ class MMGraph(WorkerThread):
         centroid_corresp.set_index("node_id", inplace=True)
         for stop in self.stops.values():
             stop.__map_matching_id__[self.mode_id] = centroid_corresp.loc[stop.stop_id, "centroid_id"]
-        
-        self.signal.emit(["update", "secondary", 1, "Graph built from cache"])
+
+        self.signal.emit(["update", "master", 3, "Graph built from cache"])
         return self.__graph_from_broken_net(centroids, net)
 
     def __build_graph_from_scratch(self):
         self.logger.info(f"Creating map-matching graph from scratch for mode_id={self.mode_id}")
-        self.signal.emit(["start", "secondary", 1, "Building graph from scratch ..."])
+        self.signal.emit(["update", "master", 2, "Building graph from scratch ..."])
 
         self.df = self.df.assign(original_id=self.df.link_id, is_connector=0, geo=self.df.wkt.apply(shapely.wkt.loads))
         self.df.loc[self.df.link_id < 0, "link_id"] = self.df.link_id * -1 + self.df.link_id.max() + 1
@@ -171,7 +171,7 @@ class MMGraph(WorkerThread):
         cols.append("wkt")
         self.df[cols].to_csv(self.__mm_graph_file, index=False)
         pd.DataFrame(self.node_corresp, columns=["node_id", "centroid_id"]).to_csv(self.__centroids_file)
-        self.signal.emit(["update", "secondary", 1, "Graph built from scratch"])
+        self.signal.emit(["update", "master", 3, "Graph built from scratch"])
         return self.__graph_from_broken_net(centroids, net)
 
     def connect_node(self, stop) -> None:
