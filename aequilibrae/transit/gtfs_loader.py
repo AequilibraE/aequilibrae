@@ -126,7 +126,14 @@ class GTFSReader(WorkerThread):
         self.signal.emit(["start", "secondary", len(self.trips), "De-conflicting stop times"])
         total_fast = 0
         for prog_counter, route in enumerate(self.trips):
-            self.signal.emit(["update", "secondary", prog_counter + 1])
+            self.signal.emit(
+                    [
+                        "update",
+                        "secondary",
+                        prog_counter + 1,
+                        f"De-conflicting stop times ---> {prog_counter + 1} / {len(self.trips)}",
+                    ]
+                )
             max_speeds = self.__max_speeds__.get(self.routes[route].route_type, pd.DataFrame([]))
             for pattern in self.trips[route]:  # type: Trip
                 for trip in self.trips[route][pattern]:
@@ -272,11 +279,11 @@ class GTFSReader(WorkerThread):
         shapes[:]["shape_pt_lat"][:] = lats[:]
         shapes[:]["shape_pt_lon"][:] = lons[:]
         for i, shape_id in enumerate(all_shape_ids):
-            self.signal.emit(["update", "secondary", i + 1])
             items = shapes[shapes["shape_id"] == shape_id]
             items = items[np.argsort(items["shape_pt_sequence"])]
             shape = LineString(list(zip(items["shape_pt_lon"], items["shape_pt_lat"])))
             self.shapes[shape_id] = shape
+            self.signal.emit(["update", "secondary", i + 1, f"Loading shapes ---> {i + 1} / {len(all_shape_ids)}"])
 
     def __load_trips_table(self):
         self.logger.debug("Starting __load_trips_table")
@@ -311,7 +318,7 @@ class GTFSReader(WorkerThread):
         self.trips = {str(x): {} for x in np.unique(trips_array["route_id"])}
 
         for i, line in enumerate(trips_array):
-            self.signal.emit(["update", "secondary", i + 1])
+            self.signal.emit(["update", "secondary", i + 1, f"Loading trips ---> {i + 1} / {trips_array.shape[0]}"])
             trip = Trip()
             trip._populate(line, trips_array.dtype.names)
             trip.route_id = self.routes[trip.route].route_id
@@ -438,7 +445,14 @@ class GTFSReader(WorkerThread):
             data.loc[:, "stop_sequence"] = np.arange(data.shape[0])
             self.stop_times[trip_id] = data
             counter += data.shape[0]
-        self.signal.emit(["update", "secondary", counter])  # indent
+            self.signal.emit(
+                    [
+                        "update",
+                        "secondary",
+                        counter,
+                        f"Loading stop times ---> {counter + 1} / {df.trip_id.unique().shape[0]}",
+                    ]
+                )
 
     def __load_stops_table(self):
         self.logger.debug("Starting __load_stops_table")
@@ -459,12 +473,12 @@ class GTFSReader(WorkerThread):
 
         self.signal.emit(["start", "secondary", stops.shape[0], "Loading stops"])
         for i, line in enumerate(stops):
-            self.signal.emit(["update", "secondary", i + 1])
             s = Stop(self.agency.agency_id, line, stops.dtype.names)
             s.agency = self.agency.agency
             s.srid = self.srid
             s.get_node_id()
             self.stops[s.stop_id] = s
+            self.signal.emit(["update", "secondary", i + 1, f"Loading stops ---> {i + 1} / {stops.shape[0]}"])
 
     def __load_routes_table(self):
         self.logger.debug("Starting __load_routes_table")
@@ -492,10 +506,10 @@ class GTFSReader(WorkerThread):
 
         self.signal.emit(["start", "secondary", len(routes), "Loading routes"])
         for i, line in routes.iterrows():
-            self.signal.emit(["update", "secondary", i + 1])
             r = Route(self.agency.agency_id)
             r.populate(line.values, routes.columns)
             self.routes[r.route] = r
+            self.signal.emit(["update", "secondary", i + 1, f"Loading routes ---> {i + 1} / {len(routes)}"])
 
     def __load_feed_calendar(self):
         self.logger.debug("Starting __load_feed_calendar")

@@ -206,7 +206,7 @@ class GTFSRouteSystemBuilder(WorkerThread):
 
         self.__build_data()
 
-        self.signal.emit(["update", "master", 1])
+        self.signal.emit(["update", "master", 1, ""])
 
         self.gtfs_data.agency.service_date = self.day
 
@@ -238,20 +238,20 @@ class GTFSRouteSystemBuilder(WorkerThread):
             self.signal.emit(["start", "secondary", len(self.select_patterns.keys()), "Saving patterns"])
             for counter, (_, pattern) in enumerate(self.select_patterns.items()):
                 pattern.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1])
+                self.signal.emit(["update", "secondary", counter + 1, f"Saving patterns ---> {counter + 1} / {len(self.select_patterns.keys())}"])
             conn.commit()
 
-            self.signal.emit(["update", "master", 1])
+            self.signal.emit(["update", "master", 1, ""])
 
             self.gtfs_data.agency.save_to_database(conn)
 
             self.signal.emit(["start", "secondary", len(self.select_trips), "Saving trips"])
             for counter, trip in enumerate(self.select_trips):
                 trip.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1])
+                self.signal.emit(["update", "secondary", counter + 1, f"Saving trips ---> {counter + 1} / {len(self.select_trips)}"])
             conn.commit()
 
-            self.signal.emit(["update", "master", 2])
+            self.signal.emit(["update", "master", 2, ""])
 
             for counter, (_, link) in enumerate(self.select_links.items()):
                 link.save_to_database(conn, commit=False)
@@ -283,10 +283,10 @@ class GTFSRouteSystemBuilder(WorkerThread):
                     if stop.geo.within(self.project.zoning.get(closest_zone).geometry):
                         stop.taz = closest_zone
                 stop.save_to_database(conn, commit=False)
-                self.signal.emit(["update", "secondary", counter + 1])
+                self.signal.emit(["update", "secondary", counter + 1, f"Saving stops ---> {counter + 1} / {len(self.select_stops.keys())}"])
             conn.commit()
 
-            self.signal.emit(["update", "master", 3])
+            self.signal.emit(["update", "master", 3, ""])
 
         self.__outside_zones = None in [x.taz for x in self.select_stops.values()]
         if self.__outside_zones:
@@ -301,13 +301,16 @@ class GTFSRouteSystemBuilder(WorkerThread):
         self.select_links.clear()
         self.select_patterns.clear()
 
+        self.signal.emit(["start", "secondary", 1, ""])
         if self.__do_execute_map_matching:
             self.builds_link_graphs_with_broken_stops()
 
         c = Constants()
         self.signal.emit(["start", "secondary", len(self.select_routes), f"Loading data for {self.day}"])
         for counter, (route_id, route) in enumerate(self.select_routes.items()):
-            self.signal.emit(["update", "secondary", counter + 1, f"{counter + 1} / {len(self.select_routes)}"])
+            self.signal.emit(
+                ["update", "secondary", counter + 1, f"Selected routes ---> {counter + 1} / {len(self.select_routes)}"]
+            )
             new_trips = self._get_trips_by_date_and_route(route_id, self.day)
 
             all_pats = [trip.pattern_hash for trip in new_trips]
