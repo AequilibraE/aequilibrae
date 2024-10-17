@@ -391,7 +391,7 @@ cpdef void dfs(long origin,
         # loop on outgoing edges
         for idx in range(<size_t>graph_fs[tail_vert_idx], <size_t>graph_fs[tail_vert_idx + 1]):
             head_vert_idx = <size_t>csr_indices[idx]
-            if pred[head_vert_idx] == -1:
+            if pred[head_vert_idx] < 0:
                 pred[head_vert_idx] = tail_vert_idx
                 visited.push_back(head_vert_idx)
 

@@ -8,7 +8,6 @@ from libcpp.vector cimport vector
 
 from aequilibrae.paths.multi_threaded_paths import MultiThreadedPaths
 
-ctypedef vector[ITYPE_t]* disconn_vec
 
 def connectivity_multi_threaded(tester):
     graph = tester.graph
@@ -20,7 +19,6 @@ def connectivity_multi_threaded(tester):
     
     cdef:
         long zones = graph.num_zones
-        # vector[disconn_vec] all_disconnected = vector[disconn_vec](zones)
 
     pool = ThreadPool(cores)
     all_threads = {"count": 0, "run": 0}
@@ -35,9 +33,11 @@ def connectivity_multi_threaded(tester):
     signal.emit(["finished_threaded_procedure", None])
 
     if len(results["disconnected"]) > 0:
-        disconn = np.vstack(results["disconnected"])
+        disconn = np.vstack(results["disconnected"]).astype(np.int64)
+        disconn[:, 1] = graph.centroids[disconn[:, 1]]
     else:
         disconn = []
+
     return pd.DataFrame(disconn, columns=["origin", "destination"])
 
 
