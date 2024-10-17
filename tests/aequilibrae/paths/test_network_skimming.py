@@ -42,7 +42,7 @@ class TestNetwork_skimming(TestCase):
         res = SkimResults()
         res.prepare(graph)
         aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res)
+        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
         _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
         skm = NetworkSkimming(graph)
@@ -84,7 +84,7 @@ class TestNetwork_skimming(TestCase):
         res = SkimResults()
         res.prepare(graph)
         aux_res = MultiThreadedNetworkSkimming()
-        aux_res.prepare(graph, res)
+        aux_res.prepare(graph, res.cores, res.nodes, res.num_skims)
         _ = skimming_single_origin(12, graph, res, aux_res, 0)
 
         skm = NetworkSkimming(graph)

@@ -32,7 +32,7 @@ class TestSkimming_single_origin(unittest.TestCase):
         res = SkimResults()
         res.prepare(g)
         aux_result = MultiThreadedNetworkSkimming()
-        aux_result.prepare(g, res)
+        aux_result.prepare(g, res.cores, res.nodes, res.num_skims)
 
         a = skimming_single_origin(origin, g, res, aux_result, 0)
         tot = np.sum(res.skims.distance[origin, :])

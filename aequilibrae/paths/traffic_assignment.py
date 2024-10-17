@@ -21,6 +21,7 @@ from aequilibrae.paths.optimal_strategies import OptimalStrategies
 from aequilibrae.paths.traffic_class import TrafficClass, TransportClassBase
 from aequilibrae.paths.vdf import VDF, all_vdf_functions
 from aequilibrae.project.database_connection import database_connection
+from aequilibrae.utils.core_setter import set_cores
 
 
 class AssignmentBase(ABC):
@@ -410,10 +411,10 @@ class TrafficAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load traffic classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
-            c._aon_results.set_cores(cores)
+            c.results.set_cores(self.cores)
+            c._aon_results.set_cores(self.cores)
 
     def set_save_path_files(self, save_it: bool) -> None:
         """Turn path saving on or off.
@@ -927,9 +928,9 @@ class TransitAssignment(AssignmentBase):
         if not self.classes:
             raise RuntimeError("You need load transit classes before overwriting the number of cores")
 
-        self.cores = cores
+        self.cores = set_cores(cores)
         for c in self.classes:
-            c.results.set_cores(cores)
+            c.results.set_cores(self.cores)
 
     def info(self) -> dict:
         """Returns information for the transit assignment procedure
