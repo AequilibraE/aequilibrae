@@ -24,11 +24,11 @@ class ConnectivityAnalysis:
         >>> graph = network.graphs['c']
         >>> graph.set_graph(cost_field="distance")
 
-        >>> conn_test = ConectivityTester(graph)
+        >>> conn_test = ConnectivityAnalysis(graph)
         >>> conn_test.execute()
 
         # The connectivity tester report as a Pandas DataFrame
-        >>> conn_test.report
+        >>> conn_test.disconnected_pairs
 
         >>> project.close()
     """
