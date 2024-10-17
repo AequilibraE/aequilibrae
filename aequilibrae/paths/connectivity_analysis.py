@@ -23,12 +23,13 @@ class ConnectivityAnalysis:
 
         >>> graph = network.graphs['c']
         >>> graph.set_graph(cost_field="distance")
+        >>> graph.set_blocked_centroid_flows(False)
 
         >>> conn_test = ConnectivityAnalysis(graph)
         >>> conn_test.execute()
 
         # The connectivity tester report as a Pandas DataFrame
-        >>> conn_test.disconnected_pairs
+        >>> disconnected = conn_test.disconnected_pairs
 
         >>> project.close()
     """
